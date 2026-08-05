@@ -184,7 +184,7 @@ Rules from n8n:
 After the four modules are complete, populate legacy template fields:
 
 ```bash
-python scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
 ```
 
 This writes `template_fields` in `study.reference.json`. The renderer overlays those fields at the template root, so n8n-style placeholders such as `{AI_shortTitle}` and `{protocolNumber}` resolve without changing the client template.

@@ -17,7 +17,7 @@ Do not install only `SKILL.md`. The skill requires the bundled `assets/`, `refer
 - `SKILL.md`: the Hermes skill instructions and routing description.
 - `assets/client-templates/`: bundled DOCX and PRS XML templates.
 - `references/`: branch, schema, approval, source-of-truth, and template-contract instructions.
-- `scripts/`: deterministic Python and Node scripts used by the skill.
+- `scripts/`: deterministic Python scripts used by the skill.
 
 The scripts do not call OpenAI directly. Hermes should use `gpt-5.5` for the agent reasoning and narrative-generation steps, then run the local scripts for validation, mapping, rendering, and QA.
 
@@ -79,37 +79,20 @@ git pull --ff-only origin main
 
 ## Runtime Requirements
 
-Install these in the same environment where Hermes runs skill commands:
+The core workflow has one runtime requirement in the environment where Hermes runs skill commands:
 
 - Python 3.9 or newer.
-- Node.js 18 or newer.
-- npm.
-- `python-docx`, required for static table-of-contents refresh and audit.
-- macOS Pages plus `osascript`, required only when the final DOCX must be rendered and audited with Apple Pages.
+- macOS Pages plus the built-in `osascript` command is optional and required only when the final DOCX must be rendered and audited with Apple Pages.
+
+All Python scripts use the standard library. Do not run `pip install`, `npm install`, or any package bootstrap command for this skill. Node.js is not used.
 
 Check versions:
 
 ```bash
 python3 --version
-node --version
-npm --version
 ```
 
-Install the Python TOC dependency:
-
-```bash
-python3 -m pip install python-docx
-```
-
-Install deterministic Node dependencies from the lockfile:
-
-```bash
-cd "$HERMES_SKILLS_DIR/clinical-document-generation/scripts"
-npm ci
-cd ..
-```
-
-Do not commit `scripts/node_modules/`; it is a local runtime dependency directory.
+The Python version check must report 3.9 or newer. No additional runtime installation is needed.
 
 ## Verify Local Setup
 
@@ -124,16 +107,8 @@ assert sys.version_info >= (3, 9), sys.version
 print("Python version OK")
 PY
 
-python3 - <<'PY'
-from docx import Document
-print("python-docx OK")
-PY
-
 python3 -m py_compile scripts/*.py
-
-cd scripts
-node -e "Promise.all([import('docxtemplater'), import('pizzip')]).then(() => console.log('Node DOCX dependencies OK'))"
-cd ..
+python3 -m unittest discover -s tests -v
 ```
 
 Run a smoke test that creates and then removes a temporary run outside the repo:
@@ -188,7 +163,7 @@ Important registration details:
 - Point Hermes at the repo root, not `scripts/`, `references/`, or the parent skills directory.
 - Keep the skill name as `clinical-document-generation`; it matches the `name` field in `SKILL.md`.
 - Route this skill to `gpt-5.5`. Do not route the generation workflow to a smaller or summarization-only model.
-- Allow the skill runtime to execute `python3`, `node`, and `npm`.
+- Allow the skill runtime to execute `python3`.
 - Allow the skill runtime to read and write local run directories.
 - Allow `osascript` only if the Hermes host uses Apple Pages for final DOCX rendering and TOC audit.
 
@@ -222,9 +197,9 @@ For real studies, the Hermes agent must follow this sequence:
 9. Parse the approved Markdown back into `study.reference.json`.
 10. Generate branch-specific narrative fields with `gpt-5.5` and save them under `generated`.
 11. Run the branch mapper and validation scripts.
-12. Render final DOCX/XML outputs only with `--require-approval`.
+12. Render final DOCX/XML outputs only with `python3 scripts/render_templates.py --run-dir <run-dir> --require-approval`.
 13. Run PRS XML validation for prospective and ambispective XML outputs.
-14. For DOCX files with a static TOC/index, render to PDF with the reviewer-facing engine, refresh static TOC/index values, re-render, and audit before delivery.
+14. For DOCX files with a static TOC/index, render to PDF with the reviewer-facing engine, refresh static TOC/index values, re-render, and audit before delivery. On macOS, use `python3 scripts/export_docx_with_pages.py <input.docx> <output.pdf>` for Pages export.
 
 Read `SKILL.md` and the referenced files in `references/` for the full workflow before generating real client documents.
 
@@ -246,28 +221,9 @@ Do not mark a run complete if any of these are true:
 
 The GitHub account used by Hermes does not have access to the private repo. Authenticate as an invited GitHub user or request repo access.
 
-`Missing Node dependency "docxtemplater"`
+`Unsupported or encrypted PDF`
 
-Run:
-
-```bash
-cd "$HERMES_SKILLS_DIR/clinical-document-generation/scripts"
-npm ci
-```
-
-If Hermes runs Node from a different working directory, set:
-
-```bash
-export CLINICAL_DOC_NODE_PACKAGE_DIR="$HERMES_SKILLS_DIR/clinical-document-generation/scripts"
-```
-
-`ModuleNotFoundError: No module named 'docx'`
-
-Install `python-docx` in the Python environment used by Hermes:
-
-```bash
-python3 -m pip install python-docx
-```
+The built-in PDF text extractor accepts the unencrypted PDFs generated by Apple Pages and ordinary office renderers. Re-export the DOCX as an unencrypted PDF with the same renderer the reviewer will use, then rerun TOC refresh/audit.
 
 `osascript: command not found` or Apple Pages export fails
 

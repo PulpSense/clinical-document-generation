@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Scan DOCX and XML templates for Docxtemplater-style placeholders."""
+"""Scan DOCX and XML templates for brace-style placeholders."""
 
 from __future__ import annotations
 

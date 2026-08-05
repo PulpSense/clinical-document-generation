@@ -72,13 +72,13 @@ The exact required fields are ultimately determined by template placeholders. Ru
 After the extraction pass, run:
 
 ```bash
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 If the preflight passes, create and present the named source Markdown:
 
 ```bash
-python scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
+python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
 ```
 
 After presenting the generated source Markdown, stop and wait for reviewer approval. If the reviewer uploads an edited source Markdown, parse it with `scripts/parse_source_truth_md.py`. Continue to final generation only after the source Markdown is approved and approval is recorded.

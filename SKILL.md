@@ -51,7 +51,7 @@ Run script commands from this skill folder, or use absolute paths to the skill's
 6. Read `references/source-of-truth-md.md`, then run the client/source-input preflight before creating any structured source document:
 
 ```bash
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 If required source inputs are missing, stop before structured Markdown generation and send `reference/missing-inputs.md` or a concise missing-input checklist to the reviewer. Do not ask the reviewer to supply AI-written protocol, ICF, summary, or XML prose.
@@ -59,7 +59,7 @@ If required source inputs are missing, stop before structured Markdown generatio
 7. When required source inputs are complete, create the reviewer-facing structured Markdown document:
 
 ```bash
-python scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
+python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
 ```
 
 Present the generated Markdown file reported by `scripts/create_source_truth_md.py` and recorded in `approval.review_file`, then stop. This Markdown file is the editable equivalent of the old n8n intake form: it should contain client-provided study facts and regulatory inputs only. It must not include AI-generated introductions, methods, goals, ICF language, summary prose, XML narrative text, or `template_fields`.
@@ -71,7 +71,7 @@ When presenting this file, return or attach only the generated source Markdown. 
 Do not continue to final protocol, ICF, XML, short-document, TOC, or render-QA generation in the same turn merely because the user originally asked to create or generate clinical documents. The reviewer may approve it as-is or upload an edited copy. If an edited Markdown file is uploaded, preserve it under `input/attachments/`, then parse it:
 
 ```bash
-python scripts/parse_source_truth_md.py --run-dir <run-dir> --source-md input/attachments/<edited-source-md> --approval-status pending_review
+python3 scripts/parse_source_truth_md.py --run-dir <run-dir> --source-md input/attachments/<edited-source-md> --approval-status pending_review
 ```
 
 After this point, the latest parsed source-of-truth Markdown is authoritative. Do not reinterpret the original messy inputs unless the reviewer provides additional corrections. Do not repair apparent typos or inconsistencies in mapped Markdown values unless they technically break the workflow as described in the source-of-truth authority rule above.
@@ -79,12 +79,12 @@ After this point, the latest parsed source-of-truth Markdown is authoritative. D
 8. Read `references/approval-loop.md`. Only after the reviewer clearly approves the generated or edited source Markdown in a separate approval action, parse the saved Markdown file from disk before recording or relying on approval. This is required even when the reviewer did not upload a separate edited file, because the reviewer may have edited the generated source Markdown in place after it was presented:
 
 ```bash
-python scripts/parse_source_truth_md.py \
+python3 scripts/parse_source_truth_md.py \
   --run-dir <run-dir> \
   --source-md <run-dir>/<approval.review_file> \
   --approval-status approved \
   --approved-by "<reviewer>"
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 Review `reference/review-parse-report.md` and stop if parser warnings or missing required inputs remain. Do not assume `reference/study.reference.json` still matches the reviewer-facing Markdown just because the file was generated earlier.
@@ -94,7 +94,7 @@ Do not edit the approved source Markdown before this parse step. If a mapped val
 If approval is recorded separately after a parse or correction pass, use:
 
 ```bash
-python scripts/set_approval.py --run-dir <run-dir> --status approved --approved-by "<reviewer>"
+python3 scripts/set_approval.py --run-dir <run-dir> --status approved --approved-by "<reviewer>"
 ```
 
 Use `--approval-status approved --approved-by "<reviewer>"` when parsing an uploaded Markdown file if the accompanying message clearly says it is approved or good to generate. Do not use `approved` for the initial message that supplied raw study input, even if that message asked to create final documents.
@@ -103,13 +103,13 @@ Use `--approval-status approved --approved-by "<reviewer>"` when parsing an uplo
 
 ```bash
 # Prospective protocol + ICF + XML branch
-python scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
 
 # Ambispective protocol + ICF + XML branch
-python scripts/build_n8n_ambispective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_ambispective_fields.py --run-dir <run-dir>
 
 # Retrospective protocol branch
-python scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
 ```
 
 For prospective runs, read `references/n8n-prospective-protocol-icf-xml.md`. For ambispective runs, read `references/n8n-ambispective-protocol-icf-xml.md`. For retrospective protocol runs, read `references/n8n-retrospective-protocol.md`.
@@ -117,7 +117,7 @@ For prospective runs, read `references/n8n-prospective-protocol-icf-xml.md`. For
 For prospective and ambispective runs with XML, also read `references/prs-xml.md` and build PRS XML fields after the n8n mapper:
 
 ```bash
-python scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
 ```
 
 If this command reports missing PRS inputs, return those missing items to the reviewer and do not continue to final rendering.
@@ -131,47 +131,46 @@ If this command reports missing PRS inputs, return those missing items to the re
 12. Validate the reference file and active branch templates. Use `--require-approval` for final output generation:
 
 ```bash
-python scripts/validate_reference.py --run-dir <run-dir>
-python scripts/validate_reference.py --run-dir <run-dir> --require-approval
+python3 scripts/validate_reference.py --run-dir <run-dir>
+python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
 ```
 
-13. Install the Node dependencies for DOCX rendering if they are not already available:
+13. Confirm Python 3.9 or newer is available. All scripts use the Python standard library; do not install Python or Node packages:
 
 ```bash
-cd scripts
-npm install
+python3 --version
 ```
 
 14. Generate outputs. Use `--require-approval` for final outputs:
 
 ```bash
-node scripts/render_templates.mjs --run-dir <run-dir>
-node scripts/render_templates.mjs --run-dir <run-dir> --require-approval
+python3 scripts/render_templates.py --run-dir <run-dir>
+python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
 ```
 
 15. For prospective and ambispective PRS XML runs, validate the rendered XML:
 
 ```bash
-python scripts/validate_prs_xml.py --run-dir <run-dir>
+python3 scripts/validate_prs_xml.py --run-dir <run-dir>
 ```
 
 16. For every DOCX output with a static index or table of contents, regardless of study type or document kind, render the final DOCX to PDF with the same app/rendering engine the reviewer will use. Then refresh the static TOC/index from that rendered PDF. The refresh script must also normalize index rows to real right-aligned dot-leader tab stops, not manual dot strings. Render/export once more, then audit the TOC/index against the final rendered pages. If the reviewer is inspecting the DOCX in Apple Pages, export the DOCX from Pages and use that Pages-generated PDF as the source of truth:
 
 ```bash
-osascript scripts/export_docx_with_pages.applescript \
+python3 scripts/export_docx_with_pages.py \
   <run-dir>/output/<document>.docx \
   <run-dir>/logs/pages-render/<document>.pdf
 
-python scripts/refresh_static_toc.py \
+python3 scripts/refresh_static_toc.py \
   --docx <run-dir>/output/<document>.docx \
   --pdf <run-dir>/logs/pages-render/<document>.pdf \
   --report <run-dir>/logs/toc-refresh.json
 
-osascript scripts/export_docx_with_pages.applescript \
+python3 scripts/export_docx_with_pages.py \
   <run-dir>/output/<document>.docx \
   <run-dir>/logs/pages-render/<document>.pdf
 
-python scripts/audit_static_toc.py \
+python3 scripts/audit_static_toc.py \
   --docx <run-dir>/output/<document>.docx \
   --pdf <run-dir>/logs/pages-render/<document>.pdf \
   --output <run-dir>/logs/toc-audit.json
@@ -238,7 +237,7 @@ The raw source material is evidence. Before client review, `study.reference.json
 
 ## Template Rules
 
-- Use Docxtemplater-style placeholders in DOCX templates, such as `{study.title}`.
+- Use the brace placeholder syntax in DOCX templates, such as `{study.title}`.
 - Use the same placeholder paths in XML templates.
 - Use loops only for arrays, such as `{#sites}{facility.name}{/sites}`.
 - Avoid placeholders that rely on hidden prompt context. Every placeholder must resolve from `study.reference.json`.
@@ -246,7 +245,7 @@ The raw source material is evidence. Before client review, `study.reference.json
 - Scan templates before generation:
 
 ```bash
-python scripts/scan_placeholders.py templates/protocol.template.docx templates/icf.template.docx templates/study.template.xml
+python3 scripts/scan_placeholders.py templates/protocol.template.docx templates/icf.template.docx templates/study.template.xml
 ```
 
 ## Output Rules

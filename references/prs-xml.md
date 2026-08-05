@@ -34,7 +34,7 @@ Use `regulatory.prs.last_follow_up_date_type` whenever `procedures.last_follow_u
 After the branch n8n mapper, run:
 
 ```bash
-python scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
 ```
 
 This script:
@@ -47,9 +47,9 @@ This script:
 Then validate and render:
 
 ```bash
-python scripts/validate_reference.py --run-dir <run-dir> --require-approval
-node scripts/render_templates.mjs --run-dir <run-dir> --require-approval
-python scripts/validate_prs_xml.py --run-dir <run-dir>
+python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
+python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
+python3 scripts/validate_prs_xml.py --run-dir <run-dir>
 ```
 
 The renderer uses `__prs_counts` to remove unused repeated blocks or clone the last exemplar block when the real study has more repeated items than the template contains.

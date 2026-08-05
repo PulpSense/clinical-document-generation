@@ -6,26 +6,19 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import zipfile
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree as ET
+
+from pdf_text import extract_pdf_pages
 
 
 TOC_LINE_RE = re.compile(r"^(?P<title>.+?)(?:\t|\s*\.{3,}\s*)(?P<page>\d+)\s*$")
 LEADING_NUMBER_RE = re.compile(r"^(?P<number>\d+)(?:\.(?=\s)|\s+\.)")
 ROOT_SECTION_RE = re.compile(r"^(?P<number>\d+)(?:\.|\s)")
-
-
-def require_imports():
-    try:
-        from docx import Document
-        from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
-    except ImportError as exc:
-        raise SystemExit("python-docx is required to audit DOCX TOC entries.") from exc
-    try:
-        import pdfplumber
-    except ImportError as exc:
-        raise SystemExit("pdfplumber is required to audit rendered PDF pages.") from exc
-    return Document, WD_TAB_ALIGNMENT, WD_TAB_LEADER, pdfplumber
+WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+W = "{" + WORD_NS + "}"
 
 
 def normalize(value: str) -> str:
@@ -35,22 +28,33 @@ def normalize(value: str) -> str:
     return value
 
 
-def has_right_dot_leader_tab(paragraph: Any, alignment: Any, leader: Any) -> bool:
-    text = paragraph.text.replace("\u00a0", " ")
-    if "\t" not in text:
+def paragraph_text(paragraph: ET.Element) -> str:
+    pieces = []
+    for element in paragraph.iter():
+        if element.tag == W + "t" and element.text:
+            pieces.append(element.text)
+        elif element.tag == W + "tab":
+            pieces.append("\t")
+        elif element.tag == W + "br":
+            pieces.append("\n")
+    return "".join(pieces)
+
+
+def has_right_dot_leader_tab(paragraph: ET.Element) -> bool:
+    if "\t" not in paragraph_text(paragraph).replace("\u00a0", " "):
         return False
-    for tab in paragraph.paragraph_format.tab_stops:
-        if tab.alignment == alignment.RIGHT and tab.leader == leader.DOTS:
+    for tab in paragraph.findall(f"./{W}pPr/{W}tabs/{W}tab"):
+        if tab.get(W + "val") == "right" and tab.get(W + "leader") in {"dot", "dots"}:
             return True
     return False
 
 
 def toc_entries(docx_path: Path) -> list[dict[str, Any]]:
-    Document, WD_TAB_ALIGNMENT, WD_TAB_LEADER, _ = require_imports()
-    document = Document(str(docx_path))
+    with zipfile.ZipFile(docx_path) as archive:
+        document = ET.fromstring(archive.read("word/document.xml"))
     entries: list[dict[str, Any]] = []
-    for index, paragraph in enumerate(document.paragraphs):
-        text = paragraph.text.replace("\u00a0", " ").strip()
+    for index, paragraph in enumerate(document.iter(W + "p")):
+        text = paragraph_text(paragraph).replace("\u00a0", " ").strip()
         match = TOC_LINE_RE.match(text)
         if not match:
             continue
@@ -60,16 +64,14 @@ def toc_entries(docx_path: Path) -> list[dict[str, Any]]:
                 "paragraph_index": index,
                 "title": title,
                 "listed_page": int(match.group("page")),
-                "alignment_ok": has_right_dot_leader_tab(paragraph, WD_TAB_ALIGNMENT, WD_TAB_LEADER),
+                "alignment_ok": has_right_dot_leader_tab(paragraph),
             }
         )
     return entries
 
 
 def rendered_pages(pdf_path: Path) -> list[str]:
-    _, _, _, pdfplumber = require_imports()
-    with pdfplumber.open(str(pdf_path)) as pdf:
-        return [page.extract_text() or "" for page in pdf.pages]
+    return extract_pdf_pages(pdf_path)
 
 
 def is_toc_or_index_title(title: str) -> bool:

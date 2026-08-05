@@ -40,7 +40,7 @@ At this stage, the generated source Markdown recorded in `approval.review_file` 
 Before creating the named source-of-truth Markdown, run:
 
 ```bash
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 If the command reports missing inputs, do not create the structured Markdown. Send `reference/missing-inputs.md` or summarize the missing source fields to the reviewer, then update the draft reference after the reviewer provides the missing information. Do not ask the reviewer to provide AI-generated introductions, methods, ICF language, summary prose, or XML narrative fields.
@@ -48,7 +48,7 @@ If the command reports missing inputs, do not create the structured Markdown. Se
 Only create the structured Markdown when the preflight passes:
 
 ```bash
-python scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
+python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
 ```
 
 This writes `reference/source-of-truth--<protocol>--<study-slug>.md` by default and records the exact path in `source.source_of_truth_file`, `source.source_of_truth_md`, and `approval.review_file` in `reference/study.reference.json`.
@@ -65,7 +65,7 @@ When the reviewer uploads an edited source Markdown:
 2. Parse the uploaded Markdown:
 
 ```bash
-python scripts/parse_source_truth_md.py \
+python3 scripts/parse_source_truth_md.py \
   --run-dir <run-dir> \
   --source-md input/attachments/<uploaded-source-md> \
   --approval-status pending_review
@@ -80,12 +80,12 @@ python scripts/parse_source_truth_md.py \
 If the reviewer says the generated source Markdown is good without uploading edits, do not assume the current JSON still matches the Markdown. Parse the saved run file anyway, because the reviewer may have edited the generated file in place. Do not edit the Markdown before parsing:
 
 ```bash
-python scripts/parse_source_truth_md.py \
+python3 scripts/parse_source_truth_md.py \
   --run-dir <run-dir> \
   --source-md <run-dir>/<approval.review_file> \
   --approval-status approved \
   --approved-by "<reviewer>"
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 Review `reference/review-parse-report.md` and stop if parser warnings or missing inputs remain.
@@ -107,14 +107,14 @@ Do not treat the original source-material submission as "the reviewer says the g
 After approval:
 
 ```bash
-python scripts/parse_source_truth_md.py --run-dir <run-dir> --source-md <run-dir>/<approval.review_file> --approval-status approved --approved-by "<reviewer>"
-python scripts/check_required_inputs.py --run-dir <run-dir>
-python scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check  # after generated narrative has been saved
-python scripts/build_n8n_<branch>_fields.py --run-dir <run-dir>
-python scripts/build_prs_xml_fields.py --run-dir <run-dir>  # prospective/ambispective XML only
-python scripts/validate_reference.py --run-dir <run-dir> --require-approval
-node scripts/render_templates.mjs --run-dir <run-dir> --require-approval
-python scripts/validate_prs_xml.py --run-dir <run-dir>  # prospective/ambispective XML only
+python3 scripts/parse_source_truth_md.py --run-dir <run-dir> --source-md <run-dir>/<approval.review_file> --approval-status approved --approved-by "<reviewer>"
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check  # after generated narrative has been saved
+python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir>
+python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>  # prospective/ambispective XML only
+python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
+python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
+python3 scripts/validate_prs_xml.py --run-dir <run-dir>  # prospective/ambispective XML only
 ```
 
 Use the branch-specific mapper names:
