@@ -35,13 +35,13 @@ An initial request that provides study source material and asks to "create", "ge
 Before generating the reviewer-facing source Markdown, run:
 
 ```bash
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 If missing inputs are reported, ask for those inputs before creating the structured document. When the preflight passes, generate the source Markdown:
 
 ```bash
-python scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
+python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
 ```
 
 Present the generated source Markdown path recorded in `approval.review_file` in the active channel or attach it if the channel supports files. The Markdown includes stable hidden `field` markers so the parser can map reviewer edits back into JSON. It must contain source inputs only, equivalent to the old n8n form fields; generated protocol, ICF, short-document, and XML prose should not appear in it.
@@ -65,12 +65,12 @@ If the reviewer sends corrections as text or audio instead of editing the Markdo
 When the reviewer approves the source Markdown:
 
 ```bash
-python scripts/parse_source_truth_md.py \
+python3 scripts/parse_source_truth_md.py \
   --run-dir <run-dir> \
   --source-md <run-dir>/<approval.review_file> \
   --approval-status approved \
   --approved-by "<reviewer>"
-python scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
 This parse step is mandatory even when the reviewer did not upload a separate edited file. The reviewer may have edited the saved source Markdown in place after it was presented, and `reference/study.reference.json` must be regenerated from the current Markdown before final narrative generation, mapper checks, validation, or rendering. Review `reference/review-parse-report.md`; if parser warnings or missing required inputs remain, stop and resolve them before continuing.
@@ -80,15 +80,15 @@ Do not edit the approved source Markdown before parsing it. If a mapped value lo
 If approval must be recorded after a separate parsed correction pass, use:
 
 ```bash
-python scripts/set_approval.py --run-dir <run-dir> --status approved --approved-by "<reviewer>"
+python3 scripts/set_approval.py --run-dir <run-dir> --status approved --approved-by "<reviewer>"
 ```
 
 Then final validation and rendering must use approval gating:
 
 ```bash
-python scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check
-python scripts/validate_reference.py --run-dir <run-dir> --require-approval
-node scripts/render_templates.mjs --run-dir <run-dir> --require-approval
+python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check
+python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
+python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
 ```
 
 Before running the mapper check, generate the branch-specific n8n/OpenAI narrative fields from the approved input reference and save them under `generated`. Do not mark final outputs complete if validation fails, unresolved placeholders remain, required generated fields remain blank, or `needs_review` is not empty.

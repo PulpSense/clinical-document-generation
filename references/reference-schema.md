@@ -205,19 +205,19 @@ Use `changes_requested` while corrections are being applied. Use `approved` only
 For prospective protocol, ICF, and XML variables from the existing workflow, run:
 
 ```bash
-python scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
 ```
 
 For ambispective protocol, ICF, and XML variables from the existing workflow, run:
 
 ```bash
-python scripts/build_n8n_ambispective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_ambispective_fields.py --run-dir <run-dir>
 ```
 
 For retrospective protocol templates from the existing workflow, run:
 
 ```bash
-python scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
 ```
 
 These populate `template_fields` with legacy placeholders such as `AI_shortTitle`, `AI_introduction`, `AI_populationLong`, `AI_studyDesignLong`, and `sampleSizeJustification`. Keep module prose under `generated.protocol` or `generated.icf`; `template_fields` is only the rendering adapter.

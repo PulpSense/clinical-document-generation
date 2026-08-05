@@ -1,8 +1,0 @@
-{
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "docxtemplater": "^3.54.0",
-    "pizzip": "^3.1.7"
-  }
-}

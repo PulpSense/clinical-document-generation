@@ -54,7 +54,7 @@ Do not place these generated variables in the source Markdown. It should contain
 Run:
 
 ```bash
-python scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
 ```
 
 This writes all fields below to `template_fields`. The renderer overlays `template_fields` at the template root.
@@ -186,7 +186,7 @@ The n8n prospective branch builds XML from the same `Set Protocol Fields` output
 The old n8n `Generate XML JSON` node used a simplified PRS shape and hardcoded values that the client corrected manually. For final ClinicalTrials.gov PRS XML, do not use that old JSON shape as the output structure. After this n8n mapper runs, run:
 
 ```bash
-python scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
 ```
 
 Use `references/prs-xml.md` for the canonical PRS template, required reviewer-controlled PRS fields, repeated block counts, defaults, and XML validation.

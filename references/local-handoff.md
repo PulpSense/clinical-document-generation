@@ -4,19 +4,20 @@ Use this guide when handing the workflow to the study team or when running it wi
 
 ## Setup
 
-Install DOCX rendering dependencies once from the skill folder:
+Confirm Python 3.9 or newer is available:
 
 ```bash
-cd clinical-document-generation/scripts
-npm install
+python3 --version
 ```
+
+All scripts use the Python standard library. Do not install Python or Node packages.
 
 ## Run a Generation
 
 1. Create a run directory:
 
 ```bash
-python scripts/create_run.py \
+python3 scripts/create_run.py \
   --root runs \
   --slug <study-slug> \
   --study-type <prospective|ambispective|retrospective> \
@@ -28,7 +29,7 @@ The command copies the bundled client templates for the selected study type. Ret
 2. Draft the internal reference from the source material, then run the missing-input preflight:
 
 ```bash
-python scripts/check_required_inputs.py --run-dir runs/<study-slug>
+python3 scripts/check_required_inputs.py --run-dir runs/<study-slug>
 ```
 
 If `reference/missing-inputs.md` lists missing inputs, ask the reviewer for those inputs before creating the structured source Markdown.
@@ -36,13 +37,13 @@ If `reference/missing-inputs.md` lists missing inputs, ask the reviewer for thos
 3. Create the reviewer-facing Markdown source document:
 
 ```bash
-python scripts/create_source_truth_md.py --run-dir runs/<study-slug> --require-complete
+python3 scripts/create_source_truth_md.py --run-dir runs/<study-slug> --require-complete
 ```
 
 Send or attach the generated file shown by the command output, normally `reference/source-of-truth--<protocol>--<study-slug>.md`. The reviewer edits values between field marker comments or approves it as-is. If an edited Markdown file is uploaded, save it under `input/attachments/` and parse it:
 
 ```bash
-python scripts/parse_source_truth_md.py \
+python3 scripts/parse_source_truth_md.py \
   --run-dir runs/<study-slug> \
   --source-md runs/<study-slug>/input/attachments/<edited-source-md> \
   --approval-status pending_review
@@ -60,19 +61,19 @@ Confirm `meta.study_type` and `meta.document_set` before rendering:
 
 ```bash
 # Prospective protocol + ICF + XML branch
-python scripts/build_n8n_prospective_fields.py --run-dir runs/<study-slug>
+python3 scripts/build_n8n_prospective_fields.py --run-dir runs/<study-slug>
 
 # Ambispective protocol + ICF + XML branch
-python scripts/build_n8n_ambispective_fields.py --run-dir runs/<study-slug>
+python3 scripts/build_n8n_ambispective_fields.py --run-dir runs/<study-slug>
 
 # Retrospective protocol branch
-python scripts/build_n8n_retrospective_protocol_fields.py --run-dir runs/<study-slug>
+python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir runs/<study-slug>
 ```
 
 For prospective and ambispective XML runs, then populate PRS XML placeholders:
 
 ```bash
-python scripts/build_prs_xml_fields.py --run-dir runs/<study-slug>
+python3 scripts/build_prs_xml_fields.py --run-dir runs/<study-slug>
 ```
 
 If this reports missing PRS inputs, resolve them with the reviewer before final generation.
@@ -80,33 +81,33 @@ If this reports missing PRS inputs, resolve them with the reviewer before final 
 5. Record approval when the reviewer approves the source Markdown, unless approval was already recorded by the parser:
 
 ```bash
-python scripts/set_approval.py --run-dir runs/<study-slug> --status approved --approved-by "<reviewer>"
+python3 scripts/set_approval.py --run-dir runs/<study-slug> --status approved --approved-by "<reviewer>"
 ```
 
 6. Validate fields:
 
 ```bash
-python scripts/validate_reference.py --run-dir runs/<study-slug>
-python scripts/validate_reference.py --run-dir runs/<study-slug> --require-approval
+python3 scripts/validate_reference.py --run-dir runs/<study-slug>
+python3 scripts/validate_reference.py --run-dir runs/<study-slug> --require-approval
 ```
 
 7. Generate outputs:
 
 ```bash
-node scripts/render_templates.mjs --run-dir runs/<study-slug> --require-approval
+python3 scripts/render_templates.py --run-dir runs/<study-slug> --require-approval
 ```
 
 8. Validate PRS XML for prospective and ambispective XML runs:
 
 ```bash
-python scripts/validate_prs_xml.py --run-dir runs/<study-slug>
+python3 scripts/validate_prs_xml.py --run-dir runs/<study-slug>
 ```
 
 9. For any DOCX output with a static index or table of contents, render the DOCX to PDF, refresh the static TOC/index page values and alignment, then audit both page values and right-aligned dot-leader formatting:
 
 ```bash
-python scripts/refresh_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/pages-render/<document>.pdf --report runs/<study-slug>/logs/toc-refresh.json
-python scripts/audit_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/pages-render/<document>.pdf --output runs/<study-slug>/logs/toc-audit.json
+python3 scripts/refresh_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/pages-render/<document>.pdf --report runs/<study-slug>/logs/toc-refresh.json
+python3 scripts/audit_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/pages-render/<document>.pdf --output runs/<study-slug>/logs/toc-audit.json
 ```
 
 Use the same PDF renderer the reviewer will inspect. For Apple Pages review, export the final DOCX from Pages, refresh the TOC/index from that Pages-generated PDF, export from Pages again, and audit the final Pages-generated PDF. If the refresh report updates page values or alignment, re-render/re-export before the final audit. Do not ship while `toc-audit.json` has page mismatches, missing headings, or alignment mismatches.
@@ -132,7 +133,7 @@ If the change comes from the reviewer by text/audio instead of an edited Markdow
 
 ## Template Updates
 
-Bundled templates live under `assets/client-templates/`. Use Docxtemplater-style placeholders that map to `reference/study.reference.json`, such as `{study.title}` or `{parties.principal_investigator.name}`. Run `scripts/scan_placeholders.py` and `scripts/validate_reference.py` after changing templates.
+Bundled templates live under `assets/client-templates/`. Use brace placeholders that map to `reference/study.reference.json`, such as `{study.title}` or `{parties.principal_investigator.name}`. Run `scripts/scan_placeholders.py` and `scripts/validate_reference.py` after changing templates.
 
 ## QA Gate
 

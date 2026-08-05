@@ -71,7 +71,7 @@ Retrospective studies follow the protocol-only branch from the current workflow:
 Run:
 
 ```bash
-python scripts/validate_reference.py --run-dir <run-dir>
+python3 scripts/validate_reference.py --run-dir <run-dir>
 ```
 
 Validation checks `meta.study_type`, `meta.document_set`, required branch fields, required templates for that branch, and placeholders in active templates.

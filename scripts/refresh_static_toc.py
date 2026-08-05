@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import html
 import json
 import re
 import shutil
@@ -15,13 +16,9 @@ from typing import Any
 from audit_static_toc import audit, normalize
 
 
-def require_document():
-    try:
-        from docx import Document
-        from docx.enum.text import WD_TAB_ALIGNMENT, WD_TAB_LEADER
-    except ImportError as exc:
-        raise SystemExit("python-docx is required to refresh DOCX TOC entries.") from exc
-    return Document, WD_TAB_ALIGNMENT, WD_TAB_LEADER
+PARAGRAPH_RE = re.compile(r"<w:p\b[^>]*>.*?</w:p>", re.DOTALL)
+PARAGRAPH_PROPERTIES_RE = re.compile(r"<w:pPr\b[^>]*>.*?</w:pPr>", re.DOTALL)
+RUN_PROPERTIES_RE = re.compile(r"<w:rPr\b[^>]*>.*?</w:rPr>", re.DOTALL)
 
 
 def set_word_field_refresh_flags(path: Path) -> None:
@@ -59,50 +56,85 @@ def set_word_field_refresh_flags(path: Path) -> None:
             tmp_path.unlink()
 
 
-def update_paragraph_text(paragraph: Any, new_text: str) -> None:
-    if paragraph.runs:
-        paragraph.runs[0].text = new_text
-        for run in paragraph.runs[1:]:
-            run.text = ""
-    else:
-        paragraph.add_run(new_text)
+def toc_tab_position(document_xml: str) -> int:
+    page_size = re.search(r"<w:pgSz\b[^>]*\bw:w=\"(?P<width>\d+)\"", document_xml)
+    margins = re.search(
+        r"<w:pgMar\b(?=[^>]*\bw:left=\"(?P<left>\d+)\")"
+        r"(?=[^>]*\bw:right=\"(?P<right>\d+)\")[^>]*/?>",
+        document_xml,
+    )
+    if not page_size or not margins:
+        return 9360
+    return max(
+        0,
+        int(page_size.group("width"))
+        - int(margins.group("left"))
+        - int(margins.group("right")),
+    )
 
 
-def toc_tab_position(document: Any) -> Any:
-    section = document.sections[0]
-    return section.page_width - section.left_margin - section.right_margin
+def normalized_paragraph_properties(paragraph: str, tab_position: int) -> str:
+    match = PARAGRAPH_PROPERTIES_RE.search(paragraph)
+    properties = match.group(0) if match else "<w:pPr></w:pPr>"
+    properties = re.sub(r"<w:tabs\b[^>]*>.*?</w:tabs>", "", properties, flags=re.DOTALL)
+    properties = re.sub(r"<w:tabs\b[^>]*/>", "", properties)
+    properties = re.sub(r"<w:ind\b[^>]*/>", "", properties)
+    tab = (
+        f'<w:tabs><w:tab w:val="right" w:leader="dot" '
+        f'w:pos="{tab_position}"/></w:tabs>'
+    )
+    return properties.replace("</w:pPr>", tab + "</w:pPr>")
 
 
-def has_right_dot_leader_tab(paragraph: Any, tab_position: Any, alignment: Any, leader: Any) -> bool:
-    for tab in paragraph.paragraph_format.tab_stops:
-        if tab.alignment != alignment.RIGHT or tab.leader != leader.DOTS:
-            continue
-        # Allow a tiny tolerance for renderer/library round-tripping.
-        if abs(int(tab.position) - int(tab_position)) < 20:
-            return True
-    return False
+def align_toc_paragraph(paragraph: str, title: str, page: int, tab_position: int) -> str:
+    opening = re.match(r"<w:p\b[^>]*>", paragraph)
+    if not opening:
+        return paragraph
+    properties = normalized_paragraph_properties(paragraph, tab_position)
+    run_properties_match = RUN_PROPERTIES_RE.search(paragraph)
+    run_properties = run_properties_match.group(0) if run_properties_match else ""
+    escaped_title = html.escape(normalize(title), quote=False)
+    run = (
+        f"<w:r>{run_properties}<w:t xml:space=\"preserve\">{escaped_title}</w:t>"
+        f"<w:tab/><w:t>{page}</w:t></w:r>"
+    )
+    return opening.group(0) + properties + run + "</w:p>"
 
 
-def align_toc_entry(
-    paragraph: Any,
-    title: str,
-    page: int,
-    tab_position: Any,
-    alignment: Any,
-    leader: Any,
-) -> bool:
-    current = paragraph.text.replace("\u00a0", " ").strip()
-    replacement = f"{normalize(title)}\t{page}"
-    already_aligned = "\t" in current and has_right_dot_leader_tab(paragraph, tab_position, alignment, leader)
+def update_document_xml(path: Path, entries: list[dict[str, Any]]) -> None:
+    with zipfile.ZipFile(path) as archive:
+        document_xml = archive.read("word/document.xml").decode("utf-8")
+    by_index = {
+        entry["paragraph_index"]: entry
+        for entry in entries
+        if entry.get("actual_page") is not None
+    }
+    tab_position = toc_tab_position(document_xml)
+    paragraph_index = -1
 
-    update_paragraph_text(paragraph, replacement)
-    tab_stops = paragraph.paragraph_format.tab_stops
-    tab_stops.clear_all()
-    tab_stops.add_tab_stop(tab_position, alignment.RIGHT, leader.DOTS)
-    paragraph.paragraph_format.left_indent = None
-    paragraph.paragraph_format.right_indent = None
-    paragraph.paragraph_format.first_line_indent = None
-    return current != replacement or not already_aligned
+    def replace_paragraph(match: re.Match[str]) -> str:
+        nonlocal paragraph_index
+        paragraph_index += 1
+        entry = by_index.get(paragraph_index)
+        if not entry:
+            return match.group(0)
+        return align_toc_paragraph(
+            match.group(0), entry["title"], entry["actual_page"], tab_position
+        )
+
+    updated_xml = PARAGRAPH_RE.sub(replace_paragraph, document_xml).encode("utf-8")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".docx", dir=path.parent) as tmp:
+        tmp_path = Path(tmp.name)
+    try:
+        with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(
+            tmp_path, "w"
+        ) as destination:
+            for item in source.infolist():
+                data = updated_xml if item.filename == "word/document.xml" else source.read(item.filename)
+                destination.writestr(item, data)
+        tmp_path.replace(path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def refresh_docx(docx_path: Path, pdf_path: Path, output_path: Path) -> dict[str, Any]:
@@ -119,13 +151,9 @@ def refresh_docx(docx_path: Path, pdf_path: Path, output_path: Path) -> dict[str
     else:
         output_path = docx_path
 
-    Document, WD_TAB_ALIGNMENT, WD_TAB_LEADER = require_document()
-    document = Document(str(output_path))
-    tab_position = toc_tab_position(document)
     updated = []
     aligned_count = 0
     for entry in result["entries"]:
-        paragraph = document.paragraphs[entry["paragraph_index"]]
         actual_page = entry["actual_page"]
         if actual_page is None:
             continue
@@ -137,17 +165,10 @@ def refresh_docx(docx_path: Path, pdf_path: Path, output_path: Path) -> dict[str
                     "new_page": actual_page,
                 }
             )
-        if align_toc_entry(
-            paragraph,
-            entry["title"],
-            actual_page,
-            tab_position,
-            WD_TAB_ALIGNMENT,
-            WD_TAB_LEADER,
-        ):
+        if actual_page != entry["listed_page"] or not entry.get("alignment_ok"):
             aligned_count += 1
 
-    document.save(output_path)
+    update_document_xml(output_path, result["entries"])
     set_word_field_refresh_flags(output_path)
     return {
         **result,

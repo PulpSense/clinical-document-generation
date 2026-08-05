@@ -4,7 +4,7 @@ Templates are allowed to change. The scripts stay generic by requiring every pla
 
 ## Placeholder Syntax
 
-Use Docxtemplater-style placeholders:
+Use the skill's brace placeholder syntax:
 
 ```text
 {study.title}
@@ -61,19 +61,19 @@ Client templates copied from the existing workflow may contain flat placeholders
 These are supported through top-level `template_fields`. For retrospective protocol runs, generate them with:
 
 ```bash
-python scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
 ```
 
 For prospective protocol, ICF, and XML runs, generate them with:
 
 ```bash
-python scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
 ```
 
 For ambispective protocol, ICF, and XML runs, generate them with:
 
 ```bash
-python scripts/build_n8n_ambispective_fields.py --run-dir <run-dir>
+python3 scripts/build_n8n_ambispective_fields.py --run-dir <run-dir>
 ```
 
 Do not manually duplicate clinical facts into `template_fields`; derive them from the reviewed reference and generated module outputs.
@@ -133,7 +133,7 @@ assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml
 Then run:
 
 ```bash
-python scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
 ```
 
 The PRS mapper writes flat PRS placeholders into `template_fields` and sets `template_fields.__prs_counts`. The renderer uses those counts to keep exactly one repeated XML block per real intervention, arm, primary outcome, secondary outcome, and other outcome.
@@ -145,8 +145,8 @@ Only templates listed by `meta.document_set` are rendered. For example, retrospe
 Run:
 
 ```bash
-python scripts/scan_placeholders.py templates/protocol.template.docx templates/icf.template.docx templates/short.template.docx templates/study.template.xml
-python scripts/validate_reference.py --run-dir <run-dir>
+python3 scripts/scan_placeholders.py templates/protocol.template.docx templates/icf.template.docx templates/short.template.docx templates/study.template.xml
+python3 scripts/validate_reference.py --run-dir <run-dir>
 ```
 
 Validation checks that:
@@ -159,7 +159,7 @@ Validation checks that:
 For PRS XML, also run:
 
 ```bash
-python scripts/validate_prs_xml.py --run-dir <run-dir>
+python3 scripts/validate_prs_xml.py --run-dir <run-dir>
 ```
 
 Validation does not prove the clinical correctness of generated language. Review the reference file before final output.
