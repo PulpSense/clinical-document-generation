@@ -47,14 +47,14 @@ Run script commands from this skill folder, or use absolute paths to the skill's
 2. If the input is audio and a transcription tool is available, transcribe it and save the transcript under `input/transcript.md`. If transcription is not available, ask for a transcript before continuing.
 3. If the source material is unstructured, read `references/intake-workflow.md`, then normalize the source into `input/` and draft `reference/study.reference.json`.
 4. Read `references/study-type-branches.md`. Normalize `meta.study_type` to `Prospective`, `Ambispective`, or `Retrospective`, then set `meta.document_set` for that branch.
-5. Read `references/reference-schema.md`, then create or update the internal draft reference. Keep uncertain values as `null` and record questions in `needs_review`; do not hide gaps by inventing data.
+5. Read `references/reference-schema.md`, then create or update the internal draft reference. Keep uncertain values as `null` and record questions in `needs_review`; do not hide gaps by inventing data. For a prospective or ambispective study, read `references/starred-fillout-required-inputs.md`. For a retrospective study, read `references/retrospective-required-inputs.md`. Record starred-field candidates under `source.field_candidates`, and distinguish repeated identical evidence from conflicting distinct values.
 6. Read `references/source-of-truth-md.md`, then run the client/source-input preflight before creating any structured source document:
 
 ```bash
 python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
-If required source inputs are missing, stop before structured Markdown generation and send `reference/missing-inputs.md` or a concise missing-input checklist to the reviewer. Do not ask the reviewer to supply AI-written protocol, ICF, summary, or XML prose.
+For every study type, stop only when a starred Fillout field is missing or has multiple distinct source inputs. Ignore optional and generic `needs_review` items at this gate. If blocking source inputs remain, stop before structured Markdown generation and send `reference/missing-inputs.md` or one concise consolidated checklist to the reviewer. Do not ask the reviewer to supply AI-written protocol, ICF, summary, or XML prose.
 
 7. When required source inputs are complete, create the reviewer-facing structured Markdown document:
 
@@ -120,7 +120,7 @@ For prospective and ambispective runs with XML, also read `references/prs-xml.md
 python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
 ```
 
-If this command reports missing PRS inputs, return those missing items to the reviewer and do not continue to final rendering.
+For prospective and ambispective studies, this command reports both all PRS gaps and the subset that corresponds to missing starred fields. Stop and ask the reviewer only when `blocking_missing_count` is nonzero. Nonstar PRS gaps remain visible but nonblocking.
 
 10. Use the bundled templates unless the reviewer/client supplies replacements. `create_run.py` copies the bundled defaults into `templates/` using these standard names:
    - `protocol.template.docx`
@@ -154,33 +154,44 @@ python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
 python3 scripts/validate_prs_xml.py --run-dir <run-dir>
 ```
 
-16. For every DOCX output with a static index or table of contents, regardless of study type or document kind, render the final DOCX to PDF with the same app/rendering engine the reviewer will use. Then refresh the static TOC/index from that rendered PDF. The refresh script must also normalize index rows to real right-aligned dot-leader tab stops, not manual dot strings. Render/export once more, then audit the TOC/index against the final rendered pages. If the reviewer is inspecting the DOCX in Apple Pages, export the DOCX from Pages and use that Pages-generated PDF as the source of truth:
+16. DOCX generation must never depend on a desktop office application. After the DOCX exists, use the portable exporter for optional PDF-based visual and static TOC/index QA. Treat these PDFs as internal QA artifacts: do not deliver or list them as user-facing outputs unless the reviewer explicitly asks for PDF files. Automatic mode tries Pages on macOS, Microsoft Word on Windows, and LibreOffice on Linux, with LibreOffice as a fallback where available:
 
 ```bash
-python3 scripts/export_docx_with_pages.py \
+python3 scripts/export_docx_to_pdf.py \
   <run-dir>/output/<document>.docx \
-  <run-dir>/logs/pages-render/<document>.pdf
+  <run-dir>/logs/docx-render/<document>.pdf \
+  --report <run-dir>/logs/docx-render/<document>.json
+```
+
+Read the report. If `status` is `unavailable`, keep and deliver the generated DOCX, state that PDF-based visual/TOC QA was skipped because no compatible renderer was installed, and do not run the refresh or audit commands below. This is nonblocking by default. Use `--require-renderer` only when the client explicitly requires strict renderer-based QA.
+
+If `status` is `exported` and the DOCX contains a static index or table of contents, refresh page values and normalize index rows to real right-aligned dot-leader tab stops, then export once more and audit:
+
+```bash
 
 python3 scripts/refresh_static_toc.py \
   --docx <run-dir>/output/<document>.docx \
-  --pdf <run-dir>/logs/pages-render/<document>.pdf \
+  --pdf <run-dir>/logs/docx-render/<document>.pdf \
   --report <run-dir>/logs/toc-refresh.json
 
-python3 scripts/export_docx_with_pages.py \
+python3 scripts/export_docx_to_pdf.py \
   <run-dir>/output/<document>.docx \
-  <run-dir>/logs/pages-render/<document>.pdf
+  <run-dir>/logs/docx-render/<document>.pdf \
+  --report <run-dir>/logs/docx-render/<document>.json
 
 python3 scripts/audit_static_toc.py \
   --docx <run-dir>/output/<document>.docx \
-  --pdf <run-dir>/logs/pages-render/<document>.pdf \
+  --pdf <run-dir>/logs/docx-render/<document>.pdf \
   --output <run-dir>/logs/toc-audit.json
 ```
 
-If `toc-refresh.json` reports `updated_count` or `aligned_count` greater than zero, always re-render/re-export before running the final audit. Repeat refresh and audit if the updated TOC changes pagination. Do not present a DOCX with a static index/TOC as complete unless `toc-audit.json` reports zero page mismatches, zero missing headings, and zero alignment mismatches.
+If `toc-refresh.json` reports `updated_count` or `aligned_count` greater than zero, always re-render/re-export before running the final audit. Repeat refresh and audit if the updated TOC changes pagination. When a renderer is available, do not present a DOCX with a static index/TOC as visually verified unless `toc-audit.json` reports zero page mismatches, zero missing headings, and zero alignment mismatches.
 
 The final audit must not count text on the TOC/index pages as evidence that a later heading is on that page. For every TOC/index entry after the TOC/index entry itself, actual-page lookup must begin after the rendered TOC/index ends. This prevents entries such as `4. INTRODUCTION` from being accepted on the index page merely because the index contains that title.
 
-17. Review `logs/generation-report.json`, `logs/prs-xml-validation.json`, `logs/toc-refresh.json`, `logs/toc-audit.json`, `reference/missing_fields.md`, and `reference/review-parse-report.md` when present. Do not present the output as complete if required placeholders are unresolved, approval is missing, PRS XML validation fails, TOC/index page values or right-aligned dot-leader formatting do not match the rendered document, or critical fields remain in `needs_review`.
+17. Extract or read the rendered DOCX text and inspect static template prose for stale study-specific content before delivery. Placeholder validation alone is insufficient because bundled or client templates may contain hard-coded language from a prior study. Check especially for unrelated procedures or conditions, sponsor/IRB role confusion, duplicate organization suffixes such as `IRB IRB`, incorrect intervention names, and payment, cost, alternative-treatment, privacy, or regulatory-authority language that does not fit the reviewed study. Make narrowly scoped template fixes, rerender, and repeat renderer/TOC QA.
+
+18. Review `logs/generation-report.json`, `logs/prs-xml-validation.json`, `logs/docx-render/*.json`, `logs/toc-refresh.json`, `logs/toc-audit.json`, `reference/missing_fields.md`, and `reference/review-parse-report.md` when present. Also extract and inspect the complete rendered DOCX text for stale client-template prose before delivery. The bundled prospective templates may contain legacy study-specific language such as cataract surgery, handpieces, treatment assignment, prior-to-surgery replacement, duplicated `IRB IRB`, or unrelated sponsor/payment statements even when all placeholders resolve. Replace or remove such language using only the approved study facts and generated narrative, then re-export and repeat TOC/visual QA. Do not present the output as complete if required placeholders are unresolved, approval is missing, PRS XML validation fails, stale study-specific template content remains, an available renderer finds TOC/index mismatches, or blocking fields remain in `needs_review`. A renderer-unavailable report is a nonblocking QA limitation and must be disclosed. In every branch, only conflict-tagged review items mapped to starred inputs are blocking; optional and generic review notes remain visible.
 
 ## Run Directory Contract
 
@@ -223,7 +234,7 @@ The raw source material is evidence. Before client review, `study.reference.json
 - Keep raw user wording in `source.raw_summary` or `source.notes` when it helps later review.
 - Separate user-provided data from generated narrative text under `generated`.
 - Use `null` for missing values, not empty invented filler.
-- Add each uncertainty, conflict, or missing required field to `needs_review`.
+- Add each uncertainty, conflict, or missing required field to `needs_review`. For every study type, also store candidate values for starred fields under `source.field_candidates`; only missing or conflicting starred fields block the input gate.
 - Keep generated protocol, ICF, short-document, and XML values in the reference file after source approval so regenerating outputs is deterministic. The ICF and shorter document should be generated from the same reviewed reference file, not by reinterpreting the original messy input.
 - Treat the generated source Markdown recorded in `approval.review_file` as the human review surface for source inputs only. On every approval, parse the current saved Markdown file and regenerate `study.reference.json` from it before generating narrative, running mappers, or rendering templates. If a reviewer uploads an edited source Markdown file, preserve it and parse that uploaded copy; otherwise parse the run's recorded source Markdown from disk in case the reviewer edited it in place.
 - Preserve reviewer-edited mapped string values exactly, even when they appear to be typos, brand inconsistencies, grammar issues, or conflicts with the raw input. Do not change source Markdown values for content correctness. Only make a narrowly scoped technical fix when an approved value blocks the workflow, and document that fix.
@@ -268,7 +279,7 @@ Hermes owns the channel mechanics: reading Slack/Telegram/email text, receiving 
 
 1. Preserve each message, transcript, and attachment under `input/`.
 2. Update `reference/study.reference.json` from all available source material.
-3. Run `scripts/check_required_inputs.py`. If missing inputs remain, ask for those inputs and stop before creating the source Markdown.
+3. Run `scripts/check_required_inputs.py`. For every study type, ask only for missing or conflicting starred fields. If blocking inputs remain, ask for all of them together and stop before creating the source Markdown.
 4. Run `scripts/create_source_truth_md.py --require-complete`, send or attach the generated source Markdown path from the command output, and stop for reviewer approval.
 5. If the reviewer uploads an edited source Markdown file, preserve it under `input/attachments/` and run `scripts/parse_source_truth_md.py`.
 6. If the reviewer replies with corrections in text or audio instead of editing the Markdown file, update the internal reference, rerun the preflight, and regenerate the named source Markdown.
@@ -280,6 +291,8 @@ Hermes owns the channel mechanics: reading Slack/Telegram/email text, receiving 
 - Read `references/source-of-truth-md.md` before generating, sending, parsing, or approving the structured Markdown source-of-truth document.
 - Read `references/approval-loop.md` before presenting structured study data for review or deciding whether final generation may proceed.
 - Read `references/study-type-branches.md` before setting `meta.study_type`, `meta.document_set`, or choosing templates.
+- Read `references/starred-fillout-required-inputs.md` for prospective and ambispective starred-field extraction, candidate tracking, and stop behavior.
+- Read `references/retrospective-required-inputs.md` for retrospective starred-field extraction, candidate tracking, and stop behavior.
 - Read `references/n8n-prospective-protocol-icf-xml.md` for prospective studies before generating protocol, ICF, XML, visit-table, and template fields.
 - Read `references/n8n-ambispective-protocol-icf-xml.md` for ambispective studies before generating protocol, ICF, XML, visit-table, and template fields.
 - Read `references/n8n-retrospective-protocol.md` for retrospective protocol studies, including MB-25-01-style video/chart review protocols.

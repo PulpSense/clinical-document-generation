@@ -68,15 +68,23 @@ def _stream_data(pdf_object: bytes) -> bytes:
     if end < marker.end():
         raise ValueError("Malformed PDF stream.")
     data = pdf_object[marker.end() : end]
+    if b"/FlateDecode" in pdf_object[: marker.start()]:
+        candidates = [data]
+        if data.endswith(b"\r\n"):
+            candidates.append(data[:-2])
+        elif data.endswith((b"\r", b"\n")):
+            candidates.append(data[:-1])
+        last_error: zlib.error | None = None
+        for candidate in candidates:
+            try:
+                return zlib.decompress(candidate)
+            except zlib.error as exc:
+                last_error = exc
+        raise ValueError("Unable to decompress a PDF text stream.") from last_error
     if data.endswith(b"\r\n"):
         data = data[:-2]
     elif data.endswith((b"\r", b"\n")):
         data = data[:-1]
-    if b"/FlateDecode" in pdf_object[: marker.start()]:
-        try:
-            data = zlib.decompress(data)
-        except zlib.error as exc:
-            raise ValueError("Unable to decompress a PDF text stream.") from exc
     return data
 
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Clinical Document Generation"
   short_description: "Review and generate study documents"
-  default_prompt: "Use $clinical-document-generation only when a client asks to generate prospective, ambispective, or retrospective study documents, including protocol, ICF, short summary, or ClinicalTrials.gov/PRS XML outputs. Create the editable Markdown source-of-truth input map first, block on missing required inputs before creating it, parse reviewer edits back into the internal reference, then generate the correct branch-specific outputs after approval."
+  default_prompt: "Use $clinical-document-generation to prepare a study document set, asking only for missing or conflicting starred Fillout fields in every study branch before source review."

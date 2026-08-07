@@ -2,6 +2,8 @@
 
 Use this reference when `meta.study_type` is `Ambispective`.
 
+Read `references/starred-fillout-required-inputs.md` first. Its 35 starred fields are the only ambispective source-input blockers.
+
 ## Branch Shape
 
 The existing workflow routes `selectYourTypeOfStudy = Ambispective` through this sequence:
@@ -200,7 +202,8 @@ Use `references/prs-xml.md` for the canonical PRS template, required reviewer-co
 ## QA Rules
 
 - Do not generate final ambispective outputs until `build_n8n_ambispective_fields.py --check` reports no blank required fields.
-- Do not generate final PRS XML until `build_prs_xml_fields.py --check` reports no missing PRS inputs and `validate_prs_xml.py` passes after rendering.
+- `build_prs_xml_fields.py --check` reports all PRS gaps and a `blocking_missing` subset. Ask the reviewer only when `blocking_missing_count` is nonzero; nonstar administration gaps remain visible but nonblocking.
+- Do not present final PRS XML as technically valid until `validate_prs_xml.py` passes after rendering.
 - Keep missing optional administrative fields blank rather than inventing them.
 - Preserve n8n typos such as `sponsortName`, `sponsortAdress`, `ibrName`, `ibrAdress`, `studyCordinatorName`, and `icfStudyLenght&Participants`; copied templates may use those exact names.
 - The protocol, ICF, and XML fields must come from the same reviewed `study.reference.json`.

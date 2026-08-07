@@ -87,6 +87,7 @@ SECTION_SPECS: list[tuple[str, list[str]]] = [
         "Design And Interventions",
         [
             "design.study_design",
+            "design.number_of_sites",
             "design.study_arm",
             "design.arms",
             "design.groups",
@@ -159,6 +160,7 @@ SECTION_SPECS: list[tuple[str, list[str]]] = [
             "risks_benefits.risks",
             "risks_benefits.benefits",
             "risks_benefits.side_effects",
+            "risks_benefits.compensation_or_reimbursement",
             "risks_benefits.compensation",
             "risks_benefits.reimbursement",
             "risks_benefits.payment",

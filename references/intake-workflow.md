@@ -25,10 +25,10 @@ Create or update `reference/study.reference.json` in this order:
 2. Normalize the study type branch using `references/study-type-branches.md`.
 3. Set `meta.document_set` from the branch before selecting templates.
 4. Add `null` for expected fields that are not present.
-5. Add every missing, ambiguous, or conflicting item to `needs_review`.
+5. Add every missing, ambiguous, or conflicting item to `needs_review`. Record all starred-field candidates under `source.field_candidates`. Follow `references/starred-fillout-required-inputs.md` for prospective/ambispective and `references/retrospective-required-inputs.md` for retrospective.
 6. Draft generated narrative fields only after the factual fields are filled.
 7. Keep generated narrative under `generated`, not mixed into factual fields.
-8. Run `scripts/check_required_inputs.py` before creating the reviewer-facing source Markdown. If required inputs are missing, ask for them and do not create the source Markdown yet.
+8. Run `scripts/check_required_inputs.py` before creating the reviewer-facing source Markdown. In every branch, this stops only for a missing starred field or conflicting distinct candidates for a starred field. If blocking inputs remain, ask for them together and do not create the source Markdown yet.
 9. Set `approval.status` to `pending_review` after creating or parsing a review-ready source Markdown. If corrections arrive, use `changes_requested` until the revised source Markdown is ready.
 
 ## Generated Text Rules

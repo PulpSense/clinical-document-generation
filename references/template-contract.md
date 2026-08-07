@@ -110,7 +110,7 @@ For tables, put the loop around the row that must repeat.
 
 Any generated DOCX that contains a static index or table of contents must use real right-aligned dot-leader tab stops for page numbers. Manual dot strings are not acceptable, even when the page numbers are correct.
 
-After rendering the DOCX to the same PDF engine the reviewer will inspect, run `scripts/refresh_static_toc.py`. This script refreshes page values and normalizes static index/TOC rows to `title<TAB>page` with a right-aligned dot leader. Re-render/export the DOCX and run `scripts/audit_static_toc.py`. The final audit must report zero page mismatches, zero missing headings, and zero alignment mismatches before the DOCX is considered complete.
+After generating the DOCX, run `scripts/export_docx_to_pdf.py` in automatic mode. If a renderer is available, run `scripts/refresh_static_toc.py`, re-export, and run `scripts/audit_static_toc.py`. The final audit must report zero page mismatches, zero missing headings, and zero alignment mismatches before the DOCX is considered visually verified. If no renderer is available, the DOCX remains a valid deliverable, but record and disclose that PDF-based visual/TOC QA was skipped.
 
 The audit must treat TOC/index pages as front matter, not as the real location of later content. For any entry after the `TABLE OF CONTENTS` or `INDEX` entry, the heading search must start on the first page after the rendered TOC/index. This is required for all document sets and study branches so an index row cannot satisfy its own page lookup.
 

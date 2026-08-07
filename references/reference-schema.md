@@ -29,22 +29,22 @@ Use `reference/study.reference.json` as the internal machine-readable cache for 
 ## Field Guidance
 
 - `meta`: run metadata and identifiers, such as `protocol_number`, `version`, `date`, `study_type`, and `document_set`. `study_type` must normalize to `Prospective`, `Ambispective`, or `Retrospective`.
-- `source`: intake channel, preserved context summary, and source Markdown metadata, such as `channel`, `raw_files`, `transcript_files`, `notes`, `source_of_truth_file`, `source_of_truth_md`, `source_of_truth_status`, and source Markdown timestamps.
+- `source`: intake channel, preserved context summary, source Markdown metadata, and draft extraction provenance, such as `channel`, `raw_files`, `transcript_files`, `notes`, `field_candidates`, `source_of_truth_file`, `source_of_truth_md`, `source_of_truth_status`, and source Markdown timestamps. Use `field_candidates` as described in the branch input contract so conflicting starred inputs can be detected deterministically.
 - `template_fields`: compatibility values for client templates that use legacy flat placeholders, especially n8n-style protocol fields such as `AI_shortTitle` and `protocolNumber`.
 - `approval`: review workflow state, such as `status`, `review_file`, `approved_by`, `approved_at`, and `notes`. Use `pending_review`, `changes_requested`, or `approved`.
 - `study`: core study facts, such as `title`, `short_title`, `condition`, `background`, `unmet_need`, `hypothesis`, and `timeline`.
 - `parties`: sponsor, funding source, principal investigator, sub-investigators, study coordinator, IRB/ethics committee, and other responsible parties.
 - `sites`: array of site objects with facility, address, contact, backup contact, and investigator details.
 - `population`: sample size, sample justification, inclusion criteria, exclusion criteria, ages, sex/gender, and study population wording.
-- `design`: study design, arms/groups, intervention/test articles, control articles, masking/blinding, bias minimization, and data sources.
+- `design`: study design, number of sites, arms/groups, intervention/test articles, control articles, masking/blinding, bias minimization, and data sources.
 - `objectives`: primary, secondary, and exploratory objectives.
 - `endpoints`: primary, secondary, exploratory, and safety endpoints. Keep endpoint text and timing separate when possible.
 - `procedures`: visit schedule, assessments, data collection, case selection, privacy protocol, and study procedure text.
 - `statistics`: analysis plan, analysis data sets, methodology, considerations, sample size justification, enrollment, and groups.
-- `risks_benefits`: risks, benefits, side effects, compensation, reimbursement, and participant-facing text for ICF content.
+- `risks_benefits`: risks, benefits, side effects, combined compensation/reimbursement form input, and participant-facing text for ICF content.
 - `generated`: agent-generated text that templates use directly. Group by document, for example `generated.protocol.introduction`, `generated.icf.study_purpose`, and `generated.short.summary`.
 - `regulatory`: XML-specific values and flags. Keep jurisdiction-specific mappings here instead of hardcoding them in scripts. For ClinicalTrials.gov PRS XML, put reviewer-controlled values under `regulatory.prs`.
-- `needs_review`: array of review items with `field`, `issue`, and optional `source`.
+- `needs_review`: array of review items with `field`, `issue`, and optional `source` and `kind`. For a starred-field conflict in any branch, set `kind` to `conflict`; ordinary review notes remain nonblocking.
 
 ## Minimal Example
 

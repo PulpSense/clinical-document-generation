@@ -2,6 +2,8 @@
 
 Use this reference when `meta.study_type` is `Prospective`.
 
+Read `references/starred-fillout-required-inputs.md` first. Its 35 starred fields are the only prospective source-input blockers.
+
 ## Branch Shape
 
 The existing workflow routes `selectYourTypeOfStudy = Prospective` through this sequence:
@@ -194,7 +196,7 @@ Use `references/prs-xml.md` for the canonical PRS template, required reviewer-co
 ## QA Rules
 
 - Do not generate final prospective outputs until `build_n8n_prospective_fields.py --check` reports no blank required fields.
-- Do not generate final PRS XML until `build_prs_xml_fields.py --check` reports no missing PRS inputs and `validate_prs_xml.py` passes after rendering.
+- For prospective runs, `build_prs_xml_fields.py --check` distinguishes missing PRS values from blocking missing starred inputs. Nonstar PRS administration gaps remain visible but do not trigger intake follow-up. Do not present XML as technically valid unless `validate_prs_xml.py` passes after rendering.
 - Keep missing optional administrative fields blank rather than inventing them.
 - Preserve n8n typos such as `sponsortName`, `sponsortAdress`, `ibrName`, `ibrAdress`, and `studyCordinatorName`; copied templates may use those exact names.
 - The ICF and XML fields must come from the same reviewed `study.reference.json` as the protocol.

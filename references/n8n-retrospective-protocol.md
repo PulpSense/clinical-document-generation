@@ -2,6 +2,8 @@
 
 Use this reference when `meta.study_type` is `Retrospective`, especially for studies like MB-25-01.
 
+Read `references/retrospective-required-inputs.md` first. Its 21 starred fields are the only retrospective source-input blockers.
+
 ## Document Classification
 
 MB-25-01 is a retrospective clinical study protocol. More specifically, it is a retrospective, single-surgeon surgical video and medical-record review comparing two vitrectomy platforms:
@@ -234,5 +236,5 @@ Expected n8n retrospective protocol placeholders:
 Notes:
 
 - Keep the n8n typo `irbAdress` and `sponsortName` because the template may contain those exact placeholders.
-- The n8n workflow derives `protocolNumber` from investigator initials and the current year when no explicit number exists. Prefer a reviewed `meta.protocol_number` if provided.
+- The n8n workflow derives `protocolNumber` from investigator initials and the current year when no explicit number exists. Prefer a reviewed `meta.protocol_number` if provided, but never ask for it solely to pass retrospective intake.
 - Preserve `template_fields` for rendering, but keep clinical facts and generated prose in the structured reference sections.

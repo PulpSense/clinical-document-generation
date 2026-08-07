@@ -41,23 +41,23 @@ The renderer uses `meta.document_set`. Templates that are present but not listed
 
 ### Prospective
 
-Prospective studies require enough detail for protocol, participant-facing ICF, and XML:
-
-- Sponsor, investigator affiliation, sites, objectives, endpoints, procedures, inclusion/exclusion criteria.
-- Visit schedule, interventions/test articles, risks, benefits, privacy, compensation/reimbursement when applicable.
-- PRS XML-specific regulatory values under `regulatory.prs`, including provider study ID, org name, overall status, IRB approval status, study UID/outcome UID, and overall contact.
+Read `references/starred-fillout-required-inputs.md`. The prospective source-input gate is defined only by the 35 fields/groups marked with `*` in Fillout. Stop when one is missing or has more than one distinct source candidate. Do not promote optional form fields, generated narrative, or PRS administration fields into prospective intake blockers.
 
 ### Ambispective
 
-Ambispective studies follow the prospective document set, but the reference must separate retrospective and prospective data collection:
+Read `references/starred-fillout-required-inputs.md`. The confirmed ambispective form has the same 35 starred fields and stop behavior as the prospective form. Protocol numbers, PI affiliation, PRS administration values, study UID, and overall contact are not intake blockers unless they are part of a conflict involving a starred field.
+
+Ambispective studies follow the prospective document set, but generated content must separate retrospective and prospective data collection:
 
 - Existing/historical data sources.
 - Prospective visits, procedures, or follow-up.
 - Which endpoints come from historical review versus prospective collection.
 - ICF language appropriate to the prospective portion.
-- PRS XML-specific regulatory values under `regulatory.prs`, using the same source-controlled fields as prospective studies.
+- PRS XML-specific regulatory values under `regulatory.prs` when supplied. Missing nonstar PRS administration values remain visible but do not trigger intake questions.
 
 ### Retrospective
+
+Read `references/retrospective-required-inputs.md`. The retrospective source-input gate is defined only by its 21 confirmed starred fields. `meta.protocol_number`, funding-source details, facility city, sub-investigator, test articles, and references are not intake blockers.
 
 Retrospective studies follow the protocol-only branch from the current workflow:
 
@@ -74,4 +74,4 @@ Run:
 python3 scripts/validate_reference.py --run-dir <run-dir>
 ```
 
-Validation checks `meta.study_type`, `meta.document_set`, required branch fields, required templates for that branch, and placeholders in active templates.
+Validation checks `meta.study_type`, `meta.document_set`, required branch fields, required templates for that branch, and placeholders in active templates. Technical parser, approval, rendering, controlled-vocabulary, and XML failures may still stop a prospective or ambispective run after the source-input gate passes.

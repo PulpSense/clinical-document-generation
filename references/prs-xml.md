@@ -14,9 +14,9 @@ Do not create XML from scratch. Preserve the PRS element names, major order, req
 
 Retrospective studies do not generate XML in the n8n workflow unless the user/client explicitly overrides the branch and supplies a retrospective XML template.
 
-## Required Source Fields
+## PRS Field Completeness
 
-Before creating the named source Markdown, prospective and ambispective references must include these reviewer-controlled PRS fields:
+These PRS values should be reviewer-controlled when supplied:
 
 - `regulatory.prs.provider_study_id`
 - `regulatory.prs.org_name`
@@ -25,7 +25,7 @@ Before creating the named source Markdown, prospective and ambispective referenc
 - `regulatory.prs.study_uid`
 - `parties.overall_contact`
 
-Do not guess these fields. If they are absent, keep them missing or add `needs_review`; `scripts/check_required_inputs.py` must block source Markdown creation until they are provided.
+Do not guess these fields. They are not starred Fillout fields in either prospective or ambispective intake: keep absent values blank or add nonblocking `needs_review` items, and do not ask follow-up questions solely for them. Read `references/starred-fillout-required-inputs.md` for the shared gate.
 
 Use `regulatory.prs.last_follow_up_date_type` whenever `procedures.last_follow_up_date` or `regulatory.prs.last_follow_up_date` is present.
 
@@ -90,4 +90,4 @@ Use these defaults only when the source does not explicitly provide a value:
 - `delayedPosting`: `No`
 - `sharingIPD` and `sharingIpd`: `No`
 
-`irbApprovalStatus` has no default. It must come from the source/client correction.
+`irbApprovalStatus` has no default. Keep it blank when it is absent. Its absence is nonblocking during prospective and ambispective intake, although the final rendered XML must still pass technical validation.
