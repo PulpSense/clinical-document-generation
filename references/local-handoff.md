@@ -32,7 +32,7 @@ The command copies the bundled client templates for the selected study type. Ret
 python3 scripts/check_required_inputs.py --run-dir runs/<study-slug>
 ```
 
-If `reference/missing-inputs.md` lists missing inputs, ask the reviewer for those inputs before creating the structured source Markdown.
+If `reference/missing-inputs.md` lists blocking inputs, ask the reviewer for them before creating the structured source Markdown. For every study type, this report contains only missing or conflicting starred Fillout fields.
 
 3. Create the reviewer-facing Markdown source document:
 
@@ -76,7 +76,7 @@ For prospective and ambispective XML runs, then populate PRS XML placeholders:
 python3 scripts/build_prs_xml_fields.py --run-dir runs/<study-slug>
 ```
 
-If this reports missing PRS inputs, resolve them with the reviewer before final generation.
+For prospective and ambispective studies, stop only when this reports `blocking_missing_count` greater than zero. Other PRS gaps remain visible as nonblocking review notes.
 
 5. Record approval when the reviewer approves the source Markdown, unless approval was already recorded by the parser:
 
@@ -103,14 +103,21 @@ python3 scripts/render_templates.py --run-dir runs/<study-slug> --require-approv
 python3 scripts/validate_prs_xml.py --run-dir runs/<study-slug>
 ```
 
-9. For any DOCX output with a static index or table of contents, render the DOCX to PDF, refresh the static TOC/index page values and alignment, then audit both page values and right-aligned dot-leader formatting:
+9. After DOCX generation, try the platform-aware PDF exporter:
 
 ```bash
-python3 scripts/refresh_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/pages-render/<document>.pdf --report runs/<study-slug>/logs/toc-refresh.json
-python3 scripts/audit_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/pages-render/<document>.pdf --output runs/<study-slug>/logs/toc-audit.json
+python3 scripts/export_docx_to_pdf.py runs/<study-slug>/output/<document>.docx runs/<study-slug>/logs/docx-render/<document>.pdf --report runs/<study-slug>/logs/docx-render/<document>.json
 ```
 
-Use the same PDF renderer the reviewer will inspect. For Apple Pages review, export the final DOCX from Pages, refresh the TOC/index from that Pages-generated PDF, export from Pages again, and audit the final Pages-generated PDF. If the refresh report updates page values or alignment, re-render/re-export before the final audit. Do not ship while `toc-audit.json` has page mismatches, missing headings, or alignment mismatches.
+Automatic mode tries Pages on macOS, Word on Windows, and LibreOffice on Linux. If the report status is `unavailable`, retain the generated DOCX, skip PDF/TOC commands, and disclose the QA limitation. If the report status is `exported` and the DOCX has a static index or table of contents, refresh and audit it:
+
+```bash
+python3 scripts/refresh_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/docx-render/<document>.pdf --report runs/<study-slug>/logs/toc-refresh.json
+python3 scripts/export_docx_to_pdf.py runs/<study-slug>/output/<document>.docx runs/<study-slug>/logs/docx-render/<document>.pdf --report runs/<study-slug>/logs/docx-render/<document>.json
+python3 scripts/audit_static_toc.py --docx runs/<study-slug>/output/<document>.docx --pdf runs/<study-slug>/logs/docx-render/<document>.pdf --output runs/<study-slug>/logs/toc-audit.json
+```
+
+If the refresh report updates page values or alignment, re-render before the final audit. When a renderer is available, do not ship while `toc-audit.json` has page mismatches, missing headings, or alignment mismatches.
 
 When auditing a static TOC/index, do not accept matches found on the TOC/index pages for entries that come after the TOC/index entry. The audit must verify the real heading location after the rendered TOC/index ends, otherwise the index can accidentally validate itself.
 
@@ -121,6 +128,7 @@ runs/<study-slug>/output/protocol.docx
 runs/<study-slug>/output/icf.docx
 runs/<study-slug>/output/study.xml
 runs/<study-slug>/logs/generation-report.json
+runs/<study-slug>/logs/docx-render/<document>.json
 runs/<study-slug>/logs/toc-refresh.json
 runs/<study-slug>/logs/toc-audit.json
 ```
@@ -142,7 +150,7 @@ Do not mark a run complete when:
 - `missing_count` is greater than `0`.
 - `unresolved_output_placeholders` contains any values.
 - `approval_status` is not `approved`.
-- Critical study-specific values remain in `needs_review`.
+- Branch-blocking starred-field conflicts remain in `needs_review`; optional and generic notes do not block.
 - Required inputs still appear in `reference/missing-inputs.md`.
 - The approved source Markdown was not parsed or confirmed.
 - PRS XML validation has not passed for a prospective or ambispective XML run.

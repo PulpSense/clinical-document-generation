@@ -8,7 +8,12 @@ import json
 from pathlib import Path
 
 from scan_placeholders import scan_path
-from study_type_branches import DOC_TEMPLATES, validate_branch
+from study_type_branches import (
+    DOC_TEMPLATES,
+    branch_for_study_type,
+    starred_review_item_is_blocking,
+    validate_branch,
+)
 
 
 STANDARD_TEMPLATES = list(dict.fromkeys(DOC_TEMPLATES.values()))
@@ -172,6 +177,18 @@ def normalized_status(reference: dict) -> str:
     return str(approval.get("status") or "").strip().lower()
 
 
+def blocking_review_items(reference: dict, needs_review: list) -> list:
+    meta = reference.get("meta") if isinstance(reference.get("meta"), dict) else {}
+    branch = branch_for_study_type(meta.get("study_type"))
+    if not branch or not branch.get("source_required_fields"):
+        return needs_review
+    blocking = []
+    for item in needs_review:
+        if starred_review_item_is_blocking(item, branch["source_required_fields"]):
+            blocking.append(item)
+    return blocking
+
+
 def validate_approval(reference: dict, needs_review: list) -> list[dict]:
     missing = []
     if normalized_status(reference) != "approved":
@@ -185,7 +202,7 @@ def validate_approval(reference: dict, needs_review: list) -> list[dict]:
         missing.append(
             {
                 "field": "needs_review",
-                "issue": "Final generation requires needs_review to be empty.",
+                "issue": "Final generation requires all branch-blocking needs_review items to be resolved.",
             }
         )
     source = reference.get("source")
@@ -211,7 +228,7 @@ def main() -> int:
     parser.add_argument(
         "--require-approval",
         action="store_true",
-        help="Fail validation unless approval.status is approved and needs_review is empty.",
+        help="Fail unless approval is recorded and no branch-blocking review items remain.",
     )
     args = parser.parse_args()
 
@@ -242,8 +259,9 @@ def main() -> int:
     missing = branch_missing + missing
     warnings = branch_warnings + warnings
     needs_review = reference.get("needs_review") or []
+    blocking_needs_review = blocking_review_items(reference, needs_review)
     if args.require_approval:
-        missing = validate_approval(reference, needs_review) + missing
+        missing = validate_approval(reference, blocking_needs_review) + missing
     write_missing_fields(missing_path, missing, warnings, needs_review)
 
     report = {
@@ -255,6 +273,7 @@ def main() -> int:
         "missing_count": len(missing),
         "warning_count": len(warnings),
         "needs_review_count": len(needs_review),
+        "blocking_needs_review_count": len(blocking_needs_review),
         "approval_status": normalized_status(reference) or None,
         "approval_required": bool(args.require_approval),
         "missing": missing,

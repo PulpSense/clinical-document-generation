@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from study_type_branches import branch_for_study_type, starred_requirement_for_field
+
 
 STANDARD_REFERENCE = "reference/study.reference.json"
 STANDARD_TEMPLATE = "templates/study.template.xml"
@@ -484,6 +486,15 @@ def add_review_item(reference: dict, field: str, issue: str) -> None:
     reference["needs_review"] = items
 
 
+def blocking_missing_items(reference: dict, missing: list[dict]) -> list[dict]:
+    meta = reference.get("meta") if isinstance(reference.get("meta"), dict) else {}
+    branch = branch_for_study_type(meta.get("study_type"))
+    if not branch or not branch.get("source_required_fields"):
+        return missing
+    requirements = branch["source_required_fields"]
+    return [item for item in missing if starred_requirement_for_field(item.get("field"), requirements)]
+
+
 def add_indexed_outcome_fields(fields: dict, prefix: str, item: dict) -> None:
     fields[f"{prefix}Measure"] = item["measure"]
     fields[f"{prefix}OutcomeMeasure"] = item["measure"]
@@ -541,7 +552,7 @@ def build_fields(reference: dict, template_path: Path) -> tuple[dict, list[dict]
             "__xml_profile": "clinicaltrials-prs",
             "providerStudyId": first_path(reference, "regulatory.prs.provider_study_id", "regulatory.provider_study_id"),
             "orgName": first_path(reference, "regulatory.prs.org_name", "regulatory.org_name"),
-            "protocolNumber": first_path(reference, "meta.protocol_number"),
+            "protocolNumber": first_path(reference, "meta.protocol_number") or text(existing.get("protocolNumber")),
             "providerName": first_path(reference, "regulatory.prs.provider_name", "regulatory.provider_name") or "NLM_DES",
             "overallStatus": overall_status,
             "fdaRegulatedDrug": first_path(reference, "regulatory.prs.fda_regulated_drug") or fda_drug,
@@ -759,10 +770,23 @@ def main() -> int:
     template_path = Path(args.template).expanduser().resolve() if args.template else run_dir / STANDARD_TEMPLATE
     reference = load_json(reference_path)
     fields, missing = build_fields(reference, template_path)
+    blocking_missing = blocking_missing_items(reference, missing)
 
     if args.check:
-        print(json.dumps({"missing_count": len(missing), "missing": missing, "template_fields": fields}, indent=2, ensure_ascii=False))
-        return 1 if missing else 0
+        print(
+            json.dumps(
+                {
+                    "missing_count": len(missing),
+                    "blocking_missing_count": len(blocking_missing),
+                    "missing": missing,
+                    "blocking_missing": blocking_missing,
+                    "template_fields": fields,
+                },
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return 1 if blocking_missing else 0
 
     merged = reference.get("template_fields") if isinstance(reference.get("template_fields"), dict) else {}
     merged.update(fields)
@@ -780,13 +804,15 @@ def main() -> int:
                 "updated": display_path(reference_path, run_dir),
                 "field_count": len(fields),
                 "missing_count": len(missing),
+                "blocking_missing_count": len(blocking_missing),
                 "missing": missing,
+                "blocking_missing": blocking_missing,
                 "prs_counts": fields["__prs_counts"],
             },
             indent=2,
         )
     )
-    return 1 if missing else 0
+    return 1 if blocking_missing else 0
 
 
 if __name__ == "__main__":

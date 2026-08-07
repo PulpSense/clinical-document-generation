@@ -8,7 +8,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from study_type_branches import branch_for_study_type, has_meaningful_value
+from study_type_branches import (
+    branch_for_study_type,
+    has_meaningful_value,
+    is_meaningful_value,
+    starred_distinct_candidate_count,
+    starred_requirement_for_field,
+    starred_requirement_value,
+    starred_review_item_is_blocking,
+)
 
 
 STANDARD_REFERENCE = "reference/study.reference.json"
@@ -54,16 +62,42 @@ def missing_inputs(reference: dict) -> list[dict]:
         return missing
 
     canonical = branch["canonical_study_type"]
-    for field in branch.get("source_required_paths", branch["required_paths"]):
-        if not has_meaningful_value(reference, field):
-            append_missing(
-                field,
-                f"Required client/source input for {canonical} source-of-truth review.",
-            )
+    if branch.get("source_required_fields"):
+        requirements = branch["source_required_fields"]
 
-    for item in reference.get("needs_review") or []:
-        field, issue = review_item_text(item)
-        append_missing(field, issue)
+        for requirement in requirements:
+            count = starred_distinct_candidate_count(reference, requirement)
+            if count > 1:
+                append_missing(
+                    requirement["field"],
+                    f"Starred {canonical.lower()} field `{requirement['label']}` has {count} distinct source inputs. Resolve the conflict before continuing.",
+                )
+
+        for item in reference.get("needs_review") or []:
+            if not starred_review_item_is_blocking(item, requirements):
+                continue
+            field, issue = review_item_text(item)
+            requirement = starred_requirement_for_field(field, requirements)
+            if requirement:
+                append_missing(requirement["field"], issue)
+
+        for requirement in requirements:
+            if not is_meaningful_value(starred_requirement_value(reference, requirement)):
+                append_missing(
+                    requirement["field"],
+                    f"Missing starred {canonical.lower()} input: {requirement['label']}.",
+                )
+    else:
+        for field in branch.get("source_required_paths", branch["required_paths"]):
+            if not has_meaningful_value(reference, field):
+                append_missing(
+                    field,
+                    f"Required client/source input for {canonical} source-of-truth review.",
+                )
+
+        for item in reference.get("needs_review") or []:
+            field, issue = review_item_text(item)
+            append_missing(field, issue)
 
     return missing
 
@@ -74,7 +108,7 @@ def write_report(path: Path, run_dir: Path, missing: list[dict]) -> None:
         lines.append("No missing required inputs were detected. The structured source document may be created.")
     else:
         lines.append(
-            "Do not create the structured source document yet. Resolve the missing client/source inputs below, update "
+            "Do not create the structured source document yet. Resolve the missing or conflicting client/source inputs below, update "
             "`reference/study.reference.json`, and rerun the preflight."
         )
         lines.append("")

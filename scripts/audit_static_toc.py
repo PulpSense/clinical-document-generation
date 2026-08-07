@@ -83,6 +83,15 @@ def toc_like_line_count(text: str) -> int:
     return sum(1 for line in text.splitlines() if TOC_LINE_RE.match(normalize(line)))
 
 
+def toc_dot_leader_line_count(text: str) -> int:
+    """Count dot-leader fragments when PDF extraction splits TOC rows.
+
+    Pages/Word exports may put the title, page number, and leader dots on
+    separate extracted lines, so TOC_LINE_RE alone misses continuation pages.
+    """
+    return sum(1 for line in text.splitlines() if re.search(r"\.{5,}", normalize(line)))
+
+
 def page_has_toc_or_index_heading(text: str) -> bool:
     normalized = normalize(text).upper()
     if "TABLE OF CONTENTS" in normalized:
@@ -161,7 +170,8 @@ def toc_end_page(pages: list[str]) -> int:
             return 0
     end = max(toc_pages)
     for page_number in range(end + 1, len(pages) + 1):
-        if toc_like_line_count(pages[page_number - 1]) < 3:
+        page_text = pages[page_number - 1]
+        if toc_like_line_count(page_text) < 3 and toc_dot_leader_line_count(page_text) < 3:
             break
         end = page_number
     return end

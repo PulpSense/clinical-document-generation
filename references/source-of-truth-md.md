@@ -37,6 +37,8 @@ At this stage, the generated source Markdown recorded in `approval.review_file` 
 
 ## Required Input Gate
 
+Read `references/starred-fillout-required-inputs.md` for prospective/ambispective or `references/retrospective-required-inputs.md` for retrospective. Only missing or conflicting starred Fillout fields block this gate; optional and generic review notes do not.
+
 Before creating the named source-of-truth Markdown, run:
 
 ```bash

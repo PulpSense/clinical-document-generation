@@ -310,7 +310,13 @@ def build_fields(reference: dict) -> dict:
     study_design_short = first_text(get_path(reference, "design.study_design"))
     study_arm = first_text(protocol.get("studyArm"), get_path(reference, "design.study_arm"))
     sampling_method = "Probability Simple" if study_arm.lower() == "single arm" else "Non-Probability Simple"
-    icf_payment = first_text(icf.get("icfPayment"), icf.get("payment"), get_path(reference, "risks_benefits.compensation"))
+    icf_payment = first_text(
+        icf.get("icfPayment"),
+        icf.get("payment"),
+        get_path(reference, "risks_benefits.compensation_or_reimbursement"),
+        get_path(reference, "risks_benefits.compensation"),
+        get_path(reference, "risks_benefits.reimbursement"),
+    )
 
     fields = {
         "visitsTable": "",
@@ -346,6 +352,8 @@ def build_fields(reference: dict) -> dict:
         "testArticle(s)": first_text(
             list_article_names(get_path(reference, "design.test_articles")),
             list_article_names(get_path(reference, "design.arms")),
+            get_path(reference, "design.intervention_name"),
+            get_path(reference, "design.intervention.name"),
             get_path(reference, "source.n8n_form_fields.areThereAnyTestArticles"),
         ),
         "investigatorName": pi_name,
@@ -354,7 +362,7 @@ def build_fields(reference: dict) -> dict:
         "controlArticle(s)": first_text(list_article_names(get_path(reference, "design.control_articles"))),
         "sampleSize": first_text(get_path(reference, "population.sample_size")),
         "AI_populationShort": first_text(protocol.get("populationShort"), get_path(reference, "population.study_population")),
-        "sitesNumber": first_text(len(reference.get("sites") or [])),
+        "sitesNumber": first_text(get_path(reference, "design.number_of_sites"), len(reference.get("sites") or [])),
         "studyDesignShort": study_design_short,
         "AI_masked": first_text(protocol.get("masked"), get_path(reference, "design.masking"), "Not applicable"),
         "AI_variables": first_text(protocol.get("variables"), join_paragraphs(get_path(reference, "endpoints.primary"), get_path(reference, "endpoints.secondary"))),
@@ -435,7 +443,12 @@ def build_fields(reference: dict) -> dict:
             ]
             if item
         ),
-        "daysBeforeScreening": first_text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"), "N/A"),
+        "daysBeforeScreening": re.sub(
+            r"\s*days?\s*$",
+            "",
+            first_text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"), "N/A"),
+            flags=re.IGNORECASE,
+        ),
         "studyPurpose": first_text(icf.get("icfPurpose"), icf.get("study_purpose")),
         "icfEligibilityBullets": bulletize(first_text(icf.get("icfEligibilityBullets"), criteria_text(get_path(reference, "population.inclusion_criteria")))),
         "icfVisitsOverview": first_text(icf.get("icfVisitOverview"), icf.get("visits_overview"), icf.get("procedures"), get_path(reference, "procedures.visit_schedule")),

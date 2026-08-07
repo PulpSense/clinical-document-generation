@@ -38,7 +38,7 @@ Before generating the reviewer-facing source Markdown, run:
 python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
-If missing inputs are reported, ask for those inputs before creating the structured document. When the preflight passes, generate the source Markdown:
+If blocking inputs are reported, ask for those inputs before creating the structured document. Ask only for missing or conflicting starred fields, using `references/starred-fillout-required-inputs.md` for prospective/ambispective or `references/retrospective-required-inputs.md` for retrospective. When the preflight passes, generate the source Markdown:
 
 ```bash
 python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
@@ -91,4 +91,4 @@ python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
 python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
 ```
 
-Before running the mapper check, generate the branch-specific n8n/OpenAI narrative fields from the approved input reference and save them under `generated`. Do not mark final outputs complete if validation fails, unresolved placeholders remain, required generated fields remain blank, or `needs_review` is not empty.
+Before running the mapper check, generate the branch-specific n8n/OpenAI narrative fields from the approved input reference and save them under `generated`. Do not mark final outputs complete if validation fails, unresolved placeholders remain, required generated fields remain blank, or branch-blocking review items remain. Optional and generic review notes do not block in any branch.

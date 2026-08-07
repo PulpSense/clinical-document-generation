@@ -90,6 +90,7 @@ def skeleton_reference(created_at: str, study_type: str | None = None) -> dict:
             "raw_files": ["input/raw_context.md"],
             "transcript_files": [],
             "notes": None,
+            "field_candidates": {},
             "source_of_truth_file": None,
             "source_of_truth_md": None,
             "source_of_truth_status": None,
