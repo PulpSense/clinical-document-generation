@@ -24,12 +24,13 @@ Create or update `reference/study.reference.json` in this order:
 1. Fill factual fields copied from source material: title, study type, sponsor, investigator, sites, sample size, endpoints, criteria, procedures, timelines, and regulatory facts.
 2. Normalize the study type branch using `references/study-type-branches.md`.
 3. Set `meta.document_set` from the branch before selecting templates.
-4. Add `null` for expected fields that are not present.
-5. Add every missing, ambiguous, or conflicting item to `needs_review`. Record all starred-field candidates under `source.field_candidates`. Follow `references/starred-fillout-required-inputs.md` for prospective/ambispective and `references/retrospective-required-inputs.md` for retrospective.
-6. Draft generated narrative fields only after the factual fields are filled.
-7. Keep generated narrative under `generated`, not mixed into factual fields.
-8. Run `scripts/check_required_inputs.py` before creating the reviewer-facing source Markdown. In every branch, this stops only for a missing starred field or conflicting distinct candidates for a starred field. If blocking inputs remain, ask for them together and do not create the source Markdown yet.
-9. Set `approval.status` to `pending_review` after creating or parsing a review-ready source Markdown. If corrections arrive, use `changes_requested` until the revised source Markdown is ready.
+4. For prospective or ambispective studies, resolve `meta.icf_template` before the source-of-truth step. Auto-select when exactly one of Advarra or Sterling is stated in the input. Otherwise ask the reviewer to choose. If another IRB is named, explain that only Advarra and Sterling are available and ask which to use. Apply a later answer with `scripts/select_icf_template.py`. Retrospective studies skip this selection.
+5. Add `null` for expected fields that are not present.
+6. Add every missing, ambiguous, or conflicting item to `needs_review`. Record all starred-field candidates under `source.field_candidates`. Follow `references/starred-fillout-required-inputs.md` for prospective/ambispective and `references/retrospective-required-inputs.md` for retrospective.
+7. Draft generated narrative fields only after the factual fields are filled.
+8. Keep generated narrative under `generated`, not mixed into factual fields.
+9. Run `scripts/check_required_inputs.py` before creating the reviewer-facing source Markdown. Clinical inputs stop only for a missing starred field or conflicting distinct candidates for a starred field. Prospective and ambispective runs also stop when the operational Advarra/Sterling ICF template choice has not been resolved. If blocking inputs remain, ask for them together and do not create the source Markdown yet.
+10. Set `approval.status` to `pending_review` after creating or parsing a review-ready source Markdown. If corrections arrive, use `changes_requested` until the revised source Markdown is ready.
 
 ## Generated Text Rules
 

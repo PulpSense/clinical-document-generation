@@ -190,17 +190,18 @@ For real studies, the Hermes agent must follow this sequence:
 1. Preserve raw source material under the run's `input/` directory.
 2. Classify the study as `Prospective`, `Ambispective`, or `Retrospective`.
 3. Draft `reference/study.reference.json`.
-4. Run `python3 scripts/check_required_inputs.py --run-dir <run-dir>`.
-5. If blocking inputs remain, ask for them together and stop. For all three study types, only missing or conflicting starred Fillout fields block this intake step.
-6. Create the reviewer-facing source Markdown with `python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete`.
-7. Send or attach only the generated source Markdown for review.
-8. Wait for explicit reviewer approval or an edited source Markdown upload.
-9. Parse the approved Markdown back into `study.reference.json`.
-10. Generate branch-specific narrative fields with `gpt-5.5` and save them under `generated`.
-11. Run the branch mapper and validation scripts.
-12. Render final DOCX/XML outputs only with `python3 scripts/render_templates.py --run-dir <run-dir> --require-approval`.
-13. Run PRS XML validation for prospective and ambispective XML outputs.
-14. Run `python3 scripts/export_docx_to_pdf.py <input.docx> <output.pdf> --report <report.json>` for optional platform-aware visual QA. If a renderer is available and the DOCX has a static TOC/index, refresh, re-render, and audit it. If no renderer is available, keep the DOCX and disclose that visual/TOC QA was skipped.
+4. For prospective or ambispective studies, resolve Advarra vs Sterling before source-of-truth generation. Auto-select an explicitly named supported template; otherwise ask. Apply a later answer with `python3 scripts/select_icf_template.py --run-dir <run-dir> --choice <advarra|sterling>`. Retrospective studies skip this step.
+5. Run `python3 scripts/check_required_inputs.py --run-dir <run-dir>`.
+6. If blocking inputs remain, ask for them together and stop. Clinical input blockers are limited to missing or conflicting starred Fillout fields; prospective and ambispective runs also require the separate ICF template choice.
+7. Create the reviewer-facing source Markdown with `python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete`.
+8. Send or attach only the generated source Markdown for review.
+9. Wait for explicit reviewer approval or an edited source Markdown upload.
+10. Parse the approved Markdown back into `study.reference.json`.
+11. Generate branch-specific narrative fields with `gpt-5.5` and save them under `generated`.
+12. Run the branch mapper and validation scripts.
+13. Render final DOCX/XML outputs only with `python3 scripts/render_templates.py --run-dir <run-dir> --require-approval`.
+14. Run PRS XML validation for prospective and ambispective XML outputs.
+15. Run `python3 scripts/export_docx_to_pdf.py <input.docx> <output.pdf> --report <report.json>` for optional platform-aware visual QA. If a renderer is available and the DOCX has a static TOC/index, refresh, re-render, and audit it. If no renderer is available, keep the DOCX and disclose that visual/TOC QA was skipped.
 
 Read `SKILL.md` and the referenced files in `references/` for the full workflow before generating real client documents.
 

@@ -24,7 +24,15 @@ python3 scripts/create_run.py \
   --raw-context <source-notes.md>
 ```
 
-The command copies the bundled client templates for the selected study type. Retrospective copies only the protocol template. Prospective and ambispective copy protocol, ICF, and PRS XML templates. Pass explicit `--protocol-template`, `--icf-template`, or `--xml-template` only when replacing a bundled template.
+The command copies the bundled client templates for the selected study type. Retrospective copies only the protocol template. Prospective and ambispective copy protocol and PRS XML templates, then copy the ICF automatically when the raw input names exactly one supported choice: Advarra or Sterling.
+
+Before the source-of-truth step, confirm `meta.icf_template` for every prospective or ambispective run. If the input names neither supported template, ask which to use. If it names another IRB, explain that only Advarra and Sterling are available and ask which one to use. Apply the answer with:
+
+```bash
+python3 scripts/select_icf_template.py --run-dir runs/<study-slug> --choice <advarra|sterling>
+```
+
+Retrospective runs skip this step. Pass explicit `--protocol-template`, `--icf-template`, or `--xml-template` only when replacing a bundled template.
 
 2. Draft the internal reference from the source material, then run the missing-input preflight:
 
@@ -32,7 +40,7 @@ The command copies the bundled client templates for the selected study type. Ret
 python3 scripts/check_required_inputs.py --run-dir runs/<study-slug>
 ```
 
-If `reference/missing-inputs.md` lists blocking inputs, ask the reviewer for them before creating the structured source Markdown. For every study type, this report contains only missing or conflicting starred Fillout fields.
+If `reference/missing-inputs.md` lists blocking inputs, ask the reviewer for them before creating the structured source Markdown. Clinical input blockers are limited to missing or conflicting starred Fillout fields; a prospective or ambispective report can also contain the separate unresolved ICF template choice.
 
 3. Create the reviewer-facing Markdown source document:
 

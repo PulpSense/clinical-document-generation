@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from check_required_inputs import missing_inputs, write_report
+from icf_template_selection import ensure_run_icf_template
 
 
 STANDARD_REFERENCE = "reference/study.reference.json"
@@ -398,6 +399,9 @@ def main() -> int:
     run_dir = Path(args.run_dir).expanduser().resolve()
     reference_path = Path(args.reference).expanduser().resolve() if args.reference else run_dir / STANDARD_REFERENCE
     reference = load_json(reference_path)
+    selection = ensure_run_icf_template(run_dir, reference)
+    if selection.get("choice"):
+        reference_path.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     output_path = Path(args.output).expanduser().resolve() if args.output else default_output_path(run_dir, reference)
 
     missing = missing_inputs(reference)

@@ -37,6 +37,15 @@ Use these defaults from the existing workflow:
 
 The renderer uses `meta.document_set`. Templates that are present but not listed in `meta.document_set` are not rendered.
 
+### ICF Template Selection
+
+Prospective and ambispective runs support two bundled ICF families:
+
+- `Advarra`: branch-specific Advarra template.
+- `Sterling`: one Sterling template shared by both branches.
+
+Resolve the choice before the source-of-truth file is created. If exactly one supported name appears in the source, select it automatically. If no supported name appears, ask whether to use Advarra or Sterling. If an unsupported IRB appears, state that only those two templates are available and ask which to use. Record the result in `meta.icf_template` and apply it with `scripts/select_icf_template.py`. Retrospective runs do not require an ICF choice.
+
 ## Required Reference Focus
 
 ### Prospective

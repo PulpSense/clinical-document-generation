@@ -28,7 +28,7 @@ Use `reference/study.reference.json` as the internal machine-readable cache for 
 
 ## Field Guidance
 
-- `meta`: run metadata and identifiers, such as `protocol_number`, `version`, `date`, `study_type`, and `document_set`. `study_type` must normalize to `Prospective`, `Ambispective`, or `Retrospective`.
+- `meta`: run metadata and identifiers, such as `protocol_number`, `version`, `date`, `study_type`, `document_set`, and `icf_template`. `study_type` must normalize to `Prospective`, `Ambispective`, or `Retrospective`. For prospective and ambispective runs, `icf_template` must be `Advarra` or `Sterling` before source-of-truth generation; retrospective runs leave it unset.
 - `source`: intake channel, preserved context summary, source Markdown metadata, and draft extraction provenance, such as `channel`, `raw_files`, `transcript_files`, `notes`, `field_candidates`, `source_of_truth_file`, `source_of_truth_md`, `source_of_truth_status`, and source Markdown timestamps. Use `field_candidates` as described in the branch input contract so conflicting starred inputs can be detected deterministically.
 - `template_fields`: compatibility values for client templates that use legacy flat placeholders, especially n8n-style protocol fields such as `AI_shortTitle` and `protocolNumber`.
 - `approval`: review workflow state, such as `status`, `review_file`, `approved_by`, `approved_at`, and `notes`. Use `pending_review`, `changes_requested`, or `approved`.

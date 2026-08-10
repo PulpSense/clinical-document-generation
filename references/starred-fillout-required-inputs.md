@@ -9,7 +9,7 @@ Before creating the source-of-truth Markdown, stop only when:
 - one of the starred fields below has no meaningful value; or
 - one starred field has more than one distinct, nonblank source candidate.
 
-Whitespace-only text is missing. Repeated identical values from multiple sources are agreement, not conflict. Multiple items intentionally supplied inside one list or table answer are one field value, not conflicting candidates.
+Whitespace-only text is missing. Repeated identical values from multiple sources are agreement, not conflict. Multiple items intentionally supplied inside one list, table, document, spreadsheet, email, or other uploaded source are one field value, not conflicting candidates when they describe the same required input.
 
 Do not block prospective or ambispective intake for an optional field, an optional `needs_review` item, missing AI-generated prose, or missing PRS administration data that was not starred in Fillout. Parser, approval, template-rendering, controlled-vocabulary, and XML-structure failures remain technical blockers.
 
@@ -27,7 +27,7 @@ Do not block prospective or ambispective intake for an optional field, an option
 - `design.study_design`: study design.
 - `design.intervention_name`: intervention name.
 - `design.intervention_type`: intervention type.
-- `design.number_of_sites`: number of investigational sites. This value must be supplied separately from the facilities table. Stop if it conflicts with the number of meaningful facility rows.
+- `design.number_of_sites`: number of investigational sites. This value must be supplied separately from the facility/site information. Stop if it conflicts with the number of meaningful facility entries extracted from the source material.
 - `endpoints.primary`: the combined primary/secondary endpoint answer. Preserve secondary and exploratory items under their normal endpoint keys when supplied, but the Fillout gate is the combined answer.
 - `procedures.assessments`: planned assessments and schedule. `procedures.visit_schedule` may satisfy the same form field when it contains the assessment schedule.
 
@@ -63,11 +63,11 @@ The business and office phone fields are independently starred. Even when the sa
 
 ### Participating Sites And Staff
 
-- `sites.facilities`: at least one meaningful facility row under `sites[].facility`.
-- `sites.contacts`: at least one meaningful site-contact row under `sites[].contact` or `sites[].contacts`.
-- `sites.investigators`: at least one meaningful site-investigator row under `sites[].investigator` or `sites[].investigators`.
+- `sites.facilities`: at least one meaningful facility entry, normalized under `sites[].facility`.
+- `sites.contacts`: at least one meaningful site-contact entry, normalized under `sites[].contact` or `sites[].contacts`.
+- `sites.investigators`: at least one meaningful site-investigator entry, normalized under `sites[].investigator` or `sites[].investigators`.
 
-These three starred tables must each be supplied; values from the separate study-coordinator and principal-investigator fields do not silently replace a missing table. Facility IDs and facility-reference IDs may be generated deterministically. Multiple rows in any of these tables are valid and are not conflicts.
+These three starred site/staff information groups must each be supplied, but the client does not need to provide them as table inputs. If the information appears in another uploaded format, extract it and normalize it into the structured `sites[]` fields. Values from the separate study-coordinator and principal-investigator fields do not silently replace missing site/staff information. Facility IDs and facility-reference IDs may be generated deterministically. Multiple facilities, contacts, or investigators are valid and are not conflicts.
 
 ## Optional Fields
 
@@ -99,6 +99,6 @@ During extraction, preserve prospective and ambispective starred-field candidate
 }
 ```
 
-For a list or table supplied as one candidate, wrap the entire value in a `value` object. Do not flatten its rows into separate candidates.
+For a list, table, document section, spreadsheet range, email, or other uploaded source supplied as one candidate, wrap the entire value in a `value` object. Do not flatten its entries into separate conflicting candidates.
 
 If candidate values conflict, keep the canonical field unresolved, add a field-specific `needs_review` item with `"kind": "conflict"`, and run `scripts/check_required_inputs.py`. After the reviewer resolves the conflict, retain only the selected value or identical agreeing candidates. Generic review notes on populated starred fields are nonblocking.

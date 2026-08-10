@@ -29,6 +29,7 @@ any unstructured input
   -> save raw source material
   -> classify Prospective, Ambispective, or Retrospective branch
   -> draft internal reference/study.reference.json
+  -> for Prospective/Ambispective, resolve Advarra vs Sterling ICF template
   -> stop and ask for missing source inputs if preflight fails
   -> create one input-only reference/source-of-truth--<protocol>--<study-slug>.md for reviewer correction/approval
   -> parse the saved source-of-truth Markdown back into study.reference.json after every approval
@@ -48,15 +49,28 @@ Run script commands from this skill folder, or use absolute paths to the skill's
 3. If the source material is unstructured, read `references/intake-workflow.md`, then normalize the source into `input/` and draft `reference/study.reference.json`.
 4. Read `references/study-type-branches.md`. Normalize `meta.study_type` to `Prospective`, `Ambispective`, or `Retrospective`, then set `meta.document_set` for that branch.
 5. Read `references/reference-schema.md`, then create or update the internal draft reference. Keep uncertain values as `null` and record questions in `needs_review`; do not hide gaps by inventing data. For a prospective or ambispective study, read `references/starred-fillout-required-inputs.md`. For a retrospective study, read `references/retrospective-required-inputs.md`. Record starred-field candidates under `source.field_candidates`, and distinguish repeated identical evidence from conflicting distinct values.
-6. Read `references/source-of-truth-md.md`, then run the client/source-input preflight before creating any structured source document:
+6. For `Prospective` and `Ambispective`, resolve the ICF template before creating the source-of-truth file. Inspect the user's current message, preserved raw context, and IRB name:
+   - If exactly one of `Advarra` or `Sterling` is mentioned, select it automatically. `create_run.py` performs this detection and records the result in `meta.icf_template`.
+   - If neither is mentioned, ask: `Which ICF template should I use: Advarra or Sterling?` Stop until the reviewer answers.
+   - If both are mentioned without a clear single choice, ask which one to use and stop.
+   - If another IRB is named, say that only the Advarra and Sterling ICF templates are available, ask which one to use, and stop.
+   - After a reviewer answers, apply the choice deterministically:
+
+```bash
+python3 scripts/select_icf_template.py --run-dir <run-dir> --choice <advarra|sterling>
+```
+
+This copies the selected asset to `templates/icf.template.docx` and records the choice internally. The Sterling asset is shared by the prospective and ambispective branches. Retrospective runs skip this step because their standard document set has no ICF. Do not put `meta.icf_template` in the reviewer-facing source-of-truth Markdown; it is an operational template choice, not a clinical study input.
+
+7. Read `references/source-of-truth-md.md`, then run the client/source-input preflight before creating any structured source document:
 
 ```bash
 python3 scripts/check_required_inputs.py --run-dir <run-dir>
 ```
 
-For every study type, stop only when a starred Fillout field is missing or has multiple distinct source inputs. Ignore optional and generic `needs_review` items at this gate. If blocking source inputs remain, stop before structured Markdown generation and send `reference/missing-inputs.md` or one concise consolidated checklist to the reviewer. Do not ask the reviewer to supply AI-written protocol, ICF, summary, or XML prose.
+For clinical study inputs, stop only when a starred Fillout field is missing or has multiple distinct source inputs. The only separate operational blocker is the unresolved ICF template choice for a prospective or ambispective run. Ignore optional and generic `needs_review` items at this gate. If blocking inputs remain, stop before structured Markdown generation and send `reference/missing-inputs.md` or one concise consolidated checklist to the reviewer. Do not ask the reviewer to supply AI-written protocol, ICF, summary, or XML prose.
 
-7. When required source inputs are complete, create the reviewer-facing structured Markdown document:
+8. When required source inputs are complete and any required ICF template choice is recorded, create the reviewer-facing structured Markdown document:
 
 ```bash
 python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete
@@ -76,7 +90,7 @@ python3 scripts/parse_source_truth_md.py --run-dir <run-dir> --source-md input/a
 
 After this point, the latest parsed source-of-truth Markdown is authoritative. Do not reinterpret the original messy inputs unless the reviewer provides additional corrections. Do not repair apparent typos or inconsistencies in mapped Markdown values unless they technically break the workflow as described in the source-of-truth authority rule above.
 
-8. Read `references/approval-loop.md`. Only after the reviewer clearly approves the generated or edited source Markdown in a separate approval action, parse the saved Markdown file from disk before recording or relying on approval. This is required even when the reviewer did not upload a separate edited file, because the reviewer may have edited the generated source Markdown in place after it was presented:
+9. Read `references/approval-loop.md`. Only after the reviewer clearly approves the generated or edited source Markdown in a separate approval action, parse the saved Markdown file from disk before recording or relying on approval. This is required even when the reviewer did not upload a separate edited file, because the reviewer may have edited the generated source Markdown in place after it was presented:
 
 ```bash
 python3 scripts/parse_source_truth_md.py \
@@ -99,7 +113,7 @@ python3 scripts/set_approval.py --run-dir <run-dir> --status approved --approved
 
 Use `--approval-status approved --approved-by "<reviewer>"` when parsing an uploaded Markdown file if the accompanying message clearly says it is approved or good to generate. Do not use `approved` for the initial message that supplied raw study input, even if that message asked to create final documents.
 
-9. After source Markdown approval, generate the branch-specific n8n/OpenAI module outputs from the approved input fields and save them under `generated.protocol`, `generated.icf`, `generated.short`, or `generated.xml` as described by the branch reference. Then populate n8n-compatible template fields:
+10. After source Markdown approval, generate the branch-specific n8n/OpenAI module outputs from the approved input fields and save them under `generated.protocol`, `generated.icf`, `generated.short`, or `generated.xml` as described by the branch reference. Then populate n8n-compatible template fields:
 
 ```bash
 # Prospective protocol + ICF + XML branch
@@ -122,39 +136,39 @@ python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
 
 For prospective and ambispective studies, this command reports both all PRS gaps and the subset that corresponds to missing starred fields. Stop and ask the reviewer only when `blocking_missing_count` is nonzero. Nonstar PRS gaps remain visible but nonblocking.
 
-10. Use the bundled templates unless the reviewer/client supplies replacements. `create_run.py` copies the bundled defaults into `templates/` using these standard names:
+11. Use the bundled templates unless the reviewer/client supplies replacements. `create_run.py` copies the bundled defaults into `templates/` using these standard names:
    - `protocol.template.docx`
    - `icf.template.docx`
    - `short.template.docx`
    - `study.template.xml`
-11. Read `references/template-contract.md` before editing templates or mapping placeholders. Templates may vary, but placeholders must map to paths in `study.reference.json` or to n8n-compatible `template_fields`.
-12. Validate the reference file and active branch templates. Use `--require-approval` for final output generation:
+12. Read `references/template-contract.md` before editing templates or mapping placeholders. Templates may vary, but placeholders must map to paths in `study.reference.json` or to n8n-compatible `template_fields`.
+13. Validate the reference file and active branch templates. Use `--require-approval` for final output generation:
 
 ```bash
 python3 scripts/validate_reference.py --run-dir <run-dir>
 python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
 ```
 
-13. Confirm Python 3.9 or newer is available. All scripts use the Python standard library; do not install Python or Node packages:
+14. Confirm Python 3.9 or newer is available. All scripts use the Python standard library; do not install Python or Node packages:
 
 ```bash
 python3 --version
 ```
 
-14. Generate outputs. Use `--require-approval` for final outputs:
+15. Generate outputs. Use `--require-approval` for final outputs:
 
 ```bash
 python3 scripts/render_templates.py --run-dir <run-dir>
 python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
 ```
 
-15. For prospective and ambispective PRS XML runs, validate the rendered XML:
+16. For prospective and ambispective PRS XML runs, validate the rendered XML:
 
 ```bash
 python3 scripts/validate_prs_xml.py --run-dir <run-dir>
 ```
 
-16. DOCX generation must never depend on a desktop office application. After the DOCX exists, use the portable exporter for optional PDF-based visual and static TOC/index QA. Treat these PDFs as internal QA artifacts: do not deliver or list them as user-facing outputs unless the reviewer explicitly asks for PDF files. Automatic mode tries Pages on macOS, Microsoft Word on Windows, and LibreOffice on Linux, with LibreOffice as a fallback where available:
+17. DOCX generation must never depend on a desktop office application. After the DOCX exists, use the portable exporter for optional PDF-based visual and static TOC/index QA. Treat these PDFs as internal QA artifacts: do not deliver or list them as user-facing outputs unless the reviewer explicitly asks for PDF files. Automatic mode tries Pages on macOS, Microsoft Word on Windows, and LibreOffice on Linux, with LibreOffice as a fallback where available:
 
 ```bash
 python3 scripts/export_docx_to_pdf.py \
@@ -189,9 +203,9 @@ If `toc-refresh.json` reports `updated_count` or `aligned_count` greater than ze
 
 The final audit must not count text on the TOC/index pages as evidence that a later heading is on that page. For every TOC/index entry after the TOC/index entry itself, actual-page lookup must begin after the rendered TOC/index ends. This prevents entries such as `4. INTRODUCTION` from being accepted on the index page merely because the index contains that title.
 
-17. Extract or read the rendered DOCX text and inspect static template prose for stale study-specific content before delivery. Placeholder validation alone is insufficient because bundled or client templates may contain hard-coded language from a prior study. Check especially for unrelated procedures or conditions, sponsor/IRB role confusion, duplicate organization suffixes such as `IRB IRB`, incorrect intervention names, and payment, cost, alternative-treatment, privacy, or regulatory-authority language that does not fit the reviewed study. Make narrowly scoped template fixes, rerender, and repeat renderer/TOC QA.
+18. Extract or read the rendered DOCX text and inspect static template prose for stale study-specific content before delivery. Placeholder validation alone is insufficient because bundled or client templates may contain hard-coded language from a prior study. Check especially for unrelated procedures or conditions, sponsor/IRB role confusion, duplicate organization suffixes such as `IRB IRB`, incorrect intervention names, and payment, cost, alternative-treatment, privacy, or regulatory-authority language that does not fit the reviewed study. Make narrowly scoped template fixes, rerender, and repeat renderer/TOC QA.
 
-18. Review `logs/generation-report.json`, `logs/prs-xml-validation.json`, `logs/docx-render/*.json`, `logs/toc-refresh.json`, `logs/toc-audit.json`, `reference/missing_fields.md`, and `reference/review-parse-report.md` when present. Also extract and inspect the complete rendered DOCX text for stale client-template prose before delivery. The bundled prospective templates may contain legacy study-specific language such as cataract surgery, handpieces, treatment assignment, prior-to-surgery replacement, duplicated `IRB IRB`, or unrelated sponsor/payment statements even when all placeholders resolve. Replace or remove such language using only the approved study facts and generated narrative, then re-export and repeat TOC/visual QA. Do not present the output as complete if required placeholders are unresolved, approval is missing, PRS XML validation fails, stale study-specific template content remains, an available renderer finds TOC/index mismatches, or blocking fields remain in `needs_review`. A renderer-unavailable report is a nonblocking QA limitation and must be disclosed. In every branch, only conflict-tagged review items mapped to starred inputs are blocking; optional and generic review notes remain visible.
+19. Review `logs/generation-report.json`, `logs/prs-xml-validation.json`, `logs/docx-render/*.json`, `logs/toc-refresh.json`, `logs/toc-audit.json`, `reference/missing_fields.md`, and `reference/review-parse-report.md` when present. Also extract and inspect the complete rendered DOCX text for stale client-template prose before delivery. The bundled prospective templates may contain legacy study-specific language such as cataract surgery, handpieces, treatment assignment, prior-to-surgery replacement, duplicated `IRB IRB`, or unrelated sponsor/payment statements even when all placeholders resolve. Replace or remove such language using only the approved study facts and generated narrative, then re-export and repeat TOC/visual QA. Do not present the output as complete if required placeholders are unresolved, approval is missing, PRS XML validation fails, stale study-specific template content remains, an available renderer finds TOC/index mismatches, or blocking fields remain in `needs_review`. A renderer-unavailable report is a nonblocking QA limitation and must be disclosed. In every branch, only conflict-tagged review items mapped to starred inputs are blocking; optional and generic review notes remain visible.
 
 ## Run Directory Contract
 
@@ -279,11 +293,12 @@ Hermes owns the channel mechanics: reading Slack/Telegram/email text, receiving 
 
 1. Preserve each message, transcript, and attachment under `input/`.
 2. Update `reference/study.reference.json` from all available source material.
-3. Run `scripts/check_required_inputs.py`. For every study type, ask only for missing or conflicting starred fields. If blocking inputs remain, ask for all of them together and stop before creating the source Markdown.
-4. Run `scripts/create_source_truth_md.py --require-complete`, send or attach the generated source Markdown path from the command output, and stop for reviewer approval.
-5. If the reviewer uploads an edited source Markdown file, preserve it under `input/attachments/` and run `scripts/parse_source_truth_md.py`.
-6. If the reviewer replies with corrections in text or audio instead of editing the Markdown file, update the internal reference, rerun the preflight, and regenerate the named source Markdown.
-7. When the reviewer clearly approves the generated or edited source-of-truth Markdown file, first parse the current saved Markdown with `scripts/parse_source_truth_md.py --source-md <run-dir>/<approval.review_file> --approval-status approved --approved-by "<reviewer>"`, rerun the required-input preflight, review the parse report, then validate and render with `--require-approval`. Do not alter mapped Markdown values before parsing unless a technical issue prevents parsing or final generation.
+3. For prospective or ambispective runs, resolve Advarra vs Sterling and apply the choice before source-of-truth generation. Retrospective runs skip this step.
+4. Run `scripts/check_required_inputs.py`. Ask only for missing or conflicting starred clinical fields plus any unresolved prospective/ambispective ICF template choice. If blocking inputs remain, ask for all of them together and stop before creating the source Markdown.
+5. Run `scripts/create_source_truth_md.py --require-complete`, send or attach the generated source Markdown path from the command output, and stop for reviewer approval.
+6. If the reviewer uploads an edited source Markdown file, preserve it under `input/attachments/` and run `scripts/parse_source_truth_md.py`.
+7. If the reviewer replies with corrections in text or audio instead of editing the Markdown file, update the internal reference, rerun the preflight, and regenerate the named source Markdown.
+8. When the reviewer clearly approves the generated or edited source-of-truth Markdown file, first parse the current saved Markdown with `scripts/parse_source_truth_md.py --source-md <run-dir>/<approval.review_file> --approval-status approved --approved-by "<reviewer>"`, rerun the required-input preflight, review the parse report, then validate and render with `--require-approval`. Do not alter mapped Markdown values before parsing unless a technical issue prevents parsing or final generation.
 
 ## References
 

@@ -27,7 +27,7 @@ Do not block retrospective intake for an optional field, an ordinary `needs_revi
 - `endpoints.primary`: combined key-endpoints answer.
 - `procedures.assessments`: assessments conducted and their schedules. `procedures.visit_schedule` is an accepted compatibility key.
 
-The site count and facility name are independently required form answers. The retrospective form requests one facility name rather than a facilities table, so do not compare `design.number_of_sites` with the number of `sites` rows.
+The site count and facility name are independently required form answers. The retrospective form requests one facility name rather than grouped facility/site information, so do not compare `design.number_of_sites` with the number of `sites` rows.
 
 ### Participant Details And Analysis
 

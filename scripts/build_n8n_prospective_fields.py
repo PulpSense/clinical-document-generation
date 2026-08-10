@@ -181,9 +181,28 @@ def address(value: Any) -> str:
     if isinstance(value, str):
         return value
     if isinstance(value, dict):
+        full_address = text(value.get("full_address")).strip()
+        if full_address:
+            return full_address
         ordered = ["line1", "address_line1", "street", "city", "state", "country", "zip"]
         return ", ".join(text(value.get(key)).strip() for key in ordered if text(value.get(key)).strip())
     return text(value)
+
+
+def street_address(value: Any) -> str:
+    if isinstance(value, str):
+        return value
+    if not isinstance(value, dict):
+        return text(value)
+    street = first_text(value.get("line1"), value.get("address_line1"), value.get("street"))
+    if street:
+        return street
+    full_address = text(value.get("full_address")).strip()
+    city = text(value.get("city")).strip()
+    marker = f", {city}," if city else ""
+    if full_address and marker and marker in full_address:
+        return full_address.split(marker, 1)[0]
+    return full_address
 
 
 def list_article_names(value: Any) -> str:
@@ -317,6 +336,7 @@ def build_fields(reference: dict) -> dict:
         get_path(reference, "risks_benefits.compensation"),
         get_path(reference, "risks_benefits.reimbursement"),
     )
+    facility_address_text = first_text(street_address(facility.get("address")))
 
     fields = {
         "visitsTable": "",
@@ -433,6 +453,7 @@ def build_fields(reference: dict) -> dict:
         "interventionName": first_text(get_path(reference, "design.intervention_name"), get_path(reference, "design.intervention"), get_path(reference, "design.test_articles")),
         "samplingMethod": sampling_method,
         "facilityName": first_text(facility.get("name"), get_path(reference, "parties.sponsor.name")),
+        "facilityAddress": facility_address_text,
         "facilityLocation": ", ".join(
             item
             for item in [
@@ -478,6 +499,48 @@ def build_fields(reference: dict) -> dict:
             "irbAdress": fields["ibrAdress"],
             "irbEmail": fields["ibrEmail"],
             "irbPhone": fields["ibrPhoneNumber"],
+            "sterlingIrbId": first_text(
+                get_path(reference, "parties.irb.id"),
+                get_path(reference, "regulatory.sterling_irb_id"),
+                get_path(reference, "regulatory.irb_id"),
+            ),
+            "AI_alternatives": first_text(
+                icf.get("alternatives"),
+                get_path(reference, "risks_benefits.alternatives"),
+                "You may choose not to participate in this study and discuss other available options with your doctor.",
+            ),
+            "AI_costs": first_text(
+                icf.get("costs"),
+                get_path(reference, "risks_benefits.costs"),
+                "The study team will explain any study-related costs before you decide whether to participate.",
+            ),
+            "AI_injuryCompensation": first_text(
+                icf.get("injury_compensation"),
+                get_path(reference, "risks_benefits.injury_compensation"),
+                "The study team will explain what medical care or compensation may be available for a research-related injury.",
+            ),
+            "AI_privacy": first_text(
+                icf.get("privacy"),
+                get_path(reference, "risks_benefits.privacy"),
+                "Your research information will be stored securely and accessed only by authorized individuals as permitted by law.",
+            ),
+            "AI_authorizationDuration": first_text(
+                icf.get("authorization_duration"),
+                get_path(reference, "risks_benefits.authorization_duration"),
+                "This permission (also called authorization) will not expire.",
+            ),
+            "sterlingSecondaryPhone": (
+                fields["sudyCordinatorOfficePhone"]
+                if fields["sudyCordinatorOfficePhone"] != fields["studyCordinatorPhone"]
+                else ""
+            ),
+            "studyContactPhones": " or ".join(
+                dict.fromkeys(
+                    phone
+                    for phone in (fields["studyCordinatorPhone"], fields["sudyCordinatorOfficePhone"])
+                    if phone
+                )
+            ),
         }
     )
     return fields
