@@ -181,19 +181,19 @@ STARRED_FILLOUT_FIELDS = [
     },
     {
         "field": "sites.facilities",
-        "label": "Facilities table",
+        "label": "Facility information",
         "paths": ["sites"],
         "kind": "facilities_table",
     },
     {
         "field": "sites.contacts",
-        "label": "Contacts table",
+        "label": "Site contact information",
         "paths": ["sites"],
         "kind": "contacts_table",
     },
     {
         "field": "sites.investigators",
-        "label": "Investigators table",
+        "label": "Site investigator information",
         "paths": ["sites"],
         "kind": "investigators_table",
     },
@@ -205,7 +205,7 @@ AMBISPECTIVE_STARRED_FIELDS = STARRED_FILLOUT_FIELDS
 
 # The retrospective Fillout has a smaller, independently confirmed set of 21
 # starred fields. It asks for one facility name rather than the three site
-# tables used by the prospective and ambispective forms.
+# site/staff information groups used by the prospective and ambispective forms.
 RETROSPECTIVE_STARRED_FIELDS = [
     {"field": "study.title", "label": "Full title of the study", "paths": ["study.title"]},
     {

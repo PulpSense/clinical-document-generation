@@ -18,7 +18,14 @@ sys.path.insert(0, str(SCRIPTS_DIR))
 from audit_static_toc import audit  # noqa: E402
 from build_prs_xml_fields import blocking_missing_items  # noqa: E402
 from check_required_inputs import missing_inputs  # noqa: E402
+from create_run import main as create_run_main  # noqa: E402
+from create_source_truth_md import document_markdown  # noqa: E402
 from export_docx_to_pdf import export_docx, main as export_docx_main, renderer_order  # noqa: E402
+from icf_template_selection import (  # noqa: E402
+    BUNDLED_ICF_TEMPLATES,
+    ensure_run_icf_template,
+    resolve_icf_template_choice,
+)
 from pdf_text import extract_pdf_pages  # noqa: E402
 from refresh_static_toc import refresh_docx  # noqa: E402
 from render_templates import (  # noqa: E402
@@ -222,6 +229,21 @@ class RepositoryContractTests(unittest.TestCase):
         self.assertFalse((SCRIPTS_DIR / "package.json").exists())
         self.assertFalse((SCRIPTS_DIR / "package-lock.json").exists())
 
+    def test_sterling_template_is_clean_and_uses_supported_placeholders(self) -> None:
+        template = REPO_ROOT / "assets/client-templates/docx/sterling-icf.template.docx"
+        self.assertTrue(template.is_file())
+        with zipfile.ZipFile(template) as archive:
+            visible_parts = "\n".join(
+                archive.read(name).decode("utf-8", errors="replace")
+                for name in archive.namelist()
+                if name in {"word/document.xml", "word/header2.xml"}
+            )
+        for stale in ("MERGEFIELD", "«", "»", "w:highlight", "xx/xx/xxxx", "XX years"):
+            self.assertNotIn(stale, visible_parts)
+        token_names = {item["name"] for item in scan_path(template) if item["kind"] == "variable"}
+        self.assertIn("AI_studyPurpose", token_names)
+        self.assertIn("sterlingIrbId", token_names)
+
 
 class PortableDocxExporterTests(unittest.TestCase):
     def test_renderer_order_is_platform_aware(self) -> None:
@@ -287,7 +309,7 @@ class PortableDocxExporterTests(unittest.TestCase):
 class StarredInputGateTests(unittest.TestCase):
     def complete_reference(self, study_type: str = "Prospective") -> dict:
         return {
-            "meta": {"study_type": study_type},
+            "meta": {"study_type": study_type, "icf_template": "Advarra"},
             "source": {"field_candidates": {}},
             "study": {
                 "title": "Prospective Study",
@@ -477,6 +499,88 @@ class StarredInputGateTests(unittest.TestCase):
             ],
         )
 
+    def test_tabular_site_input_satisfies_site_groups_before_icf_choice(self) -> None:
+        reference = self.complete_reference()
+        reference["meta"].pop("icf_template")
+        reference["design"]["number_of_sites"] = 2
+        reference["sites"] = [
+            {
+                "facility": {"name": "North Neurology Research Center"},
+                "contact": {"name": "Casey Nguyen", "email": "casey.nguyen@example.org"},
+                "investigators": [{"name": "Dana Roberts", "degrees": "MD"}],
+            },
+            {
+                "facility": {"name": "Lakeside Headache Institute"},
+                "contact": {"name": "Morgan Patel", "email": "morgan.patel@example.org"},
+                "investigators": [{"name": "Lee Martinez", "degrees": "DO"}],
+            },
+        ]
+        reference["source"]["field_candidates"].update(
+            {
+                "sites.facilities": [
+                    {
+                        "source": "prospective_table_input_no_icf_template.md#Participating Facilities",
+                        "value": [site["facility"] for site in reference["sites"]],
+                    }
+                ],
+                "sites.contacts": [
+                    {
+                        "source": "prospective_table_input_no_icf_template.md#Site Contacts",
+                        "value": [site["contact"] for site in reference["sites"]],
+                    }
+                ],
+                "sites.investigators": [
+                    {
+                        "source": "prospective_table_input_no_icf_template.md#Site Investigators",
+                        "value": [site["investigators"] for site in reference["sites"]],
+                    }
+                ],
+            }
+        )
+        missing = missing_inputs(reference)
+        self.assertEqual([item["field"] for item in missing], ["meta.icf_template"])
+
+    def test_non_table_site_input_satisfies_site_groups_before_icf_choice(self) -> None:
+        reference = self.complete_reference()
+        reference["meta"].pop("icf_template")
+        reference["design"]["number_of_sites"] = 2
+        reference["sites"] = [
+            {
+                "facility": {"name": "North Neurology Research Center"},
+                "contact": {"name": "Casey Nguyen", "email": "casey.nguyen@example.org"},
+                "investigators": [{"name": "Dana Roberts", "degrees": "MD"}],
+            },
+            {
+                "facility": {"name": "Lakeside Headache Institute"},
+                "contact": {"name": "Morgan Patel", "email": "morgan.patel@example.org"},
+                "investigators": [{"name": "Lee Martinez", "degrees": "DO"}],
+            },
+        ]
+        reference["source"]["field_candidates"].update(
+            {
+                "sites.facilities": [
+                    {
+                        "source": "prospective_non_table_input_no_icf_template.md#Site narrative",
+                        "value": "Site 01 is North Neurology Research Center; Site 02 is Lakeside Headache Institute.",
+                    }
+                ],
+                "sites.contacts": [
+                    {
+                        "source": "prospective_non_table_input_no_icf_template.md#Site narrative",
+                        "value": "Casey Nguyen and Morgan Patel are the site contacts.",
+                    }
+                ],
+                "sites.investigators": [
+                    {
+                        "source": "prospective_non_table_input_no_icf_template.md#Site narrative",
+                        "value": "Dana Roberts, MD, and Lee Martinez, DO, are the site investigators.",
+                    }
+                ],
+            }
+        )
+        missing = missing_inputs(reference)
+        self.assertEqual([item["field"] for item in missing], ["meta.icf_template"])
+
     def test_optional_review_items_do_not_block_starred_branches(self) -> None:
         for study_type in ("Prospective", "Ambispective"):
             reference = self.complete_reference(study_type)
@@ -598,6 +702,150 @@ class StarredInputGateTests(unittest.TestCase):
         missing, _, active = validate_branch(reference, available)
         self.assertEqual(missing, [])
         self.assertEqual(active, available)
+
+
+class IcfTemplateSelectionTests(unittest.TestCase):
+    def reference(self, study_type: str = "Prospective", irb_name: str = "Example IRB") -> dict:
+        return {
+            "meta": {"study_type": study_type, "document_set": ["protocol_docx", "icf_docx", "xml"]},
+            "parties": {"irb": {"name": irb_name}},
+        }
+
+    def test_detects_a_single_template_mention(self) -> None:
+        result = resolve_icf_template_choice(
+            self.reference(),
+            raw_text="Please use the Sterling IRB consent template.",
+        )
+        self.assertEqual(result["choice"], "Sterling")
+        self.assertEqual(result["reason"], "detected")
+
+    def test_ambiguous_or_unsupported_irb_requires_a_choice(self) -> None:
+        ambiguous = resolve_icf_template_choice(
+            self.reference(),
+            raw_text="Compare the Advarra and Sterling templates.",
+        )
+        self.assertIsNone(ambiguous["choice"])
+        self.assertIn("Both Advarra and Sterling", ambiguous["issue"])
+
+        unsupported = resolve_icf_template_choice(self.reference(irb_name="Central Review IRB"))
+        self.assertIsNone(unsupported["choice"])
+        self.assertIn("only the Advarra and Sterling", unsupported["issue"])
+
+    def test_missing_selection_blocks_before_source_truth(self) -> None:
+        reference = StarredInputGateTests().complete_reference()
+        reference["meta"].pop("icf_template")
+        missing = missing_inputs(reference)
+        self.assertEqual(missing[0]["field"], "meta.icf_template")
+        self.assertIn("before creating the source-of-truth file", missing[0]["issue"])
+
+    def test_sterling_template_is_shared_by_prospective_and_ambispective(self) -> None:
+        self.assertEqual(
+            BUNDLED_ICF_TEMPLATES["Prospective"]["Sterling"],
+            BUNDLED_ICF_TEMPLATES["Ambispective"]["Sterling"],
+        )
+
+    def test_selection_copies_template_and_records_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            (run_dir / "input").mkdir()
+            (run_dir / "input/raw_context.md").write_text("Use Sterling IRB.", encoding="utf-8")
+            reference = self.reference("Ambispective")
+            result = ensure_run_icf_template(run_dir, reference)
+            destination = run_dir / "templates/icf.template.docx"
+            self.assertEqual(result["choice"], "Sterling")
+            self.assertEqual(reference["meta"]["icf_template"], "Sterling")
+            self.assertEqual(
+                destination.read_bytes(),
+                BUNDLED_ICF_TEMPLATES["Ambispective"]["Sterling"].read_bytes(),
+            )
+            manifest = json.loads((run_dir / "input/source_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["templates"]["icf_template"]["selection"], "Sterling")
+
+    def test_create_run_auto_selects_sterling_from_raw_input(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            raw_context = root / "request.md"
+            raw_context.write_text("Please generate this study using the Sterling ICF template.", encoding="utf-8")
+            argv = [
+                "create_run.py",
+                "--root",
+                str(root),
+                "--slug",
+                "auto-sterling",
+                "--study-type",
+                "prospective",
+                "--raw-context",
+                str(raw_context),
+            ]
+            with patch.object(sys, "argv", argv), redirect_stdout(io.StringIO()):
+                self.assertEqual(create_run_main(), 0)
+
+            run_dir = root / "auto-sterling"
+            reference = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
+            manifest = json.loads((run_dir / "input/source_manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(reference["meta"]["icf_template"], "Sterling")
+            self.assertEqual(manifest["templates"]["icf_template"]["selection"], "Sterling")
+            self.assertTrue((run_dir / "templates/icf.template.docx").is_file())
+
+    def test_template_choice_is_not_in_source_of_truth_markdown(self) -> None:
+        reference = StarredInputGateTests().complete_reference()
+        reference["meta"]["icf_template"] = "Sterling"
+        rendered = document_markdown(reference)
+        self.assertNotIn("meta.icf_template", rendered)
+        self.assertNotIn("### Icf template", rendered)
+
+    def test_retrospective_never_requires_icf_selection(self) -> None:
+        reference = self.reference("Retrospective")
+        reference["meta"]["document_set"] = ["protocol_docx"]
+        result = resolve_icf_template_choice(reference, raw_text="Sterling")
+        self.assertFalse(result["required"])
+        self.assertIsNone(result["choice"])
+
+
+class FinalInputFixtureTests(unittest.TestCase):
+    FIXTURE_DIR = REPO_ROOT / "tests" / "final_inputs"
+
+    def complete_reference_without_icf_choice(self) -> dict:
+        reference = StarredInputGateTests().complete_reference()
+        reference["meta"].pop("icf_template", None)
+        reference["parties"]["irb"]["name"] = "PulpSense Central Review Board"
+        reference["design"]["number_of_sites"] = 2
+        reference["sites"] = [
+            {
+                "facility": {"name": "North Neurology Research Center"},
+                "contact": {"name": "Casey Nguyen", "email": "casey.nguyen@example.org"},
+                "investigators": [{"name": "Dana Roberts", "degrees": "MD"}],
+            },
+            {
+                "facility": {"name": "Lakeside Headache Institute"},
+                "contact": {"name": "Morgan Patel", "email": "morgan.patel@example.org"},
+                "investigators": [{"name": "Lee Martinez", "degrees": "DO"}],
+            },
+        ]
+        return reference
+
+    def assert_fixture_leaves_only_icf_choice(self, fixture_name: str) -> None:
+        raw_text = (self.FIXTURE_DIR / fixture_name).read_text(encoding="utf-8")
+        lowered = raw_text.lower()
+        self.assertNotIn("advarra", lowered)
+        self.assertNotIn("sterling", lowered)
+        self.assertNotIn("icf", lowered)
+        self.assertNotIn("icf template", lowered)
+
+        reference = self.complete_reference_without_icf_choice()
+        selection = resolve_icf_template_choice(reference, raw_text=raw_text)
+        self.assertTrue(selection["required"])
+        self.assertIsNone(selection["choice"])
+        self.assertEqual(selection["reason"], "missing")
+
+        missing = missing_inputs(reference)
+        self.assertEqual([item["field"] for item in missing], ["meta.icf_template"])
+
+    def test_final_table_input_leaves_only_icf_template_choice(self) -> None:
+        self.assert_fixture_leaves_only_icf_choice("prospective_table_input_no_icf_template.md")
+
+    def test_final_non_table_input_leaves_only_icf_template_choice(self) -> None:
+        self.assert_fixture_leaves_only_icf_choice("prospective_non_table_input_no_icf_template.md")
 
 
 if __name__ == "__main__":

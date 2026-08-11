@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from icf_template_selection import ensure_run_icf_template, selection_issue
 from study_type_branches import (
     branch_for_study_type,
     has_meaningful_value,
@@ -62,6 +63,11 @@ def missing_inputs(reference: dict) -> list[dict]:
         return missing
 
     canonical = branch["canonical_study_type"]
+    if canonical in {"Prospective", "Ambispective"}:
+        choice = meta.get("icf_template")
+        if not choice or str(choice).strip().lower() not in {"advarra", "sterling", "provided", "custom"}:
+            append_missing("meta.icf_template", selection_issue(reference, "invalid" if choice else "missing"))
+
     if branch.get("source_required_fields"):
         requirements = branch["source_required_fields"]
 
@@ -130,6 +136,9 @@ def main() -> int:
     reference_path = Path(args.reference).expanduser().resolve() if args.reference else run_dir / STANDARD_REFERENCE
     output_path = Path(args.output).expanduser().resolve() if args.output else run_dir / STANDARD_OUTPUT
     reference = load_json(reference_path)
+    selection = ensure_run_icf_template(run_dir, reference)
+    if selection.get("choice"):
+        reference_path.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     missing = missing_inputs(reference)
     write_report(output_path, run_dir, missing)
 

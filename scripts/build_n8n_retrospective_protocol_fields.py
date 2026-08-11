@@ -14,7 +14,9 @@ from typing import Any
 STANDARD_REFERENCE = "reference/study.reference.json"
 NBSP_BULLET = "•\u00a0\u00a0\u00a0\u00a0"
 OPTIONAL_TEMPLATE_FIELDS = {
+    "AI_secondaryOutcomes",
     "AI_exploratoryOutcomes",
+    "AI_studyProcedureBullets",
 }
 
 

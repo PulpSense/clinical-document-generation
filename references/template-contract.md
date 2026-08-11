@@ -88,6 +88,14 @@ templates/icf.template.docx
 templates/short.template.docx
 ```
 
+For prospective and ambispective ICF output, the run must record `meta.icf_template` before source-of-truth generation. `Advarra` selects the branch-specific Advarra asset; `Sterling` selects the shared `sterling-icf.template.docx` asset. Apply a reviewer choice with:
+
+```bash
+python3 scripts/select_icf_template.py --run-dir <run-dir> --choice <advarra|sterling>
+```
+
+The command always writes the selected template to the standard run path `templates/icf.template.docx`, so downstream validation and rendering remain branch-independent.
+
 Recommended examples:
 
 ```text

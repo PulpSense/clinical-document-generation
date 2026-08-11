@@ -37,7 +37,9 @@ At this stage, the generated source Markdown recorded in `approval.review_file` 
 
 ## Required Input Gate
 
-Read `references/starred-fillout-required-inputs.md` for prospective/ambispective or `references/retrospective-required-inputs.md` for retrospective. Only missing or conflicting starred Fillout fields block this gate; optional and generic review notes do not.
+Read `references/starred-fillout-required-inputs.md` for prospective/ambispective or `references/retrospective-required-inputs.md` for retrospective. Only missing or conflicting starred Fillout fields block the clinical-input gate; optional and generic review notes do not. Before this gate, prospective and ambispective runs must also resolve the operational ICF template choice to `Advarra` or `Sterling`. Retrospective runs do not require an ICF choice.
+
+The ICF template choice must remain internal in `meta.icf_template` and must not appear as an editable source-of-truth field. If the input names exactly one supported template, select it automatically. If it names neither, both, or an unsupported IRB, ask the reviewer which supported template to use before running this command.
 
 Before creating the named source-of-truth Markdown, run:
 

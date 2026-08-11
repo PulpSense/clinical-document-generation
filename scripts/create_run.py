@@ -10,6 +10,11 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
+from icf_template_selection import (
+    INTERNAL_PROVIDED_CHOICE,
+    apply_bundled_icf_template,
+    resolve_icf_template_choice,
+)
 from study_type_branches import canonical_study_type, default_document_set
 
 
@@ -27,12 +32,10 @@ STANDARD_TEMPLATE_NAMES = {
 DEFAULT_TEMPLATE_SOURCES = {
     "Prospective": {
         "protocol_template": SKILL_DIR / "assets" / "client-templates" / "docx" / "prospective-protocol.template.docx",
-        "icf_template": SKILL_DIR / "assets" / "client-templates" / "docx" / "prospective-icf.template.docx",
         "xml_template": SKILL_DIR / "assets" / "client-templates" / "prs" / "clinicaltrials_prs_full_placeholder_template.xml",
     },
     "Ambispective": {
         "protocol_template": SKILL_DIR / "assets" / "client-templates" / "docx" / "ambispective-protocol.template.docx",
-        "icf_template": SKILL_DIR / "assets" / "client-templates" / "docx" / "ambispective-icf.template.docx",
         "xml_template": SKILL_DIR / "assets" / "client-templates" / "prs" / "clinicaltrials_prs_full_placeholder_template.xml",
     },
     "Retrospective": {
@@ -74,7 +77,7 @@ def display_path(path: Path, base: Path) -> str:
         return path.name
 
 
-def skeleton_reference(created_at: str, study_type: str | None = None) -> dict:
+def skeleton_reference(created_at: str, study_type: str | None = None, icf_template: str | None = None) -> dict:
     canonical = canonical_study_type(study_type)
     return {
         "meta": {
@@ -84,6 +87,7 @@ def skeleton_reference(created_at: str, study_type: str | None = None) -> dict:
             "date": None,
             "study_type": canonical,
             "document_set": default_document_set(canonical),
+            "icf_template": icf_template,
         },
         "source": {
             "channel": None,
@@ -166,6 +170,11 @@ def main() -> int:
     parser.add_argument("--reference", help="Existing study.reference.json to copy.")
     parser.add_argument("--protocol-template", help="DOCX template for the protocol document.")
     parser.add_argument("--icf-template", help="DOCX template for the informed consent form.")
+    parser.add_argument(
+        "--icf-template-choice",
+        choices=["advarra", "sterling"],
+        help="Bundled ICF template choice. Required before source-of-truth for Prospective/Ambispective runs unless detected from input.",
+    )
     parser.add_argument("--main-template", help="DOCX template for the main document.")
     parser.add_argument("--short-template", help="DOCX template for the short document.")
     parser.add_argument("--xml-template", help="XML template for the study XML.")
@@ -227,6 +236,29 @@ def main() -> int:
                 "path": f"templates/{dest_name}",
                 "source": "bundled_client_template",
             }
+
+    reference = json.loads(reference_dest.read_text(encoding="utf-8"))
+    raw_text = raw_dest.read_text(encoding="utf-8", errors="replace")
+    if args.icf_template:
+        meta = reference.get("meta") if isinstance(reference.get("meta"), dict) else {}
+        meta["icf_template"] = INTERNAL_PROVIDED_CHOICE
+        reference["meta"] = meta
+        if "icf_template" in copied_templates:
+            copied_templates["icf_template"]["selection"] = INTERNAL_PROVIDED_CHOICE
+    elif canonical in {"Prospective", "Ambispective"} and not args.no_default_templates:
+        selection = resolve_icf_template_choice(
+            reference,
+            raw_text=raw_text,
+            requested_choice=args.icf_template_choice,
+        )
+        if selection.get("choice"):
+            destination = apply_bundled_icf_template(run_dir, reference, selection["choice"])
+            copied_templates["icf_template"] = {
+                "path": display_path(destination, run_dir),
+                "source": "bundled_client_template",
+                "selection": selection["choice"],
+            }
+    reference_dest.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
     manifest = {
         "created_at": created_at,
