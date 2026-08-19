@@ -403,21 +403,44 @@ def gate_prs_xml(run_dir: Path, reference: dict, artifacts: dict[str, str]) -> G
     )
 
 
+def default_exporter(docx_path: Path, pdf_path: Path) -> dict:
+    """Export one DOCX to PDF with whatever renderer the host provides."""
+    from export_docx_to_pdf import export_docx
+
+    report, _ = export_docx(docx_path, pdf_path)
+    return report
+
+
+def default_toc_auditor(docx_path: Path, pdf_path: Path) -> dict:
+    from audit_static_toc import audit
+
+    return audit(docx_path, pdf_path)
+
+
+def host_has_renderer() -> bool:
+    from export_docx_to_pdf import renderer_available, renderer_order
+
+    return any(renderer_available(name) for name in renderer_order())
+
+
 def gate_visual_qa(
     run_dir: Path,
     artifacts: dict[str, str],
     renderer_available: bool | None,
+    *,
+    exporter: Callable[[Path, Path], dict] | None = None,
+    toc_auditor: Callable[[Path, Path], dict] | None = None,
 ) -> tuple[GateResult, dict]:
-    """Record renderer-based QA evidence.
+    """Run and retain renderer-based QA evidence.
 
     Renderer unavailability stays non-blocking, matching the existing exporter
-    contract. When a renderer *is* available its failures remain blocking.
+    contract: the DOCX is still deliverable and the limitation is disclosed.
+    When a renderer *is* available, its export and static-TOC failures block
+    delivery.
     """
     docx_rels = [rel for rel in artifacts.values() if rel.endswith(".docx")]
     if renderer_available is None:
-        from export_docx_to_pdf import renderer_order
-
-        renderer_available = bool(renderer_order())
+        renderer_available = host_has_renderer()
 
     if not renderer_available:
         evidence = {
@@ -428,24 +451,112 @@ def gate_visual_qa(
         }
         write_json(run_dir / STANDARD_VISUAL_QA, evidence)
         return (
-            GateResult(
-                "visual_qa",
-                "skipped",
-                blocking=False,
-                detail=evidence["note"],
-            ),
+            GateResult("visual_qa", "skipped", blocking=False, detail=evidence["note"]),
             evidence,
         )
 
+    exporter = exporter or default_exporter
+    toc_auditor = toc_auditor or default_toc_auditor
+    findings: list[dict] = []
+    documents: list[dict] = []
+    limitations: list[dict] = []
+
+    for rel in docx_rels:
+        docx_path = run_dir / rel
+        pdf_path = run_dir / "logs" / (Path(rel).stem + ".pdf")
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        record: dict[str, Any] = {"document": rel}
+        try:
+            export_report = exporter(docx_path, pdf_path)
+        except Exception as exc:  # noqa: BLE001 - a renderer crash is a QA failure
+            findings.append({"document": rel, "issue": f"PDF export raised {exc.__class__.__name__}: {exc}"})
+            documents.append({**record, "export_status": "error"})
+            continue
+
+        status = str(export_report.get("status") or "")
+        record["export_status"] = status
+        record["renderer"] = export_report.get("renderer")
+
+        if status == "unavailable":
+            # No renderer produced a PDF, so visual QA did not run. The DOCX
+            # stays deliverable and the limitation is disclosed, matching the
+            # existing exporter contract. `pages_available()` only proves the
+            # app is installed, so a failed attempt here is a capability gap,
+            # not a defect in the document.
+            record["attempts"] = export_report.get("attempts")
+            limitations.append(
+                {
+                    "document": rel,
+                    "issue": str(export_report.get("message") or "No usable renderer was found."),
+                }
+            )
+            documents.append(record)
+            continue
+
+        if status != "exported":
+            findings.append(
+                {
+                    "document": rel,
+                    "issue": f"An available renderer failed to export the document: {export_report.get('message') or status}.",
+                }
+            )
+            documents.append(record)
+            continue
+
+        try:
+            audit_report = toc_auditor(docx_path, pdf_path)
+        except Exception as exc:  # noqa: BLE001
+            findings.append({"document": rel, "issue": f"Static-TOC audit raised {exc.__class__.__name__}: {exc}"})
+            documents.append(record)
+            continue
+
+        record["toc"] = {
+            "entry_count": audit_report.get("entry_count", 0),
+            "mismatch_count": audit_report.get("mismatch_count", 0),
+            "alignment_mismatch_count": audit_report.get("alignment_mismatch_count", 0),
+            "missing_count": audit_report.get("missing_count", 0),
+        }
+        for key, label in (
+            ("mismatch_count", "page mismatches"),
+            ("alignment_mismatch_count", "alignment mismatches"),
+            ("missing_count", "missing headings"),
+        ):
+            count = int(audit_report.get(key) or 0)
+            if count:
+                findings.append(
+                    {"document": rel, "issue": f"Static TOC audit reported {count} {label}."}
+                )
+        documents.append(record)
+
+    qa_ran = any(item.get("export_status") == "exported" for item in documents)
+    if findings:
+        status = "fail"
+    elif qa_ran:
+        status = "pass"
+    else:
+        status = "skipped"
+
     evidence = {
-        "status": "available",
-        "renderer": "available",
-        "documents": docx_rels,
-        "note": "Renderer-based visual and static-TOC QA evidence is retained with the run.",
+        "status": "available" if qa_ran else "unavailable",
+        "renderer": "available" if qa_ran else "unavailable",
+        "documents": documents,
+        "findings": findings,
+        "limitations": limitations,
+        "note": (
+            "Renderer-based visual and static-TOC QA evidence is retained with the run."
+            if qa_ran
+            else "PDF-based visual and static-TOC QA was skipped; the DOCX outputs remain deliverable."
+        ),
     }
     write_json(run_dir / STANDARD_VISUAL_QA, evidence)
     return (
-        GateResult("visual_qa", "pass", detail=evidence["note"]),
+        GateResult(
+            "visual_qa",
+            status,
+            findings,
+            blocking=status != "skipped",
+            detail=evidence["note"],
+        ),
         evidence,
     )
 
@@ -515,6 +626,8 @@ def generate_branch(
     reference_path: Path | None = None,
     require_approval: bool = True,
     renderer_available: bool | None = None,
+    exporter: Callable[[Path, Path], dict] | None = None,
+    toc_auditor: Callable[[Path, Path], dict] | None = None,
 ) -> dict:
     """Generate, gate, and evidence the default document set for one branch."""
     run_dir = Path(run_dir)
@@ -610,7 +723,13 @@ def generate_branch(
     gates.append(gate_visit_table(run_dir, reference, canonical, artifacts))
     gates.append(gate_prs_xml(run_dir, reference, artifacts))
     gates.append(gate_stale_content(run_dir, reference, artifacts))
-    visual_gate, qa = gate_visual_qa(run_dir, artifacts, renderer_available)
+    visual_gate, qa = gate_visual_qa(
+        run_dir,
+        artifacts,
+        renderer_available,
+        exporter=exporter,
+        toc_auditor=toc_auditor,
+    )
     gates.append(visual_gate)
 
     return _result(canonical, document_set, artifacts, gates, qa, run_dir)
