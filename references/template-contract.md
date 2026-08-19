@@ -114,6 +114,26 @@ For tables, put the loop around the row that must repeat.
 
 `templates/main.template.docx` is supported as a legacy alias for older runs, but new client templates should use `protocol.template.docx`.
 
+## Visit Schedule Tables
+
+Prospective and ambispective protocol visit schedules must be **Data-Driven Tables**: one real Word row per visit. Put the loop around the row that repeats, opening the block in the first cell and closing it in the last:
+
+```text
+| {#visits}{visitNumber} | {visitName} | {visitWindow} | {CRFnumber}{/visits} |
+```
+
+The branch mapper publishes those rows as `template_fields.visits`. The `AI_visitNumber`, `AI_visitName`, `AI_visitWindow`, and `AI_CRFnumber` fields remain available as newline-joined compatibility values for older external templates, but they are a **Legacy String Fallback**: they pack every visit into a single table cell. They may never carry the schedule in a bundled protocol template.
+
+Two checks enforce this:
+
+```bash
+python3 scripts/validate_template_contract.py
+```
+
+fails when a bundled prospective or ambispective protocol visit table uses the legacy scalar placeholders or has no repeated row block. The `visit_table` Delivery Gate then fails a run whose rendered protocol packs multiple visits into one row, renders the wrong number of rows, or drops a visit.
+
+Keep the repeating header row marked with `<w:tblHeader/>` and leave that flag off the data row. A data row carrying `tblHeader` repeats on every page once it is duplicated per visit.
+
 ## Static Index And TOC Alignment
 
 Any generated DOCX that contains a static index or table of contents must use real right-aligned dot-leader tab stops for page numbers. Manual dot strings are not acceptable, even when the page numbers are correct.

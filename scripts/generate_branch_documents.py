@@ -32,6 +32,13 @@ from render_templates import (
 )
 from study_type_branches import branch_for_study_type, default_document_set
 from validate_prs_xml import validate as validate_prs_xml
+from validate_template_contract import (
+    ROW_RE,
+    TABLE_RE,
+    is_visit_table,
+    visible_text,
+    visit_table_findings,
+)
 
 
 STANDARD_REFERENCE = "reference/study.reference.json"
@@ -275,6 +282,109 @@ def gate_stale_content(
     )
 
 
+#: Branches whose protocol must render a real visit schedule table.
+VISIT_TABLE_BRANCHES = {"Prospective", "Ambispective"}
+
+
+def rendered_visit_rows(path: Path) -> list[str] | None:
+    """Body rows of the rendered visit schedule table, or None if absent."""
+    with zipfile.ZipFile(path) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+    for table in TABLE_RE.findall(xml):
+        rows = ROW_RE.findall(table)
+        if is_visit_table(rows):
+            return rows[1:]
+    return None
+
+
+def gate_visit_table(
+    run_dir: Path,
+    reference: dict,
+    canonical: str,
+    artifacts: dict[str, str],
+) -> GateResult:
+    """Require one real Word row per visit in the branch protocol.
+
+    A Legacy String Fallback -- every visit newline-packed into a single body
+    row -- resolves every placeholder and still renders an unreadable schedule,
+    so it is reported and fails here rather than passing as delivery-ready.
+    """
+    rel = artifacts.get("protocol_docx")
+    if canonical not in VISIT_TABLE_BRANCHES or not rel:
+        return GateResult(
+            "visit_table",
+            "skipped",
+            blocking=False,
+            detail="This branch's protocol does not require a Data-Driven visit table.",
+        )
+
+    template_fields = reference.get("template_fields")
+    template_fields = template_fields if isinstance(template_fields, dict) else {}
+    visits = template_fields.get("visits")
+    visits = [item for item in visits if isinstance(item, dict)] if isinstance(visits, list) else []
+
+    findings: list[dict] = []
+    findings.extend(
+        {**item, "document": "templates/protocol.template.docx"}
+        for item in visit_table_findings(run_dir / "templates" / "protocol.template.docx")
+    )
+
+    if not visits:
+        findings.append(
+            {
+                "document": rel,
+                "issue": "The branch mapper produced no structured visit rows for the schedule.",
+            }
+        )
+        return GateResult("visit_table", "fail", findings)
+
+    rows = rendered_visit_rows(run_dir / rel)
+    if rows is None:
+        findings.append(
+            {"document": rel, "issue": "The generated protocol has no visit schedule table."}
+        )
+        return GateResult("visit_table", "fail", findings)
+
+    texts = [visible_text(row) for row in rows]
+    names = [str(visit.get("visitName") or "").strip() for visit in visits]
+    for text in texts:
+        packed = [name for name in names if name and name in text]
+        if len(packed) > 1:
+            findings.append(
+                {
+                    "document": rel,
+                    "issue": (
+                        "Legacy String Fallback: "
+                        f"{len(packed)} visits are packed into one table row "
+                        "instead of one real row per visit."
+                    ),
+                    "visits": ", ".join(packed),
+                }
+            )
+            break
+
+    if len(rows) != len(visits):
+        findings.append(
+            {
+                "document": rel,
+                "issue": (
+                    f"The visit schedule renders {len(rows)} body rows for {len(visits)} visits."
+                ),
+            }
+        )
+
+    for name in names:
+        if name and not any(name in text for text in texts):
+            findings.append({"document": rel, "issue": f"Visit `{name}` has no table row."})
+
+    return GateResult(
+        "visit_table",
+        "fail" if findings else "pass",
+        findings,
+        detail="Each visit must be one real Word table row.",
+    )
+
+
 def gate_prs_xml(run_dir: Path, reference: dict, artifacts: dict[str, str]) -> GateResult:
     rel = artifacts.get("xml")
     if not rel:
@@ -497,6 +607,7 @@ def generate_branch(
 
     gates.append(gate_placeholders(run_dir, artifacts))
     gates.append(gate_content_completeness(run_dir, reference, canonical, artifacts))
+    gates.append(gate_visit_table(run_dir, reference, canonical, artifacts))
     gates.append(gate_prs_xml(run_dir, reference, artifacts))
     gates.append(gate_stale_content(run_dir, reference, artifacts))
     visual_gate, qa = gate_visual_qa(run_dir, artifacts, renderer_available)

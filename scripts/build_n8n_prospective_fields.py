@@ -413,6 +413,18 @@ def build_fields(reference: dict) -> dict:
             protocol.get("study_procedure"),
             get_path(reference, "procedures.study_procedure"),
         ),
+        # Structured rows drive the protocol's Data-Driven visit table. The
+        # newline-joined `AI_visit*` fields below stay as compatibility values
+        # for older external templates; they cannot satisfy a real visit table.
+        "visits": [
+            {
+                "visitNumber": first_text(row.get("visitNumber")),
+                "visitName": first_text(row.get("visitName")),
+                "visitWindow": first_text(row.get("visitWindow")),
+                "CRFnumber": first_text(row.get("CRFnumber")),
+            }
+            for row in visit_table
+        ],
         "AI_visitNumber": "\n".join(first_text(row.get("visitNumber")) for row in visit_table),
         "AI_visitName": "\n".join(first_text(row.get("visitName")) for row in visit_table),
         "AI_visitWindow": "\n".join(first_text(row.get("visitWindow")) for row in visit_table),
