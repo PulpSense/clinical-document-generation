@@ -53,7 +53,9 @@ def _shared_source_facts() -> dict:
         },
         "design": {
             "study_design": "Randomised, parallel-group, open-label study",
-            "number_of_sites": 3,
+            "number_of_sites": 1,
+            "intervention_name": "Agent QX",
+            "intervention_type": "Drug",
             "study_arm": "Two arm",
             "test_articles": ["Agent QX"],
         },
@@ -93,6 +95,7 @@ def _shared_source_facts() -> dict:
         "procedures": {
             "assessments": "Symptom score, vital signs, and laboratory panel at each visit.",
             "assessment_details": "Assessments follow the schedule defined in the visit table.",
+            "minimum_days_before_screening_without_participation": 30,
         },
         "risks_benefits": {
             "risks": "Risks include injection-site reaction and transient headache.",
@@ -110,12 +113,14 @@ def _shared_source_facts() -> dict:
             "funding_source": {"name": "Northwind Therapeutics", "address": _address()},
             "irb": {
                 "name": "Advarra IRB",
+                "affiliation": "Independent central institutional review board",
                 "address": "6100 Merriweather Drive, Columbia, MD 21044",
                 "phone": "+1-555-0100",
                 "email": "irb@example.org",
             },
             "study_coordinator": {
                 "name": "Jordan Lee",
+                "title": "RN, CCRC",
                 "business_phone": "+1-555-0111",
                 "office_phone": "+1-555-0112",
                 "email": "jordan.lee@example.org",
@@ -126,10 +131,34 @@ def _shared_source_facts() -> dict:
                 "facility": {
                     "name": "Northwind Clinical Research Center",
                     "address": _address(),
-                }
+                },
+                "contact": {
+                    "name": "Jordan Lee",
+                    "title": "RN, CCRC",
+                    "phone": "+1-555-0111",
+                    "email": "jordan.lee@example.org",
+                },
+                "investigator": {
+                    "name": "Dr Alex Rivera",
+                    "title": "MD",
+                    "role": "Principal Investigator",
+                },
             }
         ],
-        "regulatory": {"jurisdiction": "United States", "xml_profile": "clinicaltrials-prs"},
+        "regulatory": {
+            "jurisdiction": "United States",
+            "xml_profile": "clinicaltrials-prs",
+            "prs": {
+                "provider_study_id": "NWT-QX-001",
+                "provider_name": "Northwind Therapeutics",
+                "org_name": "Northwind Therapeutics",
+                "overall_status": "Recruiting",
+                "irb_approval_status": "Approved",
+                "study_uid": "U0000-QX-0001",
+                "responsible_party_type": "Sponsor",
+                "lead_sponsor_agency": "Northwind Therapeutics",
+            },
+        },
     }
 
 
@@ -225,7 +254,7 @@ def _prospective_generated(visit_count: int = 7) -> dict:
             "icfStudyLenght&Participants": (
                 "About 120 people will take part in this study, and your participation will last about 12 months."
             ),
-            "studyPurpose": "The purpose of this study is to find out whether Agent QX reduces symptoms of Chronic Condition Y.",
+            "icfPurpose": "The purpose of this study is to find out whether Agent QX reduces symptoms of Chronic Condition Y.",
             "interventionPossibleSideEffects": "You may have soreness where the study drug is given, or a headache.",
             "benefits": "You may or may not benefit from taking part in this study.",
             "payment": "You will be reimbursed for travel costs for each visit you attend.",
@@ -284,6 +313,23 @@ def _ambispective_endpoints() -> dict:
             }
         ],
     }
+
+
+def generated_modules(branch: str, *, visit_count: int = 7) -> dict:
+    """The narrative modules Hermes writes from approved facts.
+
+    Parsing approved Source-of-Truth Markdown deliberately clears `generated`,
+    because draft prose must be rewritten from the facts the reviewer approved.
+    Tests that walk the review loop use this to replay that step.
+    """
+    normalized = branch.strip().lower()
+    if normalized == "retrospective":
+        return _retrospective_generated()
+    if normalized == "prospective":
+        return _prospective_generated(visit_count)
+    if normalized == "ambispective":
+        return _ambispective_generated()
+    raise ValueError(f"Unknown branch: {branch}")
 
 
 def approved_reference(branch: str, *, visit_count: int = 7) -> dict:

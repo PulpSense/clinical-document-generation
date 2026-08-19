@@ -172,10 +172,23 @@ def apply_branch_mapping(reference: dict, canonical: str, run_dir: Path) -> list
 
 
 def document_text(path: Path) -> str:
-    if path.suffix.lower() == ".docx":
-        with zipfile.ZipFile(path) as archive:
-            return visible_text_from_word_xml(archive.read("word/document.xml").decode())
-    return path.read_text(encoding="utf-8", errors="replace")
+    """Visible text of a rendered artifact.
+
+    DOCX content also lives in headers and footers, and the renderer resolves
+    placeholders in every `word/*.xml` part. The Delivery Gates read the same
+    scope so content cannot hide from them in a header.
+    """
+    if path.suffix.lower() != ".docx":
+        return path.read_text(encoding="utf-8", errors="replace")
+    pieces: list[str] = []
+    with zipfile.ZipFile(path) as archive:
+        for name in sorted(archive.namelist()):
+            if not name.startswith("word/") or not name.endswith(".xml"):
+                continue
+            pieces.append(
+                visible_text_from_word_xml(archive.read(name).decode("utf-8", errors="ignore"))
+            )
+    return "\n".join(pieces)
 
 
 def unresolved_in_output(path: Path) -> list[str]:

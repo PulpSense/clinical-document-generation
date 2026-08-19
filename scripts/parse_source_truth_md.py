@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from study_type_branches import canonical_study_type, default_document_set, get_path
+from study_type_branches import (
+    canonical_study_type,
+    default_document_set,
+    get_path,
+    has_meaningful_value,
+)
 
 
 STANDARD_REFERENCE = "reference/study.reference.json"
@@ -35,6 +40,13 @@ RESET_ROOTS = [
     "generated",
     "regulatory",
     "references",
+]
+
+# Operational metadata lives inside a reset root but is not a reviewer-owned
+# study fact. It is chosen by the workflow, never shown in the reviewer
+# Markdown, and the active branch needs it after approval.
+PRESERVED_OPERATIONAL_PATHS = [
+    "regulatory.xml_profile",
 ]
 
 
@@ -189,6 +201,9 @@ def set_path(data: dict, dotted_path: str, value: Any) -> None:
 
 def reset_reference(original: dict) -> dict:
     reference = deepcopy(original)
+    preserved = [
+        (path, get_path(original, path)) for path in PRESERVED_OPERATIONAL_PATHS
+    ]
     for root in RESET_ROOTS:
         if root == "sites" or isinstance(reference.get(root), list):
             reference[root] = []
@@ -196,7 +211,60 @@ def reset_reference(original: dict) -> dict:
             reference[root] = {}
     reference["template_fields"] = {}
     reference["needs_review"] = []
+    for path, value in preserved:
+        if value is not None:
+            set_path(reference, path, value)
     return reference
+
+
+def review_item_is_explicitly_unresolved(item: Any) -> bool:
+    """True when the reviewer deliberately left this item open."""
+    if not isinstance(item, dict):
+        return False
+    if item.get("unresolved") is True:
+        return True
+    return item.get("resolved") is False
+
+
+def prune_resolved_candidates(reference: dict, original: dict) -> list[str]:
+    """Drop Field Candidates the approved Markdown has now resolved.
+
+    A candidate survives only while its field still has no meaningful value, so
+    a reviewer decision can never be re-litigated by pre-approval extraction
+    state. Returns the field ids that were cleared.
+    """
+    source = reference.get("source")
+    if not isinstance(source, dict):
+        return []
+    candidates = source.get("field_candidates")
+    if not isinstance(candidates, dict) or not candidates:
+        return []
+
+    resolved = [field for field in candidates if has_meaningful_value(reference, field)]
+    if resolved:
+        source["field_candidates"] = {
+            field: value for field, value in candidates.items() if field not in resolved
+        }
+    return resolved
+
+
+def carry_unresolved_review_items(reference: dict, original: dict) -> list[dict]:
+    """Keep review state the reviewer did not resolve.
+
+    An item survives when it is explicitly flagged unresolved, or when the field
+    it names still has no meaningful value after the approved Markdown is
+    applied. Everything else was settled by the reviewer.
+    """
+    carried: list[dict] = []
+    for item in original.get("needs_review") or []:
+        if not isinstance(item, dict):
+            continue
+        field = str(item.get("field") or "").strip()
+        explicit = review_item_is_explicitly_unresolved(item)
+        if explicit or (field and not has_meaningful_value(reference, field)):
+            carried.append(deepcopy(item))
+    reference["needs_review"] = carried
+    return carried
 
 
 def apply_rows(original: dict, parsed_rows: list[tuple[str, str]]) -> tuple[dict, list[str]]:
@@ -224,6 +292,19 @@ def apply_rows(original: dict, parsed_rows: list[tuple[str, str]]) -> tuple[dict
         meta["study_type"] = canonical
         if not meta.get("document_set"):
             meta["document_set"] = default_document_set(canonical)
+
+    cleared = prune_resolved_candidates(reference, original)
+    carried = carry_unresolved_review_items(reference, original)
+    if cleared:
+        warnings.append(
+            "Cleared resolved field candidates: " + ", ".join(sorted(cleared)) + "."
+        )
+    if carried:
+        warnings.append(
+            "Review state remains unresolved for: "
+            + ", ".join(sorted(str(item.get("field") or "needs_review") for item in carried))
+            + "."
+        )
     return reference, warnings
 
 
@@ -246,20 +327,25 @@ def write_report(path: Path, parsed_count: int, warnings: list[str], markdown_re
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--run-dir", required=True, help="Run directory containing reference/study.reference.json.")
-    parser.add_argument("--source-md", required=True, help="Edited source-of-truth Markdown uploaded by the reviewer.")
-    parser.add_argument("--reference", help="Existing reference JSON path. Defaults to reference/study.reference.json.")
-    parser.add_argument("--output-reference", help="Output reference JSON path. Defaults to reference/study.reference.json.")
-    parser.add_argument("--approval-status", choices=["pending_review", "changes_requested", "approved"], default="pending_review")
-    parser.add_argument("--approved-by", help="Reviewer name when approval-status is approved.")
-    args = parser.parse_args()
+def parse_approved_markdown(
+    run_dir: Path,
+    source_md: Path,
+    *,
+    reference_path: Path | None = None,
+    output_path: Path | None = None,
+    approval_status: str = "pending_review",
+    approved_by: str | None = None,
+) -> dict:
+    """Parse reviewer-facing Markdown back into the study reference.
 
-    run_dir = Path(args.run_dir).expanduser().resolve()
-    source_md = Path(args.source_md).expanduser().resolve()
-    reference_path = Path(args.reference).expanduser().resolve() if args.reference else run_dir / STANDARD_REFERENCE
-    output_path = Path(args.output_reference).expanduser().resolve() if args.output_reference else reference_path
+    The parsed Markdown replaces the pre-approval study-fact state. Resolved
+    Field Candidates and settled review items do not survive; operational
+    metadata and explicitly unresolved review state do.
+    """
+    run_dir = Path(run_dir)
+    source_md = Path(source_md)
+    reference_path = reference_path or run_dir / STANDARD_REFERENCE
+    output_path = output_path or reference_path
     report_path = run_dir / STANDARD_REPORT
 
     original = load_json(reference_path)
@@ -282,10 +368,10 @@ def main() -> int:
     approval = reference.get("approval")
     if not isinstance(approval, dict):
         approval = {}
-    approval["status"] = args.approval_status
+    approval["status"] = approval_status
     approval["review_file"] = rel_source
-    if args.approval_status == "approved":
-        approval["approved_by"] = args.approved_by or approval.get("approved_by") or "reviewer"
+    if approval_status == "approved":
+        approval["approved_by"] = approved_by or approval.get("approved_by") or "reviewer"
         approval["approved_at"] = datetime.now(timezone.utc).isoformat()
     else:
         approval["approved_by"] = None
@@ -294,19 +380,53 @@ def main() -> int:
 
     output_path.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     write_report(report_path, len(rows), warnings, rel_source, display_path(output_path, run_dir))
+    return {
+        "reference": reference,
+        "updated": display_path(output_path, run_dir),
+        "parsed_fields": len(rows),
+        "warnings": warnings,
+        "warning_count": len(warnings),
+        "report": display_path(report_path, run_dir),
+        "approval_status": approval_status,
+    }
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-dir", required=True, help="Run directory containing reference/study.reference.json.")
+    parser.add_argument("--source-md", required=True, help="Edited source-of-truth Markdown uploaded by the reviewer.")
+    parser.add_argument("--reference", help="Existing reference JSON path. Defaults to reference/study.reference.json.")
+    parser.add_argument("--output-reference", help="Output reference JSON path. Defaults to reference/study.reference.json.")
+    parser.add_argument("--approval-status", choices=["pending_review", "changes_requested", "approved"], default="pending_review")
+    parser.add_argument("--approved-by", help="Reviewer name when approval-status is approved.")
+    args = parser.parse_args()
+
+    run_dir = Path(args.run_dir).expanduser().resolve()
+    source_md = Path(args.source_md).expanduser().resolve()
+    reference_path = Path(args.reference).expanduser().resolve() if args.reference else run_dir / STANDARD_REFERENCE
+    output_path = Path(args.output_reference).expanduser().resolve() if args.output_reference else reference_path
+
+    result = parse_approved_markdown(
+        run_dir,
+        source_md,
+        reference_path=reference_path,
+        output_path=output_path,
+        approval_status=args.approval_status,
+        approved_by=args.approved_by,
+    )
     print(
         json.dumps(
             {
-                "updated": display_path(output_path, run_dir),
-                "parsed_fields": len(rows),
-                "warning_count": len(warnings),
-                "report": display_path(report_path, run_dir),
-                "approval_status": args.approval_status,
+                "updated": result["updated"],
+                "parsed_fields": result["parsed_fields"],
+                "warning_count": result["warning_count"],
+                "report": result["report"],
+                "approval_status": result["approval_status"],
             },
             indent=2,
         )
     )
-    return 1 if warnings else 0
+    return 1 if result["warnings"] else 0
 
 
 if __name__ == "__main__":
