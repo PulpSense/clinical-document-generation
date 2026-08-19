@@ -426,6 +426,25 @@ def default_toc_auditor(docx_path: Path, pdf_path: Path) -> dict:
     return audit(docx_path, pdf_path)
 
 
+def default_toc_refresher(docx_path: Path, pdf_path: Path) -> dict:
+    """Rewrite static TOC page values in place from the rendered PDF.
+
+    A document that carries no static TOC needs no refresh. That is a document
+    shape, not a QA failure, so it reports zero changes instead of raising.
+    """
+    from audit_static_toc import toc_entries
+    from refresh_static_toc import refresh_docx
+
+    if not toc_entries(docx_path):
+        return {"updated_count": 0, "aligned_count": 0, "note": "no static TOC entries"}
+    try:
+        return refresh_docx(docx_path, pdf_path, docx_path)
+    except SystemExit as exc:
+        # The refresh tool refuses through SystemExit, which would otherwise
+        # abort the whole run instead of being recorded as a QA finding.
+        raise RuntimeError(str(exc)) from exc
+
+
 def host_has_renderer() -> bool:
     from export_docx_to_pdf import renderer_available, renderer_order
 
@@ -438,6 +457,7 @@ def gate_visual_qa(
     renderer_available: bool | None,
     *,
     exporter: Callable[[Path, Path], dict] | None = None,
+    refresher: Callable[[Path, Path], dict] | None = None,
     toc_auditor: Callable[[Path, Path], dict] | None = None,
 ) -> tuple[GateResult, dict]:
     """Run and retain renderer-based QA evidence.
@@ -465,6 +485,7 @@ def gate_visual_qa(
         )
 
     exporter = exporter or default_exporter
+    refresher = refresher or default_toc_refresher
     toc_auditor = toc_auditor or default_toc_auditor
     findings: list[dict] = []
     documents: list[dict] = []
@@ -511,6 +532,50 @@ def gate_visual_qa(
             )
             documents.append(record)
             continue
+
+        # A generated document paginates differently from the template it came
+        # from, so its static TOC is stale by construction. Refresh it against
+        # the rendered PDF before auditing, exactly as the documented workflow
+        # does; auditing first would fail every document on a host that can
+        # actually render.
+        try:
+            refresh_report = refresher(docx_path, pdf_path)
+        except Exception as exc:  # noqa: BLE001 - a refresh crash is a QA failure
+            findings.append(
+                {"document": rel, "issue": f"Static-TOC refresh raised {exc.__class__.__name__}: {exc}"}
+            )
+            documents.append(record)
+            continue
+
+        refreshed = {
+            "updated_count": int(refresh_report.get("updated_count") or 0),
+            "aligned_count": int(refresh_report.get("aligned_count") or 0),
+        }
+        record["toc_refresh"] = refreshed
+
+        if refreshed["updated_count"] or refreshed["aligned_count"]:
+            # The refresh moved page values, so the audit needs a PDF exported
+            # from the updated document rather than the stale one.
+            try:
+                export_report = exporter(docx_path, pdf_path)
+            except Exception as exc:  # noqa: BLE001
+                findings.append(
+                    {"document": rel, "issue": f"PDF re-export raised {exc.__class__.__name__}: {exc}"}
+                )
+                documents.append(record)
+                continue
+            if str(export_report.get("status") or "") != "exported":
+                findings.append(
+                    {
+                        "document": rel,
+                        "issue": (
+                            "An available renderer failed to re-export the refreshed document: "
+                            f"{export_report.get('message') or export_report.get('status')}."
+                        ),
+                    }
+                )
+                documents.append(record)
+                continue
 
         try:
             audit_report = toc_auditor(docx_path, pdf_path)
@@ -636,6 +701,7 @@ def generate_branch(
     require_approval: bool = True,
     renderer_available: bool | None = None,
     exporter: Callable[[Path, Path], dict] | None = None,
+    refresher: Callable[[Path, Path], dict] | None = None,
     toc_auditor: Callable[[Path, Path], dict] | None = None,
 ) -> dict:
     """Generate, gate, and evidence the default document set for one branch."""
@@ -732,6 +798,7 @@ def generate_branch(
         artifacts,
         renderer_available,
         exporter=exporter,
+        refresher=refresher,
         toc_auditor=toc_auditor,
     )
     gates.append(visual_gate)

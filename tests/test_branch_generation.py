@@ -289,6 +289,9 @@ class ProspectiveBranchTests(unittest.TestCase):
             pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
             return {"status": "exported", "renderer": "stub"}
 
+        def refresher(docx_path: Path, pdf_path: Path) -> dict:
+            return {"updated_count": 0, "aligned_count": 0}
+
         def auditor(docx_path: Path, pdf_path: Path) -> dict:
             return {
                 "entry_count": 12,
@@ -302,7 +305,11 @@ class ProspectiveBranchTests(unittest.TestCase):
             build_run(run_dir, "prospective")
 
             result = generate_branch(
-                run_dir, renderer_available=True, exporter=exporter, toc_auditor=auditor
+                run_dir,
+                renderer_available=True,
+                exporter=exporter,
+                refresher=refresher,
+                toc_auditor=auditor,
             )
 
             visual = gate(result, "visual_qa")
@@ -311,6 +318,119 @@ class ProspectiveBranchTests(unittest.TestCase):
             issues = " ".join(item["issue"] for item in visual["findings"])
             self.assertIn("2 page mismatches", issues)
             self.assertIn("1 alignment mismatches", issues)
+
+    def test_static_toc_is_refreshed_before_it_is_audited(self) -> None:
+        """A generated document shifts pagination, so the static TOC is stale.
+
+        SKILL.md refreshes it against the rendered PDF, re-exports, and only
+        then audits. Auditing the unrefreshed TOC would fail every document
+        that renders on a host with a working renderer.
+        """
+        calls: list[str] = []
+
+        def exporter(docx_path: Path, pdf_path: Path) -> dict:
+            calls.append("export")
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+            return {"status": "exported", "renderer": "stub"}
+
+        def refresher(docx_path: Path, pdf_path: Path) -> dict:
+            calls.append("refresh")
+            return {"updated_count": 16, "aligned_count": 45}
+
+        def auditor(docx_path: Path, pdf_path: Path) -> dict:
+            refreshed = "refresh" in calls
+            calls.append("audit")
+            return {
+                "entry_count": 12,
+                "mismatch_count": 0 if refreshed else 16,
+                "alignment_mismatch_count": 0 if refreshed else 45,
+                "missing_count": 0,
+            }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            build_run(run_dir, "prospective")
+
+            result = generate_branch(
+                run_dir,
+                renderer_available=True,
+                exporter=exporter,
+                refresher=refresher,
+                toc_auditor=auditor,
+            )
+
+            self.assertEqual(calls[:4], ["export", "refresh", "export", "audit"])
+            visual = gate(result, "visual_qa")
+            self.assertEqual(visual["status"], "pass", visual["findings"])
+            self.assertTrue(result["delivery_ready"], result["gates"])
+            evidence = json.loads((run_dir / "logs" / "visual-qa.json").read_text())
+            refreshed = evidence["documents"][0]["toc_refresh"]
+            self.assertEqual(refreshed["updated_count"], 16)
+            self.assertEqual(refreshed["aligned_count"], 45)
+
+    def test_an_unchanged_toc_is_not_re_exported(self) -> None:
+        """Re-export only when the refresh actually changed the document."""
+        calls: list[str] = []
+
+        def exporter(docx_path: Path, pdf_path: Path) -> dict:
+            calls.append("export")
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+            return {"status": "exported", "renderer": "stub"}
+
+        def refresher(docx_path: Path, pdf_path: Path) -> dict:
+            calls.append("refresh")
+            return {"updated_count": 0, "aligned_count": 0}
+
+        def auditor(docx_path: Path, pdf_path: Path) -> dict:
+            calls.append("audit")
+            return {
+                "entry_count": 12,
+                "mismatch_count": 0,
+                "alignment_mismatch_count": 0,
+                "missing_count": 0,
+            }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            build_run(run_dir, "prospective")
+
+            result = generate_branch(
+                run_dir,
+                renderer_available=True,
+                exporter=exporter,
+                refresher=refresher,
+                toc_auditor=auditor,
+            )
+
+            self.assertEqual(calls[:3], ["export", "refresh", "audit"])
+            self.assertTrue(result["delivery_ready"], result["gates"])
+
+    def test_a_failing_toc_refresh_prevents_delivery(self) -> None:
+        def exporter(docx_path: Path, pdf_path: Path) -> dict:
+            pdf_path.write_bytes(b"%PDF-1.4\n%%EOF\n")
+            return {"status": "exported", "renderer": "stub"}
+
+        def refresher(docx_path: Path, pdf_path: Path) -> dict:
+            raise RuntimeError("refresh exploded")
+
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            build_run(run_dir, "prospective")
+
+            result = generate_branch(
+                run_dir,
+                renderer_available=True,
+                exporter=exporter,
+                refresher=refresher,
+            )
+
+            visual = gate(result, "visual_qa")
+            self.assertEqual(visual["status"], "fail")
+            self.assertFalse(result["delivery_ready"])
+            self.assertIn(
+                "refresh exploded",
+                " ".join(item["issue"] for item in visual["findings"]),
+            )
 
     def test_installed_but_unusable_renderer_stays_nonblocking(self) -> None:
         """`pages_available()` only proves the app exists, not that it can export."""

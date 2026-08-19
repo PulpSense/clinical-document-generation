@@ -163,6 +163,8 @@ python3 scripts/generate_branch_documents.py --run-dir <run-dir>
 
 It refuses to render anything while approval is missing or a Required Source Input is unresolved, and it writes `logs/branch-generation.json` plus a `logs/repair-report.md` naming every failed gate. Deliver only when `delivery_ready` is true.
 
+When a renderer is available, this step also runs the static TOC loop for you: it exports each DOCX, refreshes stale TOC page values against the rendered PDF, re-exports when the refresh changed pagination, and audits the result. A document with no static TOC is refreshed as a no-op rather than treated as a failure. The counts are recorded per document in `logs/visual-qa.json` under `toc_refresh` and `toc`. When no renderer is available the whole check is skipped and disclosed as a QA limitation; the DOCX outputs stay deliverable. The manual commands in step 17 remain for diagnostics and for re-checking after hand edits to a template.
+
 The lower-level renderer stays available for partial or diagnostic runs. Use `--require-approval` for anything that could be delivered:
 
 ```bash
