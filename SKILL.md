@@ -215,7 +215,10 @@ Use this structure for every study:
 runs/<study-or-protocol-slug>/
   input/
     raw_context.md
+    source-intake-manifest.json
     source_manifest.json
+    evidence/
+    extracted/
     transcript.md
     attachments/
   reference/
