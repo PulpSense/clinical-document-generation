@@ -7,11 +7,13 @@ evidence retained so the released version can be audited afterwards.
 
 from __future__ import annotations
 
+import io
 import json
 import sys
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from branch_fixtures import approved_reference
@@ -21,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from package_skill import PackagingRefused, package_skill  # noqa: E402
-from run_branch_smoke import SMOKE_BRANCHES, run_smoke  # noqa: E402
+from run_branch_smoke import SMOKE_BRANCHES, main as smoke_main, run_smoke  # noqa: E402
 
 
 def unavailable_exporter(docx_path: Path, pdf_path: Path) -> dict:
@@ -54,6 +56,23 @@ class BranchSmokeTests(unittest.TestCase):
             )
             self.assertEqual(sorted(SMOKE_BRANCHES), ["Ambispective", "Prospective", "Retrospective"])
             self.assertTrue(evidence["package_eligible"], evidence["branches"])
+
+    def test_no_renderer_flag_skips_renderer_backed_qa(self) -> None:
+        """Running the smoke must not be able to launch a renderer unasked."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                exit_code = smoke_main(["--root", str(root), "--no-renderer"])
+
+            self.assertEqual(exit_code, 0)
+            evidence = json.loads((root / "skill-smoke.json").read_text(encoding="utf-8"))
+            self.assertTrue(evidence["package_eligible"], evidence["failed_branches"])
+            for item in evidence["branches"]:
+                visual = [g for g in item["gates"] if g["gate"] == "visual_qa"][0]
+                self.assertEqual(visual["status"], "skipped")
+                self.assertFalse(visual["blocking"])
 
     def test_evidence_identifies_outputs_gates_and_qa_limitations(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

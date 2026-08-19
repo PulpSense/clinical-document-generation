@@ -141,6 +141,14 @@ python3 scripts/run_branch_smoke.py --root /tmp/clinical-smoke
 
 It generates the prospective, ambispective, and retrospective document sets from approved reference fixtures, runs each branch's Delivery Gates, and writes `skill-smoke.json` recording the branch, active document set, generated artifacts, gate outcomes, and any QA limitation. It exits non-zero when a branch fails or was never smoked.
 
+On a host with a renderer installed, the smoke exports each DOCX to PDF for static-TOC QA, which launches that renderer. To run every other Delivery Gate without starting one:
+
+```bash
+python3 scripts/run_branch_smoke.py --root /tmp/clinical-smoke --no-renderer
+```
+
+Renderer-backed QA is then skipped and disclosed, exactly as it is on a host with no renderer at all.
+
 Build the package:
 
 ```bash

@@ -35,6 +35,7 @@ def smoke_branch(
     reference: dict | None = None,
     renderer_available: bool | None = None,
     exporter: Callable[[Path, Path], dict] | None = None,
+    refresher: Callable[[Path, Path], dict] | None = None,
     toc_auditor: Callable[[Path, Path], dict] | None = None,
 ) -> dict:
     """Generate and gate one branch, returning its smoke record."""
@@ -48,6 +49,7 @@ def smoke_branch(
         run_dir,
         renderer_available=renderer_available,
         exporter=exporter,
+        refresher=refresher,
         toc_auditor=toc_auditor,
     )
     return {
@@ -69,6 +71,7 @@ def run_smoke(
     fixtures: dict[str, dict] | None = None,
     renderer_available: bool | None = None,
     exporter: Callable[[Path, Path], dict] | None = None,
+    refresher: Callable[[Path, Path], dict] | None = None,
     toc_auditor: Callable[[Path, Path], dict] | None = None,
 ) -> dict:
     """Smoke every supported branch and decide package eligibility."""
@@ -83,6 +86,7 @@ def run_smoke(
             reference=fixtures.get(branch),
             renderer_available=renderer_available,
             exporter=exporter,
+            refresher=refresher,
             toc_auditor=toc_auditor,
         )
         for branch in branches
@@ -113,12 +117,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help="Directory that receives the smoke runs and their evidence.",
     )
+    parser.add_argument(
+        "--no-renderer",
+        action="store_true",
+        help=(
+            "Skip renderer-backed PDF and static-TOC QA. Every other Delivery "
+            "Gate still runs. Use this when no renderer should be launched."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
-    evidence = run_smoke(Path(args.root).expanduser().resolve())
+    evidence = run_smoke(
+        Path(args.root).expanduser().resolve(),
+        renderer_available=False if args.no_renderer else None,
+    )
     print(json.dumps(evidence, indent=2, ensure_ascii=False))
     return 0 if evidence["package_eligible"] else 1
 
