@@ -44,7 +44,7 @@ any unstructured input
 
 Run script commands from this skill folder, or use absolute paths to the skill's `scripts/` files.
 
-1. Create a run directory with `scripts/create_run.py`. Store every source in `input/`: pasted text, message exports, transcripts, attachments, and any user-provided templates. If no templates are supplied, `create_run.py` copies the bundled client templates for the selected study type.
+1. Create a run directory with `scripts/create_run.py`, passing every file the client sent as `--evidence <path>`. The files become one Source Intake Packet recorded in `input/source-intake-manifest.json`, and the whole packet — not just the first file — is read for template selection and source inspection. Markdown, plain text, JSON, CSV, PDF, and DOCX evidence is extracted to text; anything else is preserved and reported as `unsupported` or `unreadable`, and you must tell the reviewer which file that was rather than proceeding as if it had not arrived. `--raw-context` still works and simply creates a one-file packet. If no templates are supplied, `create_run.py` copies the bundled client templates for the selected study type.
 2. If the input is audio and a transcription tool is available, transcribe it and save the transcript under `input/transcript.md`. If transcription is not available, ask for a transcript before continuing.
 3. If the source material is unstructured, read `references/intake-workflow.md`, then normalize the source into `input/` and draft `reference/study.reference.json`.
 4. Read `references/study-type-branches.md`. Normalize `meta.study_type` to `Prospective`, `Ambispective`, or `Retrospective`, then set `meta.document_set` for that branch.
@@ -155,7 +155,15 @@ python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
 python3 --version
 ```
 
-15. Generate outputs. Use `--require-approval` for final outputs:
+15. Generate outputs. Prefer the branch workflow, which maps the approved reference, renders every active template, runs all applicable Delivery Gates, and retains QA evidence in one step:
+
+```bash
+python3 scripts/generate_branch_documents.py --run-dir <run-dir>
+```
+
+It refuses to render anything while approval is missing or a Required Source Input is unresolved, and it writes `logs/branch-generation.json` plus a `logs/repair-report.md` naming every failed gate. Deliver only when `delivery_ready` is true.
+
+The lower-level renderer stays available for partial or diagnostic runs. Use `--require-approval` for anything that could be delivered:
 
 ```bash
 python3 scripts/render_templates.py --run-dir <run-dir>
