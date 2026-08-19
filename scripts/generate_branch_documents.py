@@ -53,7 +53,10 @@ ARTIFACTS = {
     "xml": "output/study.xml",
 }
 
-#: Template language that must never survive into a delivered document.
+#: Template scaffolding that must never survive into a delivered document.
+#: Keep this list to strings no reviewed clinical text would legitimately
+#: contain. Study-specific stale language belongs in `meta.stale_content_markers`,
+#: which is per-run and can name the prior study's wording exactly.
 DEFAULT_STALE_MARKERS = (
     "MERGEFIELD",
     "«",
@@ -62,7 +65,6 @@ DEFAULT_STALE_MARKERS = (
     "XX years",
     "Lorem ipsum",
     "[INSERT",
-    "TBD",
 )
 
 #: `template_fields` keys whose text must reach the rendered branch documents.
@@ -241,14 +243,21 @@ def gate_content_completeness(
                 }
             )
             continue
-        probe = value.splitlines()[0].strip()
-        if probe and probe not in corpus:
-            findings.append(
-                {
-                    "field": field,
-                    "issue": "Branch-required Study-Specific Body content is missing from the rendered document set.",
-                }
-            )
+        # Probe the first and last lines, not just the first: content that was
+        # truncated after line one would otherwise look complete.
+        lines = [line.strip() for line in value.splitlines() if line.strip()]
+        for probe, position in ((lines[0], "start"), (lines[-1], "end")) if lines else ():
+            if probe not in corpus:
+                findings.append(
+                    {
+                        "field": field,
+                        "issue": (
+                            f"Branch-required Study-Specific Body content is missing from the "
+                            f"rendered document set (the {position} of the value was not found)."
+                        ),
+                    }
+                )
+                break
     return GateResult(
         "content_completeness",
         "fail" if findings else "pass",
@@ -700,12 +709,7 @@ def generate_branch(
             detail="Branch mapping must supply every value its active templates require.",
         )
     )
-    reference_path.write_text(
-        json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
-    )
-
-    meta = reference.setdefault("meta", {})
-    meta["document_set"] = document_set
+    reference.setdefault("meta", {})["document_set"] = document_set
     reference_path.write_text(
         json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )

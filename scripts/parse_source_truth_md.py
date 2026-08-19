@@ -226,7 +226,7 @@ def review_item_is_explicitly_unresolved(item: Any) -> bool:
     return item.get("resolved") is False
 
 
-def prune_resolved_candidates(reference: dict, original: dict) -> list[str]:
+def prune_resolved_candidates(reference: dict) -> list[str]:
     """Drop Field Candidates the approved Markdown has now resolved.
 
     A candidate survives only while its field still has no meaningful value, so
@@ -267,9 +267,18 @@ def carry_unresolved_review_items(reference: dict, original: dict) -> list[dict]
     return carried
 
 
-def apply_rows(original: dict, parsed_rows: list[tuple[str, str]]) -> tuple[dict, list[str]]:
+def apply_rows(
+    original: dict, parsed_rows: list[tuple[str, str]]
+) -> tuple[dict, list[str], list[str]]:
+    """Apply reviewer-approved rows. Returns the reference, warnings, and notes.
+
+    Warnings mean the parse could not do what the Markdown asked. Notes record
+    what the approval settled, which is normal on the happy path and must never
+    be mistaken for a failure.
+    """
     reference = reset_reference(original)
     warnings: list[str] = []
+    notes: list[str] = []
     for field_id, raw_value in parsed_rows:
         if field_id.startswith(("generated.", "template_fields.", "source.", "approval.", "needs_review.")):
             warnings.append(f"Skipped non-source field id `{field_id}`.")
@@ -293,22 +302,29 @@ def apply_rows(original: dict, parsed_rows: list[tuple[str, str]]) -> tuple[dict
         if not meta.get("document_set"):
             meta["document_set"] = default_document_set(canonical)
 
-    cleared = prune_resolved_candidates(reference, original)
+    cleared = prune_resolved_candidates(reference)
     carried = carry_unresolved_review_items(reference, original)
     if cleared:
-        warnings.append(
+        notes.append(
             "Cleared resolved field candidates: " + ", ".join(sorted(cleared)) + "."
         )
     if carried:
-        warnings.append(
+        notes.append(
             "Review state remains unresolved for: "
             + ", ".join(sorted(str(item.get("field") or "needs_review") for item in carried))
             + "."
         )
-    return reference, warnings
+    return reference, warnings, notes
 
 
-def write_report(path: Path, parsed_count: int, warnings: list[str], markdown_rel: str, output_rel: str) -> None:
+def write_report(
+    path: Path,
+    parsed_count: int,
+    warnings: list[str],
+    markdown_rel: str,
+    output_rel: str,
+    notes: list[str] | None = None,
+) -> None:
     lines = [
         "# Source Of Truth Parse Report",
         "",
@@ -323,6 +339,10 @@ def write_report(path: Path, parsed_count: int, warnings: list[str], markdown_re
             lines.append(f"- {warning}")
     else:
         lines.append("No parser warnings were detected.")
+    if notes:
+        lines.extend(["", "## Notes", ""])
+        for note in notes:
+            lines.append(f"- {note}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -352,7 +372,7 @@ def parse_approved_markdown(
     rows, warnings = extract_rows(source_md)
     rows, header_warnings = reconcile_study_header(original, rows, extract_study_header(source_md))
     warnings.extend(header_warnings)
-    reference, apply_warnings = apply_rows(original, rows)
+    reference, apply_warnings, notes = apply_rows(original, rows)
     warnings.extend(apply_warnings)
 
     source = reference.get("source")
@@ -379,13 +399,22 @@ def parse_approved_markdown(
     reference["approval"] = approval
 
     output_path.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    write_report(report_path, len(rows), warnings, rel_source, display_path(output_path, run_dir))
+    write_report(
+        report_path,
+        len(rows),
+        warnings,
+        rel_source,
+        display_path(output_path, run_dir),
+        notes,
+    )
     return {
         "reference": reference,
         "updated": display_path(output_path, run_dir),
         "parsed_fields": len(rows),
         "warnings": warnings,
         "warning_count": len(warnings),
+        "notes": notes,
+        "note_count": len(notes),
         "report": display_path(report_path, run_dir),
         "approval_status": approval_status,
     }
@@ -420,6 +449,7 @@ def main() -> int:
                 "updated": result["updated"],
                 "parsed_fields": result["parsed_fields"],
                 "warning_count": result["warning_count"],
+                "note_count": result["note_count"],
                 "report": result["report"],
                 "approval_status": result["approval_status"],
             },

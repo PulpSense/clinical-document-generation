@@ -225,6 +225,53 @@ class ConflictResolutionTests(unittest.TestCase):
             self.assertIn(TITLE_B, (run_dir / "output" / "study.xml").read_text(encoding="utf-8"))
 
 
+class ParseCommandExitCodeTests(unittest.TestCase):
+    """SKILL.md step 8 runs this command and reads its exit code."""
+
+    def run_parse(self, run_dir: Path) -> int:
+        import io
+        from contextlib import redirect_stdout
+        from unittest.mock import patch
+
+        import parse_source_truth_md
+
+        argv = [
+            "parse_source_truth_md.py",
+            "--run-dir", str(run_dir),
+            "--source-md", str(run_dir / "reference" / "source-of-truth.md"),
+            "--approval-status", "approved",
+            "--approved-by", "reviewer",
+        ]
+        buffer = io.StringIO()
+        with patch.object(sys, "argv", argv), redirect_stdout(buffer):
+            return parse_source_truth_md.main()
+
+    def test_clearing_a_resolved_candidate_is_not_a_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            reference = conflicted_run(run_dir)
+            markdown = set_field(document_markdown(reference), "study.title", TITLE_B)
+            (run_dir / "reference" / "source-of-truth.md").write_text(markdown, encoding="utf-8")
+
+            self.assertEqual(self.run_parse(run_dir), 0)
+
+            report = (run_dir / "reference" / "review-parse-report.md").read_text(encoding="utf-8")
+            self.assertIn("No parser warnings were detected.", report)
+            self.assertIn("Cleared resolved field candidates", report)
+
+    def test_a_real_parse_warning_still_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            reference = conflicted_run(run_dir)
+            markdown = set_field(document_markdown(reference), "study.title", TITLE_B)
+            markdown += "\n<!-- field: generated.protocol.methods -->\nnope\n<!-- /field -->\n"
+            (run_dir / "reference" / "source-of-truth.md").write_text(markdown, encoding="utf-8")
+
+            self.assertEqual(self.run_parse(run_dir), 1)
+            report = (run_dir / "reference" / "review-parse-report.md").read_text(encoding="utf-8")
+            self.assertIn("Skipped non-source field id", report)
+
+
 class ApprovalStateTests(unittest.TestCase):
     def test_supplying_source_material_is_not_approval(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
