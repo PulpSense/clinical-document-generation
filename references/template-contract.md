@@ -153,7 +153,15 @@ The branch mapper publishes the matrix as `template_fields.visitsTable`, in the 
 
 The inserted table is always followed by a paragraph, because a table may not be the last thing in a table cell and two adjacent tables merge into one.
 
-The matrix is used with the shape it declares when `generated.protocol.visitsTable` supplies a non-empty one; a blank generated matrix degrades to the derived table rather than blanking the section. Otherwise it is derived from the visit schedule the branch already holds, with the assessments column falling back to `procedures.assessments` and then `generated.protocol.measurements`. No Required Source Input carries an assessment-per-visit matrix, so a study with no assessment detail still renders a complete table.
+The matrix is used with the shape it declares when `generated.protocol.visitsTable` supplies a non-empty one; a blank generated matrix degrades to the derived table rather than blanking the section.
+
+### What the derived table is, and is not
+
+The caption reads "Proposed Visits and Study Assessments", but the derived table is **not** a schedule-of-assessments matrix marking which assessment happens at which visit. No Required Source Input carries assessment-per-visit detail, and the branch scripts may not add one, so the derived table repeats the study-level assessments text against each visit and shares three of its four columns with Table 9.2-1.
+
+This is a deliberate, accepted fallback, not an oversight. The original workflow called `visitsTable` the "Protocol visit table equivalent", which is what this reproduces. A true assessments matrix would need per-visit assessment data, and collecting it is a source-contract change to be decided with the client rather than inferred by a mapper.
+
+A model that supplies `generated.protocol.visitsTable` can render a real matrix of any width today: the renderer builds whatever shape the matrix declares. The fallback only covers studies where no such matrix was generated. Otherwise it is derived from the visit schedule the branch already holds, with the assessments column falling back to `procedures.assessments` and then `generated.protocol.measurements`. No Required Source Input carries an assessment-per-visit matrix, so a study with no assessment detail still renders a complete table.
 
 Two checks enforce this, mirroring the visit table:
 
