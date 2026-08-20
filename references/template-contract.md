@@ -183,6 +183,18 @@ After generating the DOCX, run `scripts/export_docx_to_pdf.py` in automatic mode
 
 The audit must treat TOC/index pages as front matter, not as the real location of later content. For any entry after the `TABLE OF CONTENTS` or `INDEX` entry, the heading search must start on the first page after the rendered TOC/index. This is required for all document sets and study branches so an index row cannot satisfy its own page lookup.
 
+A static TOC must also describe the document it sits in. A bundled template may not list a section its own body does not contain:
+
+```bash
+python3 scripts/validate_template_contract.py
+```
+
+fails when a bundled protocol template's TOC carries an entry that no heading in that template answers. A heading may share its paragraph with the content after it, as `9.1. Analysis Data Sets {AI_analysisDataSets}` does, so an entry is answered by a paragraph that is its title or its title followed by a placeholder; a merely longer heading does not answer it.
+
+This check reads both the entries and the body with `audit_static_toc`'s own parser. A `<w:t>`-only regex drops the `<w:tab/>` that separates a compliant entry from its page number, which stops the row being recognised as a TOC row at all and makes every entry match itself. One known limitation: a heading whose number comes from Word list numbering rather than its text will not be matched, and would be reported as an orphan.
+
+An orphan entry is invisible until a renderer audits the TOC against a rendered PDF, and it then blocks packaging outright, so it is worth catching deterministically first.
+
 ## XML Templates
 
 `scripts/create_run.py` copies the bundled PRS XML template into:

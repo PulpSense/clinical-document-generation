@@ -32,12 +32,28 @@ BUNDLED_DOCX_DIR = REPO_ROOT / "assets" / "client-templates" / "docx"
 
 
 def toc_paragraph(title: str, page: int) -> str:
-    """A paragraph shaped like a real static TOC row."""
+    """A TOC row written with manual dot leaders, as the bundled templates are."""
+    return (
+        "<w:p>"
+        f'<w:r><w:t xml:space="preserve">{title} ........... {page}</w:t></w:r></w:p>'
+    )
+
+
+def refreshed_toc_paragraph(title: str, page: int) -> str:
+    """A TOC row in the shape `refresh_static_toc` actually produces.
+
+    The page number sits in its own run behind a real `<w:tab/>`, and the dots
+    are drawn by a right-aligned dot-leader tab stop rather than typed. This is
+    the shape `references/template-contract.md` requires, and reading it with a
+    `<w:t>`-only regex loses the tab entirely.
+    """
     return (
         "<w:p><w:pPr><w:tabs>"
         '<w:tab w:val="right" w:leader="dot" w:pos="9000"/>'
         "</w:tabs></w:pPr>"
-        f'<w:r><w:t xml:space="preserve">{title}\t{page}</w:t></w:r></w:p>'
+        f'<w:r><w:t xml:space="preserve">{title}</w:t></w:r>'
+        "<w:r><w:tab/></w:r>"
+        f'<w:r><w:t xml:space="preserve">{page}</w:t></w:r></w:p>'
     )
 
 
@@ -80,6 +96,42 @@ class OrphanTocEntryTests(unittest.TestCase):
         )
 
         self.assertEqual(findings, [])
+
+    def test_an_orphan_is_caught_in_a_contract_compliant_toc(self) -> None:
+        """The check must work on the TOC shape the contract actually mandates.
+
+        Reading these rows with a `<w:t>`-only regex drops the `<w:tab/>`, so
+        no row is recognised as a TOC row, every entry matches itself, and the
+        check silently reports nothing at all.
+        """
+        findings = self.findings_for(
+            refreshed_toc_paragraph("8. STUDY PROCEDURE", 5)
+            + refreshed_toc_paragraph("8.1. Informed Consent / Subject enrollment", 5)
+            + body_paragraph("8. STUDY PROCEDURE")
+            + body_paragraph("{AI_studyProcedure}")
+        )
+
+        self.assertEqual(len(findings), 1)
+        self.assertIn("Informed Consent", findings[0]["entry"])
+
+    def test_a_line_broken_heading_still_answers_its_entry(self) -> None:
+        """`<w:br/>` inside a heading is whitespace, not a missing section."""
+        findings = self.findings_for(
+            refreshed_toc_paragraph("8. STUDY PROCEDURE", 5)
+            + '<w:p><w:r><w:t xml:space="preserve">8. STUDY</w:t>'
+            '<w:br/><w:t xml:space="preserve">PROCEDURE</w:t></w:r></w:p>'
+        )
+
+        self.assertEqual(findings, [])
+
+    def test_a_merely_longer_heading_does_not_answer_an_entry(self) -> None:
+        """`9. STATISTICAL METHODS AND ANALYSIS` is a different section."""
+        findings = self.findings_for(
+            refreshed_toc_paragraph("9. STATISTICAL METHODS", 5)
+            + body_paragraph("9. STATISTICAL METHODS AND ANALYSIS")
+        )
+
+        self.assertEqual(len(findings), 1)
 
     def test_a_document_with_no_toc_is_not_a_finding(self) -> None:
         self.assertEqual(self.findings_for(body_paragraph("1. TITLE PAGE")), [])

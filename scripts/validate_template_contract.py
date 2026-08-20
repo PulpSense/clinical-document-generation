@@ -42,8 +42,6 @@ VISIT_BLOCK_PATH = "visits"
 STRUCTURAL_TABLE_PLACEHOLDER = "{visitsTable}"
 
 #: Bundled templates whose visit schedule must be a Data-Driven Table.
-PARAGRAPH_RE = re.compile(r"<w:p\b[^>]*>.*?</w:p>", re.DOTALL)
-
 #: Every bundled protocol template, whose static TOC must describe its body.
 PROTOCOL_TEMPLATES = (
     "prospective-protocol.template.docx",
@@ -159,11 +157,19 @@ def missing_structural_table_findings(template_path: Path) -> list[dict]:
 def orphan_toc_findings(template_path: Path) -> list[dict]:
     """Report static TOC entries that no heading in the body answers to.
 
+    Both sides are read with the TOC reader's own parser. A regex over `<w:t>`
+    elements would drop the `<w:tab/>` that separates a refreshed entry from
+    its page number, so contract-compliant rows would not be recognised as TOC
+    rows at all and every entry would end up matching itself.
+
     A heading may share its paragraph with the content that follows it, as
-    `9.1. Analysis Data Sets {AI_analysisDataSets}` does, so an entry counts as
-    answered when a body paragraph *starts with* its title.
+    `9.1. Analysis Data Sets {AI_analysisDataSets}` does, so an entry is
+    answered by a paragraph that is its title or its title followed by a
+    placeholder. A merely longer heading does not answer it.
     """
-    from audit_static_toc import TOC_LINE_RE, toc_entries
+    import xml.etree.ElementTree as ET
+
+    from audit_static_toc import TOC_LINE_RE, W, normalize, paragraph_text, toc_entries
 
     template = Path(template_path)
     entries = toc_entries(template)
@@ -171,21 +177,19 @@ def orphan_toc_findings(template_path: Path) -> list[dict]:
         return []
 
     with zipfile.ZipFile(template) as archive:
-        xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
-    # A TOC row carries its page number after a tab or a run of dots. Reusing
-    # the reader's own test keeps this working whether the leader is literal
-    # dots or a right-aligned dot-leader tab stop.
+        document = ET.fromstring(archive.read("word/document.xml"))
+
     body = []
-    for match in PARAGRAPH_RE.finditer(xml):
-        text = visible_text(match.group(0)).replace("\u00a0", " ").strip()
+    for paragraph in document.iter(W + "p"):
+        text = paragraph_text(paragraph).replace("\u00a0", " ").strip()
         if TOC_LINE_RE.match(text):
             continue
-        body.append(" ".join(text.split()).lower())
+        body.append(normalize(text).lower())
 
     findings = []
     for entry in entries:
-        title = " ".join(entry["title"].split()).lower()
-        if any(paragraph.startswith(title) for paragraph in body):
+        title = normalize(entry["title"]).lower()
+        if any(_answers(paragraph, title) for paragraph in body):
             continue
         findings.append(
             {
@@ -199,6 +203,13 @@ def orphan_toc_findings(template_path: Path) -> list[dict]:
             }
         )
     return findings
+
+
+def _answers(paragraph: str, title: str) -> bool:
+    """Whether a body paragraph is the heading a TOC entry points at."""
+    if paragraph == title:
+        return True
+    return paragraph.startswith(title) and paragraph[len(title) :].lstrip().startswith("{")
 
 
 def bundled_template_findings() -> list[dict]:
