@@ -15,6 +15,7 @@ from icf_template_selection import (
     apply_bundled_icf_template,
     resolve_icf_template_choice,
 )
+from source_intake import build_packet, packet_text
 from study_type_branches import canonical_study_type, default_document_set
 
 
@@ -167,6 +168,13 @@ def main() -> int:
         help="Study branch used to set meta.study_type and meta.document_set in a new reference.",
     )
     parser.add_argument("--raw-context", help="Path to raw context text/markdown to copy.")
+    parser.add_argument(
+        "--evidence",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="An Evidence File in the Source Intake Packet. Repeat for every file the client sent.",
+    )
     parser.add_argument("--reference", help="Existing study.reference.json to copy.")
     parser.add_argument("--protocol-template", help="DOCX template for the protocol document.")
     parser.add_argument("--icf-template", help="DOCX template for the informed consent form.")
@@ -208,6 +216,12 @@ def main() -> int:
     elif not raw_dest.exists():
         raw_dest.write_text("", encoding="utf-8")
 
+    # One Markdown file is simply the smallest Source Intake Packet, so both
+    # entry points build the same manifest.
+    evidence_paths = [args.raw_context] if args.raw_context else []
+    evidence_paths.extend(args.evidence)
+    packet = build_packet(run_dir, evidence_paths) if evidence_paths else None
+
     reference_dest = run_dir / "reference" / "study.reference.json"
     if args.reference:
         copy_if_present(args.reference, reference_dest)
@@ -238,7 +252,7 @@ def main() -> int:
             }
 
     reference = json.loads(reference_dest.read_text(encoding="utf-8"))
-    raw_text = raw_dest.read_text(encoding="utf-8", errors="replace")
+    raw_text = packet_text(run_dir) or raw_dest.read_text(encoding="utf-8", errors="replace")
     if args.icf_template:
         meta = reference.get("meta") if isinstance(reference.get("meta"), dict) else {}
         meta["icf_template"] = INTERNAL_PROVIDED_CHOICE
@@ -260,16 +274,30 @@ def main() -> int:
             }
     reference_dest.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
+    sources = [
+        {
+            "type": "raw_context",
+            "path": "input/raw_context.md",
+            "provided": bool(args.raw_context),
+        }
+    ]
+    if packet:
+        sources.extend(
+            {
+                "type": "evidence_file",
+                "path": item["path"],
+                "filename": item["filename"],
+                "media_type": item["media_type"],
+                "status": item["status"],
+            }
+            for item in packet["evidence"]
+        )
     manifest = {
         "created_at": created_at,
         "run_dir": ".",
-        "sources": [
-            {
-                "type": "raw_context",
-                "path": "input/raw_context.md",
-                "provided": bool(args.raw_context),
-            }
-        ],
+        "source_intake_packet": "input/source-intake-manifest.json" if packet else None,
+        "evidence_counts": packet["counts"] if packet else None,
+        "sources": sources,
         "templates": copied_templates,
     }
     (run_dir / "input" / "source_manifest.json").write_text(

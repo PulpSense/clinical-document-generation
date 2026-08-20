@@ -11,7 +11,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from study_type_branches import canonical_study_type, default_document_set, get_path
+from study_type_branches import (
+    canonical_study_type,
+    default_document_set,
+    get_path,
+    has_meaningful_value,
+)
 
 
 STANDARD_REFERENCE = "reference/study.reference.json"
@@ -35,6 +40,13 @@ RESET_ROOTS = [
     "generated",
     "regulatory",
     "references",
+]
+
+# Operational metadata lives inside a reset root but is not a reviewer-owned
+# study fact. It is chosen by the workflow, never shown in the reviewer
+# Markdown, and the active branch needs it after approval.
+PRESERVED_OPERATIONAL_PATHS = [
+    "regulatory.xml_profile",
 ]
 
 
@@ -189,6 +201,9 @@ def set_path(data: dict, dotted_path: str, value: Any) -> None:
 
 def reset_reference(original: dict) -> dict:
     reference = deepcopy(original)
+    preserved = [
+        (path, get_path(original, path)) for path in PRESERVED_OPERATIONAL_PATHS
+    ]
     for root in RESET_ROOTS:
         if root == "sites" or isinstance(reference.get(root), list):
             reference[root] = []
@@ -196,12 +211,74 @@ def reset_reference(original: dict) -> dict:
             reference[root] = {}
     reference["template_fields"] = {}
     reference["needs_review"] = []
+    for path, value in preserved:
+        if value is not None:
+            set_path(reference, path, value)
     return reference
 
 
-def apply_rows(original: dict, parsed_rows: list[tuple[str, str]]) -> tuple[dict, list[str]]:
+def review_item_is_explicitly_unresolved(item: Any) -> bool:
+    """True when the reviewer deliberately left this item open."""
+    if not isinstance(item, dict):
+        return False
+    if item.get("unresolved") is True:
+        return True
+    return item.get("resolved") is False
+
+
+def prune_resolved_candidates(reference: dict) -> list[str]:
+    """Drop Field Candidates the approved Markdown has now resolved.
+
+    A candidate survives only while its field still has no meaningful value, so
+    a reviewer decision can never be re-litigated by pre-approval extraction
+    state. Returns the field ids that were cleared.
+    """
+    source = reference.get("source")
+    if not isinstance(source, dict):
+        return []
+    candidates = source.get("field_candidates")
+    if not isinstance(candidates, dict) or not candidates:
+        return []
+
+    resolved = [field for field in candidates if has_meaningful_value(reference, field)]
+    if resolved:
+        source["field_candidates"] = {
+            field: value for field, value in candidates.items() if field not in resolved
+        }
+    return resolved
+
+
+def carry_unresolved_review_items(reference: dict, original: dict) -> list[dict]:
+    """Keep review state the reviewer did not resolve.
+
+    An item survives when it is explicitly flagged unresolved, or when the field
+    it names still has no meaningful value after the approved Markdown is
+    applied. Everything else was settled by the reviewer.
+    """
+    carried: list[dict] = []
+    for item in original.get("needs_review") or []:
+        if not isinstance(item, dict):
+            continue
+        field = str(item.get("field") or "").strip()
+        explicit = review_item_is_explicitly_unresolved(item)
+        if explicit or (field and not has_meaningful_value(reference, field)):
+            carried.append(deepcopy(item))
+    reference["needs_review"] = carried
+    return carried
+
+
+def apply_rows(
+    original: dict, parsed_rows: list[tuple[str, str]]
+) -> tuple[dict, list[str], list[str]]:
+    """Apply reviewer-approved rows. Returns the reference, warnings, and notes.
+
+    Warnings mean the parse could not do what the Markdown asked. Notes record
+    what the approval settled, which is normal on the happy path and must never
+    be mistaken for a failure.
+    """
     reference = reset_reference(original)
     warnings: list[str] = []
+    notes: list[str] = []
     for field_id, raw_value in parsed_rows:
         if field_id.startswith(("generated.", "template_fields.", "source.", "approval.", "needs_review.")):
             warnings.append(f"Skipped non-source field id `{field_id}`.")
@@ -224,10 +301,30 @@ def apply_rows(original: dict, parsed_rows: list[tuple[str, str]]) -> tuple[dict
         meta["study_type"] = canonical
         if not meta.get("document_set"):
             meta["document_set"] = default_document_set(canonical)
-    return reference, warnings
+
+    cleared = prune_resolved_candidates(reference)
+    carried = carry_unresolved_review_items(reference, original)
+    if cleared:
+        notes.append(
+            "Cleared resolved field candidates: " + ", ".join(sorted(cleared)) + "."
+        )
+    if carried:
+        notes.append(
+            "Review state remains unresolved for: "
+            + ", ".join(sorted(str(item.get("field") or "needs_review") for item in carried))
+            + "."
+        )
+    return reference, warnings, notes
 
 
-def write_report(path: Path, parsed_count: int, warnings: list[str], markdown_rel: str, output_rel: str) -> None:
+def write_report(
+    path: Path,
+    parsed_count: int,
+    warnings: list[str],
+    markdown_rel: str,
+    output_rel: str,
+    notes: list[str] | None = None,
+) -> None:
     lines = [
         "# Source Of Truth Parse Report",
         "",
@@ -242,8 +339,85 @@ def write_report(path: Path, parsed_count: int, warnings: list[str], markdown_re
             lines.append(f"- {warning}")
     else:
         lines.append("No parser warnings were detected.")
+    if notes:
+        lines.extend(["", "## Notes", ""])
+        for note in notes:
+            lines.append(f"- {note}")
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def parse_approved_markdown(
+    run_dir: Path,
+    source_md: Path,
+    *,
+    reference_path: Path | None = None,
+    output_path: Path | None = None,
+    approval_status: str = "pending_review",
+    approved_by: str | None = None,
+) -> dict:
+    """Parse reviewer-facing Markdown back into the study reference.
+
+    The parsed Markdown replaces the pre-approval study-fact state. Resolved
+    Field Candidates and settled review items do not survive; operational
+    metadata and explicitly unresolved review state do.
+    """
+    run_dir = Path(run_dir)
+    source_md = Path(source_md)
+    reference_path = reference_path or run_dir / STANDARD_REFERENCE
+    output_path = output_path or reference_path
+    report_path = run_dir / STANDARD_REPORT
+
+    original = load_json(reference_path)
+    rows, warnings = extract_rows(source_md)
+    rows, header_warnings = reconcile_study_header(original, rows, extract_study_header(source_md))
+    warnings.extend(header_warnings)
+    reference, apply_warnings, notes = apply_rows(original, rows)
+    warnings.extend(apply_warnings)
+
+    source = reference.get("source")
+    if not isinstance(source, dict):
+        source = {}
+    rel_source = display_path(source_md, run_dir)
+    source["source_of_truth_file"] = rel_source
+    source["source_of_truth_md"] = rel_source
+    source["source_of_truth_status"] = "uploaded_reviewed"
+    source["source_of_truth_parsed_at"] = datetime.now(timezone.utc).isoformat()
+    reference["source"] = source
+
+    approval = reference.get("approval")
+    if not isinstance(approval, dict):
+        approval = {}
+    approval["status"] = approval_status
+    approval["review_file"] = rel_source
+    if approval_status == "approved":
+        approval["approved_by"] = approved_by or approval.get("approved_by") or "reviewer"
+        approval["approved_at"] = datetime.now(timezone.utc).isoformat()
+    else:
+        approval["approved_by"] = None
+        approval["approved_at"] = None
+    reference["approval"] = approval
+
+    output_path.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    write_report(
+        report_path,
+        len(rows),
+        warnings,
+        rel_source,
+        display_path(output_path, run_dir),
+        notes,
+    )
+    return {
+        "reference": reference,
+        "updated": display_path(output_path, run_dir),
+        "parsed_fields": len(rows),
+        "warnings": warnings,
+        "warning_count": len(warnings),
+        "notes": notes,
+        "note_count": len(notes),
+        "report": display_path(report_path, run_dir),
+        "approval_status": approval_status,
+    }
 
 
 def main() -> int:
@@ -260,53 +434,29 @@ def main() -> int:
     source_md = Path(args.source_md).expanduser().resolve()
     reference_path = Path(args.reference).expanduser().resolve() if args.reference else run_dir / STANDARD_REFERENCE
     output_path = Path(args.output_reference).expanduser().resolve() if args.output_reference else reference_path
-    report_path = run_dir / STANDARD_REPORT
 
-    original = load_json(reference_path)
-    rows, warnings = extract_rows(source_md)
-    rows, header_warnings = reconcile_study_header(original, rows, extract_study_header(source_md))
-    warnings.extend(header_warnings)
-    reference, apply_warnings = apply_rows(original, rows)
-    warnings.extend(apply_warnings)
-
-    source = reference.get("source")
-    if not isinstance(source, dict):
-        source = {}
-    rel_source = display_path(source_md, run_dir)
-    source["source_of_truth_file"] = rel_source
-    source["source_of_truth_md"] = rel_source
-    source["source_of_truth_status"] = "uploaded_reviewed"
-    source["source_of_truth_parsed_at"] = datetime.now(timezone.utc).isoformat()
-    reference["source"] = source
-
-    approval = reference.get("approval")
-    if not isinstance(approval, dict):
-        approval = {}
-    approval["status"] = args.approval_status
-    approval["review_file"] = rel_source
-    if args.approval_status == "approved":
-        approval["approved_by"] = args.approved_by or approval.get("approved_by") or "reviewer"
-        approval["approved_at"] = datetime.now(timezone.utc).isoformat()
-    else:
-        approval["approved_by"] = None
-        approval["approved_at"] = None
-    reference["approval"] = approval
-
-    output_path.write_text(json.dumps(reference, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    write_report(report_path, len(rows), warnings, rel_source, display_path(output_path, run_dir))
+    result = parse_approved_markdown(
+        run_dir,
+        source_md,
+        reference_path=reference_path,
+        output_path=output_path,
+        approval_status=args.approval_status,
+        approved_by=args.approved_by,
+    )
     print(
         json.dumps(
             {
-                "updated": display_path(output_path, run_dir),
-                "parsed_fields": len(rows),
-                "warning_count": len(warnings),
-                "report": display_path(report_path, run_dir),
-                "approval_status": args.approval_status,
+                "updated": result["updated"],
+                "parsed_fields": result["parsed_fields"],
+                "warning_count": result["warning_count"],
+                "note_count": result["note_count"],
+                "report": result["report"],
+                "approval_status": result["approval_status"],
             },
             indent=2,
         )
     )
-    return 1 if warnings else 0
+    return 1 if result["warnings"] else 0
 
 
 if __name__ == "__main__":

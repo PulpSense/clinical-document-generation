@@ -129,6 +129,42 @@ test -f /tmp/hermes-clinical-runs/setup-smoke/templates/protocol.template.docx
 rm -rf /tmp/hermes-clinical-runs /tmp/hermes-clinical-source.md
 ```
 
+## Branch Smoke And Packaging
+
+A skill version is releasable only after every supported branch has generated its complete default document set and passed every applicable Delivery Gate.
+
+Run the branch smoke:
+
+```bash
+python3 scripts/run_branch_smoke.py --root /tmp/clinical-smoke
+```
+
+It generates the prospective, ambispective, and retrospective document sets from approved reference fixtures, runs each branch's Delivery Gates, and writes `skill-smoke.json` recording the branch, active document set, generated artifacts, gate outcomes, and any QA limitation. It exits non-zero when a branch fails or was never smoked.
+
+On a host with a renderer installed, the smoke exports each DOCX to PDF for static-TOC QA, which launches that renderer. To run every other Delivery Gate without starting one:
+
+```bash
+python3 scripts/run_branch_smoke.py --root /tmp/clinical-smoke --no-renderer
+```
+
+Renderer-backed QA is then skipped and disclosed, exactly as it is on a host with no renderer at all.
+
+Build the package:
+
+```bash
+python3 scripts/package_skill.py --output /tmp/clinical-document-generation.zip --smoke-root /tmp/clinical-smoke
+```
+
+Packaging launches a renderer for static-TOC QA on a host that has one. To build without starting one, pass the same flag the smoke takes:
+
+```bash
+python3 scripts/package_skill.py --output /tmp/clinical-document-generation.zip --smoke-root /tmp/clinical-smoke --no-renderer
+```
+
+Packaging runs the smoke first and refuses to write an archive unless every branch passed. Invalid PRS XML, unresolved placeholders, missing branch-required body content, an absent Data-Driven visit table, or detected stale template content all block the release. Renderer unavailability does not: it is recorded as a QA limitation, matching the exporter contract. An available renderer that fails, or a static-TOC audit that finds page, alignment, or missing-heading mismatches, does block.
+
+The archive contains `SKILL.md`, `README.md`, `agents/`, `assets/`, `references/`, `scripts/`, and the `smoke-evidence.json` that authorised the release.
+
 ## Register In Hermes
 
 Register the cloned repository root as a Hermes skill source.

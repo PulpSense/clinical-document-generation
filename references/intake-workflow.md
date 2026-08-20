@@ -2,14 +2,30 @@
 
 Use this guide when the source material is unstructured: Telegram or Slack messages, email text, meeting notes, audio transcripts, pasted synopsis text, PDFs, DOCX files, images with extracted text, spreadsheets, or mixed attachments.
 
+## The Source Intake Packet
+
+A client submission is one **Source Intake Packet**, whether it is a single Markdown file or nine mixed attachments. The packet holds one or more **Evidence Files** and is represented by `input/source-intake-manifest.json`, which records each file's identity, submission order, provenance, media type, processing status, and any extraction error.
+
+Build the packet with every file the client sent:
+
+```bash
+python3 scripts/create_run.py \
+  --root <runs-root> --slug <slug> --study-type <branch> \
+  --evidence <file-1> --evidence <file-2> --evidence <file-3>
+```
+
+`--raw-context <file>` remains supported and simply creates a one-file packet.
+
+Supported Evidence File types are Markdown, plain text, JSON, CSV, PDF, and DOCX. A file of any other type is still copied into the run and listed in the manifest with status `unsupported`; a file that cannot be read is listed as `unreadable` with the error naming the file. Never treat either as if it had not arrived — report it to the reviewer.
+
 ## Intake Rules
 
-1. Preserve the original material before extracting anything.
-2. Save pasted text or message content to `input/raw_context.md`.
-3. Save audio transcripts to `input/transcript.md`. If an audio file is provided but no transcription tool is available, ask for a transcript.
-4. Save attachments under `input/attachments/` and list them in `input/source_manifest.json`.
-5. Record the intake channel in `source.channel`, for example `telegram`, `slack`, `email`, `audio_transcript`, `uploaded_file`, or `manual_context`.
-6. If new material arrives during review, preserve it as an additional input before applying corrections to the reference file.
+1. Preserve the original material before extracting anything. Every Evidence File belongs in the packet.
+2. Read the whole packet, not only the first file. Template selection and every other source inspection use the combined evidence text, because a study can name its IRB only in the third attachment.
+3. Save audio transcripts as Evidence Files. If an audio file is provided but no transcription tool is available, ask for a transcript.
+4. Record the intake channel in `source.channel`, for example `telegram`, `slack`, `email`, `audio_transcript`, `uploaded_file`, or `manual_context`.
+5. If new material arrives during review, add it to the packet before applying corrections to the reference file.
+6. Tell the reviewer about any Evidence File the workflow could not read, and which one it was.
 
 ## Source-Of-Truth Stop Rule
 

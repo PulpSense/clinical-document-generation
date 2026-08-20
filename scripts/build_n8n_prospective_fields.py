@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from data_driven_tables import build_matrix, matrix_is_empty, read_matrix
+
 
 STANDARD_REFERENCE = "reference/study.reference.json"
 NBSP_BULLET = "•\u00a0\u00a0\u00a0\u00a0"
@@ -223,6 +225,51 @@ def criteria_text(items: Any) -> str:
     return text(items)
 
 
+#: Columns of Table 15.1, whose caption pairs visits with their assessments.
+ASSESSMENT_TABLE_HEADER = ("Visit Number", "Visit Name", "Visit Window", "Assessments")
+
+
+def assessment_matrix(reference: dict, visit_table: list[dict]) -> dict:
+    """Build Table 15.1 from data the branch already holds.
+
+    No Required Source Input carries an assessment-per-visit matrix, so a
+    generated one is used when the model supplied it and the visit schedule
+    supplies it otherwise. A study with no assessment detail still renders a
+    complete table; the assessments column falls back to the study-level text.
+    """
+    generated = get_path(reference, "generated.protocol.visitsTable")
+    if not matrix_is_empty(generated):
+        cells, columns, rows = read_matrix(generated)
+        # Honour the shape the model declared rather than inferring a new one.
+        return {
+            "cells": [text(cell) for cell in cells[: columns * rows]],
+            "totalColumns": columns,
+            "totalRows": rows,
+        }
+
+    if not visit_table:
+        # Nothing to tabulate. The section is empty and the gates say so,
+        # rather than a lone header row implying a table that has no content.
+        return build_matrix([], 0)
+
+    study_assessments = first_text(
+        get_path(reference, "procedures.assessments"),
+        get_path(reference, "generated.protocol.measurements"),
+        get_path(reference, "procedures.assessment_details"),
+    )
+    cells = list(ASSESSMENT_TABLE_HEADER)
+    for row in visit_table:
+        cells.extend(
+            [
+                first_text(row.get("visitNumber")),
+                first_text(row.get("visitName")),
+                first_text(row.get("visitWindow")),
+                first_text(row.get("assessments")) or study_assessments,
+            ]
+        )
+    return build_matrix(cells, len(ASSESSMENT_TABLE_HEADER))
+
+
 def visit_rows(reference: dict) -> list[dict]:
     generated = reference.get("generated") if isinstance(reference.get("generated"), dict) else {}
     protocol = generated.get("protocol") if isinstance(generated.get("protocol"), dict) else {}
@@ -339,7 +386,7 @@ def build_fields(reference: dict) -> dict:
     facility_address_text = first_text(street_address(facility.get("address")))
 
     fields = {
-        "visitsTable": "",
+        "visitsTable": assessment_matrix(reference, visit_table),
         "studyCordinatorName": coordinator_name,
         "studyCordinatorPhone": first_text(
             get_path(reference, "parties.study_coordinator.business_phone"),
@@ -413,6 +460,18 @@ def build_fields(reference: dict) -> dict:
             protocol.get("study_procedure"),
             get_path(reference, "procedures.study_procedure"),
         ),
+        # Structured rows drive the protocol's Data-Driven visit table. The
+        # newline-joined `AI_visit*` fields below stay as compatibility values
+        # for older external templates; they cannot satisfy a real visit table.
+        "visits": [
+            {
+                "visitNumber": first_text(row.get("visitNumber")),
+                "visitName": first_text(row.get("visitName")),
+                "visitWindow": first_text(row.get("visitWindow")),
+                "CRFnumber": first_text(row.get("CRFnumber")),
+            }
+            for row in visit_table
+        ],
         "AI_visitNumber": "\n".join(first_text(row.get("visitNumber")) for row in visit_table),
         "AI_visitName": "\n".join(first_text(row.get("visitName")) for row in visit_table),
         "AI_visitWindow": "\n".join(first_text(row.get("visitWindow")) for row in visit_table),

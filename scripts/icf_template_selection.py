@@ -176,9 +176,24 @@ def apply_bundled_icf_template(run_dir: Path, reference: dict, choice: str) -> P
     return destination
 
 
-def ensure_run_icf_template(run_dir: Path, reference: dict, requested_choice: Any = None) -> dict:
+def run_source_text(run_dir: Path) -> str:
+    """Every readable Evidence File in the run's Source Intake Packet.
+
+    Source inspection must consider the complete packet: a study can name its
+    IRB only in the third attachment. The single raw-context file remains the
+    fallback for runs created before packets existed.
+    """
+    from source_intake import packet_text
+
+    text = packet_text(run_dir)
+    if text.strip():
+        return text
     raw_path = run_dir / "input" / "raw_context.md"
-    raw_text = raw_path.read_text(encoding="utf-8", errors="replace") if raw_path.exists() else ""
+    return raw_path.read_text(encoding="utf-8", errors="replace") if raw_path.exists() else ""
+
+
+def ensure_run_icf_template(run_dir: Path, reference: dict, requested_choice: Any = None) -> dict:
+    raw_text = run_source_text(run_dir)
     result = resolve_icf_template_choice(reference, raw_text=raw_text, requested_choice=requested_choice)
     choice = result.get("choice")
     if not result["required"] or not choice:
