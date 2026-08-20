@@ -149,9 +149,11 @@ The branch mapper publishes the matrix as `template_fields.visitsTable`, in the 
 {"cells": ["Visit Number", "Visit Name", "…"], "totalColumns": 4, "totalRows": 8}
 ```
 
-`cells` is read row-major, the first row renders as a repeating shaded header, and a short final row is padded so the table stays rectangular. A ragged or oversized `cells` list is tolerated; an empty one is not.
+`cells` is read row-major, the first row renders as a repeating shaded header, and a short final row is padded so the table stays rectangular. A declared `totalRows` is honoured, so cells beyond `totalRows` x `totalColumns` are ignored rather than growing the table; a missing `totalRows` is computed from the cell count. An empty matrix is not tolerated.
 
-The matrix is used verbatim when `generated.protocol.visitsTable` supplies one. Otherwise it is derived from the visit schedule the branch already holds, with the assessments column falling back to `procedures.assessments` and then `generated.protocol.measurements`. No Required Source Input carries an assessment-per-visit matrix, so a study with no assessment detail still renders a complete table.
+The inserted table is always followed by a paragraph, because a table may not be the last thing in a table cell and two adjacent tables merge into one.
+
+The matrix is used with the shape it declares when `generated.protocol.visitsTable` supplies a non-empty one; a blank generated matrix degrades to the derived table rather than blanking the section. Otherwise it is derived from the visit schedule the branch already holds, with the assessments column falling back to `procedures.assessments` and then `generated.protocol.measurements`. No Required Source Input carries an assessment-per-visit matrix, so a study with no assessment detail still renders a complete table.
 
 Two checks enforce this, mirroring the visit table:
 

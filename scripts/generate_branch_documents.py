@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import zipfile
 from datetime import datetime, timezone
@@ -30,6 +31,7 @@ from render_templates import (
     unresolved_in_text,
     visible_text_from_word_xml,
 )
+from data_driven_tables import matrix_is_empty
 from study_type_branches import branch_for_study_type, default_document_set
 from validate_prs_xml import validate as validate_prs_xml
 from validate_template_contract import (
@@ -306,9 +308,43 @@ def rendered_visit_rows(path: Path) -> list[str] | None:
     return None
 
 
+PARAGRAPH_RE = re.compile(r"<w:p\b[^>]*>.*?</w:p>", re.DOTALL)
+
+
+def table_follows_caption(path: Path, caption: str) -> bool:
+    """True when a real table sits directly under `caption` in the document.
+
+    The caption also appears in the table of contents, so the last paragraph
+    carrying it is the one in the body. Matching on a paragraph's visible text
+    keeps this working when the caption is split across several runs.
+    """
+    with zipfile.ZipFile(path) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+
+    needle = " ".join(caption.split()).lower()
+    caption_end = -1
+    for paragraph in PARAGRAPH_RE.finditer(xml):
+        if needle in " ".join(visible_text(paragraph.group(0)).split()).lower():
+            caption_end = paragraph.end()
+    if caption_end < 0:
+        return False
+
+    table = TABLE_RE.search(xml, caption_end)
+    if not table:
+        return False
+    # Body text between the caption and the next table means the caption is
+    # not the one introducing it.
+    return not any(
+        visible_text(paragraph.group(0)).strip()
+        for paragraph in PARAGRAPH_RE.finditer(xml, caption_end, table.start())
+    )
+
+
 def gate_structural_tables(
+    run_dir: Path,
     reference: dict,
     canonical: str,
+    artifacts: dict[str, str],
 ) -> GateResult:
     """Refuse to deliver a structural section that renders as a bare caption.
 
@@ -320,7 +356,8 @@ def gate_structural_tables(
     """
     branch = branch_for_study_type(canonical) or {}
     declared = branch.get("structural_tables") or []
-    if not declared:
+    rel = artifacts.get("protocol_docx")
+    if not declared or not rel:
         return GateResult(
             "structural_tables",
             "skipped",
@@ -333,21 +370,32 @@ def gate_structural_tables(
 
     findings = []
     for item in declared:
-        field = item["field"]
-        value = template_fields.get(field)
-        cells = value.get("cells") if isinstance(value, dict) else None
-        if isinstance(cells, list) and any(str(cell).strip() for cell in cells):
+        field, section = item["field"], item["section"]
+        if matrix_is_empty(template_fields.get(field)):
+            findings.append(
+                {
+                    "field": f"template_fields.{field}",
+                    "section": section,
+                    "issue": (
+                        f"{section} would render as a caption with no table "
+                        "because its structural table is empty."
+                    ),
+                }
+            )
             continue
-        findings.append(
-            {
-                "field": f"template_fields.{field}",
-                "section": item["section"],
-                "issue": (
-                    f"{item['section']} would render as a caption with no table "
-                    "because its structural table is empty."
-                ),
-            }
-        )
+        # A full matrix proves the data; only the document proves the table.
+        if not table_follows_caption(run_dir / rel, section):
+            findings.append(
+                {
+                    "field": f"template_fields.{field}",
+                    "section": section,
+                    "document": rel,
+                    "issue": (
+                        f"{section} has no table beneath it in the rendered "
+                        "document, so the structural table was never inserted."
+                    ),
+                }
+            )
 
     if findings:
         return GateResult("structural_tables", "fail", findings=findings)
@@ -839,7 +887,7 @@ def generate_branch(
     gates.append(gate_placeholders(run_dir, artifacts))
     gates.append(gate_content_completeness(run_dir, reference, canonical, artifacts))
     gates.append(gate_visit_table(run_dir, reference, canonical, artifacts))
-    gates.append(gate_structural_tables(reference, canonical))
+    gates.append(gate_structural_tables(run_dir, reference, canonical, artifacts))
     gates.append(gate_prs_xml(run_dir, reference, artifacts))
     gates.append(gate_stale_content(run_dir, reference, artifacts))
     visual_gate, qa = gate_visual_qa(

@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from data_driven_tables import build_matrix, matrix_is_empty, read_matrix
+
 
 STANDARD_REFERENCE = "reference/study.reference.json"
 NBSP_BULLET = "•\u00a0\u00a0\u00a0\u00a0"
@@ -227,27 +229,6 @@ def criteria_text(items: Any) -> str:
 ASSESSMENT_TABLE_HEADER = ("Visit Number", "Visit Name", "Visit Window", "Assessments")
 
 
-def normalized_matrix(value: Any) -> dict | None:
-    """A generated Data-Driven Table matrix, or None when there is not one."""
-    if not isinstance(value, dict):
-        return None
-    cells = value.get("cells")
-    if not isinstance(cells, list) or not cells:
-        return None
-    try:
-        columns = int(value.get("totalColumns") or 0)
-    except (TypeError, ValueError):
-        return None
-    if columns <= 0:
-        return None
-    rows = -(-len(cells) // columns)
-    return {
-        "cells": [text(cell) for cell in cells],
-        "totalColumns": columns,
-        "totalRows": rows,
-    }
-
-
 def assessment_matrix(reference: dict, visit_table: list[dict]) -> dict:
     """Build Table 15.1 from data the branch already holds.
 
@@ -256,14 +237,20 @@ def assessment_matrix(reference: dict, visit_table: list[dict]) -> dict:
     supplies it otherwise. A study with no assessment detail still renders a
     complete table; the assessments column falls back to the study-level text.
     """
-    generated = normalized_matrix(get_path(reference, "generated.protocol.visitsTable"))
-    if generated:
-        return generated
+    generated = get_path(reference, "generated.protocol.visitsTable")
+    if not matrix_is_empty(generated):
+        cells, columns, rows = read_matrix(generated)
+        # Honour the shape the model declared rather than inferring a new one.
+        return {
+            "cells": [text(cell) for cell in cells[: columns * rows]],
+            "totalColumns": columns,
+            "totalRows": rows,
+        }
 
     if not visit_table:
         # Nothing to tabulate. The section is empty and the gates say so,
         # rather than a lone header row implying a table that has no content.
-        return {"cells": [], "totalColumns": 0, "totalRows": 0}
+        return build_matrix([], 0)
 
     study_assessments = first_text(
         get_path(reference, "procedures.assessments"),
@@ -280,8 +267,7 @@ def assessment_matrix(reference: dict, visit_table: list[dict]) -> dict:
                 first_text(row.get("assessments")) or study_assessments,
             ]
         )
-    columns = len(ASSESSMENT_TABLE_HEADER)
-    return {"cells": cells, "totalColumns": columns, "totalRows": len(cells) // columns}
+    return build_matrix(cells, len(ASSESSMENT_TABLE_HEADER))
 
 
 def visit_rows(reference: dict) -> list[dict]:

@@ -15,6 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from data_driven_tables import read_matrix
+
 
 STANDARD = {
     "reference": "reference/study.reference.json",
@@ -54,14 +56,13 @@ PARAGRAPH_RE = re.compile(r"<w:p\b[^>]*>.*?</w:p>", re.DOTALL)
 ROW_RE = re.compile(r"<w:tr\b[^>]*>.*?</w:tr>", re.DOTALL)
 MISSING = object()
 
-#: A Data-Driven Table arrives as a row-major cell matrix. The reference
-#: contract removes the placeholder and inserts a real table in its place, so
-#: the matrix must describe its own shape rather than rely on the template.
-MATRIX_TABLE_KEYS = ("cells", "totalColumns", "totalRows")
-#: Usable body width for a Letter page with the bundled 1.25in side margins.
+#: Table width copied from the bundled protocol templates' own visit table, so
+#: an inserted table lines up with the tables already in the document.
 MATRIX_TABLE_WIDTH_DXA = 8730
 MATRIX_TABLE_BORDERS = ("top", "left", "bottom", "right", "insideH", "insideV")
-SCALAR_TOKEN_RE = re.compile(r"\{(?P<path>[" + PATH_CHARS + r"]+)\}")
+#: A cell may not end with a table, and two adjacent tables merge into one, so
+#: an inserted table is always followed by a paragraph.
+EMPTY_PARAGRAPH = "<w:p/>"
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -403,26 +404,6 @@ def _render_docx_row_blocks(xml: str, root_data: Any, local_data: Any) -> str:
     return ROW_RE.sub(replace_row, xml)
 
 
-def matrix_table(value: Any) -> tuple[list[str], int, int] | None:
-    """Read a Data-Driven Table matrix, or None when the value is not one.
-
-    An empty matrix is still a matrix: the placeholder must be removed rather
-    than left to a scalar pass that would stringify the mapping into the
-    document. Emptiness is a delivery question, answered by the gates.
-    """
-    if not isinstance(value, dict) or not all(key in value for key in MATRIX_TABLE_KEYS):
-        return None
-    cells = value.get("cells")
-    if not isinstance(cells, list):
-        return None
-    try:
-        columns = int(value.get("totalColumns") or 0)
-        rows = int(value.get("totalRows") or 0)
-    except (TypeError, ValueError):
-        return None
-    return [stringify(cell) for cell in cells], max(columns, 0), max(rows, 0)
-
-
 def _matrix_cell_xml(value: str, width: int, *, header: bool) -> str:
     run_properties = (
         '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
@@ -454,7 +435,7 @@ def _matrix_row_xml(values: list[str], width: int, *, header: bool) -> str:
     return f"<w:tr>{properties}{cells}</w:tr>"
 
 
-def matrix_table_xml(cells: list[str], columns: int, rows: int) -> str:
+def _matrix_table_xml(cells: list[Any], columns: int, rows: int) -> str:
     """Build a real Word table from a row-major cell matrix."""
     if columns <= 0 or rows <= 0 or not cells:
         return ""
@@ -465,7 +446,7 @@ def matrix_table_xml(cells: list[str], columns: int, rows: int) -> str:
     )
     body = []
     for index in range(rows):
-        chunk = list(cells[index * columns : (index + 1) * columns])
+        chunk = [stringify(cell) for cell in cells[index * columns : (index + 1) * columns]]
         # A ragged matrix still has to render as a rectangle.
         chunk += [""] * (columns - len(chunk))
         body.append(_matrix_row_xml(chunk, width, header=index == 0))
@@ -484,13 +465,13 @@ def _render_docx_matrix_tables(xml: str, root_data: Any, local_data: Any) -> str
 
     def replace_paragraph(match: re.Match[str]) -> str:
         paragraph = match.group(0)
-        token = SCALAR_TOKEN_RE.fullmatch(_text_node_text(paragraph).strip())
-        if not token:
+        token = TOKEN_RE.fullmatch(_text_node_text(paragraph).strip())
+        if not token or token.group("prefix"):
             return paragraph
-        table = matrix_table(resolve_value(local_data, root_data, token.group("path")))
-        if table is None:
+        matrix = read_matrix(resolve_value(local_data, root_data, token.group("path")))
+        if matrix is None:
             return paragraph
-        return matrix_table_xml(*table)
+        return _matrix_table_xml(*matrix) + EMPTY_PARAGRAPH
 
     return PARAGRAPH_RE.sub(replace_paragraph, xml)
 

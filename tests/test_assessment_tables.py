@@ -25,7 +25,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from build_n8n_prospective_fields import build_fields  # noqa: E402
-from generate_branch_documents import generate_branch  # noqa: E402
+from generate_branch_documents import (  # noqa: E402
+    gate_structural_tables,
+    generate_branch,
+)
 from render_templates import render_docx  # noqa: E402
 from validate_template_contract import (  # noqa: E402
     STRUCTURAL_TABLE_PLACEHOLDER,
@@ -82,6 +85,17 @@ def rendered_table(cells: list[str], *, columns: int, rows: int) -> str:
         render_docx(template, output, {"visitsTable": matrix(columns, rows, cells)})
 
         return document_xml(output)
+
+
+def strip_placeholder(template: Path) -> None:
+    """Simulate a template that quietly stopped consuming the structural data."""
+    with zipfile.ZipFile(template) as archive:
+        parts = {name: archive.read(name) for name in archive.namelist()}
+    document = parts["word/document.xml"].decode("utf-8")
+    parts["word/document.xml"] = document.replace("{visitsTable}", "").encode("utf-8")
+    with zipfile.ZipFile(template, "w") as archive:
+        for name, data in parts.items():
+            archive.writestr(name, data)
 
 
 def table_after_caption(path: Path, caption: str) -> str | None:
@@ -183,34 +197,43 @@ class AssessmentMatrixMappingTests(unittest.TestCase):
 
 
 class StructuralTableGateTests(unittest.TestCase):
-    def test_an_empty_structural_table_prevents_delivery(self) -> None:
-        """A generated matrix of blank cells still resolves the placeholder.
+    def test_a_template_that_lost_the_placeholder_prevents_delivery(self) -> None:
+        """The data can be perfect while the document is still missing the table.
 
-        Every Required Source Input is satisfied here, so nothing upstream
-        objects; only a gate that looks at the table's contents can stop a
-        protocol whose section 15 is a caption over an empty grid.
+        This is the defect the whole ticket is about: the token resolves, so
+        placeholder validation passes, and section 15 ships as a bare caption.
+        Only a gate that reads the rendered document can catch it.
         """
         with tempfile.TemporaryDirectory() as temporary:
             run_dir = Path(temporary)
-            reference = build_run(run_dir, "prospective")
-            reference["generated"]["protocol"]["visitsTable"] = matrix(
-                2, 2, ["", "   ", "", ""]
-            )
-            (run_dir / "reference" / "study.reference.json").write_text(
-                json.dumps(reference), encoding="utf-8"
-            )
+            build_run(run_dir, "prospective")
+            strip_placeholder(run_dir / "templates" / "protocol.template.docx")
 
             result = generate_branch(run_dir, renderer_available=False)
 
             self.assertFalse(result["delivery_ready"], result["gates"])
             structural = [g for g in result["gates"] if g["gate"] == "structural_tables"]
-            self.assertTrue(structural, "the branch must run a structural table gate")
             self.assertEqual(structural[0]["status"], "fail")
-            self.assertEqual(
-                structural[0]["findings"][0]["section"], ASSESSMENT_CAPTION
-            )
+            finding = structural[0]["findings"][0]
+            self.assertEqual(finding["section"], ASSESSMENT_CAPTION)
+            self.assertIn("never inserted", finding["issue"])
             report = (run_dir / "logs" / "repair-report.md").read_text(encoding="utf-8")
             self.assertIn(ASSESSMENT_CAPTION, report)
+
+    def test_an_empty_matrix_prevents_delivery(self) -> None:
+        """A branch with nothing to tabulate must not ship the caption alone."""
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            reference = build_run(run_dir, "prospective")
+            reference["template_fields"] = {"visitsTable": matrix(0, 0, [])}
+
+            gate = gate_structural_tables(
+                run_dir, reference, "Prospective", {"protocol_docx": "output/protocol.docx"}
+            )
+
+            self.assertEqual(gate["status"], "fail")
+            self.assertIn("empty", gate["findings"][0]["issue"])
+            self.assertEqual(gate["findings"][0]["section"], ASSESSMENT_CAPTION)
 
     def test_a_populated_structural_table_passes_the_gate(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -275,6 +298,15 @@ class RenderedAssessmentTableTests(unittest.TestCase):
                 4,
                 "the visit schedule keeps its four columns",
             )
+
+            assessments = table_after_caption(
+                run_dir / "output" / "protocol.docx", ASSESSMENT_CAPTION
+            )
+            self.assertNotEqual(
+                assessments, schedule[0], "15.1 must not be the same table as 9.2-1"
+            )
+            self.assertIn("Assessments", visible(ROW_RE.findall(assessments)[0]))
+            self.assertNotIn("CRF", visible(ROW_RE.findall(assessments)[0]))
 
     def test_retrospective_has_no_assessment_table(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
