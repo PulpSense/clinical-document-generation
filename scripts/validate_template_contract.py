@@ -42,6 +42,15 @@ VISIT_BLOCK_PATH = "visits"
 STRUCTURAL_TABLE_PLACEHOLDER = "{visitsTable}"
 
 #: Bundled templates whose visit schedule must be a Data-Driven Table.
+PARAGRAPH_RE = re.compile(r"<w:p\b[^>]*>.*?</w:p>", re.DOTALL)
+
+#: Every bundled protocol template, whose static TOC must describe its body.
+PROTOCOL_TEMPLATES = (
+    "prospective-protocol.template.docx",
+    "ambispective-protocol.template.docx",
+    "retrospective-protocol.template.docx",
+)
+
 VISIT_TABLE_TEMPLATES = (
     "prospective-protocol.template.docx",
     "ambispective-protocol.template.docx",
@@ -147,9 +156,58 @@ def missing_structural_table_findings(template_path: Path) -> list[dict]:
     ]
 
 
+def orphan_toc_findings(template_path: Path) -> list[dict]:
+    """Report static TOC entries that no heading in the body answers to.
+
+    A heading may share its paragraph with the content that follows it, as
+    `9.1. Analysis Data Sets {AI_analysisDataSets}` does, so an entry counts as
+    answered when a body paragraph *starts with* its title.
+    """
+    from audit_static_toc import TOC_LINE_RE, toc_entries
+
+    template = Path(template_path)
+    entries = toc_entries(template)
+    if not entries:
+        return []
+
+    with zipfile.ZipFile(template) as archive:
+        xml = archive.read("word/document.xml").decode("utf-8", errors="ignore")
+    # A TOC row carries its page number after a tab or a run of dots. Reusing
+    # the reader's own test keeps this working whether the leader is literal
+    # dots or a right-aligned dot-leader tab stop.
+    body = []
+    for match in PARAGRAPH_RE.finditer(xml):
+        text = visible_text(match.group(0)).replace("\u00a0", " ").strip()
+        if TOC_LINE_RE.match(text):
+            continue
+        body.append(" ".join(text.split()).lower())
+
+    findings = []
+    for entry in entries:
+        title = " ".join(entry["title"].split()).lower()
+        if any(paragraph.startswith(title) for paragraph in body):
+            continue
+        findings.append(
+            {
+                "template": template.name,
+                "part": "word/document.xml",
+                "entry": entry["title"],
+                "issue": (
+                    "The static table of contents lists a section the document "
+                    "body does not contain."
+                ),
+            }
+        )
+    return findings
+
+
 def bundled_template_findings() -> list[dict]:
     """Every contract violation across the bundled templates that require one."""
     findings: list[dict] = []
+    for name in PROTOCOL_TEMPLATES:
+        template = BUNDLED_DOCX_DIR / name
+        if template.exists():
+            findings.extend(orphan_toc_findings(template))
     for name in VISIT_TABLE_TEMPLATES:
         template = BUNDLED_DOCX_DIR / name
         if not template.exists():
