@@ -118,6 +118,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         required=True,
         help="Directory that receives the branch smoke runs and their evidence.",
     )
+    parser.add_argument(
+        "--no-renderer",
+        action="store_true",
+        help=(
+            "Skip renderer-backed PDF and static-TOC QA while smoking. Every "
+            "other Delivery Gate still runs. Use this when no renderer should "
+            "be launched."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -127,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         result = package_skill(
             Path(args.output).expanduser().resolve(),
             smoke_root=Path(args.smoke_root).expanduser().resolve(),
+            renderer_available=False if args.no_renderer else None,
         )
     except PackagingRefused as exc:
         print(str(exc), file=sys.stderr)

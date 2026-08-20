@@ -22,7 +22,11 @@ from branch_fixtures import approved_reference
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from package_skill import PackagingRefused, package_skill  # noqa: E402
+from package_skill import (  # noqa: E402
+    PackagingRefused,
+    main as package_main,
+    package_skill,
+)
 from run_branch_smoke import SMOKE_BRANCHES, main as smoke_main, run_smoke  # noqa: E402
 
 
@@ -186,6 +190,32 @@ class PackagingTests(unittest.TestCase):
                 [item["branch"] for item in result["smoke"]["branches"]],
                 ["Prospective", "Ambispective", "Retrospective"],
             )
+
+    def test_no_renderer_flag_packages_without_launching_one(self) -> None:
+        """Packaging must not be forced to open a desktop renderer."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "skill.zip"
+
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                exit_code = package_main(
+                    [
+                        "--output", str(archive),
+                        "--smoke-root", str(root / "smoke"),
+                        "--no-renderer",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(archive.exists())
+            evidence = json.loads(
+                (root / "smoke" / "skill-smoke.json").read_text(encoding="utf-8")
+            )
+            self.assertTrue(evidence["package_eligible"], evidence["failed_branches"])
+            for item in evidence["branches"]:
+                visual = [g for g in item["gates"] if g["gate"] == "visual_qa"][0]
+                self.assertEqual(visual["status"], "skipped")
 
     def test_package_contains_the_complete_skill_source(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
