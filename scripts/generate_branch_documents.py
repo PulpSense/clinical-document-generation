@@ -306,6 +306,54 @@ def rendered_visit_rows(path: Path) -> list[str] | None:
     return None
 
 
+def gate_structural_tables(
+    reference: dict,
+    canonical: str,
+) -> GateResult:
+    """Refuse to deliver a structural section that renders as a bare caption.
+
+    A structural placeholder resolves to a table, not to prose. When its
+    matrix is empty the token still resolves, so the placeholder gate passes
+    and the document ships a caption followed by nothing. That is what this
+    gate exists to catch, and it names the affected section so the Repair
+    Report points at the part of the document a reviewer has to look at.
+    """
+    branch = branch_for_study_type(canonical) or {}
+    declared = branch.get("structural_tables") or []
+    if not declared:
+        return GateResult(
+            "structural_tables",
+            "skipped",
+            blocking=False,
+            detail="This branch's documents declare no structural tables.",
+        )
+
+    template_fields = reference.get("template_fields")
+    template_fields = template_fields if isinstance(template_fields, dict) else {}
+
+    findings = []
+    for item in declared:
+        field = item["field"]
+        value = template_fields.get(field)
+        cells = value.get("cells") if isinstance(value, dict) else None
+        if isinstance(cells, list) and any(str(cell).strip() for cell in cells):
+            continue
+        findings.append(
+            {
+                "field": f"template_fields.{field}",
+                "section": item["section"],
+                "issue": (
+                    f"{item['section']} would render as a caption with no table "
+                    "because its structural table is empty."
+                ),
+            }
+        )
+
+    if findings:
+        return GateResult("structural_tables", "fail", findings=findings)
+    return GateResult("structural_tables", "pass")
+
+
 def gate_visit_table(
     run_dir: Path,
     reference: dict,
@@ -791,6 +839,7 @@ def generate_branch(
     gates.append(gate_placeholders(run_dir, artifacts))
     gates.append(gate_content_completeness(run_dir, reference, canonical, artifacts))
     gates.append(gate_visit_table(run_dir, reference, canonical, artifacts))
+    gates.append(gate_structural_tables(reference, canonical))
     gates.append(gate_prs_xml(run_dir, reference, artifacts))
     gates.append(gate_stale_content(run_dir, reference, artifacts))
     visual_gate, qa = gate_visual_qa(

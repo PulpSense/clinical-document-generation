@@ -223,6 +223,67 @@ def criteria_text(items: Any) -> str:
     return text(items)
 
 
+#: Columns of Table 15.1, whose caption pairs visits with their assessments.
+ASSESSMENT_TABLE_HEADER = ("Visit Number", "Visit Name", "Visit Window", "Assessments")
+
+
+def normalized_matrix(value: Any) -> dict | None:
+    """A generated Data-Driven Table matrix, or None when there is not one."""
+    if not isinstance(value, dict):
+        return None
+    cells = value.get("cells")
+    if not isinstance(cells, list) or not cells:
+        return None
+    try:
+        columns = int(value.get("totalColumns") or 0)
+    except (TypeError, ValueError):
+        return None
+    if columns <= 0:
+        return None
+    rows = -(-len(cells) // columns)
+    return {
+        "cells": [text(cell) for cell in cells],
+        "totalColumns": columns,
+        "totalRows": rows,
+    }
+
+
+def assessment_matrix(reference: dict, visit_table: list[dict]) -> dict:
+    """Build Table 15.1 from data the branch already holds.
+
+    No Required Source Input carries an assessment-per-visit matrix, so a
+    generated one is used when the model supplied it and the visit schedule
+    supplies it otherwise. A study with no assessment detail still renders a
+    complete table; the assessments column falls back to the study-level text.
+    """
+    generated = normalized_matrix(get_path(reference, "generated.protocol.visitsTable"))
+    if generated:
+        return generated
+
+    if not visit_table:
+        # Nothing to tabulate. The section is empty and the gates say so,
+        # rather than a lone header row implying a table that has no content.
+        return {"cells": [], "totalColumns": 0, "totalRows": 0}
+
+    study_assessments = first_text(
+        get_path(reference, "procedures.assessments"),
+        get_path(reference, "generated.protocol.measurements"),
+        get_path(reference, "procedures.assessment_details"),
+    )
+    cells = list(ASSESSMENT_TABLE_HEADER)
+    for row in visit_table:
+        cells.extend(
+            [
+                first_text(row.get("visitNumber")),
+                first_text(row.get("visitName")),
+                first_text(row.get("visitWindow")),
+                first_text(row.get("assessments")) or study_assessments,
+            ]
+        )
+    columns = len(ASSESSMENT_TABLE_HEADER)
+    return {"cells": cells, "totalColumns": columns, "totalRows": len(cells) // columns}
+
+
 def visit_rows(reference: dict) -> list[dict]:
     generated = reference.get("generated") if isinstance(reference.get("generated"), dict) else {}
     protocol = generated.get("protocol") if isinstance(generated.get("protocol"), dict) else {}
@@ -339,7 +400,7 @@ def build_fields(reference: dict) -> dict:
     facility_address_text = first_text(street_address(facility.get("address")))
 
     fields = {
-        "visitsTable": "",
+        "visitsTable": assessment_matrix(reference, visit_table),
         "studyCordinatorName": coordinator_name,
         "studyCordinatorPhone": first_text(
             get_path(reference, "parties.study_coordinator.business_phone"),

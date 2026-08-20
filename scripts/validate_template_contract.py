@@ -37,6 +37,9 @@ LEGACY_VISIT_PLACEHOLDERS = {
 
 #: The structured rows a compliant visit table repeats over.
 VISIT_BLOCK_PATH = "visits"
+#: Table 15.1 is inserted where this placeholder sits. A template that drops it
+#: silently loses the section, exactly as the visit table was once lost.
+STRUCTURAL_TABLE_PLACEHOLDER = "{visitsTable}"
 
 #: Bundled templates whose visit schedule must be a Data-Driven Table.
 VISIT_TABLE_TEMPLATES = (
@@ -125,6 +128,25 @@ def missing_visit_table_findings(template_path: Path) -> list[dict]:
     ]
 
 
+def missing_structural_table_findings(template_path: Path) -> list[dict]:
+    """Report a template that no longer carries its structural table placeholder."""
+    template = Path(template_path)
+    for xml in document_parts(template).values():
+        if STRUCTURAL_TABLE_PLACEHOLDER in visible_text(xml):
+            return []
+    return [
+        {
+            "template": template.name,
+            "part": "word/document.xml",
+            "placeholder": STRUCTURAL_TABLE_PLACEHOLDER,
+            "issue": (
+                "The branch requires a structural assessments table, but the "
+                "template has no placeholder to insert one into."
+            ),
+        }
+    ]
+
+
 def bundled_template_findings() -> list[dict]:
     """Every contract violation across the bundled templates that require one."""
     findings: list[dict] = []
@@ -141,6 +163,7 @@ def bundled_template_findings() -> list[dict]:
             )
             continue
         findings.extend(missing_visit_table_findings(template))
+        findings.extend(missing_structural_table_findings(template))
         findings.extend(visit_table_findings(template))
     return findings
 

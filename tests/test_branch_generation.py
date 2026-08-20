@@ -475,6 +475,7 @@ class ProspectiveBranchTests(unittest.TestCase):
                     "placeholders",
                     "content_completeness",
                     "visit_table",
+                    "structural_tables",
                     "prs_xml",
                     "stale_content",
                     "visual_qa",

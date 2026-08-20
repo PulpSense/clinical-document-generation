@@ -163,6 +163,8 @@ python3 scripts/generate_branch_documents.py --run-dir <run-dir>
 
 It refuses to render anything while approval is missing or a Required Source Input is unresolved, and it writes `logs/branch-generation.json` plus a `logs/repair-report.md` naming every failed gate. Deliver only when `delivery_ready` is true.
 
+Prospective and ambispective protocols also carry a Structural Table: `{visitsTable}` under the Table 15.1 caption is replaced by a real Word table built from `template_fields.visitsTable`. Because an empty matrix still resolves the placeholder, the `structural_tables` gate fails a run whose table would render as a caption over nothing and names the section in the Repair Report. See `references/template-contract.md`.
+
 When a renderer is available, this step also runs the static TOC loop for you: it exports each DOCX, refreshes stale TOC page values against the rendered PDF, re-exports when the refresh changed pagination, and audits the result. A document with no static TOC is refreshed as a no-op rather than treated as a failure. The counts are recorded per document in `logs/visual-qa.json` under `toc_refresh` and `toc`. When no renderer is available the whole check is skipped and disclosed as a QA limitation; the DOCX outputs stay deliverable. The manual commands in step 17 remain for diagnostics and for re-checking after hand edits to a template.
 
 The lower-level renderer stays available for partial or diagnostic runs. Use `--require-approval` for anything that could be delivered:

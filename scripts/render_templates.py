@@ -54,6 +54,15 @@ PARAGRAPH_RE = re.compile(r"<w:p\b[^>]*>.*?</w:p>", re.DOTALL)
 ROW_RE = re.compile(r"<w:tr\b[^>]*>.*?</w:tr>", re.DOTALL)
 MISSING = object()
 
+#: A Data-Driven Table arrives as a row-major cell matrix. The reference
+#: contract removes the placeholder and inserts a real table in its place, so
+#: the matrix must describe its own shape rather than rely on the template.
+MATRIX_TABLE_KEYS = ("cells", "totalColumns", "totalRows")
+#: Usable body width for a Letter page with the bundled 1.25in side margins.
+MATRIX_TABLE_WIDTH_DXA = 8730
+MATRIX_TABLE_BORDERS = ("top", "left", "bottom", "right", "insideH", "insideV")
+SCALAR_TOKEN_RE = re.compile(r"\{(?P<path>[" + PATH_CHARS + r"]+)\}")
+
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -394,6 +403,98 @@ def _render_docx_row_blocks(xml: str, root_data: Any, local_data: Any) -> str:
     return ROW_RE.sub(replace_row, xml)
 
 
+def matrix_table(value: Any) -> tuple[list[str], int, int] | None:
+    """Read a Data-Driven Table matrix, or None when the value is not one.
+
+    An empty matrix is still a matrix: the placeholder must be removed rather
+    than left to a scalar pass that would stringify the mapping into the
+    document. Emptiness is a delivery question, answered by the gates.
+    """
+    if not isinstance(value, dict) or not all(key in value for key in MATRIX_TABLE_KEYS):
+        return None
+    cells = value.get("cells")
+    if not isinstance(cells, list):
+        return None
+    try:
+        columns = int(value.get("totalColumns") or 0)
+        rows = int(value.get("totalRows") or 0)
+    except (TypeError, ValueError):
+        return None
+    return [stringify(cell) for cell in cells], max(columns, 0), max(rows, 0)
+
+
+def _matrix_cell_xml(value: str, width: int, *, header: bool) -> str:
+    run_properties = (
+        '<w:rFonts w:ascii="Arial" w:cs="Arial" w:eastAsia="Arial" w:hAnsi="Arial"/>'
+        + ('<w:b w:val="1"/><w:bCs w:val="1"/>' if header else "")
+        + '<w:sz w:val="20"/><w:szCs w:val="20"/>'
+    )
+    shading = '<w:shd w:fill="cccccc" w:val="clear"/>' if header else ""
+    alignment = '<w:jc w:val="center"/>' if header else ""
+    return (
+        f'<w:tc><w:tcPr><w:tcW w:w="{width}" w:type="dxa"/>{shading}</w:tcPr>'
+        '<w:p><w:pPr><w:widowControl w:val="0"/>'
+        '<w:spacing w:before="0" w:line="240" w:lineRule="auto"/>'
+        f'<w:ind w:left="0" w:firstLine="0"/>{alignment}'
+        f'<w:rPr>{run_properties}</w:rPr></w:pPr>'
+        f'<w:r><w:rPr>{run_properties}<w:rtl w:val="0"/></w:rPr>'
+        f'<w:t xml:space="preserve">{xml_escape(value)}</w:t></w:r></w:p></w:tc>'
+    )
+
+
+def _matrix_row_xml(values: list[str], width: int, *, header: bool) -> str:
+    # Only the header repeats across pages; marking body rows as headers is the
+    # defect that made the visit schedule unreadable.
+    properties = (
+        '<w:trPr><w:cantSplit w:val="1"/>'
+        + ('<w:tblHeader w:val="1"/>' if header else "")
+        + "</w:trPr>"
+    )
+    cells = "".join(_matrix_cell_xml(value, width, header=header) for value in values)
+    return f"<w:tr>{properties}{cells}</w:tr>"
+
+
+def matrix_table_xml(cells: list[str], columns: int, rows: int) -> str:
+    """Build a real Word table from a row-major cell matrix."""
+    if columns <= 0 or rows <= 0 or not cells:
+        return ""
+    width = max(MATRIX_TABLE_WIDTH_DXA // columns, 1)
+    borders = "".join(
+        f'<w:{edge} w:val="single" w:sz="8" w:space="0" w:color="000000"/>'
+        for edge in MATRIX_TABLE_BORDERS
+    )
+    body = []
+    for index in range(rows):
+        chunk = list(cells[index * columns : (index + 1) * columns])
+        # A ragged matrix still has to render as a rectangle.
+        chunk += [""] * (columns - len(chunk))
+        body.append(_matrix_row_xml(chunk, width, header=index == 0))
+    grid = "".join(f'<w:gridCol w:w="{width}"/>' for _ in range(columns))
+    return (
+        f'<w:tbl><w:tblPr><w:tblW w:w="{width * columns}" w:type="dxa"/>'
+        f"<w:tblBorders>{borders}</w:tblBorders>"
+        '<w:jc w:val="left"/><w:tblLook w:val="0600"/>'
+        "<w:tblLayout w:type=\"fixed\"/></w:tblPr>"
+        f"<w:tblGrid>{grid}</w:tblGrid>{''.join(body)}</w:tbl>"
+    )
+
+
+def _render_docx_matrix_tables(xml: str, root_data: Any, local_data: Any) -> str:
+    """Replace a lone matrix placeholder paragraph with a real table."""
+
+    def replace_paragraph(match: re.Match[str]) -> str:
+        paragraph = match.group(0)
+        token = SCALAR_TOKEN_RE.fullmatch(_text_node_text(paragraph).strip())
+        if not token:
+            return paragraph
+        table = matrix_table(resolve_value(local_data, root_data, token.group("path")))
+        if table is None:
+            return paragraph
+        return matrix_table_xml(*table)
+
+    return PARAGRAPH_RE.sub(replace_paragraph, xml)
+
+
 def _standalone_marker(paragraph: str) -> tuple[str, str] | None:
     visible = _text_node_text(paragraph).strip()
     match = re.fullmatch(r"\{(?P<prefix>[#/])(?P<path>[" + PATH_CHARS + r"]+)\}", visible)
@@ -454,7 +555,8 @@ def _render_docx_inline_blocks(xml: str, root_data: Any, local_data: Any) -> str
 
 
 def _render_docx_xml(xml: str, root_data: Any, local_data: Any) -> str:
-    rendered = _render_docx_row_blocks(xml, root_data, local_data)
+    rendered = _render_docx_matrix_tables(xml, root_data, local_data)
+    rendered = _render_docx_row_blocks(rendered, root_data, local_data)
     rendered = _render_docx_paragraph_blocks(rendered, root_data, local_data)
     rendered = _render_docx_inline_blocks(rendered, root_data, local_data)
     return _render_docx_scalars(rendered, root_data, local_data)

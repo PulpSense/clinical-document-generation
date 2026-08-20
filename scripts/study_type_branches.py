@@ -319,6 +319,12 @@ BRANCHES = {
         "optional_document_set": ["short_docx"],
         "source_required_fields": STARRED_FILLOUT_FIELDS,
         "source_required_paths": [item["field"] for item in STARRED_FILLOUT_FIELDS],
+        "structural_tables": [
+            {
+                "field": "visitsTable",
+                "section": "Table 15.1. Proposed Visits and Study Assessments",
+            }
+        ],
         "required_paths": [
             "generated.protocol",
             "generated.icf",
@@ -331,6 +337,12 @@ BRANCHES = {
         "optional_document_set": ["short_docx"],
         "source_required_fields": STARRED_FILLOUT_FIELDS,
         "source_required_paths": [item["field"] for item in STARRED_FILLOUT_FIELDS],
+        "structural_tables": [
+            {
+                "field": "visitsTable",
+                "section": "Table 15.1. Proposed Visits and Study Assessments",
+            }
+        ],
         "required_paths": [
             "generated.protocol",
             "generated.icf",
@@ -343,6 +355,7 @@ BRANCHES = {
         "optional_document_set": ["short_docx"],
         "source_required_fields": RETROSPECTIVE_STARRED_FIELDS,
         "source_required_paths": [item["field"] for item in RETROSPECTIVE_STARRED_FIELDS],
+        "structural_tables": [],
         "required_paths": [
             "generated.protocol",
         ],

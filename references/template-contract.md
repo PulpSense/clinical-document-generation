@@ -134,6 +134,37 @@ fails when a bundled prospective or ambispective protocol visit table uses the l
 
 Keep the repeating header row marked with `<w:tblHeader/>` and leave that flag off the data row. A data row carrying `tblHeader` repeats on every page once it is duplicated per visit.
 
+## Structural Tables
+
+A **Structural Table** is a table whose shape is decided by the data rather than by the template, because its column count is not known when the template is written. It cannot be expressed as a repeated Word row, so it is not written as a `{#block}`. Instead the template carries a lone scalar placeholder on its own paragraph, and the renderer removes that paragraph and inserts a real Word table in its place:
+
+```text
+Table 15.1. Proposed Visits and Study Assessments
+{visitsTable}
+```
+
+The branch mapper publishes the matrix as `template_fields.visitsTable`, in the shape the original workflow defined:
+
+```json
+{"cells": ["Visit Number", "Visit Name", "…"], "totalColumns": 4, "totalRows": 8}
+```
+
+`cells` is read row-major, the first row renders as a repeating shaded header, and a short final row is padded so the table stays rectangular. A ragged or oversized `cells` list is tolerated; an empty one is not.
+
+The matrix is used verbatim when `generated.protocol.visitsTable` supplies one. Otherwise it is derived from the visit schedule the branch already holds, with the assessments column falling back to `procedures.assessments` and then `generated.protocol.measurements`. No Required Source Input carries an assessment-per-visit matrix, so a study with no assessment detail still renders a complete table.
+
+Two checks enforce this, mirroring the visit table:
+
+```bash
+python3 scripts/validate_template_contract.py
+```
+
+fails when a bundled prospective or ambispective protocol template no longer carries the `{visitsTable}` placeholder. The `structural_tables` Delivery Gate then fails a run whose matrix is empty or entirely blank, naming the affected section in the Repair Report.
+
+That gate exists because a Structural Table fails silently. An empty matrix still *resolves* the placeholder, so placeholder validation passes and the document ships the caption with nothing beneath it.
+
+Retrospective protocols declare no structural tables and carry neither the placeholder nor the caption.
+
 ## Static Index And TOC Alignment
 
 Any generated DOCX that contains a static index or table of contents must use real right-aligned dot-leader tab stops for page numbers. Manual dot strings are not acceptable, even when the page numbers are correct.
