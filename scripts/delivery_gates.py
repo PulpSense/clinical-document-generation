@@ -288,6 +288,51 @@ def audit_retrospective_visual_acceptance(path: Path) -> list[dict[str, str]]:
     return errors
 
 
+def audit_retrospective_structure(path: Path) -> list[dict[str, str]]:
+    """Audit the generated retrospective document against the 1–13 contract."""
+    errors: list[dict[str, str]] = []
+    try:
+        with zipfile.ZipFile(path) as archive:
+            root = ET.fromstring(archive.read("word/document.xml"))
+    except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
+        return [{"field": str(path), "issue": f"Retrospective structure could not parse DOCX: {exc}."}]
+
+    body = root.find(".//" + W + "body")
+    if body is None:
+        return [{"field": str(path), "issue": "Retrospective protocol has no Word body."}]
+    children = list(body)
+    headings: list[tuple[int, str]] = []
+    for index, child in enumerate(children):
+        if child.tag != W + "p":
+            continue
+        style = child.find("./" + W + "pPr/" + W + "pStyle")
+        if style is not None and style.get(W + "val", "").lower().startswith("heading"):
+            headings.append((index, re.sub(r"\s+", " ", _text(child)).strip()))
+    expected = {f"{section.number} {section.title}": section for section in retrospective_contract() if section.number not in {"1.", "2.", "3."}}
+    for title, section in expected.items():
+        matches = [index for index, heading in headings if heading == title]
+        if len(matches) != 1:
+            errors.append({"field": section.section_id, "issue": f"Required retrospective section appears {len(matches)} times; expected exactly once."})
+            continue
+        if section.role == "leaf":
+            start = matches[0]
+            substantive = False
+            for child in children[start + 1:]:
+                if child.tag == W + "p":
+                    style = child.find("./" + W + "pPr/" + W + "pStyle")
+                    if style is not None and style.get(W + "val", "").lower().startswith("heading"):
+                        break
+                    if re.sub(r"\s+", " ", _text(child)).strip():
+                        substantive = True
+                        break
+                elif child.tag == W + "tbl":
+                    substantive = True
+                    break
+            if not substantive:
+                errors.append({"field": section.section_id, "issue": "Required retrospective leaf section has no substantive body content."})
+    return errors
+
+
 def audit_generated_outputs(run_dir: Path, outputs: list[str], *, protocol_output: str = "output/protocol.docx") -> dict[str, Any]:
     """Run package, unresolved-placeholder, and protocol-structure gates."""
     failures: list[dict[str, str]] = []
@@ -315,8 +360,6 @@ def audit_generated_outputs(run_dir: Path, outputs: list[str], *, protocol_outpu
     pdf_path = run_dir / "logs" / "docx-render" / "protocol.pdf"
     protocol_path = run_dir / protocol_output
     if protocol_path.exists():
-        structure_errors = audit_protocol_structure(protocol_path, require_substantive=True)
-        failures.extend(structure_errors)
         reference_path = run_dir / "reference/study.reference.json"
         study_type = ""
         if reference_path.is_file():
@@ -325,6 +368,12 @@ def audit_generated_outputs(run_dir: Path, outputs: list[str], *, protocol_outpu
                 study_type = str((reference.get("meta") or {}).get("study_type") or "")
             except (OSError, ValueError, json.JSONDecodeError):
                 study_type = ""
+        structure_errors = (
+            audit_retrospective_structure(protocol_path)
+            if study_type.casefold() == "retrospective"
+            else audit_protocol_structure(protocol_path, require_substantive=True)
+        )
+        failures.extend(structure_errors)
         failures.extend(
             audit_retrospective_visual_acceptance(protocol_path)
             if study_type.casefold() == "retrospective"

@@ -100,6 +100,7 @@ def build_protocol_model(reference: dict[str, Any]) -> dict[str, Any]:
     """
     generated = reference.get("generated") if isinstance(reference.get("generated"), dict) else {}
     protocol = generated.get("protocol") if isinstance(generated.get("protocol"), dict) else {}
+    retrospective = str((reference.get("meta") or {}).get("study_type") or "").casefold() == "retrospective"
     sections = protocol.get("sections") if isinstance(protocol.get("sections"), list) else []
     tables_root = reference.get("template_fields")
     tables_root = tables_root.get("data_driven_tables") if isinstance(tables_root, dict) else {}
@@ -114,6 +115,8 @@ def build_protocol_model(reference: dict[str, Any]) -> dict[str, Any]:
     if isinstance(tables_root, dict):
         for name, value in tables_root.items():
             if name == "prs_xml" or not isinstance(value, dict):
+                continue
+            if retrospective and name in {"visit_schedule", "schedule_of_assessments"}:
                 continue
             table = _table_contract(str(name), value)
             # The complete protocol already owns the schedule and evidence
@@ -281,13 +284,14 @@ def _paragraph_text(paragraph: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", text)).strip()
 
 
-def _retain_template_shell(document_xml: str) -> tuple[str, bool]:
+def _retain_template_shell(document_xml: str, *, retrospective: bool = False) -> tuple[str, bool]:
     """Keep template-owned pages and remove its legacy generated body."""
     paragraphs = list(PARAGRAPH_RE.finditer(document_xml))
+    boundary = "4. INTRODUCTION" if retrospective else "5. INTRODUCTION"
     generated_starts = [
         match.start()
         for match in paragraphs
-        if _paragraph_text(match.group()).startswith("5. INTRODUCTION")
+        if _paragraph_text(match.group()).startswith(boundary)
     ]
     # The TOC contains the same label; the final occurrence is the legacy
     # generated-body boundary in the bundled templates.
@@ -301,7 +305,7 @@ def _retain_template_shell(document_xml: str) -> tuple[str, bool]:
     return document_xml[:generated_start] + document_xml[section_start:], True
 
 
-def _ensure_section4_toc_entry(document_xml: str) -> str:
+def _ensure_section4_toc_entry(document_xml: str, *, retrospective: bool = False) -> str:
     """Add omitted Section 4 and sample-size table rows to the static TOC."""
     def row(title: str, page: int) -> str:
         return (
@@ -317,15 +321,27 @@ def _ensure_section4_toc_entry(document_xml: str) -> str:
                 continue
             document_xml = document_xml[: match.start()] + row("4. TABLE OF CONTENTS", 4) + document_xml[match.start() :]
             break
-    if not re.search(r"Table\s+11\.1\.?\s+Sample Size Evidence\s+\.{3,}\s+\d+", document_xml, re.I):
+    table_number = "10.1" if retrospective else "11.1"
+    if not re.search(rf"Table\s+{re.escape(table_number)}\.?\s+Sample Size Evidence\s+\.{3,}\s+\d+", document_xml, re.I):
         rows = list(PARAGRAPH_RE.finditer(document_xml))
+        target = r"11\.?\s+CONFIDENTIALITY" if retrospective else r"12\.?\s+CONFIDENTIALITY"
         for match in rows:
             text = _paragraph_text(match.group())
-            if not re.match(r"12\.?\s+CONFIDENTIALITY", text, re.I):
+            if not re.match(target, text, re.I):
                 continue
-            document_xml = document_xml[: match.start()] + row("Table 11.1. Sample Size Evidence", 8) + document_xml[match.start() :]
+            document_xml = document_xml[: match.start()] + row(f"Table {table_number} Sample Size Evidence", 8) + document_xml[match.start() :]
             break
     return document_xml
+
+
+def _remove_retrospective_orphan_toc_entries(document_xml: str) -> str:
+    """Remove legacy prospective table rows from the retrospective TOC."""
+    return PARAGRAPH_RE.sub(
+        lambda match: ""
+        if _paragraph_text(match.group()).casefold().startswith("table visit schedule")
+        else match.group(),
+        document_xml,
+    )
 
 
 def _toc_field() -> str:
@@ -440,9 +456,12 @@ def render_protocol_docx(template_path: Path, output_path: Path, reference: dict
         with zipfile.ZipFile(legacy) as archive:
             members = {item.filename: archive.read(item.filename) for item in archive.infolist()}
         document = members["word/document.xml"].decode("utf-8")
-        document = _ensure_section4_toc_entry(document)
+        retrospective = str((reference.get("meta") or {}).get("study_type") or "").casefold() == "retrospective"
+        document = _ensure_section4_toc_entry(document, retrospective=retrospective)
+        if retrospective:
+            document = _remove_retrospective_orphan_toc_entries(document)
         document = _ensure_real_toc_field(document)
-        document, legacy_body_removed = _retain_template_shell(document)
+        document, legacy_body_removed = _retain_template_shell(document, retrospective=retrospective)
         members["word/document.xml"] = _inject_body(
             document, structured_body(model, _document_content_width(document))
         ).encode("utf-8")

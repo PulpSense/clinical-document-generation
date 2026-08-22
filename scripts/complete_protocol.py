@@ -235,6 +235,32 @@ def operational_detail_missing(reference: dict[str, Any], *, require_replacement
 
 def protocol_completeness_missing(reference: dict[str, Any], *, strict_operational: bool = False) -> list[dict[str, str]]:
     """Return missing source facts that would otherwise invite fabricated prose."""
+    study_type = str(_get(reference, "meta.study_type")).casefold()
+    if study_type == "retrospective":
+        requirements = [
+            ("study.title", "Study title"),
+            ("study.background", "Study background"),
+            ("objectives.primary", "Primary objective"),
+            ("design.study_design", "Study design"),
+            ("procedures.assessments", "Completed assessments and their schedule"),
+            ("population.inclusion_criteria", "Inclusion criteria"),
+            ("population.exclusion_criteria", "Exclusion criteria"),
+            ("population.sample_size", "Sample size"),
+            ("endpoints.primary", "Primary endpoint"),
+            ("statistics.analysis_plan", "Statistical analysis plan"),
+        ]
+        missing = [
+            {"field": path, "issue": f"Missing required source input for complete retrospective protocol: {label}."}
+            for path, label in requirements
+            if not _text(_get(reference, path))
+            and not (path == "procedures.assessments" and _text(_get(reference, "procedures.visit_schedule")))
+        ]
+        if not _text(_get(reference, "population.sample_justification")) and not _text(_get(reference, "statistics.sample_size_justification")):
+            missing.append({"field": "population.sample_justification", "issue": "Missing required source input for complete retrospective protocol: Sample-size justification."})
+        values = _all_strings(reference)
+        if any(re.search(r"\b(?:draft|todo|tbd|needs review|internal only)\b", value, re.I) for value in values):
+            missing.append({"field": "generated.protocol", "issue": "Internal drafting language is present in approved retrospective protocol content."})
+        return missing
     requirements = [
         ("study.title", "Study title"),
         ("study.background", "Study background"),
@@ -285,6 +311,8 @@ def _all_strings(value: Any) -> list[str]:
 
 def build_complete_protocol(reference: dict[str, Any]) -> dict[str, Any]:
     """Create sectioned protocol content without inventing unsupported facts."""
+    if str(_get(reference, "meta.study_type")).casefold() == "retrospective":
+        return build_retrospective_protocol(reference)
     missing = protocol_completeness_missing(reference)
     if missing:
         raise ProtocolCompletenessError("Complete Protocol Gate failed: " + "; ".join(item["issue"] for item in missing))
@@ -351,6 +379,40 @@ def build_complete_protocol(reference: dict[str, Any]) -> dict[str, Any]:
     add("19.", "SUMMARY OF RISKS AND BENEFITS", _paragraphs(_get(protocol, "risks"), _get(risks, "risks"), _get(protocol, "benefits"), _get(risks, "benefits")))
     add("19.1", "Summary of risks", _paragraphs(_get(protocol, "risks"), _get(risks, "risks")))
     add("19.2", "Summary of benefits", _paragraphs(_get(protocol, "benefits"), _get(risks, "benefits")))
+    return {"title": _text(_get(reference, "study.title")), "sections": sections}
+
+
+def build_retrospective_protocol(reference: dict[str, Any]) -> dict[str, Any]:
+    """Build the contracted retrospective 1–13 hierarchy from approved facts."""
+    protocol = _get(reference, "generated.protocol", {})
+    sample_justification = _first_text(reference, "population.sample_justification", "statistics.sample_size_justification")
+
+    def first(*values: Any) -> str:
+        return next((value for value in (_text(item) for item in values) if value), "")
+
+    def add(number: str, title: str, paragraphs: list[str], *, lists: list[list[str]] | None = None, tables: list[dict[str, Any]] | None = None) -> None:
+        sections.append({"number": number, "title": title, "paragraphs": [item for item in paragraphs if item], "lists": lists or [], "tables": tables or []})
+
+    sections: list[dict[str, Any]] = []
+    add("4.", "INTRODUCTION", [first(protocol.get("introduction"), _get(reference, "study.background"), _get(reference, "study.unmet_need"))])
+    add("5.", "OBJECTIVE(S)", [first(protocol.get("objectivesIntro"), _get(reference, "objectives.primary"), _get(reference, "study.hypothesis"))])
+    add("6.", "SUBJECTS", [])
+    add("6.1.", "Subject Population", [first(protocol.get("populationLong"), _get(reference, "population.study_population"), f"The retrospective study will review approximately {_text(_get(reference, 'population.sample_size'))} eligible records or subjects.")])
+    add("6.2.", "Inclusion/Exclusion Criteria", [], lists=[_items(_get(reference, "population.inclusion_criteria")) + _items(_get(reference, "population.exclusion_criteria"))])
+    add("7.", "STUDY DESIGN", [])
+    add("7.1.", "Study Design", [first(protocol.get("studyDesignLong"), _get(reference, "design.study_design"))])
+    add("7.2.", "Methods Used to Minimize Bias", [first(protocol.get("methods"), "Standardized eligibility criteria, source abstraction procedures, and predefined analysis methods will be used to minimize bias.")])
+    add("8.", "STUDY PROCEDURE", [])
+    add("8.1.", "Informed Consent / Subject enrollment", [first(protocol.get("studyProcedure"), _get(reference, "procedures.assessments"), _get(reference, "procedures.visit_schedule"))])
+    add("9.", "ANALYSIS PLAN", [])
+    add("9.1.", "Analysis Data Sets", [first(protocol.get("analysisDataSets"), _get(reference, "statistics.analysis_plan"))])
+    add("9.2.", "Statistical Methodology", [first(protocol.get("statisticalMethodology"), _get(reference, "statistics.methodology"), _get(reference, "statistics.analysis_plan"))])
+    add("9.3.", "General Statistical Considerations", [first(protocol.get("statisticalConsiderations"), _get(reference, "statistics.software"), "Missing, unavailable, and excluded records will be identified and summarized in the final analysis.")])
+    sample_rows = [{"evidence": "Planned retrospective sample", "value": _text(_get(reference, "population.sample_size")), "source": "Approved study source"}, {"evidence": "Sample-size justification", "value": sample_justification, "source": "Approved study source"}]
+    add("10.", "SAMPLE SIZE JUSTIFICATION", [first(protocol.get("sampleSizeJustification"), sample_justification)], tables=[_table("sample_size_evidence", "10.1 Sample Size Evidence", [{"key": "evidence", "label": "Evidence"}, {"key": "value", "label": "Value"}, {"key": "source", "label": "Source"}], sample_rows)])
+    add("11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", [first(protocol.get("confidentialityPublication"), _get(reference, "confidentiality.publication"), "Study records will be handled confidentially and reported in aggregate without direct subject identifiers.")])
+    add("12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", [first(protocol.get("risks"), _get(reference, "safety.adverse_events"), _get(reference, "risks_benefits.risks"), "Any safety information identified in the reviewed records will be recorded and assessed according to the approved study procedures.")])
+    add("13.", "GCP, ICH and ETHICAL CONSIDERATIONS", [first(protocol.get("ethics"), _get(reference, "ethics.considerations"), "The retrospective study will be conducted in accordance with applicable ethical requirements, GCP, and ICH principles.")])
     return {"title": _text(_get(reference, "study.title")), "sections": sections}
 
 

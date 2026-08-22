@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import sys
 import unittest
+import json
+import tempfile
+import zipfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -18,6 +21,9 @@ from retrospective import (  # noqa: E402
 )
 from drafting import plan_retrospective_batches  # noqa: E402
 from delivery_gates import audit_retrospective_visual_acceptance  # noqa: E402
+from delivery_gates import audit_retrospective_structure  # noqa: E402
+from complete_protocol import with_complete_protocol  # noqa: E402
+from protocol_document import render_protocol_docx  # noqa: E402
 from workflow import branch_contract  # noqa: E402
 
 
@@ -69,6 +75,26 @@ class RetrospectiveReplacementTests(unittest.TestCase):
         ])
         self.assertNotIn("icf", " ".join(batch["batch_id"] for batch in replacement["drafting_batches"]).lower())
         self.assertNotIn("prs", " ".join(batch["batch_id"] for batch in replacement["drafting_batches"]).lower())
+
+    def test_retrospective_generation_renders_the_1_to_13_contract(self) -> None:
+        fixture = json.loads((Path(__file__).parent / "fixtures/gp-26-01-approved.json").read_text(encoding="utf-8"))
+        fixture["meta"]["study_type"] = "Retrospective"
+        fixture["meta"]["document_set"] = ["protocol_docx"]
+        reference = with_complete_protocol(fixture)
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "protocol.docx"
+            report = render_protocol_docx(
+                Path(__file__).parents[1] / "assets/client-templates/docx/retrospective-protocol.template.docx",
+                output,
+                reference,
+            )
+            self.assertEqual(report["unresolved_placeholders"], [])
+            self.assertEqual(audit_retrospective_structure(output), [])
+            self.assertEqual(audit_retrospective_visual_acceptance(output), [])
+            with zipfile.ZipFile(output) as archive:
+                document_text = archive.read("word/document.xml").decode("utf-8")
+            self.assertNotIn("14. GCP", document_text)
+            self.assertNotIn("Table Visit Schedule", document_text)
 
 
 if __name__ == "__main__":
