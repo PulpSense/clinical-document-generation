@@ -6,18 +6,16 @@ compatibility adapter for existing Hermes and n8n integrations during the
 expand step tracked by issue #17.
 """
 
-from __future__ import annotations
-
 from clinical_document_workflow import (
-    approve_source,
-    generate_approved_run,
-    prepare_run,
-    validate_run,
+    approve_source as _approve_source,
+    generate_approved_run as _generate_approved_run,
+    prepare_run as _prepare_run,
+    validate_run as _validate_run,
 )
 
-prepare = prepare_run
-approve = approve_source
-validate = validate_run
-generate = generate_approved_run
+prepare = _prepare_run
+approve = _approve_source
+validate = _validate_run
+generate = _generate_approved_run
 
 __all__ = ["prepare", "approve", "validate", "generate"]

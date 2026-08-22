@@ -29,6 +29,8 @@ class WorkflowInterfaceTests(unittest.TestCase):
         return run_dir
 
     def test_public_workflow_exposes_only_the_four_lifecycle_operations(self) -> None:
+        public_names = {name for name in dir(workflow) if not name.startswith("_")}
+        self.assertEqual(public_names, {"approve", "generate", "prepare", "validate"})
         self.assertEqual(
             set(workflow.__all__),
             {"prepare", "approve", "validate", "generate"},
