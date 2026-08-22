@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 import hashlib
+import inspect
+import re
 import time
 import zipfile
 import xml.etree.ElementTree as ET
@@ -73,6 +75,69 @@ def _artifact_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
+def _identity_facts(reference: dict[str, Any]) -> dict[str, str]:
+    """Return approved identity facts that must survive every branch artifact."""
+    candidates = (
+        ("study.title", ("study", "title")),
+        ("study.short_title", ("study", "short_title")),
+        ("study.sponsor", ("study", "sponsor")),
+        ("meta.protocol_number", ("meta", "protocol_number")),
+        ("population.sample_size", ("population", "sample_size")),
+    )
+    facts: dict[str, str] = {}
+    for label, path in candidates:
+        current: Any = reference
+        for key in path:
+            current = current.get(key) if isinstance(current, dict) else None
+        value = str(current or "").strip()
+        if value:
+            facts[label] = value
+    return facts
+
+
+def visual_page_evidence(artifact: str, pages: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Inspect each rendered page using deterministic, artifact-bound evidence.
+
+    Text extraction cannot prove geometric clipping or overlap, so those are
+    explicitly represented as unassessed rather than falsely passing.
+    """
+    findings: list[dict[str, Any]] = []
+    evidence: list[dict[str, Any]] = []
+    seen: dict[str, int] = {}
+    placeholder = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
+    for page_number, raw_page in enumerate(pages, start=1):
+        page = re.sub(r"\s+", " ", raw_page or "").strip()
+        page_key = page.casefold()
+        duplicate_of = seen.get(page_key) if page else None
+        if page:
+            seen[page_key] = page_number
+        checks = {
+            "blank_page": "failed" if not page else "passed",
+            "duplicate_page_text": "failed" if duplicate_of else "passed",
+            "unresolved_placeholder": "failed" if placeholder.search(page) else "passed",
+            "text_evidence": "passed" if page else "failed",
+            "clipping": "not_assessed_from_text",
+            "overlap": "not_assessed_from_text",
+            "split_row": "not_assessed_from_text",
+            "overflow": "not_assessed_from_text",
+            "style_drift": "not_assessed_from_text",
+        }
+        page_evidence = {"artifact": artifact, "page": page_number, "status": "passed", "checks": checks}
+        if not page:
+            page_evidence["status"] = "failed"
+            findings.append(_finding(f"{artifact}:page:{page_number}", "Rendered page is blank or has no extractable inspection evidence.", "Visual Layout Gate", "Non-empty extracted text or image inspection evidence for this page."))
+        if duplicate_of:
+            page_evidence["status"] = "failed"
+            findings.append(_finding(f"{artifact}:page:{page_number}", f"Rendered page duplicates page {duplicate_of} exactly.", "Visual Layout Gate", "A distinct rendered page with non-duplicated content."))
+        if placeholder.search(page):
+            page_evidence["status"] = "failed"
+            findings.append(_finding(f"{artifact}:page:{page_number}", "Rendered page contains an unresolved placeholder.", "Visual Layout Gate", "A rendered page free of unresolved placeholders."))
+        evidence.append(page_evidence)
+    if not pages:
+        findings.append(_finding(f"{artifact}:pages", "Renderer produced no pages.", "Visual Layout Gate", "A complete rendered page set."))
+    return evidence, findings
+
+
 def _prospective_package_findings(run_dir: Path, outputs: list[str], study_type: str) -> list[dict[str, Any]]:
     expected = set(BRANCH_DOCUMENT_SETS[study_type])
     observed = set(outputs)
@@ -89,12 +154,13 @@ def _prospective_package_findings(run_dir: Path, outputs: list[str], study_type:
         return findings
 
     reference = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
-    shared = {
-        "study.title": str((reference.get("study") or {}).get("title") or "").strip(),
-        "meta.protocol_number": str((reference.get("meta") or {}).get("protocol_number") or "").strip(),
-    }
+    shared = _identity_facts(reference)
     for relative, path in paths.items():
-        text = _artifact_text(path)
+        try:
+            text = _artifact_text(path)
+        except (OSError, KeyError, ET.ParseError, zipfile.BadZipFile) as exc:
+            findings.append(_finding(relative, f"Artifact cannot be read for package verification: {exc}.", "Branch Package Gate", "A readable Protocol DOCX, ICF DOCX, or PRS XML artifact."))
+            continue
         for field, value in shared.items():
             if value and value not in text:
                 findings.append(_finding(f"{relative}:{field}", "Shared approved study fact is absent from the artifact.", "Cross-Document Consistency Gate", f"The approved source value `{value}` in the generated artifact."))
@@ -156,30 +222,11 @@ def verify_branch_document_set(run_dir: Path, outputs: list[str], *, require_ren
         }
         if render.get("status") == "exported" and pdf_path.is_file():
             pages = extract_pdf_pages(pdf_path)
-            evidence["pages"] = [
-                {
-                    "artifact": relative,
-                    "page": index,
-                    "status": "passed" if page.strip() else "failed",
-                    "checks": {
-                        "clipping": "not_detected",
-                        "overlap": "not_detected",
-                        "blank_page": "passed" if page.strip() else "failed",
-                        "orphan_heading": "not_detected",
-                        "split_row": "not_detected",
-                        "overflow": "not_detected",
-                        "duplicate_section": "not_detected",
-                        "style_drift": "not_detected",
-                        "page_furniture": "not_detected",
-                    },
-                    "evidence_sha256": _sha256(pdf_path),
-                    "artifact_sha256": evidence["artifact_sha256"],
-                }
-                for index, page in enumerate(pages, start=1)
-            ]
+            evidence["pages"], page_findings = visual_page_evidence(relative, pages)
             for item in evidence["pages"]:
-                if item["status"] == "failed":
-                    visual_findings.append(_finding(f"{relative}:page:{item['page']}", "Rendered page contains no inspectable evidence.", "Visual Layout Gate", "Rendered page evidence for every Protocol and ICF page."))
+                item["evidence_sha256"] = _sha256(pdf_path)
+                item["artifact_sha256"] = evidence["artifact_sha256"]
+            visual_findings.extend(page_findings)
         elif render.get("status") == "unavailable":
             visual_findings.append(_finding(
                 f"{relative}:rendering",
@@ -218,6 +265,10 @@ def bind_generation_manifest(run_dir: Path, manifest_path: Path, outputs: list[s
         if path.is_file()
     ]
     manifest["model"] = reference.get("generation", {}).get("model") or "gpt-5.5"
+    source_path = run_dir / "source-of-truth.md"
+    if source_path.is_file():
+        manifest["source"] = {"path": source_path.relative_to(run_dir).as_posix(), "sha256": _sha256(source_path)}
+        manifest["contracts"]["source_sha256"] = manifest["source"]["sha256"]
     manifest["renderer_evidence"] = verification.get("review_passes", {}).get("visual", {}).get("evidence", {})
     renderers = {
         evidence.get("active_renderer")
@@ -428,9 +479,24 @@ def run_delivery_pipeline(
     if report["status"] != "passed" and max_repairs > 0:
         for repair_number in range(1, min(max_repairs, MAX_TARGET_ATTEMPTS - 1) + 1):
             repairs = []
+            failed_targets = sorted({
+                str(finding.get("field", "")).split(":", 1)[0]
+                for review in report.get("review_passes", {}).values()
+                for finding in review.get("findings", [])
+                if str(finding.get("field", "")).startswith("output/")
+            })
+            failed_targets = [target for target in failed_targets if target in outputs] or list(outputs)
+            accepted_drafts = [draft for draft in reference.get("generation", {}).get("drafts", []) if isinstance(draft, dict) and draft.get("accepted") and draft.get("artifact") not in failed_targets]
             if rebuild is not None:
-                result = rebuild()
-                repairs.append({"mode": "clean_template_rebuild", "result": result})
+                try:
+                    parameters = inspect.signature(rebuild).parameters
+                    if "failed_targets" in parameters or any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()):
+                        result = rebuild(failed_targets=failed_targets, reused_section_drafts=accepted_drafts)
+                    else:
+                        result = rebuild()
+                except ValueError:
+                    result = rebuild()
+                repairs.append({"mode": "targeted_rebuild", "targets": failed_targets, "reused_section_drafts": accepted_drafts, "result": result})
             else:
                 for relative in outputs:
                     path = run_dir / relative
@@ -451,7 +517,7 @@ def run_delivery_pipeline(
                 branch_report = verify_branch_document_set(run_dir, outputs, require_renderer=require_renderer)
                 report["branch_package"] = branch_report
                 report["status"] = "passed" if branch_report["status"] == "passed" and report["status"] == "passed" else "failed"
-            attempts.append({"phase": "after_controlled_repair", "attempt": repair_number, "status": report["status"], "repairs": repairs, "reused_section_drafts": True})
+            attempts.append({"phase": "after_controlled_repair", "attempt": repair_number, "status": report["status"], "repairs": repairs, "reused_section_drafts": accepted_drafts})
             if report["status"] == "passed":
                 break
     report["attempts"] = attempts

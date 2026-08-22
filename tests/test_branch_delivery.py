@@ -16,6 +16,7 @@ from delivery_pipeline import (  # noqa: E402
     PROSPECTIVE_ADVARRA_DOCUMENT_SET,
     bind_generation_manifest,
     verify_branch_document_set,
+    visual_page_evidence,
 )
 from revisions import publish_revision  # noqa: E402
 
@@ -87,6 +88,31 @@ class BranchDeliveryTests(unittest.TestCase):
                 {item["field"] for item in report["review_passes"]["consistency"]["findings"]},
                 set(AMBISPECTIVE_DOCUMENT_SET) - {"output/protocol.docx"},
             )
+
+    def test_package_consistency_checks_all_identity_facts_in_each_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            (run_dir / "reference").mkdir()
+            reference = self.reference()
+            reference["study"].update({"short_title": "ASP-23", "sponsor": "PulpSense"})
+            reference["meta"]["study_type"] = "Prospective"
+            (run_dir / "reference/study.reference.json").write_text(json.dumps(reference), encoding="utf-8")
+            write_docx(run_dir / "output/protocol.docx", "A prospective study P-23 ASP-23 PulpSense")
+            write_docx(run_dir / "output/icf.docx", "A prospective study P-23 ASP-23")
+            (run_dir / "output/study.xml").parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / "output/study.xml").write_text(
+                "<clinical_study><brief_title>A prospective study</brief_title><id_info><org_study_id>P-23</org_study_id></id_info><sponsor>PulpSense</sponsor></clinical_study>",
+                encoding="utf-8",
+            )
+            report = verify_branch_document_set(run_dir, list(PROSPECTIVE_ADVARRA_DOCUMENT_SET))
+            fields = {item["field"] for item in report["review_passes"]["consistency"]["findings"]}
+            self.assertIn("output/icf.docx:study.sponsor", fields)
+
+    def test_visual_evidence_inspects_every_page_and_flags_blank_or_duplicate_pages(self) -> None:
+        evidence, findings = visual_page_evidence("output/protocol.docx", ["cover", "", "cover"])
+        self.assertEqual([page["page"] for page in evidence], [1, 2, 3])
+        self.assertEqual({item["field"] for item in findings}, {"output/protocol.docx:page:2", "output/protocol.docx:page:3"})
+        self.assertNotEqual(evidence[0]["checks"]["blank_page"], "not_detected")
 
     def test_only_the_newest_passing_revision_is_published(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
