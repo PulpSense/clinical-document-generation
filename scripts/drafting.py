@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
+from retrospective import SectionDraft, merge_section_drafts, retrospective_batch_plan
+
 
 @dataclass(frozen=True)
 class DraftingBatch:
@@ -28,4 +30,12 @@ def plan_batches(batch_specs: Iterable[DraftingBatch]) -> tuple[DraftingBatch, .
     return batches
 
 
-__all__ = ["DraftingBatch", "plan_batches"]
+def plan_retrospective_batches() -> tuple[DraftingBatch, ...]:
+    """Expose the retrospective topology through the DraftingBatch seam."""
+    return tuple(
+        DraftingBatch(item["batch_id"], tuple(item["section_ids"]))
+        for item in retrospective_batch_plan()
+    )
+
+
+__all__ = ["DraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "retrospective_batch_plan", "merge_section_drafts"]

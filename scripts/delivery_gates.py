@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import re
+import json
 import tempfile
 import zipfile
 from pathlib import Path
 from typing import Any
+
+from retrospective import retrospective_contract
 from xml.etree import ElementTree as ET
 
 from render_templates import unresolved_in_docx
@@ -257,6 +260,34 @@ def audit_gp26_visual_acceptance(path: Path) -> list[dict[str, str]]:
     return errors
 
 
+def audit_retrospective_visual_acceptance(path: Path) -> list[dict[str, str]]:
+    """Audit the bundled Retrospective 1–13 heading contract without rewriting."""
+    errors: list[dict[str, str]] = []
+    try:
+        with zipfile.ZipFile(path) as archive:
+            root = ET.fromstring(archive.read("word/document.xml"))
+            body_text = _text(root)
+            headings = [
+                re.sub(r"\s+", " ", _text(paragraph)).strip()
+                for paragraph in root.findall(".//" + W + "p")
+                if paragraph.find("./" + W + "pPr/" + W + "pStyle") is not None
+                and paragraph.find("./" + W + "pPr/" + W + "pStyle").get(W + "val", "").lower().startswith("heading")
+            ]
+    except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
+        return [{"field": str(path), "issue": f"Retrospective visual acceptance could not parse DOCX: {exc}."}]
+
+    for section in retrospective_contract():
+        if section.number in {"1.", "2.", "3."}:
+            continue  # title page, investigator agreement, and TOC are table/page furniture
+        expected = f"{section.number} {section.title}"
+        count = headings.count(expected)
+        if count != 1:
+            errors.append({"field": section.section_id, "issue": f"Required Retrospective section appears {count} times; expected exactly once."})
+    if STALE_TEMPLATE_LANGUAGE.search(body_text):
+        errors.append({"field": "word/document.xml", "issue": "Stale study-specific template or internal drafting language is present."})
+    return errors
+
+
 def audit_generated_outputs(run_dir: Path, outputs: list[str], *, protocol_output: str = "output/protocol.docx") -> dict[str, Any]:
     """Run package, unresolved-placeholder, and protocol-structure gates."""
     failures: list[dict[str, str]] = []
@@ -277,7 +308,19 @@ def audit_generated_outputs(run_dir: Path, outputs: list[str], *, protocol_outpu
     if protocol_path.exists():
         structure_errors = audit_protocol_structure(protocol_path, require_substantive=True)
         failures.extend(structure_errors)
-        failures.extend(audit_gp26_visual_acceptance(protocol_path))
+        reference_path = run_dir / "reference/study.reference.json"
+        study_type = ""
+        if reference_path.is_file():
+            try:
+                reference = json.loads(reference_path.read_text(encoding="utf-8"))
+                study_type = str((reference.get("meta") or {}).get("study_type") or "")
+            except (OSError, ValueError, json.JSONDecodeError):
+                study_type = ""
+        failures.extend(
+            audit_retrospective_visual_acceptance(protocol_path)
+            if study_type.casefold() == "retrospective"
+            else audit_gp26_visual_acceptance(protocol_path)
+        )
         if pdf_path.exists() and pdf_path.stat().st_mtime >= protocol_path.stat().st_mtime:
             try:
                 from audit_static_toc import audit
