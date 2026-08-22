@@ -36,6 +36,14 @@ client run.
 
 The scripts do not call OpenAI directly. Hermes should use `gpt-5.5` for the agent reasoning and narrative-generation steps, then run the local scripts for validation, mapping, rendering, and QA.
 
+## Public Workflow Seam
+
+Client integrations should import `scripts/workflow.py` and use only its four
+Run Lifecycle operations: `prepare`, `approve`, `validate`, and `generate`.
+The six replacement ownership modules are `contracts`, `drafting`, `rendering`,
+`quality`, and `prs_xml`, alongside `workflow`; existing integrations may keep
+using `clinical_document_workflow.py` while migration is in progress.
+
 ## Access Check
 
 The repository is private. Before cloning, confirm the GitHub account used by Hermes or by the setup agent has access to `PulpSense/clinical-document-generation`.

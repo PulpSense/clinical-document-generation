@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from tests.test_quality_contract import QualityContractTests  # noqa: E402
+import workflow  # noqa: E402
 from workflow import approve, generate, prepare, validate  # noqa: E402
 
 
@@ -29,7 +30,7 @@ class WorkflowInterfaceTests(unittest.TestCase):
 
     def test_public_workflow_exposes_only_the_four_lifecycle_operations(self) -> None:
         self.assertEqual(
-            {name for name in ("prepare", "approve", "validate", "generate") if callable(globals()[name])},
+            set(workflow.__all__),
             {"prepare", "approve", "validate", "generate"},
         )
 
