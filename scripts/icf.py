@@ -171,7 +171,10 @@ def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: di
     except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
         return [{"field": str(path), "issue": f"ICF document cannot be parsed: {exc}."}]
 
-    if re.search(r"<w:(?:commentRangeStart|commentReference|ins|del|moveFrom|moveTo)\b", review_xml):
+    if any(name.startswith("word/comments") for name in members) or re.search(
+        r"<w:(?:commentRangeStart|commentRangeEnd|commentReference|ins|del|moveFrom|moveTo)\b",
+        review_xml,
+    ):
         errors.append({"field": "word/document.xml", "issue": "Comments or tracked changes remain in the ICF candidate."})
     if re.search(r"<w:vanish\b", review_xml):
         errors.append({"field": "word/document.xml", "issue": "Hidden review content remains in the ICF candidate."})
@@ -191,15 +194,26 @@ def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: di
     paragraphs = root.findall(".//" + W + "p")
     paragraph_texts = [_text(paragraph) for paragraph in paragraphs]
     contract_titles = {_heading_key(section.title) for section in contract}
-    for paragraph in paragraphs:
+    contract_start = next(
+        (index for index, paragraph in enumerate(paragraphs) if _heading_key(_text(paragraph)) in expected),
+        len(paragraphs),
+    )
+    for index, paragraph in enumerate(paragraphs):
         title = _text(paragraph)
-        visible_heading = _heading_key(title) in expected or (
-            title and title == title.upper() and len(title) >= 4 and not title.endswith(":")
-        )
-        if not visible_heading:
-            continue
         style = paragraph.find("./" + W + "pPr/" + W + "pStyle")
-        if style is None or not style.get(W + "val", "").casefold().startswith("heading"):
+        style_name = style.get(W + "val", "") if style is not None else ""
+        is_contract_heading = _heading_key(title) in expected
+        is_styled_heading = style_name.casefold().startswith("heading")
+        # Sterling's cover page uses styled uppercase labels before the first
+        # contracted section.  Once the section hierarchy starts, any new
+        # styled heading must belong to that contract.
+        is_signature_rule = bool(title) and not re.search(r"[^_\s]", title)
+        is_orphan_heading = index >= contract_start and is_styled_heading and title and not is_signature_rule and not is_contract_heading
+        if is_orphan_heading:
+            errors.append({"field": title, "issue": "Visible ICF heading is not part of the selected Document Section Contract."})
+        if not is_contract_heading:
+            continue
+        if not is_styled_heading:
             errors.append({"field": title, "issue": "Visible ICF heading does not use a Word heading style."})
     for index, title in enumerate(paragraph_texts):
         if _heading_key(title) not in contract_titles:

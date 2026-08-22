@@ -6,6 +6,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -127,6 +128,24 @@ class BranchDeliveryTests(unittest.TestCase):
             report = verify_branch_document_set(run_dir, list(PROSPECTIVE_ADVARRA_DOCUMENT_SET))
             fields = {item["field"] for item in report["review_passes"]["consistency"]["findings"]}
             self.assertIn("output/icf.docx:study.sponsor", fields)
+
+    def test_prospective_sterling_package_applies_the_icf_contract_gate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            (run_dir / "reference").mkdir()
+            reference = self.reference()
+            reference["meta"]["icf_template"] = "Sterling"
+            (run_dir / "reference/study.reference.json").write_text(json.dumps(reference), encoding="utf-8")
+            for artifact in ("protocol.docx", "icf.docx"):
+                write_docx(run_dir / "output" / artifact, "A prospective study P-23")
+            (run_dir / "output/study.xml").parent.mkdir(parents=True, exist_ok=True)
+            (run_dir / "output/study.xml").write_text("<study>A prospective study P-23</study>", encoding="utf-8")
+
+            with patch("delivery_pipeline.export_docx", return_value=({"status": "unavailable", "message": "test"}, 1)):
+                report = verify_branch_document_set(run_dir, list(PROSPECTIVE_ADVARRA_DOCUMENT_SET))
+            findings = report["review_passes"]["consistency"]["findings"]
+            self.assertTrue(any(item["field"] == "page_fields" for item in findings))
+            self.assertTrue(any("ICF candidate has no Word footer part" in item["issue"] for item in findings))
 
     def test_visual_evidence_inspects_every_page_and_flags_blank_or_duplicate_pages(self) -> None:
         evidence, findings = visual_page_evidence("output/protocol.docx", ["cover", "", "cover"])

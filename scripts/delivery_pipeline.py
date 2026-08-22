@@ -197,14 +197,14 @@ def _prospective_package_findings(run_dir: Path, outputs: list[str], study_type:
             unresolved = unresolved_in_docx(path)
             for token in unresolved:
                 findings.append(_finding(f"{relative}:{token}", "Unresolved placeholder remains in the artifact.", "Content Completeness Gate", "A fully rendered artifact with no unresolved placeholders."))
-    if study_type == "Ambispective":
+    if study_type in {"Prospective", "Ambispective"}:
         from icf import audit_icf_document, icf_contract
 
         icf_path = run_dir / "output/icf.docx"
         if icf_path.is_file():
             findings.extend(
-                _finding(item["field"], item["issue"], "Cross-Document Consistency Gate", "The Ambispective existing-records disclosure inside the study-procedures section.")
-                for item in audit_icf_document(icf_path, icf_contract("Ambispective", (reference.get("meta") or {}).get("icf_template")), reference)
+                _finding(item["field"], item["issue"], "Cross-Document Consistency Gate", "The selected branch's contracted ICF hierarchy, participant-facing content, and signatures.")
+                for item in audit_icf_document(icf_path, icf_contract(study_type, (reference.get("meta") or {}).get("icf_template")), reference)
             )
     return findings
 

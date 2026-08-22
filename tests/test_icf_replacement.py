@@ -129,6 +129,26 @@ class IcfReplacementTests(unittest.TestCase):
             self.assertIn("word/document.xml", fields)
             self.assertIn("LEGAL RIGHTS", fields)
 
+    def test_icf_audit_rejects_comment_parts_and_orphan_headings(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "icf.docx"
+            source = REPO_ROOT / "assets/client-templates/docx/sterling-icf.template.docx"
+            path.write_bytes(source.read_bytes())
+            contract = icf_contract("Prospective", "Sterling")
+            with zipfile.ZipFile(path) as archive:
+                members = {item.filename: archive.read(item.filename) for item in archive.infolist()}
+            document = members["word/document.xml"].decode()
+            marker = '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>ORPHAN HEADING</w:t></w:r></w:p>'
+            document = document.replace("</w:body>", marker + "</w:body>")
+            members["word/document.xml"] = document.encode()
+            members["word/comments.xml"] = b'<w:comments xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" />'
+            with zipfile.ZipFile(path, "w") as archive:
+                for name, raw in members.items():
+                    archive.writestr(name, raw)
+            errors = audit_icf_document(path, contract, {"study": {"title": "Approved study"}})
+            self.assertIn("word/document.xml", {item["field"] for item in errors})
+            self.assertIn("ORPHAN HEADING", {item["field"] for item in errors})
+
 
 if __name__ == "__main__":
     unittest.main()
