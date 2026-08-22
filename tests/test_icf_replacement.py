@@ -52,6 +52,31 @@ class IcfReplacementTests(unittest.TestCase):
         procedure = next(section for section in icf_contract("Ambispective", "Advarra") if section.title == "WHAT WILL HAPPEN DURING THE STUDY")
         self.assertIn("existing-records", procedure.placement.casefold())
 
+    def test_sterling_contracts_are_branch_specific(self) -> None:
+        prospective = icf_contract("Prospective", "Sterling")
+        ambispective = icf_contract("Ambispective", "Sterling")
+        self.assertEqual([item.title for item in prospective], [item.title for item in ambispective])
+        self.assertNotEqual(
+            [item.section_id for item in prospective],
+            [item.section_id for item in ambispective],
+        )
+        procedures = next(item for item in ambispective if item.title == "PROCEDURES")
+        self.assertIn("existing-records", procedures.placement.casefold())
+        self.assertFalse(next(item for item in prospective if item.title == "PROCEDURES").placement)
+
+    def test_sanitized_sterling_template_passes_contract_audit_for_both_branches(self) -> None:
+        from icf import sanitize_icf_document
+
+        reference = {"study": {"title": "Approved study"}, "meta": {"protocol_number": "P-25"}}
+        for study_type in ("Prospective", "Ambispective"):
+            with self.subTest(study_type=study_type), tempfile.TemporaryDirectory() as temporary:
+                path = Path(temporary) / "icf.docx"
+                source = REPO_ROOT / "assets/client-templates/docx/sterling-icf.template.docx"
+                path.write_bytes(source.read_bytes())
+                contract = icf_contract(study_type, "Sterling")
+                sanitize_icf_document(path, contract, reference)
+                self.assertEqual(audit_icf_document(path, contract, reference), [])
+
     def test_ambispective_sanitizer_inserts_records_disclosure_after_procedures_heading(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "icf.docx"

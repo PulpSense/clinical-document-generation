@@ -78,17 +78,27 @@ def icf_contract(study_type: str, template: str) -> tuple[ICFSection, ...]:
             )
         return tuple(sections)
     if choice == "sterling":
-        return _sections(STERLING_TITLES, "sterling-" + branch)
+        sections = list(_sections(STERLING_TITLES, "sterling-" + branch))
+        if branch == "ambispective":
+            procedures = next(section for section in sections if section.title == "PROCEDURES")
+            sections[sections.index(procedures)] = ICFSection(
+                procedures.section_id,
+                procedures.title,
+                procedures.role,
+                procedures.repair,
+                placement="Existing-records disclosure belongs inside the study-procedures section.",
+            )
+        return tuple(sections)
     raise ValueError(f"Unsupported ICF template {template!r}.")
 
 
-def unified_icf_batch() -> Any:
+def unified_icf_batch(study_type: str = "Prospective", template: str = "Advarra") -> Any:
     """Return the single model-facing batch used for participant-facing ICF prose."""
     from prospective import ProspectiveDraftingBatch
 
     return ProspectiveDraftingBatch(
         "icf-narrative",
-        tuple(section.section_id for section in icf_contract("Prospective", "Advarra")),
+        tuple(section.section_id for section in icf_contract(study_type, template)),
         ("study", "objectives", "population", "procedures", "risks_benefits", "parties", "sites"),
         ("protocol-foundations",),
     )
@@ -111,6 +121,41 @@ def _text(element: ET.Element) -> str:
     return re.sub(r"\s+", " ", " ".join(item.text or "" for item in element.iter(W + "t"))).strip()
 
 
+def _heading_key(value: str) -> str:
+    """Compare headings by reader-visible words, not template whitespace."""
+    return re.sub(r"\s*/\s*", "/", re.sub(r"\s+", " ", value).strip()).casefold()
+
+
+def _page_field() -> ET.Element:
+    paragraph = ET.Element(W + "p")
+    run = ET.SubElement(paragraph, W + "r")
+    begin = ET.SubElement(run, W + "fldChar")
+    begin.set(W + "fldCharType", "begin")
+    instruction = ET.SubElement(run, W + "instrText")
+    instruction.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
+    instruction.text = " PAGE "
+    end = ET.SubElement(run, W + "fldChar")
+    end.set(W + "fldCharType", "end")
+    return paragraph
+
+
+def _has_page_field(members: dict[str, bytes]) -> bool:
+    for name, raw in members.items():
+        if not name.startswith("word/") or not name.endswith(".xml"):
+            continue
+        try:
+            root = ET.fromstring(raw)
+        except ET.ParseError:
+            continue
+        if _root_has_page_field(root):
+            return True
+    return False
+
+
+def _root_has_page_field(root: ET.Element) -> bool:
+    return any((element.text or "").strip().upper() == "PAGE" for element in root.iter(W + "instrText"))
+
+
 def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: dict[str, Any]) -> list[dict[str, str]]:
     """Audit a rendered ICF without rewriting it or releasing it."""
     contract = tuple(contract)
@@ -119,15 +164,18 @@ def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: di
         with zipfile.ZipFile(path) as archive:
             members = {name: archive.read(name) for name in archive.namelist()}
             root = ET.fromstring(members["word/document.xml"])
-            all_xml = b"\n".join(members.values()).decode("utf-8", "ignore")
+            review_xml = b"\n".join(
+                raw for name, raw in members.items()
+                if name.startswith("word/") and name.endswith(".xml") and name != "word/styles.xml"
+            ).decode("utf-8", "ignore")
     except (OSError, KeyError, zipfile.BadZipFile, ET.ParseError) as exc:
         return [{"field": str(path), "issue": f"ICF document cannot be parsed: {exc}."}]
 
-    if re.search(r"<w:(?:commentRangeStart|commentReference|ins|del|moveFrom|moveTo)\b", all_xml):
+    if re.search(r"<w:(?:commentRangeStart|commentReference|ins|del|moveFrom|moveTo)\b", review_xml):
         errors.append({"field": "word/document.xml", "issue": "Comments or tracked changes remain in the ICF candidate."})
-    if re.search(r"<w:vanish\b", all_xml):
+    if re.search(r"<w:vanish\b", review_xml):
         errors.append({"field": "word/document.xml", "issue": "Hidden review content remains in the ICF candidate."})
-    if not re.search(r"<w:instrText[^>]*>\s*PAGE\s*</w:instrText>", all_xml, re.I):
+    if not _has_page_field(members):
         errors.append({"field": "page_fields", "issue": "ICF candidate has no Word PAGE field for page furniture."})
     if not any(name.startswith("word/footer") and name.endswith(".xml") for name in members):
         errors.append({"field": "footers", "issue": "ICF candidate has no Word footer part."})
@@ -139,13 +187,13 @@ def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: di
         if fact in body_text and fact not in source_text:
             errors.append({"field": "word/document.xml", "issue": f"Unsupported stale template fact remains: {fact}."})
 
-    expected = {section.title for section in contract}
+    expected = {_heading_key(section.title) for section in contract}
     paragraphs = root.findall(".//" + W + "p")
     paragraph_texts = [_text(paragraph) for paragraph in paragraphs]
-    contract_titles = {section.title for section in contract}
+    contract_titles = {_heading_key(section.title) for section in contract}
     for paragraph in paragraphs:
         title = _text(paragraph)
-        visible_heading = title in expected or (
+        visible_heading = _heading_key(title) in expected or (
             title and title == title.upper() and len(title) >= 4 and not title.endswith(":")
         )
         if not visible_heading:
@@ -154,28 +202,33 @@ def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: di
         if style is None or not style.get(W + "val", "").casefold().startswith("heading"):
             errors.append({"field": title, "issue": "Visible ICF heading does not use a Word heading style."})
     for index, title in enumerate(paragraph_texts):
-        if title not in contract_titles:
+        if _heading_key(title) not in contract_titles:
             continue
         substantive = False
         for following in paragraph_texts[index + 1:]:
             if not following:
                 continue
-            if following in contract_titles or (following == following.upper() and len(following) >= 4 and not following.endswith(":")):
+            if _heading_key(following) in contract_titles or (following == following.upper() and len(following) >= 4 and not following.endswith(":")):
                 break
             substantive = True
             break
         if not substantive:
             errors.append({"field": title, "issue": "Required ICF leaf heading has no substantive participant-facing body content."})
     for section in contract:
-        if section.title.casefold() not in body_text:
+        if _heading_key(section.title) not in _heading_key(body_text):
             errors.append({"field": section.title, "issue": "Required ICF heading is missing."})
         if section.placement and section.title.casefold() in body_text:
-            procedure_start = body_text.find(section.title.casefold())
-            next_heading = min(
-                (body_text.find(other.title.casefold(), procedure_start + len(section.title)) for other in contract if other.title != section.title and body_text.find(other.title.casefold(), procedure_start + len(section.title)) >= 0),
-                default=len(body_text),
+            start = next(
+                (index for index, title in enumerate(paragraph_texts) if _heading_key(title) == _heading_key(section.title)),
+                None,
             )
-            procedure_text = body_text[procedure_start:next_heading]
+            procedure_parts: list[str] = []
+            if start is not None:
+                for title in paragraph_texts[start:]:
+                    if procedure_parts and _heading_key(title) in contract_titles:
+                        break
+                    procedure_parts.append(title)
+            procedure_text = " ".join(procedure_parts).casefold()
             if not any(token in procedure_text for token in ("existing record", "historical record", "medical record", "previously collected")):
                 errors.append({"field": section.title, "issue": section.placement})
     if "in case of an injury related to this research study" in body_text and "in case of an injury related to this research study" not in {title.casefold() for title in expected} and "legal rights" in body_text:
@@ -226,7 +279,7 @@ def sanitize_icf_document(path: Path, contract: Iterable[ICFSection], reference:
                 text_nodes = paragraph.findall(".//" + W + "t")
                 text = "".join(node.text or "" for node in text_nodes)
                 title = text.strip()
-                visible_heading = title in {section.title for section in contract} or (
+                visible_heading = _heading_key(title) in {_heading_key(section.title) for section in contract} or (
                     title and title == title.upper() and len(title) >= 4 and not title.endswith(":")
                 )
                 if visible_heading:
@@ -256,7 +309,7 @@ def sanitize_icf_document(path: Path, contract: Iterable[ICFSection], reference:
             if placement and name == "word/document.xml":
                 paragraphs = root.findall(".//" + W + "p")
                 already_present = any(
-                    any(token in _text(paragraph).casefold() for token in ("existing record", "historical record", "medical record", "previously collected"))
+                    any(token in _text(paragraph).casefold() for token in ("existing record", "historical record", "previously collected"))
                     for paragraph in paragraphs
                 )
                 if not already_present:
@@ -270,14 +323,18 @@ def sanitize_icf_document(path: Path, contract: Iterable[ICFSection], reference:
                             text.text = "The study team may review relevant existing medical records or other information collected before your participation. This existing-records review will be kept confidential and will be used only for the purposes described in this study."
                             body.insert(list(body).index(heading) + 1, disclosure)
                             local_changed = True
-        if name == "word/_rels/document.xml.rels":
+        if name.startswith("word/footer") and name.endswith(".xml"):
+            if not _root_has_page_field(root):
+                root.append(_page_field())
+                local_changed = True
+        if name.endswith(".rels"):
             for relationship in list(root):
                 if "comment" in (relationship.get("Target") or "").casefold():
                     root.remove(relationship)
                     local_changed = True
         if name == "[Content_Types].xml":
             for override in list(root):
-                if "comment" in (override.get("PartName") or "").casefold():
+                if "comment" in (override.get("PartName") or "").casefold() or "comment" in (override.get("ContentType") or "").casefold():
                     root.remove(override)
                     local_changed = True
         if local_changed:

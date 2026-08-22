@@ -108,24 +108,17 @@ def prospective_batch_plan() -> tuple[ProspectiveDraftingBatch, ...]:
     )
 
 
-def _icf_batch() -> ProspectiveDraftingBatch:
+def _icf_batch(study_type: str = "Prospective", template: str = "Advarra") -> ProspectiveDraftingBatch:
     """Return the one unified participant-facing ICF drafting batch."""
     from icf import unified_icf_batch
 
-    return unified_icf_batch()
+    return unified_icf_batch(study_type, template)
 
 
 def branch_batch_plan(study_type: str = "Prospective", template: str = "Advarra") -> tuple[ProspectiveDraftingBatch, ...]:
-    """Return the four-batch topology with the selected ICF contract."""
+    """Return the drafting topology with the selected branch ICF contract."""
     batches = list(prospective_batch_plan())
-    from icf import icf_contract
-
-    batches[-1] = ProspectiveDraftingBatch(
-        batches[-1].batch_id,
-        tuple(section.section_id for section in icf_contract(study_type, template)),
-        batches[-1].approved_field_families,
-        batches[-1].prerequisite_ids,
-    )
+    batches[-1] = _icf_batch(study_type, template)
     return tuple(batches)
 
 
