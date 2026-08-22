@@ -197,6 +197,14 @@ class ClinicalDocumentWorkflowTests(unittest.TestCase):
             prepared = prepare_run(run_dir)
             approve_source(run_dir, approved_by="Client Reviewer")
             source_path = run_dir / prepared["source_of_truth"]
+            for relative in (
+                "drafts/section.json",
+                "output/protocol.docx",
+                "evidence/readiness.json",
+            ):
+                path = run_dir / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("preserved evidence", encoding="utf-8")
             source_path.write_text(source_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
 
             result = validate_run(run_dir)
@@ -205,7 +213,30 @@ class ClinicalDocumentWorkflowTests(unittest.TestCase):
             self.assertEqual(result["readiness_report"]["status"], "blocked")
             stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
             self.assertEqual(stored["approval"]["status"], "changes_requested")
-            self.assertTrue((run_dir / "state/source-invalidation.json").is_file())
+            invalidation = json.loads((run_dir / "state/source-invalidation.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                invalidation["invalidated_material"],
+                [
+                    {"path": "drafts/section.json", "status": "invalidated"},
+                    {"path": "evidence/readiness.json", "status": "invalidated"},
+                    {"path": "output/protocol.docx", "status": "invalidated"},
+                ],
+            )
+
+    def test_deleted_approved_source_invalidates_approval_before_generation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.write_run(Path(temporary), self.reference())
+            prepared = prepare_run(run_dir)
+            approve_source(run_dir, approved_by="Client Reviewer")
+            (run_dir / prepared["source_of_truth"]).unlink()
+
+            result = generate_approved_run(run_dir)
+
+            self.assertEqual(result["status"], "blocked")
+            self.assertEqual(result["stage"], "approval_gate")
+            self.assertEqual(result["findings"][0]["actual_sha256"], None)
+            stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
+            self.assertEqual(stored["approval"]["status"], "changes_requested")
 
 
 if __name__ == "__main__":

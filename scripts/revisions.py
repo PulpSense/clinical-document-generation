@@ -43,9 +43,9 @@ def source_change(reference: dict[str, Any], run_dir: Path) -> dict[str, Any] | 
         else None
     )
     source_path = current_source_path(run_dir, reference)
-    if not approved_hash or source_path is None or not source_path.is_file():
+    if not approved_hash or source_path is None:
         return None
-    actual_hash = sha256_file(source_path)
+    actual_hash = sha256_file(source_path) if source_path.is_file() else None
     if actual_hash == approved_hash:
         return None
     return {
@@ -64,12 +64,17 @@ def invalidate_changed_source(run_dir: Path, reference: dict[str, Any]) -> dict[
     if finding is None:
         return None
     now = datetime.now(timezone.utc).isoformat()
+    affected_material = _affected_material(run_dir)
     state = {
         "status": "invalidated",
         "reason": "approved_source_changed",
         "invalidated_at": now,
         "finding": finding,
-        "affected_material": _affected_material(run_dir),
+        "affected_material": affected_material,
+        "invalidated_material": [
+            {"path": path, "status": "invalidated"}
+            for path in affected_material
+        ],
     }
     _write_json(run_dir / "state/source-invalidation.json", state)
     _write_json(run_dir / "state/client-facing-revision.json", {
@@ -90,7 +95,7 @@ def invalidate_changed_source(run_dir: Path, reference: dict[str, Any]) -> dict[
 def _affected_material(run_dir: Path) -> list[str]:
     """List preserved material that must not be treated as current output."""
     paths: list[str] = []
-    for root in ("drafts", "output", "logs"):
+    for root in ("drafts", "evidence", "output", "logs"):
         directory = run_dir / root
         if directory.is_dir():
             paths.extend(path.relative_to(run_dir).as_posix() for path in directory.rglob("*") if path.is_file())
