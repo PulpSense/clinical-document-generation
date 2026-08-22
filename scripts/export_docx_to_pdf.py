@@ -7,12 +7,12 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import zipfile
-import re
 from pathlib import Path
 from typing import Any
 
@@ -125,13 +125,17 @@ def renderer_available(renderer: str) -> bool:
 
 
 def run_pages(input_path: Path, output_path: Path) -> tuple[bool, str]:
-    result = subprocess.run(
-        ["osascript", "-", str(input_path), str(output_path)],
-        input=PAGES_SCRIPT,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["osascript", "-", str(input_path), str(output_path)],
+            input=PAGES_SCRIPT,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Pages did not finish rendering within 60 seconds."
     message = (result.stderr or result.stdout).strip()
     return result.returncode == 0 and output_path.is_file(), message
 
@@ -143,13 +147,17 @@ def run_word(input_path: Path, output_path: Path) -> tuple[bool, str]:
     environment = os.environ.copy()
     environment["CLINICAL_DOCX_INPUT"] = str(input_path)
     environment["CLINICAL_PDF_OUTPUT"] = str(output_path)
-    result = subprocess.run(
-        [command, "-NoProfile", "-NonInteractive", "-Command", WORD_POWERSHELL],
-        text=True,
-        capture_output=True,
-        check=False,
-        env=environment,
-    )
+    try:
+        result = subprocess.run(
+            [command, "-NoProfile", "-NonInteractive", "-Command", WORD_POWERSHELL],
+            text=True,
+            capture_output=True,
+            check=False,
+            env=environment,
+            timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Microsoft Word did not finish rendering within 60 seconds."
     message = (result.stderr or result.stdout).strip()
     return result.returncode == 0 and output_path.is_file(), message
 
@@ -178,21 +186,25 @@ def run_libreoffice(input_path: Path, output_path: Path) -> tuple[bool, str]:
                     )
                     data = text.encode("utf-8")
                 destination.writestr(item, data)
-        result = subprocess.run(
-            [
-                command,
-                f"-env:UserInstallation={profile_path.as_uri()}",
-                "--headless",
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                str(temporary_path),
-                str(render_input),
-            ],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
+        try:
+            result = subprocess.run(
+                [
+                    command,
+                    f"-env:UserInstallation={profile_path.as_uri()}",
+                    "--headless",
+                    "--convert-to",
+                    "pdf",
+                    "--outdir",
+                    str(temporary_path),
+                    str(render_input),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=60,
+            )
+        except subprocess.TimeoutExpired:
+            return False, "LibreOffice did not finish rendering within 60 seconds."
         converted = temporary_path / f"{input_path.stem}.pdf"
         message = (result.stderr or result.stdout).strip()
         if result.returncode != 0 or not converted.is_file():
@@ -231,6 +243,22 @@ def export_docx(
     if not input_path.is_file():
         result["message"] = f"Input DOCX does not exist: {input_path}"
         return result, 1
+    try:
+        with zipfile.ZipFile(input_path) as archive:
+            names = set(archive.namelist())
+            content_types = archive.read("[Content_Types].xml").decode("utf-8", errors="ignore") if "[Content_Types].xml" in names else ""
+            if (
+                "word/document.xml" not in names
+                or "word/_rels/document.xml.rels" not in names
+                or "wordprocessingml.document.main+xml" not in content_types
+            ):
+                result["status"] = "unavailable"
+                result["message"] = "Input is not a valid DOCX package."
+                return result, 1 if (require_renderer or renderer != "auto") else 0
+    except (OSError, zipfile.BadZipFile):
+        result["status"] = "unavailable"
+        result["message"] = "Input is not a valid DOCX package."
+        return result, 1 if (require_renderer or renderer != "auto") else 0
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     candidates = renderer_order() if renderer == "auto" else [renderer]

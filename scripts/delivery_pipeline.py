@@ -142,14 +142,20 @@ def visual_page_evidence(artifact: str, pages: list[str]) -> tuple[list[dict[str
             seen[page_key] = page_number
         checks = {
             "blank_page": "failed" if not page else "passed",
+            "unexpected_blank_page": "failed" if not page else "passed",
             "duplicate_page_text": "failed" if duplicate_of else "passed",
+            "duplicate_sections": "failed" if duplicate_of else "passed",
             "unresolved_placeholder": "failed" if placeholder.search(page) else "passed",
             "text_evidence": "passed" if page else "failed",
             "clipping": "not_assessed_from_text",
             "overlap": "not_assessed_from_text",
+            "orphan_heading": "not_assessed_from_text",
             "split_row": "not_assessed_from_text",
+            "split_rows": "not_assessed_from_text",
             "overflow": "not_assessed_from_text",
+            "table_overflow": "not_assessed_from_text",
             "style_drift": "not_assessed_from_text",
+            "missing_page_furniture": "not_assessed_from_text",
         }
         page_evidence = {"artifact": artifact, "page": page_number, "status": "passed", "checks": checks}
         if not page:
@@ -263,7 +269,7 @@ def verify_branch_document_set(run_dir: Path, outputs: list[str], *, require_ren
                 "Visual Layout Gate",
                 "A rendered page set produced by Microsoft Word, LibreOffice, or Pages.",
             ))
-        elif code:
+        elif render.get("status") == "unavailable" or code:
             visual_findings.append(_finding(f"{relative}:rendering", render.get("message", "Renderer failed."), "Visual Layout Gate", "A successful render by the Active Renderer."))
         visual_evidence[relative] = evidence
     visual = _review_pass("visual_layout_all_pages", visual_findings, evidence=visual_evidence)
@@ -311,6 +317,7 @@ def bind_generation_manifest(run_dir: Path, manifest_path: Path, outputs: list[s
         relative: {
             "artifact_sha256": evidence.get("artifact_sha256"),
             "renderer": evidence.get("active_renderer"),
+            "evidence_path": f"logs/docx-render/{Path(relative).stem}.pdf",
             "evidence_sha256": sorted({
                 page.get("evidence_sha256")
                 for page in evidence.get("pages", [])
@@ -334,7 +341,7 @@ def manifest_evidence_current(run_dir: Path, manifest_path: Path) -> bool:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     bindings = manifest.get("evidence_binding")
     artifacts = {item.get("path"): item.get("sha256") for item in manifest.get("artifacts", [])}
-    if not isinstance(bindings, dict):
+    if not isinstance(bindings, dict) or not bindings:
         return False
     for relative, expected in artifacts.items():
         path = run_dir / str(relative)
@@ -342,7 +349,14 @@ def manifest_evidence_current(run_dir: Path, manifest_path: Path) -> bool:
             return False
     for relative, evidence in bindings.items():
         path = run_dir / str(relative)
-        if path.is_file() and evidence.get("artifact_sha256") != _sha256(path):
+        if not path.is_file() or evidence.get("artifact_sha256") != _sha256(path):
+            return False
+        evidence_path = evidence.get("evidence_path")
+        expected_evidence_hashes = evidence.get("evidence_sha256") or []
+        if not evidence_path or not expected_evidence_hashes:
+            return False
+        evidence_file = run_dir / str(evidence_path)
+        if not evidence_file.is_file() or _sha256(evidence_file) not in expected_evidence_hashes:
             return False
     return True
 

@@ -404,7 +404,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     evidence_path = run_dir / "logs/readiness-evidence.json"
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    if pipeline["status"] == "passed" and revision_id and branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] in {"Prospective", "Ambispective"}:
+    if pipeline["status"] == "passed" and revision_id:
         revision_manifest_path = run_dir / "revisions" / str(revision_id) / "generation-manifest.json"
         revision["manifest"] = bind_generation_manifest(
             run_dir,
