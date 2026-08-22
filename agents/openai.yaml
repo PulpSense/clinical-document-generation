@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clinical Document Generation"
+  short_description: "Review and generate study documents"
+  default_prompt: "Use $clinical-document-generation to prepare a study document set, resolve Advarra vs Sterling before source review when an ICF is required, and ask only for missing or conflicting starred clinical inputs."

@@ -1,0 +1,194 @@
+{
+  "meta": {
+    "protocol_number": "GP-26-01",
+    "version": "1.0",
+    "date": "21 Aug 2026",
+    "study_type": "Prospective",
+    "document_set": ["protocol_docx"]
+  },
+  "approval": {
+    "status": "approved",
+    "approved_by": "Reference Protocol QA"
+  },
+  "study": {
+    "title": "GP-26-01 Sentinel Patch Evaluation",
+    "short_title": "GP-26-01 Sentinel Patch",
+    "background": "Postoperative pain and recovery are often assessed at irregular intervals, limiting the ability to describe recovery between clinic visits. This prospective observational study evaluates whether a wearable Sentinel Patch can support structured symptom and device-use follow-up.",
+    "hypothesis": "Structured monitoring will provide a complete and operationally usable record of postoperative recovery through Month 3."
+  },
+  "objectives": {
+    "primary": "To describe the change in postoperative pain score from baseline to Month 3.",
+    "secondary": "To describe device adherence, usability, and the frequency of safety events during follow-up."
+  },
+  "population": {
+    "study_population": "Approximately 60 adults 18 to 80 years of age will be enrolled across two investigational sites.",
+    "inclusion_criteria": [
+      "Adults 18 to 80 years old.",
+      "Eligible historical postoperative records are available for abstraction.",
+      "Able and willing to complete prospective Sentinel Patch follow-up through Month 3."
+    ],
+    "exclusion_criteria": [
+      "Concurrent participation in an interventional study.",
+      "Historical records are incomplete for the planned abstraction.",
+      "Unable to complete prospective follow-up.",
+      "Any investigator-determined safety concern."
+    ],
+    "sample_size": "60 participants",
+    "sample_justification": "The sample is intended to provide descriptive estimates of pain recovery, adherence, usability, and safety while allowing for expected attrition through Month 3."
+  },
+  "design": {
+    "study_design": "Prospective, multicenter, single-arm observational study with historical record abstraction and prospective Sentinel Patch monitoring."
+  },
+  "procedures": {
+    "assessments": "Historical chart abstraction, baseline enrollment, Month 1 telephone follow-up, and Month 3 clinic follow-up, including pain score review, device-use download, and usability questionnaire.",
+    "methods": "The same approved assessment schedule will be used at both sites. Historical and prospective observations will be labeled by source and visit.",
+    "consent": "Written informed consent will be obtained before any study-specific prospective procedure. Permission for historical record abstraction will be documented in the same consent process.",
+    "visit_schedule": "Participants will complete screening and baseline activities before device initiation, a Month 1 telephone follow-up within the stated window, and a Month 3 clinic follow-up within the stated window.",
+    "assessment_details": "At each applicable contact, the study team will review pain score, device use, adverse events, concomitant concerns, and completion of the relevant case report form.",
+    "unscheduled_visits": "Unscheduled contacts may be performed when needed to address a safety concern, device issue, or missing assessment and will be recorded with the reason and outcome.",
+    "discontinued_subjects": "Participants may discontinue at any time. The investigator will document the reason when available and retain data collected before discontinuation as permitted by consent and applicable requirements.",
+    "retention": "The study team will use reminder calls and scheduled follow-up contacts to support completion through Month 3.",
+    "discontinuation": "A participant may stop device use or withdraw from prospective follow-up without penalty or loss of entitled care.",
+    "termination": "The investigator may terminate participation for a safety concern, protocol noncompliance, inability to complete follow-up, or loss to follow-up.",
+    "study_termination": "The sponsor or investigator may terminate the study for safety, feasibility, regulatory, or operational reasons.",
+    "study_completion": "The study is complete after the final enrolled participant has completed or discontinued Month 3 follow-up and required closeout activities are documented.",
+    "visit_schedule_table": [
+      {"visitNumber": "1", "visitName": "Screening / Baseline", "visitWindow": "Day -30 to Day 0", "CRFnumber": "SCR/BL"},
+      {"visitNumber": "2", "visitName": "Month 1 Telephone Follow-up", "visitWindow": "Day 30 +/- 7", "CRFnumber": "M1"},
+      {"visitNumber": "3", "visitName": "Month 3 Clinic Follow-up", "visitWindow": "Day 90 +/- 7", "CRFnumber": "M3"}
+    ]
+  },
+  "statistics": {
+    "analysis_plan": "The primary analysis will summarize change in pain score from baseline to Month 3. Secondary analyses will summarize adherence, usability responses, and adverse events using descriptive statistics.",
+    "methodology": "Continuous variables will be summarized using count, mean, standard deviation, median, and range as appropriate. Categorical variables will be summarized using counts and percentages.",
+    "software": "Analyses will be performed using validated statistical software under the sponsor's data-management procedures."
+  },
+  "safety": {
+    "general_information": "The investigator will review safety information at every study contact and will ensure that relevant events are documented in the case report form.",
+    "monitoring": "Participants will be asked about adverse events, device-related complaints, and changes in health status at each scheduled contact.",
+    "adverse_events": "Adverse events and serious adverse events will be recorded from consent through the end of study participation, assessed for severity and relationship, and reported according to applicable requirements.",
+    "follow_up": "The investigator will follow unresolved adverse events and quality complaints until resolution, stabilization, or documentation that further follow-up is not clinically meaningful."
+  },
+  "ethics": {
+    "considerations": "The study will be conducted in accordance with the Declaration of Helsinki, ICH GCP, the approved protocol, informed consent requirements, and applicable regulations.",
+    "confidentiality": "Study records will use coded identifiers. Access to identifiable information will be limited to authorized study personnel and oversight bodies as permitted by law."
+  },
+  "confidentiality": {
+    "publication": "Study results may be presented or published in a manner that does not identify individual participants.",
+    "data_handling": "Data will be stored in access-controlled study systems and retained according to the approved record-retention plan."
+  },
+  "risks_benefits": {
+    "risks": "Risks are expected to be minimal. Historical record review creates a confidentiality risk. Prospective patch use may cause temporary skin irritation, redness, itching, adhesive sensitivity, or discomfort. Participants may experience inconvenience from follow-up contacts, questionnaires, clinic attendance, or device-use activities.",
+    "benefits": "Participants may not receive a direct benefit. The study may improve understanding of postoperative recovery and the operational use of structured wearable monitoring.",
+    "compensation_or_reimbursement": "Any reimbursement will be described in the approved informed consent materials and administered according to site procedures.",
+    "injury_handling": "Study-related injuries will receive appropriate medical evaluation and treatment. The investigator will document and report suspected study-related injury according to applicable requirements."
+  },
+  "endpoints": {
+    "primary": "Change in postoperative pain score from baseline to Month 3."
+  },
+  "generated": {
+    "protocol": {
+      "introduction": "This protocol describes the approved objectives, population, procedures, operational safeguards, and analysis plan for GP-26-01.",
+      "objectivesIntro": "The study objectives are evaluated using the scheduled historical and prospective assessments.",
+      "populationLong": "The study will enroll approximately 60 adults across two sites. Participants must have eligible historical records and be able to complete the prospective Sentinel Patch schedule.",
+      "studyDesignLong": "This is a prospective, multicenter, single-arm observational study combining historical chart abstraction with prospective monitoring.",
+      "methods": "Standardized visit windows, source labels, and case report forms will be used to reduce collection variability.",
+      "studyProcedure": "Study procedures include consent, historical abstraction, baseline assessment, device monitoring, Month 1 telephone follow-up, and Month 3 clinic follow-up.",
+      "consent": "Consent will be obtained before study-specific prospective procedures and historical record abstraction.",
+      "visitScheduleDetails": "The Schedule of Assessments defines the required visit names, windows, and CRF identifiers.",
+      "measurementsDetails": "Pain score, device use, usability, adverse events, and relevant clinical information will be collected at applicable visits.",
+      "analysisDataSets": "The analysis sets will include enrolled participants with available baseline and follow-up data, with exclusions documented in the analysis report.",
+      "statisticalMethodology": "Descriptive statistics will be used for the primary and secondary objectives.",
+      "statisticalConsiderations": "Missing data and participant discontinuation will be summarized and considered when interpreting results.",
+      "sampleSizeJustification": "The planned sample supports descriptive estimation while allowing for expected attrition.",
+      "confidentialityPublication": "Results will be reported in aggregate and without participant identifiers.",
+      "risks": "The expected risks are minimal and include confidentiality risk, temporary skin effects, and inconvenience.",
+      "benefits": "The study may contribute useful evidence about structured postoperative monitoring.",
+      "ethics": "The study will follow approved ethical and regulatory requirements.",
+      "ethicalConfidentiality": "Participant confidentiality will be protected through coded identifiers and access controls.",
+      "measurements": "Standard evaluation procedures include pain, device-use, usability, and safety assessments.",
+      "confidentiality": "Study data will be handled using approved access, retention, and publication controls.",
+      "injury_compensation": "Injury evaluation and any reimbursement will follow the approved consent and site procedures.",
+      "endpointCriteria": "Study endpoints are based on completion or discontinuation of the approved follow-up schedule.",
+      "completion": "Completion is assessed after the Month 3 visit or documented final contact.",
+      "discontinuation": "Participants may discontinue without penalty, with the reason and available data documented.",
+      "termination": "Participation may be terminated for safety, noncompliance, inability to complete follow-up, or loss to follow-up.",
+      "studyTermination": "The study may be terminated for safety, regulatory, feasibility, or operational reasons.",
+      "studyCompletion": "Study completion occurs after final participant follow-up and closeout documentation.",
+      "visitScheduleTable": [
+        {"visitNumber": "1", "visitName": "Screening / Baseline", "visitWindow": "Day -30 to Day 0", "CRFnumber": "SCR/BL"},
+        {"visitNumber": "2", "visitName": "Month 1 Telephone Follow-up", "visitWindow": "Day 30 +/- 7", "CRFnumber": "M1"},
+        {"visitNumber": "3", "visitName": "Month 3 Clinic Follow-up", "visitWindow": "Day 90 +/- 7", "CRFnumber": "M3"}
+      ]
+    }
+  },
+  "template_fields": {
+    "title": "GP-26-01 Sentinel Patch Evaluation",
+    "protocolNumber": "GP-26-01",
+    "date": "21 Aug 2026",
+    "AI_shortTitle": "GP-26-01 Sentinel Patch",
+    "ibrName": "Example Institutional Review Board",
+    "ibrAdress": "Example City",
+    "sponsortName": "PulpSense Clinical Research",
+    "sponsortAdress": "Example City",
+    "investigatorName": "Jordan Lee, MD",
+    "investigatorTitle": "Principal Investigator",
+    "facilityName": "Example Investigational Site",
+    "facilityLocation": "Example City",
+    "objective": "Describe postoperative pain recovery through Month 3.",
+    "sampleSize": "60 participants",
+    "sitesNumber": "2",
+    "studyDesignShort": "Prospective single-arm observational study",
+    "testArticle(s)": "Sentinel Patch",
+    "controlArticle(s)": "Not applicable",
+    "fundingSourceClarification": "",
+    "fundingSourceName": "PulpSense Clinical Research",
+    "fundingSourceAdress": "Example City",
+    "subInvestigatorHas": "",
+    "subInvestigatorName": "",
+    "studyCordinatorName": "Taylor Morgan",
+    "studyCordinatorEmail": "study@example.org",
+    "studyCordinatorPhone": "+1 555 0100",
+    "studyCordinator24Phone": "+1 555 0101",
+    "totalVisits": "3",
+    "AI_populationShort": "Adults 18 to 80 years old",
+    "AI_populationLong": "Approximately 60 adults with eligible records who can complete Month 3 follow-up.",
+    "AI_inclusionCriteria": "Adults 18 to 80 years old with eligible records and ability to complete follow-up.",
+    "AI_exclusionCriteria": "Concurrent interventional study, incomplete records, inability to follow up, or safety concern.",
+    "AI_studyDesignLong": "Prospective multicenter single-arm observational study.",
+    "AI_methods": "Standardized visits, windows, source labels, and case report forms.",
+    "AI_duration": "Approximately 3 months per participant",
+    "AI_masked": "Open-label observational",
+    "AI_variables": "Pain score, device use, usability, and safety events",
+    "AI_introduction": "Approved introduction for the GP-26-01 Sentinel Patch evaluation.",
+    "AI_visitSchedule": "Screening/Baseline, Month 1 telephone, and Month 3 clinic follow-up",
+    "AI_visitScheduleDetails": "See the complete Schedule of Assessments in Section 15.",
+    "AI_measurements": "Pain, device use, usability, and safety assessments",
+    "AI_measurementsDetails": "Assessments are collected at the applicable scheduled contact.",
+    "AI_analysisDataSets": "Enrolled participants with available baseline and follow-up data",
+    "AI_statisticalMethodology": "Descriptive statistics for primary and secondary objectives",
+    "AI_statisticalConsiderations": "Missing data and discontinuation will be summarized.",
+    "AI_risks": "Minimal confidentiality, skin irritation, and inconvenience risks.",
+    "AI_benefits": "The study may improve understanding of structured postoperative monitoring.",
+    "AI_CRFnumber": "SCR/BL, M1, M3",
+    "AI_visitNumber": "1, 2, 3",
+    "AI_visitName": "Screening/Baseline, Month 1, Month 3",
+    "AI_visitWindow": "Day -30 to Day 0; Day 30 +/- 7; Day 90 +/- 7",
+    "visitsTable": "",
+    "data_driven_tables": {
+      "visit_schedule": {
+        "columns": [
+          {"key": "visitNumber", "label": "Visit Number"},
+          {"key": "visitName", "label": "Visit Name"},
+          {"key": "visitWindow", "label": "Visit Window"},
+          {"key": "CRFnumber", "label": "CRF Number"}
+        ],
+        "rows": [
+          {"visitNumber": "1", "visitName": "Screening / Baseline", "visitWindow": "Day -30 to Day 0", "CRFnumber": "SCR/BL"},
+          {"visitNumber": "2", "visitName": "Month 1 Telephone Follow-up", "visitWindow": "Day 30 +/- 7", "CRFnumber": "M1"},
+          {"visitNumber": "3", "visitName": "Month 3 Clinic Follow-up", "visitWindow": "Day 90 +/- 7", "CRFnumber": "M3"}
+        ]
+      }
+    }
+  }
+}

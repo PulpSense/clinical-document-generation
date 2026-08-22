@@ -1,0 +1,10 @@
+{
+  "input": "/Users/juanpabloleoni/Documents/PulpSense/clinical-document-generation",
+  "output": "/Users/juanpabloleoni/Documents/PulpSense/clinical-document-generation/protocol.pdf",
+  "platform": "Darwin",
+  "requested_renderer": "auto",
+  "renderer": null,
+  "status": "error",
+  "attempts": [],
+  "message": "Input DOCX does not exist: /Users/juanpabloleoni/Documents/PulpSense/clinical-document-generation"
+}

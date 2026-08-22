@@ -1,0 +1,3 @@
+# Use one section contract for DOCX generation and validation
+
+Each generated Protocol or ICF uses one versioned Document Section Contract as the authority for its hierarchy, evidence, boilerplate, drafting, and completeness checks. Prospective and Ambispective Protocols follow the Embedded Client Reference’s corrected 1–19 hierarchy, Retrospective follows the corrected bundled Retrospective template’s 1–13 hierarchy, every required leaf section must be substantive, and Container Sections need not duplicate child content; Generated PRS XML retains its existing structure, mapping, formatting, and regression behavior.
