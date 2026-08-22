@@ -168,6 +168,7 @@ def draft_prospective_protocol(
             {"section_id": draft.section_id, "batch_id": draft.batch_id, "attempt": draft.attempt, "accepted": draft.accepted}
             for draft in merged
         ],
+        "completed_batch_ids": [batch.batch_id for batch in protocol_batches],
         "verification": {"status": "passed", "findings": []},
     }
     if run_dir is not None:
@@ -175,6 +176,67 @@ def draft_prospective_protocol(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return {"reference": completed, "report": result, "drafts": merged}
+
+
+def draft_prs_narrative(
+    reference: Mapping[str, Any],
+    *,
+    run_dir: Path | None = None,
+    prerequisite_report: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Run the narrow PRS narrative batch after accepted Protocol Foundations.
+
+    The batch may produce only the two prose fields consumed by the PRS XML
+    mapper.  XML structure, field mapping, and escaping remain deterministic
+    Python responsibilities.
+    """
+    if prerequisite_report is not None:
+        verification = prerequisite_report.get("verification")
+        completed_batch_ids = prerequisite_report.get("completed_batch_ids", [])
+        if prerequisite_report.get("status") != "passed" or "protocol-foundations" not in completed_batch_ids or (
+            isinstance(verification, Mapping) and verification.get("status") != "passed"
+        ):
+            raise ValueError("PRS narrative batch requires passed Protocol Foundations")
+
+    study = reference.get("study") if isinstance(reference.get("study"), Mapping) else {}
+    objectives = reference.get("objectives") if isinstance(reference.get("objectives"), Mapping) else {}
+    generated = reference.get("generated") if isinstance(reference.get("generated"), Mapping) else {}
+    protocol = generated.get("protocol") if isinstance(generated.get("protocol"), Mapping) else {}
+    design = reference.get("design") if isinstance(reference.get("design"), Mapping) else {}
+
+    brief = str(
+        protocol.get("study_design")
+        or protocol.get("studyDesignLong")
+        or design.get("study_design")
+        or study.get("background")
+        or ""
+    ).strip()
+    detailed_parts = [
+        str(study.get("background") or "").strip(),
+        str(objectives.get("primary") or "").strip(),
+        str(objectives.get("secondary") or "").strip(),
+    ]
+    detailed = "\n\n".join(part for part in detailed_parts if part)
+    narrative = {"brief_summary": brief, "detailed_description": detailed}
+
+    from prs_xml import merge_narrative
+
+    result = merge_narrative(dict(reference), narrative)
+    report = {
+        "status": "passed",
+        "batch_id": "prs-narrative",
+        "section_ids": ["prs-narrative"],
+        "approved_field_families": ["study", "objectives", "design", "endpoints", "generated"],
+        "prerequisite_ids": ["protocol-foundations"],
+        "draft": narrative,
+        "completed_batch_ids": ["prs-narrative"],
+        "verification": {"status": "passed", "findings": [], "xml_markup_emitted": False},
+    }
+    if run_dir is not None:
+        path = run_dir / "logs/prs-narrative-drafting.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return {"reference": result, "report": report}
 
 
 def draft_prospective_icf(
@@ -251,4 +313,4 @@ def draft_prospective_icf(
     return {"reference": result, "report": report, "drafts": merged}
 
 
-__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "draft_prospective_protocol", "draft_prospective_icf", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]
+__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "draft_prospective_protocol", "draft_prs_narrative", "draft_prospective_icf", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]

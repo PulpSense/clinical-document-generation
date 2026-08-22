@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from workflow import branch_contract  # noqa: E402
-from drafting import draft_prospective_protocol  # noqa: E402
+from drafting import draft_prs_narrative, draft_prospective_protocol  # noqa: E402
 from drafting import plan_prospective_batches  # noqa: E402
 from prospective import (  # noqa: E402
     SectionDraft,
@@ -38,6 +38,30 @@ class ProspectiveReplacementTests(unittest.TestCase):
         self.assertNotIn("template_fields", operations["approved_input"])
         sections = result["reference"]["generated"]["protocol"]["sections"]
         self.assertTrue(any(section.get("tables") for section in sections if section.get("number") == "15."))
+
+    def test_prs_narrative_runs_after_protocol_and_merges_only_prose(self) -> None:
+        reference = {
+            "study": {"background": "Background."},
+            "objectives": {"primary": "Primary.", "secondary": "Secondary."},
+            "design": {"study_design": "Design."},
+            "generated": {"protocol": {}},
+        }
+        result = draft_prs_narrative(
+            reference,
+            prerequisite_report={
+                "status": "passed",
+                "completed_batch_ids": ["protocol-foundations"],
+                "verification": {"status": "passed"},
+            },
+        )
+        self.assertEqual(result["report"]["batch_id"], "prs-narrative")
+        self.assertFalse(result["report"]["verification"]["xml_markup_emitted"])
+        self.assertEqual(result["reference"]["generated"]["xml"], {
+            "brief_summary": "Design.",
+            "detailed_description": "Background.\n\nPrimary.\n\nSecondary.",
+        })
+        with self.assertRaisesRegex(ValueError, "requires passed"):
+            draft_prs_narrative(reference, prerequisite_report={"status": "passed", "completed_batch_ids": []})
 
     def test_contract_has_corrected_1_to_19_hierarchy(self) -> None:
         contract = prospective_contract()

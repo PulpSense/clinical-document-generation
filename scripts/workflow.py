@@ -284,7 +284,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
         branch = branch_for_study_type((reference.get("meta") or {}).get("study_type"))
         drafting_report = None
         if branch and branch["canonical_study_type"] in {"Prospective", "Ambispective"}:
-            from drafting import draft_prospective_icf, draft_prospective_protocol
+            from drafting import draft_prs_narrative, draft_prospective_icf, draft_prospective_protocol
 
             drafted = draft_prospective_protocol(
                 reference,
@@ -294,6 +294,17 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
             )
             reference = drafted["reference"]
             _write_reference(reference_path, reference)
+            prs_drafted = draft_prs_narrative(
+                reference,
+                run_dir=run_dir,
+                prerequisite_report=drafted["report"],
+            )
+            reference = prs_drafted["reference"]
+            _write_reference(reference_path, reference)
+            # The narrative batch runs after Protocol Foundations and before
+            # rendering; rebuild the deterministic XML map with its accepted
+            # prose values while retaining Python's structural authority.
+            adapter_report = _populate_branch_fields(run_dir, reference_path, reference)
             icf_drafted = draft_prospective_icf(
                 reference,
                 run_dir=run_dir,
@@ -304,6 +315,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
             _write_reference(reference_path, reference)
             drafting_report = {
                 "protocol": drafted["report"],
+                "prs": prs_drafted["report"],
                 "icf": icf_drafted["report"],
             }
         generation = run_generation(
