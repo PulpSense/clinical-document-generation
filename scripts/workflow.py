@@ -7,6 +7,7 @@ provides the deterministic run-state transitions and client handoff boundary.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -346,6 +347,11 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
         replacement_path.parent.mkdir(parents=True, exist_ok=True)
         replacement_path.write_text(json.dumps(replacement_workflow, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if pipeline["status"] == "passed" and revision_id:
+        revision_manifest_path = run_dir / "revisions" / str(revision_id) / "generation-manifest.json"
+        if revision_manifest_path.is_file():
+            revision_manifest = json.loads(revision_manifest_path.read_text(encoding="utf-8"))
+            revision_manifest["status"] = "passed"
+            revision_manifest_path.write_text(json.dumps(revision_manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         publish_revision(run_dir, str(revision_id), client_outputs)
     return {
         "status": "passed" if pipeline["status"] == "passed" else "blocked",
@@ -378,6 +384,17 @@ def approve_source(
         source_path = run_dir / source_path
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
+    review_file = source_path
+    reference_dir = (run_dir / "reference").resolve()
+    try:
+        source_path.resolve().relative_to(reference_dir)
+    except ValueError:
+        # Preserve the upload as reviewer evidence, but make the exact
+        # approved bytes a stable run-local canonical source for generation.
+        canonical_path = reference_dir / "approved-source-of-truth.md"
+        canonical_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_path, canonical_path)
+        source_path = canonical_path
     result = parse_source_truth(
         run_dir,
         source_path,
@@ -391,6 +408,8 @@ def approve_source(
     approval = updated.setdefault("approval", {})
     approval["run_revision"] = revision["revision_id"]
     approval["revision_path"] = revision["path"]
+    if review_file.resolve() != source_path.resolve():
+        approval["review_file"] = review_file.resolve().relative_to(run_dir).as_posix()
     _write_reference(reference_path, updated)
     return result
 

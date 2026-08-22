@@ -176,6 +176,22 @@ class ClinicalDocumentWorkflowTests(unittest.TestCase):
             stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
             self.assertEqual(stored["approval"]["review_file"], "input/attachments/client-edited-source.md")
 
+    def test_approved_client_edit_is_copied_into_the_canonical_reference_area(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.write_run(Path(temporary), self.reference())
+            prepared = prepare_run(run_dir)
+            edited = run_dir / "input/attachments/client-edited-source.md"
+            edited.parent.mkdir(parents=True, exist_ok=True)
+            edited.write_text((run_dir / prepared["source_of_truth"]).read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+            approve_source(run_dir, approved_by="Client Reviewer", source_md=edited)
+
+            stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
+            canonical = run_dir / stored["source"]["source_of_truth_file"]
+            self.assertTrue(canonical.is_relative_to(run_dir / "reference"))
+            self.assertEqual(canonical.read_bytes(), edited.read_bytes())
+            self.assertEqual(stored["approval"]["review_file"], "input/attachments/client-edited-source.md")
+
     def test_approval_records_hash_and_immutable_revision_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             run_dir = self.write_run(Path(temporary), self.reference())

@@ -133,6 +133,29 @@ def create_revision(run_dir: Path, reference_path: Path, source_path: Path) -> d
 
 def publish_revision(run_dir: Path, revision_id: str, outputs: list[str]) -> dict[str, Any]:
     """Point the run's client-facing filter at the newest passing revision."""
+    passing_ids = []
+    root = run_dir / REVISION_ROOT
+    if root.is_dir():
+        for path in root.iterdir():
+            if not path.is_dir() or not path.name.isdigit():
+                continue
+            manifest_path = path / "generation-manifest.json"
+            if not manifest_path.is_file():
+                continue
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if manifest.get("status") == "passed":
+                passing_ids.append(path.name)
+    newest_passing = max(passing_ids, default=None)
+    if newest_passing != str(revision_id):
+        return {
+            "status": "not_published",
+            "revision_id": str(revision_id),
+            "reason": "superseded_by_newer_passing_revision" if newest_passing else "revision_is_not_passing",
+            "client_outputs": [],
+        }
     release = {
         "status": "passed",
         "revision_id": revision_id,

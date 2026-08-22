@@ -17,6 +17,7 @@ from delivery_pipeline import (  # noqa: E402
     bind_generation_manifest,
     verify_branch_document_set,
 )
+from revisions import publish_revision  # noqa: E402
 
 
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -86,6 +87,22 @@ class BranchDeliveryTests(unittest.TestCase):
                 {item["field"] for item in report["review_passes"]["consistency"]["findings"]},
                 set(AMBISPECTIVE_DOCUMENT_SET) - {"output/protocol.docx"},
             )
+
+    def test_only_the_newest_passing_revision_is_published(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            for revision_id, status in (("0001", "passed"), ("0002", "passed")):
+                revision_dir = run_dir / "revisions" / revision_id
+                revision_dir.mkdir(parents=True)
+                (revision_dir / "generation-manifest.json").write_text(
+                    json.dumps({"revision_id": revision_id, "status": status}), encoding="utf-8"
+                )
+
+            release = publish_revision(run_dir, "0001", ["output/protocol.docx"])
+
+            self.assertEqual(release["status"], "not_published")
+            self.assertEqual(release["reason"], "superseded_by_newer_passing_revision")
+            self.assertFalse((run_dir / "state/client-facing-revision.json").exists())
 
 
 if __name__ == "__main__":
