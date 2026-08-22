@@ -318,12 +318,60 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
                 "prs": prs_drafted["report"],
                 "icf": icf_drafted["report"],
             }
+            # Keep stable artifact ownership with each accepted draft so the
+            # delivery retry loop can reuse unaffected sections precisely.
+            generation_state = reference.setdefault("generation", {})
+            if not isinstance(generation_state, dict):
+                generation_state = {}
+                reference["generation"] = generation_state
+            generation_state["drafts"] = [
+                {**draft, "artifact": "output/protocol.docx"}
+                for draft in drafted["report"].get("section_drafts", [])
+            ] + [
+                {**draft, "artifact": "output/icf.docx"}
+                for draft in icf_drafted["report"].get("section_drafts", [])
+            ]
+            _write_reference(reference_path, reference)
         generation = run_generation(
             run_dir,
             reference_path,
             require_approval=True,
             require_source_contract=True,
         )
+
+        def rebuild_failed_targets(*, failed_targets=None, reused_section_drafts=None):
+            """Re-render after a targeted gate repair while preserving accepted drafts.
+
+            The delivery pipeline owns the retry budget and identifies failed
+            artifacts.  Keeping this callback keyword-aware is important: it
+            prevents a retry from silently degrading into an untracked,
+            whole-package rebuild and leaves an auditable ledger for the run.
+            """
+            retry = {
+                "failed_targets": list(failed_targets or []),
+                "reused_section_drafts": list(reused_section_drafts or []),
+            }
+            retry_reference = json.loads(reference_path.read_text(encoding="utf-8"))
+            retry_generation = retry_reference.setdefault("generation", {})
+            if not isinstance(retry_generation, dict):
+                retry_generation = {}
+                retry_reference["generation"] = retry_generation
+            retry_generation["last_targeted_retry"] = retry
+            # run_generation preserves the accepted generated sections already
+            # present in this reference; only failed artifacts are rebuilt by
+            # the renderer.
+            _write_reference(reference_path, retry_reference)
+            retry_path = run_dir / "logs/targeted-retry.json"
+            retry_path.parent.mkdir(parents=True, exist_ok=True)
+            retry_path.write_text(json.dumps(retry, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            return run_generation(
+                run_dir,
+                reference_path,
+                require_approval=True,
+                require_source_contract=True,
+                target_outputs=set(failed_targets or []),
+            )
+
         pipeline = run_delivery_pipeline(
             run_dir,
             generation["outputs"],
@@ -332,12 +380,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
             # lower-level renderer remains optional for structural generation,
             # but the Branch Document Set cannot be ready without evidence.
             require_renderer=True,
-            rebuild=lambda: run_generation(
-                run_dir,
-                reference_path,
-                require_approval=True,
-                require_source_contract=True,
-            ),
+            rebuild=rebuild_failed_targets,
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return {"status": "blocked", "stage": "generation", "error": str(exc), "client_outputs": []}

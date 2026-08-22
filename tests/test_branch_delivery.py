@@ -15,6 +15,7 @@ from delivery_pipeline import (  # noqa: E402
     AMBISPECTIVE_DOCUMENT_SET,
     PROSPECTIVE_ADVARRA_DOCUMENT_SET,
     bind_generation_manifest,
+    targeted_retry_plan,
     verify_branch_document_set,
     visual_page_evidence,
 )
@@ -88,6 +89,25 @@ class BranchDeliveryTests(unittest.TestCase):
                 {item["field"] for item in report["review_passes"]["consistency"]["findings"]},
                 set(AMBISPECTIVE_DOCUMENT_SET) - {"output/protocol.docx"},
             )
+
+    def test_targeted_retry_reuses_only_accepted_drafts_from_unaffected_artifacts(self) -> None:
+        reference = {
+            "generation": {
+                "drafts": [
+                    {"section_id": "protocol", "accepted": True, "artifact": "output/protocol.docx"},
+                    {"section_id": "icf", "accepted": True, "artifact": "output/icf.docx"},
+                    {"section_id": "rejected", "accepted": False, "artifact": "output/icf.docx"},
+                ]
+            }
+        }
+        failed, reused = targeted_retry_plan(
+            reference,
+            [{"field": "output/icf.docx:page:4", "issue": "overflow"}],
+            list(AMBISPECTIVE_DOCUMENT_SET),
+        )
+
+        self.assertEqual(failed, ["output/icf.docx"])
+        self.assertEqual([draft["section_id"] for draft in reused], ["protocol"])
 
     def test_package_consistency_checks_all_identity_facts_in_each_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

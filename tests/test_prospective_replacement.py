@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from workflow import branch_contract  # noqa: E402
-from drafting import draft_prs_narrative, draft_prospective_protocol  # noqa: E402
+from drafting import draft_prs_narrative, draft_prospective_icf, draft_prospective_protocol  # noqa: E402
 from drafting import plan_prospective_batches  # noqa: E402
 from prospective import (  # noqa: E402
     SectionDraft,
@@ -38,6 +38,25 @@ class ProspectiveReplacementTests(unittest.TestCase):
         self.assertNotIn("template_fields", operations["approved_input"])
         sections = result["reference"]["generated"]["protocol"]["sections"]
         self.assertTrue(any(section.get("tables") for section in sections if section.get("number") == "15."))
+
+    def test_ambispective_drafting_runs_protocol_icf_and_prs_batches_end_to_end(self) -> None:
+        reference = json.loads((Path(__file__).parent / "fixtures/gp-26-01-approved.json").read_text(encoding="utf-8"))
+        reference["meta"].update({"study_type": "Ambispective", "icf_template": "Advarra"})
+        protocol = draft_prospective_protocol(reference, study_type="Ambispective")
+        prs = draft_prs_narrative(
+            protocol["reference"],
+            prerequisite_report=protocol["report"],
+        )
+        icf = draft_prospective_icf(
+            prs["reference"],
+            study_type="Ambispective",
+            icf_template="Advarra",
+        )
+
+        self.assertEqual(protocol["report"]["contract_version"], "ambispective-1-19-v1")
+        self.assertEqual(prs["report"]["status"], "passed")
+        self.assertEqual(icf["report"]["status"], "passed")
+        self.assertTrue(any("existing-records" in draft["content"] for draft in icf["report"]["section_drafts"]))
 
     def test_prs_narrative_runs_after_protocol_and_merges_only_prose(self) -> None:
         reference = {

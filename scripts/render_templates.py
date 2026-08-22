@@ -684,6 +684,7 @@ def run_generation(
     *,
     require_approval: bool = False,
     require_source_contract: bool = False,
+    target_outputs: set[str] | None = None,
 ) -> dict[str, Any]:
     data = read_json(reference_path)
     approval_status = normalized_approval_status(data)
@@ -757,6 +758,10 @@ def run_generation(
     for key, template_rel, output_rel in DOCX_OUTPUTS:
         if not should_render(key, document_set):
             continue
+        if target_outputs is not None and output_rel not in target_outputs:
+            if (run_dir / output_rel).is_file():
+                outputs.append(output_rel)
+            continue
         template_path = run_dir / template_rel
         if not template_path.exists():
             continue
@@ -782,11 +787,15 @@ def run_generation(
     key, template_rel, output_rel = XML_OUTPUT
     xml_template = run_dir / template_rel
     if should_render(key, document_set) and xml_template.exists():
-        xml_output_path = run_dir / output_rel
-        unresolved[output_rel] = render_xml(xml_template, xml_output_path, render_data)
-        expand_prs_locations(xml_output_path, data)
-        outputs.append(output_rel)
-        templates.append(template_rel)
+        if target_outputs is not None and output_rel not in target_outputs:
+            if (run_dir / output_rel).is_file():
+                outputs.append(output_rel)
+        else:
+            xml_output_path = run_dir / output_rel
+            unresolved[output_rel] = render_xml(xml_template, xml_output_path, render_data)
+            expand_prs_locations(xml_output_path, data)
+            outputs.append(output_rel)
+            templates.append(template_rel)
 
     report_path = run_dir / STANDARD["report"]
     prior_report: dict[str, Any] = {}

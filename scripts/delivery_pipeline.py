@@ -41,6 +41,35 @@ class DeliveryBlockedError(ValueError):
     """Raised when the final client-facing handoff cannot be validated."""
 
 
+def targeted_retry_plan(
+    reference: dict[str, Any],
+    findings: list[dict[str, Any]],
+    outputs: list[str],
+) -> tuple[list[str], list[dict[str, Any]]]:
+    """Return failed artifacts and accepted drafts safe to carry forward.
+
+    Drafts are reusable only when their owning artifact was not implicated by
+    a finding.  This small, pure seam keeps retry selection deterministic and
+    makes it impossible to claim reuse while accidentally reusing a failed
+    target's content.
+    """
+    failed = sorted({
+        str(finding.get("field", "")).split(":", 1)[0]
+        for finding in findings
+        if str(finding.get("field", "")).startswith("output/")
+    })
+    failed_targets = [target for target in failed if target in outputs] or list(outputs)
+    generation = reference.get("generation") if isinstance(reference.get("generation"), dict) else {}
+    drafts = generation.get("drafts", []) if isinstance(generation, dict) else []
+    accepted = [
+        draft for draft in drafts
+        if isinstance(draft, dict)
+        and draft.get("accepted")
+        and draft.get("artifact") not in failed_targets
+    ]
+    return failed_targets, accepted
+
+
 def _write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -479,14 +508,12 @@ def run_delivery_pipeline(
     if report["status"] != "passed" and max_repairs > 0:
         for repair_number in range(1, min(max_repairs, MAX_TARGET_ATTEMPTS - 1) + 1):
             repairs = []
-            failed_targets = sorted({
-                str(finding.get("field", "")).split(":", 1)[0]
+            findings = [
+                finding
                 for review in report.get("review_passes", {}).values()
                 for finding in review.get("findings", [])
-                if str(finding.get("field", "")).startswith("output/")
-            })
-            failed_targets = [target for target in failed_targets if target in outputs] or list(outputs)
-            accepted_drafts = [draft for draft in reference.get("generation", {}).get("drafts", []) if isinstance(draft, dict) and draft.get("accepted") and draft.get("artifact") not in failed_targets]
+            ]
+            failed_targets, accepted_drafts = targeted_retry_plan(reference, findings, outputs)
             if rebuild is not None:
                 try:
                     parameters = inspect.signature(rebuild).parameters
