@@ -176,6 +176,37 @@ class ClinicalDocumentWorkflowTests(unittest.TestCase):
             stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
             self.assertEqual(stored["approval"]["review_file"], "input/attachments/client-edited-source.md")
 
+    def test_approval_records_hash_and_immutable_revision_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.write_run(Path(temporary), self.reference())
+            prepared = prepare_run(run_dir)
+            result = approve_source(run_dir, approved_by="Client Reviewer")
+
+            stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
+            revision_id = stored["approval"]["run_revision"]
+            revision_dir = run_dir / "revisions" / revision_id
+            self.assertEqual(stored["approval"]["approved_source_sha256"], result["source_sha256"])
+            self.assertTrue((revision_dir / "source-of-truth.md").is_file())
+            manifest = json.loads((revision_dir / "generation-manifest.json").read_text(encoding="utf-8"))
+            self.assertEqual(manifest["approved_source"]["sha256"], result["source_sha256"])
+            self.assertEqual(prepared["source_of_truth"], stored["approval"]["review_file"])
+
+    def test_changed_approved_source_invalidates_approval_and_client_handoff(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = self.write_run(Path(temporary), self.reference())
+            prepared = prepare_run(run_dir)
+            approve_source(run_dir, approved_by="Client Reviewer")
+            source_path = run_dir / prepared["source_of_truth"]
+            source_path.write_text(source_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+
+            result = validate_run(run_dir)
+
+            self.assertEqual(result["source_invalidation"]["field"], "approval.approved_source_sha256")
+            self.assertEqual(result["readiness_report"]["status"], "blocked")
+            stored = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
+            self.assertEqual(stored["approval"]["status"], "changes_requested")
+            self.assertTrue((run_dir / "state/source-invalidation.json").is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

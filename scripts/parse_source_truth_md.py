@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from study_type_branches import canonical_study_type, default_document_set, get_path
+from revisions import sha256_file
 
 
 STANDARD_REFERENCE = "reference/study.reference.json"
@@ -277,6 +278,10 @@ def parse_source_truth(
     source["source_of_truth_md"] = rel_source
     source["source_of_truth_status"] = "uploaded_reviewed"
     source["source_of_truth_parsed_at"] = datetime.now(timezone.utc).isoformat()
+    source_hash = sha256_file(source_md)
+    source["source_sha256"] = source_hash
+    if approval_status == "approved":
+        source["approved_source_sha256"] = source_hash
     reference["source"] = source
 
     approval = reference.get("approval")
@@ -287,6 +292,7 @@ def parse_source_truth(
     if approval_status == "approved":
         approval["approved_by"] = approved_by or approval.get("approved_by") or "reviewer"
         approval["approved_at"] = datetime.now(timezone.utc).isoformat()
+        approval["approved_source_sha256"] = source_hash
     else:
         approval["approved_by"] = None
         approval["approved_at"] = None
@@ -301,6 +307,7 @@ def parse_source_truth(
         "warnings": warnings,
         "report": display_path(report_path, run_dir),
         "approval_status": approval_status,
+        "source_sha256": source_hash,
     }
 
 

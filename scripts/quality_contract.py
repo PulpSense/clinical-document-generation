@@ -366,6 +366,7 @@ def validate_source_contract(
     *,
     require_approval: bool = True,
     require_tables: bool = True,
+    require_structured_source: bool = False,
     run_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Validate branch-aware source facts and return an auditable report."""
@@ -395,6 +396,17 @@ def validate_source_contract(
                 sample = _find_table(normalized, "sample_size_evidence")
                 if sample is not None:
                     findings.extend(_table_errors("sample_size_evidence", sample))
+        elif require_structured_source:
+            # Source review must establish the repeated schedule rows before
+            # approval; post-approval adapters may add derived table fields.
+            schedule = _find_table(normalized, "visit_schedule")
+            if schedule is None or isinstance(schedule, str):
+                findings.append({
+                    "field": "procedures.visit_schedule_table",
+                    "issue": "Repeated visit content must be represented as structured rows before approval; prose alone is not sufficient.",
+                    "evidence_required": "Reviewer-provided visit schedule rows with visit number, name, and window.",
+                    "severity": "blocking",
+                })
     findings.extend(conflicts)
     findings.extend(_candidate_conflicts(normalized, _required_inputs(normalized, branch) if branch else []))
     findings.extend(_contamination_findings(normalized))

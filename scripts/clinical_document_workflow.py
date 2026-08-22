@@ -22,6 +22,7 @@ from icf_template_selection import ensure_run_icf_template
 from quality_contract import repair_report_markdown, validate_source_contract
 from parse_source_truth_md import parse_source_truth
 from readiness_contract import readiness_evidence, readiness_report
+from revisions import create_revision, invalidate_changed_source, publish_revision
 from render_templates import run_generation
 from study_type_branches import branch_for_study_type
 
@@ -66,11 +67,15 @@ def validate_run(run_dir: Path, *, require_approval: bool = True) -> dict[str, A
     """
     run_dir = run_dir.resolve()
     _, reference = _load_reference(run_dir)
+    invalidation = invalidate_changed_source(run_dir, reference)
+    if invalidation:
+        reference = json.loads((run_dir / STANDARD_REFERENCE).read_text(encoding="utf-8"))
     report = readiness_report(reference, require_approval=require_approval, run_dir=run_dir)
     return {
         "status": report["status"],
         "stage": "readiness",
         "readiness_report": report,
+        "source_invalidation": invalidation,
         "client_outputs": [],
     }
 
@@ -163,16 +168,23 @@ def prepare_run(run_dir: Path, *, requested_icf_choice: Any = None) -> dict[str,
     """Create one consolidated input request or the approval Markdown."""
     run_dir = run_dir.resolve()
     reference_path, reference = _load_reference(run_dir)
+    invalidation = invalidate_changed_source(run_dir, reference)
+    if invalidation:
+        reference = json.loads(reference_path.read_text(encoding="utf-8"))
     branch = branch_for_study_type((reference.get("meta") or {}).get("study_type"))
     selection = ensure_run_icf_template(run_dir, reference, requested_choice=requested_icf_choice)
     if selection.get("choice"):
         _write_reference(reference_path, reference)
 
     legacy_findings = missing_inputs(reference)
-    # Structured tables and generated protocol prose are post-approval adapters,
-    # not reviewer intake requirements. The intake gate is limited to approved
-    # source facts (plus the branch-specific starred-field check above).
-    contract = validate_source_contract(reference, require_approval=False, require_tables=False)
+    # Repeated source structures are reviewed before approval; generated prose
+    # and format-specific adapters remain post-approval concerns.
+    contract = validate_source_contract(
+        reference,
+        require_approval=False,
+        require_tables=False,
+        require_structured_source=True,
+    )
     findings = _merge_findings(legacy_findings, contract["blocking_findings"])
     if findings:
         _write_input_blockers(run_dir, findings)
@@ -184,6 +196,7 @@ def prepare_run(run_dir: Path, *, requested_icf_choice: Any = None) -> dict[str,
             "missing": findings,
             "source_of_truth": None,
             "client_outputs": [],
+            "source_invalidation": invalidation,
         }
 
     (run_dir / "reference/missing-inputs.md").unlink(missing_ok=True)
@@ -198,6 +211,7 @@ def prepare_run(run_dir: Path, *, requested_icf_choice: Any = None) -> dict[str,
         "source_of_truth": output_path.relative_to(run_dir).as_posix(),
         "field_count": sum(len(rows) for _, rows in section_fields(reference)),
         "client_outputs": [],
+        "source_invalidation": invalidation,
     }
 
 
@@ -205,6 +219,9 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     """Generate and gate the complete Branch Document Set after approval."""
     run_dir = run_dir.resolve()
     reference_path, reference = _load_reference(run_dir)
+    invalidation = invalidate_changed_source(run_dir, reference)
+    if invalidation:
+        return {"status": "blocked", "stage": "approval_gate", "findings": [invalidation], "client_outputs": []}
     # Table adapters are materialized below by _populate_branch_fields.
     contract = validate_source_contract(reference, require_approval=True, require_tables=False, run_dir=run_dir)
     if contract["status"] != "passed":
@@ -235,6 +252,16 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return {"status": "blocked", "stage": "generation", "error": str(exc), "client_outputs": []}
 
+    approval = reference.get("approval") if isinstance(reference.get("approval"), dict) else {}
+    revision_id = approval.get("run_revision")
+    revision = None
+    if revision_id:
+        manifest_path = run_dir / "revisions" / str(revision_id) / "generation-manifest.json"
+        if manifest_path.is_file():
+            revision = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if revision is None:
+        revision = create_revision(run_dir, reference_path, Path(reference["source"]["source_of_truth_file"]))
+    revision_id = revision.get("revision_id") if isinstance(revision, dict) else revision_id
     evidence = readiness_evidence(
         json.loads(reference_path.read_text(encoding="utf-8")),
         pipeline=pipeline,
@@ -244,6 +271,9 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     evidence_path = run_dir / "logs/readiness-evidence.json"
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    client_outputs = pipeline.get("client_outputs", []) if pipeline["status"] == "passed" else []
+    if pipeline["status"] == "passed" and revision_id:
+        publish_revision(run_dir, str(revision_id), client_outputs)
     return {
         "status": "passed" if pipeline["status"] == "passed" else "blocked",
         "stage": "delivery",
@@ -251,7 +281,8 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
         "branch_adapters": adapter_report,
         "delivery_pipeline": pipeline,
         "readiness_evidence": evidence,
-        "client_outputs": pipeline.get("client_outputs", []) if pipeline["status"] == "passed" else [],
+        "run_revision": revision,
+        "client_outputs": client_outputs,
     }
 
 
@@ -273,13 +304,21 @@ def approve_source(
         source_path = run_dir / source_path
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
-    return parse_source_truth(
+    result = parse_source_truth(
         run_dir,
         source_path,
         approval_status="approved",
         approved_by=approved_by,
         reference_path=reference_path,
     )
+    revision = create_revision(run_dir, reference_path, source_path)
+    result["run_revision"] = revision
+    updated = json.loads(reference_path.read_text(encoding="utf-8"))
+    approval = updated.setdefault("approval", {})
+    approval["run_revision"] = revision["revision_id"]
+    approval["revision_path"] = revision["path"]
+    _write_reference(reference_path, updated)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
