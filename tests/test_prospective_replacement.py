@@ -14,6 +14,7 @@ from prospective import (  # noqa: E402
     prospective_contract,
     prospective_batch_plan,
     scoped_batch_input,
+    validate_prs_narrative,
     verify_prospective_sections,
 )
 
@@ -23,20 +24,22 @@ class ProspectiveReplacementTests(unittest.TestCase):
         contract = prospective_contract()
         top_level = [item.number for item in contract if "." not in item.section_id]
         self.assertEqual(top_level, [f"{index}." for index in range(1, 20)])
-        self.assertEqual(len(prospective_batch_plan()), 4)
+        self.assertEqual(len(prospective_batch_plan()), 5)
         self.assertEqual(plan_prospective_batches(), prospective_batch_plan())
 
     def test_batches_expose_only_relevant_approved_field_families(self) -> None:
         batches = prospective_batch_plan()
         self.assertEqual(
             [batch.batch_id for batch in batches],
-            ["protocol-foundations", "protocol-operations", "protocol-analysis-and-oversight", "icf-narrative"],
+            ["protocol-foundations", "protocol-operations", "protocol-analysis-and-oversight", "prs-narrative", "icf-narrative"],
         )
         self.assertNotIn("icf", " ".join(batches[0].approved_field_families).lower())
         self.assertIn("procedures", batches[1].approved_field_families)
         self.assertIn("statistics", batches[2].approved_field_families)
-        self.assertIn("procedures", batches[3].approved_field_families)
-        self.assertNotIn("protocol", batches[3].approved_field_families)
+        self.assertEqual(batches[3].prerequisite_ids, ("protocol-foundations",))
+        self.assertEqual(batches[3].section_ids, ("prs-narrative",))
+        self.assertIn("procedures", batches[4].approved_field_families)
+        self.assertNotIn("protocol", batches[4].approved_field_families)
 
     def test_scoped_batch_input_excludes_unrelated_reference_families(self) -> None:
         reference = {"study": {"title": "Study"}, "objectives": {"primary": "Outcome"}, "procedures": {"assessments": "Visits"}, "statistics": {"analysis_plan": "Descriptive"}, "generated": {"protocol": {"internal": "not a drafting input"}}}
@@ -45,8 +48,13 @@ class ProspectiveReplacementTests(unittest.TestCase):
         self.assertNotIn("generated", scoped)
         scoped["study"]["title"] = "changed"  # type: ignore[index]
         self.assertEqual(reference["study"]["title"], "Study")  # type: ignore[index]
+        prs_scoped = scoped_batch_input({"study": {}, "generated": {"protocol": {"study_design": "accepted"}, "xml": "forbidden"}}, "prs-narrative")
+        self.assertEqual(prs_scoped, {"study": {}, "generated": {"protocol": {"study_design": "accepted"}}})
         with self.assertRaisesRegex(ValueError, "Unknown"):
             scoped_batch_input(reference, "icf")
+        self.assertEqual(validate_prs_narrative({"brief_summary": "Brief", "detailed_description": "Detailed", "xml": "ignored"}), {"brief_summary": "Brief", "detailed_description": "Detailed"})
+        with self.assertRaisesRegex(ValueError, "XML"):
+            validate_prs_narrative({"brief_summary": "<arm_group />"})
 
     def test_merge_and_verify_are_contract_ordered_and_fail_closed(self) -> None:
         drafts = [
@@ -64,7 +72,7 @@ class ProspectiveReplacementTests(unittest.TestCase):
         workflow = contract["replacement_workflow"]
         self.assertEqual(workflow["contract_version"], "prospective-1-19-v1")
         self.assertEqual(len(workflow["section_ids"]), len(prospective_contract()))
-        self.assertEqual(len(workflow["drafting_batches"]), 4)
+        self.assertEqual(len(workflow["drafting_batches"]), 5)
         self.assertEqual(workflow["candidate_visibility"], "internal_until_complete_branch_package")
 
 

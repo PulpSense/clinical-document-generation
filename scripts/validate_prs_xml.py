@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from prs_xml_contract import compare_structure
+
 
 STANDARD_REFERENCE = "reference/study.reference.json"
 STANDARD_XML = "output/study.xml"
 STANDARD_REPORT = "logs/prs-xml-validation.json"
+DEFAULT_STRUCTURAL_REFERENCE = Path(__file__).resolve().parents[1] / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml"
 TOKEN_RE = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]\(\)&]*\}")
 FORBIDDEN_EXACT = {"none", "n/a", "na", "http://", "https://"}
 ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -101,6 +104,8 @@ def validate(xml_path: Path, reference: dict) -> tuple[list[str], dict[str, Any]
         return [f"XML parse error: {exc}"], {"unresolved": unresolved}
 
     root = tree.getroot()
+    structural_errors = compare_structure(DEFAULT_STRUCTURAL_REFERENCE, xml_path)
+    errors.extend(f"structural contract: {error}" for error in structural_errors)
     study = None
     for element in root.iter():
         if element.tag == "clinical_study":
@@ -199,6 +204,10 @@ def validate(xml_path: Path, reference: dict) -> tuple[list[str], dict[str, Any]
         "unresolved": unresolved,
         "rendered_counts": counts,
         "expected_counts": expected,
+        "structural_contract": {
+            "reference": str(DEFAULT_STRUCTURAL_REFERENCE),
+            "passed": not structural_errors,
+        },
     }
     return errors, metadata
 

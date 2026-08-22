@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<clinical_study>
+  <id_info><nct_id>{studyUid}</nct_id></id_info>
+  <brief_title>Defective generated example</brief_title>
+  <intervention><intervention_name>Collapsed block</intervention_name></intervention>
+  <primary_outcome><outcome_measure>Outcome</outcome_measure></primary_outcome>
+</clinical_study>

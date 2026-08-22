@@ -25,6 +25,7 @@ class IcfReplacementTests(unittest.TestCase):
             "protocol-foundations",
             "protocol-operations",
             "protocol-analysis-and-oversight",
+            "prs-narrative",
             "icf-narrative",
         ])
         self.assertEqual(unified_icf_batch(), batches[-1])

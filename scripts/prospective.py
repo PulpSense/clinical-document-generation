@@ -8,6 +8,7 @@ keeps ownership of contract order, structural validation, and atomic delivery.
 from __future__ import annotations
 
 import copy
+import re
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
@@ -71,6 +72,9 @@ class ProspectiveDraftingBatch:
     prerequisite_ids: tuple[str, ...] = ()
 
 
+PRS_NARRATIVE_FIELDS = ("brief_summary", "detailed_description")
+
+
 def prospective_contract() -> tuple[SectionContract, ...]:
     return PROSPECTIVE_SECTIONS
 
@@ -93,6 +97,12 @@ def prospective_batch_plan() -> tuple[ProspectiveDraftingBatch, ...]:
             ("analysis-plan", "sample-size", "confidentiality-publication", "quality-safety", "ethics", "confidentiality", "financial-injury", "endpoint-criteria", "risks-benefits"),
             ("statistics", "safety", "ethics", "confidentiality", "risks_benefits", "endpoints", "procedures", "population"),
             ("protocol-foundations", "protocol-operations"),
+        ),
+        ProspectiveDraftingBatch(
+            "prs-narrative",
+            ("prs-narrative",),
+            ("study", "objectives", "design", "endpoints", "generated"),
+            ("protocol-foundations",),
         ),
         _icf_batch(),
     )
@@ -132,11 +142,35 @@ def scoped_batch_input(
         selected = next((item for item in prospective_batch_plan() if item.batch_id == batch), None)
     if selected is None or not isinstance(selected, ProspectiveDraftingBatch):
         raise ValueError(f"Unknown Prospective drafting batch: {batch}")
-    return {
+    scoped = {
         family: copy.deepcopy(reference[family])
         for family in selected.approved_field_families
         if family in reference
     }
+    if selected.batch_id == "prs-narrative":
+        # The narrative task receives source facts and accepted foundations,
+        # never XML templates, field maps, or a choice of XML taxonomy.
+        generated = scoped.get("generated")
+        if isinstance(generated, dict):
+            scoped["generated"] = {"protocol": copy.deepcopy(generated.get("protocol", {}))}
+    return scoped
+
+
+def validate_prs_narrative(draft: Mapping[str, object]) -> dict[str, str]:
+    """Accept only the two prose values the PRS batch is allowed to draft."""
+    if not isinstance(draft, Mapping):
+        raise ValueError("PRS narrative draft must be a mapping")
+    accepted: dict[str, str] = {}
+    for field in PRS_NARRATIVE_FIELDS:
+        value = draft.get(field, "")
+        if value is None:
+            value = ""
+        if not isinstance(value, str):
+            raise ValueError(f"PRS narrative field {field} must be text")
+        if re.search(r"</?[A-Za-z_][^>]*>", value):
+            raise ValueError("PRS narrative batch must not emit XML markup")
+        accepted[field] = value.strip()
+    return accepted
 
 
 def merge_prospective_drafts(drafts: Iterable[SectionDraft]) -> tuple[SectionDraft, ...]:
@@ -168,6 +202,6 @@ def verify_prospective_sections(drafts: Iterable[SectionDraft]) -> list[dict[str
 
 __all__ = [
     "PROSPECTIVE_SECTIONS", "ProspectiveDraftingBatch", "prospective_contract",
-    "prospective_batch_plan", "branch_batch_plan", "scoped_batch_input", "merge_prospective_drafts", "verify_prospective_sections",
+    "prospective_batch_plan", "branch_batch_plan", "scoped_batch_input", "validate_prs_narrative", "PRS_NARRATIVE_FIELDS", "merge_prospective_drafts", "verify_prospective_sections",
     "RetryLedger", "reuse_accepted_drafts", "verify_rendered_pages",
 ]
