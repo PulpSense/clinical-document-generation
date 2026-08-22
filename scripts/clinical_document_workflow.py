@@ -17,7 +17,7 @@ from create_source_truth_md import (
     section_fields,
     update_source_metadata,
 )
-from delivery_pipeline import run_delivery_pipeline
+from delivery_pipeline import bind_generation_manifest, run_delivery_pipeline, verify_branch_document_set
 from icf_template_selection import ensure_run_icf_template
 from quality_contract import repair_report_markdown, validate_source_contract
 from parse_source_truth_md import parse_source_truth
@@ -307,6 +307,14 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     evidence_path = run_dir / "logs/readiness-evidence.json"
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if pipeline["status"] == "passed" and revision_id and branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] == "Prospective":
+        revision_manifest_path = run_dir / "revisions" / str(revision_id) / "generation-manifest.json"
+        revision["manifest"] = bind_generation_manifest(
+            run_dir,
+            revision_manifest_path,
+            generation["outputs"],
+            pipeline.get("branch_package") or verify_branch_document_set(run_dir, generation["outputs"], require_renderer=require_renderer),
+        )
     client_outputs = pipeline.get("client_outputs", []) if pipeline["status"] == "passed" else []
     replacement_workflow = None
     if branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] in {"Retrospective", "Prospective", "Ambispective"}:
