@@ -14,7 +14,7 @@ from acceptance_corpus import (  # noqa: E402
     drafting_task_budget,
     verification_task_budget,
 )
-from clinical_document_workflow import branch_contract  # noqa: E402
+from workflow import branch_contract  # noqa: E402
 from prs_xml_contract import compare_structure  # noqa: E402
 
 

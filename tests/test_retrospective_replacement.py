@@ -18,7 +18,7 @@ from retrospective import (  # noqa: E402
 )
 from drafting import plan_retrospective_batches  # noqa: E402
 from delivery_gates import audit_retrospective_visual_acceptance  # noqa: E402
-from clinical_document_workflow import branch_contract  # noqa: E402
+from workflow import branch_contract  # noqa: E402
 
 
 class RetrospectiveReplacementTests(unittest.TestCase):

@@ -35,13 +35,13 @@ An initial request that provides study source material and asks to "create", "ge
 Before generating the reviewer-facing source Markdown, run:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 If blocking inputs are reported, ask for those inputs before creating the structured document. Ask for the missing or conflicting starred fields, using `references/starred-fillout-required-inputs.md` for prospective/ambispective or `references/retrospective-required-inputs.md` for retrospective. When the preflight passes, generate the source Markdown:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 Present the generated source Markdown path recorded in `approval.review_file` in the active channel or attach it if the channel supports files. The Markdown includes stable hidden `field` markers so the parser can map reviewer edits back into JSON. It must contain source inputs only, equivalent to the old n8n form fields; generated protocol, ICF, short-document, and XML prose should not appear in it.
@@ -66,11 +66,11 @@ If the reviewer sends corrections as text or audio instead of editing the Markdo
 When the reviewer approves the source Markdown:
 
 ```bash
-python3 scripts/clinical_document_workflow.py \
+python3 scripts/workflow.py \
   --run-dir <run-dir> \
   --stage approve \
   --approved-by "<reviewer>"
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage validate
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
 ```
 
 This parse step is mandatory even when the reviewer did not upload a separate edited file. The reviewer may have edited the saved source Markdown in place after it was presented, and `reference/study.reference.json` must be regenerated from the current Markdown before final narrative generation, mapper checks, validation, or rendering. Review `reference/review-parse-report.md`; if parser warnings or missing required inputs remain, stop and resolve them before continuing.
@@ -80,14 +80,14 @@ Do not edit the approved source Markdown before parsing it. If a mapped value lo
 If approval must be recorded after a separate parsed correction pass, use:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
+python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
 ```
 
 Then final validation and rendering must use approval gating:
 
 ```bash
 python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 Before running the mapper check, generate the branch-specific n8n/OpenAI narrative fields from the approved input reference and save them under `generated`. Do not mark final outputs complete if validation fails, unresolved placeholders remain, required generated fields remain blank, or branch-blocking review items remain. Optional and generic review notes do not block in any branch.

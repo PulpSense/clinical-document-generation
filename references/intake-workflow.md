@@ -73,13 +73,13 @@ The exact required fields are ultimately determined by template placeholders. Th
 After the extraction pass, run:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 If the preflight passes, create and present the named source Markdown:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 After presenting the generated source Markdown, stop and wait for reviewer approval. If the reviewer uploads an edited source Markdown, preserve it in the run and let the public workflow parse it during approval. Continue to final generation only after the source Markdown is approved and approval is recorded.

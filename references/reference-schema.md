@@ -211,7 +211,7 @@ python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
 For ambispective protocol, ICF, and XML variables from the existing workflow, run:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 For retrospective protocol templates from the existing workflow, run:

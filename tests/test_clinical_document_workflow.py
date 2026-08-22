@@ -11,7 +11,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from clinical_document_workflow import approve_source, generate_approved_run, prepare_run, validate_run  # noqa: E402
+from workflow import approve_source, generate_approved_run, prepare_run, validate_run  # noqa: E402
 from tests.test_quality_contract import QualityContractTests  # noqa: E402
 
 

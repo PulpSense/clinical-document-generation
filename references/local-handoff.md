@@ -39,7 +39,7 @@ If `reference/missing-inputs.md` lists blocking inputs, ask the reviewer for the
 Send or attach the generated file shown by the command output, normally `reference/source-of-truth--<protocol>--<study-slug>.md`. The reviewer edits values between field marker comments or approves it as-is. If an edited Markdown file is uploaded, save it under `input/attachments/` and parse it:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir runs/<study-slug> --stage prepare
+python3 scripts/workflow.py --run-dir runs/<study-slug> --stage prepare
 The current edited file is parsed by the public workflow during approval.
 ```
 
@@ -58,31 +58,31 @@ Confirm `meta.study_type` and `meta.document_set` before rendering:
 6. Validate fields:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir runs/<study-slug> --stage validate
+python3 scripts/workflow.py --run-dir runs/<study-slug> --stage validate
 ```
 
 7. Generate outputs:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir runs/<study-slug> --stage generate
+python3 scripts/workflow.py --run-dir runs/<study-slug> --stage generate
 ```
 
 8. Validate PRS XML for prospective and ambispective XML runs:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir runs/<study-slug> --stage generate
+python3 scripts/workflow.py --run-dir runs/<study-slug> --stage generate
 ```
 
 9. After DOCX generation, try the platform-aware PDF exporter:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir runs/<study-slug> --stage generate --require-renderer
+python3 scripts/workflow.py --run-dir runs/<study-slug> --stage generate --require-renderer
 ```
 
 Automatic mode tries Pages on macOS, Word on Windows, and LibreOffice on Linux. If the report status is `unavailable`, retain the generated DOCX, skip PDF/TOC commands, and disclose the QA limitation. If the report status is `exported` and the DOCX has a static index or table of contents, refresh and audit it:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir runs/<study-slug> --stage generate --require-renderer
+python3 scripts/workflow.py --run-dir runs/<study-slug> --stage generate --require-renderer
 ```
 
 If the refresh report updates page values or alignment, re-render before the final audit. When a renderer is available, do not ship while `toc-audit.json` has page mismatches, missing headings, or alignment mismatches.

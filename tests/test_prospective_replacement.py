@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from clinical_document_workflow import branch_contract  # noqa: E402
+from workflow import branch_contract  # noqa: E402
 from drafting import plan_prospective_batches  # noqa: E402
 from prospective import (  # noqa: E402
     SectionDraft,

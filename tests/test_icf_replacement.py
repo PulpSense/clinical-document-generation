@@ -9,7 +9,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from clinical_document_workflow import branch_contract  # noqa: E402
+from workflow import branch_contract  # noqa: E402
 from icf import (  # noqa: E402
     audit_icf_document,
     icf_contract,

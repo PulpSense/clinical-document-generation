@@ -48,7 +48,7 @@ from study_type_branches import (  # noqa: E402
     validate_branch,
 )
 from validate_reference import blocking_review_items, main as validate_reference_main  # noqa: E402
-from clinical_document_workflow import branch_contract, validated_client_outputs  # noqa: E402
+from workflow import branch_contract, validated_client_outputs  # noqa: E402
 
 
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -333,6 +333,17 @@ class TocTests(unittest.TestCase):
 
 
 class RepositoryContractTests(unittest.TestCase):
+    def test_replacement_has_one_public_workflow_and_six_python_ownership_modules(self) -> None:
+        expected = {"workflow.py", "contracts.py", "drafting.py", "rendering.py", "quality.py", "prs_xml.py"}
+        self.assertTrue(expected.issubset({path.name for path in (REPO_ROOT / "scripts").glob("*.py")}))
+        self.assertFalse((REPO_ROOT / "scripts/clinical_document_workflow.py").exists())
+        references = "\n".join(
+            path.read_text(encoding="utf-8")
+            for path in (REPO_ROOT / "README.md", REPO_ROOT / "SKILL.md")
+        )
+        self.assertNotIn("python3 scripts/clinical_document_workflow.py", references)
+        self.assertNotIn("import clinical_document_workflow", references)
+
     def test_scripts_directory_contains_python_only(self) -> None:
         forbidden = {".js", ".mjs", ".cjs", ".applescript"}
         offenders = [path.name for path in SCRIPTS_DIR.iterdir() if path.suffix in forbidden]

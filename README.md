@@ -21,7 +21,7 @@ Do not install only `SKILL.md`. The skill requires the bundled `assets/`, `refer
 
 Quality and delivery entry points:
 
-- `scripts/clinical_document_workflow.py` is the only public workflow seam. It
+- `scripts/workflow.py` is the only public workflow seam. It
   owns prepare, approval, readiness, generation, and delivery for a complete
   conversational run.
 - `scripts/quality_contract.py` validates branch-aware source completeness,
@@ -41,8 +41,9 @@ The scripts do not call OpenAI directly. Hermes should use `gpt-5.5` for the age
 Client integrations should import `scripts/workflow.py` and use only its four
 Run Lifecycle operations: `prepare`, `approve`, `validate`, and `generate`.
 The six replacement ownership modules are `contracts`, `drafting`, `rendering`,
-`quality`, and `prs_xml`, alongside `workflow`; existing integrations may keep
-using `clinical_document_workflow.py` while migration is in progress.
+`quality`, and `prs_xml`, alongside `workflow`. The former
+`clinical_document_workflow.py` compatibility entrypoint has been removed;
+callers must use the public seam.
 
 ## Access Check
 
@@ -225,9 +226,9 @@ For real studies, the Hermes agent must follow this sequence:
 10. Generate the complete branch document set through the public seam:
 
     ```bash
-    python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
-    python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage approve --approved-by "<client>"
-    python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+    python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
+    python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<client>"
+    python3 scripts/workflow.py --run-dir <run-dir> --stage generate
     ```
 
     The final command maps the approved source, generates the required branch

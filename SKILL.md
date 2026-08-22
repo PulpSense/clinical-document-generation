@@ -45,12 +45,12 @@ any unstructured input
 
 Run script commands from this skill folder, or use absolute paths to the skill's `scripts/` files.
 
-Use `scripts/clinical_document_workflow.py` as the only public workflow seam.
+Use `scripts/workflow.py` as the only public workflow seam.
 The other scripts are internal adapters; the agent invokes them through this
 workflow and the client does not need to know or run them directly.
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 This returns exactly one of two pre-generation states: `blocked` with a single
@@ -59,7 +59,7 @@ reviewer-facing Source-of-Truth Markdown. After the client explicitly approves
 that Markdown, run:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 The generate stage validates the recorded Markdown file, populates the branch
@@ -70,7 +70,7 @@ When the client approves the Markdown, record that approval through the same
 workflow seam so the current file is parsed before generation:
 
 ```bash
-python3 scripts/clinical_document_workflow.py \
+python3 scripts/workflow.py \
   --run-dir <run-dir> --stage approve --approved-by "<client>"
 ```
 
@@ -85,7 +85,7 @@ renders, validates, and hands off the required documents.
 Before generation, the agent may request one consolidated readiness report:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage validate
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
 ```
 
 Readiness is defined by `scripts/readiness_contract.py`. Future findings are
@@ -115,7 +115,7 @@ explicitly redrawn destination.
 7. Read `references/source-of-truth-md.md`, then run the public workflow in `prepare` mode. It owns the client/source-input preflight before creating any structured source document:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 For clinical study inputs, stop only when a starred Fillout field is missing or
@@ -129,7 +129,7 @@ one concise consolidated checklist to the reviewer.
 8. When required source inputs are complete and any required ICF template choice is recorded, the public workflow creates the reviewer-facing structured Markdown document:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 Present the generated Markdown file recorded in `approval.review_file`, then stop. This Markdown file is the editable equivalent of the old n8n intake form: it should contain client-provided study facts and regulatory inputs only. It must not include AI-generated introductions, methods, goals, ICF language, summary prose, XML narrative text, or `template_fields`.
@@ -141,7 +141,7 @@ When presenting this file, return or attach only the generated source Markdown. 
 Do not continue to final protocol, ICF, XML, short-document, TOC, or render-QA generation in the same turn merely because the user originally asked to create or generate clinical documents. The reviewer may approve it as-is or upload an edited copy. If an edited Markdown file is uploaded, preserve it under `input/attachments/`, then parse it:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 After this point, the latest parsed source-of-truth Markdown is authoritative. Do not reinterpret the original messy inputs unless the reviewer provides additional corrections. Do not repair apparent typos or inconsistencies in mapped Markdown values unless they technically break the workflow as described in the source-of-truth authority rule above.
@@ -149,7 +149,7 @@ After this point, the latest parsed source-of-truth Markdown is authoritative. D
 9. Read `references/approval-loop.md`. Only after the reviewer clearly approves the generated or edited source Markdown in a separate approval action, parse the saved Markdown file from disk before recording or relying on approval. This is required even when the reviewer did not upload a separate edited file, because the reviewer may have edited the generated source Markdown in place after it was presented:
 
 ```bash
-python3 scripts/clinical_document_workflow.py \
+python3 scripts/workflow.py \
   --run-dir <run-dir> \
   --stage approve \
   --approved-by "<reviewer>"
@@ -174,7 +174,7 @@ For prospective runs, read `references/n8n-prospective-protocol-icf-xml.md`. For
 For prospective and ambispective runs with XML, also read `references/prs-xml.md`; the public workflow builds and validates PRS XML internally.
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 The internal PRS adapter reports all PRS gaps and the subset that corresponds
@@ -190,7 +190,7 @@ gap remains and keeps nonblocking diagnostics as internal evidence.
 13. Validate the reference file and active branch templates. Use `--require-approval` for final output generation:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage validate
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
 ```
 
 With `--require-approval`, validation also runs the branch Content Completeness Gate. If a Delivery Gate fails, inspect `reference/repair-report.md`; it explains which Study-Specific Body fields, Data-Driven Tables, or other branch-required elements must be repaired before the Generated Protocol, Generated ICF, or Generated PRS XML is ready for delivery.
@@ -204,13 +204,13 @@ python3 --version
 15. Generate outputs. Use `--require-approval` for final outputs:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 16. For prospective and ambispective PRS XML runs, validate the rendered XML:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 17. DOCX generation must never depend on a desktop office application. The
@@ -221,7 +221,7 @@ internal QA evidence. Use `--require-renderer` on the public `generate` stage
 when strict renderer-based QA is required:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate --require-renderer
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate --require-renderer
 ```
 
 The workflow records renderer availability and keeps renderer-unavailable QA
@@ -232,7 +232,7 @@ contents, the workflow refreshes page values, rerenders, and audits alignment:
 
 ```bash
 
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate --require-renderer
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate --require-renderer
 ```
 
 If the internal TOC report records changes, the workflow rerenders before its final audit. When a renderer is available, do not present a DOCX with a static index/TOC as visually verified unless the audit reports zero page mismatches, zero missing headings, and zero alignment mismatches.

@@ -73,7 +73,7 @@ python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
 For ambispective protocol, ICF, and XML runs, generate them with:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage generate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 Do not manually duplicate clinical facts into `template_fields`; derive them from the reviewed reference and generated module outputs.
@@ -91,7 +91,7 @@ templates/short.template.docx
 For prospective and ambispective ICF output, the run must record `meta.icf_template` before source-of-truth generation. `Advarra` selects the branch-specific Advarra asset; `Sterling` selects the shared `sterling-icf.template.docx` asset. Apply a reviewer choice with:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare --icf-choice <advarra|sterling>
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare --icf-choice <advarra|sterling>
 ```
 
 The command always writes the selected template to the standard run path `templates/icf.template.docx`, so downstream validation and rendering remain branch-independent.

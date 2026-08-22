@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from clinical_document_workflow import branch_contract as get_branch_contract
+from workflow import branch_contract as get_branch_contract
 from retrospective import RETROSPECTIVE_SECTIONS, retrospective_contract
 from prospective import PROSPECTIVE_SECTIONS, prospective_contract
 from quality_contract import validate_source_contract

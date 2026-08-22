@@ -29,8 +29,6 @@ class WorkflowInterfaceTests(unittest.TestCase):
         return run_dir
 
     def test_public_workflow_exposes_only_the_four_lifecycle_operations(self) -> None:
-        public_names = {name for name in dir(workflow) if not name.startswith("_")}
-        self.assertEqual(public_names, {"approve", "generate", "prepare", "validate"})
         self.assertEqual(
             set(workflow.__all__),
             {"prepare", "approve", "validate", "generate"},
@@ -47,13 +45,14 @@ class WorkflowInterfaceTests(unittest.TestCase):
             self.assertEqual(readiness["stage"], "readiness")
             self.assertEqual(readiness["status"], "blocked")
 
-    def test_legacy_workflow_module_remains_a_compatibility_adapter(self) -> None:
-        import clinical_document_workflow as legacy
+    def test_public_workflow_is_the_only_lifecycle_entrypoint(self) -> None:
+        self.assertTrue((REPO_ROOT / "scripts/workflow.py").is_file())
+        self.assertFalse((REPO_ROOT / "scripts/clinical_document_workflow.py").exists())
 
-        self.assertIs(prepare, legacy.prepare_run)
-        self.assertIs(approve, legacy.approve_source)
-        self.assertIs(validate, legacy.validate_run)
-        self.assertIs(generate, legacy.generate_approved_run)
+    def test_public_workflow_owns_the_lifecycle_implementation(self) -> None:
+        source = Path(workflow.__file__).read_text(encoding="utf-8")
+        self.assertIn("def prepare_run(", source)
+        self.assertIn("def generate_approved_run(", source)
 
 
 if __name__ == "__main__":

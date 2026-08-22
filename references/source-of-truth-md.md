@@ -44,7 +44,7 @@ The ICF template choice must remain internal in `meta.icf_template` and must not
 Before creating the named source-of-truth Markdown, run:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 If the command reports missing inputs, do not create the structured Markdown. Send `reference/missing-inputs.md` or summarize the missing source fields to the reviewer, then update the draft reference after the reviewer provides the missing information. Do not ask the reviewer to provide AI-generated introductions, methods, ICF language, summary prose, or XML narrative fields.
@@ -52,7 +52,7 @@ If the command reports missing inputs, do not create the structured Markdown. Se
 Only create the structured Markdown when the preflight passes:
 
 ```bash
-python3 scripts/clinical_document_workflow.py --run-dir <run-dir> --stage prepare
+python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 This writes `reference/source-of-truth--<protocol>--<study-slug>.md` by default and records the exact path in `source.source_of_truth_file`, `source.source_of_truth_md`, and `approval.review_file` in `reference/study.reference.json`.
