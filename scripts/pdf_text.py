@@ -446,6 +446,29 @@ def extract_pdf_pages(path: Path) -> list[str]:
         page_object = objects[number]
         fonts = _page_fonts(page_object, objects)
         pages.append(_extract_content_text(_page_content(page_object, objects), fonts))
+    if pages and not any(any(ord(char) < 9 for char in page) for page in pages):
+        return pages
+    # LibreOffice may emit a valid PDF with a font encoding that cannot be
+    # recovered from the standard-library parser.  Prefer an installed PDF
+    # text engine as a compatibility fallback; the core workflow still has no
+    # third-party runtime requirement.
+    try:
+        import fitz  # type: ignore
+
+        with fitz.open(path) as document:
+            fallback = [page.get_text() for page in document]
+        if fallback:
+            return fallback
+    except (ImportError, OSError, RuntimeError):
+        pass
+    try:
+        from pypdf import PdfReader  # type: ignore
+
+        fallback = [(page.extract_text() or "") for page in PdfReader(str(path)).pages]
+        if fallback:
+            return fallback
+    except (ImportError, OSError, ValueError):
+        pass
     if not pages:
         raise ValueError("The PDF does not contain extractable pages.")
     return pages

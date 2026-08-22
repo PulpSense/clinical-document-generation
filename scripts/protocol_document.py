@@ -328,6 +328,48 @@ def _ensure_section4_toc_entry(document_xml: str) -> str:
     return document_xml
 
 
+def _toc_field() -> str:
+    """Add an updateable Word TOC field beside the cached static TOC.
+
+    The static rows remain the portable cached display used by renderers that
+    do not update fields.  Word can update the real field on open, and the
+    delivery pipeline audits the cached rows after final pagination.
+    """
+    return (
+        '<w:p><w:pPr><w:rPr><w:vanish/></w:rPr></w:pPr>'
+        '<w:r><w:fldChar w:fldCharType="begin" w:fldLock="true"/></w:r>'
+        '<w:r><w:instrText xml:space="preserve"> TOC \\o "1-3" \\h \\z \\u </w:instrText></w:r>'
+        '<w:r><w:fldChar w:fldCharType="separate"/></w:r>'
+        '<w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>'
+    )
+
+
+def _ensure_real_toc_field(document_xml: str) -> str:
+    """Store a locked, updateable TOC field beside the cached TOC."""
+    field = _toc_field()
+    if re.search(r"<w:instrText[^>]*>\s*TOC\b", document_xml, re.I):
+        return document_xml
+    matches = list(PARAGRAPH_RE.finditer(document_xml))
+    for match in matches:
+        if "TABLE OF CONTENTS" in _paragraph_text(match.group()).upper():
+            end = match.end()
+            return document_xml[:end] + field + document_xml[end:]
+    return document_xml
+
+
+def _ensure_update_fields(members: dict[str, bytes]) -> dict[str, bytes]:
+    """Tell Word to refresh fields when the document is opened."""
+    name = "word/settings.xml"
+    settings = members.get(name)
+    if not settings:
+        return members
+    text = settings.decode("utf-8")
+    if "updateFields" not in text:
+        text = text.replace("</w:settings>", '<w:updateFields w:val="true"/></w:settings>')
+    members[name] = text.encode("utf-8")
+    return members
+
+
 def _strip_embedded_fonts(members: dict[str, bytes]) -> dict[str, bytes]:
     clean = {
         name: data
@@ -399,12 +441,14 @@ def render_protocol_docx(template_path: Path, output_path: Path, reference: dict
             members = {item.filename: archive.read(item.filename) for item in archive.infolist()}
         document = members["word/document.xml"].decode("utf-8")
         document = _ensure_section4_toc_entry(document)
+        document = _ensure_real_toc_field(document)
         document, legacy_body_removed = _retain_template_shell(document)
         members["word/document.xml"] = _inject_body(
             document, structured_body(model, _document_content_width(document))
         ).encode("utf-8")
         members = _strip_embedded_fonts(members)
         members = _ensure_footer(members)
+        members = _ensure_update_fields(members)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as archive:
             for name, data in members.items():
@@ -423,4 +467,5 @@ def render_protocol_docx(template_path: Path, output_path: Path, reference: dict
         "package_size_bytes": output_path.stat().st_size,
         "has_header": any(name.startswith("word/header") for name in members),
         "has_footer": any(name.startswith("word/footer") for name in members),
+        "toc_field": True,
     }

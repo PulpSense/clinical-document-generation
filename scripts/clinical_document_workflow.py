@@ -290,7 +290,16 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
             run_dir,
             generation["outputs"],
             require_source_contract=True,
-            require_renderer=require_renderer,
+            # A complete public delivery is a visual certification.  The
+            # lower-level renderer remains optional for structural generation,
+            # but the Branch Document Set cannot be ready without evidence.
+            require_renderer=True,
+            rebuild=lambda: run_generation(
+                run_dir,
+                reference_path,
+                require_approval=True,
+                require_source_contract=True,
+            ),
         )
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return {"status": "blocked", "stage": "generation", "error": str(exc), "client_outputs": []}

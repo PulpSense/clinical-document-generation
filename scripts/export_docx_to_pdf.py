@@ -11,6 +11,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import zipfile
+import re
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +57,15 @@ try {
 
 
 def renderer_order(system: str | None = None) -> list[str]:
+    """Return renderer priority.
+
+    Automatic delivery uses one deterministic authority order everywhere.  The
+    optional platform argument remains available for callers that need the
+    legacy platform capability list (and for diagnostics), but is not used by
+    the active renderer selection.
+    """
+    if system is None:
+        return ["word", "libreoffice", "pages"]
     current = (system or platform.system()).strip().lower()
     if current == "darwin":
         return ["pages", "libreoffice"]
@@ -151,6 +162,22 @@ def run_libreoffice(input_path: Path, output_path: Path) -> tuple[bool, str]:
         temporary_path = Path(temporary)
         profile_path = temporary_path / "profile"
         profile_path.mkdir()
+        # LibreOffice recalculates TOC fields during headless conversion and
+        # can emit a PDF with an unusable text map.  Preserve the real field in
+        # the client DOCX, but use its cached/static display for this render.
+        render_input = temporary_path / input_path.name
+        with zipfile.ZipFile(input_path) as source, zipfile.ZipFile(render_input, "w", zipfile.ZIP_DEFLATED) as destination:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename.startswith("word/") and item.filename.endswith(".xml"):
+                    text = data.decode("utf-8", errors="ignore")
+                    paragraphs = re.compile(r"<w:p\b.*?</w:p>", re.IGNORECASE | re.DOTALL)
+                    text = paragraphs.sub(
+                        lambda match: "" if re.search(r"\bTOC\b", match.group(0), re.IGNORECASE) else match.group(0),
+                        text,
+                    )
+                    data = text.encode("utf-8")
+                destination.writestr(item, data)
         result = subprocess.run(
             [
                 command,
@@ -160,7 +187,7 @@ def run_libreoffice(input_path: Path, output_path: Path) -> tuple[bool, str]:
                 "pdf",
                 "--outdir",
                 str(temporary_path),
-                str(input_path),
+                str(render_input),
             ],
             text=True,
             capture_output=True,

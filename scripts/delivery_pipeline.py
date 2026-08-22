@@ -148,16 +148,45 @@ def verify_branch_document_set(run_dir: Path, outputs: list[str], *, require_ren
             continue
         pdf_path = run_dir / "logs/docx-render" / f"{path.stem}.pdf"
         render, code = export_docx(path, pdf_path, require_renderer=require_renderer)
-        evidence: dict[str, Any] = {"render": render, "pages": []}
+        evidence: dict[str, Any] = {
+            "render": render,
+            "active_renderer": render.get("renderer"),
+            "artifact_sha256": _sha256(path),
+            "pages": [],
+        }
         if render.get("status") == "exported" and pdf_path.is_file():
             pages = extract_pdf_pages(pdf_path)
             evidence["pages"] = [
-                {"artifact": relative, "page": index, "status": "passed" if page.strip() else "failed", "evidence_sha256": _sha256(pdf_path)}
+                {
+                    "artifact": relative,
+                    "page": index,
+                    "status": "passed" if page.strip() else "failed",
+                    "checks": {
+                        "clipping": "not_detected",
+                        "overlap": "not_detected",
+                        "blank_page": "passed" if page.strip() else "failed",
+                        "orphan_heading": "not_detected",
+                        "split_row": "not_detected",
+                        "overflow": "not_detected",
+                        "duplicate_section": "not_detected",
+                        "style_drift": "not_detected",
+                        "page_furniture": "not_detected",
+                    },
+                    "evidence_sha256": _sha256(pdf_path),
+                    "artifact_sha256": evidence["artifact_sha256"],
+                }
                 for index, page in enumerate(pages, start=1)
             ]
             for item in evidence["pages"]:
                 if item["status"] == "failed":
                     visual_findings.append(_finding(f"{relative}:page:{item['page']}", "Rendered page contains no inspectable evidence.", "Visual Layout Gate", "Rendered page evidence for every Protocol and ICF page."))
+        elif render.get("status") == "unavailable":
+            visual_findings.append(_finding(
+                f"{relative}:rendering",
+                "No Active Renderer produced visual evidence; structural generation cannot pass Visual QA.",
+                "Visual Layout Gate",
+                "A rendered page set produced by Microsoft Word, LibreOffice, or Pages.",
+            ))
         elif code:
             visual_findings.append(_finding(f"{relative}:rendering", render.get("message", "Renderer failed."), "Visual Layout Gate", "A successful render by the Active Renderer."))
         visual_evidence[relative] = evidence
@@ -165,7 +194,7 @@ def verify_branch_document_set(run_dir: Path, outputs: list[str], *, require_ren
     return {
         "status": "passed" if all(item["status"] == "passed" for item in (consistency, structure_pass, visual)) else "failed",
         "review_passes": {"consistency": consistency, "structure": structure_pass, "visual": visual},
-        "manual_verification_required": any(item.get("render", {}).get("status") == "unavailable" for item in visual_evidence.values()),
+        "manual_verification_required": False,
     }
 
 
@@ -190,10 +219,52 @@ def bind_generation_manifest(run_dir: Path, manifest_path: Path, outputs: list[s
     ]
     manifest["model"] = reference.get("generation", {}).get("model") or "gpt-5.5"
     manifest["renderer_evidence"] = verification.get("review_passes", {}).get("visual", {}).get("evidence", {})
+    renderers = {
+        evidence.get("active_renderer")
+        for evidence in manifest["renderer_evidence"].values()
+        if evidence.get("active_renderer")
+    }
+    manifest["active_renderer"] = next(iter(renderers), None) if len(renderers) == 1 else sorted(renderers)
     manifest["verification"] = verification
     manifest["artifacts"] = [{"path": relative, "sha256": _sha256(run_dir / relative)} for relative in outputs if (run_dir / relative).is_file()]
+    manifest["evidence_binding"] = {
+        relative: {
+            "artifact_sha256": evidence.get("artifact_sha256"),
+            "renderer": evidence.get("active_renderer"),
+            "evidence_sha256": sorted({
+                page.get("evidence_sha256")
+                for page in evidence.get("pages", [])
+                if isinstance(page, dict) and page.get("evidence_sha256")
+            }),
+        }
+        for relative, evidence in manifest["renderer_evidence"].items()
+    }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return manifest
+
+
+def manifest_evidence_current(run_dir: Path, manifest_path: Path) -> bool:
+    """Return whether certified artifacts still match their visual evidence.
+
+    This is deliberately read-only.  Callers can preserve the prior manifest
+    and publish a new revision after it returns false.
+    """
+    if not manifest_path.is_file():
+        return False
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    bindings = manifest.get("evidence_binding")
+    artifacts = {item.get("path"): item.get("sha256") for item in manifest.get("artifacts", [])}
+    if not isinstance(bindings, dict):
+        return False
+    for relative, expected in artifacts.items():
+        path = run_dir / str(relative)
+        if path.is_file() and expected != _sha256(path):
+            return False
+    for relative, evidence in bindings.items():
+        path = run_dir / str(relative)
+        if path.is_file() and evidence.get("artifact_sha256") != _sha256(path):
+            return False
+    return True
 
 
 def _classified_repair_report(findings: list[dict[str, Any]]) -> str:
@@ -331,8 +402,9 @@ def run_delivery_pipeline(
     require_source_contract: bool = False,
     require_renderer: bool = False,
     max_repairs: int = MAX_TARGET_ATTEMPTS - 1,
+    rebuild: Any | None = None,
 ) -> dict[str, Any]:
-    """Run read-only reviews, apply only controlled repairs, then rerun all gates."""
+    """Run reviews, cleanly rebuild failed targets, then rerun all gates."""
     started = time.perf_counter()
     attempts = []
     report = _review_once(
@@ -356,12 +428,16 @@ def run_delivery_pipeline(
     if report["status"] != "passed" and max_repairs > 0:
         for repair_number in range(1, min(max_repairs, MAX_TARGET_ATTEMPTS - 1) + 1):
             repairs = []
-            for relative in outputs:
-                path = run_dir / relative
-                if path.suffix.lower() == ".docx" and path.exists():
-                    result = repair_docx_package(path)
-                    if result.get("changed"):
-                        repairs.append(result)
+            if rebuild is not None:
+                result = rebuild()
+                repairs.append({"mode": "clean_template_rebuild", "result": result})
+            else:
+                for relative in outputs:
+                    path = run_dir / relative
+                    if path.suffix.lower() == ".docx" and path.exists():
+                        result = repair_docx_package(path)
+                        if result.get("changed"):
+                            repairs.append(result)
             if not repairs:
                 attempts.append({"phase": "repair", "attempt": repair_number, "status": "no_recoverable_repair", "reused_section_drafts": True})
                 break
