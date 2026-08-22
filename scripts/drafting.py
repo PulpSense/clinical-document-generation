@@ -21,6 +21,7 @@ from prospective import (
     scoped_batch_input,
     verify_prospective_sections,
 )
+from icf import icf_contract, unified_icf_batch, verify_icf_sections
 from complete_protocol import with_complete_protocol
 
 
@@ -176,4 +177,78 @@ def draft_prospective_protocol(
     return {"reference": completed, "report": result, "drafts": merged}
 
 
-__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "draft_prospective_protocol", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]
+def draft_prospective_icf(
+    reference: Mapping[str, Any],
+    *,
+    run_dir: Path | None = None,
+    study_type: str = "Prospective",
+    icf_template: str = "Advarra",
+) -> dict[str, Any]:
+    """Draft and merge the one participant-facing ICF batch.
+
+    The ICF batch receives only approved study families.  Its section-keyed
+    drafts are retained in the reference so the generated candidate and its
+    audit trail share the same deterministic contract.
+    """
+    batch = unified_icf_batch(study_type, icf_template)
+    scoped = scoped_batch_input(reference, batch)
+    fields = reference.get("template_fields") if isinstance(reference.get("template_fields"), Mapping) else {}
+    field_map = {
+        "PURPOSE": ("AI_studyPurpose",),
+        "WHAT WILL HAPPEN DURING THE STUDY": ("AI_icfVisitsOverview", "AI_visitsDetails"),
+        "LENGTH OF THE STUDY AND NUMBER OF PARTICIPANTS EXPECTED": ("AI_visitsAndLength",),
+        "SIDE EFFECTS AND OTHER RISKS": ("AI_interventionPossibleSideEffects",),
+        "POSSIBLE BENEFITS OF THE STUDY": ("AI_benefits",),
+        "PAYMENT FOR BEING IN THE STUDY": ("AI_payment",),
+        "ADDITIONAL COSTS": ("AI_costs",),
+        "ALTERNATIVES TO PARTICIPATION": ("AI_alternatives",),
+        "RELEASE OF MEDICAL RECORDS AND PRIVACY": ("AI_privacy",),
+    }
+    drafts: list[SectionDraft] = []
+    for section in icf_contract(study_type, icf_template):
+        values = [str(fields.get(key, "")).strip() for key in field_map.get(section.title, ()) if fields.get(key)]
+        if section.title == "LEGAL RIGHTS":
+            values.append("The approved Advarra client language preserves the participant's legal rights without referring to a nonexistent injury section.")
+        if section.placement:
+            values.append("The approved source requires the existing-records disclosure within the study-procedures section.")
+        if not values:
+            # Legal and signature sections are supplied by the selected client
+            # template; retain an explicit section-keyed record without
+            # inventing study facts.
+            values.append(f"The selected {icf_template} client template supplies the approved {section.title.casefold()} language.")
+        drafts.append(SectionDraft(section.section_id, "\n\n".join(values), batch_id=batch.batch_id))
+
+    findings = verify_icf_sections(drafts, study_type, icf_template)
+    if findings:
+        raise ValueError("ICF Section Draft verification failed: " + "; ".join(item["section_id"] for item in findings))
+    merged = tuple(drafts)
+    report = {
+        "status": "passed",
+        "batch_id": batch.batch_id,
+        "section_ids": list(batch.section_ids),
+        "approved_field_families": list(batch.approved_field_families),
+        "prerequisite_ids": list(batch.prerequisite_ids),
+        "approved_input": scoped,
+        "section_drafts": [
+            {"section_id": draft.section_id, "batch_id": draft.batch_id, "content": draft.content, "accepted": draft.accepted}
+            for draft in merged
+        ],
+        "verification": {"status": "passed", "findings": []},
+    }
+    result = dict(reference)
+    generated = result.setdefault("generated", {})
+    if not isinstance(generated, dict):
+        generated = {}
+        result["generated"] = generated
+    generated["icf"] = {
+        "drafting_contract_version": f"{icf_template.casefold()}-{study_type.casefold()}-v1",
+        "sections": report["section_drafts"],
+    }
+    if run_dir is not None:
+        path = run_dir / "logs/icf-drafting.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return {"reference": result, "report": report, "drafts": merged}
+
+
+__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "draft_prospective_protocol", "draft_prospective_icf", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]

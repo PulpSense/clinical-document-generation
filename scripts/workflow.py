@@ -284,7 +284,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
         branch = branch_for_study_type((reference.get("meta") or {}).get("study_type"))
         drafting_report = None
         if branch and branch["canonical_study_type"] in {"Prospective", "Ambispective"}:
-            from drafting import draft_prospective_protocol
+            from drafting import draft_prospective_icf, draft_prospective_protocol
 
             drafted = draft_prospective_protocol(
                 reference,
@@ -294,7 +294,18 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
             )
             reference = drafted["reference"]
             _write_reference(reference_path, reference)
-            drafting_report = drafted["report"]
+            icf_drafted = draft_prospective_icf(
+                reference,
+                run_dir=run_dir,
+                study_type=branch["canonical_study_type"],
+                icf_template=str((reference.get("meta") or {}).get("icf_template") or "Advarra"),
+            )
+            reference = icf_drafted["reference"]
+            _write_reference(reference_path, reference)
+            drafting_report = {
+                "protocol": drafted["report"],
+                "icf": icf_drafted["report"],
+            }
         generation = run_generation(
             run_dir,
             reference_path,

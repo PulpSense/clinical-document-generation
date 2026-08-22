@@ -16,9 +16,35 @@ from icf import (  # noqa: E402
     unified_icf_batch,
 )
 from prospective import prospective_batch_plan  # noqa: E402
+from drafting import draft_prospective_icf  # noqa: E402
 
 
 class IcfReplacementTests(unittest.TestCase):
+    def test_public_icf_drafting_merges_every_section_keyed_draft(self) -> None:
+        reference = {
+            "meta": {"study_type": "Prospective", "icf_template": "Advarra"},
+            "template_fields": {
+                "AI_studyPurpose": "The study evaluates the approved study purpose.",
+                "AI_icfVisitsOverview": "You will complete the approved study visits.",
+                "AI_visitsDetails": "The study team will perform the approved procedures.",
+                "AI_visitsAndLength": "The study lasts for the approved duration.",
+                "AI_interventionPossibleSideEffects": "The approved source describes these risks.",
+                "AI_benefits": "The approved source describes these benefits.",
+                "AI_payment": "You will receive the approved payment information.",
+                "AI_costs": "The approved source describes study costs.",
+                "AI_alternatives": "You may choose not to participate.",
+                "AI_privacy": "Your study information will be kept confidential.",
+            },
+        }
+        result = draft_prospective_icf(reference)
+        self.assertEqual(result["report"]["batch_id"], "icf-narrative")
+        self.assertEqual(
+            [item["section_id"] for item in result["report"]["section_drafts"]],
+            [item.section_id for item in icf_contract("Prospective", "Advarra")],
+        )
+        self.assertEqual(result["report"]["verification"]["status"], "passed")
+        self.assertEqual(len(result["reference"]["generated"]["icf"]["sections"]), len(icf_contract("Prospective", "Advarra")))
+
     def test_prospective_branch_has_one_unified_icf_batch(self) -> None:
         batches = prospective_batch_plan()
         self.assertEqual([batch.batch_id for batch in batches], [
