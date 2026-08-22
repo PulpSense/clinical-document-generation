@@ -42,8 +42,9 @@ Client integrations should import `scripts/workflow.py` and use only its four
 Run Lifecycle operations: `prepare`, `approve`, `validate`, and `generate`.
 The six replacement ownership modules are `contracts`, `drafting`, `rendering`,
 `quality`, and `prs_xml`, alongside `workflow`. The former
-`clinical_document_workflow.py` compatibility entrypoint has been removed;
-callers must use the public seam.
+`clinical_document_workflow.py` remains as a compatibility adapter during
+migration; it delegates every operation to `workflow.py` and is not a second
+workflow.
 
 ## Access Check
 

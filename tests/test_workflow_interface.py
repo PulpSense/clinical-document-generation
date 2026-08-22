@@ -14,6 +14,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 from tests.test_quality_contract import QualityContractTests  # noqa: E402
 import workflow  # noqa: E402
 from workflow import approve, generate, prepare, validate  # noqa: E402
+import clinical_document_workflow  # noqa: E402
 
 
 class WorkflowInterfaceTests(unittest.TestCase):
@@ -45,9 +46,24 @@ class WorkflowInterfaceTests(unittest.TestCase):
             self.assertEqual(readiness["stage"], "readiness")
             self.assertEqual(readiness["status"], "blocked")
 
-    def test_public_workflow_is_the_only_lifecycle_entrypoint(self) -> None:
+    def test_public_workflow_is_the_primary_lifecycle_entrypoint(self) -> None:
         self.assertTrue((REPO_ROOT / "scripts/workflow.py").is_file())
-        self.assertFalse((REPO_ROOT / "scripts/clinical_document_workflow.py").exists())
+        self.assertTrue((REPO_ROOT / "scripts/clinical_document_workflow.py").is_file())
+
+    def test_legacy_entrypoint_delegates_to_the_public_workflow(self) -> None:
+        self.assertIs(clinical_document_workflow.prepare, workflow.prepare)
+        self.assertIs(clinical_document_workflow.approve, workflow.approve)
+        self.assertIs(clinical_document_workflow.validate, workflow.validate)
+        self.assertIs(clinical_document_workflow.generate, workflow.generate)
+        self.assertIs(clinical_document_workflow.branch_contract, workflow.branch_contract)
+        self.assertIs(
+            clinical_document_workflow.validated_client_outputs,
+            workflow.validated_client_outputs,
+        )
+        self.assertEqual(
+            set(clinical_document_workflow.__all__),
+            {"prepare", "approve", "validate", "generate"},
+        )
 
     def test_public_workflow_owns_the_lifecycle_implementation(self) -> None:
         source = Path(workflow.__file__).read_text(encoding="utf-8")
