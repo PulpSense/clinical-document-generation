@@ -26,6 +26,7 @@ class ICFSection:
     title: str
     role: str = "leaf"
     repair: str = ""
+    placement: str = ""
 
 
 ADVARA_TITLES = (
@@ -66,6 +67,15 @@ def icf_contract(study_type: str, template: str) -> tuple[ICFSection, ...]:
         for index, section in enumerate(sections):
             if section.title == "LEGAL RIGHTS":
                 sections[index] = ICFSection(section.section_id, section.title, repair="Remove invalid cross-reference to a nonexistent injury section.")
+        if branch == "ambispective":
+            procedure = next(section for section in sections if section.title == "WHAT WILL HAPPEN DURING THE STUDY")
+            sections[sections.index(procedure)] = ICFSection(
+                procedure.section_id,
+                procedure.title,
+                procedure.role,
+                procedure.repair,
+                placement="Existing-records disclosure belongs inside the study-procedures section.",
+            )
         return tuple(sections)
     if choice == "sterling":
         return _sections(STERLING_TITLES, "sterling-" + branch)
@@ -159,6 +169,15 @@ def audit_icf_document(path: Path, contract: Iterable[ICFSection], reference: di
     for section in contract:
         if section.title.casefold() not in body_text:
             errors.append({"field": section.title, "issue": "Required ICF heading is missing."})
+        if section.placement and section.title.casefold() in body_text:
+            procedure_start = body_text.find(section.title.casefold())
+            next_heading = min(
+                (body_text.find(other.title.casefold(), procedure_start + len(section.title)) for other in contract if other.title != section.title and body_text.find(other.title.casefold(), procedure_start + len(section.title)) >= 0),
+                default=len(body_text),
+            )
+            procedure_text = body_text[procedure_start:next_heading]
+            if not any(token in procedure_text for token in ("existing record", "historical record", "medical record", "previously collected")):
+                errors.append({"field": section.title, "issue": section.placement})
     if "in case of an injury related to this research study" in body_text and "in case of an injury related to this research study" not in {title.casefold() for title in expected} and "legal rights" in body_text:
         errors.append({"field": "LEGAL RIGHTS", "issue": "Prospective Legal Rights still references a nonexistent injury section."})
     return errors
@@ -176,6 +195,8 @@ def sanitize_icf_document(path: Path, contract: Iterable[ICFSection], reference:
     changed: list[str] = []
     with zipfile.ZipFile(path) as archive:
         members = {item.filename: archive.read(item.filename) for item in archive.infolist()}
+
+    placement = next((section for section in contract if section.placement), None)
 
     for name, raw in list(members.items()):
         if name.startswith("word/comments"):
@@ -200,7 +221,8 @@ def sanitize_icf_document(path: Path, contract: Iterable[ICFSection], reference:
                     parent.remove(child)
                     local_changed = True
         if name.startswith("word/"):
-            for paragraph in root.findall(".//" + W + "p"):
+            paragraphs = root.findall(".//" + W + "p")
+            for paragraph in paragraphs:
                 text_nodes = paragraph.findall(".//" + W + "t")
                 text = "".join(node.text or "" for node in text_nodes)
                 title = text.strip()
@@ -231,6 +253,23 @@ def sanitize_icf_document(path: Path, contract: Iterable[ICFSection], reference:
                         for node in text_nodes[1:]:
                             node.text = ""
                         local_changed = True
+            if placement and name == "word/document.xml":
+                paragraphs = root.findall(".//" + W + "p")
+                already_present = any(
+                    any(token in _text(paragraph).casefold() for token in ("existing record", "historical record", "medical record", "previously collected"))
+                    for paragraph in paragraphs
+                )
+                if not already_present:
+                    heading = next((paragraph for paragraph in paragraphs if _text(paragraph).strip() == placement.title), None)
+                    if heading is not None:
+                        body = root.find(".//" + W + "body")
+                        if body is not None:
+                            disclosure = ET.Element(W + "p")
+                            run = ET.SubElement(disclosure, W + "r")
+                            text = ET.SubElement(run, W + "t")
+                            text.text = "The study team may review relevant existing medical records or other information collected before your participation. This existing-records review will be kept confidential and will be used only for the purposes described in this study."
+                            body.insert(list(body).index(heading) + 1, disclosure)
+                            local_changed = True
         if name == "word/_rels/document.xml.rels":
             for relationship in list(root):
                 if "comment" in (relationship.get("Target") or "").casefold():

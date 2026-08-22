@@ -12,6 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from delivery_pipeline import (  # noqa: E402
+    AMBISPECTIVE_DOCUMENT_SET,
     PROSPECTIVE_ADVARRA_DOCUMENT_SET,
     bind_generation_manifest,
     verify_branch_document_set,
@@ -69,6 +70,22 @@ class BranchDeliveryTests(unittest.TestCase):
             self.assertEqual(len(manifest["artifacts"][0]["sha256"]), 64)
             self.assertEqual(manifest["renderer_evidence"]["output/protocol.docx"]["pages"], [1])
             self.assertEqual(manifest["contracts"]["branch"], "prospective-advarra-package-v1")
+
+    def test_ambispective_package_requires_the_complete_branch_document_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            run_dir = Path(temporary)
+            (run_dir / "reference").mkdir()
+            reference = self.reference()
+            reference["meta"]["study_type"] = "Ambispective"
+            (run_dir / "reference/study.reference.json").write_text(json.dumps(reference), encoding="utf-8")
+            write_docx(run_dir / "output/protocol.docx", "A prospective study P-23")
+            report = verify_branch_document_set(run_dir, ["output/protocol.docx"])
+
+            self.assertEqual(report["status"], "failed")
+            self.assertEqual(
+                {item["field"] for item in report["review_passes"]["consistency"]["findings"]},
+                set(AMBISPECTIVE_DOCUMENT_SET) - {"output/protocol.docx"},
+            )
 
 
 if __name__ == "__main__":

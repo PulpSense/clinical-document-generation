@@ -59,7 +59,8 @@ def branch_contract(reference: dict[str, Any]) -> dict[str, Any]:
         }
     elif branch["canonical_study_type"] in {"Prospective", "Ambispective"}:
         result["replacement_workflow"] = {
-            "contract_version": "prospective-1-19-v1",
+            "contract_version": "prospective-1-19-v1" if branch["canonical_study_type"] == "Prospective" else "ambispective-1-19-v1",
+            "input_contract": "prospective-ambispective-v1",
             "section_ids": [section.section_id for section in prospective_contract()],
             "drafting_batches": [
                 {
@@ -80,6 +81,12 @@ def branch_contract(reference: dict[str, Any]) -> dict[str, Any]:
             "icf_contract": f"{str((reference.get('meta') or {}).get('icf_template') or 'unknown').casefold()}-{branch['canonical_study_type'].casefold()}-v1",
             "icf_section_ids": [section.section_id for section in icf_contract(branch["canonical_study_type"], (reference.get("meta") or {}).get("icf_template"))] if (reference.get("meta") or {}).get("icf_template") else [],
         }
+        if branch["canonical_study_type"] == "Ambispective":
+            result["replacement_workflow"]["authoring_rules"] = [
+                "Keep historical records and prospective visits or follow-up distinct.",
+                "Identify which outcomes come from historical review versus prospective collection.",
+                "Place the existing-records disclosure inside the ICF study-procedures section.",
+            ]
     return result
 
 
@@ -307,7 +314,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     evidence_path = run_dir / "logs/readiness-evidence.json"
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    if pipeline["status"] == "passed" and revision_id and branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] == "Prospective":
+    if pipeline["status"] == "passed" and revision_id and branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] in {"Prospective", "Ambispective"}:
         revision_manifest_path = run_dir / "revisions" / str(revision_id) / "generation-manifest.json"
         revision["manifest"] = bind_generation_manifest(
             run_dir,

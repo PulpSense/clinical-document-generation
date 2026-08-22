@@ -27,6 +27,11 @@ PROSPECTIVE_ADVARRA_DOCUMENT_SET = (
     "output/icf.docx",
     "output/study.xml",
 )
+AMBISPECTIVE_DOCUMENT_SET = PROSPECTIVE_ADVARRA_DOCUMENT_SET
+BRANCH_DOCUMENT_SETS = {
+    "Prospective": PROSPECTIVE_ADVARRA_DOCUMENT_SET,
+    "Ambispective": AMBISPECTIVE_DOCUMENT_SET,
+}
 MAX_TARGET_ATTEMPTS = 3
 
 
@@ -68,14 +73,14 @@ def _artifact_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def _prospective_package_findings(run_dir: Path, outputs: list[str]) -> list[dict[str, Any]]:
-    expected = set(PROSPECTIVE_ADVARRA_DOCUMENT_SET)
+def _prospective_package_findings(run_dir: Path, outputs: list[str], study_type: str) -> list[dict[str, Any]]:
+    expected = set(BRANCH_DOCUMENT_SETS[study_type])
     observed = set(outputs)
     findings: list[dict[str, Any]] = []
     for relative in sorted(expected - observed):
         findings.append(_finding(relative, "Required Branch Document Set artifact is missing.", "Branch Package Gate", "A generated Protocol DOCX, ICF DOCX, and PRS XML."))
     for relative in sorted(observed - expected):
-        findings.append(_finding(relative, "Artifact is not part of the Prospective Advarra Branch Document Set.", "Branch Package Gate", "Only Protocol DOCX, ICF DOCX, and PRS XML may be client-facing."))
+        findings.append(_finding(relative, f"Artifact is not part of the {study_type} Branch Document Set.", "Branch Package Gate", "Only Protocol DOCX, ICF DOCX, and PRS XML may be client-facing."))
     paths = {relative: run_dir / relative for relative in expected & observed}
     for relative, path in paths.items():
         if not path.is_file():
@@ -97,13 +102,36 @@ def _prospective_package_findings(run_dir: Path, outputs: list[str]) -> list[dic
             unresolved = unresolved_in_docx(path)
             for token in unresolved:
                 findings.append(_finding(f"{relative}:{token}", "Unresolved placeholder remains in the artifact.", "Content Completeness Gate", "A fully rendered artifact with no unresolved placeholders."))
+    if study_type == "Ambispective":
+        from icf import audit_icf_document, icf_contract
+
+        icf_path = run_dir / "output/icf.docx"
+        if icf_path.is_file():
+            findings.extend(
+                _finding(item["field"], item["issue"], "Cross-Document Consistency Gate", "The Ambispective existing-records disclosure inside the study-procedures section.")
+                for item in audit_icf_document(icf_path, icf_contract("Ambispective", (reference.get("meta") or {}).get("icf_template")), reference)
+            )
     return findings
 
 
 def verify_branch_document_set(run_dir: Path, outputs: list[str], *, require_renderer: bool = False) -> dict[str, Any]:
     """Verify a prospective package without changing any generated artifact."""
     reference = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
-    package_findings = _prospective_package_findings(run_dir, outputs)
+    branch = str((reference.get("meta") or {}).get("study_type") or "")
+    if branch not in BRANCH_DOCUMENT_SETS:
+        return {"status": "failed", "review_passes": {"consistency": _review_pass("cross_document_consistency", [_finding("meta.study_type", "Branch package verification is not supported for this study type.", "Branch Package Gate", "Prospective or Ambispective branch metadata.")]), "structure": _review_pass("section_substance_and_structure", []), "visual": _review_pass("visual_layout_all_pages", [])}, "manual_verification_required": False}
+    package_findings = _prospective_package_findings(run_dir, outputs, branch)
+    if any(item.get("gate") == "Branch Package Gate" for item in package_findings):
+        consistency = _review_pass("cross_document_consistency", package_findings)
+        return {
+            "status": "failed",
+            "review_passes": {
+                "consistency": consistency,
+                "structure": _review_pass("section_substance_and_structure", []),
+                "visual": _review_pass("visual_layout_all_pages", [], evidence={}),
+            },
+            "manual_verification_required": False,
+        }
     structure = audit_generated_outputs(run_dir, outputs)
     structure_findings = [
         _finding(item.get("field", "unknown"), item.get("issue", "Structure check failed."), "Document Structure Gate", "A structurally valid Protocol and ICF with substantive contracted sections.")
@@ -146,8 +174,10 @@ def bind_generation_manifest(run_dir: Path, manifest_path: Path, outputs: list[s
     manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
     reference = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
     manifest["branch_document_set"] = list(outputs)
-    manifest["contracts"] = {**manifest.get("contracts", {}), "branch": "prospective-advarra-package-v1", "source": "quality_contract", "prs_xml": "prs_xml_contract"}
-    manifest["boilerplate"] = {"protocol": "prospective-protocol.template.docx", "icf": "advarra-icf.template.docx", "prs_xml": "clinicaltrials_prs_full_placeholder_template.xml"}
+    study_type = str((reference.get("meta") or {}).get("study_type") or "Prospective")
+    icf_template = str((reference.get("meta") or {}).get("icf_template") or "Advarra").casefold()
+    manifest["contracts"] = {**manifest.get("contracts", {}), "branch": f"{study_type.casefold()}-{icf_template}-package-v1", "source": "quality_contract", "prs_xml": "prs_xml_contract"}
+    manifest["boilerplate"] = {"protocol": f"{study_type.casefold()}-protocol.template.docx", "icf": f"{icf_template}-icf.template.docx", "prs_xml": "clinicaltrials_prs_full_placeholder_template.xml"}
     template_paths = {
         "protocol": run_dir / "templates/protocol.template.docx",
         "icf": run_dir / "templates/icf.template.docx",
@@ -313,7 +343,7 @@ def run_delivery_pipeline(
     )
     reference = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
     meta = reference.get("meta") if isinstance(reference.get("meta"), dict) else {}
-    if str(meta.get("study_type", "")).casefold() == "prospective" and str(meta.get("icf_template", "")).casefold() == "advarra":
+    if str(meta.get("study_type", "")).casefold() in {"prospective", "ambispective"}:
         branch_report = verify_branch_document_set(run_dir, outputs, require_renderer=require_renderer)
         report["branch_package"] = branch_report
         report["review_passes"]["content"]["findings"].extend(branch_report["review_passes"]["consistency"]["findings"])
@@ -341,7 +371,7 @@ def run_delivery_pipeline(
                 require_source_contract=require_source_contract,
                 require_renderer=require_renderer,
             )
-            if str(meta.get("study_type", "")).casefold() == "prospective" and str(meta.get("icf_template", "")).casefold() == "advarra":
+            if str(meta.get("study_type", "")).casefold() in {"prospective", "ambispective"}:
                 branch_report = verify_branch_document_set(run_dir, outputs, require_renderer=require_renderer)
                 report["branch_package"] = branch_report
                 report["status"] = "passed" if branch_report["status"] == "passed" and report["status"] == "passed" else "failed"

@@ -48,6 +48,26 @@ class IcfReplacementTests(unittest.TestCase):
             "Remove invalid cross-reference to a nonexistent injury section.",
         )
 
+    def test_advarra_ambispective_contract_places_records_disclosure_in_procedures(self) -> None:
+        procedure = next(section for section in icf_contract("Ambispective", "Advarra") if section.title == "WHAT WILL HAPPEN DURING THE STUDY")
+        self.assertIn("existing-records", procedure.placement.casefold())
+
+    def test_ambispective_sanitizer_inserts_records_disclosure_after_procedures_heading(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "icf.docx"
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr(
+                    "word/document.xml",
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>INTRODUCTION</w:t></w:r></w:p><w:p><w:r><w:t>WHAT WILL HAPPEN DURING THE STUDY</w:t></w:r></w:p><w:p><w:r><w:t>Visit details.</w:t></w:r></w:p></w:body></w:document>',
+                )
+            from icf import sanitize_icf_document
+
+            sanitize_icf_document(path, icf_contract("Ambispective", "Advarra"), {"study": {"title": "Approved study"}})
+            with zipfile.ZipFile(path) as archive:
+                document = archive.read("word/document.xml").decode()
+            self.assertIn("existing medical records", document)
+            self.assertLess(document.index("WHAT WILL HAPPEN"), document.index("existing medical records"))
+
     def test_icf_audit_rejects_review_residue_stale_facts_and_unstyled_headings(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "icf.docx"
