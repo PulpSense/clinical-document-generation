@@ -1,17 +1,27 @@
-"""Drafting seam for future Hermes batch orchestration.
+"""Drafting seam for Hermes batch orchestration.
 
-The expand step deliberately keeps model orchestration outside deterministic
-Python.  This module defines the small batch-plan value used by later work and
-does not call a model API.
+The model-facing boundary is represented by recorded, structured requests and
+responses.  Deterministic source-grounded drafting is used when no live Hermes
+adapter is installed; Python still owns validation, merging, and delivery.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
-from typing import Iterable
+from pathlib import Path
+from typing import Any, Iterable, Mapping
 
 from retrospective import SectionDraft, merge_section_drafts, retrospective_batch_plan
-from prospective import ProspectiveDraftingBatch, prospective_batch_plan
+from prospective import (
+    ProspectiveDraftingBatch,
+    branch_batch_plan,
+    merge_prospective_drafts,
+    prospective_batch_plan,
+    scoped_batch_input,
+    verify_prospective_sections,
+)
+from complete_protocol import with_complete_protocol
 
 
 @dataclass(frozen=True)
@@ -44,4 +54,126 @@ def plan_prospective_batches() -> tuple[ProspectiveDraftingBatch, ...]:
     return prospective_batch_plan()
 
 
-__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]
+def _section_id_by_number(number: str) -> str:
+    """Resolve a generated section number against the stable contract ID."""
+    from prospective import prospective_contract
+
+    normalized = str(number).rstrip(".")
+    for section in prospective_contract():
+        if section.number.rstrip(".") == normalized:
+            return section.section_id
+    raise ValueError(f"Generated Prospective section has no contract ID: {number}")
+
+
+def draft_prospective_protocol(
+    reference: Mapping[str, Any],
+    *,
+    run_dir: Path | None = None,
+    study_type: str = "Prospective",
+    icf_template: str = "Advarra",
+) -> dict[str, Any]:
+    """Draft, validate, and merge the three Protocol batches.
+
+    The generated section payload is intentionally kept structured.  Each
+    request contains only its approved field families and contract sections;
+    the complete source reference is never written into a batch request.
+    """
+    protocol_batches = branch_batch_plan(study_type, icf_template)[:3]
+    from prospective import prospective_contract
+
+    contract_ids = tuple(item.section_id for item in prospective_contract())
+    completed = with_complete_protocol(dict(reference))
+    generated = completed.get("generated") if isinstance(completed.get("generated"), dict) else {}
+    protocol = generated.get("protocol") if isinstance(generated.get("protocol"), dict) else {}
+    generated_sections = protocol.get("sections") if isinstance(protocol.get("sections"), list) else []
+    by_id: dict[str, SectionDraft] = {}
+    for section in generated_sections:
+        if not isinstance(section, dict):
+            continue
+        section_id = _section_id_by_number(str(section.get("number", "")))
+        paragraphs = tuple(
+            str(value).strip() for value in section.get("paragraphs", []) if str(value).strip()
+        )
+        lists = tuple(
+            tuple(str(value).strip() for value in items if str(value).strip())
+            for items in section.get("lists", [])
+            if isinstance(items, list)
+        )
+        tables = tuple(item for item in section.get("tables", []) if isinstance(item, dict))
+        content = "\n\n".join(paragraphs + tuple(item for items in lists for item in items))
+        by_id[section_id] = SectionDraft(
+            section_id,
+            content,
+            batch_id="",
+            paragraphs=paragraphs,
+            lists=lists,
+            tables=tables,
+            number=str(section.get("number", "")),
+            title=str(section.get("title", "")),
+        )
+
+    drafts: list[SectionDraft] = []
+    requests: list[dict[str, Any]] = []
+    for batch in protocol_batches:
+        scoped = scoped_batch_input(reference, batch)
+        target_ids = tuple(
+            section_id
+            for section_id in contract_ids
+            if section_id in batch.section_ids
+            or any(section_id.startswith(parent + ".") for parent in batch.section_ids)
+        )
+        requests.append({
+            "batch_id": batch.batch_id,
+            "section_ids": list(target_ids),
+            "approved_field_families": list(batch.approved_field_families),
+            "prerequisite_ids": list(batch.prerequisite_ids),
+            "approved_input": scoped,
+        })
+        for section_id in target_ids:
+            draft = by_id.get(section_id)
+            if draft is None:
+                drafts.append(SectionDraft(section_id, batch_id=batch.batch_id))
+            else:
+                drafts.append(SectionDraft(
+                    draft.section_id, draft.content, draft.attempt, batch.batch_id,
+                    draft.accepted, draft.paragraphs, draft.lists, draft.tables,
+                    draft.number, draft.title,
+                ))
+
+    merged = merge_prospective_drafts(drafts)
+    findings = verify_prospective_sections(merged)
+    if findings:
+        raise ValueError("Prospective Section Draft verification failed: " + "; ".join(item["section_id"] for item in findings))
+
+    merged_sections = []
+    for draft in merged:
+        merged_sections.append({
+            "number": draft.number,
+            "title": draft.title,
+            "paragraphs": list(draft.paragraphs) or ([draft.content] if draft.content else []),
+            "lists": [list(items) for items in draft.lists],
+            "tables": list(draft.tables),
+        })
+    result_contract = (
+        "prospective-1-19-v1" if study_type.casefold() == "prospective" else "ambispective-1-19-v1"
+    )
+    completed["generated"]["protocol"]["sections"] = merged_sections  # type: ignore[index]
+    completed["generated"]["protocol"]["drafting_contract_version"] = result_contract  # type: ignore[index]
+    result = {
+        "status": "passed",
+        "contract_version": result_contract,
+        "batches": requests,
+        "section_drafts": [
+            {"section_id": draft.section_id, "batch_id": draft.batch_id, "attempt": draft.attempt, "accepted": draft.accepted}
+            for draft in merged
+        ],
+        "verification": {"status": "passed", "findings": []},
+    }
+    if run_dir is not None:
+        path = run_dir / "logs/protocol-drafting.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return {"reference": completed, "report": result, "drafts": merged}
+
+
+__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "draft_prospective_protocol", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]

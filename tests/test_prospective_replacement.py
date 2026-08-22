@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from workflow import branch_contract  # noqa: E402
+from drafting import draft_prospective_protocol  # noqa: E402
 from drafting import plan_prospective_batches  # noqa: E402
 from prospective import (  # noqa: E402
     SectionDraft,
@@ -20,6 +22,23 @@ from prospective import (  # noqa: E402
 
 
 class ProspectiveReplacementTests(unittest.TestCase):
+    def test_public_drafting_boundary_merges_three_scoped_protocol_batches(self) -> None:
+        reference = json.loads((Path(__file__).parent / "fixtures/gp-26-01-approved.json").read_text(encoding="utf-8"))
+        reference["meta"]["study_type"] = "Prospective"
+        result = draft_prospective_protocol(reference)
+        report = result["report"]
+        self.assertEqual(report["status"], "passed")
+        self.assertEqual([batch["batch_id"] for batch in report["batches"]], [
+            "protocol-foundations", "protocol-operations", "protocol-analysis-and-oversight"
+        ])
+        self.assertEqual(len(result["drafts"]), len([section for section in prospective_contract() if section.number not in {"1.", "2.", "3.", "4."}]))
+        self.assertEqual(report["verification"]["findings"], [])
+        operations = next(batch for batch in report["batches"] if batch["batch_id"] == "protocol-operations")
+        self.assertIn("procedures", operations["approved_field_families"])
+        self.assertNotIn("template_fields", operations["approved_input"])
+        sections = result["reference"]["generated"]["protocol"]["sections"]
+        self.assertTrue(any(section.get("tables") for section in sections if section.get("number") == "15."))
+
     def test_contract_has_corrected_1_to_19_hierarchy(self) -> None:
         contract = prospective_contract()
         top_level = [item.number for item in contract if "." not in item.section_id]

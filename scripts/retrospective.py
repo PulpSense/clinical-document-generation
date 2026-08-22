@@ -67,6 +67,11 @@ class SectionDraft:
     attempt: int = 1
     batch_id: str = ""
     accepted: bool = True
+    paragraphs: tuple[str, ...] = ()
+    lists: tuple[tuple[str, ...], ...] = ()
+    tables: tuple[dict[str, Any], ...] = ()
+    number: str = ""
+    title: str = ""
 
 
 def merge_section_drafts(drafts: Iterable[SectionDraft]) -> tuple[SectionDraft, ...]:

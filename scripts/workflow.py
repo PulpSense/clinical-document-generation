@@ -281,6 +281,20 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
 
     try:
         adapter_report = _populate_branch_fields(run_dir, reference_path, reference)
+        branch = branch_for_study_type((reference.get("meta") or {}).get("study_type"))
+        drafting_report = None
+        if branch and branch["canonical_study_type"] in {"Prospective", "Ambispective"}:
+            from drafting import draft_prospective_protocol
+
+            drafted = draft_prospective_protocol(
+                reference,
+                run_dir=run_dir,
+                study_type=branch["canonical_study_type"],
+                icf_template=str((reference.get("meta") or {}).get("icf_template") or "Advarra"),
+            )
+            reference = drafted["reference"]
+            _write_reference(reference_path, reference)
+            drafting_report = drafted["report"]
         generation = run_generation(
             run_dir,
             reference_path,
@@ -338,6 +352,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
         replacement_workflow = {
             **branch_contract(reference)["replacement_workflow"],
             "status": pipeline["status"],
+            "protocol_drafting": drafting_report,
             "content_findings": pipeline.get("review_passes", {}).get("content", {}).get("findings", []),
             "visual_findings": pipeline.get("review_passes", {}).get("visual", {}).get("findings", []),
             "client_outputs": list(client_outputs),
@@ -358,6 +373,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
         "stage": "delivery",
         "generation": generation,
         "branch_adapters": adapter_report,
+        "protocol_drafting": drafting_report,
         "delivery_pipeline": pipeline,
         "readiness_evidence": evidence,
         "replacement_workflow": replacement_workflow,

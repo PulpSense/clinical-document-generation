@@ -727,7 +727,12 @@ def run_generation(
                 "Content Completeness Gate / Complete Protocol Gate failed; see reference/repair-report.md "
                 f"for {len(protocol_missing)} missing item(s)."
             )
-        data = with_complete_protocol(data)
+        protocol_data = data.get("generated", {}).get("protocol", {}) if isinstance(data.get("generated"), dict) else {}
+        # A replacement-workflow Protocol has already been assembled from
+        # validated Section Drafts.  Preserve that accepted merge; older runs
+        # continue through the compatibility builder below.
+        if not isinstance(protocol_data, dict) or not protocol_data.get("drafting_contract_version"):
+            data = with_complete_protocol(data)
         # Keep the structured, source-grounded protocol that was actually
         # rendered in the reference artifact for audit and downstream checks.
         reference_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
