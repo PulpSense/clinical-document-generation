@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from retrospective import SectionDraft, merge_section_drafts, retrospective_batch_plan
+from prospective import ProspectiveDraftingBatch, prospective_batch_plan
 
 
 @dataclass(frozen=True)
@@ -38,4 +39,9 @@ def plan_retrospective_batches() -> tuple[DraftingBatch, ...]:
     )
 
 
-__all__ = ["DraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "retrospective_batch_plan", "merge_section_drafts"]
+def plan_prospective_batches() -> tuple[ProspectiveDraftingBatch, ...]:
+    """Expose the three stable Protocol batches for both forward branches."""
+    return prospective_batch_plan()
+
+
+__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]

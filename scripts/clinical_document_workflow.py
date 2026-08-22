@@ -25,6 +25,7 @@ from readiness_contract import readiness_evidence, readiness_report
 from revisions import create_revision, invalidate_changed_source, publish_revision
 from render_templates import run_generation
 from retrospective import retrospective_batch_plan, retrospective_contract
+from prospective import prospective_batch_plan, prospective_contract
 from study_type_branches import branch_for_study_type
 
 
@@ -54,6 +55,24 @@ def branch_contract(reference: dict[str, Any]) -> dict[str, Any]:
             "verification_tasks": ["content", "visual"],
             "max_total_attempts": 3,
             "document_template": "assets/client-templates/docx/retrospective-protocol.template.docx",
+        }
+    elif branch["canonical_study_type"] in {"Prospective", "Ambispective"}:
+        result["replacement_workflow"] = {
+            "contract_version": "prospective-1-19-v1",
+            "section_ids": [section.section_id for section in prospective_contract()],
+            "drafting_batches": [
+                {
+                    "batch_id": batch.batch_id,
+                    "section_ids": list(batch.section_ids),
+                    "approved_field_families": list(batch.approved_field_families),
+                    "prerequisite_ids": list(batch.prerequisite_ids),
+                }
+                for batch in prospective_batch_plan()
+            ],
+            "verification_tasks": ["content", "visual"],
+            "max_total_attempts": 3,
+            "document_template": "assets/client-templates/docx/prospective-protocol.template.docx",
+            "candidate_visibility": "internal_until_complete_branch_package",
         }
     return result
 
@@ -284,7 +303,7 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
     evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     client_outputs = pipeline.get("client_outputs", []) if pipeline["status"] == "passed" else []
     replacement_workflow = None
-    if branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] == "Retrospective":
+    if branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"] in {"Retrospective", "Prospective", "Ambispective"}:
         replacement_workflow = {
             **branch_contract(reference)["replacement_workflow"],
             "status": pipeline["status"],
@@ -292,7 +311,8 @@ def generate_approved_run(run_dir: Path, *, require_renderer: bool = False) -> d
             "visual_findings": pipeline.get("review_passes", {}).get("visual", {}).get("findings", []),
             "client_outputs": list(client_outputs),
         }
-        replacement_path = run_dir / "logs/retrospective-replacement-workflow.json"
+        branch_name = branch_for_study_type((reference.get("meta") or {}).get("study_type"))["canonical_study_type"].lower()
+        replacement_path = run_dir / f"logs/{branch_name}-replacement-workflow.json"
         replacement_path.parent.mkdir(parents=True, exist_ok=True)
         replacement_path.write_text(json.dumps(replacement_workflow, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if pipeline["status"] == "passed" and revision_id:
