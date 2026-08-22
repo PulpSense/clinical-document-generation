@@ -13,7 +13,9 @@ from acceptance_corpus import (  # noqa: E402
     BRANCH_TEMPLATE_MATRIX,
     drafting_task_budget,
     verification_task_budget,
+    canonical_fixtures,
 )
+from acceptance_runner import assert_task_budget, certify_corpus  # noqa: E402
 from workflow import branch_contract  # noqa: E402
 from prs_xml_contract import compare_structure  # noqa: E402
 
@@ -59,6 +61,36 @@ class BranchAcceptanceCorpusTests(unittest.TestCase):
         defective = REPO_ROOT / "tests/fixtures/prs-xml-defective.xml"
         self.assertTrue(defective.is_file())
         self.assertTrue(compare_structure(golden, defective))
+
+    def test_canonical_fixtures_are_distinct_and_runner_covers_full_matrix(self) -> None:
+        fixtures = canonical_fixtures()
+        self.assertEqual(len({fixture.fixture_id for fixture in fixtures}), 6)
+        self.assertEqual(len({fixture.path for fixture in fixtures}), 6)
+
+        calls = []
+
+        def fake_run(fixture, template):
+            calls.append((fixture.study_type, fixture.profile, template))
+            return {
+                "status": "passed",
+                "replacement_workflow": {
+                    "drafting_batches": [{}] * drafting_task_budget(fixture.study_type),
+                    "verification_tasks": [{}] * verification_task_budget(fixture.study_type),
+                },
+            }
+
+        result = certify_corpus(fake_run)
+        self.assertTrue(result.passed, result.failures)
+        self.assertEqual(len(calls), 10)
+        self.assertEqual(len({(branch, template) for branch, _, template in calls}), 5)
+        self.assertEqual(
+            assert_task_budget(
+                "Retrospective",
+                {"replacement_workflow": {"drafting_batches": [{}] * 3, "verification_tasks": [{}, {}]}},
+            ),
+            [],
+        )
+        self.assertTrue(assert_task_budget("Retrospective", {"replacement_workflow": {}}))
 
 
 if __name__ == "__main__":
