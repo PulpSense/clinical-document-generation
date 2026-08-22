@@ -1,0 +1,7 @@
+{
+  "fixture_id": "prospective-sparse-complete",
+  "study_type": "Prospective",
+  "profile": "sparse-complete",
+  "evidence_density": "minimum substantive evidence",
+  "source_fixture": "tests/fixtures/gp-26-01-approved.json"
+}

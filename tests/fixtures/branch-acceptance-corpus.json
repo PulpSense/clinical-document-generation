@@ -1,0 +1,52 @@
+[
+  {
+    "fixture_id": "prospective-sparse-complete",
+    "study_type": "Prospective",
+    "profile": "sparse-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/prospective-sparse-complete.json"
+  },
+  {
+    "fixture_id": "prospective-rich-complete",
+    "study_type": "Prospective",
+    "profile": "rich-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/prospective-rich-complete.json"
+  },
+  {
+    "fixture_id": "ambispective-sparse-complete",
+    "study_type": "Ambispective",
+    "profile": "sparse-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-sparse-complete.json"
+  },
+  {
+    "fixture_id": "ambispective-rich-complete",
+    "study_type": "Ambispective",
+    "profile": "rich-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/ambispective-rich-complete.json"
+  },
+  {
+    "fixture_id": "retrospective-sparse-complete",
+    "study_type": "Retrospective",
+    "profile": "sparse-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/retrospective-sparse-complete.json"
+  },
+  {
+    "fixture_id": "retrospective-rich-complete",
+    "study_type": "Retrospective",
+    "profile": "rich-complete",
+    "path": "tests/fixtures/branch-acceptance-corpus/retrospective-rich-complete.json"
+  },
+  {
+    "fixture_id": "prospective-known-missing-template",
+    "study_type": "Prospective",
+    "profile": "regression",
+    "path": "tests/final_inputs/prospective_table_input_no_icf_template.md",
+    "regression": true
+  },
+  {
+    "fixture_id": "ambispective-known-missing-template",
+    "study_type": "Ambispective",
+    "profile": "regression",
+    "path": "tests/final_inputs/prospective_non_table_input_no_icf_template.md",
+    "regression": true
+  }
+]

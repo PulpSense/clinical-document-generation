@@ -1,0 +1,7 @@
+{
+  "fixture_id": "ambispective-rich-complete",
+  "study_type": "Ambispective",
+  "profile": "rich-complete",
+  "evidence_density": "historical/prospective operational tables and narrative details",
+  "source_fixture": "tests/fixtures/gp-26-01-approved.json"
+}

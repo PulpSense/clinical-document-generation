@@ -1,0 +1,7 @@
+{
+  "fixture_id": "retrospective-rich-complete",
+  "study_type": "Retrospective",
+  "profile": "rich-complete",
+  "evidence_density": "multiple retrospective operational tables and narrative details",
+  "source_fixture": "tests/fixtures/gp-26-01-approved.json"
+}
