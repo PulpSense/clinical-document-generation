@@ -25,7 +25,8 @@ from readiness_contract import readiness_evidence, readiness_report
 from revisions import create_revision, invalidate_changed_source, publish_revision
 from render_templates import run_generation
 from retrospective import retrospective_batch_plan, retrospective_contract
-from prospective import prospective_batch_plan, prospective_contract
+from prospective import branch_batch_plan, prospective_contract
+from icf import icf_contract
 from study_type_branches import branch_for_study_type
 
 
@@ -67,12 +68,17 @@ def branch_contract(reference: dict[str, Any]) -> dict[str, Any]:
                     "approved_field_families": list(batch.approved_field_families),
                     "prerequisite_ids": list(batch.prerequisite_ids),
                 }
-                for batch in prospective_batch_plan()
+                for batch in branch_batch_plan(
+                    branch["canonical_study_type"],
+                    (reference.get("meta") or {}).get("icf_template") or "Advarra",
+                )
             ],
             "verification_tasks": ["content", "visual"],
             "max_total_attempts": 3,
             "document_template": "assets/client-templates/docx/prospective-protocol.template.docx",
             "candidate_visibility": "internal_until_complete_branch_package",
+            "icf_contract": f"{str((reference.get('meta') or {}).get('icf_template') or 'unknown').casefold()}-{branch['canonical_study_type'].casefold()}-v1",
+            "icf_section_ids": [section.section_id for section in icf_contract(branch["canonical_study_type"], (reference.get("meta") or {}).get("icf_template"))] if (reference.get("meta") or {}).get("icf_template") else [],
         }
     return result
 

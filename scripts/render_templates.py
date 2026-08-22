@@ -766,6 +766,11 @@ def run_generation(
             }
         else:
             unresolved[output_rel] = render_docx(template_path, output_path, render_data)
+            if key == "icf_docx":
+                from icf import icf_contract, sanitize_icf_document
+
+                choice = str((data.get("meta") or {}).get("icf_template") or "")
+                sanitize_icf_document(output_path, icf_contract((data.get("meta") or {}).get("study_type"), choice), data)
         outputs.append(output_rel)
         templates.append(template_rel)
 

@@ -23,18 +23,20 @@ class ProspectiveReplacementTests(unittest.TestCase):
         contract = prospective_contract()
         top_level = [item.number for item in contract if "." not in item.section_id]
         self.assertEqual(top_level, [f"{index}." for index in range(1, 20)])
-        self.assertEqual(len(prospective_batch_plan()), 3)
+        self.assertEqual(len(prospective_batch_plan()), 4)
         self.assertEqual(plan_prospective_batches(), prospective_batch_plan())
 
     def test_batches_expose_only_relevant_approved_field_families(self) -> None:
         batches = prospective_batch_plan()
         self.assertEqual(
             [batch.batch_id for batch in batches],
-            ["protocol-foundations", "protocol-operations", "protocol-analysis-and-oversight"],
+            ["protocol-foundations", "protocol-operations", "protocol-analysis-and-oversight", "icf-narrative"],
         )
         self.assertNotIn("icf", " ".join(batches[0].approved_field_families).lower())
         self.assertIn("procedures", batches[1].approved_field_families)
         self.assertIn("statistics", batches[2].approved_field_families)
+        self.assertIn("procedures", batches[3].approved_field_families)
+        self.assertNotIn("protocol", batches[3].approved_field_families)
 
     def test_scoped_batch_input_excludes_unrelated_reference_families(self) -> None:
         reference = {"study": {"title": "Study"}, "objectives": {"primary": "Outcome"}, "procedures": {"assessments": "Visits"}, "statistics": {"analysis_plan": "Descriptive"}, "generated": {"protocol": {"internal": "not a drafting input"}}}
@@ -62,7 +64,7 @@ class ProspectiveReplacementTests(unittest.TestCase):
         workflow = contract["replacement_workflow"]
         self.assertEqual(workflow["contract_version"], "prospective-1-19-v1")
         self.assertEqual(len(workflow["section_ids"]), len(prospective_contract()))
-        self.assertEqual(len(workflow["drafting_batches"]), 3)
+        self.assertEqual(len(workflow["drafting_batches"]), 4)
         self.assertEqual(workflow["candidate_visibility"], "internal_until_complete_branch_package")
 
 

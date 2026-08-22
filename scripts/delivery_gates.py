@@ -301,6 +301,15 @@ def audit_generated_outputs(run_dir: Path, outputs: list[str], *, protocol_outpu
         if unresolved:
             package_errors.append({"field": relative, "issue": "Unresolved placeholders: " + ", ".join(unresolved)})
         failures.extend(package_errors)
+        if relative == "output/icf.docx":
+            try:
+                reference = json.loads((run_dir / "reference/study.reference.json").read_text(encoding="utf-8"))
+                from icf import audit_icf_document, icf_contract
+
+                meta = reference.get("meta") if isinstance(reference.get("meta"), dict) else {}
+                failures.extend(audit_icf_document(path, icf_contract(meta.get("study_type"), meta.get("icf_template")), reference))
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                failures.append({"field": relative, "issue": f"ICF contract audit failed: {exc}."})
         package_reports.append({"output": relative, "package_error_count": len(package_errors), "package_size_bytes": path.stat().st_size})
     rendering: dict[str, Any] = {"status": "skipped", "reason": "No external PDF render evidence was supplied."}
     pdf_path = run_dir / "logs" / "docx-render" / "protocol.pdf"
