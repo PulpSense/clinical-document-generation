@@ -34,10 +34,10 @@ Use `regulatory.prs.last_follow_up_date_type` whenever `procedures.last_follow_u
 After the branch n8n mapper, run:
 
 ```bash
-python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
-This script:
+The public generate operation invokes the internal PRS adapter. It:
 
 - writes every PRS placeholder into `template_fields`, using empty strings for optional unknown values
 - sets `regulatory.xml_profile` to `clinicaltrials-prs`
@@ -48,9 +48,8 @@ This script:
 Then validate and render:
 
 ```bash
-python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
-python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
-python3 scripts/validate_prs_xml.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 The renderer uses `__prs_counts` to remove unused repeated blocks or clone the last exemplar block when the real study has more repeated items than the template contains.

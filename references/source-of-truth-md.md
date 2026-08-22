@@ -66,13 +66,14 @@ Do not list preserved raw inputs, source manifests, draft JSON, copied templates
 When the reviewer uploads an edited source Markdown:
 
 1. Preserve the uploaded file under `input/attachments/`.
-2. Parse the uploaded Markdown:
+2. Send the uploaded Markdown through the public approval operation:
 
 ```bash
-python3 scripts/parse_source_truth_md.py \
+python3 scripts/workflow.py \
   --run-dir <run-dir> \
+  --stage approve \
   --source-md input/attachments/<uploaded-source-md> \
-  --approval-status pending_review
+  --approved-by "<reviewer>"
 ```
 
 3. Treat the parsed Markdown as authoritative over prior raw inputs and prior JSON. Do not repair apparent typos or string inconsistencies in mapped values unless they technically block the workflow.
@@ -84,12 +85,7 @@ python3 scripts/parse_source_truth_md.py \
 If the reviewer says the generated source Markdown is good without uploading edits, do not assume the current JSON still matches the Markdown. Parse the saved run file anyway, because the reviewer may have edited the generated file in place. Do not edit the Markdown before parsing:
 
 ```bash
-python3 scripts/parse_source_truth_md.py \
-  --run-dir <run-dir> \
-  --source-md <run-dir>/<approval.review_file> \
-  --approval-status approved \
-  --approved-by "<reviewer>"
-python3 scripts/check_required_inputs.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
 ```
 
 Review `reference/review-parse-report.md` and stop if parser warnings or missing inputs remain.
@@ -111,14 +107,8 @@ Do not treat the original source-material submission as "the reviewer says the g
 After approval:
 
 ```bash
-python3 scripts/parse_source_truth_md.py --run-dir <run-dir> --source-md <run-dir>/<approval.review_file> --approval-status approved --approved-by "<reviewer>"
-python3 scripts/check_required_inputs.py --run-dir <run-dir>
-python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check  # after generated narrative has been saved
-python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir>
-python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>  # prospective/ambispective XML only
-python3 scripts/validate_reference.py --run-dir <run-dir> --require-approval
-python3 scripts/render_templates.py --run-dir <run-dir> --require-approval
-python3 scripts/validate_prs_xml.py --run-dir <run-dir>  # prospective/ambispective XML only
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 Use the branch-specific mapper names:

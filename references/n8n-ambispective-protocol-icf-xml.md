@@ -199,7 +199,7 @@ After `scripts/build_prs_xml_fields.py` runs, rebuilt PRS XML templates may use 
 The old n8n `Generate XML JSON1` node used a simplified PRS shape and hardcoded values that the client corrected manually. For final ClinicalTrials.gov PRS XML, do not use that old JSON shape as the output structure. After this n8n mapper runs, run:
 
 ```bash
-python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 Use `references/prs-xml.md` for the canonical PRS template, required reviewer-controlled PRS fields, repeated block counts, defaults, and XML validation.

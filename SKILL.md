@@ -46,8 +46,10 @@ any unstructured input
 Run script commands from this skill folder, or use absolute paths to the skill's `scripts/` files.
 
 Use `scripts/workflow.py` as the only public workflow seam.
-The other scripts are internal adapters; the agent invokes them through this
-workflow and the client does not need to know or run them directly.
+The other Python files under `scripts/` are private implementation adapters;
+the agent invokes them through this workflow and the client does not run them
+directly. The former compatibility workflow entrypoint was removed after the
+replacement passed acceptance; do not recreate a second lifecycle seam.
 
 ```bash
 python3 scripts/workflow.py --run-dir <run-dir> --stage prepare

@@ -34,7 +34,8 @@ The skill must mimic the same logical sequence locally:
 1. Structure source facts into `reference/study.reference.json`.
 2. Run the four retrospective generation modules below using the reviewed source facts.
 3. Save module outputs under `generated.protocol`.
-4. Run `scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>` to populate `template_fields`.
+4. Let the public workflow populate `template_fields` through its internal
+   retrospective adapter during `generate`.
 5. Generate the named source Markdown, complete the source Markdown approval loop, then render final outputs.
 6. Render the protocol DOCX after approval.
 
@@ -186,7 +187,7 @@ Rules from n8n:
 After the four modules are complete, populate legacy template fields:
 
 ```bash
-python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 This writes `template_fields` in `study.reference.json`. The renderer overlays those fields at the template root, so n8n-style placeholders such as `{AI_shortTitle}` and `{protocolNumber}` resolve without changing the client template.

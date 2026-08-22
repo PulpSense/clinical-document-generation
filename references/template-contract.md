@@ -61,13 +61,13 @@ Client templates copied from the existing workflow may contain flat placeholders
 These are supported through top-level `template_fields`. For retrospective protocol runs, generate them with:
 
 ```bash
-python3 scripts/build_n8n_retrospective_protocol_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 For prospective protocol, ICF, and XML runs, generate them with:
 
 ```bash
-python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 For ambispective protocol, ICF, and XML runs, generate them with:
@@ -185,7 +185,7 @@ assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml
 Then run:
 
 ```bash
-python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 The PRS mapper writes flat PRS placeholders into `template_fields`, sets `template_fields.__prs_counts`, and also writes `template_fields.data_driven_tables.prs_xml`. The renderer uses the counts to keep exactly one repeated XML block per real intervention, arm, primary outcome, secondary outcome, and other outcome in legacy indexed templates.
@@ -198,7 +198,7 @@ Run:
 
 ```bash
 python3 scripts/scan_placeholders.py templates/protocol.template.docx templates/icf.template.docx templates/short.template.docx templates/study.template.xml
-python3 scripts/validate_reference.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
 ```
 
 Validation checks that:
@@ -213,7 +213,7 @@ Validation checks that:
 For PRS XML, also run:
 
 ```bash
-python3 scripts/validate_prs_xml.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 Validation does not prove the clinical correctness of generated language. Review the reference file before final output.

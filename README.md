@@ -17,7 +17,9 @@ Do not install only `SKILL.md`. The skill requires the bundled `assets/`, `refer
 - `SKILL.md`: the Hermes skill instructions and routing description.
 - `assets/client-templates/`: bundled DOCX and PRS XML templates.
 - `references/`: branch, schema, approval, source-of-truth, and template-contract instructions.
-- `scripts/`: deterministic Python scripts used by the skill.
+- `scripts/`: the six Python ownership modules plus their private deterministic
+  adapters and validators. These files are implementation details of the
+  public workflow, not additional user workflows.
 
 Quality and delivery entry points:
 
@@ -42,9 +44,8 @@ Client integrations should import `scripts/workflow.py` and use only its four
 Run Lifecycle operations: `prepare`, `approve`, `validate`, and `generate`.
 The six replacement ownership modules are `contracts`, `drafting`, `rendering`,
 `quality`, and `prs_xml`, alongside `workflow`. The former
-`clinical_document_workflow.py` remains as a compatibility adapter during
-migration; it delegates every operation to `workflow.py` and is not a second
-workflow.
+The former compatibility entrypoint has been removed after acceptance. There
+is no supported lifecycle command or import besides `workflow.py`.
 
 ## Access Check
 

@@ -80,7 +80,7 @@ Retrospective studies follow the protocol-only branch from the current workflow:
 Run:
 
 ```bash
-python3 scripts/validate_reference.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
 ```
 
 Validation checks `meta.study_type`, `meta.document_set`, required branch fields, required templates for that branch, and placeholders in active templates. Technical parser, approval, rendering, controlled-vocabulary, and XML failures may still stop a prospective or ambispective run after the source-input gate passes.

@@ -31,7 +31,8 @@ The skill must mimic that sequence locally:
 1. Draft or update `reference/study.reference.json` from source material.
 2. Run the source-input preflight, generate the named source Markdown, and complete the source Markdown approval loop.
 3. After approval, generate each module output below from the approved source inputs and save it under `generated.protocol`, `generated.icf`, or `generated.xml`.
-4. Run `scripts/build_n8n_prospective_fields.py --run-dir <run-dir>` to populate the flat n8n variables under `template_fields`, then render final outputs.
+4. Let the public workflow populate the flat compatibility variables under
+   `template_fields` and render final outputs after approval.
 
 ## OpenAI Module Outputs
 
@@ -56,7 +57,7 @@ Do not place these generated variables in the source Markdown. It should contain
 Run:
 
 ```bash
-python3 scripts/build_n8n_prospective_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 This writes all fields below to `template_fields`. The renderer overlays `template_fields` at the template root.
@@ -193,7 +194,7 @@ After `scripts/build_prs_xml_fields.py` runs, rebuilt PRS XML templates may use 
 The old n8n `Generate XML JSON` node used a simplified PRS shape and hardcoded values that the client corrected manually. For final ClinicalTrials.gov PRS XML, do not use that old JSON shape as the output structure. After this n8n mapper runs, run:
 
 ```bash
-python3 scripts/build_prs_xml_fields.py --run-dir <run-dir>
+python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 Use `references/prs-xml.md` for the canonical PRS template, required reviewer-controlled PRS fields, repeated block counts, defaults, and XML validation.

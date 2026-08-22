@@ -83,10 +83,10 @@ If approval must be recorded after a separate parsed correction pass, use:
 python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
 ```
 
-Then final validation and rendering must use approval gating:
+Then use the public workflow for final validation and rendering:
 
 ```bash
-python3 scripts/build_n8n_<branch>_fields.py --run-dir <run-dir> --check
+python3 scripts/workflow.py --run-dir <run-dir> --stage validate
 python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
