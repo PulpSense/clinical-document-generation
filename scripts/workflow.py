@@ -30,6 +30,7 @@ from rendering import render_documents, template_paths
 REFERENCE = Path("reference/study.reference.json")
 MAX_VERIFICATION_ATTEMPTS = 3
 DESKTOP_DELIVERY_RETRIES = 2
+DESKTOP_OPERATION_BUDGET_SECONDS = 900.0
 
 
 @dataclass(frozen=True)
@@ -450,6 +451,125 @@ def confirm_desktop_delivery(
         "attempts": sum(int(item.get("attempts", 0)) for item in opened),
         "findings": findings,
     }
+
+
+def run_desktop_operation(
+    run_dir: Path,
+    *,
+    handoff_runner: Callable[[list[Mapping[str, Any]], float], Any],
+    opener: Callable[[str], bytes],
+    operation_id: str = "default",
+    budget_seconds: float = DESKTOP_OPERATION_BUDGET_SECONDS,
+    clock: Callable[[], float] | None = None,
+    progress: Callable[[str, float], Any] | None = None,
+) -> dict[str, Any]:
+    """Run the post-approval lifecycle and confirm its Desktop file delivery.
+
+    Hermes owns the ``handoff_runner`` boundary and Desktop owns ``opener``;
+    this function only routes path metadata, advances the public workflow, and
+    validates the immutable delivery manifest.  The deadline is persisted so a
+    resumed operation cannot obtain a fresh budget.
+    """
+    run_dir = run_dir.resolve()
+    clock = clock or time.monotonic
+    if budget_seconds <= 0:
+        raise ValueError("Desktop operation budget must be positive.")
+    operation_key = _slug(operation_id)
+    state_path = run_dir / "logs" / (
+        "desktop-operation.json" if operation_key == "default" else f"desktop-operation-{operation_key}.json"
+    )
+    try:
+        persisted = _read(state_path) if state_path.is_file() else {}
+    except (OSError, ValueError, json.JSONDecodeError):
+        persisted = {}
+    if persisted.get("operation_id") not in {None, operation_id}:
+        raise ValueError("Desktop operation state belongs to a different operation.")
+
+    terminal = persisted.get("status") in {"passed", "blocked", "timeout"}
+    if terminal and isinstance(persisted.get("result"), Mapping):
+        return dict(persisted["result"])
+    started = float(persisted.get("started_monotonic", clock()))
+    deadline = float(persisted.get("deadline_monotonic", started + budget_seconds))
+    stage_history = list(persisted.get("stage_history", []))
+
+    def save(status: str, result: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        payload = {
+            "operation_id": operation_id,
+            "started_monotonic": started,
+            "deadline_monotonic": deadline,
+            "budget_seconds": deadline - started,
+            "status": status,
+            "stage_history": stage_history,
+        }
+        if result is not None:
+            payload["result"] = dict(result)
+        _write(state_path, payload)
+        return dict(result or payload)
+
+    def finish(result: Mapping[str, Any]) -> dict[str, Any]:
+        return save(str(result.get("status", "blocked")), result)
+
+    while True:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return finish({
+                "status": "timeout",
+                "stage": "desktop_operation",
+                "deadline_monotonic": deadline,
+                "findings": [{"category": "timeout", "field": "operation", "issue": "The post-approval Desktop operation deadline expired."}],
+                "client_outputs": [],
+            })
+        result = generate(run_dir)
+        stage = str(result.get("stage") or "generate")
+        stage_history.append({"stage": stage, "status": result.get("status"), "remaining_seconds": round(remaining, 3)})
+        save("running")
+        if progress is not None:
+            progress(stage, max(0.0, deadline - clock()))
+        if result.get("status") == "awaiting_hermes":
+            handoffs = result.get("handoffs")
+            if not isinstance(handoffs, list) or not handoffs:
+                return finish({**result, "status": "blocked", "stage": "hermes_handoff", "client_outputs": []})
+            remaining = deadline - clock()
+            if remaining <= 0:
+                continue
+            try:
+                handoff_runner(handoffs, remaining)
+            except Exception as exc:
+                return finish({
+                    "status": "blocked",
+                    "stage": "hermes_handoff",
+                    "findings": [{"category": "hermes", "field": "handoff", "issue": str(exc)}],
+                    "client_outputs": [],
+                })
+            continue
+        if result.get("status") != "passed":
+            return finish(result)
+        if deadline - clock() <= 0:
+            continue
+        manifest_name = str(result.get("manifest") or "")
+        manifest_path = (run_dir / manifest_name).resolve()
+        try:
+            manifest_path.relative_to(run_dir)
+            manifest = _read(manifest_path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            return finish({
+                "status": "blocked",
+                "stage": "desktop_delivery",
+                "findings": [{"category": "delivery", "field": "manifest", "issue": str(exc)}],
+                "client_outputs": [],
+            })
+        reply = result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
+        delivery = confirm_desktop_delivery(manifest, reply, opener, deadline=deadline)
+        final = {
+            **result,
+            "status": "passed" if delivery["confirmed"] else "blocked",
+            "stage": "desktop_delivery",
+            "delivery": delivery,
+            "deadline_monotonic": deadline,
+        }
+        if not delivery["confirmed"]:
+            final["client_outputs"] = []
+        return finish(final)
 
 
 def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
@@ -900,7 +1020,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "prepare", "run_release_gate", "validate"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "prepare", "run_desktop_operation", "run_release_gate", "validate"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

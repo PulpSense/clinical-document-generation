@@ -1,3 +1,5 @@
+import json
+
 import workflow
 
 
@@ -77,3 +79,90 @@ def test_desktop_confirmation_blocks_missing_attachment_without_opening_anything
 
     assert result["status"] == "blocked"
     assert calls == []
+
+
+def test_desktop_operation_routes_handoffs_then_confirms_the_published_manifest(tmp_path, monkeypatch):
+    calls = []
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "handoffs": [{"request_path": "draft.json"}]},
+        {"status": "passed", "stage": "delivery", "manifest": "revisions/r1/delivery-manifest.json"},
+    ])
+    manifest = _manifest()
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda run_dir: next(results))
+
+    def route(handoffs, remaining_seconds):
+        calls.append((handoffs, remaining_seconds))
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=route,
+        opener=lambda path: b"1234" if path.endswith("Protocol final.docx") else b"567",
+        budget_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert result["stage"] == "desktop_delivery"
+    assert len(calls) == 1
+    assert result["delivery"]["confirmed"] is True
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert state["status"] == "passed"
+    assert state["operation_id"] == "default"
+
+
+def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_after_timeout(tmp_path, monkeypatch):
+    now = [100.0]
+    generated = []
+    monkeypatch.setattr(workflow, "generate", lambda run_dir: generated.append(True) or {
+        "status": "awaiting_hermes",
+        "stage": "drafting",
+        "handoffs": [{"request_path": "draft.json"}],
+    })
+
+    def route(handoffs, remaining_seconds):
+        now[0] = 111.0
+
+    first = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=route,
+        opener=lambda path: b"unused",
+        budget_seconds=10,
+        clock=lambda: now[0],
+    )
+    second = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=route,
+        opener=lambda path: b"unused",
+        budget_seconds=99,
+        clock=lambda: now[0],
+    )
+
+    assert first["status"] == second["status"] == "timeout"
+    assert first["stage"] == second["stage"] == "desktop_operation"
+    assert len(generated) == 1
+    assert second["deadline_monotonic"] == first["deadline_monotonic"]
+
+
+def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fails(tmp_path, monkeypatch):
+    manifest = _manifest()
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda run_dir: {
+        "status": "passed",
+        "stage": "delivery",
+        "manifest": "revisions/r1/delivery-manifest.json",
+    })
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda handoffs, remaining_seconds: None,
+        opener=lambda path: b"wrong",
+        budget_seconds=30,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "desktop_delivery"
+    assert result["delivery"]["confirmed"] is False
