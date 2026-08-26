@@ -8,10 +8,12 @@ import copy
 import hashlib
 import json
 import os
+import platform
 import shutil
 import sys
 import tempfile
 import time
+import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -23,7 +25,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import batch_plan, canonical_study_type, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import create_verification_requests, pending_verifications, preflight, quality_report, render_pages, sha256_file as quality_sha256
+from quality import _template_fonts, create_verification_requests, pending_verifications, preflight, quality_report, render_pages, renderer, sha256_file as quality_sha256
 from rendering import render_documents, template_paths
 
 
@@ -31,6 +33,95 @@ REFERENCE = Path("reference/study.reference.json")
 MAX_VERIFICATION_ATTEMPTS = 3
 DESKTOP_DELIVERY_RETRIES = 2
 DESKTOP_OPERATION_BUDGET_SECONDS = 900.0
+RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
+
+
+def _release_excluded(path: Path) -> bool:
+    """Return whether a path belongs to development-only or sensitive data."""
+    parts = set(path.parts)
+    if parts & {".git", ".scratch", "runs", ".hermes", ".test-venv", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "tests", "input", "inputs", "source-data", "patient-data", "evidence", "output"}:
+        return True
+    name = path.name.casefold()
+    if name in {".env", ".env.local", "artifact.md", ".coverage"} or name.endswith((".pem", ".key", ".p12", ".pfx", ".sqlite", ".sqlite3")):
+        return True
+    return False
+
+
+def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
+    """Create a deterministic, installable Hermes skill archive.
+
+    The archive contains only the skill runtime and its governed resources. The
+    manifest is written into the archive and hashes every other member, making
+    the installed candidate auditable without including source inputs or runs.
+    """
+    repo_root = repo_root.resolve()
+    output_path = output_path.expanduser().resolve()
+    if output_path == repo_root or repo_root in output_path.parents:
+        raise ValueError("Release archive must be outside the skill repository.")
+    files = [
+        path for path in sorted(repo_root.rglob("*"))
+        if path.is_file() and not _release_excluded(path.relative_to(repo_root))
+    ]
+    if not files:
+        raise ValueError("No release files were found.")
+    entries = []
+    for path in files:
+        relative = path.relative_to(repo_root).as_posix()
+        entries.append({"path": relative, "sha256": sha256_file(path), "bytes": path.stat().st_size})
+    templates = [path for path in files if path.is_relative_to(repo_root / "assets/client-templates")]
+    font_inventory = {}
+    for path in templates:
+        if path.suffix.casefold() == ".docx":
+            font_inventory[path.relative_to(repo_root).as_posix()] = sorted(_template_fonts(path))
+    implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
+    manifest = {
+        "schema_version": "hermes-release-manifest/v1",
+        "package_root": "clinical-document-generation",
+        "package_purpose": "Installable runtime for the reviewed clinical document workflow.",
+        "installation": {
+            "entrypoint": "SKILL.md",
+            "runtime": "Python 3.10+",
+            "dependencies": "requirements.txt",
+            "install_as_direct_child_of": "Hermes skills directory",
+            "required_external_tools": ["Microsoft Word, LibreOffice, or Apple Pages", "pdftoppm"],
+        },
+        "inventory": {
+            "implementation": implementation_files,
+            "templates_and_contracts": [item["path"] for item in entries if item["path"].startswith(("assets/", "references/"))],
+            "font_identities": font_inventory,
+            "renderer_at_packaging": renderer(environment=os.environ),
+            "harness": {"python": platform.python_version(), "platform": platform.platform()},
+            "model": "Hermes Desktop runtime; model identity is recorded per generation evidence.",
+        },
+        "excluded_classes": ["git metadata", "development virtual environments", "credentials", "patient/source data", "old run outputs", "development tests"],
+        "files": entries,
+    }
+    manifest_payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    manifest["package_fingerprint"] = hashlib.sha256(manifest_payload).hexdigest()
+    manifest_text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_name(f".{output_path.name}.tmp")
+    try:
+        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+            for path in files:
+                relative = path.relative_to(repo_root).as_posix()
+                info = zipfile.ZipInfo(f"clinical-document-generation/{relative}", date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(info, path.read_bytes())
+            info = zipfile.ZipInfo(f"clinical-document-generation/{RELEASE_MANIFEST}", date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = zipfile.ZIP_DEFLATED
+            archive.writestr(info, manifest_text.encode("utf-8"))
+        os.replace(temporary, output_path)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return {
+        "status": "passed",
+        "package": output_path.as_posix(),
+        "package_fingerprint": manifest["package_fingerprint"],
+        "file_count": len(entries),
+        "archive_bytes": output_path.stat().st_size,
+        "manifest": f"clinical-document-generation/{RELEASE_MANIFEST}",
+    }
 
 
 @dataclass(frozen=True)
@@ -1010,9 +1101,10 @@ def run_release_gate(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root")
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an installable release archive")
     args = parser.parse_args(argv)
-    if args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
+    if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
+    elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     else:
         if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless --release-gate is used")
         run_dir = Path(args.run_dir).expanduser().resolve()
@@ -1020,7 +1112,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "prepare", "run_desktop_operation", "run_release_gate", "validate"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "package_release", "prepare", "run_desktop_operation", "run_release_gate", "validate"]
 
 
 if __name__ == "__main__": raise SystemExit(main())
