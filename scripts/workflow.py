@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import json
 import os
 import shutil
 import sys
 import tempfile
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -27,6 +29,7 @@ from rendering import render_documents, template_paths
 
 REFERENCE = Path("reference/study.reference.json")
 MAX_VERIFICATION_ATTEMPTS = 3
+DESKTOP_DELIVERY_RETRIES = 2
 
 
 @dataclass(frozen=True)
@@ -343,6 +346,112 @@ def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, 
     return build
 
 
+def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | None = None) -> dict[str, Any]:
+    """Build the supported file-link payload for the final Desktop reply.
+
+    The manifest is the only source for attachments.  In particular, this
+    deliberately does not scan the run directory, which could expose drafts,
+    QA evidence, or rendered previews.
+    """
+    outputs = manifest.get("client_outputs")
+    if not isinstance(outputs, list) or not outputs:
+        raise ValueError("A passing Generation Manifest must contain client outputs.")
+    attachments = []
+    for item in outputs:
+        if not isinstance(item, Mapping):
+            raise ValueError("Generation Manifest contains an invalid client output.")
+        path = str(item.get("path") or "")
+        filename = Path(path).name
+        path_parts = Path(path).parts
+        digest = str(item.get("sha256") or "")
+        if (
+            not path
+            or Path(path).is_absolute()
+            or ".." in path_parts
+            or not filename
+            or filename != path.rsplit("/", 1)[-1]
+            or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest.lower())
+            or int(item.get("bytes") or 0) < 1
+        ):
+            raise ValueError("Generation Manifest contains an invalid client output path.")
+        absolute_path = (run_dir / path).resolve().as_posix() if run_dir is not None else path
+        attachments.append({
+            "filename": filename,
+            "path": path,
+            "absolute_path": absolute_path,
+            "sha256": digest,
+            "bytes": int(item.get("bytes") or 0),
+            "mime_type": "application/xml" if filename.lower().endswith(".xml") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "link": f"[{filename}](<{absolute_path}>)",
+        })
+    return {
+        "type": "desktop_file_attachments",
+        "attachments": attachments,
+        "client_outputs_only": True,
+    }
+
+
+def confirm_desktop_delivery(
+    manifest: Mapping[str, Any],
+    reply: Mapping[str, Any],
+    opener: Callable[[str], bytes],
+    *,
+    deadline: float | None = None,
+    retries: int = DESKTOP_DELIVERY_RETRIES,
+) -> dict[str, Any]:
+    """Retrieve and open every attachment, preserving the manifest bytes.
+
+    ``opener`` is the actual Desktop media boundary: it must return the bytes
+    obtained by opening the link, rather than merely echoing a path. Retries
+    reuse the same validated attachment and never invoke generation again.
+    """
+    expected = desktop_attachment_reply(manifest)["attachments"]
+    actual = reply.get("attachments") if isinstance(reply, Mapping) else None
+    findings = []
+    def identity(item: Mapping[str, Any]) -> tuple[Any, ...]:
+        return tuple(item.get(key) for key in ("filename", "path", "sha256", "bytes"))
+
+    if not isinstance(actual, list) or [identity(item) for item in actual if isinstance(item, Mapping)] != [identity(item) for item in expected]:
+        findings.append({"category": "delivery", "field": "attachments", "issue": "Desktop reply attachments do not match the immutable Generation Manifest."})
+    if findings:
+        return {"status": "blocked", "confirmed": False, "findings": findings, "attempts": 0}
+    opened = []
+    for item, delivered in zip(expected, actual, strict=True):
+        attempts = 0
+        last_issue = ""
+        opened_current = False
+        while attempts <= retries:
+            attempts += 1
+            if deadline is not None and time.monotonic() >= deadline:
+                last_issue = "Desktop delivery deadline expired."
+                break
+            try:
+                payload = opener(str(delivered.get("absolute_path") or delivered["path"]))
+                if not isinstance(payload, bytes):
+                    raise TypeError("Desktop opener did not return bytes.")
+                digest = hashlib.sha256(payload).hexdigest()
+                if len(payload) != int(item["bytes"]) or digest != item["sha256"]:
+                    raise ValueError("Retrieved file bytes do not match the immutable Generation Manifest.")
+                opened.append({"filename": item["filename"], "sha256": digest, "bytes": len(payload), "attempts": attempts})
+                opened_current = True
+                break
+            except Exception as exc:  # transport failures are reported, never certified
+                last_issue = str(exc)
+        else:
+            last_issue = last_issue or "Desktop file transfer failed."
+        if not opened_current:
+            findings.append({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."})
+            break
+    return {
+        "status": "confirmed" if not findings else "blocked",
+        "confirmed": not findings,
+        "opened": opened,
+        "attempts": sum(int(item.get("attempts", 0)) for item in opened),
+        "findings": findings,
+    }
+
+
 def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
     evidence = []
     for path in sorted((revision_dir / "hermes/accepted").glob("*.json")):
@@ -396,8 +505,9 @@ def _publish(run_dir: Path, revision_dir: Path, reference: Mapping[str, Any], qu
     build_path = revision_dir / "candidate-build.json"
     build = _read(build_path) if build_path.is_file() else {}
     manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published}
+    manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
-    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "client_outputs": [item["path"] for item in published], "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
+    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
 
 
 def _clear_verification_responses(revision_dir: Path, tasks: set[str] | None = None) -> None:
@@ -790,7 +900,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "generate", "prepare", "run_release_gate", "validate"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "prepare", "run_release_gate", "validate"]
 
 
 if __name__ == "__main__": raise SystemExit(main())
