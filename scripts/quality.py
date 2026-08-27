@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, protocol_contract, recovery_finding
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, protocol_contract, recovery_finding
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -1448,6 +1448,12 @@ def _artifact_hashes(revision_dir: Path, paths: Iterable[Path]) -> list[dict[str
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
+    draftable_sections = {
+        section_id
+        for batch in batch_plan(branch, icf_template)
+        for section_id in batch.section_ids
+    }
     protocol = revision_dir / "candidate/protocol.docx"
     findings.extend(audit_docx(protocol, required_phrases=[str(get_path(reference, "study.title", ""))]))
     document = Document(protocol)
@@ -1570,7 +1576,6 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         findings.extend(audit_docx(icf, required_phrases=[str(get_path(reference, "study.title", ""))]))
         icf_document = Document(icf)
         icf_visible = re.sub(r"\s+", " ", " ".join(paragraph.text for paragraph in icf_document.paragraphs)).casefold()
-        icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
         for section_id, title in icf_retained_sections(branch, icf_template):
             if title.casefold() not in icf_visible:
                 findings.append(recovery_finding({
@@ -1587,6 +1592,11 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 "target_ids": ["layout:icf"],
                 "issue": "Required participant signature block is missing from the ICF.",
             }, "document_structure_defect"))
+        injury_or_costs = (
+            "icf.injury" if "icf.injury" in draftable_sections
+            else "icf.costs" if "icf.costs" in draftable_sections
+            else "icf"
+        )
         stale_icf_claims = {
             "eye tests and procedures": "icf.procedures",
             "routine cataract surgery": "icf.study-purpose",
@@ -1594,8 +1604,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             "no additional side effects or risks expected": "icf.risks",
             "not to be used for participant enrollment": "icf.study-purpose",
             "advarra institutional review board": "icf.privacy",
-            "all charges for medical care": "icf.injury",
-            "insurance company": "icf.injury",
+            "all charges for medical care": injury_or_costs,
+            "insurance company": injury_or_costs,
         }
         for phrase, target in stale_icf_claims.items():
             if phrase in icf_visible and phrase not in source_visible:
@@ -1630,7 +1640,11 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             governed.append(item)
             continue
         targets = item.get("target_ids") if isinstance(item.get("target_ids"), list) else []
-        unlocalized = not targets or any(str(target).strip().casefold() in {"", "protocol", "icf"} for target in targets)
+        unlocalized = not targets or any(
+            str(target).strip().casefold() in {"", "protocol", "icf"}
+            or str(target) not in draftable_sections
+            for target in targets
+        )
         governed.append(recovery_finding(
             item,
             "document_structure_defect" if unlocalized else "drafting_defect",

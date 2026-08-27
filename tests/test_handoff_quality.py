@@ -658,6 +658,23 @@ def test_unlocalized_protocol_duplicate_stops_as_a_structural_defect(tmp_path):
     assert result["stage"] == "document_structure"
 
 
+def test_stale_icf_cost_language_uses_the_supported_branch_drafting_target(tmp_path):
+    from rendering import render_documents
+
+    reference = fixture()
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    icf_path = tmp_path / "candidate/icf.docx"
+    document = Document(icf_path)
+    document.add_paragraph("All charges for medical care will be billed to your insurance company.")
+    document.save(icf_path)
+
+    findings = deterministic_content_check(tmp_path, reference)
+    stale = next(item for item in findings if "all charges for medical care" in item["issue"])
+
+    assert stale["target_ids"] == ["icf.costs"]
+    assert (stale["recovery_class"], stale["action"]) == ("drafting_defect", "retry_drafting_target")
+
+
 def test_complete_bundle_is_part_of_governing_resources():
     resources = governing_resources(ROOT, fixture())
     bundle = resources["contracted_template_bundle"]
