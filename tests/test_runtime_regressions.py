@@ -552,7 +552,7 @@ def test_layout_retry_persists_scoped_rule_and_the_original_operation_deadline(t
         reference,
         revision_dir,
         {},
-        [{"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "issue": "orphan heading"}],
+        [{"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
         "rendered_document_qa",
         operation_deadline=99.0,
         clock=clock,
@@ -631,6 +631,7 @@ def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
     response_path.parent.mkdir(parents=True, exist_ok=True)
     response_path.write_text("{}", encoding="utf-8")
     current = {
+        "status": "passed",
         "renderer": {"kind": "LibreOffice"},
         "page_renderer": {"kind": "pymupdf"},
         "artifacts": [
@@ -639,6 +640,11 @@ def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
     }
 
     merged = workflow._merge_artifact_reports(prior, current)
+    assurance, assurance_render = workflow._merge_partial_assurance(
+        {"render_report": prior},
+        {"status": "passed", "render": current},
+        {"protocol"},
+    )
     paths = quality.create_verification_requests(tmp_path, _source(), merged)
     icf_request = json.loads(next(path for path in paths if "visual.icf" in path.name).read_text(encoding="utf-8"))
     protocol_request = json.loads(next(path for path in paths if "visual.protocol" in path.name).read_text(encoding="utf-8"))
@@ -647,6 +653,7 @@ def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
     assert response_path.is_file()
     assert icf_request["renderer"] == {"kind": "Pages"}
     assert protocol_request["renderer"] == {"kind": "LibreOffice"}
+    assert assurance["render"] == assurance_render == merged
 
 
 def test_renderer_preflight_render_verifies_an_uninspectable_font_instead_of_failing(monkeypatch):
@@ -1058,7 +1065,7 @@ def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     reference_path.parent.mkdir(parents=True)
     working = {"generation": {}}
     reference_path.write_text(json.dumps(working), encoding="utf-8")
-    finding = {"category": "reviewer-transient", "field": "clinical_content_verification", "target_ids": ["verification:content"], "issue": "temporary"}
+    finding = {"category": "reviewer-transient", "field": "clinical_content_verification", "target_ids": ["verification:content"], "recovery_class": "verifier_transient", "action": "retry_verifier", "issue": "temporary"}
 
     result = workflow._quality_retry(run_dir, reference_path, working, {}, revision, {}, [finding], "quality")
 
@@ -1067,6 +1074,59 @@ def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["generation"]["verification_attempts"]["verification:content"] == 1
     assert not (revision / "hermes/verification-responses/clinical_content_verification.json").exists()
+
+
+def test_quality_retry_rejects_a_finding_without_a_governed_recovery_class(tmp_path):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {}},
+        {},
+        revision,
+        {},
+        [{"category": "visual", "field": "protocol", "issue": "free text must not select recovery"}],
+        "quality",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "recovery_classification"
+    assert result["findings"][0]["field"] == "recovery_class"
+
+
+def test_quality_retry_rejects_a_recovery_class_with_the_wrong_target_type(tmp_path):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {}},
+        {},
+        revision,
+        {},
+        [{
+            "category": "verification",
+            "field": "content",
+            "target_ids": ["verification:content"],
+            "recovery_class": "visual_defect",
+            "action": "targeted_layout_repair",
+            "issue": "category prose must not override the Recovery Class",
+        }],
+        "quality",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "recovery_classification"
+    assert result["findings"][0]["field"] == "target_ids"
 
 
 def test_layout_failure_rebuilds_and_reverifies_before_retry_limit(tmp_path, monkeypatch):
@@ -1096,7 +1156,7 @@ def test_layout_failure_rebuilds_and_reverifies_before_retry_limit(tmp_path, mon
         {},
         revision,
         {},
-        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "issue": "orphan heading"}],
+        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
         "quality",
     )
 
@@ -1114,7 +1174,7 @@ def test_layout_failure_blocks_only_after_three_total_attempts(tmp_path):
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
-    finding = {"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "issue": "orphan heading"}
+    finding = {"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}
 
     result = workflow._quality_retry(
         run_dir,
@@ -1239,7 +1299,7 @@ def test_layout_failure_invalidates_only_the_affected_artifact_evidence(tmp_path
         {"meta": {"study_type": "Retrospective"}},
         revision,
         {},
-        [{"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "issue": "orphaned heading"}],
+        [{"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphaned heading"}],
         "quality",
     )
 

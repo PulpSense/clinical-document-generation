@@ -54,6 +54,22 @@ def _bundle() -> dict:
     }
 
 
+def _structural_validation(revision_dir: Path, *expected_files: str) -> dict:
+    return {
+        "status": "structurally_valid",
+        "expected_files": list(expected_files),
+        "candidate_files": [
+            {
+                "path": path.relative_to(revision_dir).as_posix(),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "bytes": path.stat().st_size,
+            }
+            for path in sorted((revision_dir / "candidate").glob("*"))
+            if path.is_file()
+        ],
+    }
+
+
 def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exact_artifacts(tmp_path):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
@@ -96,6 +112,7 @@ def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exa
         tmp_path,
         {},
         contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[office],
         page_renderer_identities=[pages],
         font_probe=lambda font, **_kwargs: states[font],
@@ -159,6 +176,7 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
         tmp_path,
         {},
         contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[word, libreoffice],
         page_renderer_identities=[poppler, pymupdf],
         font_probe=lambda _font, **_kwargs: (True, "available"),
@@ -197,6 +215,11 @@ def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnosti
     document = Document()
     document.add_paragraph("Structurally valid candidate")
     document.save(candidate / "protocol.docx")
+    stale_pdf = tmp_path / "rendered/protocol.pdf"
+    stale_page = tmp_path / "rendered/protocol/page-1.png"
+    stale_page.parent.mkdir(parents=True)
+    stale_pdf.write_bytes(b"stale pdf")
+    stale_page.write_bytes(b"stale page")
     original_hash = hashlib.sha256((candidate / "protocol.docx").read_bytes()).hexdigest()
     word = {"kind": "Microsoft Word", "path": "/controlled/word"}
     libreoffice = {"kind": "LibreOffice", "path": "/controlled/soffice"}
@@ -206,6 +229,7 @@ def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnosti
         tmp_path,
         {},
         contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[word, libreoffice],
         page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
         font_probe=lambda _font, **_kwargs: (True, "available"),
@@ -220,7 +244,94 @@ def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnosti
         "bytes": (candidate / "protocol.docx").stat().st_size,
     }]
     assert report["diagnostic"]["recovery_class"] == "adapter_fault"
-    assert report["diagnostic"]["action"] == "preserve_candidate_and_stop"
+    assert report["diagnostic"]["action"] == RECOVERY_POLICIES["adapter_fault"]
+    assert report["diagnostic"]["outcome"] == "adapters_exhausted"
+    assert report["diagnostic"]["candidate_disposition"] == "preserved"
     assert report["diagnostic"]["office_attempts"] == report["render"]["renderer_attempts"]
     assert report["diagnostic"]["page_attempts"] == []
     assert len(report["findings"]) == 1
+    assert not stale_pdf.exists()
+    assert not stale_page.exists()
+
+
+def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp_path):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    document = Document()
+    run = document.add_paragraph().add_run("Missing font")
+    run.font.name = "Missing Sans"
+    document.save(candidate / "protocol.docx")
+    rebuilds = []
+
+    def rebuild(substitutions):
+        rebuilds.append(dict(substitutions))
+        rebuilt = Document(candidate / "protocol.docx")
+        for paragraph in rebuilt.paragraphs:
+            for run in paragraph.runs:
+                if run.font.name in substitutions:
+                    run.font.name = substitutions[run.font.name]
+        rebuilt.save(candidate / "protocol.docx")
+        return {"status": "passed"}
+
+    def probe(font, **_kwargs):
+        return (False, "missing") if font == "Missing Sans" else (True, "available")
+
+    def fail_export(*_args, **_kwargs):
+        raise RuntimeError("controlled failure")
+
+    first = render_assurance(
+        ROOT,
+        tmp_path,
+        {},
+        contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, "protocol.docx"),
+        renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
+        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        font_probe=probe,
+        rebuild_candidate=rebuild,
+        office_exporter=fail_export,
+    )
+    substituted_hash = hashlib.sha256((candidate / "protocol.docx").read_bytes()).hexdigest()
+    second = render_assurance(
+        ROOT,
+        tmp_path,
+        {},
+        contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, "protocol.docx"),
+        candidate_font_substitutions=first["font_substitutions"],
+        renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
+        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        font_probe=probe,
+        rebuild_candidate=rebuild,
+        office_exporter=fail_export,
+    )
+
+    assert first["font_substitutions"] == second["font_substitutions"] == {"Missing Sans": "Liberation Sans"}
+    assert rebuilds == [{"Missing Sans": "Liberation Sans"}]
+    assert hashlib.sha256((candidate / "protocol.docx").read_bytes()).hexdigest() == substituted_hash
+
+
+def test_render_assurance_rejects_an_incomplete_branch_candidate(tmp_path):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    Document().save(candidate / "protocol.docx")
+
+    report = render_assurance(
+        ROOT,
+        tmp_path,
+        {},
+        contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(
+            tmp_path,
+            "protocol.docx",
+            "icf.docx",
+            "study.xml",
+        ),
+        renderer_identities=[],
+        page_renderer_identities=[],
+    )
+
+    assert report["status"] == "blocked"
+    assert report["render"]["status"] == "not_run"
+    assert report["findings"][0]["recovery_class"] == "document_structure_defect"
+    assert "complete structurally validated" in report["findings"][0]["issue"]

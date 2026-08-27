@@ -142,6 +142,13 @@ def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_re
     def fake_assurance(_root, revision_dir, _reference, **kwargs):
         observed["pages"] = kwargs["page_renderer_identities"]
         observed["candidate"] = (revision_dir / "candidate/installation-smoke.docx").is_file()
+        document = workflow.Document(revision_dir / "candidate/installation-smoke.docx")
+        observed["fonts"] = {
+            run.font.name
+            for paragraph in document.paragraphs
+            for run in paragraph.runs
+            if run.font.name
+        }
         return {
             "schema_version": "render-assurance/v1",
             "status": "passed",
@@ -170,3 +177,4 @@ def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_re
     assert result["status"] == "passed"
     assert observed["pages"] == [bundled]
     assert observed["candidate"] is True
+    assert observed["fonts"] == {"Liberation Sans", "Liberation Serif", "Liberation Mono"}

@@ -27,10 +27,10 @@ from docx import Document
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
-from contracts import ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
+from contracts import BUNDLED_FONT_FILES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, recovery_finding, render_assurance, renderer, renderers, sha256_file as quality_sha256
+from quality import PAGE_RENDERER_BACKENDS, RECOVERY_POLICIES, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, recovery_finding, render_assurance, renderer, renderers, sha256_file as quality_sha256
 from rendering import render_documents
 
 
@@ -330,13 +330,24 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
         candidate_dir = revision_dir / "candidate"
         candidate_dir.mkdir()
         document = Document()
-        run = document.add_paragraph().add_run("Clinical document installation smoke")
-        run.font.name = "Liberation Sans"
+        for font in BUNDLED_FONT_FILES:
+            run = document.add_paragraph().add_run(f"{font}: Clinical document installation smoke")
+            run.font.name = font
         document.save(candidate_dir / "installation-smoke.docx")
+        smoke_path = candidate_dir / "installation-smoke.docx"
         assurance = render_assurance(
             skill_root,
             revision_dir,
             reference,
+            structural_validation={
+                "status": "structurally_valid",
+                "expected_files": [smoke_path.name],
+                "candidate_files": [{
+                    "path": smoke_path.relative_to(revision_dir).as_posix(),
+                    "sha256": sha256_file(smoke_path),
+                    "bytes": smoke_path.stat().st_size,
+                }],
+            },
             deadline_seconds=deadline_seconds,
             renderer_identities=fallback_renderers,
             page_renderer_identities=fallback_pages,
@@ -843,7 +854,7 @@ def _document_report_failure(
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     """Interpret one blocked DOCX report identically on every render path."""
     findings = [
-        {**finding, "target_ids": [f"layout:{item['artifact']}"]}
+        recovery_finding({**finding, "target_ids": [f"layout:{item['artifact']}"]}, "document_structure_defect")
         for item in document_report.get("artifacts", [])
         for finding in item.get("findings", [])
     ]
@@ -917,10 +928,22 @@ def _cached_build(revision_dir: Path, fingerprint: str) -> dict[str, Any] | None
 
 
 def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, Any], contracted_bundle: Mapping[str, Any], document_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None, render_report: Mapping[str, Any]) -> dict[str, Any]:
-    candidate_files = [{"path": path.relative_to(revision_dir).as_posix(), "sha256": sha256_file(path), "bytes": path.stat().st_size} for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
+    candidate_files = _candidate_file_records(revision_dir)
     build = {"fingerprint": fingerprint, "governing_resources": dict(governing), "contracted_template_bundle": dict(contracted_bundle), "candidate_files": candidate_files, "document_report": dict(document_report), "xml_report": dict(xml_report) if xml_report else None, "render_report": dict(render_report)}
     _write(revision_dir / "candidate-build.json", build)
     return build
+
+
+def _candidate_file_records(revision_dir: Path) -> list[dict[str, Any]]:
+    return [
+        {
+            "path": path.relative_to(revision_dir).as_posix(),
+            "sha256": sha256_file(path),
+            "bytes": path.stat().st_size,
+        }
+        for path in sorted((revision_dir / "candidate").glob("*"))
+        if path.is_file()
+    ]
 
 
 def _cached_candidate_structure(revision_dir: Path, fingerprint: str) -> dict[str, Any] | None:
@@ -947,23 +970,17 @@ def _record_candidate_structure(
     contracted_bundle: Mapping[str, Any],
     document_report: Mapping[str, Any],
     xml_report: Mapping[str, Any] | None,
+    expected_files: Iterable[str],
 ) -> dict[str, Any]:
     snapshot = {
         "fingerprint": fingerprint,
         "governing_resources": dict(governing),
         "contracted_template_bundle": dict(contracted_bundle),
-        "candidate_files": [
-            {
-                "path": path.relative_to(revision_dir).as_posix(),
-                "sha256": sha256_file(path),
-                "bytes": path.stat().st_size,
-            }
-            for path in sorted((revision_dir / "candidate").glob("*"))
-            if path.is_file()
-        ],
+        "candidate_files": _candidate_file_records(revision_dir),
         "document_report": dict(document_report),
         "xml_report": dict(xml_report) if xml_report else None,
         "font_substitutions": dict(governing.get("font_substitutions") or {}),
+        "expected_files": sorted(str(name) for name in expected_files),
         "status": "structurally_valid",
     }
     _write(revision_dir / "candidate-structure.json", snapshot)
@@ -988,6 +1005,20 @@ def _merge_artifact_reports(prior: Mapping[str, Any], current: Mapping[str, Any]
     merged = {**dict(prior), **dict(current), "artifacts": [artifacts[key] for key in sorted(artifacts)]}
     merged["status"] = "passed" if artifacts and all(item.get("status", "passed") == "passed" for item in artifacts.values()) else "blocked"
     return merged
+
+
+def _merge_partial_assurance(
+    prior_build: Mapping[str, Any],
+    assurance: Mapping[str, Any],
+    repaired_artifacts: set[str],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Return the complete exact-artifact evidence persisted after a local repair."""
+    complete = dict(assurance)
+    render_report = dict(complete.get("render") or {})
+    if repaired_artifacts and render_report.get("status") == "passed":
+        render_report = _merge_artifact_reports(prior_build.get("render_report", {}), render_report)
+        complete["render"] = render_report
+    return complete, render_report
 
 
 def _unaffected_build_is_valid(
@@ -1571,8 +1602,59 @@ def _quality_retry(
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
     """Retry draftable targets; deterministic layout defects require an actual repair."""
+    invalid_recovery = [
+        {
+            "category": "recovery-classification",
+            "field": "recovery_class",
+            "issue": "Every recoverable finding must carry one governed Recovery Class and its lawful action.",
+            "finding": dict(item),
+        }
+        for item in findings
+        if item.get("recovery_class") not in RECOVERY_POLICIES
+        or item.get("action") != RECOVERY_POLICIES.get(str(item.get("recovery_class")))
+    ]
+    if invalid_recovery:
+        return _repair_block(
+            run_dir,
+            "recovery_classification",
+            invalid_recovery,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
+    structural = [item for item in findings if item.get("recovery_class") == "document_structure_defect"]
+    if structural:
+        return _repair_block(
+            run_dir,
+            "document_structure",
+            structural,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
+    expected_target_category = {
+        "visual_defect": "layout",
+        "drafting_defect": "section",
+        "verifier_transient": "verification",
+    }
+    explicit_route_errors = [
+        {
+            "category": "recovery-classification",
+            "field": "target_ids",
+            "issue": f"Recovery Class {item.get('recovery_class')} requires {expected} targets.",
+            "finding": dict(item),
+        }
+        for item in findings
+        if (expected := expected_target_category.get(str(item.get("recovery_class")))) is not None
+        and isinstance(item.get("target_ids"), list)
+        and item.get("target_ids")
+        and any(RetryTarget.parse(str(target)).category != expected for target in item["target_ids"])
+    ]
+    if explicit_route_errors:
+        return _repair_block(
+            run_dir,
+            "recovery_classification",
+            explicit_route_errors,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
     _archive_failed_attempt(revision_dir, stage, findings)
-    transient = [item for item in findings if item.get("category") == "reviewer-transient"]
+    transient = [item for item in findings if item.get("recovery_class") == "verifier_transient"]
     if transient:
         verification_attempts = working_reference.setdefault("generation", {}).setdefault("verification_attempts", {})
         exhausted = []
@@ -1597,7 +1679,7 @@ def _quality_retry(
             path.write_text(repair_report(exhausted), encoding="utf-8")
             return {"status": "blocked", "stage": "reviewer_retry_limit", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
         _clear_verification_responses(revision_dir, tasks)
-        remaining = [item for item in findings if item.get("category") != "reviewer-transient"]
+        remaining = [item for item in findings if item.get("recovery_class") != "verifier_transient"]
         if not remaining:
             return _awaiting(
                 revision_dir,
@@ -1629,15 +1711,33 @@ def _quality_retry(
             field = str(finding.get("field") or "")
             if field in known_sections:
                 targets = [field]
-            elif finding.get("category") == "visual" or "visual" in field:
+            elif finding.get("recovery_class") == "visual_defect":
                 targets = [f"layout:{finding.get('artifact') or 'documents'}"]
-            elif "content" in field or finding.get("category") == "verification":
+            elif finding.get("recovery_class") == "verifier_transient":
                 targets = ["verification:content"]
             else:
                 targets = ["layout:documents"]
         finding["target_ids"] = targets
         normalized.append(finding)
     targets = {RetryTarget.parse(target) for finding in normalized for target in finding["target_ids"]}
+    route_errors = [
+        {
+            "category": "recovery-classification",
+            "field": "target_ids",
+            "issue": f"Recovery Class {finding.get('recovery_class')} requires {expected} targets.",
+            "finding": finding,
+        }
+        for finding in normalized
+        if (expected := expected_target_category.get(str(finding.get("recovery_class")))) is not None
+        and any(RetryTarget.parse(str(target)).category != expected for target in finding["target_ids"])
+    ]
+    if route_errors:
+        return _repair_block(
+            run_dir,
+            "recovery_classification",
+            route_errors,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
     section_targets = {
         target.target_id
         for target in targets
@@ -1850,7 +1950,7 @@ def generate(
                         for finding in xml_report["findings"]
                     ]
                     return _repair_block(run_dir, "xml", findings, candidate_outputs=_candidate_outputs(revision_dir))
-            structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report)
+            structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
 
         remaining = 180.0 if operation_deadline is None else operation_deadline - clock()
         if remaining <= 0:
@@ -1883,6 +1983,7 @@ def generate(
             revision_dir,
             reference,
             contracted_bundle=bundle,
+            structural_validation=structure,
             candidate_font_substitutions=font_substitutions,
             rebuild_candidate=rebuild_with_substitutions,
             artifact_names=partial_repair or None,
@@ -1906,15 +2007,12 @@ def generate(
                 font_substitutions=font_substitutions,
                 layout_repairs=layout_repairs,
             )
-            structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report)
+            structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
+        assurance_report, render_report = _merge_partial_assurance(prior_build or {}, assurance_report, partial_repair)
         state["render_assurance"] = assurance_report
         state.pop("renderer_preflight", None)
-        structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report)
+        structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
         _write(reference_path, working_reference)
-        render_report = dict(assurance_report.get("render") or {})
-        if partial_repair and render_report.get("status") == "passed":
-            render_report = _merge_artifact_reports(prior_build.get("render_report", {}), render_report)
-            assurance_report["render"] = render_report
         if assurance_report.get("status") != "passed":
             findings = [
                 {**finding, "target_ids": finding.get("target_ids") or [f"layout:{finding.get('artifact') or 'documents'}"]}

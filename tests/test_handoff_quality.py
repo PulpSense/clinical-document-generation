@@ -291,8 +291,8 @@ def test_environment_failure_retains_a_complete_candidate_built_before_render_as
         "font_substitutions": {},
         "candidate": {"files": []},
         "render": {"status": "blocked", "renderer_attempts": [], "page_renderer_attempts": [], "findings": []},
-        "findings": [{"category": "renderer", "field": "renderer", "recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "issue": "fallback stack unavailable"}],
-        "diagnostic": {"recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "office_attempts": [], "page_attempts": []},
+        "findings": [{"category": "renderer", "field": "renderer", "recovery_class": "adapter_fault", "action": "advance_adapter", "issue": "fallback stack unavailable"}],
+        "diagnostic": {"recovery_class": "adapter_fault", "action": "advance_adapter", "outcome": "adapters_exhausted", "candidate_disposition": "preserved", "office_attempts": [], "page_attempts": []},
     })
 
     result = generate(run_dir)
@@ -337,8 +337,8 @@ def test_repeated_adapter_exhaustion_reuses_candidate_without_drafting_or_regene
             "font_substitutions": {},
             "candidate": {"files": [{"path": "candidate/protocol.docx", "sha256": hashlib.sha256(candidate.read_bytes()).hexdigest(), "bytes": candidate.stat().st_size}]},
             "render": {"status": "blocked", "renderer_attempts": [], "page_renderer_attempts": [], "findings": []},
-            "findings": [{"category": "renderer", "field": "rendering", "recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "issue": "all adapters exhausted"}],
-            "diagnostic": {"recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "office_attempts": [], "page_attempts": []},
+            "findings": [{"category": "renderer", "field": "rendering", "recovery_class": "adapter_fault", "action": "advance_adapter", "issue": "all adapters exhausted"}],
+            "diagnostic": {"recovery_class": "adapter_fault", "action": "advance_adapter", "outcome": "adapters_exhausted", "candidate_disposition": "preserved", "office_attempts": [], "page_attempts": []},
         }
 
     monkeypatch.setattr(workflow, "render_documents", counted_render)

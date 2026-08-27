@@ -1027,6 +1027,19 @@ def render_pages(
     export_docx = office_exporter or _render_pdf
     export_pages = page_exporter or rasterize_pdf
     find_blank_pages = blank_page_detector or _blank_pdf_pages
+    render_root = revision_dir / "rendered"
+    selected_artifacts = set(artifact_names or ())
+    docx_paths = [
+        path
+        for path in sorted((revision_dir / "candidate").glob("*.docx"))
+        if not selected_artifacts or path.stem in selected_artifacts
+    ]
+    if selected_artifacts:
+        for docx in docx_paths:
+            (render_root / f"{docx.stem}.pdf").unlink(missing_ok=True)
+            shutil.rmtree(render_root / docx.stem, ignore_errors=True)
+    elif render_root.exists():
+        shutil.rmtree(render_root)
     renderer_candidates = [dict(item) for item in (renderer_identities or [])]
     if renderer_identity is not None:
         renderer_candidates = [dict(renderer_identity), *[item for item in renderer_candidates if dict(item) != dict(renderer_identity)]]
@@ -1042,15 +1055,8 @@ def render_pages(
     if not page_candidates:
         return {"status": "blocked", "renderer": renderer_candidates[0], "findings": [{"category": "renderer", "field": "page_renderer", "issue": "No supported PDF page renderer is available."}]}
 
-    render_root = revision_dir / "rendered"
     renderer_attempts: list[dict[str, Any]] = []
     page_attempts: list[dict[str, Any]] = []
-    selected_artifacts = set(artifact_names or ())
-    docx_paths = [
-        path
-        for path in sorted((revision_dir / "candidate").glob("*.docx"))
-        if not selected_artifacts or path.stem in selected_artifacts
-    ]
     for renderer_index, identity in enumerate(renderer_candidates, 1):
         remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
         if remaining <= 0:
@@ -1167,6 +1173,7 @@ def render_assurance(
     reference: Mapping[str, Any],
     *,
     contracted_bundle: Mapping[str, Any] | None = None,
+    structural_validation: Mapping[str, Any],
     candidate_font_substitutions: Mapping[str, str] | None = None,
     rebuild_candidate: Any = None,
     artifact_names: Iterable[str] | None = None,
@@ -1188,24 +1195,30 @@ def render_assurance(
     runtime_environment = _runtime_environment(repo_root, None, bundle)
     selected_artifacts = set(artifact_names or ())
     all_candidate_paths = [path for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
+    structural_evidence, structural_finding = _validated_candidate_structure(
+        revision_dir,
+        structural_validation,
+        all_candidate_paths,
+    )
     candidate_paths = [
         path
         for path in all_candidate_paths
         if path.suffix.casefold() == ".docx"
         if not selected_artifacts or path.stem in selected_artifacts
     ]
-    if not candidate_paths:
-        finding = recovery_finding({
-            "category": "document-structure",
-            "field": "candidate",
-            "issue": "Render Assurance requires a complete structurally validated DOCX candidate.",
-        }, "document_structure_defect")
+    if structural_finding is not None or not candidate_paths:
+        finding = structural_finding or recovery_finding({
+                "category": "document-structure",
+                "field": "candidate",
+                "issue": "Render Assurance requires a complete structurally validated DOCX candidate.",
+            }, "document_structure_defect")
         return {
             "schema_version": "render-assurance/v1",
             "status": "blocked",
             "fonts": {},
             "font_substitutions": {},
             "candidate": {"files": []},
+            "structural_validation": structural_evidence,
             "render": {"status": "not_run", "findings": [finding]},
             "findings": [finding],
         }
@@ -1231,7 +1244,8 @@ def render_assurance(
             substitute = _approved_packaged_font_fallback(font, approved_font_plan)
             bundled = _bundled_font_path(repo_root, substitute, approved_font_plan)
             if bundled is not None:
-                substitutions[font] = substitute
+                if substitute.casefold() != font.casefold():
+                    substitutions[font] = substitute
                 evidence.update({
                     "substitute": substitute,
                     "substitute_match": f"bundled approved compatible font: {bundled.relative_to(repo_root)}",
@@ -1241,6 +1255,15 @@ def render_assurance(
         fonts[font] = evidence
 
     prior_substitutions = dict(candidate_font_substitutions or {})
+    for source, target in prior_substitutions.items():
+        if source not in required_fonts and target in required_fonts:
+            substitutions[source] = target
+            fonts[source] = {
+                "state": "missing-or-unusable",
+                "match": "Persisted candidate substitution.",
+                "substitute": target,
+                "resolution": "candidate_substitution_preserved",
+            }
     if substitutions != prior_substitutions:
         if rebuild_candidate is None:
             finding = recovery_finding({
@@ -1279,6 +1302,11 @@ def render_assurance(
             if not selected_artifacts or path.stem in selected_artifacts
         ]
         all_candidate_paths = [path for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
+        structural_evidence = {
+            **structural_evidence,
+            "candidate_files": _artifact_hashes(revision_dir, all_candidate_paths),
+            "revalidated_after_substitution": True,
+        }
 
     office_candidates = (
         [dict(item) for item in renderer_identities]
@@ -1315,10 +1343,7 @@ def render_assurance(
                 "action": RECOVERY_POLICIES["visual_defect"],
             })
         elif finding.get("category") == "renderer":
-            finding.update({
-                "recovery_class": "adapter_fault",
-                "action": "preserve_candidate_and_stop",
-            })
+            finding = recovery_finding(finding, "adapter_fault")
         governed_findings.append(finding)
     render_report["findings"] = governed_findings
     if render_report.get("status") == "passed":
@@ -1337,6 +1362,7 @@ def render_assurance(
             "font_evidence": fonts,
             "font_substitutions": substitutions,
         },
+        "structural_validation": structural_evidence,
         "render": render_report,
         "findings": governed_findings,
         "elapsed_seconds": round(clock() - started, 3),
@@ -1346,7 +1372,10 @@ def render_assurance(
     ):
         report["diagnostic"] = {
             "recovery_class": "adapter_fault",
-            "action": "preserve_candidate_and_stop",
+            "action": RECOVERY_POLICIES["adapter_fault"],
+            "outcome": "adapters_exhausted",
+            "candidate_disposition": "preserved",
+            "publication": "blocked",
             "office_attempts": render_report["renderer_attempts"],
             "page_attempts": render_report["page_renderer_attempts"],
             "font_evidence": fonts,
@@ -1354,6 +1383,45 @@ def render_assurance(
             "candidate_files": report["candidate"]["files"],
         }
     return report
+
+
+def _validated_candidate_structure(
+    revision_dir: Path,
+    validation: Mapping[str, Any],
+    candidate_paths: Iterable[Path],
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    paths = list(candidate_paths)
+    current = _artifact_hashes(revision_dir, paths)
+    expected = {str(name) for name in validation.get("expected_files", []) if str(name)}
+    actual = {path.name for path in paths}
+    recorded = {
+        str(item.get("path")): item
+        for item in validation.get("candidate_files", [])
+        if isinstance(item, Mapping) and item.get("path")
+    }
+    evidence = {
+        "status": validation.get("status"),
+        "expected_files": sorted(expected),
+        "candidate_files": current,
+    }
+    complete = (
+        validation.get("status") == "structurally_valid"
+        and bool(expected)
+        and actual == expected
+        and all(
+            (row := recorded.get(item["path"])) is not None
+            and row.get("sha256") == item["sha256"]
+            and int(row.get("bytes") or 0) == item["bytes"]
+            for item in current
+        )
+    )
+    if complete:
+        return evidence, None
+    return evidence, recovery_finding({
+        "category": "document-structure",
+        "field": "candidate",
+        "issue": "Render Assurance requires the complete structurally validated Branch Document Set with matching hashes.",
+    }, "document_structure_defect")
 
 
 def _governed_adapter_attempts(attempts: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -1756,10 +1824,20 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
 
 
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
-    findings = deterministic_content_check(revision_dir, reference)
-    findings.extend(render_report.get("findings", []))
-    if xml_report: findings.extend(xml_report.get("findings", []))
-    verification_findings, evidence = validate_verifications(revision_dir); findings.extend(verification_findings)
+    findings = [recovery_finding(item, "drafting_defect") for item in deterministic_content_check(revision_dir, reference)]
+    findings.extend(
+        item if item.get("recovery_class") in RECOVERY_POLICIES
+        else recovery_finding(item, "visual_defect" if item.get("category") == "visual" else "adapter_fault")
+        for item in render_report.get("findings", [])
+    )
+    if xml_report:
+        findings.extend(recovery_finding(item, "document_structure_defect") for item in xml_report.get("findings", []))
+    verification_findings, evidence = validate_verifications(revision_dir)
+    findings.extend(
+        item if item.get("recovery_class") in RECOVERY_POLICIES
+        else recovery_finding(item, "visual_defect" if item.get("category") == "visual" else "verifier_transient")
+        for item in verification_findings
+    )
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
