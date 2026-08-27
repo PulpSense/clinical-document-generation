@@ -853,11 +853,18 @@ def _document_report_failure(
     document_report: Mapping[str, Any],
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
     """Interpret one blocked DOCX report identically on every render path."""
-    findings = [
-        recovery_finding({**finding, "target_ids": [f"layout:{item['artifact']}"]}, "document_structure_defect")
-        for item in document_report.get("artifacts", [])
-        for finding in item.get("findings", [])
-    ]
+    findings = []
+    for item in document_report.get("artifacts", []):
+        for raw in item.get("findings", []):
+            finding = dict(raw)
+            governed = (
+                finding.get("recovery_class") in RECOVERY_POLICIES
+                and finding.get("action") == RECOVERY_POLICIES.get(str(finding.get("recovery_class")))
+            )
+            findings.append(
+                finding if governed
+                else recovery_finding({**finding, "target_ids": [f"layout:{item['artifact']}"]}, "document_structure_defect")
+            )
     classification = [
         finding for finding in findings
         if finding.get("category") == "layout-repair-classification"

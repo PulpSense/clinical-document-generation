@@ -615,6 +615,57 @@ def test_layout_repair_rejects_a_nonexact_table_target_as_classification(tmp_pat
     assert block["stage"] == "layout_repair_classification"
 
 
+def test_document_report_failure_preserves_a_governed_drafting_route_through_quality_retry(tmp_path, monkeypatch):
+    report = {
+        "status": "blocked",
+        "artifacts": [{
+            "artifact": "icf",
+            "findings": [{
+                "category": "content",
+                "field": "icf.study-purpose",
+                "target_ids": ["icf.study-purpose"],
+                "issue": "Study-purpose content is missing.",
+                "recovery_class": "drafting_defect",
+                "action": "retry_drafting_target",
+            }],
+        }],
+    }
+    run_dir = tmp_path / "run"
+    revision_dir = run_dir / "revisions/r-test"
+    revision_dir.mkdir(parents=True)
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
+
+    def fake_schedule_requests(**_kwargs):
+        path = revision_dir / "hermes/drafting-requests/icf-study-purpose.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({
+            "task": "draft_sections",
+            "response_path": "hermes/drafting-responses/icf-study-purpose.json",
+        }), encoding="utf-8")
+        return [path]
+
+    monkeypatch.setattr(workflow, "schedule_requests", fake_schedule_requests)
+
+    findings, block = workflow._document_report_failure(run_dir, revision_dir, report)
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {}},
+        json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")),
+        revision_dir,
+        {},
+        findings,
+        "quality",
+    )
+
+    assert block is None
+    assert findings == report["artifacts"][0]["findings"]
+    assert result["status"] == "awaiting_hermes", result
+    assert result["stage"] == "drafting_retry"
+
+
 def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
     prior = {
         "renderer": {"kind": "Pages"},

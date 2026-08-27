@@ -998,7 +998,7 @@ def test_docx_audit_assigns_recovery_classes_at_the_finding_producer(tmp_path):
 
     drafting = next(item for item in findings if "Unresolved template token" in item["issue"])
     structure = next(item for item in findings if "Tracked changes" in item["issue"])
-    assert (drafting["recovery_class"], drafting["action"]) == ("drafting_defect", "retry_drafting_target")
+    assert (drafting["recovery_class"], drafting["action"]) == ("document_structure_defect", "preserve_and_stop")
     assert (structure["recovery_class"], structure["action"]) == ("document_structure_defect", "preserve_and_stop")
 
 

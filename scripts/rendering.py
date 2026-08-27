@@ -2344,20 +2344,20 @@ def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict
     findings = [
         recovery_finding(
             {"category": "rendering", "field": path.name, "issue": f"Unresolved template token: {token}"},
-            "drafting_defect",
+            "document_structure_defect",
         )
         for token in sorted(set(TOKEN.findall(text)))
     ]
     if INTERNAL_LANGUAGE.search(text) or "evidence_refs" in text or "{\"" in text:
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, "drafting_defect"))
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, "document_structure_defect"))
     if AUTHORING_LANGUAGE.search(text):
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "drafting_defect"))
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "document_structure_defect"))
     duplicate = next((match for paragraph_text in paragraph_texts if (match := DUPLICATE_WORD.search(paragraph_text))), None)
     if duplicate:
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively."}, "drafting_defect"))
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively."}, "document_structure_defect"))
     for phrase in required_phrases:
         if phrase and phrase.casefold() not in text.casefold():
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, "drafting_defect"))
+            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, "document_structure_defect"))
     with zipfile.ZipFile(path) as package:
         names = set(package.namelist())
         if names & _REVIEW_PARTS:

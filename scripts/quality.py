@@ -1623,7 +1623,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             "if you agree to participate, you will be asked to sign",
         ))
         if not consent_to_sign:
-            findings.append({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."})
+            findings.append(recovery_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, "document_structure_defect"))
     return [
         item if item.get("recovery_class") in RECOVERY_POLICIES
         else recovery_finding(item, "drafting_defect")
