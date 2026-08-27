@@ -33,16 +33,22 @@ Prospective and Ambispective use the same obligatory input contract. Retrospecti
 ## Public interface
 
 Run commands from this skill folder. `scripts/workflow.py` is the only CLI entrypoint.
+Resolve one supported interpreter first and retain its absolute path; do not
+delegate launch to an ambiguous `python3` command. The Desktop launcher uses
+`workflow.resolve_python_runtime`, launches with the returned `executable`,
+and passes the returned identity to `run_desktop_operation` so every resume is
+recorded. In the examples below, `CLINICAL_PYTHON` is that validated absolute
+Python 3.10+ path.
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
-python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
-python3 scripts/workflow.py --run-dir <run-dir> --stage validate
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
-python3 scripts/workflow.py --release-gate
-python3 scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
-python3 scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
-python3 scripts/workflow.py --verify-installation
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --release-gate
+"$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
+"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
+"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
 ```
 
 `--package-release` creates the installable candidate from the current
@@ -61,7 +67,7 @@ The release gate never fabricates verifier approval. If it returns
 requests, save their exact responses, then resume the same corpus with:
 
 ```bash
-python3 scripts/workflow.py --release-gate --release-gate-root <evidence_root>
+"$CLINICAL_PYTHON" scripts/workflow.py --release-gate --release-gate-root <evidence_root>
 ```
 
 The six production modules are:
@@ -92,7 +98,7 @@ Set `meta.study_type` to exactly `Prospective`, `Ambispective`, or `Retrospectiv
 Run:
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 - If `status` is `blocked`, present the single `missing_inputs` checklist. Ask all missing questions together when practical.
@@ -108,7 +114,7 @@ The client may edit values only inside the field markers. Never reinterpret or s
 Only after a separate explicit approval action, run:
 
 ```bash
-python3 scripts/workflow.py \
+"$CLINICAL_PYTHON" scripts/workflow.py \
   --run-dir <run-dir> \
   --stage approve \
   --approved-by "<reviewer>"
@@ -122,8 +128,11 @@ After approval, do not ask the reviewer any additional clinical or document-cont
 
 The Desktop parent must call `workflow.run_desktop_operation` for the entire
 post-approval lifecycle. Supply the host's Hermes handoff runner and actual
-Desktop file opener. The operation persists its start and 30-minute deadline
-under the run workspace, so retries and resume calls cannot reset either.
+Desktop file opener. The operation persists its start and cross-process UTC deadline
+under the run workspace, so retries and resume calls cannot reset either. It
+records every compatible runtime identity used to resume. Persisted monotonic
+timestamps are never treated as portable; monotonic time is used only inside
+one process and converted to the persisted UTC anchor.
 
 Resolve the installed skill root from the currently loaded `SKILL.md` location
 or runtime entrypoint. Never copy a repository path from prior run evidence or
@@ -137,7 +146,7 @@ developing or diagnosing the inner lifecycle outside a client request, its CLI
 form is:
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 The workflow advances deterministically until it passes, blocks, or returns `status: awaiting_hermes` with one or more request paths.
@@ -201,7 +210,7 @@ concurrently so every-page image inspection stays off the serial critical path:
 - `clinical_content_verification`: checks source fidelity, every required section, unsupported claims, cross-document consistency, and participant-facing ICF language.
 - `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
 
-The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Its response must include every page number and exact PNG hash with every requested check. Missing or stale page assessments block delivery.
+The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery.
 
 The deterministic render gate also rejects pages with no meaningful body content, even when a running header or page number is present. A signature or continuation sentence may not be stranded on an otherwise empty page.
 
@@ -212,6 +221,7 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 ## Word template authorities
 
 - Every Protocol branch uses the bundled Protocol client authority for page geometry, typography, headers/footers, heading hierarchy, document-control surfaces, and table design.
+- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Never insert unconditional body-section breaks merely to copy or stabilize a prior pagination result. Keep every heading with its first substantive paragraph, list, or table while preserving intentional title-page and table-of-contents boundaries.
 - Advarra ICF output uses the bundled Advarra authority; Sterling output uses the bundled Sterling authority.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.

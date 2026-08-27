@@ -151,29 +151,60 @@ def test_workflow_subprocess_timeout_is_reported_explicitly(tmp_path: Path, monk
 
 
 def test_operation_budget_persists_deadline_across_resume_and_reserves_cleanup(tmp_path: Path) -> None:
-    now = [100.0]
-    budget = OperationBudget(tmp_path / "run", clock=lambda: now[0], budget_seconds=20.0, cleanup_reserve_seconds=3.0)
+    monotonic = [100.0]
+    wall_time = [1_000.0]
+    budget = OperationBudget(
+        tmp_path / "run",
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+        budget_seconds=20.0,
+        cleanup_reserve_seconds=3.0,
+    )
     first = budget.start_or_resume()
-    now[0] = 112.0
-    resumed = OperationBudget(tmp_path / "run", clock=lambda: now[0], budget_seconds=20.0, cleanup_reserve_seconds=3.0)
+    wall_time[0] = 1_012.0
+    monotonic[0] = 2.0
+    resumed = OperationBudget(
+        tmp_path / "run",
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+        budget_seconds=99.0,
+        cleanup_reserve_seconds=3.0,
+    )
 
-    assert resumed.start_or_resume()["deadline_monotonic"] == first["deadline_monotonic"]
+    assert resumed.start_or_resume()["deadline_at_epoch"] == first["deadline_at_epoch"]
     assert resumed.remaining() == 8.0
     assert resumed.child_timeout() == 5.0
+
+
+def test_operation_budget_uses_monotonic_elapsed_within_one_process(tmp_path: Path) -> None:
+    monotonic = [100.0]
+    wall_time = [1_000.0]
+    budget = OperationBudget(
+        tmp_path / "run",
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+        budget_seconds=20.0,
+    )
+    budget.start_or_resume()
+    monotonic[0] = 102.0
+    wall_time[0] = 2_000.0
+
+    assert budget.remaining() == 18.0
+    assert budget.elapsed() == 2.0
 
 
 def test_operation_budget_exhaustion_is_terminal_and_new_operation_is_explicit(tmp_path: Path) -> None:
     now = [0.0]
     run = tmp_path / "run"
-    budget = OperationBudget(run, clock=lambda: now[0], budget_seconds=5.0, cleanup_reserve_seconds=1.0)
+    budget = OperationBudget(run, clock=lambda: now[0], wall_clock=lambda: now[0], budget_seconds=5.0, cleanup_reserve_seconds=1.0)
     budget.start_or_resume()
     now[0] = 5.0
     assert budget.expired()
     budget.terminal("timeout", reason="deadline_exhausted")
 
-    resumed = OperationBudget(run, clock=lambda: now[0], operation_id="default", budget_seconds=99.0)
+    resumed = OperationBudget(run, clock=lambda: now[0], wall_clock=lambda: now[0], operation_id="default", budget_seconds=99.0)
     assert resumed.start_or_resume()["status"] == "timeout"
-    fresh = OperationBudget(run, clock=lambda: now[0], operation_id="new-approved-operation", budget_seconds=99.0)
+    fresh = OperationBudget(run, clock=lambda: now[0], wall_clock=lambda: now[0], operation_id="new-approved-operation", budget_seconds=99.0)
     assert fresh.start_or_resume()["operation_id"] == "new-approved-operation"
 
 

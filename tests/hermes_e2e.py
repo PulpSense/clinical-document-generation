@@ -12,7 +12,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -50,10 +50,21 @@ class OperationBudget:
 
     run_dir: Path
     clock: Any = time.monotonic
-    wall_clock: Any = lambda: datetime.now(timezone.utc).isoformat()
+    wall_clock: Any = time.time
     operation_id: str = "default"
     budget_seconds: float = OPERATION_BUDGET_SECONDS
     cleanup_reserve_seconds: float = CLEANUP_RESERVE_SECONDS
+    process_monotonic_anchor: float = field(init=False)
+    process_epoch_anchor: float = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.process_monotonic_anchor = self.clock()
+        self.process_epoch_anchor = self.wall_clock()
+
+    def epoch_now(self) -> float:
+        return self.process_epoch_anchor + max(
+            0.0, self.clock() - self.process_monotonic_anchor,
+        )
 
     @property
     def path(self) -> Path:
@@ -68,12 +79,12 @@ class OperationBudget:
             state = json.loads(self.path.read_text(encoding="utf-8"))
             if state.get("operation_id") == self.operation_id:
                 return state
-        started = self.clock()
+        started = self.epoch_now()
         state = {
             "operation_id": self.operation_id,
-            "started_at": self.wall_clock(),
-            "started_monotonic": started,
-            "deadline_monotonic": started + self.budget_seconds,
+            "started_at": datetime.fromtimestamp(started, timezone.utc).isoformat(),
+            "started_at_epoch": started,
+            "deadline_at_epoch": started + self.budget_seconds,
             "deadline_seconds": self.budget_seconds,
             "status": "running",
             "stage": "approved",
@@ -86,7 +97,10 @@ class OperationBudget:
         return json.loads(self.path.read_text(encoding="utf-8"))
 
     def remaining(self) -> float:
-        return max(0.0, float(self.state()["deadline_monotonic"]) - self.clock())
+        return max(0.0, float(self.state()["deadline_at_epoch"]) - self.epoch_now())
+
+    def elapsed(self) -> float:
+        return max(0.0, self.epoch_now() - float(self.state()["started_at_epoch"]))
 
     def child_timeout(self, requested: float | None = None) -> float:
         available = max(0.0, self.remaining() - self.cleanup_reserve_seconds)
@@ -96,12 +110,12 @@ class OperationBudget:
         state = self.state()
         state["stage"] = stage
         state["status"] = status
-        state["events"].append({"at": self.wall_clock(), "stage": stage, "status": status, **details})
+        state["events"].append({"at": datetime.fromtimestamp(self.epoch_now(), timezone.utc).isoformat(), "stage": stage, "status": status, **details})
         self._save(state)
 
     def terminal(self, status: str, *, reason: str, cleanup: dict[str, Any] | None = None) -> None:
         state = self.state()
-        state.update({"status": status, "ended_at": self.wall_clock(), "stop_reason": reason})
+        state.update({"status": status, "ended_at": datetime.fromtimestamp(self.epoch_now(), timezone.utc).isoformat(), "stop_reason": reason})
         if cleanup is not None:
             state["cleanup"] = cleanup
         self._save(state)
@@ -628,7 +642,7 @@ def _run_handoff_wave(
         [process for process, _, _, _, _ in processes],
         timeout_seconds=timeout_seconds,
         progress=(lambda observed_at: budget.event(
-            "waiting", elapsed_seconds=round(observed_at - budget.state()["started_monotonic"], 3)
+            "waiting", elapsed_seconds=round(budget.elapsed(), 3)
         )) if budget is not None else None,
     )
     missing: list[str] = []
@@ -725,7 +739,7 @@ def run_real_hermes(
                 manifest,
                 reply,
                 lambda path: Path(path).read_bytes(),
-                deadline=float(budget.state()["deadline_monotonic"]),
+                deadline=budget.clock() + budget.remaining(),
                 clock=budget.clock,
             )
             final_result = {
@@ -749,7 +763,7 @@ def run_real_hermes(
         timed_out = True
         final_result = {"status": "timeout", "stage": final_result.get("stage", "generate")}
 
-    operation_elapsed = max(0.0, budget.clock() - float(budget.state()["started_monotonic"]))
+    operation_elapsed = budget.elapsed()
     report = inspect_run(
         run_dir,
         final_result=final_result,

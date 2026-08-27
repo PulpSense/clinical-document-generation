@@ -37,6 +37,7 @@ VISUAL_CHECKS = (
     "clipping", "overlap", "overflow", "orphan_heading", "bad_table_split",
     "blank_page", "footer_collision", "unreadable_text", "duplicate_section",
     "inconsistent_style", "missing_header_footer", "toc_mismatch",
+    "excessive_whitespace", "artificial_pagination",
 )
 TRANSIENT_REVIEW_STATUSES = {"retryable_error", "transient_error", "unavailable", "temporarily_unavailable"}
 _MAC_FONT_NAMES: set[str] | None = None
@@ -1398,7 +1399,14 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
             valid_page_rows = [p for p in response.get("page_assessments", []) if isinstance(p, Mapping) and p.get("status") == "passed" and set(p.get("checks", [])) == set(VISUAL_CHECKS)]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
             if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append({"category": "visual", "field": "page_assessments", "target_ids": ["verification:visual"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."})
-        evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer}
+        evidence[evidence_key] = {
+            "request": request_path.relative_to(revision_dir).as_posix(),
+            "request_sha256": sha256_file(request_path),
+            "response": response_path.relative_to(revision_dir).as_posix(),
+            "response_sha256": sha256_file(response_path),
+            "producer": producer,
+            "artifacts": request.get("artifacts", []),
+        }
     return findings, evidence
 
 

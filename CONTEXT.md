@@ -44,6 +44,14 @@ _Avoid_: approved JSON, final input, reviewer notes
 The single user-facing progression from a Source Intake Packet through required-input collection, one approval of the final client-provided or client-edited Source-of-Truth Markdown, and final Branch Document Set delivery. A changed approved source creates a new immutable Run Revision.
 _Avoid_: workflow scripts, command sequence, generation path
 
+**Compatible Python Runtime**:
+An explicitly resolved Python 3.10+ executable, recorded by absolute path, implementation, and version for each Desktop operation process. An unqualified system `python3` command is not a runtime identity.
+_Avoid_: system Python, default Python, current interpreter
+
+**Desktop Operation Deadline**:
+The single 30-minute post-approval correctness ceiling persisted as a cross-process UTC deadline. Each process may use its own monotonic clock only to measure time inside that process; a resume never interprets a prior process's monotonic epoch or creates a new budget.
+_Avoid_: process timeout, monotonic deadline, retry timeout
+
 **Run Revision**:
 An immutable attempt tied to one exact approved source and its generation inputs, drafts, evidence, and outputs. Only the newest passing revision is client-facing; earlier revisions remain internal audit history until explicitly removed.
 _Avoid_: overwritten run, latest folder, regenerated copy

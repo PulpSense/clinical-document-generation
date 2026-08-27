@@ -1896,7 +1896,7 @@ def _normalize_protocol_table_pagination(document: Document) -> None:
 
 
 def _normalize_protocol_section_pagination(document: Document, branch: str) -> None:
-    """Keep Ambispective summary and confidentiality sections within the body area."""
+    """Remove obsolete body breaks while preserving template-owned front matter."""
     if branch != "Ambispective":
         return
     for title in ("3. GENERAL INFORMATION", "16. CONFIDENTIALITY"):
@@ -1906,7 +1906,30 @@ def _normalize_protocol_section_pagination(document: Document, branch: str) -> N
             and _protocol_heading_key(paragraph.text) == _protocol_heading_key(title)
         ), None)
         if heading is not None:
-            heading.paragraph_format.page_break_before = True
+            heading.paragraph_format.page_break_before = None
+
+
+def _protect_protocol_heading_content(document: Document) -> None:
+    """Keep each body heading and intervening template spacers with content."""
+    blocks = list(document.element.body.iterchildren())
+    for index, element in enumerate(blocks):
+        if element.tag != qn("w:p"):
+            continue
+        heading = Paragraph(element, document)
+        if _heading_level(heading) is None:
+            continue
+        heading.paragraph_format.keep_with_next = True
+        heading.paragraph_format.keep_together = True
+        for following in blocks[index + 1:]:
+            if following.tag == qn("w:tbl"):
+                break
+            if following.tag != qn("w:p"):
+                break
+            paragraph = Paragraph(following, document)
+            if paragraph.text.strip() and _heading_level(paragraph) is None:
+                break
+            paragraph.paragraph_format.keep_with_next = True
+            paragraph.paragraph_format.keep_together = True
 
 
 def _assessment_matrix(document: Document, reference: Mapping[str, Any], template_path: Path) -> None:
@@ -2089,6 +2112,7 @@ def _template_document(reference: Mapping[str, Any], model: Mapping[str, Any], t
         _normalize_protocol_section_pagination(document, branch)
         _normalize_protocol_contact_table(document)
         _normalize_protocol_table_pagination(document)
+        _protect_protocol_heading_content(document)
     _set_update_fields(document)
     return document
 

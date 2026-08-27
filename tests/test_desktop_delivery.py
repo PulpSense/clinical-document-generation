@@ -1,4 +1,8 @@
 import json
+from pathlib import Path
+import subprocess
+
+import pytest
 
 import workflow
 
@@ -198,7 +202,302 @@ def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_afte
     assert first["status"] == second["status"] == "timeout"
     assert first["stage"] == second["stage"] == "desktop_operation"
     assert len(generated) == 1
-    assert second["deadline_monotonic"] == first["deadline_monotonic"]
+    assert second["deadline_at_epoch"] == first["deadline_at_epoch"]
+
+
+def test_desktop_operation_resume_uses_wall_time_across_monotonic_epochs_and_runtimes(tmp_path, monkeypatch):
+    monotonic = [1000.0]
+    wall_time = [10_000.0]
+    first_runtime = {
+        "executable": "/opt/python3.10",
+        "implementation": "CPython",
+        "version": "3.10.14",
+    }
+    second_runtime = {
+        "executable": "/opt/python3.11",
+        "implementation": "CPython",
+        "version": "3.11.15",
+    }
+    interrupted = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "handoffs": [{"request_path": "draft.json"}]},
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(interrupted))
+
+    def interrupt(_handoffs, _remaining_seconds):
+        wall_time[0] = 10_008.0
+        monotonic[0] = 1008.0
+        raise KeyboardInterrupt
+
+    try:
+        workflow.run_desktop_operation(
+            tmp_path,
+            handoff_runner=interrupt,
+            opener=lambda _path: b"unused",
+            budget_seconds=20.0,
+            clock=lambda: monotonic[0],
+            wall_clock=lambda: wall_time[0],
+            runtime_identity=first_runtime,
+        )
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("The simulated process interruption was not propagated.")
+
+    monotonic[0] = 4.0
+    wall_time[0] = 10_012.0
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "awaiting_hermes",
+        "stage": "drafting",
+        "handoffs": [{"request_path": "draft.json"}],
+    })
+
+    def exhaust(_handoffs, remaining_seconds):
+        assert remaining_seconds == 8.0
+        monotonic[0] = 12.0
+
+    resumed = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=exhaust,
+        opener=lambda _path: b"unused",
+        budget_seconds=999.0,
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+        runtime_identity=second_runtime,
+    )
+
+    assert resumed["status"] == "timeout"
+    assert resumed["elapsed_seconds"] == 20.0
+    assert resumed["deadline_at_epoch"] == 10_020.0
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert [item["version"] for item in state["runtime_history"]] == ["3.10.14", "3.11.15"]
+
+
+def test_desktop_operation_persists_deadline_before_first_generate(tmp_path, monkeypatch):
+    monotonic = [100.0]
+    wall_time = [10_000.0]
+
+    def interrupt_during_generate(_run_dir, **_kwargs):
+        state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+        assert state["status"] == "running"
+        assert state["deadline_at_epoch"] == 10_020.0
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(workflow, "generate", interrupt_during_generate)
+    try:
+        workflow.run_desktop_operation(
+            tmp_path,
+            handoff_runner=lambda *_args: None,
+            opener=lambda _path: b"unused",
+            budget_seconds=20.0,
+            clock=lambda: monotonic[0],
+            wall_clock=lambda: wall_time[0],
+        )
+    except KeyboardInterrupt:
+        pass
+    else:
+        raise AssertionError("The simulated process interruption was not propagated.")
+
+    monotonic[0] = 2.0
+    wall_time[0] = 10_015.0
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "awaiting_hermes",
+        "stage": "drafting",
+        "handoffs": [{"request_path": "draft.json"}],
+    })
+
+    def exhaust(_handoffs, remaining_seconds):
+        assert remaining_seconds == 5.0
+        monotonic[0] = 7.0
+
+    resumed = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=exhaust,
+        opener=lambda _path: b"unused",
+        budget_seconds=999.0,
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+    )
+
+    assert resumed["status"] == "timeout"
+    assert resumed["deadline_at_epoch"] == 10_020.0
+
+
+def test_resumed_elapsed_time_keeps_truthful_performance_classification(tmp_path, monkeypatch):
+    monotonic = [100.0]
+    wall_time = [10_000.0]
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "awaiting_hermes",
+        "stage": "drafting",
+        "handoffs": [{"request_path": "draft.json"}],
+    })
+
+    def interrupt(_handoffs, _remaining_seconds):
+        monotonic[0] = 200.0
+        wall_time[0] = 10_100.0
+        raise KeyboardInterrupt
+
+    try:
+        workflow.run_desktop_operation(
+            tmp_path,
+            handoff_runner=interrupt,
+            opener=lambda _path: b"unused",
+            budget_seconds=800.0,
+            clock=lambda: monotonic[0],
+            wall_clock=lambda: wall_time[0],
+        )
+    except KeyboardInterrupt:
+        pass
+
+    monotonic[0] = 5.0
+    wall_time[0] = 10_650.0
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "blocked",
+        "stage": "quality",
+        "findings": [],
+        "client_outputs": [],
+    })
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        budget_seconds=999.0,
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+    )
+
+    assert result["elapsed_seconds"] == 650.0
+    assert result["performance_classification"] == "target_window"
+
+
+def test_desktop_runtime_resolver_skips_unsupported_python_and_records_explicit_path(monkeypatch):
+    def probe(command, **_kwargs):
+        executable = command[0]
+        version = [3, 9, 6] if executable.endswith("python3") else [3, 11, 15]
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({
+                "executable": executable,
+                "implementation": "CPython",
+                "version": ".".join(str(item) for item in version),
+                "version_info": version,
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(workflow.subprocess, "run", probe)
+
+    runtime = workflow.resolve_python_runtime(
+        candidates=[Path("/usr/bin/python3"), Path("/opt/python3.11")]
+    )
+
+    assert runtime == {
+        "executable": "/opt/python3.11",
+        "implementation": "CPython",
+        "version": "3.11.15",
+        "version_info": [3, 11, 15],
+    }
+
+
+def test_desktop_runtime_resolver_respects_an_explicit_empty_environment(monkeypatch):
+    observed = []
+
+    def probe(command, **kwargs):
+        observed.append(kwargs["env"])
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({
+                "executable": command[0],
+                "implementation": "CPython",
+                "version": "3.11.15",
+                "version_info": [3, 11, 15],
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(workflow.subprocess, "run", probe)
+
+    workflow.resolve_python_runtime(candidates=[Path("/opt/python3.11")], environment={})
+
+    assert observed == [{}]
+
+
+def test_unreadable_persisted_deadline_fails_closed_instead_of_starting_again(tmp_path, monkeypatch):
+    state_path = tmp_path / "logs/desktop-operation.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text("not-json", encoding="utf-8")
+    generated = []
+    monkeypatch.setattr(workflow, "generate", lambda *_args, **_kwargs: generated.append(True))
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        clock=lambda: 5.0,
+        wall_clock=lambda: 10_000.0,
+    )
+
+    assert result["status"] == "timeout"
+    assert generated == []
+
+
+@pytest.mark.parametrize("invalid_state", [
+    {
+        "started_at_epoch": "not-an-epoch",
+        "deadline_at_epoch": 10_020.0,
+        "budget_seconds": 20.0,
+        "runtime_history": [],
+    },
+    {
+        "started_at_epoch": 10_010.0,
+        "deadline_at_epoch": 10_000.0,
+        "budget_seconds": 20.0,
+        "runtime_history": [],
+    },
+    {
+        "started_at_epoch": 10_000.0,
+        "deadline_at_epoch": float("nan"),
+        "budget_seconds": 20.0,
+        "runtime_history": [],
+    },
+    {
+        "started_at_epoch": 10_000.0,
+        "deadline_at_epoch": 10_020.0,
+        "budget_seconds": 20.0,
+        "runtime_history": "not-a-list",
+    },
+    {
+        "started_at_epoch": 10_000.0,
+        "deadline_at_epoch": 10_020.0,
+        "budget_seconds": 20.0,
+        "runtime_history": [],
+        "stage_history": None,
+    },
+])
+def test_malformed_persisted_deadline_fails_closed_instead_of_starting_again(
+    tmp_path, monkeypatch, invalid_state,
+):
+    state_path = tmp_path / "logs/desktop-operation.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(json.dumps({
+        "operation_id": "default",
+        "status": "running",
+        **invalid_state,
+    }), encoding="utf-8")
+    generated = []
+    monkeypatch.setattr(workflow, "generate", lambda *_args, **_kwargs: generated.append(True))
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        clock=lambda: 5.0,
+        wall_clock=lambda: 10_000.0,
+    )
+
+    assert result["status"] == "timeout"
+    assert generated == []
 
 
 def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fails(tmp_path, monkeypatch):

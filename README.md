@@ -53,21 +53,26 @@ Protocol and ICF rendering begins from the bundled client Word families. The ren
 Install Python dependencies in the Hermes environment:
 
 ```bash
-python3 -m pip install -r requirements.txt
+"$CLINICAL_PYTHON" -m pip install -r requirements.txt
 ```
+
+`CLINICAL_PYTHON` must be the absolute Python 3.10+ path returned by
+`workflow.resolve_python_runtime`; do not rely on the host's unqualified
+`python3`. The Desktop operation records that identity and every later runtime
+used to resume it.
 
 ## Public commands
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
-python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
-python3 scripts/workflow.py --run-dir <run-dir> --stage validate
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
 ```
 
 `generate` may return `awaiting_hermes`. It is the deterministic inner lifecycle
 step. Normal post-approval Desktop delivery uses
-`workflow.run_desktop_operation`, which owns one persisted deadline, routes
+`workflow.run_desktop_operation`, which owns one cross-process UTC deadline, routes
 those handoffs, and confirms every final attachment through the Desktop opener.
 The standalone CLI loop is for development and controlled diagnostics; it is
 not sufficient evidence of Desktop delivery.
@@ -83,13 +88,13 @@ operation to obtain a new deadline.
 ## Verification
 
 ```bash
-python3 -m py_compile scripts/*.py
-python3 -m pytest -q
-python3 scripts/workflow.py --release-gate
+"$CLINICAL_PYTHON" -m py_compile scripts/*.py
+"$CLINICAL_PYTHON" -m pytest -q
+"$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 # Build a clean release archive outside the checkout
-python3 scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
-python3 scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
-python3 scripts/workflow.py --verify-installation
+"$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
+"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
+"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
 ```
 
 The first release-gate command may return `awaiting_hermes` with independent
@@ -97,7 +102,7 @@ content and rendered-page verification requests. Complete those requests using
 real content/image inspection, then resume without rebuilding the corpus:
 
 ```bash
-python3 scripts/workflow.py --release-gate --release-gate-root <evidence_root>
+"$CLINICAL_PYTHON" scripts/workflow.py --release-gate --release-gate-root <evidence_root>
 ```
 
 The gate never creates synthetic visual approvals.
@@ -124,7 +129,7 @@ source/patient data, old runs, and tests. Register the extracted root as
 `clinical-document-generation` with `SKILL.md` as the entrypoint.
 
 ```bash
-python3 scripts/workflow.py \
+"$CLINICAL_PYTHON" scripts/workflow.py \
   --install-release /absolute/path/clinical-document-generation-release.zip \
   --skills-dir /absolute/path/to/hermes/skills
 ```

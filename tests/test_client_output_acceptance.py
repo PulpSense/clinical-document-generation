@@ -8,11 +8,11 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.text.paragraph import Paragraph
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 from contracts import batch_plan
 from drafting import create_drafting_request, recorded_acceptance_response, validate_response
-from quality import deterministic_content_check
+from quality import deterministic_content_check, render_pages, sha256_file
 from rendering import refresh_toc_from_pdf, render_documents, render_fields
 
 
@@ -941,18 +941,104 @@ def test_retrospective_inline_template_body_is_not_duplicated(tmp_path):
     assert protocol.paragraphs[heading_index + 1].style.name == "Normal"
 
 
-def test_ambispective_pagination_boundaries_start_on_fresh_pages(tmp_path):
+def test_ambispective_body_sections_follow_template_pagination_and_spacing(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
 
     render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
 
     protocol = Document(tmp_path / "candidate/protocol.docx")
+    authority = Document(ROOT / "assets/client-templates/reference/protocol-reference.docx")
     for title in ("3. GENERAL INFORMATION", "16. CONFIDENTIALITY"):
         heading = next(
             paragraph for paragraph in protocol.paragraphs
             if paragraph.text.strip() == title
         )
-        assert heading.paragraph_format.page_break_before is True
+        authority_heading = next(
+            paragraph for paragraph in authority.paragraphs
+            if " ".join(paragraph.text.split()) == title
+        )
+        assert heading.paragraph_format.page_break_before is not True
+        assert _paragraph_rhythm(heading) == _paragraph_rhythm(authority_heading)
+    toc_index = next(
+        index for index, paragraph in enumerate(protocol.paragraphs)
+        if paragraph.text.strip() == "4. TABLE OF CONTENTS"
+    )
+    body_headings = [
+        paragraph for paragraph in protocol.paragraphs[toc_index + 1:]
+        if paragraph.style.name.casefold().startswith("heading")
+    ]
+    assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in body_headings)
+
+
+def test_protocol_headings_keep_their_first_content_and_front_matter_boundaries(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    protocol = Document(tmp_path / "candidate/protocol.docx")
+    headings = [
+        paragraph for paragraph in protocol.paragraphs
+        if paragraph.style.name.casefold().startswith("heading")
+    ]
+    assert headings
+    assert all(
+        paragraph.paragraph_format.keep_with_next is True
+        or paragraph.style.paragraph_format.keep_with_next is True
+        for paragraph in headings
+    )
+    summary_heading = next(
+        paragraph for paragraph in headings
+        if paragraph.text.strip() == "3. GENERAL INFORMATION"
+    )
+    summary_index = list(protocol.element.body).index(summary_heading._p)
+    assert list(protocol.element.body)[summary_index + 1].tag == qn("w:tbl")
+
+    title_heading = next(paragraph for paragraph in headings if paragraph.text.strip() == "1. TITLE PAGE")
+    toc_heading = next(paragraph for paragraph in headings if paragraph.text.strip() == "4. TABLE OF CONTENTS")
+    assert title_heading._p.xpath('following::w:br[@w:type="page"]')
+    assert toc_heading._p.xpath('preceding::w:br[@w:type="page"]')
+
+    visits_heading = next(
+        paragraph for paragraph in headings
+        if paragraph.text.strip().startswith("9.2. Visits and Examinations")
+    )
+    body = list(protocol.element.body)
+    visits_index = body.index(visits_heading._p)
+    table_index = next(
+        index for index in range(visits_index + 1, len(body))
+        if body[index].tag == qn("w:tbl")
+    )
+    protected_chain = [Paragraph(body[index], protocol) for index in range(visits_index, table_index)]
+    assert all(paragraph.paragraph_format.keep_with_next is True for paragraph in protected_chain)
+
+
+def test_rendered_ambispective_section_three_flows_after_investigator_agreement(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    report = render_pages(tmp_path)
+
+    assert report["status"] == "passed"
+    protocol = next(item for item in report["artifacts"] if item["artifact"] == "protocol")
+    assert protocol["docx_sha256"] == sha256_file(tmp_path / protocol["docx"])
+    assert protocol["pdf_sha256"] == sha256_file(tmp_path / protocol["pdf"])
+    assert all(page["sha256"] == sha256_file(tmp_path / page["path"]) for page in protocol["pages"])
+    pages = [" ".join((page.extract_text() or "").split()) for page in PdfReader(tmp_path / protocol["pdf"]).pages]
+    section_three_page = next(text for text in pages if "3. GENERAL INFORMATION" in text)
+    section_sixteen_page = next(text for text in pages if "16. CONFIDENTIALITY" in text)
+    visits_heading_page = next(
+        text for text in pages
+        if "9.2. Visits and Examinations" in text and "4. TABLE OF CONTENTS" not in text
+    )
+    title_page = next(text for text in pages if "1. TITLE PAGE" in text)
+    toc_page = next(text for text in pages if "4. TABLE OF CONTENTS" in text)
+    assert "2. INVESTIGATOR AGREEMENT" not in title_page
+    assert "Sample size 40 participants" not in toc_page
+    assert "2. INVESTIGATOR AGREEMENT" in section_three_page
+    assert "Objective" in section_three_page
+    assert len(section_three_page.split()) >= 120
+    assert "15. STANDARD EVALUATION PROCEDURES" in section_sixteen_page
+    assert "Table 9.2-1. Visit Schedule" in visits_heading_page
 
 
 def test_content_gate_rejects_same_section_duplicates_and_flattened_schedule_prose(tmp_path):

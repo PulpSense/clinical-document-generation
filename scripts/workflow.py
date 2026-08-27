@@ -8,6 +8,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import math
 import os
 import platform
 import shutil
@@ -39,6 +40,129 @@ NORMAL_RUNTIME_TARGET_MAX_SECONDS = 720.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 1800.0
 RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
 INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
+MINIMUM_PYTHON_VERSION = (3, 10)
+
+
+def _runtime_version(value: Mapping[str, Any]) -> tuple[int, int, int]:
+    raw = value.get("version_info")
+    if isinstance(raw, list) and len(raw) >= 2:
+        parts = [int(item) for item in raw[:3]]
+    else:
+        parts = [int(item) for item in str(value.get("version") or "").split(".")[:3]]
+    return tuple((parts + [0, 0, 0])[:3])
+
+
+def _current_python_runtime() -> dict[str, Any]:
+    runtime = {
+        "executable": str(Path(sys.executable).resolve()),
+        "implementation": platform.python_implementation(),
+        "version": platform.python_version(),
+        "version_info": list(sys.version_info[:3]),
+    }
+    if _runtime_version(runtime) < (*MINIMUM_PYTHON_VERSION, 0):
+        raise RuntimeError("The Desktop operation requires an explicitly resolved Python 3.10+ runtime.")
+    return runtime
+
+
+def resolve_python_runtime(
+    *,
+    candidates: list[Path] | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Resolve and identify an explicit Python 3.10+ executable for Desktop use."""
+    runtime_environment = os.environ if environment is None else environment
+    if candidates is None:
+        requested = runtime_environment.get("HERMES_PYTHON")
+        discovered = [Path(requested)] if requested else []
+        discovered.append(Path(sys.executable))
+        search_path = runtime_environment.get("PATH")
+        for name in ("python3.13", "python3.12", "python3.11", "python3.10", "python3"):
+            if executable := shutil.which(name, path=search_path):
+                discovered.append(Path(executable))
+        candidates = discovered
+    probe = (
+        "import json,platform,sys;"
+        "print(json.dumps({'executable':str(__import__('pathlib').Path(sys.executable).resolve()),"
+        "'implementation':platform.python_implementation(),'version':platform.python_version(),"
+        "'version_info':list(sys.version_info[:3])}))"
+    )
+    seen: set[str] = set()
+    failures: list[str] = []
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            completed = subprocess.run(
+                [key, "-c", probe],
+                capture_output=True,
+                text=True,
+                timeout=5.0,
+                check=False,
+                env=dict(runtime_environment),
+            )
+            runtime = json.loads(completed.stdout) if completed.returncode == 0 else {}
+            if not isinstance(runtime, dict) or _runtime_version(runtime) < (*MINIMUM_PYTHON_VERSION, 0):
+                failures.append(f"{key}: unsupported Python runtime")
+                continue
+            return {
+                "executable": str(runtime["executable"]),
+                "implementation": str(runtime["implementation"]),
+                "version": str(runtime["version"]),
+                "version_info": list(_runtime_version(runtime)),
+            }
+        except (OSError, ValueError, json.JSONDecodeError, subprocess.SubprocessError) as exc:
+            failures.append(f"{key}: {exc}")
+    detail = "; ".join(failures) or "no candidates were found"
+    raise RuntimeError(f"No supported Python 3.10+ Desktop runtime is available: {detail}")
+
+
+def _desktop_deadline_state(
+    persisted: Mapping[str, Any],
+    *,
+    budget_seconds: float,
+    epoch_now: float,
+) -> tuple[float, float, float, list[dict[str, Any]], list[dict[str, Any]]]:
+    """Validate portable deadline state, failing closed when it is unsafe."""
+    if not persisted:
+        return epoch_now, epoch_now + budget_seconds, budget_seconds, [], []
+    fail_closed = (epoch_now - budget_seconds, epoch_now, budget_seconds, [], [])
+    if "started_at_epoch" not in persisted or "deadline_at_epoch" not in persisted:
+        return fail_closed
+    try:
+        started_at_epoch = float(persisted["started_at_epoch"])
+        deadline_at_epoch = float(persisted["deadline_at_epoch"])
+        persisted_budget = float(
+            persisted.get("budget_seconds", deadline_at_epoch - started_at_epoch)
+        )
+        if not all(math.isfinite(value) for value in (
+            started_at_epoch, deadline_at_epoch, persisted_budget,
+        )):
+            raise ValueError("Desktop deadline state contains a non-finite value.")
+        if deadline_at_epoch < started_at_epoch or persisted_budget <= 0:
+            raise ValueError("Desktop deadline state has an invalid interval.")
+        raw_runtime_history = persisted.get("runtime_history", [])
+        if not isinstance(raw_runtime_history, list) or any(
+            not isinstance(item, Mapping) for item in raw_runtime_history
+        ):
+            raise ValueError("Desktop runtime history must be a list of objects.")
+        runtime_history = [dict(item) for item in raw_runtime_history]
+        raw_stage_history = persisted.get("stage_history", [])
+        if not isinstance(raw_stage_history, list) or any(
+            not isinstance(item, Mapping) for item in raw_stage_history
+        ):
+            raise ValueError("Desktop stage history must be a list of objects.")
+        stage_history = [dict(item) for item in raw_stage_history]
+    except (TypeError, ValueError, OverflowError):
+        return fail_closed
+    return (
+        started_at_epoch,
+        deadline_at_epoch,
+        persisted_budget,
+        runtime_history,
+        stage_history,
+    )
 
 
 def performance_classification(elapsed_seconds: float) -> str:
@@ -840,19 +964,32 @@ def run_desktop_operation(
     operation_id: str = "default",
     budget_seconds: float = DESKTOP_OPERATION_BUDGET_SECONDS,
     clock: Callable[[], float] | None = None,
+    wall_clock: Callable[[], float] | None = None,
+    runtime_identity: Mapping[str, Any] | None = None,
     progress: Callable[[str, float], Any] | None = None,
 ) -> dict[str, Any]:
     """Run the post-approval lifecycle and confirm its Desktop file delivery.
 
     Hermes owns the ``handoff_runner`` boundary and Desktop owns ``opener``;
     this function only routes path metadata, advances the public workflow, and
-    validates the immutable delivery manifest.  The deadline is persisted so a
-    resumed operation cannot obtain a fresh budget.
+    validates the immutable delivery manifest. The persisted deadline uses a
+    UTC epoch so another process or compatible runtime cannot reset it.
+    Monotonic time is converted to that epoch only within this process.
     """
     run_dir = run_dir.resolve()
     clock = clock or time.monotonic
+    wall_clock = wall_clock or time.time
     if budget_seconds <= 0:
         raise ValueError("Desktop operation budget must be positive.")
+    current_runtime = dict(runtime_identity or _current_python_runtime())
+    if _runtime_version(current_runtime) < (*MINIMUM_PYTHON_VERSION, 0):
+        raise RuntimeError("The Desktop operation requires an explicitly resolved Python 3.10+ runtime.")
+    process_monotonic_anchor = clock()
+    process_epoch_anchor = wall_clock()
+
+    def epoch_now() -> float:
+        return process_epoch_anchor + max(0.0, clock() - process_monotonic_anchor)
+
     operation_key = _slug(operation_id)
     state_path = run_dir / "logs" / (
         "desktop-operation.json" if operation_key == "default" else f"desktop-operation-{operation_key}.json"
@@ -860,23 +997,45 @@ def run_desktop_operation(
     try:
         persisted = _read(state_path) if state_path.is_file() else {}
     except (OSError, ValueError, json.JSONDecodeError):
-        persisted = {}
+        persisted = {
+            "operation_id": operation_id,
+            "budget_seconds": budget_seconds,
+            "status": "unreadable",
+        }
     if persisted.get("operation_id") not in {None, operation_id}:
         raise ValueError("Desktop operation state belongs to a different operation.")
 
     terminal = persisted.get("status") in {"passed", "blocked", "timeout"}
     if terminal and isinstance(persisted.get("result"), Mapping):
         return dict(persisted["result"])
-    started = float(persisted.get("started_monotonic", clock()))
-    deadline = float(persisted.get("deadline_monotonic", started + budget_seconds))
-    stage_history = list(persisted.get("stage_history", []))
+    started_at_epoch, deadline_at_epoch, persisted_budget, runtime_history, stage_history = (
+        _desktop_deadline_state(
+            persisted,
+            budget_seconds=budget_seconds,
+            epoch_now=epoch_now(),
+        )
+    )
+    process_deadline_monotonic = process_monotonic_anchor + max(0.0, deadline_at_epoch - process_epoch_anchor)
+
+    def runtime_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
+        return tuple(item.get(key) for key in ("executable", "implementation", "version"))
+
+    if not runtime_history or runtime_key(runtime_history[-1]) != runtime_key(current_runtime):
+        runtime_history.append(current_runtime)
+
+    def remaining_seconds() -> float:
+        return deadline_at_epoch - epoch_now()
 
     def save(status: str, result: Mapping[str, Any] | None = None) -> dict[str, Any]:
         payload = {
             "operation_id": operation_id,
-            "started_monotonic": started,
-            "deadline_monotonic": deadline,
-            "budget_seconds": deadline - started,
+            "started_at_epoch": started_at_epoch,
+            "deadline_at_epoch": deadline_at_epoch,
+            "started_at": datetime.fromtimestamp(started_at_epoch, timezone.utc).isoformat(),
+            "deadline_at": datetime.fromtimestamp(deadline_at_epoch, timezone.utc).isoformat(),
+            "budget_seconds": persisted_budget,
+            "runtime": current_runtime,
+            "runtime_history": runtime_history,
             "status": status,
             "stage_history": stage_history,
         }
@@ -886,7 +1045,7 @@ def run_desktop_operation(
         return dict(result or payload)
 
     def finish(result: Mapping[str, Any]) -> dict[str, Any]:
-        elapsed = max(0.0, clock() - started)
+        elapsed = max(0.0, epoch_now() - started_at_epoch)
         measured = {
             **result,
             "elapsed_seconds": round(elapsed, 3),
@@ -896,11 +1055,17 @@ def run_desktop_operation(
                 NORMAL_RUNTIME_TARGET_MAX_SECONDS,
             ],
             "operation_deadline_seconds": DESKTOP_OPERATION_BUDGET_SECONDS,
+            "started_at_epoch": started_at_epoch,
+            "deadline_at_epoch": deadline_at_epoch,
+            "runtime": current_runtime,
         }
         return save(str(measured.get("status", "blocked")), measured)
 
+    # Persist before any operation work can be interrupted; otherwise a restart
+    # could create a fresh correctness budget.
+    save("running")
     while True:
-        remaining = deadline - clock()
+        remaining = remaining_seconds()
         if remaining <= 0:
             retained = []
             try:
@@ -913,24 +1078,24 @@ def run_desktop_operation(
             return finish({
                 "status": "timeout",
                 "stage": "desktop_operation",
-                "deadline_monotonic": deadline,
+                "deadline_at_epoch": deadline_at_epoch,
                 "findings": [{"category": "timeout", "field": "operation", "issue": "The post-approval Desktop operation deadline expired."}],
                 "candidate_outputs": retained,
                 "client_outputs": [],
             })
-        result = generate(run_dir, operation_deadline=deadline, clock=clock)
-        if deadline - clock() <= 0:
+        result = generate(run_dir, operation_deadline=process_deadline_monotonic, clock=clock)
+        if remaining_seconds() <= 0:
             continue
         stage = str(result.get("stage") or "generate")
         stage_history.append({"stage": stage, "status": result.get("status"), "remaining_seconds": round(remaining, 3)})
         save("running")
         if progress is not None:
-            progress(stage, max(0.0, deadline - clock()))
+            progress(stage, max(0.0, remaining_seconds()))
         if result.get("status") == "awaiting_hermes":
             handoffs = result.get("handoffs")
             if not isinstance(handoffs, list) or not handoffs:
                 return finish({**result, "status": "blocked", "stage": "hermes_handoff", "client_outputs": []})
-            remaining = deadline - clock()
+            remaining = remaining_seconds()
             if remaining <= 0:
                 continue
             try:
@@ -943,7 +1108,7 @@ def run_desktop_operation(
                     and not (run_dir / "revisions" / revision_id / str(item.get("response_path") or "")).is_file()
                 ]
                 if fallback_handoffs:
-                    remaining = deadline - clock()
+                    remaining = remaining_seconds()
                     if remaining > 0:
                         if fallback_handoff_runner is not None:
                             fallback_handoff_runner(fallback_handoffs, remaining)
@@ -953,7 +1118,7 @@ def run_desktop_operation(
             except Exception as exc:
                 fallback_handoffs = [item for item in handoffs if item.get("fallback_owner") == "parent"]
                 if fallback_handoffs:
-                    remaining = deadline - clock()
+                    remaining = remaining_seconds()
                     if remaining > 0:
                         try:
                             if fallback_handoff_runner is not None:
@@ -974,7 +1139,7 @@ def run_desktop_operation(
             continue
         if result.get("status") != "passed":
             return finish(result)
-        if deadline - clock() <= 0:
+        if remaining_seconds() <= 0:
             continue
         manifest_name = str(result.get("manifest") or "")
         manifest_path = (run_dir / manifest_name).resolve()
@@ -989,13 +1154,19 @@ def run_desktop_operation(
                 "client_outputs": [],
             })
         reply = result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
-        delivery = confirm_desktop_delivery(manifest, reply, opener, deadline=deadline, clock=clock)
+        delivery = confirm_desktop_delivery(
+            manifest,
+            reply,
+            opener,
+            deadline=process_deadline_monotonic,
+            clock=clock,
+        )
         final = {
             **result,
             "status": "passed" if delivery["confirmed"] else "blocked",
             "stage": "desktop_delivery",
             "delivery": delivery,
-            "deadline_monotonic": deadline,
+            "deadline_at_epoch": deadline_at_epoch,
         }
         if not delivery["confirmed"]:
             final["client_outputs"] = []
@@ -1555,7 +1726,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

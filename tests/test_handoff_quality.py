@@ -506,6 +506,8 @@ def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path
 
     assert findings == []
     assert set(evidence) == {item["request_id"] for item in visual} | {"clinical_content_verification"}
+    for request in visual:
+        assert evidence[request["request_id"]]["artifacts"] == request["artifacts"]
 
 
 def test_response_with_wrong_request_hash_is_rejected(tmp_path):
@@ -728,7 +730,7 @@ def test_generic_content_pass_without_per_section_evidence_is_rejected(tmp_path)
     assert sum("explicitly assessed" in item["issue"] for item in findings) == 2
 
 
-def test_visual_response_is_rejected_after_bound_page_changes(tmp_path):
+def test_visual_response_is_rejected_after_any_bound_artifact_changes(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; request_dir.mkdir(parents=True)
     for relative, data in (("candidate/protocol.docx", b"docx"), ("rendered/protocol.pdf", b"pdf"), ("rendered/protocol/page-1.png", b"png")):
         path = tmp_path / relative; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
@@ -736,9 +738,22 @@ def test_visual_response_is_rejected_after_bound_page_changes(tmp_path):
     request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "request_sha256": "abc", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "docx": "candidate/protocol.docx", "docx_sha256": digest("candidate/protocol.docx"), "pdf": "rendered/protocol.pdf", "pdf_sha256": digest("rendered/protocol.pdf"), "pages": [{"page": 1, "path": "rendered/protocol/page-1.png", "sha256": digest("rendered/protocol/page-1.png")}]}], "checks": list(VISUAL_CHECKS)}
     request_path = request_dir / "r.verify.visual.json"; request_path.write_text(json.dumps(request), encoding="utf-8")
     response_path = tmp_path / request["response_path"]; response_path.parent.mkdir(parents=True); response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
-    (tmp_path / "rendered/protocol/page-1.png").write_bytes(b"changed")
-    findings, _ = validate_verifications(tmp_path)
-    assert any("stale" in item["issue"] for item in findings)
+    for relative in (
+        "candidate/protocol.docx",
+        "rendered/protocol.pdf",
+        "rendered/protocol/page-1.png",
+    ):
+        path = tmp_path / relative
+        original = path.read_bytes()
+        path.write_bytes(b"changed")
+        findings, _ = validate_verifications(tmp_path)
+        assert any("stale" in item["issue"] and relative in item["issue"] for item in findings)
+        path.write_bytes(original)
+
+
+def test_visual_review_contract_rejects_artificial_pagination_defects():
+    assert "excessive_whitespace" in VISUAL_CHECKS
+    assert "artificial_pagination" in VISUAL_CHECKS
 
 
 def test_generation_rejects_study_input_mutation_after_approval(tmp_path):

@@ -35,3 +35,16 @@ def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():
     assert "one request path to each subagent" in instructions
     assert "bounded wait for every exact `response_path`" in instructions
     assert "The next `generate` call is the authoritative response validator" in instructions
+
+
+def test_skill_documents_natural_pagination_exact_visual_bytes_and_runtime_safe_resume():
+    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    architecture = (ROOT / "docs/specs/render-assurance-fallbacks.md").read_text(encoding="utf-8")
+    for phrase in (
+        "natural content-driven pagination",
+        "exact DOCX, PDF, and page-image hashes",
+        "resolve_python_runtime",
+        "cross-process UTC deadline",
+    ):
+        assert phrase in instructions
+        assert phrase in architecture
