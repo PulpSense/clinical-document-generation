@@ -14,6 +14,7 @@ import platform
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import zipfile
@@ -40,9 +41,21 @@ DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 720.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 1800.0
+DESKTOP_STAGE_SOFT_BUDGETS = {
+    "drafting": 480.0,
+    "candidate": 120.0,
+    "render_assurance": 300.0,
+    "independent_verification": 360.0,
+    "delivery": 60.0,
+    "desktop_delivery": 60.0,
+}
 RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
 INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
 MINIMUM_PYTHON_VERSION = (3, 10)
+
+
+class OperationDeadlineExpired(RuntimeError):
+    """Raised before an atomic publication would cross the operation deadline."""
 
 
 def _runtime_version(value: Mapping[str, Any]) -> tuple[int, int, int]:
@@ -156,6 +169,12 @@ def _desktop_deadline_state(
         ):
             raise ValueError("Desktop stage history must be a list of objects.")
         stage_history = [dict(item) for item in raw_stage_history]
+        for field in ("attempt_counters", "stage_timings", "soft_budgets", "cleanup"):
+            if field in persisted and not isinstance(persisted[field], Mapping):
+                raise ValueError(f"Desktop operation {field} must be an object.")
+        for field in ("soft_budget_events", "pending_handoffs"):
+            if field in persisted and not isinstance(persisted[field], list):
+                raise ValueError(f"Desktop operation {field} must be a list.")
     except (TypeError, ValueError, OverflowError):
         return fail_closed
     return (
@@ -178,6 +197,33 @@ def performance_classification(elapsed_seconds: float) -> str:
     return "above_target_within_deadline"
 
 
+def _active_release_identity(skill_root: Path) -> dict[str, Any]:
+    """Identify the immutable release that owns a Desktop operation."""
+    manifest_path = skill_root / RELEASE_MANIFEST
+    if manifest_path.is_file():
+        manifest = _read(manifest_path)
+        fingerprint = str(manifest.get("package_fingerprint") or "")
+        if not fingerprint:
+            raise RuntimeError("The active release manifest has no package fingerprint.")
+        return {
+            "package_fingerprint": fingerprint,
+            "git_commit": manifest.get("git_commit"),
+            "source": "promoted_release",
+        }
+    implementation = [
+        {
+            "path": path.relative_to(skill_root).as_posix(),
+            "sha256": sha256_file(path),
+        }
+        for path in sorted((skill_root / "scripts").glob("*.py"))
+    ]
+    return {
+        "package_fingerprint": sha256_value(implementation),
+        "git_commit": None,
+        "source": "controlled_checkout",
+    }
+
+
 def _release_excluded(path: Path) -> bool:
     """Return whether a path belongs to development-only or sensitive data."""
     parts = set(path.parts)
@@ -189,7 +235,12 @@ def _release_excluded(path: Path) -> bool:
     return False
 
 
-def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
+def _package_release_tree(
+    repo_root: Path,
+    output_path: Path,
+    *,
+    git_commit: str,
+) -> dict[str, Any]:
     """Create a deterministic, installable Hermes skill archive.
 
     The archive contains only the skill runtime and its governed resources. The
@@ -233,6 +284,7 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
     implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
+        "git_commit": git_commit,
         "package_root": "clinical-document-generation",
         "package_purpose": "Installable runtime for the reviewed clinical document workflow.",
         "installation": {
@@ -280,10 +332,62 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         "status": "passed",
         "package": output_path.as_posix(),
         "package_fingerprint": manifest["package_fingerprint"],
+        "git_commit": git_commit,
         "file_count": len(entries),
         "archive_bytes": output_path.stat().st_size,
         "manifest": f"clinical-document-generation/{RELEASE_MANIFEST}",
     }
+
+
+def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
+    """Package the exact committed tree, never mutable checkout bytes."""
+    repo_root = repo_root.resolve()
+    output_path = output_path.expanduser().resolve()
+    if output_path == repo_root or repo_root in output_path.parents:
+        raise ValueError("Release archive must be outside the skill repository.")
+    try:
+        git_root = Path(subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()).resolve()
+        commit = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--verify", "HEAD^{commit}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError("A release must be built from a committed Git tree.") from exc
+    if git_root != repo_root:
+        raise ValueError("Release packaging must target the Git repository root.")
+    with tempfile.TemporaryDirectory(prefix="clinical-release-commit-") as temporary_dir:
+        snapshot_root = Path(temporary_dir) / "snapshot"
+        snapshot_root.mkdir()
+        snapshot_root = snapshot_root.resolve()
+        archive_path = Path(temporary_dir) / "commit.tar"
+        try:
+            with archive_path.open("wb") as archive_handle:
+                subprocess.run(
+                    ["git", "-C", str(repo_root), "archive", "--format=tar", commit],
+                    check=True,
+                    stdout=archive_handle,
+                    stderr=subprocess.PIPE,
+                )
+            with tarfile.open(archive_path, "r") as archive:
+                for member in archive.getmembers():
+                    target = (snapshot_root / member.name).resolve()
+                    try:
+                        target.relative_to(snapshot_root)
+                    except ValueError as exc:
+                        raise ValueError("The committed release archive contains an escaping path.") from exc
+                    if member.issym() or member.islnk():
+                        raise ValueError("The committed release archive contains an unsupported link.")
+                archive.extractall(snapshot_root)
+        except (OSError, subprocess.CalledProcessError, tarfile.TarError, ValueError) as exc:
+            raise ValueError("The committed release tree could not be materialized.") from exc
+        return _package_release_tree(snapshot_root, output_path, git_commit=commit)
 
 
 def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
@@ -1141,12 +1245,14 @@ def confirm_desktop_delivery(
     if findings:
         return {"status": "blocked", "confirmed": False, "findings": findings, "attempts": 0}
     opened = []
+    total_attempts = 0
     for item, delivered in zip(expected, actual, strict=True):
         attempts = 0
         last_issue = ""
         opened_current = False
         while attempts <= retries:
             attempts += 1
+            total_attempts += 1
             if deadline is not None and clock() >= deadline:
                 last_issue = "Desktop delivery deadline expired."
                 break
@@ -1154,6 +1260,8 @@ def confirm_desktop_delivery(
                 payload = opener(str(delivered.get("absolute_path") or delivered["path"]))
                 if not isinstance(payload, bytes):
                     raise TypeError("Desktop opener did not return bytes.")
+                if deadline is not None and clock() >= deadline:
+                    raise TimeoutError("Desktop delivery deadline expired before retrieval was confirmed.")
                 digest = hashlib.sha256(payload).hexdigest()
                 if len(payload) != int(item["bytes"]) or digest != item["sha256"]:
                     raise ValueError("Retrieved file bytes do not match the immutable Generation Manifest.")
@@ -1171,8 +1279,31 @@ def confirm_desktop_delivery(
         "status": "confirmed" if not findings else "blocked",
         "confirmed": not findings,
         "opened": opened,
-        "attempts": sum(int(item.get("attempts", 0)) for item in opened),
+        "attempts": total_attempts,
         "findings": findings,
+    }
+
+
+def _desktop_delivery_set_finding(
+    run_dir: Path,
+    manifest: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    try:
+        _, delivery_reference = _reference(run_dir)
+    except FileNotFoundError:
+        return None
+    expected_outputs = set(document_set(get_path(delivery_reference, "meta.study_type")))
+    actual_outputs = {
+        Path(str(item.get("path") or "")).name
+        for item in manifest.get("client_outputs", [])
+        if isinstance(item, Mapping)
+    }
+    if manifest.get("status") == "passed" and actual_outputs == expected_outputs:
+        return None
+    return {
+        "category": "delivery",
+        "field": "client_outputs",
+        "issue": f"Desktop delivery requires the exact Branch Document Set; expected={sorted(expected_outputs)}, actual={sorted(actual_outputs)}.",
     }
 
 
@@ -1187,7 +1318,10 @@ def run_desktop_operation(
     clock: Callable[[], float] | None = None,
     wall_clock: Callable[[], float] | None = None,
     runtime_identity: Mapping[str, Any] | None = None,
+    release_identity: Mapping[str, Any] | None = None,
     progress: Callable[[str, float], Any] | None = None,
+    cleanup: Callable[[str, float], Mapping[str, Any] | None] | None = None,
+    stage_soft_budgets: Mapping[str, float] | None = None,
 ) -> dict[str, Any]:
     """Run the post-approval lifecycle and confirm its Desktop file delivery.
 
@@ -1205,6 +1339,14 @@ def run_desktop_operation(
     current_runtime = dict(runtime_identity or _current_python_runtime())
     if _runtime_version(current_runtime) < (*MINIMUM_PYTHON_VERSION, 0):
         raise RuntimeError("The Desktop operation requires an explicitly resolved Python 3.10+ runtime.")
+    current_release_identity = dict(release_identity or _active_release_identity(SCRIPT_DIR.parent))
+    if not str(current_release_identity.get("package_fingerprint") or ""):
+        raise ValueError("Desktop operation release identity requires a package fingerprint.")
+    soft_budgets = {
+        str(stage): float(seconds)
+        for stage, seconds in (DESKTOP_STAGE_SOFT_BUDGETS if stage_soft_budgets is None else stage_soft_budgets).items()
+        if float(seconds) > 0
+    }
     process_monotonic_anchor = clock()
     process_epoch_anchor = wall_clock()
 
@@ -1225,6 +1367,22 @@ def run_desktop_operation(
         }
     if persisted.get("operation_id") not in {None, operation_id}:
         raise ValueError("Desktop operation state belongs to a different operation.")
+    recorded_release_identity = persisted.get("release_identity")
+    if (
+        isinstance(recorded_release_identity, Mapping)
+        and recorded_release_identity.get("package_fingerprint")
+        != current_release_identity.get("package_fingerprint")
+    ):
+        return {
+            "status": "blocked",
+            "stage": "release_identity",
+            "findings": [{
+                "category": "release",
+                "field": "package_fingerprint",
+                "issue": "Desktop operation evidence belongs to a different Promoted Release fingerprint.",
+            }],
+            "client_outputs": [],
+        }
 
     terminal = persisted.get("status") in {"passed", "blocked", "timeout"}
     if terminal and isinstance(persisted.get("result"), Mapping):
@@ -1259,6 +1417,45 @@ def run_desktop_operation(
                     "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted Desktop delivery evidence belongs to a stale Contracted Template Bundle."}],
                     "client_outputs": [],
                 }
+        if requires_bundle_validation and not (
+            isinstance(recorded_release_identity, Mapping)
+            and recorded_release_identity.get("package_fingerprint")
+        ):
+            return {
+                "status": "blocked",
+                "stage": "release_identity",
+                "findings": [{
+                    "category": "release",
+                    "field": "package_fingerprint",
+                    "issue": "Persisted passing Desktop evidence lacks a Promoted Release fingerprint.",
+                }],
+                "client_outputs": [],
+            }
+        if requires_bundle_validation:
+            manifest_name = str(prior_result.get("manifest") or "")
+            manifest_path = (run_dir / manifest_name).resolve()
+            try:
+                manifest_path.relative_to(run_dir)
+                manifest = _read(manifest_path)
+                set_finding = _desktop_delivery_set_finding(run_dir, manifest)
+                if set_finding is not None:
+                    raise ValueError(set_finding["issue"])
+                reply = prior_result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
+                delivery = confirm_desktop_delivery(manifest, reply, opener)
+                if not delivery.get("confirmed"):
+                    issue = str((delivery.get("findings") or [{}])[0].get("issue") or "Terminal delivery could not be reconfirmed.")
+                    raise ValueError(issue)
+            except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                return {
+                    "status": "blocked",
+                    "stage": "terminal_delivery_validation",
+                    "findings": [{
+                        "category": "delivery",
+                        "field": "terminal_result",
+                        "issue": f"Persisted Desktop success no longer has accessible hash-matching outputs: {exc}",
+                    }],
+                    "client_outputs": [],
+                }
         return prior_result
     started_at_epoch, deadline_at_epoch, persisted_budget, runtime_history, stage_history = (
         _desktop_deadline_state(
@@ -1267,6 +1464,50 @@ def run_desktop_operation(
             epoch_now=epoch_now(),
         )
     )
+    if isinstance(persisted.get("soft_budgets"), Mapping):
+        soft_budgets = {
+            str(stage): float(seconds)
+            for stage, seconds in persisted["soft_budgets"].items()
+            if float(seconds) > 0
+        }
+    current_stage = str(persisted.get("stage") or "approved")
+    raw_attempt_counters = persisted.get("attempt_counters")
+    if not isinstance(raw_attempt_counters, Mapping):
+        raw_attempt_counters = {}
+    attempt_counters = {
+        "drafting": dict(raw_attempt_counters.get("drafting") or {}),
+        "verification": dict(raw_attempt_counters.get("verification") or {}),
+        "generation": dict(raw_attempt_counters.get("generation") or {}),
+        "handoff_dispatches": dict(raw_attempt_counters.get("handoff_dispatches") or {}),
+        "delivery": int(raw_attempt_counters.get("delivery") or 0),
+    }
+    raw_stage_timings = persisted.get("stage_timings")
+    if not isinstance(raw_stage_timings, Mapping):
+        raw_stage_timings = {}
+    stage_timings = {
+        str(stage): dict(timing)
+        for stage, timing in raw_stage_timings.items()
+        if isinstance(timing, Mapping)
+    }
+    raw_soft_budget_events = persisted.get("soft_budget_events")
+    if not isinstance(raw_soft_budget_events, list):
+        raw_soft_budget_events = []
+    soft_budget_events = [
+        dict(item)
+        for item in raw_soft_budget_events
+        if isinstance(item, Mapping)
+    ]
+    raw_cleanup = persisted.get("cleanup")
+    cleanup_evidence = dict(raw_cleanup) if isinstance(raw_cleanup, Mapping) else {}
+    raw_pending_handoffs = persisted.get("pending_handoffs")
+    if not isinstance(raw_pending_handoffs, list):
+        raw_pending_handoffs = []
+    pending_handoffs = [
+        dict(item)
+        for item in raw_pending_handoffs
+        if isinstance(item, Mapping)
+    ]
+    last_result: dict[str, Any] = {}
     process_deadline_monotonic = process_monotonic_anchor + max(0.0, deadline_at_epoch - process_epoch_anchor)
 
     def runtime_key(item: Mapping[str, Any]) -> tuple[Any, ...]:
@@ -1288,15 +1529,26 @@ def run_desktop_operation(
             "budget_seconds": persisted_budget,
             "runtime": current_runtime,
             "runtime_history": runtime_history,
+            "release_identity": current_release_identity,
             "status": status,
+            "stage": current_stage,
             "stage_history": stage_history,
+            "stage_timings": stage_timings,
+            "attempt_counters": attempt_counters,
+            "pending_handoffs": pending_handoffs,
+            "soft_budgets": soft_budgets,
+            "soft_budget_events": soft_budget_events,
         }
+        if cleanup_evidence:
+            payload["cleanup"] = cleanup_evidence
         if result is not None:
             payload["result"] = dict(result)
         _write(state_path, payload)
         return dict(result or payload)
 
     def finish(result: Mapping[str, Any]) -> dict[str, Any]:
+        nonlocal current_stage, cleanup_evidence
+        current_stage = str(result.get("pending_stage") or result.get("stage") or current_stage)
         elapsed = max(0.0, epoch_now() - started_at_epoch)
         measured = {
             **result,
@@ -1310,8 +1562,47 @@ def run_desktop_operation(
             "started_at_epoch": started_at_epoch,
             "deadline_at_epoch": deadline_at_epoch,
             "runtime": current_runtime,
+            "release_identity": current_release_identity,
         }
+        if cleanup is not None and not cleanup_evidence:
+            cleanup_evidence = dict(cleanup(str(measured.get("status", "blocked")), max(0.0, remaining_seconds())) or {})
         return save(str(measured.get("status", "blocked")), measured)
+
+    def record_timing(stage: str, elapsed: float) -> None:
+        timing = stage_timings.setdefault(stage, {"elapsed_seconds": 0.0, "invocations": 0})
+        timing["elapsed_seconds"] = round(float(timing.get("elapsed_seconds") or 0.0) + max(0.0, elapsed), 3)
+        timing["invocations"] = int(timing.get("invocations") or 0) + 1
+
+    def record_soft_budget_event(stage: str) -> None:
+        elapsed = float(stage_timings.get(stage, {}).get("elapsed_seconds") or 0.0)
+        if (
+            stage in soft_budgets
+            and elapsed >= soft_budgets[stage]
+            and not any(item.get("stage") == stage for item in soft_budget_events)
+        ):
+            soft_budget_events.append({
+                "stage": stage,
+                "budget_seconds": soft_budgets[stage],
+                "elapsed_seconds": round(elapsed, 3),
+                "action": "early_parent_fallback" if stage == "independent_verification" else "record_diagnostic",
+            })
+
+    def refresh_generation_attempts() -> None:
+        try:
+            _, operation_reference = _reference(run_dir)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return
+        generation = operation_reference.get("generation")
+        if not isinstance(generation, Mapping):
+            return
+        attempt_counters["generation"] = {
+            str(target): int(attempt)
+            for target, attempt in dict(generation.get("attempts") or {}).items()
+        }
+        attempt_counters["verification"].update({
+            str(target): int(attempt)
+            for target, attempt in dict(generation.get("verification_attempts") or {}).items()
+        })
 
     # Persist before any operation work can be interrupted; otherwise a restart
     # could create a fresh correctness budget.
@@ -1319,26 +1610,60 @@ def run_desktop_operation(
     while True:
         remaining = remaining_seconds()
         if remaining <= 0:
-            retained = []
+            retained = [
+                dict(item)
+                for item in last_result.get("candidate_outputs", [])
+                if isinstance(item, Mapping)
+            ]
             try:
                 _, current_reference = _reference(run_dir)
                 current_revision = str(current_reference.get("approval", {}).get("revision_id") or "")
-                if current_revision:
+                if current_revision and not retained:
                     retained = _candidate_outputs(run_dir / "revisions" / current_revision)
             except (OSError, ValueError, json.JSONDecodeError):
                 pass
             return finish({
                 "status": "timeout",
                 "stage": "desktop_operation",
+                "pending_stage": current_stage if current_stage != "approved" else "generate",
                 "deadline_at_epoch": deadline_at_epoch,
                 "findings": [{"category": "timeout", "field": "operation", "issue": "The post-approval Desktop operation deadline expired."}],
                 "candidate_outputs": retained,
+                "pending_result": last_result,
                 "client_outputs": [],
             })
-        result = generate(run_dir, operation_deadline=process_deadline_monotonic, clock=clock)
+        generate_started = clock()
+        observed_stages: set[str] = set()
+
+        def observe_generate_stage(stage: str, elapsed: float) -> None:
+            observed_stages.add(stage)
+            record_timing(stage, elapsed)
+            record_soft_budget_event(stage)
+
+        try:
+            result = generate(
+                run_dir,
+                operation_deadline=process_deadline_monotonic,
+                clock=clock,
+                stage_observer=observe_generate_stage,
+            )
+        finally:
+            generate_elapsed = clock() - generate_started
+            record_timing("generate", generate_elapsed)
+            refresh_generation_attempts()
+            save("running")
+        last_result = dict(result)
+        stage = str(result.get("stage") or "generate")
+        current_stage = stage
+        if stage not in observed_stages:
+            # An awaiting result names the next stage; no time has been spent
+            # waiting on that handoff yet. Upstream generation is tracked by
+            # its observer callbacks and must not consume the next soft budget.
+            stage_elapsed = 0.0 if result.get("status") == "awaiting_hermes" else generate_elapsed
+            record_timing(stage, stage_elapsed)
+            record_soft_budget_event(stage)
         if remaining_seconds() <= 0:
             continue
-        stage = str(result.get("stage") or "generate")
         stage_history.append({"stage": stage, "status": result.get("status"), "remaining_seconds": round(remaining, 3)})
         save("running")
         if progress is not None:
@@ -1347,11 +1672,68 @@ def run_desktop_operation(
             handoffs = result.get("handoffs")
             if not isinstance(handoffs, list) or not handoffs:
                 return finish({**result, "status": "blocked", "stage": "hermes_handoff", "client_outputs": []})
+            current_handoffs = [dict(item) for item in handoffs if isinstance(item, Mapping)]
+            prior_by_response = {
+                str(item.get("response_path") or ""): item
+                for item in pending_handoffs
+            }
+            def handoff_identity(item: Mapping[str, Any]) -> tuple[Any, ...]:
+                return tuple(item.get(key) for key in (
+                    "request_id", "request_sha256", "request_path", "response_path", "task", "attempts",
+                ))
+
+            for handoff in current_handoffs:
+                prior = prior_by_response.get(str(handoff.get("response_path") or ""))
+                if prior is not None and handoff_identity(prior) != handoff_identity(handoff):
+                    return finish({
+                        "status": "blocked",
+                        "stage": "hermes_handoff_integrity",
+                        "findings": [{
+                            "category": "hermes",
+                            "field": str(handoff.get("request_path") or "handoff"),
+                            "issue": "A missing worker response was replaced by a changed request instead of redispatching the exact original request.",
+                        }],
+                        "client_outputs": [],
+                    })
+            handoffs = [
+                prior_by_response.get(str(item.get("response_path") or ""), item)
+                for item in current_handoffs
+            ]
+            pending_handoffs = [dict(item) for item in handoffs]
+            save("running")
             remaining = remaining_seconds()
             if remaining <= 0:
                 continue
             try:
-                handoff_runner(handoffs, remaining)
+                for handoff in handoffs:
+                    if not isinstance(handoff, Mapping):
+                        continue
+                    counter_name = "verification" if str(handoff.get("task") or "").endswith("verification") else "drafting"
+                    for target, attempt in dict(handoff.get("attempts") or {}).items():
+                        attempt_counters[counter_name][str(target)] = max(
+                            int(attempt_counters[counter_name].get(str(target)) or 0),
+                            int(attempt),
+                        )
+                    dispatch_key = str(handoff.get("request_sha256") or handoff.get("request_id") or handoff.get("request_path") or "")
+                    if dispatch_key:
+                        attempt_counters["handoff_dispatches"][dispatch_key] = int(
+                            attempt_counters["handoff_dispatches"].get(dispatch_key) or 0
+                        ) + 1
+                handoff_started = clock()
+                stage_elapsed = float(stage_timings.get(stage, {}).get("elapsed_seconds") or 0.0)
+                soft_remaining = max(0.0, soft_budgets.get(stage, remaining) - stage_elapsed)
+                supports_parent_fallback = (
+                    stage == "independent_verification"
+                    and any(item.get("fallback_owner") == "parent" for item in handoffs)
+                )
+                runner_timeout = min(remaining, soft_remaining) if supports_parent_fallback else remaining
+                save("running")
+                try:
+                    handoff_runner(handoffs, runner_timeout)
+                finally:
+                    record_timing(stage, clock() - handoff_started)
+                    record_soft_budget_event(stage)
+                    save("running")
                 revision_id = str(result.get("revision_id") or "")
                 fallback_handoffs = [
                     item for item in handoffs
@@ -1389,6 +1771,7 @@ def run_desktop_operation(
                     "client_outputs": [],
                 })
             continue
+        pending_handoffs = []
         if result.get("status") != "passed":
             return finish(result)
         if remaining_seconds() <= 0:
@@ -1405,6 +1788,13 @@ def run_desktop_operation(
                 "findings": [{"category": "delivery", "field": "manifest", "issue": str(exc)}],
                 "client_outputs": [],
             })
+        if set_finding := _desktop_delivery_set_finding(run_dir, manifest):
+            return finish({
+                "status": "blocked",
+                "stage": "desktop_delivery_set",
+                "findings": [set_finding],
+                "client_outputs": [],
+            })
         reply = result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
         delivery = confirm_desktop_delivery(
             manifest,
@@ -1413,6 +1803,19 @@ def run_desktop_operation(
             deadline=process_deadline_monotonic,
             clock=clock,
         )
+        attempt_counters["delivery"] = int(delivery.get("attempts") or 0)
+        if remaining_seconds() <= 0:
+            current_stage = "desktop_delivery"
+            last_result = {
+                **result,
+                "stage": "desktop_delivery",
+                "delivery": delivery,
+                "candidate_outputs": _candidate_outputs(
+                    run_dir / "revisions" / str(result.get("revision_id") or "")
+                ) if result.get("revision_id") else [],
+                "client_outputs": [],
+            }
+            continue
         final = {
             **result,
             "status": "passed" if delivery["confirmed"] else "blocked",
@@ -1443,7 +1846,15 @@ def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
     return evidence
 
 
-def _publish(run_dir: Path, revision_dir: Path, reference: Mapping[str, Any], quality: Mapping[str, Any]) -> dict[str, Any]:
+def _publish(
+    run_dir: Path,
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    quality: Mapping[str, Any],
+    *,
+    operation_deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
+) -> dict[str, Any]:
     sources = sorted((revision_dir / "candidate").glob("*.docx")) + sorted((revision_dir / "candidate").glob("*.xml"))
     expected = set(document_set(get_path(reference, "meta.study_type")))
     actual = {source.name for source in sources}
@@ -1453,8 +1864,14 @@ def _publish(run_dir: Path, revision_dir: Path, reference: Mapping[str, Any], qu
     staging = Path(tempfile.mkdtemp(prefix=".output-staging-", dir=run_dir))
     backup: Path | None = None
     try:
+        if operation_deadline is not None and clock() >= operation_deadline:
+            raise OperationDeadlineExpired("The Desktop operation expired before publication.")
         for source in sources:
             shutil.copy2(source, staging / source.name)
+        # The only client-visible mutation is the atomic swap below. Recheck
+        # after staging so slow copies cannot publish after the hard ceiling.
+        if operation_deadline is not None and clock() >= operation_deadline:
+            raise OperationDeadlineExpired("The Desktop operation expired while staging publication.")
         if output.exists():
             backup = Path(tempfile.mkdtemp(prefix=".output-backup-", dir=run_dir))
             backup.rmdir()
@@ -1607,6 +2024,7 @@ def _quality_retry(
     contracted_bundle: Mapping[str, Any] | None = None,
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
+    stage_observer: Callable[[str, float], Any] | None = None,
 ) -> dict[str, Any]:
     """Retry draftable targets; deterministic layout defects require an actual repair."""
     invalid_recovery = [
@@ -1807,7 +2225,13 @@ def _quality_retry(
             if task is not None
         }
         _clear_verification_responses(revision_dir, tasks or None)
-    return generate(run_dir, operation_deadline=operation_deadline, clock=clock)
+    retry_options: dict[str, Any] = {
+        "operation_deadline": operation_deadline,
+        "clock": clock,
+    }
+    if stage_observer is not None:
+        retry_options["stage_observer"] = stage_observer
+    return generate(run_dir, **retry_options)
 
 
 def generate(
@@ -1815,9 +2239,19 @@ def generate(
     *,
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
+    stage_observer: Callable[[str, float], Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     """Advance one approved revision until it needs Hermes work or passes."""
+    observed_at = clock()
+
+    def observe_stage(stage: str) -> None:
+        nonlocal observed_at
+        now = clock()
+        if stage_observer is not None:
+            stage_observer(stage, max(0.0, now - observed_at))
+        observed_at = now
+
     run_dir = run_dir.resolve(); reference_path, working_reference = _reference(run_dir)
     try:
         bundle = contracted_template_bundle(SCRIPT_DIR.parent, working_reference)
@@ -1881,6 +2315,7 @@ def generate(
     missing = missing_drafts(revision_dir, reference, SCRIPT_DIR.parent, contracted_bundle=bundle)
     if missing: return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
 
+    observe_stage("drafting")
     model = merged_drafts(revision_dir, reference, expected_governing)
     font_substitutions = {
         str(source): str(target)
@@ -1938,7 +2373,7 @@ def generate(
                 findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
                 if classification_block is not None:
                     return classification_block
-                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
+                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer)
             xml_report = prior_build.get("xml_report") if partial_repair else None
             if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
                 if xml_report is None or not (revision_dir / "candidate/study.xml").is_file():
@@ -1959,6 +2394,7 @@ def generate(
                     return _repair_block(run_dir, "xml", findings, candidate_outputs=_candidate_outputs(revision_dir))
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
 
+        observe_stage("candidate")
         remaining = 180.0 if operation_deadline is None else operation_deadline - clock()
         if remaining <= 0:
             return {
@@ -2037,9 +2473,10 @@ def generate(
                     "candidate_outputs": _candidate_outputs(revision_dir),
                     "client_outputs": [],
                 }
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
+            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer)
         build = _record_build(revision_dir, fingerprint, governing, bundle, document_report, xml_report, render_report)
     else:
+        observe_stage("candidate")
         document_report = build["document_report"]
         xml_report = build.get("xml_report")
         render_report = build["render_report"]
@@ -2051,6 +2488,7 @@ def generate(
             "render": render_report,
             "findings": [],
         }
+    observe_stage("render_assurance")
     if state.pop("pending_layout_artifacts", None) is not None:
         _write(reference_path, working_reference)
     create_verification_requests(revision_dir, reference, render_report, contracted_bundle=bundle)
@@ -2059,8 +2497,27 @@ def generate(
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
     final_quality["render_assurance"] = assurance_report
     if final_quality["status"] != "passed":
-        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
-    return _publish(run_dir, revision_dir, reference, final_quality)
+        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer)
+    observe_stage("independent_verification")
+    try:
+        published = _publish(
+            run_dir,
+            revision_dir,
+            reference,
+            final_quality,
+            operation_deadline=operation_deadline,
+            clock=clock,
+        )
+    except OperationDeadlineExpired as exc:
+        return {
+            "status": "timeout",
+            "stage": "delivery",
+            "findings": [{"category": "timeout", "field": "operation", "issue": str(exc)}],
+            "candidate_outputs": _candidate_outputs(revision_dir),
+            "client_outputs": [],
+        }
+    observe_stage("delivery")
+    return published
 
 
 def _save_recorded_handoff(revision_dir: Path, request_path: Path) -> None:

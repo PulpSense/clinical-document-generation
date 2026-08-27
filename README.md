@@ -77,6 +77,26 @@ those handoffs, and confirms every final attachment through the Desktop opener.
 The standalone CLI loop is for development and controlled diagnostics; it is
 not sufficient evidence of Desktop delivery.
 
+The same operation interface is used by the controlled real-Hermes certification
+adapter in `tests/hermes_e2e.py`. That adapter supplies only environment-specific
+Hermes process, read-only sandbox, file-opening, progress, and cleanup behavior;
+it does not own another generation loop or deadline. The persisted operation
+state binds the release fingerprint and compatible runtimes to the original UTC
+deadline, exact pending handoffs, attempt counters, stage timing and soft-budget
+diagnostics, cleanup evidence, and immutable terminal result.
+
+Real certification requires an extracted, hash-valid candidate rather than the
+editable checkout:
+
+```bash
+"$CLINICAL_PYTHON" tests/hermes_e2e.py --release-root /absolute/path/to/extracted/clinical-document-generation
+```
+
+The adapter loads `run_desktop_operation` from that candidate, launches Hermes
+with the candidate read-only, and binds the operation to its release-manifest
+fingerprint. Its cleanup reserve remains inside the one 30-minute operation;
+there is no shorter certification timeout.
+
 The normal approval-to-accessible-files target is 10–12 minutes. The target is
 not a cutoff. The complete operation, including retries, verification,
 attachment retrieval, and owned-process cleanup, has a 30-minute ceiling.
@@ -124,7 +144,9 @@ checks the packaged fonts, and atomically swaps it into the Hermes skills
 directory. A failed update retains the previous verified release. The archive
 includes the templates, contracts,
 boilerplate, and requirements, plus `RELEASE-MANIFEST.json` with hashes and
-packaging-time provenance. It excludes development environments, credentials,
+packaging-time provenance. Packaging materializes the exact `HEAD` commit into
+an isolated tree, records that commit, and never copies mutable checkout bytes.
+It excludes development environments, credentials,
 source/patient data, old runs, and tests. Register the extracted root as
 `clinical-document-generation` with `SKILL.md` as the entrypoint.
 
@@ -140,5 +162,8 @@ Desktop operation remains governed by the single 30-minute budget. A passing
 Generation Manifest is not delivery: the Desktop parent must expose exactly its
 client outputs as attachments, retrieve each file through the actual opener,
 and confirm byte length and SHA-256 before reporting success.
+Release Certification additionally requires completion within 15 minutes; a
+slower valid operation may still deliver before the 30-minute correctness
+ceiling, but receives a non-certifying runtime outcome.
 
 The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.

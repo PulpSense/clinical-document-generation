@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 import workflow
+from hermes_e2e import _certified_release
 from workflow import install_release, package_release, verify_installation
 
 
@@ -36,6 +37,14 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
             name.removeprefix(prefix) for name in names if name != manifest_name
         }
         assert manifest["package_fingerprint"] == result["package_fingerprint"]
+        assert manifest["git_commit"] == subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert result["git_commit"] == manifest["git_commit"]
         assert manifest["installation"]["entrypoint"] == "SKILL.md"
         assert manifest["inventory"]["implementation"]
         bundles = manifest["inventory"]["contracted_template_bundles"]
@@ -79,6 +88,10 @@ def test_release_package_can_be_installed_and_imported_without_checkout(tmp_path
     )
     assert result.returncode == 0, result.stderr
     assert (skill_dir / "agents/openai.yaml").is_file()
+    certified_workflow, identity = _certified_release(skill_dir)
+    assert callable(certified_workflow.run_desktop_operation)
+    assert identity["package_fingerprint"]
+    assert identity["source"] == "release_certification_candidate"
 
 
 def test_failed_installation_smoke_keeps_the_active_skill_unchanged(tmp_path):

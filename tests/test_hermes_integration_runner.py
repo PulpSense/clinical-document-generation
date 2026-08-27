@@ -8,15 +8,17 @@ import sys
 from hermes_e2e import (
     EXPECTED_OUTPUTS,
     DiagnosticOutcome,
+    _certified_release,
     _run_handoff_wave,
     _wait_for_processes,
     _workflow,
     input_provenance,
     inspect_run,
+    run_release_certification_operation,
     subprocess_environment,
-    OperationBudget,
     sandbox_command,
 )
+import workflow
 
 
 def test_diagnostic_reports_invalid_hermes_response_for_a_missing_response(tmp_path: Path) -> None:
@@ -60,6 +62,96 @@ def test_diagnostic_reports_invalid_hermes_response_for_a_missing_response(tmp_p
     assert report["required_outputs"] == sorted(EXPECTED_OUTPUTS)
 
 
+def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_path: Path, monkeypatch) -> None:
+    run_dir = tmp_path / "run"
+    revision_id = "r-test"
+    (run_dir / "reference").mkdir(parents=True)
+    (run_dir / "revisions" / revision_id).mkdir(parents=True)
+    (run_dir / "output").mkdir()
+    (run_dir / "reference/study.reference.json").write_text(json.dumps({
+        "meta": {"study_type": "Retrospective"},
+        "approval": {"revision_id": revision_id},
+    }), encoding="utf-8")
+    payload = b"published"
+    output_path = run_dir / "output/protocol.docx"
+    output_path.write_bytes(payload)
+    manifest = {
+        "status": "passed",
+        "client_outputs": [{
+            "path": "output/protocol.docx",
+            "sha256": "b04e5ea201bb040cae53f693f6a38a3e00b62da6039ca248fecd59b7fc842894",
+            "bytes": len(payload),
+        }],
+    }
+    manifest_path = run_dir / "revisions" / revision_id / "delivery-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "passed",
+        "stage": "delivery",
+        "manifest": manifest_path.relative_to(run_dir).as_posix(),
+    })
+
+    report = run_release_certification_operation(
+        run_dir,
+        release_root=Path(__file__).resolve().parents[1],
+        desktop_operation=workflow.run_desktop_operation,
+        release_identity={"package_fingerprint": "controlled-candidate"},
+    )
+
+    assert report["outcome"] == DiagnosticOutcome.PASSED.value
+    assert (run_dir / "logs/desktop-operation.json").is_file()
+    assert not (run_dir / "logs/hermes-operation.json").exists()
+    state = json.loads((run_dir / "logs/desktop-operation.json").read_text())
+    assert state["result"]["delivery"]["confirmed"] is True
+
+
+def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_path: Path) -> None:
+    (tmp_path / "logs").mkdir()
+    handoff = {
+        "task": "rendered_page_visual_verification",
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+    }
+    parent_reviews = []
+
+    def controlled_operation(_run_dir, **kwargs):
+        kwargs["fallback_handoff_runner"]([handoff], 12.0)
+        return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
+
+    run_release_certification_operation(
+        tmp_path,
+        release_root=tmp_path,
+        desktop_operation=controlled_operation,
+        release_identity={"package_fingerprint": "controlled-candidate"},
+        parent_visual_reviewer=lambda handoffs, remaining: parent_reviews.append((handoffs, remaining)),
+    )
+
+    assert parent_reviews == [([handoff], 12.0)]
+
+
+def test_real_release_certification_rejects_the_editable_checkout() -> None:
+    try:
+        _certified_release(Path(__file__).resolve().parents[1])
+    except ValueError as exc:
+        assert "editable checkout" in str(exc)
+    else:
+        raise AssertionError("The editable checkout was accepted for real Release Certification.")
+
+
+def test_real_release_certification_requires_clean_commit_identity(tmp_path: Path) -> None:
+    (tmp_path / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "candidate"}),
+        encoding="utf-8",
+    )
+
+    try:
+        _certified_release(tmp_path)
+    except ValueError as exc:
+        assert "clean commit" in str(exc)
+    else:
+        raise AssertionError("A release without clean-commit identity was accepted.")
+
+
 def test_subprocess_environment_exposes_hermes_managed_native_tools(tmp_path: Path, monkeypatch) -> None:
     hermes_bin = tmp_path / ".hermes/bin"
     hermes_bin.mkdir(parents=True)
@@ -101,6 +193,57 @@ def test_timeout_cleanup_tolerates_a_process_exiting_before_signal(monkeypatch) 
 
     assert timed_out is False
     assert completions[id(process)][0] == 0
+
+
+def test_bound_response_completion_terminates_and_reaps_the_owned_worker(monkeypatch) -> None:
+    signals = []
+
+    class WorkerWithCompletedResponse:
+        pid = 12345
+        returncode = None
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            self.returncode = -15
+            return self.returncode
+
+    process = WorkerWithCompletedResponse()
+    monkeypatch.setattr("hermes_e2e.os.killpg", lambda pid, sent_signal: signals.append((pid, sent_signal)))
+
+    timed_out, completions = _wait_for_processes(
+        [process],
+        timeout_seconds=30.0,
+        completion_check=lambda _process: True,
+    )
+
+    assert timed_out is False
+    assert completions[id(process)][0] == -15
+    assert signals == [(process.pid, 15)]
+
+
+def test_wait_reports_progress_while_workers_are_still_running(monkeypatch) -> None:
+    class CompletesOnSecondPoll:
+        pid = 12345
+        returncode = None
+        polls = iter((None, 0))
+
+        def poll(self):
+            self.returncode = next(self.polls)
+            return self.returncode
+
+    progress = []
+    monkeypatch.setattr("hermes_e2e.PROGRESS_INTERVAL_SECONDS", 0.0)
+
+    timed_out, _ = _wait_for_processes(
+        [CompletesOnSecondPoll()],
+        timeout_seconds=1.0,
+        progress=lambda observed_at: progress.append(observed_at),
+    )
+
+    assert timed_out is False
+    assert progress
 
 
 def test_handoff_wave_closes_parent_log_handles(tmp_path: Path, monkeypatch) -> None:
@@ -148,64 +291,6 @@ def test_workflow_subprocess_timeout_is_reported_explicitly(tmp_path: Path, monk
 
     assert returncode == 124
     assert result == {"status": "timeout", "stage": "generate"}
-
-
-def test_operation_budget_persists_deadline_across_resume_and_reserves_cleanup(tmp_path: Path) -> None:
-    monotonic = [100.0]
-    wall_time = [1_000.0]
-    budget = OperationBudget(
-        tmp_path / "run",
-        clock=lambda: monotonic[0],
-        wall_clock=lambda: wall_time[0],
-        budget_seconds=20.0,
-        cleanup_reserve_seconds=3.0,
-    )
-    first = budget.start_or_resume()
-    wall_time[0] = 1_012.0
-    monotonic[0] = 2.0
-    resumed = OperationBudget(
-        tmp_path / "run",
-        clock=lambda: monotonic[0],
-        wall_clock=lambda: wall_time[0],
-        budget_seconds=99.0,
-        cleanup_reserve_seconds=3.0,
-    )
-
-    assert resumed.start_or_resume()["deadline_at_epoch"] == first["deadline_at_epoch"]
-    assert resumed.remaining() == 8.0
-    assert resumed.child_timeout() == 5.0
-
-
-def test_operation_budget_uses_monotonic_elapsed_within_one_process(tmp_path: Path) -> None:
-    monotonic = [100.0]
-    wall_time = [1_000.0]
-    budget = OperationBudget(
-        tmp_path / "run",
-        clock=lambda: monotonic[0],
-        wall_clock=lambda: wall_time[0],
-        budget_seconds=20.0,
-    )
-    budget.start_or_resume()
-    monotonic[0] = 102.0
-    wall_time[0] = 2_000.0
-
-    assert budget.remaining() == 18.0
-    assert budget.elapsed() == 2.0
-
-
-def test_operation_budget_exhaustion_is_terminal_and_new_operation_is_explicit(tmp_path: Path) -> None:
-    now = [0.0]
-    run = tmp_path / "run"
-    budget = OperationBudget(run, clock=lambda: now[0], wall_clock=lambda: now[0], budget_seconds=5.0, cleanup_reserve_seconds=1.0)
-    budget.start_or_resume()
-    now[0] = 5.0
-    assert budget.expired()
-    budget.terminal("timeout", reason="deadline_exhausted")
-
-    resumed = OperationBudget(run, clock=lambda: now[0], wall_clock=lambda: now[0], operation_id="default", budget_seconds=99.0)
-    assert resumed.start_or_resume()["status"] == "timeout"
-    fresh = OperationBudget(run, clock=lambda: now[0], wall_clock=lambda: now[0], operation_id="new-approved-operation", budget_seconds=99.0)
-    assert fresh.start_or_resume()["operation_id"] == "new-approved-operation"
 
 
 def test_sandbox_launch_denies_repository_writes_but_allows_run_workspace(tmp_path: Path) -> None:
@@ -274,9 +359,22 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
         timed_out=False,
         child_returncode=0,
     )
+    slow_delivery = inspect_run(
+        run_dir,
+        final_result={
+            "status": "passed",
+            "stage": "desktop_delivery",
+            "delivery": {"confirmed": True},
+        },
+        elapsed_seconds=900.0,
+        timed_out=False,
+        child_returncode=0,
+    )
 
     assert without_delivery["outcome"] != DiagnosticOutcome.PASSED.value
     assert with_delivery["outcome"] == DiagnosticOutcome.PASSED.value
+    assert slow_delivery["outcome"] == DiagnosticOutcome.NON_CERTIFYING_RUNTIME.value
+    assert slow_delivery["output_published"] is True
     assert with_delivery["required_outputs"] == ["protocol.docx"]
 
 

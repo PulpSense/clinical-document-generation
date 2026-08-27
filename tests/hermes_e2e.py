@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Test-only diagnostics for the real Hermes workflow seam."""
+"""Test-only real-Hermes adapter for the production Desktop Operation seam."""
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -12,11 +13,10 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 EXPECTED_OUTPUTS = frozenset({"protocol.docx", "icf.docx", "study.xml"})
 APPROVED_INPUT_NORMALIZATIONS = {
@@ -24,9 +24,9 @@ APPROVED_INPUT_NORMALIZATIONS = {
     "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f",
 }
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OPERATION_BUDGET_SECONDS = 1800.0
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
+CERTIFICATION_RUNTIME_CEILING_SECONDS = 900.0
 DEFAULT_INPUT = Path.home() / "Downloads/clinical-document-generation-required-inputs/ambispective-required-only.md"
 DEFAULT_BASELINE = REPO_ROOT / "runs/AS-SP-001-9-sterling"
 FIRST_WAVE_BATCHES = frozenset(
@@ -42,86 +42,6 @@ FIRST_WAVE_BATCHES = frozenset(
 def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
     study_type = str((reference.get("meta") or {}).get("study_type") or "").casefold()
     return frozenset({"protocol.docx"}) if study_type == "retrospective" else EXPECTED_OUTPUTS
-
-
-@dataclass
-class OperationBudget:
-    """Persistent wall-clock budget shared by every post-approval action."""
-
-    run_dir: Path
-    clock: Any = time.monotonic
-    wall_clock: Any = time.time
-    operation_id: str = "default"
-    budget_seconds: float = OPERATION_BUDGET_SECONDS
-    cleanup_reserve_seconds: float = CLEANUP_RESERVE_SECONDS
-    process_monotonic_anchor: float = field(init=False)
-    process_epoch_anchor: float = field(init=False)
-
-    def __post_init__(self) -> None:
-        self.process_monotonic_anchor = self.clock()
-        self.process_epoch_anchor = self.wall_clock()
-
-    def epoch_now(self) -> float:
-        return self.process_epoch_anchor + max(
-            0.0, self.clock() - self.process_monotonic_anchor,
-        )
-
-    @property
-    def path(self) -> Path:
-        return self.run_dir / "logs/hermes-operation.json"
-
-    def _save(self, payload: dict[str, Any]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-
-    def start_or_resume(self) -> dict[str, Any]:
-        if self.path.is_file():
-            state = json.loads(self.path.read_text(encoding="utf-8"))
-            if state.get("operation_id") == self.operation_id:
-                return state
-        started = self.epoch_now()
-        state = {
-            "operation_id": self.operation_id,
-            "started_at": datetime.fromtimestamp(started, timezone.utc).isoformat(),
-            "started_at_epoch": started,
-            "deadline_at_epoch": started + self.budget_seconds,
-            "deadline_seconds": self.budget_seconds,
-            "status": "running",
-            "stage": "approved",
-            "events": [],
-        }
-        self._save(state)
-        return state
-
-    def state(self) -> dict[str, Any]:
-        return json.loads(self.path.read_text(encoding="utf-8"))
-
-    def remaining(self) -> float:
-        return max(0.0, float(self.state()["deadline_at_epoch"]) - self.epoch_now())
-
-    def elapsed(self) -> float:
-        return max(0.0, self.epoch_now() - float(self.state()["started_at_epoch"]))
-
-    def child_timeout(self, requested: float | None = None) -> float:
-        available = max(0.0, self.remaining() - self.cleanup_reserve_seconds)
-        return max(0.0, min(available, requested) if requested is not None else available)
-
-    def event(self, stage: str, *, status: str = "running", **details: Any) -> None:
-        state = self.state()
-        state["stage"] = stage
-        state["status"] = status
-        state["events"].append({"at": datetime.fromtimestamp(self.epoch_now(), timezone.utc).isoformat(), "stage": stage, "status": status, **details})
-        self._save(state)
-
-    def terminal(self, status: str, *, reason: str, cleanup: dict[str, Any] | None = None) -> None:
-        state = self.state()
-        state.update({"status": status, "ended_at": datetime.fromtimestamp(self.epoch_now(), timezone.utc).isoformat(), "stop_reason": reason})
-        if cleanup is not None:
-            state["cleanup"] = cleanup
-        self._save(state)
-
-    def expired(self) -> bool:
-        return self.remaining() <= 0.0
 
 
 def sandbox_command(repo_root: Path, run_dir: Path, command: Sequence[str]) -> tuple[list[str], Path]:
@@ -147,6 +67,7 @@ def sandbox_command(repo_root: Path, run_dir: Path, command: Sequence[str]) -> t
 
 class DiagnosticOutcome(str, Enum):
     PASSED = "passed"
+    NON_CERTIFYING_RUNTIME = "non-certifying-runtime"
     BLOCKED = "blocked"
     TIMEOUT = "timeout"
     RETRY_LIMIT_VIOLATED = "retry-limit-violated"
@@ -181,6 +102,70 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
+    """Load a hash-valid immutable candidate workflow for real certification."""
+    release_root = release_root.resolve()
+    if (release_root / ".git").exists():
+        raise ValueError("Real Release Certification cannot run the editable checkout.")
+    manifest_path = release_root / "RELEASE-MANIFEST.json"
+    manifest = _read_json(manifest_path)
+    if manifest is None or not str(manifest.get("package_fingerprint") or ""):
+        raise ValueError("Release Certification requires a packaged candidate manifest and fingerprint.")
+    git_commit = str(manifest.get("git_commit") or "")
+    if len(git_commit) != 40 or any(character not in "0123456789abcdef" for character in git_commit.casefold()):
+        raise ValueError("Release Certification requires a candidate built from an identified clean commit.")
+    fingerprint_payload = dict(manifest)
+    recorded_fingerprint = str(fingerprint_payload.pop("package_fingerprint"))
+    computed_fingerprint = hashlib.sha256(
+        json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+    if computed_fingerprint != recorded_fingerprint:
+        raise ValueError("Release candidate fingerprint does not match its manifest contents.")
+    for item in manifest.get("files", []):
+        relative = Path(str(item.get("path") or ""))
+        path = (release_root / relative).resolve()
+        try:
+            path.relative_to(release_root)
+        except ValueError as exc:
+            raise ValueError(f"Release manifest path escapes the candidate: {relative}") from exc
+        recorded_bytes = item.get("bytes")
+        if not path.is_file() or _sha256(path) != item.get("sha256") or path.stat().st_size != int(recorded_bytes if recorded_bytes is not None else -1):
+            raise ValueError(f"Release candidate file does not match its manifest: {relative}")
+
+    scripts = release_root / "scripts"
+    workflow_path = scripts / "workflow.py"
+    if not workflow_path.is_file():
+        raise ValueError("Release candidate has no workflow entrypoint.")
+    module_name = f"certified_clinical_workflow_{str(manifest['package_fingerprint'])[:12]}"
+    specification = importlib.util.spec_from_file_location(module_name, workflow_path)
+    if specification is None or specification.loader is None:
+        raise ImportError("Could not load the certified workflow module.")
+    module = importlib.util.module_from_spec(specification)
+    dependency_names = ("contracts", "drafting", "rendering", "quality", "prs_xml")
+    previous_modules = {name: sys.modules.get(name) for name in dependency_names}
+    sys.path.insert(0, str(scripts))
+    sys.modules[module_name] = module
+    try:
+        for name in dependency_names:
+            sys.modules.pop(name, None)
+        specification.loader.exec_module(module)
+    except Exception:
+        sys.modules.pop(module_name, None)
+        raise
+    finally:
+        sys.path.remove(str(scripts))
+        for name, previous in previous_modules.items():
+            if previous is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+    return module, {
+        "package_fingerprint": str(manifest["package_fingerprint"]),
+        "git_commit": git_commit,
+        "source": "release_certification_candidate",
+    }
 
 
 def input_provenance(
@@ -346,11 +331,7 @@ def inspect_run(
     for stage, intervals in agent_intervals.items():
         stage_elapsed_seconds[stage] = round(stage_elapsed_seconds.get(stage, 0.0) + _interval_seconds(intervals), 3)
     repair_report_path = run_dir / "reference/repair-report.md"
-    if timed_out:
-        outcome = DiagnosticOutcome.TIMEOUT
-    elif retry_limit_violations:
-        outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
-    elif (
+    valid_delivery = (
         final_result.get("status") == "passed"
         and output_files == required_outputs
         and bool((final_result.get("delivery") or {}).get("confirmed"))
@@ -358,7 +339,14 @@ def inspect_run(
         and not invalid_response_paths
         and not recorded_response_paths
         and not invalid_rejection_paths
-    ):
+    )
+    if timed_out:
+        outcome = DiagnosticOutcome.TIMEOUT
+    elif retry_limit_violations:
+        outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
+    elif valid_delivery and elapsed_seconds >= CERTIFICATION_RUNTIME_CEILING_SECONDS:
+        outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
+    elif valid_delivery:
         outcome = DiagnosticOutcome.PASSED
     elif missing_response_paths or invalid_response_paths or recorded_response_paths or invalid_rejection_paths:
         outcome = DiagnosticOutcome.INVALID_HERMES_RESPONSE
@@ -416,10 +404,11 @@ def _workflow(
     *,
     approved_by: str | None = None,
     timeout_seconds: float | None = None,
+    workflow_root: Path = REPO_ROOT,
 ) -> tuple[dict[str, Any], int]:
     command = [
         sys.executable,
-        str(REPO_ROOT / "scripts/workflow.py"),
+        str(workflow_root / "scripts/workflow.py"),
         "--run-dir",
         str(run_dir),
         "--stage",
@@ -431,7 +420,7 @@ def _workflow(
     try:
         completed = subprocess.run(
             command,
-            cwd=REPO_ROOT,
+            cwd=workflow_root,
             env=subprocess_environment(),
             text=True,
             capture_output=True,
@@ -476,7 +465,13 @@ def _workflow(
     return result, completed.returncode
 
 
-def prepare_disposable_run(baseline: Path, source_input: Path, run_dir: Path) -> dict[str, Any]:
+def prepare_disposable_run(
+    baseline: Path,
+    source_input: Path,
+    run_dir: Path,
+    *,
+    workflow_root: Path = REPO_ROOT,
+) -> dict[str, Any]:
     if run_dir.exists():
         raise FileExistsError(f"Diagnostic run already exists: {run_dir}")
     reference_dir = run_dir / "reference"
@@ -508,13 +503,18 @@ def prepare_disposable_run(baseline: Path, source_input: Path, run_dir: Path) ->
         json.dumps(reference, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    result, _ = _workflow(run_dir, "approve", approved_by="Hermes real-E2E diagnostic")
+    result, _ = _workflow(
+        run_dir,
+        "approve",
+        approved_by="Hermes Release Certification",
+        workflow_root=workflow_root,
+    )
     if result.get("status") != "passed":
         raise RuntimeError(f"Could not create governed diagnostic revision: {json.dumps(result)}")
     return result
 
 
-def _agent_prompt(run_dir: Path, revision_dir: Path, handoff: Mapping[str, Any]) -> str:
+def _agent_prompt(skill_root: Path, revision_dir: Path, handoff: Mapping[str, Any]) -> str:
     request_path = revision_dir / str(handoff["request_path"])
     response_path = revision_dir / str(handoff["response_path"])
     task = str(handoff.get("task") or "")
@@ -529,13 +529,13 @@ def _agent_prompt(run_dir: Path, revision_dir: Path, handoff: Mapping[str, Any])
     )
     return f"""Complete one isolated clinical-document Hermes handoff.
 
-Repository: {REPO_ROOT}
+Certified skill: {skill_root}
 Run revision: {revision_dir}
 Request: {request_path}
 Response: {response_path}
 Task: {task}
 
-Read {REPO_ROOT / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
+Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
 Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. Use a truthful nonempty producer.model_id. Run the repository's real validator before finishing. Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
@@ -544,6 +544,7 @@ def _wait_for_processes(
     *,
     timeout_seconds: float,
     progress: Any | None = None,
+    completion_check: Any | None = None,
 ) -> tuple[bool, dict[int, tuple[int | None, float]]]:
     deadline = time.monotonic() + timeout_seconds
     pending = {id(process): process for process in processes}
@@ -557,6 +558,20 @@ def _wait_for_processes(
             last_progress = observed_at
         for process_id, process in list(pending.items()):
             returncode = process.poll()
+            if returncode is None and completion_check is not None and completion_check(process):
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait()
+                returncode = process.returncode
             if returncode is not None:
                 completions[process_id] = (returncode, observed_at)
                 del pending[process_id]
@@ -590,13 +605,31 @@ def _wait_for_processes(
     return timed_out, completions
 
 
+def _response_is_bound(
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+) -> bool:
+    request = _read_json(revision_dir / str(handoff.get("request_path") or ""))
+    response = _read_json(revision_dir / str(handoff.get("response_path") or ""))
+    if request is None or response is None:
+        return False
+    return not any((
+        response.get("request_id") != request.get("request_id"),
+        response.get("request_sha256") != request.get("request_sha256"),
+        response.get("task") != request.get("task"),
+        not str((response.get("producer") or {}).get("model_id") or "").strip(),
+    ))
+
+
 def _run_handoff_wave(
     run_dir: Path,
     revision_dir: Path,
     handoffs: Sequence[Mapping[str, Any]],
     *,
     timeout_seconds: float,
-    budget: OperationBudget | None = None,
+    skill_root: Path = REPO_ROOT,
+    sandbox: bool = False,
+    progress: Any | None = None,
 ) -> tuple[bool, list[str]]:
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], float, Path, Path]] = []
     for handoff in handoffs:
@@ -609,7 +642,7 @@ def _run_handoff_wave(
             "hermes",
             "chat",
             "-q",
-            _agent_prompt(run_dir, revision_dir, handoff),
+            _agent_prompt(skill_root, revision_dir, handoff),
             "--source",
             "clinical-real-e2e",
             "--max-turns",
@@ -619,15 +652,15 @@ def _run_handoff_wave(
             "--safe-mode",
         ]
         sandbox_profile = None
-        if budget is not None:
-            command, sandbox_profile = sandbox_command(REPO_ROOT, run_dir, command)
+        if sandbox:
+            command, sandbox_profile = sandbox_command(skill_root, run_dir, command)
         with (
             stdout_path.open("w", encoding="utf-8") as stdout_handle,
             stderr_path.open("w", encoding="utf-8") as stderr_handle,
         ):
             process = subprocess.Popen(
                 command,
-                cwd=REPO_ROOT,
+                cwd=skill_root,
                 env=subprocess_environment(),
                 stdout=stdout_handle,
                 stderr=stderr_handle,
@@ -638,12 +671,18 @@ def _run_handoff_wave(
         if sandbox_profile is not None:
             sandbox_profile.unlink(missing_ok=True)
 
+    handoff_by_process = {
+        id(process): handoff
+        for process, handoff, _, _, _ in processes
+    }
     timed_out, completions = _wait_for_processes(
         [process for process, _, _, _, _ in processes],
         timeout_seconds=timeout_seconds,
-        progress=(lambda observed_at: budget.event(
-            "waiting", elapsed_seconds=round(budget.elapsed(), 3)
-        )) if budget is not None else None,
+        progress=progress,
+        completion_check=lambda process: _response_is_bound(
+            revision_dir,
+            handoff_by_process[id(process)],
+        ),
     )
     missing: list[str] = []
     for process, handoff, started, stdout_path, stderr_path in processes:
@@ -671,113 +710,86 @@ def _run_handoff_wave(
     return timed_out, missing
 
 
-def run_real_hermes(
+def run_release_certification_operation(
     run_dir: Path,
     *,
-    timeout_seconds: float,
+    release_root: Path,
     operation_id: str = "default",
-    budget: OperationBudget | None = None,
+    desktop_operation: Any | None = None,
+    release_identity: Mapping[str, Any] | None = None,
+    parent_visual_reviewer: Callable[[list[Mapping[str, Any]], float], None] | None = None,
 ) -> dict[str, Any]:
-    budget = budget or OperationBudget(run_dir, operation_id=operation_id, budget_seconds=min(timeout_seconds, OPERATION_BUDGET_SECONDS))
-    prior_state = budget.start_or_resume()
-    started = time.monotonic()
-    final_result: dict[str, Any] = {"status": "invalid_workflow_output", "stage": "generate"}
-    child_returncode: int | None = None
-    terminal_state = prior_state.get("status") not in {"running", None}
-    timed_out = prior_state.get("status") == "timeout"
-    if terminal_state:
-        final_result = {"status": prior_state["status"], "stage": prior_state.get("stage", "generate")}
-    last_progress = -PROGRESS_INTERVAL_SECONDS
-    while not terminal_state and not budget.expired() and budget.remaining() > budget.cleanup_reserve_seconds:
-        remaining = budget.child_timeout(timeout_seconds - (time.monotonic() - started))
-        if remaining <= 0:
-            break
-        stage = str(final_result.get("stage") or "generate")
-        if stage != budget.state().get("stage") or time.monotonic() - started - last_progress >= PROGRESS_INTERVAL_SECONDS:
-            budget.event(stage, elapsed_seconds=round(time.monotonic() - started, 3))
-            last_progress = time.monotonic() - started
-        final_result, child_returncode = _workflow(
-            run_dir,
-            "generate",
-            timeout_seconds=max(0.001, remaining),
-        )
-        if final_result.get("status") == "timeout":
-            timed_out = True
-            break
-        if final_result.get("status") != "awaiting_hermes":
-            break
-        revision_id = str(final_result.get("revision_id") or "")
-        handoffs = final_result.get("handoffs") or []
-        if not revision_id or not handoffs:
-            break
-        remaining = budget.child_timeout()
-        wave_timed_out, missing = _run_handoff_wave(
+    release_root = release_root.resolve()
+    if desktop_operation is None:
+        certified_workflow, certified_identity = _certified_release(release_root)
+        desktop_operation = certified_workflow.run_desktop_operation
+        release_identity = certified_identity
+    elif not str((release_identity or {}).get("package_fingerprint") or ""):
+        raise ValueError("An injected controlled operation requires an explicit release fingerprint.")
+    progress_started = time.monotonic()
+    last_progress = [progress_started]
+
+    def progress(stage: str, remaining_seconds: float) -> None:
+        observed = time.monotonic()
+        _append_json_line(run_dir / "logs/hermes-integration-events.jsonl", {
+            "at": datetime.now(timezone.utc).isoformat(),
+            "elapsed_seconds": round(observed - last_progress[0], 3),
+            "status": "running",
+            "stage": stage,
+            "remaining_seconds": round(remaining_seconds, 3),
+        })
+        last_progress[0] = observed
+
+    def handoff_runner(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        reference = _read_json(run_dir / "reference/study.reference.json") or {}
+        revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
+        if not revision_id:
+            raise RuntimeError("The approved Run Revision identity is missing.")
+        wave_started = time.monotonic()
+        _run_handoff_wave(
             run_dir,
             run_dir / "revisions" / revision_id,
             handoffs,
-            timeout_seconds=remaining,
-            budget=budget,
+            timeout_seconds=max(0.0, remaining_seconds - CLEANUP_RESERVE_SECONDS),
+            skill_root=release_root,
+            sandbox=True,
+            progress=lambda observed_at: progress(
+                "waiting",
+                max(0.0, remaining_seconds - (observed_at - wave_started)),
+            ),
         )
-        if wave_timed_out:
-            timed_out = True
-            break
-        if missing:
-            break
-    if final_result.get("status") == "passed" and not timed_out:
-        try:
-            scripts = REPO_ROOT / "scripts"
-            if str(scripts) not in sys.path:
-                sys.path.insert(0, str(scripts))
-            from workflow import confirm_desktop_delivery, desktop_attachment_reply
 
-            manifest_path = run_dir / str(final_result.get("manifest") or "")
-            manifest = _read_json(manifest_path)
-            if manifest is None:
-                raise ValueError("The passing workflow did not expose a readable Generation Manifest.")
-            reply = final_result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
-            delivery = confirm_desktop_delivery(
-                manifest,
-                reply,
-                lambda path: Path(path).read_bytes(),
-                deadline=budget.clock() + budget.remaining(),
-                clock=budget.clock,
+    def parent_visual_fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        if parent_visual_reviewer is None:
+            raise RuntimeError(
+                "The delegated visual reviewer failed; Release Certification requires the Desktop parent to inspect every bound page and write the response."
             )
-            final_result = {
-                **final_result,
-                "status": "passed" if delivery["confirmed"] else "blocked",
-                "stage": "desktop_delivery",
-                "delivery": delivery,
-            }
-        except (OSError, TypeError, ValueError) as exc:
-            final_result = {
-                **final_result,
-                "status": "blocked",
-                "stage": "desktop_delivery",
-                "delivery": {
-                    "status": "blocked",
-                    "confirmed": False,
-                    "findings": [{"category": "delivery", "field": "attachments", "issue": str(exc)}],
-                },
-            }
-    if budget.expired() or budget.remaining() <= budget.cleanup_reserve_seconds:
-        timed_out = True
-        final_result = {"status": "timeout", "stage": final_result.get("stage", "generate")}
+        parent_visual_reviewer(handoffs, remaining_seconds)
 
-    operation_elapsed = budget.elapsed()
+    final_result = desktop_operation(
+        run_dir,
+        handoff_runner=handoff_runner,
+        fallback_handoff_runner=parent_visual_fallback,
+        opener=lambda path: Path(path).read_bytes(),
+        operation_id=operation_id,
+        release_identity=release_identity,
+        progress=progress,
+        cleanup=lambda _status, _remaining: {
+            "owned_processes_reaped": True,
+            "late_responses_ignored": True,
+        },
+    )
+    timed_out = final_result.get("status") == "timeout"
+    operation_elapsed = float(final_result.get("elapsed_seconds") or (time.monotonic() - progress_started))
     report = inspect_run(
         run_dir,
         final_result=final_result,
         elapsed_seconds=round(operation_elapsed, 3),
         timed_out=timed_out,
-        child_returncode=child_returncode,
+        child_returncode=None,
     )
     report_path = run_dir / "logs/hermes-integration-report.json"
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    budget.terminal(
-        "timeout" if timed_out else str(report["outcome"]),
-        reason="deadline_exhausted" if timed_out else str(report["outcome"]),
-        cleanup={"owned_processes_reaped": True, "late_responses_ignored": timed_out},
-    )
     return report
 
 
@@ -786,12 +798,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
     parser.add_argument("--baseline-run", type=Path, default=DEFAULT_BASELINE)
     parser.add_argument("--run-root", type=Path, default=Path("/tmp/clinical-hermes-real-e2e"))
-    parser.add_argument("--timeout", type=float, default=1800.0)
+    parser.add_argument("--release-root", type=Path, required=True)
     parser.add_argument("--operation-id", default="default")
     args = parser.parse_args(argv)
     run_dir = args.run_root / datetime.now(timezone.utc).strftime("run-%Y%m%dT%H%M%SZ")
-    prepare_disposable_run(args.baseline_run.resolve(), args.input.resolve(), run_dir)
-    report = run_real_hermes(run_dir, timeout_seconds=args.timeout, operation_id=args.operation_id)
+    release_root = args.release_root.resolve()
+    _certified_release(release_root)
+    prepare_disposable_run(
+        args.baseline_run.resolve(),
+        args.input.resolve(),
+        run_dir,
+        workflow_root=release_root,
+    )
+    report = run_release_certification_operation(
+        run_dir,
+        release_root=release_root,
+        operation_id=args.operation_id,
+    )
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0 if report["outcome"] == DiagnosticOutcome.PASSED.value else 1
 

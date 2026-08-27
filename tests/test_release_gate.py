@@ -115,3 +115,44 @@ def test_recorded_drafting_keeps_release_gate_assurance_structural_with_external
 
     assert report["status"] == "structural_passed"
     assert report["assurance"] == "recorded-drafting-structural-only"
+
+
+def test_controlled_release_adapter_drives_the_complete_desktop_operation(tmp_path):
+    _require_renderer()
+    run_dir = tmp_path / "controlled-retrospective"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
+    reference["meta"]["protocol_number"] = "RET-CONTROLLED-41"
+    reference["study"]["title"] = "Controlled Desktop Operation study"
+    reference["approval"] = {"status": "draft"}
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    assert workflow.prepare(run_dir)["status"] == "awaiting_approval"
+    assert workflow.approve(run_dir, approved_by="Controlled Release Adapter")["status"] == "passed"
+
+    def handoff_runner(handoffs, _remaining_seconds):
+        approved = json.loads(reference_path.read_text(encoding="utf-8"))
+        revision_dir = run_dir / "revisions" / approved["approval"]["revision_id"]
+        for handoff in handoffs:
+            request_path = revision_dir / handoff["request_path"]
+            if "verification-requests" in handoff["request_path"]:
+                workflow._save_verification_response(revision_dir, request_path, acceptance_verification)
+            else:
+                workflow._save_recorded_handoff(revision_dir, request_path)
+
+    result = workflow.run_desktop_operation(
+        run_dir,
+        handoff_runner=handoff_runner,
+        opener=lambda path: Path(path).read_bytes(),
+        operation_id="controlled-release-adapter",
+        release_identity={"package_fingerprint": "controlled-candidate-41"},
+    )
+
+    assert result["status"] == "passed"
+    assert result["stage"] == "desktop_delivery"
+    assert result["client_outputs"] == ["output/protocol.docx"]
+    assert result["delivery"]["confirmed"] is True
+    state = json.loads((run_dir / "logs/desktop-operation-controlled-release-adapter.json").read_text())
+    assert state["release_identity"]["package_fingerprint"] == "controlled-candidate-41"
+    assert {"drafting", "candidate", "render_assurance", "independent_verification", "delivery"} <= set(state["stage_timings"])
+    assert state["result"] == result

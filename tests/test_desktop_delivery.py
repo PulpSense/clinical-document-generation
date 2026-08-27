@@ -64,6 +64,28 @@ def test_desktop_confirmation_retries_same_bytes_without_regenerating(tmp_path):
     assert len(calls) == 3
 
 
+def test_desktop_confirmation_rejects_an_opener_completion_after_the_hard_ceiling(tmp_path):
+    now = [0.0]
+    reply = workflow.desktop_attachment_reply(_manifest(), run_dir=tmp_path)
+
+    def late_opener(path):
+        now[0] = 6.0
+        return b"1234" if path.endswith("Protocol final.docx") else b"567"
+
+    result = workflow.confirm_desktop_delivery(
+        _manifest(),
+        reply,
+        late_opener,
+        deadline=5.0,
+        clock=lambda: now[0],
+    )
+
+    assert result["status"] == "blocked"
+    assert result["confirmed"] is False
+    assert result["opened"] == []
+    assert result["findings"][0]["recovery_class"] == "transport_fault"
+
+
 def test_desktop_confirmation_blocks_mismatch_and_does_not_certify_quality(tmp_path):
     reply = workflow.desktop_attachment_reply(_manifest(), run_dir=tmp_path)
 
@@ -74,6 +96,7 @@ def test_desktop_confirmation_blocks_mismatch_and_does_not_certify_quality(tmp_p
     assert result["findings"][0]["category"] == "delivery"
     assert result["findings"][0]["recovery_class"] == "transport_fault"
     assert result["findings"][0]["action"] == "retry_exact_bytes"
+    assert result["attempts"] == 3
 
 
 def test_desktop_confirmation_blocks_missing_attachment_without_opening_anything(tmp_path):
@@ -118,6 +141,202 @@ def test_desktop_operation_routes_handoffs_then_confirms_the_published_manifest(
     assert state["operation_id"] == "default"
 
 
+def test_desktop_operation_persists_governed_identity_attempts_timings_and_cleanup(tmp_path, monkeypatch):
+    now = [10.0]
+    handoff = {
+        "request_id": "r1.draft.introduction.initial.a1",
+        "request_sha256": "a" * 64,
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+        "attempts": {"protocol.introduction": 1},
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "passed", "stage": "delivery", "manifest": "revisions/r1/delivery-manifest.json"},
+    ])
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
+
+    def generate(_run_dir, **_kwargs):
+        now[0] += 2.0
+        return next(results)
+
+    def handoff_runner(_handoffs, _remaining):
+        now[0] += 3.0
+
+    cleanups = []
+    monkeypatch.setattr(workflow, "generate", generate)
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=handoff_runner,
+        opener=lambda path: b"1234" if path.endswith("Protocol final.docx") else b"567",
+        release_identity={"package_fingerprint": "release-abc", "git_commit": "deadbeef"},
+        cleanup=lambda status, _remaining: cleanups.append(status) or {"owned_processes_reaped": True},
+        budget_seconds=30.0,
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "passed"
+    assert state["release_identity"] == {"package_fingerprint": "release-abc", "git_commit": "deadbeef"}
+    assert state["stage"] == "desktop_delivery"
+    assert state["attempt_counters"]["drafting"] == {"protocol.introduction": 1}
+    assert state["attempt_counters"]["handoff_dispatches"] == {"a" * 64: 1}
+    assert state["stage_timings"]["generate"]["elapsed_seconds"] == 4.0
+    assert state["stage_timings"]["drafting"]["elapsed_seconds"] == 3.0
+    assert state["cleanup"] == {"owned_processes_reaped": True}
+    assert state["result"] == result
+    assert cleanups == ["passed"]
+
+
+def test_missing_worker_response_cannot_be_replaced_by_a_changed_request(tmp_path, monkeypatch):
+    original = {
+        "request_id": "r1.draft.introduction.initial.a1",
+        "request_sha256": "a" * 64,
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+        "attempts": {"protocol.introduction": 1},
+    }
+    changed = {**original, "request_sha256": "b" * 64}
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "revision_id": "r1", "handoffs": [original]},
+        {"status": "awaiting_hermes", "stage": "drafting", "revision_id": "r1", "handoffs": [changed]},
+    ])
+    routed = []
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda handoffs, _remaining: routed.append(handoffs),
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert result["stage"] == "hermes_handoff_integrity"
+    assert routed == [[original]]
+    assert state["attempt_counters"]["drafting"] == {"protocol.introduction": 1}
+    assert state["attempt_counters"]["handoff_dispatches"] == {"a" * 64: 1}
+    assert state["pending_handoffs"] == [original]
+
+
+@pytest.mark.parametrize("pending_stage", [
+    "drafting",
+    "candidate",
+    "render_assurance",
+    "independent_verification",
+    "delivery",
+])
+def test_hard_ceiling_preserves_the_exact_pending_stage_and_completed_candidates(
+    tmp_path, monkeypatch, pending_stage,
+):
+    now = [0.0]
+    retained = [{
+        "path": "candidate/protocol.docx",
+        "sha256": "c" * 64,
+        "bytes": 123,
+        "delivery_status": "internal_candidate",
+    }]
+
+    def generate(_run_dir, **_kwargs):
+        now[0] = 6.0
+        return {
+            "status": "awaiting_hermes" if pending_stage in {"drafting", "independent_verification"} else "blocked",
+            "stage": pending_stage,
+            "candidate_outputs": retained,
+            "client_outputs": [],
+        }
+
+    monkeypatch.setattr(workflow, "generate", generate)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        budget_seconds=5.0,
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "timeout"
+    assert result["stage"] == "desktop_operation"
+    assert result["pending_stage"] == pending_stage
+    assert result["candidate_outputs"] == retained
+    assert state["stage"] == pending_stage
+
+
+def test_stage_soft_budget_triggers_diagnostics_without_ending_the_operation(tmp_path, monkeypatch):
+    now = [0.0]
+    handoff = {
+        "request_id": "r1.draft.introduction.initial.a1",
+        "request_sha256": "a" * 64,
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+        "attempts": {"protocol.introduction": 1},
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "blocked", "stage": "drafting", "findings": [], "client_outputs": []},
+    ])
+    received_timeouts = []
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+
+    def slow_worker(_handoffs, timeout_seconds):
+        received_timeouts.append(timeout_seconds)
+        now[0] += 6.0
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=slow_worker,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+        stage_soft_budgets={"drafting": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert received_timeouts == [30.0]
+    assert state["soft_budget_events"] == [{
+        "stage": "drafting",
+        "budget_seconds": 5.0,
+        "elapsed_seconds": 6.0,
+        "action": "record_diagnostic",
+    }]
+
+
+def test_synchronous_candidate_stage_records_timing_and_soft_budget_diagnostic(tmp_path, monkeypatch):
+    def generate(_run_dir, **kwargs):
+        kwargs["stage_observer"]("candidate", 6.0)
+        return {"status": "blocked", "stage": "candidate", "findings": [], "client_outputs": []}
+
+    monkeypatch.setattr(workflow, "generate", generate)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        stage_soft_budgets={"candidate": 5.0},
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert state["stage_timings"]["candidate"]["elapsed_seconds"] == 6.0
+    assert state["soft_budget_events"] == [{
+        "stage": "candidate",
+        "budget_seconds": 5.0,
+        "elapsed_seconds": 6.0,
+        "action": "record_diagnostic",
+    }]
+
+
 def test_desktop_operation_uses_parent_visual_review_when_delegated_review_fails(tmp_path, monkeypatch):
     handoff = {
         "request_path": "hermes/verification-requests/visual.json",
@@ -145,6 +364,111 @@ def test_desktop_operation_uses_parent_visual_review_when_delegated_review_fails
 
     assert result["status"] == "passed"
     assert parent_reviews == [handoff]
+
+
+def test_visual_soft_budget_routes_early_parent_fallback_without_shortening_the_operation(tmp_path, monkeypatch):
+    now = [0.0]
+    handoff = {
+        "request_id": "r1.verify.visual",
+        "request_sha256": "v" * 64,
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+        "task": "rendered_page_visual_verification",
+        "fallback_owner": "parent",
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    primary_timeouts = []
+    parent_reviews = []
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+
+    def primary(_handoffs, timeout_seconds):
+        primary_timeouts.append(timeout_seconds)
+        now[0] += timeout_seconds
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=primary,
+        fallback_handoff_runner=lambda handoffs, _remaining: parent_reviews.extend(handoffs),
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+        stage_soft_budgets={"independent_verification": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert primary_timeouts == [5.0]
+    assert parent_reviews == [handoff]
+    assert state["soft_budget_events"][0]["action"] == "early_parent_fallback"
+    assert state["deadline_at_epoch"] == 1_030.0
+
+
+def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):
+    now = [0.0]
+    handoff = {
+        "request_id": "r1.verify.visual",
+        "request_sha256": "v" * 64,
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+        "task": "rendered_page_visual_verification",
+        "fallback_owner": "parent",
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+
+    def generate(_run_dir, **_kwargs):
+        result = next(results)
+        if result["status"] == "awaiting_hermes":
+            now[0] += 20.0
+        return result
+
+    primary_timeouts = []
+    monkeypatch.setattr(workflow, "generate", generate)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda _handoffs, timeout: primary_timeouts.append(timeout),
+        fallback_handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+        stage_soft_budgets={"independent_verification": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert primary_timeouts == [5.0]
+    assert state["stage_timings"]["independent_verification"]["elapsed_seconds"] == 0.0
+
+
+def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_deadline(tmp_path):
+    revision_dir = tmp_path / "revisions/r1"
+    candidate = revision_dir / "candidate"
+    candidate.mkdir(parents=True)
+    (candidate / "protocol.docx").write_bytes(b"new candidate")
+    (revision_dir / "approved-reference.json").write_text("{}", encoding="utf-8")
+    output = tmp_path / "output"
+    output.mkdir()
+    (output / "protocol.docx").write_bytes(b"previous release")
+    times = iter([9.0, 10.0])
+
+    with pytest.raises(workflow.OperationDeadlineExpired):
+        workflow._publish(
+            tmp_path,
+            revision_dir,
+            {"meta": {"study_type": "Retrospective"}},
+            {},
+            operation_deadline=10.0,
+            clock=lambda: next(times),
+        )
+
+    assert (output / "protocol.docx").read_bytes() == b"previous release"
 
 
 def test_desktop_operation_routes_parent_takeover_without_an_optional_second_runner(tmp_path, monkeypatch):
@@ -177,6 +501,7 @@ def test_desktop_operation_routes_parent_takeover_without_an_optional_second_run
 def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_after_timeout(tmp_path, monkeypatch):
     now = [100.0]
     generated = []
+    cleanups = []
     monkeypatch.setattr(workflow, "generate", lambda run_dir, **_kwargs: generated.append(True) or {
         "status": "awaiting_hermes",
         "stage": "drafting",
@@ -192,6 +517,7 @@ def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_afte
         opener=lambda path: b"unused",
         budget_seconds=10,
         clock=lambda: now[0],
+        cleanup=lambda status, _remaining: cleanups.append(status) or {"owned_processes_reaped": True},
     )
     second = workflow.run_desktop_operation(
         tmp_path,
@@ -199,12 +525,14 @@ def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_afte
         opener=lambda path: b"unused",
         budget_seconds=99,
         clock=lambda: now[0],
+        cleanup=lambda status, _remaining: cleanups.append(status) or {"owned_processes_reaped": True},
     )
 
     assert first["status"] == second["status"] == "timeout"
     assert first["stage"] == second["stage"] == "desktop_operation"
     assert len(generated) == 1
     assert second["deadline_at_epoch"] == first["deadline_at_epoch"]
+    assert cleanups == ["timeout"]
 
 
 def test_desktop_operation_resume_uses_wall_time_across_monotonic_epochs_and_runtimes(tmp_path, monkeypatch):
@@ -477,6 +805,86 @@ def test_terminal_desktop_delivery_is_invalidated_when_the_contracted_bundle_cha
     assert result["client_outputs"] == []
 
 
+def test_terminal_desktop_delivery_is_invalidated_when_the_release_fingerprint_changes(tmp_path, monkeypatch):
+    state_path = tmp_path / "logs/desktop-operation.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(json.dumps({
+        "operation_id": "default",
+        "status": "passed",
+        "release_identity": {"package_fingerprint": "old-release"},
+        "result": {
+            "status": "passed",
+            "stage": "desktop_delivery",
+            "contracted_template_bundle": {"identity_sha256": "same-bundle"},
+            "client_outputs": ["output/protocol.docx"],
+        },
+    }), encoding="utf-8")
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"meta": {"study_type": "Retrospective"}}), encoding="utf-8")
+    monkeypatch.setattr(
+        workflow,
+        "contracted_template_bundle",
+        lambda _root, _reference: {"identity_sha256": "same-bundle"},
+    )
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        release_identity={"package_fingerprint": "new-release"},
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "release_identity"
+    assert result["client_outputs"] == []
+
+
+def test_terminal_desktop_delivery_is_revalidated_against_accessible_output_bytes(tmp_path, monkeypatch):
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"meta": {"study_type": "Retrospective"}}), encoding="utf-8")
+    output_path = tmp_path / "output/protocol.docx"
+    output_path.parent.mkdir()
+    output_path.write_bytes(b"1234")
+    manifest = {
+        "status": "passed",
+        "client_outputs": [{
+            "path": "output/protocol.docx",
+            "sha256": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+            "bytes": 4,
+        }],
+    }
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    generated = []
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: generated.append(True) or {
+        "status": "passed",
+        "stage": "delivery",
+        "manifest": "revisions/r1/delivery-manifest.json",
+        "contracted_template_bundle": {"identity_sha256": "bundle-1"},
+    })
+    monkeypatch.setattr(workflow, "contracted_template_bundle", lambda _root, _reference: {
+        "identity_sha256": "bundle-1",
+    })
+    arguments = {
+        "handoff_runner": lambda *_args: None,
+        "opener": lambda path: Path(path).read_bytes(),
+        "release_identity": {"package_fingerprint": "release-1"},
+    }
+
+    first = workflow.run_desktop_operation(tmp_path, **arguments)
+    output_path.write_bytes(b"xxxx")
+    resumed = workflow.run_desktop_operation(tmp_path, **arguments)
+
+    assert first["status"] == "passed"
+    assert resumed["status"] == "blocked"
+    assert resumed["stage"] == "terminal_delivery_validation"
+    assert resumed["client_outputs"] == []
+    assert generated == [True]
+
+
 def test_legacy_passing_desktop_delivery_without_bundle_identity_fails_closed(tmp_path):
     state_path = tmp_path / "logs/desktop-operation.json"
     state_path.parent.mkdir(parents=True)
@@ -580,6 +988,42 @@ def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fa
     assert result["status"] == "blocked"
     assert result["stage"] == "desktop_delivery"
     assert result["delivery"]["confirmed"] is False
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert state["attempt_counters"]["delivery"] == 3
+
+
+def test_desktop_operation_requires_the_exact_branch_output_set_before_opening_files(tmp_path, monkeypatch):
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"meta": {"study_type": "Retrospective"}}), encoding="utf-8")
+    manifest = {
+        "status": "passed",
+        "client_outputs": [
+            {"path": "output/protocol.docx", "sha256": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4", "bytes": 4},
+            {"path": "output/study.xml", "sha256": "97a6d21df7c51e8289ac1a8c026aaac143e15aa1957f54f42e30d8f8a85c3a55", "bytes": 3},
+        ],
+    }
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "passed",
+        "stage": "delivery",
+        "manifest": "revisions/r1/delivery-manifest.json",
+    })
+    opened = []
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda path: opened.append(path) or b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "desktop_delivery_set"
+    assert result["client_outputs"] == []
+    assert opened == []
 
 
 def test_runtime_target_is_ten_to_twelve_minutes_with_a_thirty_minute_ceiling():

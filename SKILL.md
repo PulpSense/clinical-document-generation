@@ -136,6 +136,24 @@ records every compatible runtime identity used to resume. Persisted monotonic
 timestamps are never treated as portable; monotonic time is used only inside
 one process and converted to the persisted UTC anchor.
 
+The operation also persists the Promoted Release fingerprint, exact pending
+stage and handoffs, drafting and verification attempts, delivery attempts,
+stage timings, soft-budget diagnostics, cleanup evidence, and the terminal
+result. A missing response redispatches only its unchanged request identity;
+changed request bytes fail closed. Soft stage budgets may trigger diagnostics
+or the parent visual fallback, but only the original UTC deadline terminates
+the operation. A late worker or opener completion cannot change a terminal
+result or confirm delivery after that deadline.
+
+Release Certification supplies `run_desktop_operation` from an extracted,
+hash-verified candidate release built from the exact commit recorded in its
+manifest and binds its fingerprint. It must not
+import or launch the editable checkout, and it does not replace the operation's
+30-minute deadline with a harness timeout. The certification adapter must wire
+visual fallback to a Desktop-parent review callback; it must never redispatch
+that fallback through the worker launcher. A valid operation above 15 minutes
+may deliver but receives a non-certifying runtime outcome.
+
 Resolve the installed skill root from the currently loaded `SKILL.md` location
 or runtime entrypoint. Never copy a repository path from prior run evidence or
 assume macOS path separators. A machine-local launcher may record the resolved
