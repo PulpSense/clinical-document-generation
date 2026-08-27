@@ -4,6 +4,8 @@ import shutil
 from datetime import date
 from pathlib import Path
 
+from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from pypdf import PdfWriter
 
 from contracts import batch_plan, contracted_template_bundle
@@ -610,8 +612,11 @@ def test_content_verifier_receives_authorized_boilerplate_and_blank_field_policy
 def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
-    for name in ("protocol.docx", "icf.docx", "study.xml"):
-        (candidate / name).write_bytes(b"candidate")
+    for artifact in ("protocol", "icf"):
+        document = Document()
+        document.add_paragraph(f"Stable {artifact} content")
+        document.save(candidate / f"{artifact}.docx")
+    (candidate / "study.xml").write_bytes(b"candidate")
     rendered = tmp_path / "rendered"
     rendered.mkdir()
     artifacts = []
@@ -661,6 +666,38 @@ def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path
     assert set(evidence) == {item["request_id"] for item in visual} | {"clinical_content_verification"}
     for request in visual:
         assert evidence[request["request_id"]]["artifacts"] == request["artifacts"]
+
+    protocol_artifact = next(item for item in artifacts if item["artifact"] == "protocol")
+    protocol_pdf = tmp_path / protocol_artifact["pdf"]
+    protocol_page = tmp_path / protocol_artifact["pages"][0]["path"]
+    protocol_pdf.write_bytes(b"repaired-protocol-pdf")
+    protocol_page.write_bytes(b"repaired-protocol-page")
+    protocol_docx = tmp_path / protocol_artifact["docx"]
+    formatted = Document(protocol_docx)
+    formatted.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+    formatted.save(protocol_docx)
+    protocol_artifact["docx_sha256"] = hashlib.sha256(protocol_docx.read_bytes()).hexdigest()
+    protocol_artifact["pdf_sha256"] = hashlib.sha256(protocol_pdf.read_bytes()).hexdigest()
+    protocol_artifact["pages"][0]["sha256"] = hashlib.sha256(protocol_page.read_bytes()).hexdigest()
+
+    create_verification_requests(tmp_path, fixture(), render_report)
+
+    response_by_artifact = {
+        item["artifacts"][0]["artifact"]: tmp_path / item["response_path"]
+        for item in visual
+    }
+    content_response = tmp_path / next(
+        item["response_path"] for item in requests if item["task"] == "clinical_content_verification"
+    )
+    assert not response_by_artifact["protocol"].exists()
+    assert response_by_artifact["icf"].is_file()
+    assert content_response.is_file()
+
+    content_changed = Document(protocol_docx)
+    content_changed.paragraphs[0].text = "Changed protocol content"
+    content_changed.save(protocol_docx)
+    create_verification_requests(tmp_path, fixture(), render_report)
+    assert not content_response.exists()
 
 
 def test_response_with_wrong_request_hash_is_rejected(tmp_path):
@@ -831,6 +868,36 @@ def test_visual_gate_rejects_unassessed_pages(tmp_path):
     (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
     findings, _ = validate_verifications(tmp_path)
     assert any(item["category"] == "visual" for item in findings)
+
+
+def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
+    request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
+    request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "request_sha256": "abc", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": []}
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": "abc",
+        "task": request["task"],
+        "producer": {"model_id": "test"},
+        "status": "failed",
+        "findings": [{
+            "artifact": "protocol",
+            "page": 7,
+            "check": "bad_table_split",
+            "element": "Table 13.3.-1",
+            "issue": "The contact table splits badly.",
+        }],
+        "page_assessments": [],
+    }
+    (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
+    (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _ = validate_verifications(tmp_path)
+
+    failed_table = next(item for item in findings if item.get("check") == "bad_table_split")
+    assert failed_table["element"] == "Table 13.3.-1"
+    assert failed_table["target_ids"] == ["layout:protocol"]
 
 
 def test_render_gate_detects_a_textless_pdf_page(tmp_path):

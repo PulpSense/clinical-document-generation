@@ -122,6 +122,30 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _content_sha256(path: Path) -> str:
+    """Hash visible DOCX text independently from its presentation properties."""
+    if path.suffix.casefold() != ".docx":
+        return sha256_file(path)
+    try:
+        stories: list[tuple[str, list[str]]] = []
+        with zipfile.ZipFile(path) as package:
+            for name in sorted(package.namelist()):
+                if not name.startswith("word/") or not name.endswith(".xml"):
+                    continue
+                root = ET.fromstring(package.read(name))
+                values = [
+                    str(element.text or "")
+                    for element in root.iter()
+                    if ET.QName(element).localname in {"t", "instrText"}
+                ]
+                if values:
+                    stories.append((name, values))
+        payload = json.dumps(stories, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(payload).hexdigest()
+    except (OSError, ET.XMLSyntaxError, zipfile.BadZipFile):
+        return sha256_file(path)
+
+
 def _executable_candidates(
     names: Iterable[str],
     *,
@@ -959,6 +983,7 @@ def _blank_pdf_pages(path: Path) -> list[int]:
 def render_pages(
     revision_dir: Path,
     *,
+    artifact_names: Iterable[str] | None = None,
     contracted_bundle: Mapping[str, Any] | None = None,
     renderer_identity: Mapping[str, Any] | None = None,
     page_renderer_identity: Mapping[str, Any] | None = None,
@@ -987,7 +1012,12 @@ def render_pages(
     render_root = revision_dir / "rendered"
     renderer_attempts: list[dict[str, Any]] = []
     page_attempts: list[dict[str, Any]] = []
-    docx_paths = sorted((revision_dir / "candidate").glob("*.docx"))
+    selected_artifacts = set(artifact_names or ())
+    docx_paths = [
+        path
+        for path in sorted((revision_dir / "candidate").glob("*.docx"))
+        if not selected_artifacts or path.stem in selected_artifacts
+    ]
     for renderer_index, identity in enumerate(renderer_candidates, 1):
         remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
         if remaining <= 0:
@@ -1044,13 +1074,15 @@ def render_pages(
 
         findings: list[dict[str, Any]] = []
         artifacts = []
-        if render_root.exists():
+        if not selected_artifacts and render_root.exists():
             shutil.rmtree(render_root)
-        render_root.mkdir(parents=True)
+        render_root.mkdir(parents=True, exist_ok=True)
         for docx, source_pdf in pdfs.items():
             pdf = render_root / source_pdf.name
+            pdf.unlink(missing_ok=True)
             shutil.copy2(source_pdf, pdf)
             page_dir = render_root / docx.stem
+            shutil.rmtree(page_dir, ignore_errors=True)
             page_dir.mkdir()
             pages = []
             for index, source_page in enumerate(selected_pages[docx], 1):
@@ -1068,6 +1100,8 @@ def render_pages(
                 })
             artifacts.append({
                 "artifact": docx.stem,
+                "renderer": identity,
+                "page_renderer": selected_page_renderer,
                 "docx": docx.relative_to(revision_dir).as_posix(),
                 "docx_sha256": sha256_file(docx),
                 "pdf": pdf.relative_to(revision_dir).as_posix(),
@@ -1284,7 +1318,14 @@ def create_verification_requests(
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
     content_files = []
     for path in sorted((revision_dir / "candidate").glob("*")):
-        if path.is_file(): content_files.append({"path": path.relative_to(revision_dir).as_posix(), "sha256": sha256_file(path)})
+        if not path.is_file():
+            continue
+        artifact = {"path": path.relative_to(revision_dir).as_posix()}
+        if path.suffix.casefold() == ".docx":
+            artifact["content_sha256"] = _content_sha256(path)
+        else:
+            artifact["sha256"] = sha256_file(path)
+        content_files.append(artifact)
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     sections = [{"artifact": "protocol", "section_id": section.section_id, "number": section.number, "title": section.title} for section in protocol_contract(branch)]
     if branch != "Retrospective":
@@ -1306,15 +1347,20 @@ def create_verification_requests(
         artifact_name = str(artifacts[0].get("artifact", "documents")) if artifacts else "documents"
         artifact_id = re.sub(r"[^a-z0-9]+", "-", artifact_name.casefold()).strip("-") or f"document-{index}"
         request_id = f"{revision_dir.name}.verify.visual.{artifact_id}"
+        request_artifacts = [
+            {key: value for key, value in artifact.items() if key not in {"renderer", "page_renderer"}}
+            for artifact in artifacts
+        ]
         payloads.append({
             "schema_version": VERIFY_SCHEMA,
             "request_id": request_id,
             "task": "rendered_page_visual_verification",
             "revision_id": revision_dir.name,
-            "renderer": render_report.get("renderer"),
-            "artifacts": artifacts,
+            "renderer": artifacts[0].get("renderer", render_report.get("renderer")) if artifacts else render_report.get("renderer"),
+            "page_renderer": artifacts[0].get("page_renderer", render_report.get("page_renderer")) if artifacts else render_report.get("page_renderer"),
+            "artifacts": request_artifacts,
             "checks": list(VISUAL_CHECKS),
-            "instructions": "Inspect every supplied page image for this document. Do not infer pass from file existence or document text.",
+            "instructions": "Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local.",
             "reviewer_policy": {
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",
@@ -1333,13 +1379,14 @@ def create_verification_requests(
             item = _json(path); existing[item.get("request_id")] = (path, item)
         except (OSError, ValueError, json.JSONDecodeError):
             existing[path.name] = (path, {})
-    current = set(existing) == set(expected) and all(existing[key][1].get("request_sha256") == value["request_sha256"] for key, value in expected.items())
-    if not current:
-        for path, request in existing.values():
-            response_path = request.get("response_path")
-            if response_path:
-                (revision_dir / str(response_path)).unlink(missing_ok=True)
-            path.unlink(missing_ok=True)
+    for request_id, (path, request) in existing.items():
+        replacement = expected.get(request_id)
+        if replacement is not None and request.get("request_sha256") == replacement["request_sha256"]:
+            continue
+        response_path = request.get("response_path")
+        if response_path:
+            (revision_dir / str(response_path)).unlink(missing_ok=True)
+        path.unlink(missing_ok=True)
     result = []
     for payload in payloads:
         path = requests / f"{payload['request_id']}.json"; _write(path, payload); result.append(path)
@@ -1397,7 +1444,7 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
                 source = item if isinstance(item, Mapping) else {"issue": item}
                 category = "visual" if request["task"] == "rendered_page_visual_verification" else "verification"
                 finding = {"category": category, "field": request["task"], "issue": _text(source.get("issue"))}
-                for key in ("target_ids", "artifact", "page", "check"):
+                for key in ("target_ids", "artifact", "page", "check", "element"):
                     if key in source: finding[key] = source[key]
                 if category == "visual":
                     finding["target_ids"] = [f"layout:{source.get('artifact') or 'documents'}"]
@@ -1407,7 +1454,11 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
-                if not path.is_file() or sha256_file(path) != artifact.get("sha256"):
+                expected = artifact.get("content_sha256") or artifact.get("sha256")
+                actual = None
+                if path.is_file():
+                    actual = _content_sha256(path) if artifact.get("content_sha256") else sha256_file(path)
+                if not path.is_file() or actual != expected:
                     findings.append({"category": "verification", "field": request["task"], "issue": f"Verification request is stale for {artifact.get('path')}."})
             else:
                 for key in ("docx", "pdf"):

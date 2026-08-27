@@ -20,17 +20,22 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 from docx.shared import Inches
+from docx.table import Table
 from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 INTERNAL_LANGUAGE = re.compile(r"\b(?:section_id|evidence_refs|boilerplate_refs)\s*:", re.I)
 DUPLICATE_WORD = re.compile(r"\b([A-Za-z][A-Za-z'-]+)\s+\1\b", re.I)
 AUTHORING_LANGUAGE = re.compile(r"table of contents updates automatically|selected consent template", re.I)
+
+
+class LayoutRepairTargetError(ValueError):
+    """A classified repair did not identify one exact generated element."""
 
 
 
@@ -1888,24 +1893,22 @@ def _normalize_protocol_table_pagination(document: Document) -> None:
                 if caption_head.text.strip().startswith("Table 13.3.-1"):
                     caption_head.paragraph_format.keep_with_next = True
                     caption_head.paragraph_format.keep_together = True
-                    # LibreOffice may split a short contact row despite both
-                    # w:cantSplit and paragraph keep constraints. A stable
-                    # page boundary before this small fixed table produces the
-                    # same intact result in Word and fallback renderers.
-                    caption_head.paragraph_format.page_break_before = True
+                    caption_head.paragraph_format.page_break_before = None
 
 
-def _normalize_protocol_section_pagination(document: Document, branch: str) -> None:
-    """Remove obsolete body breaks while preserving template-owned front matter."""
-    if branch != "Ambispective":
-        return
-    for title in ("3. GENERAL INFORMATION", "16. CONFIDENTIALITY"):
-        heading = next((
-            paragraph for paragraph in document.paragraphs
-            if _heading_level(paragraph) == 1
-            and _protocol_heading_key(paragraph.text) == _protocol_heading_key(title)
-        ), None)
-        if heading is not None:
+def _normalize_protocol_section_pagination(document: Document) -> None:
+    """Remove forced numbered-body starts and retain front-matter boundaries."""
+    front_matter = {
+        _protocol_heading_key("1. TITLE PAGE"),
+        _protocol_heading_key("TABLE OF CONTENTS"),
+    }
+    for heading in document.paragraphs:
+        if _heading_level(heading) is None:
+            continue
+        key = _protocol_heading_key(heading.text)
+        if key in front_matter or not re.match(r"^\d+(?:\.\d+)*\.?\s+", heading.text.strip()):
+            continue
+        if heading.paragraph_format.page_break_before is True:
             heading.paragraph_format.page_break_before = None
 
 
@@ -1930,6 +1933,125 @@ def _protect_protocol_heading_content(document: Document) -> None:
                 break
             paragraph.paragraph_format.keep_with_next = True
             paragraph.paragraph_format.keep_together = True
+
+
+def _layout_target_key(value: str) -> str:
+    return re.sub(r"\s+", " ", value).strip().casefold()
+
+
+def _target_heading(document: Document, target: str, *, protocol: bool) -> Paragraph:
+    target_key = _protocol_heading_key(target) if protocol else _layout_target_key(target)
+    headings = [
+        paragraph
+        for paragraph in document.paragraphs
+        if _heading_level(paragraph) is not None
+        and (
+            _protocol_heading_key(paragraph.text) if protocol else _layout_target_key(paragraph.text)
+        ) == target_key
+    ]
+    if len(headings) != 1:
+        raise LayoutRepairTargetError(
+            f"Layout repair target heading must match exactly once; found {len(headings)}: {target}"
+        )
+    return headings[0]
+
+
+def _first_substantive_block(document: Document, heading: Paragraph) -> Paragraph | Table | None:
+    element = heading._p.getnext()
+    while element is not None and element.tag != qn("w:sectPr"):
+        if element.tag == qn("w:tbl"):
+            return Table(element, document)
+        if element.tag == qn("w:p"):
+            paragraph = Paragraph(element, document)
+            if _heading_level(paragraph) is not None:
+                return None
+            if paragraph.text.strip():
+                return paragraph
+        element = element.getnext()
+    return None
+
+
+def _repair_heading_cohesion(document: Document, target: str, *, protocol: bool) -> None:
+    """Strengthen only the heading/content pair named by visual evidence."""
+    heading = _target_heading(document, target, protocol=protocol)
+    heading.paragraph_format.keep_with_next = True
+    heading.paragraph_format.keep_together = True
+    heading.paragraph_format.widow_control = True
+    block = _first_substantive_block(document, heading)
+    if isinstance(block, Paragraph):
+        # Widow control preserves a visible first fragment without making a long
+        # section indivisible.
+        block.paragraph_format.widow_control = True
+    elif isinstance(block, Table) and block.rows:
+        _prevent_row_split(block.rows[0])
+        for cell in block.rows[0].cells:
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.widow_control = True
+
+
+def _repair_protocol_body_pagination(document: Document, target: str) -> None:
+    """Remove an evidenced forced start from one numbered Protocol heading."""
+    heading = _target_heading(document, target, protocol=True)
+    key = _protocol_heading_key(heading.text)
+    if key in {_protocol_heading_key("1. TITLE PAGE"), _protocol_heading_key("TABLE OF CONTENTS")}:
+        raise LayoutRepairTargetError(f"Front matter is not a body-pagination repair target: {target}")
+    if not re.match(r"^\d+(?:\.\d+)*\.?\s+", heading.text.strip()):
+        raise LayoutRepairTargetError(f"Body-pagination repair target is not a numbered Protocol heading: {target}")
+    # An explicit false also overrides a style-level forced page start.
+    heading.paragraph_format.page_break_before = False
+    previous = heading._p.getprevious()
+    while previous is not None and previous.tag == qn("w:p"):
+        paragraph = Paragraph(previous, document)
+        if paragraph.text.strip():
+            break
+        for page_break in list(previous.xpath('.//w:br[@w:type="page"]')):
+            page_break.getparent().remove(page_break)
+        previous = previous.getprevious()
+
+
+def _table_caption_paragraphs(document: Document, table: Table) -> list[Paragraph]:
+    paragraphs: list[Paragraph] = []
+    previous = table._tbl.getprevious()
+    while previous is not None and previous.tag == qn("w:p") and len(paragraphs) < 3:
+        paragraph = Paragraph(previous, document)
+        if paragraph.text.strip():
+            paragraphs.append(paragraph)
+        previous = previous.getprevious()
+    paragraphs.reverse()
+    return paragraphs
+
+
+def _target_table(document: Document, target: str) -> tuple[Table, Paragraph | None]:
+    target_key = _layout_target_key(target).rstrip(".:")
+    matches: list[tuple[Table, Paragraph | None]] = []
+    for table in document.tables:
+        captions = _table_caption_paragraphs(document, table)
+        caption = next((
+            paragraph for paragraph in captions
+            if target_key == _layout_target_key(paragraph.text).rstrip(".:")
+        ), None)
+        first_row = " ".join(cell.text for cell in table.rows[0].cells) if table.rows else ""
+        if caption is not None or target_key == _layout_target_key(first_row).rstrip(".:"):
+            matches.append((table, caption))
+    if len(matches) != 1:
+        raise LayoutRepairTargetError(
+            f"Layout repair target table must match exactly once; found {len(matches)}: {target}"
+        )
+    return matches[0]
+
+
+def _repair_table_pagination(document: Document, target: str) -> None:
+    """Repair only the table identified by a classified rendered finding."""
+    table, caption = _target_table(document, target)
+    for row in table.rows:
+        _prevent_row_split(row)
+    if caption is not None:
+        caption.paragraph_format.keep_with_next = True
+        caption.paragraph_format.keep_together = True
+        # A table-specific boundary must never be attached to a numbered body
+        # heading; only a separately identified caption may own it.
+        if not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption.text.strip()):
+            caption.paragraph_format.page_break_before = True
 
 
 def _assessment_matrix(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
@@ -2062,6 +2184,7 @@ def _template_document(
     authority_path: Path,
     icf: bool,
     boilerplate: Mapping[str, str],
+    layout_repair_rules: Iterable[Mapping[str, str]] = (),
 ) -> Document:
     """Populate the selected Contracted Template without replacing its Layout Contract."""
     document = Document(template_path)
@@ -2111,10 +2234,19 @@ def _template_document(
         _split_heading_content(document)
         _replace_static_toc(document)
         _apply_protocol_authority_layout(document, authority)
-        _normalize_protocol_section_pagination(document, branch)
+        _normalize_protocol_section_pagination(document)
         _normalize_protocol_contact_table(document)
         _normalize_protocol_table_pagination(document)
         _protect_protocol_heading_content(document)
+    for repair in layout_repair_rules:
+        rule = repair["rule"]
+        target = repair["target"]
+        if rule == "heading_cohesion":
+            _repair_heading_cohesion(document, target, protocol=not icf)
+        elif rule == "body_pagination" and not icf:
+            _repair_protocol_body_pagination(document, target)
+        elif rule == "table_pagination":
+            _repair_table_pagination(document, target)
     _set_update_fields(document)
     return document
 
@@ -2285,36 +2417,6 @@ def _apply_font_substitutions(document: Document, substitutions: Mapping[str, st
     return replacements
 
 
-def _apply_layout_repair(document: Document, level: int) -> dict[str, int]:
-    """Apply bounded pagination repairs without changing the template contract."""
-    level = max(0, min(int(level), 3))
-    changes = 0
-    if level == 0:
-        return {"level": 0, "changes": 0}
-    for paragraph in document.paragraphs:
-        if not paragraph.text.strip():
-            continue
-        paragraph.paragraph_format.widow_control = True
-        changes += 1
-        if paragraph.style is not None and str(paragraph.style.name).casefold().startswith("heading"):
-            paragraph.paragraph_format.keep_with_next = True
-            changes += 1
-        if level >= 2:
-            paragraph.paragraph_format.keep_together = len(paragraph.text) <= 600
-            changes += 1
-    for table in document.tables:
-        for row in table.rows:
-            properties = row._tr.get_or_add_trPr()
-            cant_split = properties.find(qn("w:cantSplit"))
-            if level == 1 and cant_split is None:
-                properties.append(OxmlElement("w:cantSplit"))
-                changes += 1
-            elif level >= 3 and cant_split is not None:
-                properties.remove(cant_split)
-                changes += 1
-    return {"level": level, "changes": changes}
-
-
 def render_documents(
     repo_root: Path,
     revision_dir: Path,
@@ -2323,7 +2425,8 @@ def render_documents(
     *,
     contracted_bundle: Mapping[str, Any] | None = None,
     font_substitutions: Mapping[str, str] | None = None,
-    layout_repair_level: int = 0,
+    artifact_names: Iterable[str] | None = None,
+    layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
 ) -> dict[str, Any]:
     output = revision_dir / "candidate"; output.mkdir(parents=True, exist_ok=True)
     fields = render_fields(reference, model)
@@ -2331,27 +2434,63 @@ def render_documents(
     protocol_template, icf_template = template_paths(repo_root, reference, contracted_bundle=bundle)
     boilerplate = _boilerplate(repo_root, bundle)
     substitutions = dict(font_substitutions or {})
+    selected = set(artifact_names or bundle["contracted_templates"])
+    unknown_artifacts = selected - set(bundle["contracted_templates"])
+    if unknown_artifacts:
+        raise ValueError(f"Unknown layout-repair artifacts: {sorted(unknown_artifacts)}")
+    normalized_repairs: dict[str, list[dict[str, str]]] = {}
+    for artifact, repairs in dict(layout_repairs or {}).items():
+        if artifact not in selected:
+            continue
+        normalized: dict[tuple[str, str], dict[str, str]] = {}
+        for repair in repairs:
+            if not isinstance(repair, Mapping):
+                raise ValueError(f"Layout repair for {artifact} must identify a rule and target.")
+            rule = str(repair.get("rule") or "").strip()
+            target = re.sub(r"\s+", " ", str(repair.get("target") or "")).strip()
+            normalized[(rule, target)] = {"rule": rule, "target": target}
+        normalized_repairs[artifact] = [normalized[key] for key in sorted(normalized)]
+    unknown_rules = {
+        f"{artifact}:{repair['rule']}"
+        for artifact, repairs in normalized_repairs.items()
+        for repair in repairs
+        if repair["rule"] not in LAYOUT_REPAIR_RULES[artifact] or not repair["target"]
+    }
+    if unknown_rules:
+        raise ValueError(f"Unknown Layout Contract repair rules: {sorted(unknown_rules)}")
     results = []
-    repair_changes = 0
     for kind, template in (("protocol", protocol_template), ("icf", icf_template)):
-        if template is None: continue
+        if template is None or kind not in selected: continue
         authority = repo_root / str(bundle["client_template_authorities"][kind]["path"])
         if not template.is_file():
             results.append({"artifact": kind, "path": "", "status": "blocked", "findings": [{"category": "rendering", "field": kind, "issue": f"Contracted client template is missing: {template}"}]})
             continue
-        document = _template_document(
-            reference,
-            model,
-            template,
-            authority_path=authority,
-            icf=kind == "icf",
-            boilerplate=boilerplate,
-        )
+        try:
+            document = _template_document(
+                reference,
+                model,
+                template,
+                authority_path=authority,
+                icf=kind == "icf",
+                boilerplate=boilerplate,
+                layout_repair_rules=normalized_repairs.get(kind, ()),
+            )
+        except LayoutRepairTargetError as exc:
+            results.append({
+                "artifact": kind,
+                "path": "",
+                "status": "blocked",
+                "findings": [{
+                    "category": "layout-repair-classification",
+                    "field": kind,
+                    "artifact": kind,
+                    "issue": str(exc),
+                }],
+            })
+            continue
         if kind == "icf":
             _clear_icf_review_highlighting(document)
         font_replacements = _apply_font_substitutions(document, substitutions)
-        layout_repair = _apply_layout_repair(document, layout_repair_level)
-        repair_changes += layout_repair["changes"]
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
         phrases = [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
         findings = audit_docx(path, required_phrases=phrases)
@@ -2360,7 +2499,7 @@ def render_documents(
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
         "contracted_template_bundle": bundle,
         "font_substitutions": substitutions,
-        "layout_repair": {"level": max(0, min(int(layout_repair_level), 3)), "changes": repair_changes},
+        "layout_repairs": normalized_repairs,
         "artifacts": results,
     }
 

@@ -20,12 +20,12 @@ import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
-from contracts import ContractedTemplateBundleError, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
+from contracts import ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, preflight, quality_report, render_pages, renderer, renderers, sha256_file as quality_sha256
@@ -540,7 +540,11 @@ VERIFICATION_TASK_BY_TARGET = {
     "visual": "rendered_page_visual_verification",
 }
 
-
+LAYOUT_RULE_BY_VISUAL_CHECK = {
+    "orphan_heading": "heading_cohesion",
+    "artificial_pagination": "body_pagination",
+    "bad_table_split": "table_pagination",
+}
 def _read(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict): raise ValueError(f"Expected JSON object: {path}")
@@ -815,6 +819,31 @@ def _repair_block(
     return result
 
 
+def _document_report_failure(
+    run_dir: Path,
+    revision_dir: Path,
+    document_report: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Interpret one blocked DOCX report identically on every render path."""
+    findings = [
+        {**finding, "target_ids": [f"layout:{item['artifact']}"]}
+        for item in document_report.get("artifacts", [])
+        for finding in item.get("findings", [])
+    ]
+    classification = [
+        finding for finding in findings
+        if finding.get("category") == "layout-repair-classification"
+    ]
+    if not classification:
+        return findings, None
+    return findings, _repair_block(
+        run_dir,
+        "layout_repair_classification",
+        classification,
+        candidate_outputs=_candidate_outputs(revision_dir),
+    )
+
+
 def _candidate_fingerprint(
     repo_root: Path,
     revision_dir: Path,
@@ -823,7 +852,7 @@ def _candidate_fingerprint(
     *,
     contracted_bundle: Mapping[str, Any],
     font_substitutions: Mapping[str, str] | None = None,
-    layout_repair_level: int = 0,
+    layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     implementation_files = [repo_root / "scripts" / name for name in ("workflow.py", "contracts.py", "drafting.py", "rendering.py", "quality.py", "prs_xml.py")]
     accepted_files = sorted((revision_dir / "hermes/accepted").glob("*.json"))
@@ -835,7 +864,10 @@ def _candidate_fingerprint(
         "accepted_drafts": {path.relative_to(revision_dir).as_posix(): sha256_file(path) for path in accepted_files},
         "merged_model_sha256": sha256_value(model),
         "font_substitutions": dict(sorted((font_substitutions or {}).items())),
-        "layout_repair_level": int(layout_repair_level),
+        "layout_repairs": {
+            str(artifact): _normalized_layout_repair_records(repairs)
+            for artifact, repairs in sorted(dict(layout_repairs or {}).items())
+        },
     }
     return sha256_value(payload), payload
 
@@ -872,6 +904,52 @@ def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, 
     build = {"fingerprint": fingerprint, "governing_resources": dict(governing), "contracted_template_bundle": dict(contracted_bundle), "candidate_files": candidate_files, "document_report": dict(document_report), "xml_report": dict(xml_report) if xml_report else None, "render_report": dict(render_report)}
     _write(revision_dir / "candidate-build.json", build)
     return build
+
+
+def _merge_artifact_reports(prior: Mapping[str, Any], current: Mapping[str, Any]) -> dict[str, Any]:
+    """Replace only newly generated artifact rows in a complete prior report."""
+    def rows(report: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+        result: dict[str, dict[str, Any]] = {}
+        for item in report.get("artifacts", []):
+            if not isinstance(item, Mapping) or not item.get("artifact"):
+                continue
+            row = dict(item)
+            row.setdefault("renderer", report.get("renderer"))
+            row.setdefault("page_renderer", report.get("page_renderer"))
+            result[str(item["artifact"])] = row
+        return result
+
+    artifacts = rows(prior)
+    artifacts.update(rows(current))
+    merged = {**dict(prior), **dict(current), "artifacts": [artifacts[key] for key in sorted(artifacts)]}
+    merged["status"] = "passed" if artifacts and all(item.get("status", "passed") == "passed" for item in artifacts.values()) else "blocked"
+    return merged
+
+
+def _unaffected_build_is_valid(
+    revision_dir: Path,
+    build: Mapping[str, Any],
+    repaired_artifacts: set[str],
+) -> bool:
+    """Prove every retained artifact still matches the build being merged."""
+    for item in build.get("candidate_files", []):
+        path = revision_dir / str(item.get("path"))
+        if path.suffix.casefold() == ".docx" and path.stem in repaired_artifacts:
+            continue
+        if not path.is_file() or sha256_file(path) != item.get("sha256"):
+            return False
+    for artifact in build.get("render_report", {}).get("artifacts", []):
+        if str(artifact.get("artifact")) in repaired_artifacts:
+            continue
+        for key in ("docx", "pdf"):
+            path = revision_dir / str(artifact.get(key))
+            if not path.is_file() or sha256_file(path) != artifact.get(f"{key}_sha256"):
+                return False
+        for page in artifact.get("pages", []):
+            path = revision_dir / str(page.get("path"))
+            if not path.is_file() or sha256_file(path) != page.get("sha256"):
+                return False
+    return True
 
 
 def _candidate_outputs(revision_dir: Path) -> list[dict[str, Any]]:
@@ -1313,6 +1391,64 @@ def _clear_verification_responses(revision_dir: Path, tasks: set[str] | None = N
             (revision_dir / str(request.get("response_path", ""))).unlink(missing_ok=True)
 
 
+def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
+    normalized: dict[tuple[str, str], dict[str, str]] = {}
+    for repair in repairs:
+        if not isinstance(repair, Mapping):
+            continue
+        rule = str(repair.get("rule") or "").strip()
+        target = " ".join(str(repair.get("target") or "").split())
+        if rule and target:
+            normalized[(rule, target)] = {"rule": rule, "target": target}
+    return [normalized[key] for key in sorted(normalized)]
+
+
+def _layout_repair_plan(findings: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
+    plan: dict[str, list[dict[str, str]]] = {}
+    unsupported: list[dict[str, Any]] = []
+    for raw in findings:
+        finding = dict(raw)
+        parsed_targets = [RetryTarget.parse(str(target)) for target in finding.get("target_ids", [])]
+        layout_targets = [target.value for target in parsed_targets if target.category == "layout"]
+        if not layout_targets:
+            continue
+        artifact = str(finding.get("artifact") or layout_targets[0]).removesuffix(".docx")
+        check = str(finding.get("check") or "")
+        target = " ".join(str(finding.get("element") or "").split())
+        rule = LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
+        if rule not in LAYOUT_REPAIR_RULES.get(artifact, ()) or not target:
+            unsupported.append({
+                **finding,
+                "required": "Classify the visual defect with one supported artifact, Layout Contract check, and exact heading or table-caption element before deterministic repair.",
+            })
+            continue
+        plan.setdefault(artifact, []).append({"rule": rule, "target": target})
+    plan = {
+        artifact: _normalized_layout_repair_records(repairs)
+        for artifact, repairs in plan.items()
+    }
+    return plan, unsupported
+
+
+def _invalidate_layout_artifact(revision_dir: Path, artifact: str) -> None:
+    """Invalidate only one DOCX and its exact rendered-page review evidence."""
+    (revision_dir / "candidate" / f"{artifact}.docx").unlink(missing_ok=True)
+    (revision_dir / "rendered" / f"{artifact}.pdf").unlink(missing_ok=True)
+    shutil.rmtree(revision_dir / "rendered" / artifact, ignore_errors=True)
+    for request_path in (revision_dir / "hermes/verification-requests").glob("*.json"):
+        try:
+            request = _read(request_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if request.get("task") != "rendered_page_visual_verification":
+            continue
+        artifacts = request.get("artifacts") if isinstance(request.get("artifacts"), list) else []
+        if not any(str(item.get("artifact")) == artifact for item in artifacts if isinstance(item, Mapping)):
+            continue
+        (revision_dir / str(request.get("response_path", ""))).unlink(missing_ok=True)
+        request_path.unlink(missing_ok=True)
+
+
 def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mapping[str, Any]]) -> Path:
     """Preserve the complete failed candidate and QA evidence before any retry mutation."""
     archive_root = revision_dir / "attempts"
@@ -1476,17 +1612,21 @@ def _quality_retry(
             return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
     if has_layout_target:
         generation = working_reference.setdefault("generation", {})
-        generation["layout_repair_level"] = min(3, int(generation.get("layout_repair_level", 0)) + 1)
-        generation["layout_repair_findings"] = normalized
+        repair_plan, unsupported = _layout_repair_plan(normalized)
+        if unsupported:
+            return _repair_block(
+                run_dir,
+                "layout_repair_classification",
+                unsupported,
+                candidate_outputs=_candidate_outputs(revision_dir),
+            )
+        persisted_repairs = generation.setdefault("layout_repairs", {})
+        for artifact, repairs in repair_plan.items():
+            existing = persisted_repairs.get(artifact, ())
+            persisted_repairs[artifact] = _normalized_layout_repair_records([*existing, *repairs])
+            _invalidate_layout_artifact(revision_dir, artifact)
+        generation["pending_layout_artifacts"] = sorted(repair_plan)
         _write(reference_path, working_reference)
-        for relative in (
-            "candidate",
-            "rendered",
-            "hermes/verification-requests",
-            "hermes/verification-responses",
-        ):
-            shutil.rmtree(revision_dir / relative, ignore_errors=True)
-        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
     else:
         tasks = {
             task
@@ -1573,7 +1713,11 @@ def generate(
         str(source): str(target)
         for source, target in dict((preflight_report or {}).get("font_substitutions") or {}).items()
     }
-    layout_repair_level = int(state.get("layout_repair_level", 0))
+    layout_repairs = {
+        str(artifact): tuple(_normalized_layout_repair_records(rules))
+        for artifact, rules in dict(state.get("layout_repairs") or {}).items()
+        if isinstance(rules, list)
+    }
     fingerprint, governing = _candidate_fingerprint(
         SCRIPT_DIR.parent,
         revision_dir,
@@ -1581,7 +1725,21 @@ def generate(
         model,
         contracted_bundle=bundle,
         font_substitutions=font_substitutions,
-        layout_repair_level=layout_repair_level,
+        layout_repairs=layout_repairs,
+    )
+    try:
+        prior_build = _read(revision_dir / "candidate-build.json")
+    except (OSError, ValueError, json.JSONDecodeError):
+        prior_build = None
+    repair_artifacts = {
+        str(artifact)
+        for artifact in state.get("pending_layout_artifacts", [])
+        if str(artifact) in layout_repairs
+    }
+    partial_repair = (
+        repair_artifacts
+        if prior_build and repair_artifacts and _unaffected_build_is_valid(revision_dir, prior_build, repair_artifacts)
+        else set()
     )
     build = _cached_build(revision_dir, fingerprint) if preflight_report is not None else None
     if build is None:
@@ -1592,22 +1750,28 @@ def generate(
             model,
             contracted_bundle=bundle,
             font_substitutions=font_substitutions,
-            layout_repair_level=layout_repair_level,
+            artifact_names=partial_repair or None,
+            layout_repairs=layout_repairs,
         )
+        if partial_repair:
+            document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
         if document_report["status"] != "passed":
-            findings = [{**finding, "target_ids": [f"layout:{item['artifact']}"]} for item in document_report["artifacts"] for finding in item["findings"]]
+            findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
+            if classification_block is not None:
+                return classification_block
             return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
-        xml_report = None
+        xml_report = prior_build.get("xml_report") if partial_repair else None
         if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
-            prs_authority = bundle["prs_authority"]
-            template = SCRIPT_DIR.parent / str(prs_authority["generation_template"]["path"])
-            xml_report = generate_xml(
-                template,
-                revision_dir / "candidate/study.xml",
-                reference,
-                model.get("prs", {}),
-                structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
-            )
+            if xml_report is None or not (revision_dir / "candidate/study.xml").is_file():
+                prs_authority = bundle["prs_authority"]
+                template = SCRIPT_DIR.parent / str(prs_authority["generation_template"]["path"])
+                xml_report = generate_xml(
+                    template,
+                    revision_dir / "candidate/study.xml",
+                    reference,
+                    model.get("prs", {}),
+                    structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
+                )
             if xml_report["status"] != "passed":
                 findings = [
                     {**finding, "category": "document-structure"}
@@ -1665,10 +1829,12 @@ def generate(
                     model,
                     contracted_bundle=bundle,
                     font_substitutions=font_substitutions,
-                    layout_repair_level=layout_repair_level,
+                    layout_repairs=layout_repairs,
                 )
                 if document_report["status"] != "passed":
-                    findings = [{**finding, "target_ids": [f"layout:{item['artifact']}"]} for item in document_report["artifacts"] for finding in item["findings"]]
+                    findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
+                    if classification_block is not None:
+                        return classification_block
                     return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
                 fingerprint, governing = _candidate_fingerprint(
                     SCRIPT_DIR.parent,
@@ -1677,10 +1843,11 @@ def generate(
                     model,
                     contracted_bundle=bundle,
                     font_substitutions=font_substitutions,
-                    layout_repair_level=layout_repair_level,
+                    layout_repairs=layout_repairs,
                 )
         render_report = render_pages(
             revision_dir,
+            artifact_names=partial_repair or None,
             contracted_bundle=bundle,
             renderer_identity=preflight_report["renderer"],
             page_renderer_identity=preflight_report.get("page_renderer"),
@@ -1689,8 +1856,16 @@ def generate(
             deadline_monotonic=operation_deadline,
             clock=clock,
         )
+        if partial_repair and render_report.get("status") == "passed":
+            render_report = _merge_artifact_reports(prior_build.get("render_report", {}), render_report)
         if render_report["status"] != "passed":
-            findings = [{**finding, "target_ids": ["layout:documents"]} for finding in render_report["findings"]]
+            findings = [
+                {
+                    **finding,
+                    "target_ids": [f"layout:{finding.get('artifact') or 'documents'}"],
+                }
+                for finding in render_report["findings"]
+            ]
             if findings and all(finding.get("category") == "renderer" for finding in findings):
                 return {
                     "status": "blocked",
@@ -1706,6 +1881,8 @@ def generate(
         document_report = build["document_report"]
         xml_report = build.get("xml_report")
         render_report = build["render_report"]
+    if state.pop("pending_layout_artifacts", None) is not None:
+        _write(reference_path, working_reference)
     create_verification_requests(revision_dir, reference, render_report, contracted_bundle=bundle)
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)

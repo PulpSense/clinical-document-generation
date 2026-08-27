@@ -20,8 +20,14 @@ from xml.etree import ElementTree as ET
 
 CONTRACT_VERSION = "clinical-documents-v2.9"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
-CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v1"
+CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
+LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
 APPROVED_FONT_PLAN_VERSION = "approved-font-plan/v1"
+
+LAYOUT_REPAIR_RULES = {
+    "protocol": ("heading_cohesion", "body_pagination", "table_pagination"),
+    "icf": ("heading_cohesion", "table_pagination"),
+}
 
 BUNDLED_FONT_FILES = {
     "Liberation Sans": "LiberationSans-Regular.ttf",
@@ -912,6 +918,21 @@ def contracted_template_bundle(repo_root: Path, reference: Mapping[str, Any]) ->
     }
     approved_font_plan = {**font_plan_payload, "sha256": _identity_hash(font_plan_payload)}
 
+    layout_baseline_payload = {
+        "schema_version": LAYOUT_PRESERVATION_BASELINE_SCHEMA,
+        "artifacts": {
+            artifact: {
+                "contracted_template": dict(template),
+                "client_template_authority": dict(client_authorities[artifact]),
+            }
+            for artifact, template in contracted_templates.items()
+        },
+    }
+    layout_preservation_baseline = {
+        **layout_baseline_payload,
+        "sha256": _identity_hash(layout_baseline_payload),
+    }
+
     if problems:
         raise ContractedTemplateBundleError(problems)
 
@@ -929,6 +950,7 @@ def contracted_template_bundle(repo_root: Path, reference: Mapping[str, Any]) ->
             **boilerplate,
         },
         "approved_font_plan": approved_font_plan,
+        "layout_preservation_baseline": layout_preservation_baseline,
         "prs_authority": prs_authority,
         "resource_hashes": dict(sorted(resource_hashes.items())),
     }

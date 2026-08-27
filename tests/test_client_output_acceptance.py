@@ -7,6 +7,7 @@ from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.shared import Pt
+from docx.table import Table
 from docx.text.paragraph import Paragraph
 from pypdf import PdfReader, PdfWriter
 
@@ -479,7 +480,36 @@ def test_client_protocol_template_renders_source_supported_schedule_of_assessmen
     assert contact_caption_tail.text.strip() == "Contact Information for Study"
     assert contact_caption_head.paragraph_format.keep_with_next is True
     assert contact_caption_tail.paragraph_format.keep_with_next is True
-    assert contact_caption_head.paragraph_format.page_break_before is True
+    assert contact_caption_head.paragraph_format.page_break_before is not True
+
+
+def test_table_specific_break_requires_a_classified_table_repair(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+
+    report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+        layout_repairs={"protocol": ({"rule": "table_pagination", "target": "Table 13.3.-1"},)},
+    )
+
+    assert report["layout_repairs"] == {
+        "protocol": [{"rule": "table_pagination", "target": "Table 13.3.-1"}],
+    }
+    protocol = Document(tmp_path / "candidate/protocol.docx")
+    contact = next(table for table in protocol.tables if table.rows[0].cells[0].text.strip() == "Study Staff")
+    caption_tail = Paragraph(contact._tbl.getprevious(), protocol)
+    caption_head = Paragraph(caption_tail._p.getprevious(), protocol)
+    assert caption_head.text.strip().startswith("Table 13.3.-1")
+    assert not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption_head.text.strip())
+    assert caption_head.paragraph_format.page_break_before is True
+    visits_caption = next(
+        paragraph for paragraph in protocol.paragraphs
+        if paragraph.text.strip().startswith("Table 9.2-1")
+    )
+    assert visits_caption.paragraph_format.page_break_before is not True
 
 
 def test_client_templates_normalize_visual_edge_cases(tmp_path):
@@ -968,6 +998,151 @@ def test_ambispective_body_sections_follow_template_pagination_and_spacing(tmp_p
         if paragraph.style.name.casefold().startswith("heading")
     ]
     assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in body_headings)
+
+
+def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path):
+    cases = (
+        ("prospective-acceptance-source.json", "Advarra"),
+        ("prospective-acceptance-source.json", "Sterling"),
+        ("ambispective-acceptance-source.json", "Advarra"),
+        ("ambispective-acceptance-source.json", "Sterling"),
+        ("retrospective-acceptance-source.json", None),
+    )
+    for fixture_name, icf_family in cases:
+        reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+        if icf_family is not None:
+            reference["meta"]["icf_template"] = icf_family
+        output = tmp_path / f"{reference['meta']['study_type']}-{icf_family or 'none'}"
+
+        document_report = render_documents(ROOT, output, reference, {"protocol": [], "icf": {}, "prs": {}})
+        render_report = render_pages(output)
+
+        assert document_report["status"] == "passed"
+        assert render_report["status"] == "passed"
+        expected_artifacts = {"protocol", "icf"} if icf_family is not None else {"protocol"}
+        assert {artifact["artifact"] for artifact in render_report["artifacts"]} == expected_artifacts
+        assert all(
+            page["sha256"] == sha256_file(output / page["path"])
+            for artifact in render_report["artifacts"]
+            for page in artifact["pages"]
+        )
+
+        protocol = Document(output / "candidate/protocol.docx")
+        rendered_protocol = next(artifact for artifact in render_report["artifacts"] if artifact["artifact"] == "protocol")
+        protocol_pages = [
+            " ".join((page.extract_text() or "").split())
+            for page in PdfReader(output / rendered_protocol["pdf"]).pages
+        ]
+        protocol_number = reference["meta"]["protocol_number"]
+        assert all(protocol_number in page and "Page" in page for page in protocol_pages)
+        assert "1. TITLE PAGE" in protocol_pages[0]
+        toc_heading = next(
+            paragraph.text.strip() for paragraph in protocol.paragraphs
+            if "TABLE OF CONTENTS" in paragraph.text
+            and paragraph.style.name.casefold().startswith("heading")
+        )
+        introduction_heading = next(
+            paragraph.text.strip() for paragraph in protocol.paragraphs
+            if "INTRODUCTION" in paragraph.text
+            and paragraph.style.name.casefold().startswith("heading")
+        )
+        toc_page = next(index for index, page in enumerate(protocol_pages) if toc_heading in page)
+        assert toc_page > 0
+        assert any(
+            index > toc_page and introduction_heading in page
+            for index, page in enumerate(protocol_pages)
+        )
+        sparse_pages = [page for page in protocol_pages if len(page.split()) < 50]
+        assert all("Duration / Follow- up" in page for page in sparse_pages)
+        if any("Table 9.2-1. Visit Schedule" in paragraph.text for paragraph in protocol.paragraphs):
+            assert any(
+                "Table 9.2-1. Visit Schedule" in page
+                and "Visit Number Visit Name Visit Window CRF Number" in page
+                for page in protocol_pages
+            )
+        if any("Table 13.3.-1" in paragraph.text for paragraph in protocol.paragraphs):
+            assert any(
+                "Table 13.3.-1" in page
+                and "Study Staff Business Phone e-mail 24-hour Office Phone" in page
+                for page in protocol_pages
+            )
+        general_information = next((
+            paragraph.text.strip() for paragraph in protocol.paragraphs
+            if "GENERAL INFORMATION" in paragraph.text
+            and paragraph.style.name.casefold().startswith("heading")
+        ), None)
+        if general_information is not None:
+            section_three_page = next(
+                page for page in protocol_pages
+                if general_information in page and toc_heading not in page
+            )
+            assert "2. INVESTIGATOR AGREEMENT" in section_three_page
+            assert len(section_three_page.split()) >= 100
+        numbered_body_headings = [
+            paragraph
+            for paragraph in protocol.paragraphs
+            if paragraph.style.name.casefold().startswith("heading")
+            and re.match(r"^\d+(?:\.\d+)*\.?\s+", paragraph.text.strip())
+            and "TITLE PAGE" not in paragraph.text
+            and "TABLE OF CONTENTS" not in paragraph.text
+        ]
+        assert numbered_body_headings
+        body = list(protocol.element.body)
+        normalized_pages = [re.sub(r"[^a-z0-9]+", " ", page.casefold()).strip() for page in protocol_pages]
+        for heading in numbered_body_headings:
+            heading_index = body.index(heading._p)
+            first_content = None
+            for element in body[heading_index + 1:]:
+                if element.tag == qn("w:tbl"):
+                    table = Table(element, protocol)
+                    first_content = " ".join(cell.text for cell in table.rows[0].cells) if table.rows else ""
+                    break
+                if element.tag != qn("w:p"):
+                    continue
+                paragraph = Paragraph(element, protocol)
+                if paragraph.style.name.casefold().startswith("heading"):
+                    break
+                if paragraph.text.strip():
+                    first_content = paragraph.text
+                    break
+            if not first_content:
+                continue
+            heading_marker = " ".join(re.findall(r"[a-z0-9]+", heading.text.casefold()))
+            content_marker = " ".join(re.findall(r"[a-z0-9]+", first_content.casefold())[:4])
+            assert any(
+                heading_marker in page
+                and content_marker in page[page.index(heading_marker) + len(heading_marker):]
+                for page in normalized_pages
+            ), f"Rendered heading is orphaned from first content: {heading.text}"
+        assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in numbered_body_headings)
+        assert all(
+            paragraph.paragraph_format.keep_with_next is True
+            or paragraph.style.paragraph_format.keep_with_next is True
+            for paragraph in numbered_body_headings
+        )
+        long_body = next(
+            paragraph
+            for paragraph in sorted(protocol.paragraphs, key=lambda item: len(item.text), reverse=True)
+            if len(paragraph.text) > 200 and not paragraph.style.name.casefold().startswith("heading")
+        )
+        assert long_body.paragraph_format.keep_together is not True
+
+        if icf_family is not None:
+            icf = Document(output / "candidate/icf.docx")
+            rendered_icf = next(artifact for artifact in render_report["artifacts"] if artifact["artifact"] == "icf")
+            icf_pages = [
+                " ".join((page.extract_text() or "").split())
+                for page in PdfReader(output / rendered_icf["pdf"]).pages
+            ]
+            assert all(protocol_number in page and "Page" in page for page in icf_pages)
+            assert all(len(page.split()) >= 50 for page in icf_pages)
+            icf_headings = [
+                paragraph
+                for paragraph in icf.paragraphs
+                if paragraph.style.name == "Heading ICF Section"
+            ]
+            assert icf_headings
+            assert all(paragraph.paragraph_format.keep_with_next is True for paragraph in icf_headings)
 
 
 def test_protocol_headings_keep_their_first_content_and_front_matter_boundaries(tmp_path):

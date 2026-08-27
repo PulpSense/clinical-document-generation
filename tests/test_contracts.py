@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -57,6 +58,20 @@ def test_every_supported_selection_resolves_one_complete_contracted_template_bun
     assert len(bundle["identity_sha256"]) == 64
     assert bundle["resource_hashes"]
     assert all(len(digest) == 64 for digest in bundle["resource_hashes"].values())
+
+    baseline = bundle["layout_preservation_baseline"]
+    assert baseline["schema_version"] == "layout-preservation-baseline/v1"
+    assert len(baseline["sha256"]) == 64
+    assert set(baseline["artifacts"]) == set(bundle["contracted_templates"])
+    for artifact, identity in baseline["artifacts"].items():
+        assert identity == {
+            "contracted_template": bundle["contracted_templates"][artifact],
+            "client_template_authority": bundle["client_template_authorities"][artifact],
+        }
+        for resource in identity.values():
+            path = ROOT / resource["path"]
+            assert path.is_file()
+            assert hashlib.sha256(path.read_bytes()).hexdigest() == resource["sha256"]
 
 
 def test_contracted_template_bundle_identity_is_stable_and_covers_every_selected_resource():

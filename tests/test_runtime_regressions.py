@@ -348,24 +348,70 @@ def test_macos_renderer_honors_the_callers_remaining_deadline(tmp_path, monkeypa
     assert observed == [7.5]
 
 
-def test_layout_repair_profile_changes_the_generated_document(tmp_path):
-    reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
-    baseline_dir = tmp_path / "baseline"
-    repaired_dir = tmp_path / "repaired"
+def test_layout_repair_is_scoped_to_one_artifact_and_rule(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+    model = {"protocol": [], "icf": {}, "prs": {}}
 
-    baseline = render_documents(ROOT, baseline_dir, reference, {"protocol": [], "icf": {}, "prs": {}})
+    baseline = render_documents(ROOT, tmp_path, reference, model)
+    icf_before = (tmp_path / "candidate/icf.docx").read_bytes()
+    baseline_protocol = Document(tmp_path / "candidate/protocol.docx")
+    unaffected_paragraphs_before = tuple(
+        paragraph._p.xml
+        for paragraph in baseline_protocol.paragraphs
+        if paragraph.text.strip() != "5. INTRODUCTION"
+    )
+    unaffected_tables_before = tuple(table._tbl.xml for table in baseline_protocol.tables)
+    geometry_before = _visible_formatting_fingerprint(tmp_path / "candidate/protocol.docx")[1:]
+    with zipfile.ZipFile(tmp_path / "candidate/protocol.docx") as package:
+        protocol_xml_before = package.read("word/document.xml")
     repaired = render_documents(
         ROOT,
-        repaired_dir,
+        tmp_path,
         reference,
-        {"protocol": [], "icf": {}, "prs": {}},
-        layout_repair_level=1,
+        model,
+        artifact_names={"protocol"},
+        layout_repairs={"protocol": ({"rule": "heading_cohesion", "target": "5. INTRODUCTION"},)},
     )
 
     assert baseline["status"] == repaired["status"] == "passed"
-    assert repaired["layout_repair"]["level"] == 1
-    assert repaired["layout_repair"]["changes"] > 0
-    assert (baseline_dir / "candidate/protocol.docx").read_bytes() != (repaired_dir / "candidate/protocol.docx").read_bytes()
+    assert [item["artifact"] for item in repaired["artifacts"]] == ["protocol"]
+    assert repaired["layout_repairs"] == {
+        "protocol": [{"rule": "heading_cohesion", "target": "5. INTRODUCTION"}],
+    }
+    assert "layout_repair" not in repaired
+    assert (tmp_path / "candidate/icf.docx").read_bytes() == icf_before
+    with zipfile.ZipFile(tmp_path / "candidate/protocol.docx") as package:
+        assert package.read("word/document.xml") != protocol_xml_before
+    repaired_protocol = Document(tmp_path / "candidate/protocol.docx")
+    assert tuple(
+        paragraph._p.xml
+        for paragraph in repaired_protocol.paragraphs
+        if paragraph.text.strip() != "5. INTRODUCTION"
+    ) == unaffected_paragraphs_before
+    assert tuple(table._tbl.xml for table in repaired_protocol.tables) == unaffected_tables_before
+    assert _visible_formatting_fingerprint(tmp_path / "candidate/protocol.docx")[1:] == geometry_before
+    assert repaired["contracted_template_bundle"]["layout_preservation_baseline"] == baseline["contracted_template_bundle"]["layout_preservation_baseline"]
+
+
+def test_body_pagination_repair_overrides_only_the_named_body_heading(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+
+    render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+        layout_repairs={"protocol": ({"rule": "body_pagination", "target": "6. OBJECTIVE(S)"},)},
+    )
+
+    protocol = Document(tmp_path / "candidate/protocol.docx")
+    target = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "6. OBJECTIVE(S)")
+    title = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "1. TITLE PAGE")
+    toc = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "4. TABLE OF CONTENTS")
+    assert target.paragraph_format.page_break_before is False
+    assert title.paragraph_format.page_break_before is not False
+    assert toc.paragraph_format.page_break_before is not False
 
 
 def _visible_formatting_fingerprint(path):
@@ -482,14 +528,14 @@ def test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatti
         assert _visible_formatting_fingerprint(baseline_path) == _visible_formatting_fingerprint(parallel_path)
 
 
-def test_layout_retry_persists_repair_and_the_original_operation_deadline(tmp_path, monkeypatch):
+def test_layout_retry_persists_scoped_rule_and_the_original_operation_deadline(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision_dir = run_dir / "revisions/r-test"
     revision_dir.mkdir(parents=True)
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
-    working_reference = {"generation": {}}
-    reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
+    working_reference = {"generation": {"layout_repairs": {"icf": [{"rule": "heading_cohesion", "target": "QUESTIONS"}]}}}
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     observed = {}
 
     def fake_generate(path, **kwargs):
@@ -506,15 +552,101 @@ def test_layout_retry_persists_repair_and_the_original_operation_deadline(tmp_pa
         reference,
         revision_dir,
         {},
-        [{"category": "visual", "field": "protocol", "target_ids": ["layout:protocol"], "issue": "overflow"}],
+        [{"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "issue": "orphan heading"}],
         "rendered_document_qa",
         operation_deadline=99.0,
         clock=clock,
     )
 
     persisted = json.loads(reference_path.read_text(encoding="utf-8"))
-    assert persisted["generation"]["layout_repair_level"] == 1
+    assert persisted["generation"]["layout_repairs"] == {
+        "icf": [{"rule": "heading_cohesion", "target": "QUESTIONS"}],
+        "protocol": [{"rule": "heading_cohesion", "target": "5. INTRODUCTION"}],
+    }
+    assert persisted["generation"]["pending_layout_artifacts"] == ["protocol"]
+    assert "layout_repair_level" not in persisted["generation"]
     assert observed == {"path": run_dir, "operation_deadline": 99.0, "clock": clock}
+
+
+def test_layout_retry_requires_an_exact_repair_element(tmp_path):
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "orphan_heading",
+        "target_ids": ["layout:protocol"],
+        "issue": "orphan heading without a bound element",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding])
+
+    assert plan == {}
+    assert unsupported[0]["required"].endswith(
+        "exact heading or table-caption element before deterministic repair."
+    )
+
+
+def test_layout_repair_rejects_a_nonexact_table_target_as_classification(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+
+    report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+        layout_repairs={"protocol": ({"rule": "table_pagination", "target": "Table"},)},
+    )
+
+    assert report["status"] == "blocked"
+    assert report["artifacts"][0]["findings"] == [{
+        "category": "layout-repair-classification",
+        "field": "protocol",
+        "artifact": "protocol",
+        "issue": "Layout repair target table must match exactly once; found 0: Table",
+    }]
+
+    run_dir = tmp_path / "run"
+    revision_dir = run_dir / "revisions/r-test"
+    revision_dir.mkdir(parents=True)
+    (run_dir / "reference").mkdir()
+    findings, block = workflow._document_report_failure(run_dir, revision_dir, report)
+    assert findings[0]["target_ids"] == ["layout:protocol"]
+    assert block is not None
+    assert block["stage"] == "layout_repair_classification"
+
+
+def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
+    prior = {
+        "renderer": {"kind": "Pages"},
+        "page_renderer": {"kind": "pdftoppm"},
+        "artifacts": [
+            {"artifact": "icf", "pages": []},
+            {"artifact": "protocol", "pages": []},
+        ],
+    }
+    initial_paths = quality.create_verification_requests(tmp_path, _source(), prior)
+    initial_icf = next(path for path in initial_paths if "visual.icf" in path.name)
+    initial_request = json.loads(initial_icf.read_text(encoding="utf-8"))
+    response_path = tmp_path / initial_request["response_path"]
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response_path.write_text("{}", encoding="utf-8")
+    current = {
+        "renderer": {"kind": "LibreOffice"},
+        "page_renderer": {"kind": "pymupdf"},
+        "artifacts": [
+            {"artifact": "protocol", "renderer": {"kind": "LibreOffice"}, "page_renderer": {"kind": "pymupdf"}, "pages": []},
+        ],
+    }
+
+    merged = workflow._merge_artifact_reports(prior, current)
+    paths = quality.create_verification_requests(tmp_path, _source(), merged)
+    icf_request = json.loads(next(path for path in paths if "visual.icf" in path.name).read_text(encoding="utf-8"))
+    protocol_request = json.loads(next(path for path in paths if "visual.protocol" in path.name).read_text(encoding="utf-8"))
+
+    assert icf_request["request_sha256"] == initial_request["request_sha256"]
+    assert response_path.is_file()
+    assert icf_request["renderer"] == {"kind": "Pages"}
+    assert protocol_request["renderer"] == {"kind": "LibreOffice"}
 
 
 def test_renderer_preflight_render_verifies_an_uninspectable_font_instead_of_failing(monkeypatch):
@@ -676,6 +808,53 @@ def test_real_visual_defect_does_not_switch_away_from_the_client_renderer(tmp_pa
     assert report["renderer"] == word
     assert rendered_by == ["Microsoft Word"]
     assert report["findings"][0]["category"] == "visual"
+
+
+def test_render_pages_regenerates_only_the_selected_artifact(tmp_path, monkeypatch):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    for artifact in ("protocol", "icf"):
+        Document().save(candidate / f"{artifact}.docx")
+    retained_pdf = tmp_path / "rendered/icf.pdf"
+    retained_page = tmp_path / "rendered/icf/page-1.png"
+    retained_page.parent.mkdir(parents=True)
+    retained_pdf.write_bytes(b"retained-icf-pdf")
+    retained_page.write_bytes(b"retained-icf-page")
+    rendered = []
+
+    def fake_export(docx, output_dir, _identity, **_kwargs):
+        rendered.append(docx.stem)
+        from pypdf import PdfWriter
+        output = output_dir / f"{docx.stem}.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        with output.open("wb") as handle:
+            writer.write(handle)
+        return output
+
+    def fake_rasterize(_pdf, output_dir, _identity, **_kwargs):
+        output_dir.mkdir(parents=True, exist_ok=True)
+        page = output_dir / "page-1.png"
+        page.write_bytes(b"protocol-page")
+        return [page]
+
+    monkeypatch.setattr(quality, "_render_pdf", fake_export)
+    monkeypatch.setattr(quality, "rasterize_pdf", fake_rasterize)
+    monkeypatch.setattr(quality, "refresh_toc_from_pdf", lambda *_args: False)
+    monkeypatch.setattr(quality, "_blank_pdf_pages", lambda _pdf: [])
+
+    report = quality.render_pages(
+        tmp_path,
+        artifact_names={"protocol"},
+        renderer_identities=[{"kind": "test", "path": "/test/renderer"}],
+        page_renderer_identities=[{"kind": "test-pages", "path": "/test/pages"}],
+    )
+
+    assert report["status"] == "passed"
+    assert rendered == ["protocol"]
+    assert [item["artifact"] for item in report["artifacts"]] == ["protocol"]
+    assert retained_pdf.read_bytes() == b"retained-icf-pdf"
+    assert retained_page.read_bytes() == b"retained-icf-page"
 
 
 def test_generated_docx_replaces_a_missing_client_font_with_the_selected_fallback(tmp_path):
@@ -895,8 +1074,15 @@ def test_layout_failure_rebuilds_and_reverifies_before_retry_limit(tmp_path, mon
     verification_response = revision / "hermes/verification-responses/visual.json"
     reference_path.parent.mkdir(parents=True)
     verification_response.parent.mkdir(parents=True)
+    verification_request = revision / "hermes/verification-requests/visual.json"
+    verification_request.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
     verification_response.write_text("{}", encoding="utf-8")
+    verification_request.write_text(json.dumps({
+        "task": "rendered_page_visual_verification",
+        "response_path": "hermes/verification-responses/visual.json",
+        "artifacts": [{"artifact": "protocol"}],
+    }), encoding="utf-8")
     (revision / "candidate-build.json").write_text("{}", encoding="utf-8")
     rerun = {"status": "awaiting_hermes", "stage": "independent_verification"}
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: rerun)
@@ -908,14 +1094,15 @@ def test_layout_failure_rebuilds_and_reverifies_before_retry_limit(tmp_path, mon
         {},
         revision,
         {},
-        [{"category": "visual", "field": "protocol.docx:10", "target_ids": ["layout:protocol.docx"], "issue": "orphan heading"}],
+        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "issue": "orphan heading"}],
         "quality",
     )
 
     assert result == rerun
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["generation"]["attempts"]["layout:protocol.docx"] == 2
-    assert not (revision / "candidate-build.json").exists()
+    assert (revision / "candidate-build.json").exists()
+    assert not verification_request.exists()
     assert not verification_response.exists()
 
 
@@ -925,7 +1112,7 @@ def test_layout_failure_blocks_only_after_three_total_attempts(tmp_path):
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
-    finding = {"category": "visual", "field": "protocol.docx:10", "target_ids": ["layout:protocol.docx"], "issue": "orphan heading"}
+    finding = {"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "issue": "orphan heading"}
 
     result = workflow._quality_retry(
         run_dir,
@@ -1007,17 +1194,38 @@ def test_protocol_omits_references_heading_when_no_references_are_supplied():
     assert "REFERENCES" not in [paragraph.text.strip() for paragraph in document.paragraphs]
 
 
-def test_layout_failure_rebuilds_the_candidate_before_blocking(tmp_path, monkeypatch):
+def test_layout_failure_invalidates_only_the_affected_artifact_evidence(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
     working = {"generation": {}}
     reference_path.write_text(json.dumps(working), encoding="utf-8")
-    for relative in ("candidate", "rendered", "hermes/verification-responses"):
+    retained = (
+        "candidate/protocol.docx",
+        "candidate/icf.docx",
+        "rendered/protocol.pdf",
+        "rendered/protocol/page-1.png",
+        "rendered/icf.pdf",
+        "rendered/icf/page-1.png",
+    )
+    for relative in retained:
         path = revision / relative
-        path.mkdir(parents=True)
-        (path / "stale").write_text("stale", encoding="utf-8")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(relative.encode())
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir(parents=True)
+    for artifact in ("protocol", "icf"):
+        request = {
+            "task": "rendered_page_visual_verification",
+            "request_id": f"visual-{artifact}",
+            "response_path": f"hermes/verification-responses/visual-{artifact}.json",
+            "artifacts": [{"artifact": artifact}],
+        }
+        (requests / f"visual-{artifact}.json").write_text(json.dumps(request), encoding="utf-8")
+        (responses / f"visual-{artifact}.json").write_text("{}", encoding="utf-8")
     (revision / "candidate-build.json").write_text("{}", encoding="utf-8")
     resumed = {"status": "awaiting_hermes", "stage": "independent_verification"}
     monkeypatch.setattr(workflow, "generate", lambda _, **_kwargs: resumed)
@@ -1029,14 +1237,24 @@ def test_layout_failure_rebuilds_the_candidate_before_blocking(tmp_path, monkeyp
         {"meta": {"study_type": "Retrospective"}},
         revision,
         {},
-        [{"category": "visual", "field": "protocol", "target_ids": ["layout:protocol"], "issue": "orphaned heading"}],
+        [{"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "issue": "orphaned heading"}],
         "quality",
     )
 
     assert result == resumed
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["generation"]["attempts"]["layout:protocol"] == 2
-    assert not (revision / "candidate").exists()
-    assert not (revision / "rendered").exists()
-    assert not (revision / "candidate-build.json").exists()
-    assert not (revision / "hermes/verification-responses").exists()
+    assert state["generation"]["layout_repairs"] == {
+        "protocol": [{"rule": "heading_cohesion", "target": "5. INTRODUCTION"}],
+    }
+    assert not (revision / "candidate/protocol.docx").exists()
+    assert not (revision / "rendered/protocol.pdf").exists()
+    assert not (revision / "rendered/protocol").exists()
+    assert not (requests / "visual-protocol.json").exists()
+    assert not (responses / "visual-protocol.json").exists()
+    assert (revision / "candidate/icf.docx").is_file()
+    assert (revision / "rendered/icf.pdf").is_file()
+    assert (revision / "rendered/icf/page-1.png").is_file()
+    assert (requests / "visual-icf.json").is_file()
+    assert (responses / "visual-icf.json").is_file()
+    assert (revision / "candidate-build.json").is_file()
