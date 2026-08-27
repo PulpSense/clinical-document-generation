@@ -24,7 +24,7 @@ from contracts import (
     SectionSpec,
     batch_plan,
     canonical_study_type,
-    contract_hash,
+    contracted_template_bundle,
     get_path,
     icf_contract,
     meaningful,
@@ -135,6 +135,8 @@ def _expected_section_contracts(
     reference: Mapping[str, Any],
     batch: BatchSpec,
     targets: Iterable[str],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     target_list = list(targets)
     if batch.artifact == "prs":
@@ -151,11 +153,15 @@ def _expected_section_contracts(
     unknown = sorted(set(target_list) - set(known))
     if unknown:
         raise ValueError(f"Draft request contains unknown section IDs: {', '.join(unknown)}")
-    boilerplate = load_boilerplate(repo_root)
+    boilerplate = load_boilerplate(repo_root, reference, contracted_bundle=contracted_bundle)
     return [_section_payload(known[target], boilerplate) for target in target_list]
 
 
-def _request_matches_approved_reference(revision_dir: Path, request: Mapping[str, Any]) -> bool:
+def _request_matches_approved_reference(
+    revision_dir: Path,
+    request: Mapping[str, Any],
+    expected_governing: Mapping[str, Any] | None = None,
+) -> bool:
     """Reconstruct every source-bearing request field from the immutable approval snapshot."""
     snapshot_path = revision_dir / "approved-reference.json"
     if not snapshot_path.is_file():
@@ -174,9 +180,21 @@ def _request_matches_approved_reference(revision_dir: Path, request: Mapping[str
         attempts = request.get("attempts")
         if not targets or not isinstance(attempts, Mapping) or set(map(str, attempts)) != set(targets):
             return False
-        expected_governing = governing_resources(repo_root, reference)
+        if expected_governing is None:
+            bundle = contracted_template_bundle(repo_root, reference)
+            expected_governing = governing_resources(repo_root, reference, contracted_bundle=bundle)
+        else:
+            bundle = expected_governing.get("contracted_template_bundle")
+            if not isinstance(bundle, Mapping):
+                return False
         scoped = _scoped_source(reference, batch.field_families)
-        expected_contracts = _expected_section_contracts(repo_root, reference, batch, targets)
+        expected_contracts = _expected_section_contracts(
+            repo_root,
+            reference,
+            batch,
+            targets,
+            contracted_bundle=bundle,
+        )
         expected_task = "prs_narrative_drafting" if batch.artifact == "prs" else "section_drafting"
         request_id = str(request.get("request_id") or "")
         wave = str(request.get("wave") or "")
@@ -209,7 +227,11 @@ def _request_matches_approved_reference(revision_dir: Path, request: Mapping[str
         return False
 
 
-def _trusted_request_valid(revision_dir: Path, request: Mapping[str, Any]) -> bool:
+def _trusted_request_valid(
+    revision_dir: Path,
+    request: Mapping[str, Any],
+    expected_governing: Mapping[str, Any] | None = None,
+) -> bool:
     request_id = str(request.get("request_id") or "")
     record_path = _request_ledger_path(revision_dir, request_id)
     if not request_id or not record_path.is_file():
@@ -222,12 +244,18 @@ def _trusted_request_valid(revision_dir: Path, request: Mapping[str, Any]) -> bo
         record.get("request_id") == request_id
         and record.get("request_sha256") == request.get("request_sha256")
         and record.get("request_sha256") == request_sha256(request)
-        and _request_matches_approved_reference(revision_dir, request)
+        and _request_matches_approved_reference(revision_dir, request, expected_governing)
     )
 
 
-def load_boilerplate(repo_root: Path) -> dict[str, str]:
-    payload = _read_json(repo_root / "references/fixed-clinical-boilerplate.json")
+def load_boilerplate(
+    repo_root: Path,
+    reference: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
+    bundle = contracted_bundle or contracted_template_bundle(repo_root, reference)
+    payload = _read_json(repo_root / str(bundle["fixed_clinical_boilerplate"]["path"]))
     if payload.get("version") != BOILERPLATE_VERSION:
         raise ValueError("Fixed Clinical Boilerplate version does not match the contract.")
     sections = payload.get("sections")
@@ -236,24 +264,17 @@ def load_boilerplate(repo_root: Path) -> dict[str, str]:
     return dict(sections)
 
 
-def governing_resources(repo_root: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
-    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    template_root = repo_root / "assets/client-templates/docx"
-    templates = [template_root / ("retrospective-protocol.template.docx" if branch == "Retrospective" else "ambispective-protocol.template.docx" if branch == "Ambispective" else "prospective-protocol.template.docx")]
-    if branch != "Retrospective":
-        choice = str(get_path(reference, "meta.icf_template", "Advarra")).casefold()
-        templates.append(template_root / ("sterling-icf.template.docx" if choice == "sterling" else "ambispective-icf.template.docx" if branch == "Ambispective" else "prospective-icf.template.docx"))
-        templates.append(repo_root / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml")
-        templates.append(repo_root / "assets/client-templates/reference/prs-manual-reference.xml")
-    templates.append(repo_root / "assets/client-templates/reference/protocol-reference.docx")
-    boilerplate_path = repo_root / "references/fixed-clinical-boilerplate.json"
+def governing_resources(
+    repo_root: Path,
+    reference: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
     implementation = [repo_root / "scripts" / name for name in IMPLEMENTATION_FILES]
     return {
         "approved_source_sha256": get_path(reference, "approval.source_sha256"),
-        "section_contract_sha256": contract_hash(reference),
-        "boilerplate_version": BOILERPLATE_VERSION,
-        "boilerplate_sha256": sha256_file(boilerplate_path),
-        "template_sha256": {path.relative_to(repo_root).as_posix(): sha256_file(path) for path in templates},
+        "contracted_template_bundle": bundle,
         "implementation_sha256": {path.relative_to(repo_root).as_posix(): sha256_file(path) for path in implementation},
         "topology_version": TOPOLOGY_VERSION,
         "prompt_version": PROMPT_VERSION,
@@ -318,7 +339,7 @@ def accepted_draft(revision_dir: Path, section_id: str, expected_governing: Mapp
     if not request_id or not accepted_request_path.is_file():
         return None
     accepted_request = _read_json(accepted_request_path)
-    if not _trusted_request_valid(revision_dir, accepted_request) or draft.get("request_sha256") != accepted_request.get("request_sha256"):
+    if not _trusted_request_valid(revision_dir, accepted_request, expected_governing) or draft.get("request_sha256") != accepted_request.get("request_sha256"):
         return None
     if expected_governing is not None and accepted_request.get("governing_resources") != dict(expected_governing):
         return None
@@ -337,7 +358,7 @@ def accepted_prs_record(revision_dir: Path, expected_governing: Mapping[str, Any
     if not request_id or not request_path.is_file():
         return {}
     request = _read_json(request_path)
-    if not _trusted_request_valid(revision_dir, request) or accepted.get("request_sha256") != request.get("request_sha256"):
+    if not _trusted_request_valid(revision_dir, request, expected_governing) or accepted.get("request_sha256") != request.get("request_sha256"):
         return {}
     return accepted
 
@@ -360,6 +381,7 @@ def create_drafting_request(
     attempts: Mapping[str, int],
     wave: str,
     findings: Iterable[Mapping[str, Any]] = (),
+    contracted_bundle: Mapping[str, Any] | None = None,
 ) -> Path:
     snapshot_path = revision_dir / "approved-reference.json"
     if not snapshot_path.is_file():
@@ -368,9 +390,16 @@ def create_drafting_request(
         raise ValueError("Drafting reference does not match the immutable approved-reference snapshot.")
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     targets = tuple(target_ids or batch.section_ids)
-    sections = _expected_section_contracts(repo_root, reference, batch, targets)
+    bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
+    sections = _expected_section_contracts(
+        repo_root,
+        reference,
+        batch,
+        targets,
+        contracted_bundle=bundle,
+    )
     scoped = _scoped_source(reference, batch.field_families)
-    governing = governing_resources(repo_root, reference)
+    governing = governing_resources(repo_root, reference, contracted_bundle=bundle)
     request_id = _request_id(revision_id, batch.batch_id, attempts, wave, sha256_value(governing))
     response_path = revision_dir / "hermes/responses" / f"{request_id}.json"
     payload: dict[str, Any] = {
@@ -705,7 +734,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
         if not _request_metadata_current(request, expected_governing):
             continue
         target_ids = [str(item.get("section_id")) for item in request.get("section_contracts", []) if isinstance(item, Mapping)]
-        if not _trusted_request_valid(revision_dir, request):
+        if not _trusted_request_valid(revision_dir, request, expected_governing):
             findings.append({
                 "category": "request-integrity",
                 "field": str(request.get("batch_id") or request_path.stem),
@@ -716,7 +745,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             continue
         if accepted_request.is_file():
             recorded = _read_json(accepted_request)
-            if not _trusted_request_valid(revision_dir, recorded) or _canonical(recorded) != _canonical(request):
+            if not _trusted_request_valid(revision_dir, recorded, expected_governing) or _canonical(recorded) != _canonical(request):
                 findings.append({
                     "category": "request-integrity",
                     "field": str(request.get("batch_id") or request_path.stem),
@@ -776,9 +805,19 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
     return findings
 
 
-def missing_drafts(revision_dir: Path, reference: Mapping[str, Any], repo_root: Path | None = None) -> list[str]:
+def missing_drafts(
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    repo_root: Path | None = None,
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> list[str]:
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    expected = governing_resources(repo_root, reference) if repo_root is not None else None
+    expected = (
+        governing_resources(repo_root, reference, contracted_bundle=contracted_bundle)
+        if repo_root is not None
+        else None
+    )
     required = [section.section_id for section in protocol_contract(branch) if section.role != "container"]
     if branch != "Retrospective":
         required.extend(section.section_id for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))))
@@ -802,10 +841,12 @@ def schedule_requests(
     attempts: Mapping[str, int] | None = None,
     wave: str = "initial",
     findings: Iterable[Mapping[str, Any]] = (),
+    contracted_bundle: Mapping[str, Any] | None = None,
 ) -> list[Path]:
     """Create one scoped request per ready batch; prerequisites are explicit."""
     attempts = dict(attempts or {})
-    expected = governing_resources(repo_root, reference)
+    bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
+    expected = governing_resources(repo_root, reference, contracted_bundle=bundle)
     created: list[Path] = []
     finding_list = list(findings)
     plan = batch_plan(
@@ -850,25 +891,30 @@ def schedule_requests(
             attempts=target_attempts,
             wave=wave,
             findings=target_findings,
+            contracted_bundle=bundle,
         ))
     return created
 
 
-def merged_drafts(revision_dir: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
+def merged_drafts(
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    expected_governing: Mapping[str, Any],
+) -> dict[str, Any]:
     """Return the deterministic, section-addressed generation model."""
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     protocol: list[dict[str, Any]] = []
     for section in protocol_contract(branch):
         entry = section.public()
-        draft = accepted_draft(revision_dir, section.section_id)
+        draft = accepted_draft(revision_dir, section.section_id, expected_governing)
         entry["paragraphs"] = list(draft.get("paragraphs") or []) if draft else []
         entry["lists"] = list(draft.get("lists") or []) if draft else []
         protocol.append(entry)
     icf = {}
     for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))):
-        draft = accepted_draft(revision_dir, section.section_id)
+        draft = accepted_draft(revision_dir, section.section_id, expected_governing)
         icf[section.section_id] = draft or {}
-    prs = accepted_prs_record(revision_dir).get("narrative", {})
+    prs = accepted_prs_record(revision_dir, expected_governing).get("narrative", {})
     return {"protocol": protocol, "icf": icf, "prs": prs}
 
 

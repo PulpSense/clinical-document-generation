@@ -3,6 +3,7 @@ from pathlib import Path
 
 from docx import Document
 
+from contracts import contracted_template_bundle
 from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS
 from rendering import template_paths
 from workflow import run_release_gate
@@ -78,6 +79,18 @@ def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch)
         outputs = case["result"]["client_outputs"]
         case_root = Path(report["evidence_root"]) / case["case"]
         reference = json.loads((case_root / "reference/study.reference.json").read_text(encoding="utf-8"))
+        expected_bundle = contracted_template_bundle(ROOT, reference)
+        revision_dir = case_root / "revisions" / case["result"]["revision_id"]
+        manifest = json.loads((case_root / case["result"]["manifest"]).read_text(encoding="utf-8"))
+        build = json.loads((revision_dir / "candidate-build.json").read_text(encoding="utf-8"))
+        verification_requests = [
+            json.loads(path.read_text(encoding="utf-8"))
+            for path in (revision_dir / "hermes/verification-requests").glob("*.json")
+        ]
+        assert case["contracted_template_bundle"] == expected_bundle
+        assert build["contracted_template_bundle"] == expected_bundle
+        assert manifest["contracted_template_bundle"] == expected_bundle
+        assert all(request["contracted_template_bundle"] == expected_bundle for request in verification_requests)
         protocol_template, icf_template = template_paths(ROOT, reference)
         assert _section_geometry(Document(case_root / "output/protocol.docx")) == _section_geometry(Document(protocol_template))
         if case["case"].startswith("retrospective"):
@@ -98,6 +111,13 @@ def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch)
                 "if you would like to participate, you will be asked to sign",
                 "if you agree to participate, you will be asked to sign",
             ))
+    assert {
+        bundle["identity_sha256"]
+        for bundle in report["contracted_template_bundles"]
+    } == {
+        case["contracted_template_bundle"]["identity_sha256"]
+        for case in report["cases"]
+    }
 
 
 def test_recorded_drafting_keeps_release_gate_assurance_structural_with_external_verification(monkeypatch):

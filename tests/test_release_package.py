@@ -38,6 +38,18 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         assert manifest["package_fingerprint"] == result["package_fingerprint"]
         assert manifest["installation"]["entrypoint"] == "SKILL.md"
         assert manifest["inventory"]["implementation"]
+        bundles = manifest["inventory"]["contracted_template_bundles"]
+        governed = manifest["inventory"]["governed_resources"]
+        assert len(bundles) == 5
+        assert "templates_and_contracts" not in manifest["inventory"]
+        assert set(governed) == {
+            path
+            for bundle in bundles
+            for path in bundle["resource_hashes"]
+        }
+        packaged_hashes = {entry["path"]: entry["sha256"] for entry in manifest["files"]}
+        for bundle in bundles:
+            assert all(packaged_hashes[path] == digest for path, digest in bundle["resource_hashes"].items())
         assert manifest["inventory"]["font_fallbacks"]["Noto Sans Symbols"] == ["Liberation Sans"]
         assert manifest["inventory"]["page_renderer_fallbacks"][:5] == [
             "pdftoppm",

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from pypdf import PdfWriter
 
-from contracts import batch_plan
+from contracts import batch_plan, contracted_template_bundle
 from drafting import accepted_draft, create_drafting_request, governing_resources, ingest_responses, pending_requests, recorded_acceptance_response, response_template, retry_attempts, schedule_requests, sha256_value, validate_response
 from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS, create_verification_requests, deterministic_content_check, validate_verifications
 from contracts import icf_retained_sections
@@ -195,6 +195,32 @@ def test_sparse_complete_approval_cannot_create_post_approval_source_questions(t
     }
     assert set(risk_benefit_contracts) == {"risks-benefits.risks", "risks-benefits.benefits", "icf.risks", "icf.benefits"}
     assert all(contract["fixed_boilerplate"] for contract in risk_benefit_contracts.values())
+
+
+def test_desktop_drafting_requests_bind_the_complete_contracted_template_bundle(tmp_path, monkeypatch):
+    _allow_renderer_preflight(monkeypatch)
+    reference = fixture()
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    assert approve(run_dir, approved_by="reviewer")["status"] == "passed"
+    result = generate(run_dir)
+
+    assert result["status"] == "awaiting_hermes"
+    revision_dir = run_dir / "revisions" / result["revision_id"]
+    requests = [
+        json.loads((revision_dir / relative).read_text(encoding="utf-8"))
+        for relative in result["requests"]
+    ]
+    expected_bundle = contracted_template_bundle(ROOT, reference)
+    for request in requests:
+        governing = request["governing_resources"]
+        assert governing["contracted_template_bundle"] == expected_bundle
+        assert "template_sha256" not in governing
+        assert "boilerplate_sha256" not in governing
 
 
 def test_incomplete_contracted_template_bundle_blocks_before_drafting(tmp_path, monkeypatch):
@@ -425,8 +451,8 @@ def test_generation_resource_change_cannot_overwrite_an_approved_revision(tmp_pa
     approval = approve(run_dir, approved_by="reviewer")
     original = workflow.governing_resources
 
-    def changed_resources(repo_root, reference):
-        resources = original(repo_root, reference)
+    def changed_resources(repo_root, reference, **kwargs):
+        resources = original(repo_root, reference, **kwargs)
         resources["prompt_version"] = "changed-after-approval"
         return resources
 
@@ -548,10 +574,12 @@ def test_protocol_leaf_heading_without_body_content_is_blocked(tmp_path):
     )
 
 
-def test_prs_template_is_part_of_governing_hashes():
+def test_complete_bundle_is_part_of_governing_resources():
     resources = governing_resources(ROOT, fixture())
-    assert "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml" in resources["template_sha256"]
-    assert "assets/client-templates/reference/protocol-reference.docx" in resources["template_sha256"]
+    bundle = resources["contracted_template_bundle"]
+    assert "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml" in bundle["resource_hashes"]
+    assert "assets/client-templates/reference/protocol-reference.docx" in bundle["resource_hashes"]
+    assert "assets/client-templates/reference/advarra-icf-reference.docx" in bundle["resource_hashes"]
     assert set(resources["implementation_sha256"]) == {
         f"scripts/{name}"
         for name in ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")

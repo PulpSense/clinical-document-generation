@@ -154,14 +154,23 @@ def test_governed_resource_mutation_changes_bundle_identity(tmp_path):
     shutil.copytree(ROOT / "references", release / "references")
     reference = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}
     before = contracted_template_bundle(release, reference)
+    sterling_before = contracted_template_bundle(
+        release,
+        {"meta": {"study_type": "Prospective", "icf_template": "Sterling"}},
+    )
     authority_path = release / "assets/client-templates/reference/advarra-icf-reference.docx"
     authority_path.write_bytes(authority_path.read_bytes() + b"governed-mutation")
 
     after = contracted_template_bundle(release, reference)
+    sterling_after = contracted_template_bundle(
+        release,
+        {"meta": {"study_type": "Prospective", "icf_template": "Sterling"}},
+    )
 
     relative = "assets/client-templates/reference/advarra-icf-reference.docx"
     assert after["resource_hashes"][relative] != before["resource_hashes"][relative]
     assert after["identity_sha256"] != before["identity_sha256"]
+    assert sterling_after["identity_sha256"] == sterling_before["identity_sha256"]
 
 
 def test_branch_section_contracts_have_no_duplicate_ids_and_expected_roots():

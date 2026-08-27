@@ -1,3 +1,4 @@
+import copy
 import json
 import zipfile
 from pathlib import Path
@@ -431,12 +432,49 @@ def test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatti
     parallel_identity_dir = tmp_path / "parallel-identity"
     monkeypatch.setattr(zipfile.time, "time", lambda: 1_800_000_000.0)
 
-    baseline = render_documents(ROOT, baseline_dir, reference, model)
     bundle = contracted_template_bundle(ROOT, reference)
-    parallel = render_documents(ROOT, parallel_identity_dir, reference, model)
+    legacy_bundle = copy.deepcopy(bundle)
+    study_type = reference["meta"]["study_type"]
+    protocol_name = {
+        "Prospective": "prospective-protocol.template.docx",
+        "Ambispective": "ambispective-protocol.template.docx",
+        "Retrospective": "retrospective-protocol.template.docx",
+    }[study_type]
+    legacy_bundle["contracted_templates"]["protocol"]["path"] = f"assets/client-templates/docx/{protocol_name}"
+    legacy_bundle["client_template_authorities"]["protocol"]["path"] = "assets/client-templates/reference/protocol-reference.docx"
+    if icf_family is not None:
+        icf_name = (
+            "sterling-icf.template.docx"
+            if icf_family == "Sterling"
+            else "ambispective-icf.template.docx"
+            if study_type == "Ambispective"
+            else "prospective-icf.template.docx"
+        )
+        legacy_bundle["contracted_templates"]["icf"]["path"] = f"assets/client-templates/docx/{icf_name}"
+        legacy_bundle["client_template_authorities"]["icf"]["path"] = (
+            f"assets/client-templates/reference/{icf_family.casefold()}-icf-reference.docx"
+        )
+    baseline = render_documents(
+        ROOT,
+        baseline_dir,
+        reference,
+        model,
+        contracted_bundle=legacy_bundle,
+    )
+    parallel = render_documents(
+        ROOT,
+        parallel_identity_dir,
+        reference,
+        model,
+        contracted_bundle=bundle,
+    )
 
     assert baseline["status"] == parallel["status"] == "passed"
     assert len(bundle["identity_sha256"]) == 64
+    assert parallel["contracted_template_bundle"] == bundle
+    for artifact in parallel["artifacts"]:
+        assert artifact["template"] == bundle["contracted_templates"][artifact["artifact"]]["path"]
+        assert artifact["client_template_authority"] == bundle["client_template_authorities"][artifact["artifact"]]["path"]
     for candidate_name in candidate_names:
         baseline_path = baseline_dir / "candidate" / candidate_name
         parallel_path = parallel_identity_dir / "candidate" / candidate_name

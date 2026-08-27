@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, canonical_study_type, get_path, icf_contract, icf_retained_sections, protocol_contract
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, protocol_contract
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -623,20 +623,50 @@ def _font_probe(
     return result.returncode == 0 and font.casefold() in families, result.stdout.strip()
 
 
-def _bundled_font_path(repo_root: Path, font: str) -> Path | None:
-    filename = BUNDLED_FONT_FILES.get(font)
+def _bundled_font_path(
+    repo_root: Path,
+    font: str,
+    approved_font_plan: Mapping[str, Any] | None = None,
+) -> Path | None:
+    families = (
+        approved_font_plan.get("packaged_families", {})
+        if isinstance(approved_font_plan, Mapping)
+        else BUNDLED_FONT_FILES
+    )
+    filename = families.get(font)
     if not filename:
         return None
-    path = repo_root / "assets/fallback-fonts" / filename
+    assets = (
+        approved_font_plan.get("packaged_font_assets", {})
+        if isinstance(approved_font_plan, Mapping)
+        else {}
+    )
+    relative = next(
+        (str(path) for path in assets if Path(str(path)).name == filename),
+        f"assets/fallback-fonts/{filename}",
+    )
+    path = repo_root / relative
     return path if path.is_file() else None
 
 
-def _runtime_environment(repo_root: Path, environment: Mapping[str, str] | None) -> dict[str, str]:
+def _runtime_environment(
+    repo_root: Path,
+    environment: Mapping[str, str] | None,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> dict[str, str]:
     runtime = dict(environment or os.environ)
-    font_dir = repo_root / "assets/fallback-fonts"
-    if font_dir.is_dir():
+    approved_font_plan = contracted_bundle.get("approved_font_plan", {}) if isinstance(contracted_bundle, Mapping) else {}
+    asset_paths = approved_font_plan.get("packaged_font_assets", {}) if isinstance(approved_font_plan, Mapping) else {}
+    font_dirs = sorted({(repo_root / str(relative)).parent for relative in asset_paths})
+    if not font_dirs:
+        font_dirs = [repo_root / "assets/fallback-fonts"]
+    available_dirs = [path for path in font_dirs if path.is_dir()]
+    if available_dirs:
         existing = runtime.get("SAL_FONTPATH", "")
-        runtime["SAL_FONTPATH"] = os.pathsep.join(part for part in (str(font_dir), existing) if part)
+        runtime["SAL_FONTPATH"] = os.pathsep.join([
+            *(str(path) for path in available_dirs),
+            *([existing] if existing else []),
+        ])
     return runtime
 
 
@@ -662,22 +692,36 @@ def _font_fallback_candidates(font: str) -> tuple[str, ...]:
     return tuple(ordered)
 
 
-def _approved_packaged_font_fallback(font: str) -> str:
+def _approved_packaged_font_fallback(
+    font: str,
+    approved_font_plan: Mapping[str, Any] | None = None,
+) -> str:
     """Map a missing template font to one audited release-owned substitute."""
     normalized = font.casefold().strip()
-    if normalized in APPROVED_PACKAGED_FONT_FALLBACKS:
-        return APPROVED_PACKAGED_FONT_FALLBACKS[normalized]
+    approved = (
+        approved_font_plan.get("approved_fallbacks", {})
+        if isinstance(approved_font_plan, Mapping)
+        else APPROVED_PACKAGED_FONT_FALLBACKS
+    )
+    families = (
+        approved_font_plan.get("packaged_families", {})
+        if isinstance(approved_font_plan, Mapping)
+        else BUNDLED_FONT_FILES
+    )
+    if normalized in approved:
+        return str(approved[normalized])
     if any(marker in normalized for marker in ("mono", "courier", "consolas", "menlo", "code")):
-        return "Liberation Mono"
+        return "Liberation Mono" if "Liberation Mono" in families else next(iter(families))
     if any(marker in normalized for marker in ("serif", "times", "georgia", "cambria", "garamond", "minion")):
-        return "Liberation Serif"
-    return "Liberation Sans"
+        return "Liberation Serif" if "Liberation Serif" in families else next(iter(families))
+    return "Liberation Sans" if "Liberation Sans" in families else next(iter(families))
 
 
 def preflight(
     repo_root: Path,
     reference: Mapping[str, Any],
     *,
+    contracted_bundle: Mapping[str, Any] | None = None,
     deadline_seconds: float = 30.0,
     environment: Mapping[str, str] | None = None,
     renderer_identities: Iterable[Mapping[str, Any]] | None = None,
@@ -696,7 +740,9 @@ def preflight(
     def remaining() -> float:
         return max(0.0, deadline - clock())
 
-    runtime_environment = _runtime_environment(repo_root, environment)
+    bundle = contracted_bundle or contracted_template_bundle(repo_root, reference)
+    approved_font_plan = bundle["approved_font_plan"]
+    runtime_environment = _runtime_environment(repo_root, environment, bundle)
     renderer_candidates = (
         [dict(item) for item in renderer_identities]
         if renderer_identities is not None
@@ -717,7 +763,7 @@ def preflight(
     renderer_attempts: list[dict[str, Any]] = []
     page_attempts: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
-    protocol_template, icf_template = template_paths(repo_root, reference)
+    protocol_template, icf_template = template_paths(repo_root, reference, contracted_bundle=bundle)
     templates = [path for path in (protocol_template, icf_template) if path is not None]
     required_fonts = sorted({font for path in templates for font in _template_fonts(path)})
     font_results: dict[str, Any] = {}
@@ -732,8 +778,8 @@ def preflight(
         font_results[font] = {"available": available, "match": detail}
         if available is not False:
             continue
-        candidate = _approved_packaged_font_fallback(font)
-        bundled = _bundled_font_path(repo_root, candidate)
+        candidate = _approved_packaged_font_fallback(font, approved_font_plan)
+        bundled = _bundled_font_path(repo_root, candidate, approved_font_plan)
         if bundled is not None:
             font_substitutions[font] = candidate
             font_results[font].update({
@@ -833,6 +879,7 @@ def preflight(
     ordered_page_renderers = ([page_identity] if page_identity else []) + [candidate for candidate in page_candidates if candidate != page_identity]
     return {
         "status": "passed" if not findings else "blocked",
+        "contracted_template_bundle": dict(bundle),
         "renderer": identity,
         "renderer_candidates": ordered_renderers,
         "renderer_attempts": renderer_attempts,
@@ -912,6 +959,7 @@ def _blank_pdf_pages(path: Path) -> list[int]:
 def render_pages(
     revision_dir: Path,
     *,
+    contracted_bundle: Mapping[str, Any] | None = None,
     renderer_identity: Mapping[str, Any] | None = None,
     page_renderer_identity: Mapping[str, Any] | None = None,
     renderer_identities: Iterable[Mapping[str, Any]] | None = None,
@@ -920,7 +968,7 @@ def render_pages(
     clock: Any = time.monotonic,
 ) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
-    runtime_environment = _runtime_environment(repo_root, None)
+    runtime_environment = _runtime_environment(repo_root, None, contracted_bundle)
     renderer_candidates = [dict(item) for item in (renderer_identities or [])]
     if renderer_identity is not None:
         renderer_candidates = [dict(renderer_identity), *[item for item in renderer_candidates if dict(item) != dict(renderer_identity)]]
@@ -1226,7 +1274,13 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     return findings
 
 
-def create_verification_requests(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any]) -> list[Path]:
+def create_verification_requests(
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    render_report: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> list[Path]:
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
     content_files = []
     for path in sorted((revision_dir / "candidate").glob("*")):
@@ -1237,7 +1291,9 @@ def create_verification_requests(revision_dir: Path, reference: Mapping[str, Any
         choice = str(get_path(reference, "meta.icf_template", "Advarra"))
         sections.extend({"artifact": "icf", "section_id": section.section_id, "number": section.number, "title": section.title} for section in icf_contract(branch, choice))
         sections.extend({"artifact": "icf", "section_id": section_id, "number": "", "title": title} for section_id, title in icf_retained_sections(branch, choice))
-    boilerplate_path = Path(__file__).resolve().parents[1] / "references/fixed-clinical-boilerplate.json"
+    repo_root = Path(__file__).resolve().parents[1]
+    bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
+    boilerplate_path = repo_root / str(bundle["fixed_clinical_boilerplate"]["path"])
     authorized_boilerplate = _json(boilerplate_path)
     if authorized_boilerplate.get("version") != BOILERPLATE_VERSION:
         raise ValueError("Verification boilerplate does not match the content contract.")
@@ -1267,6 +1323,7 @@ def create_verification_requests(revision_dir: Path, reference: Mapping[str, Any
             "response_path": f"hermes/verification-responses/{request_id}.json",
         })
     for payload in payloads:
+        payload["contracted_template_bundle"] = bundle
         payload["request_sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     expected = {payload["request_id"]: payload for payload in payloads}
     existing_paths = sorted(requests.glob("*.json"))
@@ -1332,7 +1389,7 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
                 "target_ids": [target],
                 "issue": _text(error.get("message")) or "Independent Hermes verifier reported a transient API failure.",
             })
-            evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient"}
+            evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
         issues = response.get("findings") if isinstance(response.get("findings"), list) else []
         if response.get("status") != "passed" or issues:
@@ -1384,6 +1441,7 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
             "response_sha256": sha256_file(response_path),
             "producer": producer,
             "artifacts": request.get("artifacts", []),
+            "contracted_template_bundle": request.get("contracted_template_bundle"),
         }
     return findings, evidence
 

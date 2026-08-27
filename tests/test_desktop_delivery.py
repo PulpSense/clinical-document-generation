@@ -442,6 +442,63 @@ def test_unreadable_persisted_deadline_fails_closed_instead_of_starting_again(tm
     assert generated == []
 
 
+def test_terminal_desktop_delivery_is_invalidated_when_the_contracted_bundle_changes(tmp_path, monkeypatch):
+    state_path = tmp_path / "logs/desktop-operation.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(json.dumps({
+        "operation_id": "default",
+        "status": "passed",
+        "result": {
+            "status": "passed",
+            "stage": "desktop_delivery",
+            "contracted_template_bundle": {"identity_sha256": "old-bundle"},
+            "client_outputs": ["output/protocol.docx"],
+        },
+    }), encoding="utf-8")
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"meta": {"study_type": "Retrospective"}}), encoding="utf-8")
+    monkeypatch.setattr(
+        workflow,
+        "contracted_template_bundle",
+        lambda _root, _reference: {"identity_sha256": "new-bundle"},
+    )
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "contracted_template_bundle"
+    assert result["client_outputs"] == []
+
+
+def test_legacy_passing_desktop_delivery_without_bundle_identity_fails_closed(tmp_path):
+    state_path = tmp_path / "logs/desktop-operation.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(json.dumps({
+        "operation_id": "default",
+        "status": "passed",
+        "result": {
+            "status": "passed",
+            "stage": "desktop_delivery",
+            "client_outputs": ["output/protocol.docx"],
+        },
+    }), encoding="utf-8")
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "contracted_template_bundle"
+    assert result["client_outputs"] == []
+
+
 @pytest.mark.parametrize("invalid_state", [
     {
         "started_at_epoch": "not-an-epoch",

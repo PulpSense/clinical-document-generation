@@ -29,7 +29,7 @@ from contracts import ContractedTemplateBundleError, batch_plan, canonical_study
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, preflight, quality_report, render_pages, renderer, renderers, sha256_file as quality_sha256
-from rendering import render_documents, template_paths
+from rendering import render_documents
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -208,12 +208,26 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
     for path in files:
         relative = path.relative_to(repo_root).as_posix()
         entries.append({"path": relative, "sha256": sha256_file(path), "bytes": path.stat().st_size})
-    templates = [path for path in files if path.is_relative_to(repo_root / "assets/client-templates")]
+    bundle_references = (
+        {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}},
+        {"meta": {"study_type": "Prospective", "icf_template": "Sterling"}},
+        {"meta": {"study_type": "Ambispective", "icf_template": "Advarra"}},
+        {"meta": {"study_type": "Ambispective", "icf_template": "Sterling"}},
+        {"meta": {"study_type": "Retrospective"}},
+    )
+    bundles = [contracted_template_bundle(repo_root, reference) for reference in bundle_references]
+    governed_resources = sorted({
+        relative
+        for bundle in bundles
+        for relative in bundle["resource_hashes"]
+    })
+    templates = [repo_root / relative for relative in governed_resources if Path(relative).suffix.casefold() == ".docx"]
     font_inventory = {}
     for path in templates:
         if path.suffix.casefold() == ".docx":
             font_inventory[path.relative_to(repo_root).as_posix()] = sorted(_template_fonts(path))
     required_font_names = sorted({font for fonts in font_inventory.values() for font in fonts})
+    approved_font_plan = bundles[0]["approved_font_plan"]
     implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
@@ -229,9 +243,10 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         },
         "inventory": {
             "implementation": implementation_files,
-            "templates_and_contracts": [item["path"] for item in entries if item["path"].startswith(("assets/", "references/"))],
+            "contracted_template_bundles": bundles,
+            "governed_resources": governed_resources,
             "font_identities": font_inventory,
-            "font_fallbacks": {font: [_approved_packaged_font_fallback(font)] for font in required_font_names},
+            "font_fallbacks": {font: [_approved_packaged_font_fallback(font, approved_font_plan)] for font in required_font_names},
             "renderer_at_packaging": renderer(environment=os.environ),
             "page_renderer_fallbacks": list(PAGE_RENDERER_BACKENDS),
             "page_renderer_at_packaging": page_renderer(environment=os.environ),
@@ -571,7 +586,12 @@ def _approved_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _approval_valid(run_dir: Path, reference: Mapping[str, Any]) -> tuple[bool, str]:
+def _approval_valid(
+    run_dir: Path,
+    reference: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> tuple[bool, str]:
     approval = reference.get("approval") if isinstance(reference.get("approval"), Mapping) else {}
     source = _source_path(run_dir, reference)
     if str(approval.get("status", "")).casefold() != "approved": return False, "The Source-of-Truth Markdown has not been explicitly approved."
@@ -589,7 +609,11 @@ def _approval_valid(run_dir: Path, reference: Mapping[str, Any]) -> tuple[bool, 
     snapshot = _read(snapshot_path)
     if _approved_payload(reference) != _approved_payload(snapshot):
         return False, "Study inputs changed after approval; prepare and approve a new Source-of-Truth revision."
-    expected_governing = sha256_value(governing_resources(SCRIPT_DIR.parent, snapshot))
+    expected_governing = sha256_value(governing_resources(
+        SCRIPT_DIR.parent,
+        snapshot,
+        contracted_bundle=contracted_bundle,
+    ))
     if approval.get("governing_sha256") != expected_governing:
         return False, "Generation contracts, templates, or implementation changed after approval; approve the unchanged Source-of-Truth again to create a new immutable revision."
     return True, ""
@@ -707,7 +731,8 @@ def approve(run_dir: Path, *, approved_by: str = "client", source_md: Path | Non
     digest = sha256_file(source)
     approval = {"status": "approved", "approved_by": approved_by, "approved_at": datetime.now(timezone.utc).isoformat(), "review_file": source.relative_to(run_dir).as_posix(), "source_sha256": digest}
     reference["approval"] = approval
-    governing = governing_resources(SCRIPT_DIR.parent, reference)
+    bundle = contracted_template_bundle(SCRIPT_DIR.parent, reference)
+    governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     governing_sha256 = sha256_value(governing)
     revision_identity = sha256_value({
         "approved_source_sha256": digest,
@@ -796,21 +821,16 @@ def _candidate_fingerprint(
     reference: Mapping[str, Any],
     model: Mapping[str, Any],
     *,
+    contracted_bundle: Mapping[str, Any],
     font_substitutions: Mapping[str, str] | None = None,
     layout_repair_level: int = 0,
 ) -> tuple[str, dict[str, Any]]:
-    protocol_template, icf_template = template_paths(repo_root, reference)
-    templates = [path for path in (protocol_template, icf_template) if path is not None]
-    if canonical_study_type(get_path(reference, "meta.study_type")) != "Retrospective":
-        templates.append(repo_root / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml")
-        templates.append(repo_root / "assets/client-templates/reference/prs-manual-reference.xml")
     implementation_files = [repo_root / "scripts" / name for name in ("workflow.py", "contracts.py", "drafting.py", "rendering.py", "quality.py", "prs_xml.py")]
     accepted_files = sorted((revision_dir / "hermes/accepted").glob("*.json"))
     payload = {
         "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"),
         "approved_source_sha256": get_path(reference, "approval.source_sha256"),
-        "drafting_resources": governing_resources(repo_root, reference),
-        "templates": {path.relative_to(repo_root).as_posix(): sha256_file(path) for path in templates},
+        "contracted_template_bundle": dict(contracted_bundle),
         "implementation": {path.name: sha256_file(path) for path in implementation_files},
         "accepted_drafts": {path.relative_to(revision_dir).as_posix(): sha256_file(path) for path in accepted_files},
         "merged_model_sha256": sha256_value(model),
@@ -847,9 +867,9 @@ def _cached_build(revision_dir: Path, fingerprint: str) -> dict[str, Any] | None
     return build
 
 
-def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, Any], document_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None, render_report: Mapping[str, Any]) -> dict[str, Any]:
+def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, Any], contracted_bundle: Mapping[str, Any], document_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None, render_report: Mapping[str, Any]) -> dict[str, Any]:
     candidate_files = [{"path": path.relative_to(revision_dir).as_posix(), "sha256": sha256_file(path), "bytes": path.stat().st_size} for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
-    build = {"fingerprint": fingerprint, "governing_resources": dict(governing), "candidate_files": candidate_files, "document_report": dict(document_report), "xml_report": dict(xml_report) if xml_report else None, "render_report": dict(render_report)}
+    build = {"fingerprint": fingerprint, "governing_resources": dict(governing), "contracted_template_bundle": dict(contracted_bundle), "candidate_files": candidate_files, "document_report": dict(document_report), "xml_report": dict(xml_report) if xml_report else None, "render_report": dict(render_report)}
     _write(revision_dir / "candidate-build.json", build)
     return build
 
@@ -1028,7 +1048,38 @@ def run_desktop_operation(
 
     terminal = persisted.get("status") in {"passed", "blocked", "timeout"}
     if terminal and isinstance(persisted.get("result"), Mapping):
-        return dict(persisted["result"])
+        prior_result = dict(persisted["result"])
+        recorded_bundle = prior_result.get("contracted_template_bundle")
+        requires_bundle_validation = prior_result.get("status") == "passed"
+        if requires_bundle_validation and not (
+            isinstance(recorded_bundle, Mapping)
+            and recorded_bundle.get("identity_sha256")
+        ):
+            return {
+                "status": "blocked",
+                "stage": "contracted_template_bundle",
+                "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted passing Desktop evidence lacks a complete Contracted Template Bundle identity."}],
+                "client_outputs": [],
+            }
+        if requires_bundle_validation:
+            try:
+                _, current_reference = _reference(run_dir)
+                current_bundle = contracted_template_bundle(SCRIPT_DIR.parent, current_reference)
+            except (ContractedTemplateBundleError, OSError, ValueError, json.JSONDecodeError) as exc:
+                return {
+                    "status": "blocked",
+                    "stage": "contracted_template_bundle",
+                    "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": f"Persisted Desktop evidence cannot be validated against the current governed bundle: {exc}"}],
+                    "client_outputs": [],
+                }
+            if current_bundle.get("identity_sha256") != recorded_bundle.get("identity_sha256"):
+                return {
+                    "status": "blocked",
+                    "stage": "contracted_template_bundle",
+                    "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted Desktop delivery evidence belongs to a stale Contracted Template Bundle."}],
+                    "client_outputs": [],
+                }
+        return prior_result
     started_at_epoch, deadline_at_epoch, persisted_budget, runtime_history, stage_history = (
         _desktop_deadline_state(
             persisted,
@@ -1246,10 +1297,10 @@ def _publish(run_dir: Path, revision_dir: Path, reference: Mapping[str, Any], qu
     ]
     build_path = revision_dir / "candidate-build.json"
     build = _read(build_path) if build_path.is_file() else {}
-    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published}
+    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published}
     manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
-    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
+    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
 
 
 def _clear_verification_responses(revision_dir: Path, tasks: set[str] | None = None) -> None:
@@ -1315,6 +1366,7 @@ def _quality_retry(
     findings: list[Mapping[str, Any]],
     stage: str,
     *,
+    contracted_bundle: Mapping[str, Any] | None = None,
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
@@ -1419,7 +1471,7 @@ def _quality_retry(
         invalidate_accepted_targets(revision_dir, section_targets)
         (revision_dir / "candidate-build.json").unlink(missing_ok=True)
         _clear_verification_responses(revision_dir)
-        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized)
+        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized, contracted_bundle=contracted_bundle)
         if created:
             return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
     if has_layout_target:
@@ -1457,10 +1509,10 @@ def generate(
     """Advance one approved revision until it needs Hermes work or passes."""
     run_dir = run_dir.resolve(); reference_path, working_reference = _reference(run_dir)
     try:
-        contracted_template_bundle(SCRIPT_DIR.parent, working_reference)
+        bundle = contracted_template_bundle(SCRIPT_DIR.parent, working_reference)
     except ContractedTemplateBundleError as exc:
         return _repair_block(run_dir, "contracted_template_bundle", [exc.finding])
-    approved, approval_issue = _approval_valid(run_dir, working_reference)
+    approved, approval_issue = _approval_valid(run_dir, working_reference, contracted_bundle=bundle)
     revision_id = str(working_reference.get("approval", {}).get("revision_id") or "")
     revision_dir = run_dir / "revisions" / revision_id
     reference = _read(revision_dir / "approved-reference.json") if approved else working_reference
@@ -1473,7 +1525,7 @@ def generate(
         return {"status": "blocked", "stage": "approval_gate", "findings": findings, "client_outputs": []}
     if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [{"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}], "client_outputs": []}
     state = working_reference.setdefault("generation", {})
-    expected_governing = governing_resources(SCRIPT_DIR.parent, reference)
+    expected_governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     governing_sha256 = sha256_value(expected_governing)
     prior_governing_sha256 = state.get("governing_sha256")
     if prior_governing_sha256 is not None and prior_governing_sha256 != governing_sha256:
@@ -1508,15 +1560,15 @@ def generate(
         if source_gaps or exhausted:
             path = run_dir / "reference/repair-report.md"; path.write_text(repair_report([*source_gaps, *exhausted]), encoding="utf-8")
             return {"status": "blocked", "stage": "drafting", "findings": [*source_gaps, *exhausted], "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_id, reference=reference, attempts=attempts, wave="retry", findings=drafting_findings)
+        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_id, reference=reference, attempts=attempts, wave="retry", findings=drafting_findings, contracted_bundle=bundle)
         if created: return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=drafting_findings)
-    created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_id, reference=reference, attempts=attempts, wave="initial")
+    created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_id, reference=reference, attempts=attempts, wave="initial", contracted_bundle=bundle)
     pending = pending_requests(revision_dir, expected_governing)
     if created or pending: return _awaiting(revision_dir, stage="drafting", paths=pending or created)
-    missing = missing_drafts(revision_dir, reference, SCRIPT_DIR.parent)
+    missing = missing_drafts(revision_dir, reference, SCRIPT_DIR.parent, contracted_bundle=bundle)
     if missing: return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
 
-    model = merged_drafts(revision_dir, reference)
+    model = merged_drafts(revision_dir, reference, expected_governing)
     font_substitutions = {
         str(source): str(target)
         for source, target in dict((preflight_report or {}).get("font_substitutions") or {}).items()
@@ -1527,6 +1579,7 @@ def generate(
         revision_dir,
         reference,
         model,
+        contracted_bundle=bundle,
         font_substitutions=font_substitutions,
         layout_repair_level=layout_repair_level,
     )
@@ -1537,21 +1590,23 @@ def generate(
             revision_dir,
             reference,
             model,
+            contracted_bundle=bundle,
             font_substitutions=font_substitutions,
             layout_repair_level=layout_repair_level,
         )
         if document_report["status"] != "passed":
             findings = [{**finding, "target_ids": [f"layout:{item['artifact']}"]} for item in document_report["artifacts"] for finding in item["findings"]]
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", operation_deadline=operation_deadline, clock=clock)
+            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
         xml_report = None
         if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
-            template = SCRIPT_DIR.parent / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml"
+            prs_authority = bundle["prs_authority"]
+            template = SCRIPT_DIR.parent / str(prs_authority["generation_template"]["path"])
             xml_report = generate_xml(
                 template,
                 revision_dir / "candidate/study.xml",
                 reference,
                 model.get("prs", {}),
-                structural_template=SCRIPT_DIR.parent / "assets/client-templates/reference/prs-manual-reference.xml",
+                structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
             )
             if xml_report["status"] != "passed":
                 findings = [
@@ -1582,6 +1637,7 @@ def generate(
             preflight_report = preflight(
                 SCRIPT_DIR.parent,
                 reference,
+                contracted_bundle=bundle,
                 deadline_seconds=min(30.0, remaining),
                 clock=clock,
             )
@@ -1607,22 +1663,25 @@ def generate(
                     revision_dir,
                     reference,
                     model,
+                    contracted_bundle=bundle,
                     font_substitutions=font_substitutions,
                     layout_repair_level=layout_repair_level,
                 )
                 if document_report["status"] != "passed":
                     findings = [{**finding, "target_ids": [f"layout:{item['artifact']}"]} for item in document_report["artifacts"] for finding in item["findings"]]
-                    return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", operation_deadline=operation_deadline, clock=clock)
+                    return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
                 fingerprint, governing = _candidate_fingerprint(
                     SCRIPT_DIR.parent,
                     revision_dir,
                     reference,
                     model,
+                    contracted_bundle=bundle,
                     font_substitutions=font_substitutions,
                     layout_repair_level=layout_repair_level,
                 )
         render_report = render_pages(
             revision_dir,
+            contracted_bundle=bundle,
             renderer_identity=preflight_report["renderer"],
             page_renderer_identity=preflight_report.get("page_renderer"),
             renderer_identities=preflight_report.get("renderer_candidates"),
@@ -1641,19 +1700,19 @@ def generate(
                     "candidate_outputs": _candidate_outputs(revision_dir),
                     "client_outputs": [],
                 }
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", operation_deadline=operation_deadline, clock=clock)
-        build = _record_build(revision_dir, fingerprint, governing, document_report, xml_report, render_report)
+            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
+        build = _record_build(revision_dir, fingerprint, governing, bundle, document_report, xml_report, render_report)
     else:
         document_report = build["document_report"]
         xml_report = build.get("xml_report")
         render_report = build["render_report"]
-    create_verification_requests(revision_dir, reference, render_report)
+    create_verification_requests(revision_dir, reference, render_report, contracted_bundle=bundle)
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
     final_quality["render_assurance"] = {"preflight": preflight_report, "render": render_report}
     if final_quality["status"] != "passed":
-        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", operation_deadline=operation_deadline, clock=clock)
+        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
     return _publish(run_dir, revision_dir, reference, final_quality)
 
 
@@ -1720,6 +1779,7 @@ def run_release_gate(
                 approval = approve(run_dir, approved_by="Recorded Acceptance")
                 if approval.get("status") != "passed": results.append({"case": run_dir.name, "status": "failed", "result": approval}); continue
             reference = _read(run_dir / REFERENCE)
+            case_bundle = contracted_template_bundle(repo_root, reference)
             result: dict[str, Any] = {}
             for _attempt in range(12):
                 result = generate(run_dir)
@@ -1734,14 +1794,19 @@ def run_release_gate(
                         _save_recorded_handoff(revision_dir, request_path)
                 if result.get("stage") == "independent_verification" and verification_responder is None:
                     break
-            results.append({"case": run_dir.name, "corpus": case, "icf_template": get_path(reference, "meta.icf_template"), "source_sha256": sha256_value(_approved_payload(reference)), "status": "passed" if result.get("status") == "passed" else "failed", "result": result})
+            results.append({"case": run_dir.name, "corpus": case, "icf_template": get_path(reference, "meta.icf_template"), "source_sha256": sha256_value(_approved_payload(reference)), "contracted_template_bundle": case_bundle, "status": "passed" if result.get("status") == "passed" else "failed", "result": result})
     passed = all(item["status"] == "passed" for item in results)
     awaiting = any(item.get("result", {}).get("status") == "awaiting_hermes" for item in results)
     synthetic_verification = bool(verification_responder is not None and getattr(verification_responder, "synthetic", False))
     recorded_drafting = True
     status = "structural_passed" if passed and recorded_drafting else "passed" if passed else "awaiting_hermes" if awaiting else "blocked"
     assurance = "synthetic-structural-only" if synthetic_verification else "recorded-drafting-structural-only"
-    report = {"status": status, "assurance": assurance, "recorded_drafting": recorded_drafting, "cases": results, "distinct_source_count": len({item.get("source_sha256") for item in results}), "visual_evidence": "external image inspection required; no automated visual approval is fabricated", "evidence_root": root.as_posix()}
+    unique_bundles = {
+        bundle["identity_sha256"]: bundle
+        for item in results
+        if isinstance((bundle := item.get("contracted_template_bundle")), Mapping)
+    }
+    report = {"status": status, "assurance": assurance, "recorded_drafting": recorded_drafting, "cases": results, "contracted_template_bundles": list(unique_bundles.values()), "distinct_source_count": len({item.get("source_sha256") for item in results}), "visual_evidence": "external image inspection required; no automated visual approval is fabricated", "evidence_root": root.as_posix()}
     _write(root / "release-gate-report.json", report); return report
 
 

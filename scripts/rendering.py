@@ -24,7 +24,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, canonical_study_type, get_path, meaningful, protocol_contract
+from contracts import BOILERPLATE_VERSION, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -1932,7 +1932,7 @@ def _protect_protocol_heading_content(document: Document) -> None:
             paragraph.paragraph_format.keep_together = True
 
 
-def _assessment_matrix(document: Document, reference: Mapping[str, Any], template_path: Path) -> None:
+def _assessment_matrix(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
     """Populate Table 15.1 only from approved visit/procedure relationships."""
     placeholder = next((paragraph for paragraph in document.paragraphs if "{visitsTable}" in paragraph.text), None)
     if placeholder is None:
@@ -1985,7 +1985,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], templat
         row_values = [["Approved visit or assessment", "Approved timing"], *[list(item) for item in entries]]
         header_rows = 1
 
-    authority_path = template_path.parent.parent / "reference/protocol-reference.docx"
     authority = Document(authority_path)
     design = authority.tables[-1]
     table = document.add_table(rows=len(row_values), cols=len(row_values[0]))
@@ -2055,22 +2054,25 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], templat
     placeholder._element.getparent().remove(placeholder._element)
 
 
-def _template_document(reference: Mapping[str, Any], model: Mapping[str, Any], template_path: Path, *, icf: bool, boilerplate: Mapping[str, str]) -> Document:
+def _template_document(
+    reference: Mapping[str, Any],
+    model: Mapping[str, Any],
+    template_path: Path,
+    *,
+    authority_path: Path,
+    icf: bool,
+    boilerplate: Mapping[str, str],
+) -> Document:
     """Populate the selected Contracted Template without replacing its Layout Contract."""
     document = Document(template_path)
     sterling = icf and str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling"
-    authority_path = template_path.parent.parent / "reference" / (
-        "sterling-icf-reference.docx" if sterling
-        else "advarra-icf-reference.docx" if icf
-        else "protocol-reference.docx"
-    )
     authority = Document(authority_path)
     _apply_authority_styles(document, authority)
     _apply_authority_bullet_numbering(document, authority)
     fields = render_fields(reference, model)
     _normalize_generated_placeholder_layout(document)
     if not icf:
-        _assessment_matrix(document, reference, template_path)
+        _assessment_matrix(document, reference, authority_path)
     _visit_rows(document, reference)
     for paragraph in list(_all_paragraphs(document)):
         _replace_paragraph(paragraph, fields)
@@ -2131,8 +2133,9 @@ def _cell(cell, value: Any, *, bold: bool = False) -> None:
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
 
-def _boilerplate(repo_root: Path) -> dict[str, str]:
-    payload = json.loads((repo_root / "references/fixed-clinical-boilerplate.json").read_text(encoding="utf-8"))
+def _boilerplate(repo_root: Path, bundle: Mapping[str, Any]) -> dict[str, str]:
+    relative = str(bundle["fixed_clinical_boilerplate"]["path"])
+    payload = json.loads((repo_root / relative).read_text(encoding="utf-8"))
     if payload.get("version") != BOILERPLATE_VERSION or not isinstance(payload.get("sections"), dict):
         raise ValueError("Fixed Clinical Boilerplate does not match the rendering contract.")
     return {str(key): str(value) for key, value in payload["sections"].items()}
@@ -2235,18 +2238,17 @@ def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict
     return findings
 
 
-def _template_paths(repo_root: Path, reference: Mapping[str, Any]) -> tuple[Path, Path | None]:
-    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    root = repo_root / "assets/client-templates/docx"
-    if branch == "Retrospective": return root / "retrospective-protocol.template.docx", None
-    protocol = root / ("ambispective-protocol.template.docx" if branch == "Ambispective" else "prospective-protocol.template.docx")
-    choice = str(get_path(reference, "meta.icf_template", "Advarra")).casefold()
-    icf = root / "sterling-icf.template.docx" if choice == "sterling" else root / ("ambispective-icf.template.docx" if branch == "Ambispective" else "prospective-icf.template.docx")
-    return protocol, icf
-
-
-def template_paths(repo_root: Path, reference: Mapping[str, Any]) -> tuple[Path, Path | None]:
-    return _template_paths(repo_root, reference)
+def template_paths(
+    repo_root: Path,
+    reference: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> tuple[Path, Path | None]:
+    bundle = contracted_bundle or contracted_template_bundle(repo_root, reference)
+    templates = bundle["contracted_templates"]
+    protocol = repo_root / str(templates["protocol"]["path"])
+    icf_resource = templates.get("icf")
+    return protocol, repo_root / str(icf_resource["path"]) if icf_resource else None
 
 
 def _clear_icf_review_highlighting(document: Document) -> None:
@@ -2319,22 +2321,32 @@ def render_documents(
     reference: Mapping[str, Any],
     model: Mapping[str, Any],
     *,
+    contracted_bundle: Mapping[str, Any] | None = None,
     font_substitutions: Mapping[str, str] | None = None,
     layout_repair_level: int = 0,
 ) -> dict[str, Any]:
     output = revision_dir / "candidate"; output.mkdir(parents=True, exist_ok=True)
     fields = render_fields(reference, model)
-    protocol_template, icf_template = _template_paths(repo_root, reference)
-    boilerplate = _boilerplate(repo_root)
+    bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
+    protocol_template, icf_template = template_paths(repo_root, reference, contracted_bundle=bundle)
+    boilerplate = _boilerplate(repo_root, bundle)
     substitutions = dict(font_substitutions or {})
     results = []
     repair_changes = 0
     for kind, template in (("protocol", protocol_template), ("icf", icf_template)):
         if template is None: continue
+        authority = repo_root / str(bundle["client_template_authorities"][kind]["path"])
         if not template.is_file():
             results.append({"artifact": kind, "path": "", "status": "blocked", "findings": [{"category": "rendering", "field": kind, "issue": f"Contracted client template is missing: {template}"}]})
             continue
-        document = _template_document(reference, model, template, icf=kind == "icf", boilerplate=boilerplate)
+        document = _template_document(
+            reference,
+            model,
+            template,
+            authority_path=authority,
+            icf=kind == "icf",
+            boilerplate=boilerplate,
+        )
         if kind == "icf":
             _clear_icf_review_highlighting(document)
         font_replacements = _apply_font_substitutions(document, substitutions)
@@ -2343,9 +2355,10 @@ def render_documents(
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
         phrases = [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
         findings = audit_docx(path, required_phrases=phrases)
-        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "font_replacements": font_replacements, "status": "passed" if not findings else "blocked", "findings": findings})
+        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not findings else "blocked", "findings": findings})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
+        "contracted_template_bundle": bundle,
         "font_substitutions": substitutions,
         "layout_repair": {"level": max(0, min(int(layout_repair_level), 3)), "changes": repair_changes},
         "artifacts": results,

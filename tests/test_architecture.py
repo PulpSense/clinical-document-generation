@@ -9,6 +9,28 @@ def test_production_architecture_is_exactly_six_python_files():
     assert names == ["contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py"]
 
 
+def test_contracts_is_the_only_governed_resource_selector():
+    forbidden_selectors = (
+        "prospective-protocol.template.docx",
+        "ambispective-protocol.template.docx",
+        "retrospective-protocol.template.docx",
+        "prospective-icf.template.docx",
+        "ambispective-icf.template.docx",
+        "sterling-icf.template.docx",
+        "protocol-reference.docx",
+        "advarra-icf-reference.docx",
+        "sterling-icf-reference.docx",
+        "clinicaltrials_prs_full_placeholder_template.xml",
+        "prs-manual-reference.xml",
+        "fixed-clinical-boilerplate.json",
+    )
+    consumers = ("drafting.py", "rendering.py", "quality.py", "workflow.py")
+    for name in consumers:
+        source = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+        assert "contracted_template_bundle" in source
+        assert not any(selector in source for selector in forbidden_selectors)
+
+
 def test_no_hidden_python_runtime_package_remains():
     assert not list((ROOT / "clinical_document_core").glob("*.py"))
     assert not list((ROOT / "scripts").glob("runtime_*.py"))
