@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts import ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, icf_contract, input_findings, parse_source_truth, protocol_contract, source_truth_markdown
+from contracts import ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, icf_contract, input_findings, parse_source_truth, protocol_contract, source_contract, source_truth_markdown
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +138,119 @@ def test_missing_obligatory_input_blocks_without_filler():
     reference["study"]["title"] = ""
     findings = input_findings(reference)
     assert any(item["field"] == "study.title" for item in findings)
+
+
+def test_prs_study_type_is_required_before_source_approval():
+    reference = fixture("ambispective-acceptance-source.json")
+    reference["regulatory"]["prs"].pop("study_type")
+    reference["design"]["study_design"] = "Ambispective, single-center, single-arm device study."
+
+    contract = source_contract(reference)
+
+    assert contract["status"] == "blocked"
+    assert any(
+        item["field"] == "regulatory.prs.study_type"
+        and item["issue"] == "Required Source Input is missing."
+        for item in contract["blocking_findings"]
+    )
+
+
+def test_prs_provider_study_id_is_required_before_source_approval():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["regulatory"]["prs"].pop("provider_study_id", None)
+    reference["meta"].pop("protocol_number")
+
+    contract = source_contract(reference)
+
+    assert contract["status"] == "blocked"
+    assert any(
+        item["field"] == "regulatory.prs.provider_study_id"
+        for item in contract["blocking_findings"]
+    )
+
+
+def test_prs_study_type_must_be_a_supported_registry_classification():
+    reference = fixture("ambispective-acceptance-source.json")
+    reference["regulatory"]["prs"]["study_type"] = "Ambispective"
+
+    contract = source_contract(reference)
+
+    assert contract["status"] == "blocked"
+    assert any(
+        item["field"] == "regulatory.prs.study_type"
+        and item["issue"] == "PRS study type must be Observational or Interventional."
+        for item in contract["blocking_findings"]
+    )
+
+
+def test_prs_study_type_rejects_noncanonical_reviewer_value():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["regulatory"]["prs"]["study_type"] = " observational "
+
+    contract = source_contract(reference)
+
+    assert contract["status"] == "blocked"
+    assert contract["normalized_reference"]["regulatory"]["prs"]["study_type"] == " observational "
+
+
+def test_prs_study_type_uses_unambiguous_approved_design_evidence():
+    reference = fixture("ambispective-acceptance-source.json")
+    reference["regulatory"]["prs"].pop("study_type")
+
+    contract = source_contract(reference, derive_prs_study_type=True)
+
+    assert contract["status"] == "passed"
+    assert contract["normalized_reference"]["regulatory"]["prs"]["study_type"] == "Observational"
+
+
+@pytest.mark.parametrize(
+    ("design", "expected"),
+    (
+        ("Observational", "Observational"),
+        ("Study type: Observational", "Observational"),
+        ("Interventional, randomized study", "Interventional"),
+    ),
+)
+def test_prs_study_type_uses_direct_unambiguous_classification_forms(design, expected):
+    reference = fixture("prospective-acceptance-source.json")
+    reference["regulatory"]["prs"].pop("study_type")
+    reference["design"]["study_design"] = design
+
+    contract = source_contract(reference, derive_prs_study_type=True)
+
+    assert contract["status"] == "passed"
+    assert contract["normalized_reference"]["regulatory"]["prs"]["study_type"] == expected
+
+
+@pytest.mark.parametrize(
+    "design",
+    (
+        "This is not an interventional study.",
+        "Whether this study is interventional remains unknown.",
+        "This may be an interventional study.",
+        "This might be observational.",
+        "The proposed classification is interventional.",
+        "Interventional?",
+        "This is not necessarily an interventional study.",
+        "If approved, this will be an observational study.",
+        "It is allegedly an observational study.",
+        "The study is an observational study; however, this classification is tentative.",
+        "The study is an interventional study. This classification is unconfirmed.",
+        "Ambispective, single-center observational device study with classification pending.",
+    ),
+)
+def test_prs_study_type_does_not_infer_from_negated_or_uncertain_design(design):
+    reference = fixture("prospective-acceptance-source.json")
+    reference["regulatory"]["prs"].pop("study_type")
+    reference["design"]["study_design"] = design
+
+    contract = source_contract(reference, derive_prs_study_type=True)
+
+    assert contract["status"] == "blocked"
+    assert any(
+        item["field"] == "regulatory.prs.study_type"
+        for item in contract["blocking_findings"]
+    )
 
 
 def test_conflicting_sample_size_evidence_blocks_approval():

@@ -653,7 +653,7 @@ def _ensure_optional_review_fields(reference: dict[str, Any], branch: str | None
 def prepare(run_dir: Path, *, today: date | None = None, **_: Any) -> dict[str, Any]:
     """Validate mandatory inputs and create the reviewer-editable source file."""
     run_dir = run_dir.resolve(); reference_path, reference = _reference(run_dir)
-    contract = source_contract(reference)
+    contract = source_contract(reference, derive_prs_study_type=True)
     if contract["status"] != "passed":
         path = run_dir / "reference/missing-inputs.md"; path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(repair_report(contract["blocking_findings"]), encoding="utf-8")
@@ -767,6 +767,27 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: list[Path], findings: li
         "findings": list(findings or []),
         "client_outputs": [],
     }
+
+
+def _repair_block(
+    run_dir: Path,
+    stage: str,
+    findings: list[Mapping[str, Any]],
+    *,
+    candidate_outputs: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    path = run_dir / "reference/repair-report.md"
+    path.write_text(repair_report(findings), encoding="utf-8")
+    result: dict[str, Any] = {
+        "status": "blocked",
+        "stage": stage,
+        "findings": [dict(finding) for finding in findings],
+        "repair_report": path.relative_to(run_dir).as_posix(),
+        "client_outputs": [],
+    }
+    if candidate_outputs is not None:
+        result["candidate_outputs"] = candidate_outputs
+    return result
 
 
 def _candidate_fingerprint(
@@ -1443,6 +1464,8 @@ def generate(
     if contract["status"] != "passed" or not approved:
         findings = list(contract["blocking_findings"])
         if not approved: findings.append({"category": "approval", "field": "approval", "issue": approval_issue})
+        if approved:
+            return _repair_block(run_dir, "approval_gate", findings)
         return {"status": "blocked", "stage": "approval_gate", "findings": findings, "client_outputs": []}
     if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [{"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}], "client_outputs": []}
     state = working_reference.setdefault("generation", {})
@@ -1527,8 +1550,16 @@ def generate(
                 structural_template=SCRIPT_DIR.parent / "assets/client-templates/reference/prs-manual-reference.xml",
             )
             if xml_report["status"] != "passed":
-                findings = [{**finding, "target_ids": ["layout:xml"]} for finding in xml_report["findings"]]
-                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "xml", operation_deadline=operation_deadline, clock=clock)
+                findings = [
+                    {**finding, "category": "document-structure"}
+                    for finding in xml_report["findings"]
+                ]
+                return _repair_block(
+                    run_dir,
+                    "xml",
+                    findings,
+                    candidate_outputs=_candidate_outputs(revision_dir),
+                )
 
         # Candidate construction is independent from the host's render stack.
         # Only after a complete branch candidate exists do we resolve mandatory

@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
-CONTRACT_VERSION = "clinical-documents-v2.8"
+CONTRACT_VERSION = "clinical-documents-v2.9"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 
 DOCUMENT_SETS: dict[str, tuple[str, ...]] = {
@@ -33,6 +33,38 @@ STUDY_TYPE_ALIASES = {
     "retrospective": "Retrospective",
     "chart review": "Retrospective",
 }
+
+PRS_STUDY_TYPES = {
+    "observational": "Observational",
+    "interventional": "Interventional",
+}
+
+PRS_CLASSIFICATION_ASSERTIONS = (
+    re.compile(r"^(?P<classification>observational|interventional)\.?$"),
+    re.compile(
+        r"^study type:\s*(?P<classification>observational|interventional)\.?$"
+    ),
+    re.compile(
+        r"^(?P<classification>observational|interventional),\s+"
+        r"(?:randomized|non-randomized|nonrandomized)\s+study\.?$"
+    ),
+    re.compile(
+        r"^(?P<classification>observational|interventional)(?:\s+device)?\s+study\.?$"
+    ),
+    re.compile(
+        r"^(?:this|the study|the trial)\s+is\s+(?:an?\s+)?"
+        r"(?P<classification>observational|interventional)(?:\s+device)?\s+study\.?$"
+    ),
+    re.compile(
+        r"^(?:prospective|ambispective|retrospective),\s+"
+        r"(?:(?:single|multi)-(?:center|site|arm),\s+)*"
+        r"(?:(?:single|multi)-(?:center|site|arm)\s+)?"
+        r"(?P<classification>observational|interventional)(?:\s+device)?\s+study"
+        r"(?:\s+(?:combining historical abstraction and prospective follow-up"
+        r"|with historical chart review and prospective follow-up"
+        r"|based on historical record abstraction))?\.?$"
+    ),
+)
 
 FORBIDDEN_DRAFT_LANGUAGE = (
     "the approved source provides",
@@ -124,6 +156,8 @@ PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("sites.facilities", kind="site_facilities"),
     RequiredInput("sites.contacts", kind="site_contacts"),
     RequiredInput("sites.investigators", kind="site_investigators"),
+    RequiredInput("regulatory.prs.provider_study_id", ("meta.protocol_number",), "PRS provider study ID"),
+    RequiredInput("regulatory.prs.study_type", label="PRS study type (Observational or Interventional)"),
 )
 
 RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
@@ -378,6 +412,16 @@ def canonical_study_type(value: Any) -> str | None:
     return None
 
 
+def _prs_study_type_from_design(reference: Mapping[str, Any]) -> str | None:
+    design = " ".join(str(get_path(reference, "design.study_design") or "").casefold().split())
+    matches = {
+        PRS_STUDY_TYPES[match.group("classification")]
+        for assertion in PRS_CLASSIFICATION_ASSERTIONS
+        if (match := assertion.match(design)) is not None
+    }
+    return next(iter(matches)) if len(matches) == 1 else None
+
+
 def document_set(value: Any) -> tuple[str, ...]:
     return DOCUMENT_SETS.get(canonical_study_type(value) or "", ())
 
@@ -532,6 +576,15 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         signatures = {_candidate_signature(value) for value in candidates.get(requirement.field, []) if _candidate_signature(value)}
         if len(signatures) > 1:
             findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input has conflicting source candidates.", "required": "One reviewer-selected value."})
+    if branch != "Retrospective":
+        prs_study_type = get_path(reference, "regulatory.prs.study_type")
+        if meaningful(prs_study_type) and str(prs_study_type) not in PRS_STUDY_TYPES.values():
+            findings.append({
+                "category": "source-evidence",
+                "field": "regulatory.prs.study_type",
+                "issue": "PRS study type must be Observational or Interventional.",
+                "required": "Observational or Interventional.",
+            })
     sample_size = _sample_size_signature(get_path(reference, "population.sample_size"))
     for evidence_path in ("population.sample_size_evidence", "statistics.sample_size_evidence"):
         rows = get_path(reference, evidence_path, [])
@@ -582,7 +635,13 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     return findings
 
 
-def source_contract(reference: Mapping[str, Any], *, require_approval: bool = False, run_dir: Path | None = None) -> dict[str, Any]:
+def source_contract(
+    reference: Mapping[str, Any],
+    *,
+    require_approval: bool = False,
+    run_dir: Path | None = None,
+    derive_prs_study_type: bool = False,
+) -> dict[str, Any]:
     normalized = copy.deepcopy(dict(reference))
     for legacy_key in ("template_fields", "generated", "needs_review"):
         normalized.pop(legacy_key, None)
@@ -590,6 +649,10 @@ def source_contract(reference: Mapping[str, Any], *, require_approval: bool = Fa
     if branch:
         normalized.setdefault("meta", {})["study_type"] = branch
         normalized["meta"]["document_set"] = [name.replace(".docx", "_docx").replace("study.xml", "xml") for name in DOCUMENT_SETS[branch]]
+    raw_prs_study_type = get_path(normalized, "regulatory.prs.study_type")
+    if derive_prs_study_type and branch != "Retrospective" and not meaningful(raw_prs_study_type):
+        if prs_study_type := _prs_study_type_from_design(normalized):
+            set_path(normalized, "regulatory.prs.study_type", prs_study_type)
     findings = input_findings(normalized)
     if require_approval:
         if str(get_path(normalized, "approval.status", "")).casefold() != "approved":

@@ -93,6 +93,8 @@ Create `<run-dir>/reference/study.reference.json` from the user’s supplied fac
 
 Set `meta.study_type` to exactly `Prospective`, `Ambispective`, or `Retrospective`. For prospective/ambispective studies, set `meta.icf_template` to `Advarra` or `Sterling` based on the user’s choice or clear evidence. Do not guess between templates.
 
+For prospective/ambispective studies, also set the distinct `regulatory.prs.study_type` to `Observational` or `Interventional`. Use explicit source evidence; during preparation, an unambiguous classification in `design.study_design` populates the review field. If neither classification is explicit, complete the missing-input review before approval. `meta.study_type` describes the workflow branch and is not a PRS classification.
+
 ### 2. Prepare the Source-of-Truth
 
 Run:

@@ -65,7 +65,11 @@ this file.
 - `risks_benefits`: risks, benefits, privacy, costs, alternatives, payment or
   reimbursement, and research-injury handling.
 - `regulatory.prs`: reviewer-controlled ClinicalTrials.gov values, including
-  the stable study UID used for repeated PRS records.
+  `provider_study_id` (or `meta.protocol_number`), `study_type`
+  (`Observational` or `Interventional`), and the stable study UID used for
+  repeated PRS records. This registry classification is distinct from
+  `meta.study_type`; during preparation, an unambiguous classification stated
+  in `design.study_design` populates the PRS field before review.
 
 ## Consistency rules
 

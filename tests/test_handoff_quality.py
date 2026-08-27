@@ -258,6 +258,40 @@ def test_environment_failure_retains_a_complete_candidate_built_before_render_as
     assert result["client_outputs"] == []
 
 
+def test_generation_routes_legacy_missing_prs_study_type_to_source_review(tmp_path):
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    approval = approve(run_dir, approved_by="reviewer")
+    revision_dir = run_dir / "revisions" / approval["revision_id"]
+
+    working = json.loads(reference_path.read_text(encoding="utf-8"))
+    approved = json.loads((revision_dir / "approved-reference.json").read_text(encoding="utf-8"))
+    working["regulatory"]["prs"].pop("study_type")
+    approved["regulatory"]["prs"].pop("study_type")
+    (revision_dir / "approved-reference.json").write_text(json.dumps(approved), encoding="utf-8")
+    working["approval"]["approved_reference_sha256"] = hashlib.sha256(
+        (revision_dir / "approved-reference.json").read_bytes()
+    ).hexdigest()
+    reference_path.write_text(json.dumps(working), encoding="utf-8")
+
+    result = generate(run_dir)
+
+    report = (run_dir / result["repair_report"]).read_text(encoding="utf-8")
+    assert result["status"] == "blocked"
+    assert result["stage"] == "approval_gate"
+    assert result["findings"] == [{
+        "category": "source-evidence",
+        "field": "regulatory.prs.study_type",
+        "issue": "Required Source Input is missing.",
+        "required": "PRS study type (Observational or Interventional)",
+    }]
+    assert "## regulatory.prs.study_type" in report
+    assert not (revision_dir / "attempts").exists()
+
+
 def test_source_gap_response_is_a_retryable_drafting_failure_not_a_reviewer_question(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "icf-narrative")
@@ -401,6 +435,71 @@ def test_prepare_exposes_optional_clinical_and_prs_fields_in_the_editable_source
     assert "<!-- field: statistics.missing_data_handling -->" in source
     assert "analysis_method" in source
     assert "description" in source
+
+
+def test_prepare_derives_prs_study_type_from_unambiguous_design_evidence(tmp_path):
+    reference = fixture()
+    reference["regulatory"]["prs"].pop("study_type")
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+
+    result = prepare(run_dir, today=date(2026, 8, 24))
+    prepared = json.loads(reference_path.read_text(encoding="utf-8"))
+    source = (run_dir / result["source_of_truth"]).read_text(encoding="utf-8")
+
+    assert result["status"] == "awaiting_approval"
+    assert prepared["regulatory"]["prs"]["study_type"] == "Observational"
+    assert "<!-- field: regulatory.prs.study_type -->\nObservational\n<!-- /field -->" in source
+
+
+def test_prepare_reports_missing_prs_study_type_before_approval(tmp_path):
+    reference = fixture()
+    reference["regulatory"]["prs"].pop("study_type")
+    reference["design"]["study_design"] = "Prospective, single-center device study."
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+
+    result = prepare(run_dir, today=date(2026, 8, 24))
+    report = (run_dir / result["missing_inputs"]).read_text(encoding="utf-8")
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "input_collection"
+    assert "## regulatory.prs.study_type" in report
+    assert "PRS study type (Observational or Interventional)" in report
+    assert not (run_dir / "revisions").exists()
+
+
+def test_approval_does_not_restore_a_reviewer_cleared_prs_study_type(tmp_path):
+    reference = fixture()
+    reference["regulatory"]["prs"].pop("study_type")
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+
+    prepared = prepare(run_dir, today=date(2026, 8, 24))
+    source_path = run_dir / prepared["source_of_truth"]
+    source = source_path.read_text(encoding="utf-8")
+    source_path.write_text(
+        source.replace(
+            "<!-- field: regulatory.prs.study_type -->\nObservational\n<!-- /field -->",
+            "<!-- field: regulatory.prs.study_type -->\n\n<!-- /field -->",
+        ),
+        encoding="utf-8",
+    )
+
+    result = approve(run_dir, approved_by="reviewer")
+
+    assert result["status"] == "blocked"
+    assert any(
+        item["field"] == "regulatory.prs.study_type"
+        for item in result["findings"]
+    )
+    assert not (run_dir / "revisions").exists()
 
 
 def test_protocol_leaf_heading_without_body_content_is_blocked(tmp_path):
