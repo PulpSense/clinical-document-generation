@@ -1,10 +1,11 @@
 import copy
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
-from contracts import ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, icf_contract, input_findings, parse_source_truth, protocol_contract, source_contract, source_truth_markdown
+from contracts import ContractedTemplateBundleError, ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, contracted_template_bundle, icf_contract, input_findings, parse_source_truth, protocol_contract, source_contract, source_truth_markdown
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,149 @@ def test_branch_document_sets_are_exact():
     assert DOCUMENT_SETS["Prospective"] == ("protocol.docx", "icf.docx", "study.xml")
     assert DOCUMENT_SETS["Ambispective"] == ("protocol.docx", "icf.docx", "study.xml")
     assert DOCUMENT_SETS["Retrospective"] == ("protocol.docx",)
+
+
+@pytest.mark.parametrize(
+    ("study_type", "icf_family", "protocol_template", "icf_template", "icf_authority", "has_prs"),
+    (
+        ("Prospective", "Advarra", "prospective-protocol.template.docx", "prospective-icf.template.docx", "advarra-icf-reference.docx", True),
+        ("Prospective", "Sterling", "prospective-protocol.template.docx", "sterling-icf.template.docx", "sterling-icf-reference.docx", True),
+        ("Ambispective", "Advarra", "ambispective-protocol.template.docx", "ambispective-icf.template.docx", "advarra-icf-reference.docx", True),
+        ("Ambispective", "Sterling", "ambispective-protocol.template.docx", "sterling-icf.template.docx", "sterling-icf-reference.docx", True),
+        ("Retrospective", None, "retrospective-protocol.template.docx", None, None, False),
+    ),
+)
+def test_every_supported_selection_resolves_one_complete_contracted_template_bundle(
+    study_type,
+    icf_family,
+    protocol_template,
+    icf_template,
+    icf_authority,
+    has_prs,
+):
+    meta = {"study_type": study_type}
+    if icf_family is not None:
+        meta["icf_template"] = icf_family
+
+    bundle = contracted_template_bundle(ROOT, {"meta": meta})
+
+    assert bundle["selection"] == {"study_type": study_type, "icf_family": icf_family}
+    assert bundle["contracted_templates"]["protocol"]["path"].endswith(protocol_template)
+    assert (bundle["contracted_templates"].get("icf") or {}).get("path", "").endswith(icf_template or "")
+    assert bundle["client_template_authorities"]["protocol"]["path"].endswith("protocol-reference.docx")
+    assert (bundle["client_template_authorities"].get("icf") or {}).get("path", "").endswith(icf_authority or "")
+    assert (bundle["prs_authority"] is not None) is has_prs
+    assert len(bundle["document_section_contract"]["sha256"]) == 64
+    assert len(bundle["fixed_clinical_boilerplate"]["sha256"]) == 64
+    assert len(bundle["approved_font_plan"]["sha256"]) == 64
+    assert len(bundle["identity_sha256"]) == 64
+    assert bundle["resource_hashes"]
+    assert all(len(digest) == 64 for digest in bundle["resource_hashes"].values())
+
+
+def test_contracted_template_bundle_identity_is_stable_and_covers_every_selected_resource():
+    reference = {"meta": {"study_type": "Ambispective", "icf_template": "Sterling"}}
+
+    first = contracted_template_bundle(ROOT, reference)
+    second = contracted_template_bundle(ROOT, reference)
+
+    assert first == second
+    governed_paths = {
+        item["path"]
+        for group in (
+            first["contracted_templates"],
+            first["client_template_authorities"],
+            first["prs_authority"],
+        )
+        for item in group.values()
+    }
+    governed_paths.add(first["fixed_clinical_boilerplate"]["path"])
+    governed_paths.update(first["approved_font_plan"]["packaged_font_assets"])
+    assert governed_paths == set(first["resource_hashes"])
+    assert all(
+        first["resource_hashes"][item["path"]] == item["sha256"]
+        for group in (
+            first["contracted_templates"],
+            first["client_template_authorities"],
+            first["prs_authority"],
+            first["approved_font_plan"]["packaged_font_assets"],
+        )
+        for item in group.values()
+    )
+
+
+@pytest.mark.parametrize(
+    "reference",
+    (
+        {"meta": {}},
+        {"meta": {"study_type": "Prospective"}},
+        {"meta": {"study_type": "Prospective", "icf_template": "Uncontracted"}},
+    ),
+)
+def test_missing_or_uncontracted_selection_produces_one_bundle_contract_failure(reference):
+    with pytest.raises(ContractedTemplateBundleError) as raised:
+        contracted_template_bundle(ROOT, reference)
+
+    assert raised.value.finding["field"] == "contracted_template_bundle"
+
+
+def test_internally_inconsistent_bundle_produces_one_contract_failure(tmp_path):
+    release = tmp_path / "release"
+    shutil.copytree(ROOT / "assets", release / "assets")
+    shutil.copytree(ROOT / "references", release / "references")
+    boilerplate_path = release / "references/fixed-clinical-boilerplate.json"
+    boilerplate = json.loads(boilerplate_path.read_text(encoding="utf-8"))
+    boilerplate["version"] = "uncontracted-version"
+    boilerplate_path.write_text(json.dumps(boilerplate), encoding="utf-8")
+
+    with pytest.raises(ContractedTemplateBundleError) as raised:
+        contracted_template_bundle(
+            release,
+            {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}},
+        )
+
+    assert raised.value.finding["field"] == "contracted_template_bundle"
+    assert "version does not match" in raised.value.finding["issue"]
+
+
+@pytest.mark.parametrize(
+    "relative",
+    (
+        "assets/client-templates/docx/prospective-protocol.template.docx",
+        "assets/client-templates/reference/advarra-icf-reference.docx",
+        "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+        "assets/fallback-fonts/LiberationSans-Regular.ttf",
+    ),
+)
+def test_corrupt_governed_asset_produces_one_contract_failure_before_drafting(tmp_path, relative):
+    release = tmp_path / "release"
+    shutil.copytree(ROOT / "assets", release / "assets")
+    shutil.copytree(ROOT / "references", release / "references")
+    (release / relative).write_bytes(b"not a valid governed asset")
+
+    with pytest.raises(ContractedTemplateBundleError) as raised:
+        contracted_template_bundle(
+            release,
+            {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}},
+        )
+
+    assert raised.value.finding["field"] == "contracted_template_bundle"
+
+
+def test_governed_resource_mutation_changes_bundle_identity(tmp_path):
+    release = tmp_path / "release"
+    shutil.copytree(ROOT / "assets", release / "assets")
+    shutil.copytree(ROOT / "references", release / "references")
+    reference = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}
+    before = contracted_template_bundle(release, reference)
+    authority_path = release / "assets/client-templates/reference/advarra-icf-reference.docx"
+    authority_path.write_bytes(authority_path.read_bytes() + b"governed-mutation")
+
+    after = contracted_template_bundle(release, reference)
+
+    relative = "assets/client-templates/reference/advarra-icf-reference.docx"
+    assert after["resource_hashes"][relative] != before["resource_hashes"][relative]
+    assert after["identity_sha256"] != before["identity_sha256"]
 
 
 def test_branch_section_contracts_have_no_duplicate_ids_and_expected_roots():

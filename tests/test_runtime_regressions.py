@@ -1,4 +1,5 @@
 import json
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,6 +8,7 @@ from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
 
+from contracts import contracted_template_bundle
 from quality import RESPONSE_SCHEMA, validate_verifications
 import quality
 from rendering import render_documents
@@ -363,6 +365,83 @@ def test_layout_repair_profile_changes_the_generated_document(tmp_path):
     assert repaired["layout_repair"]["level"] == 1
     assert repaired["layout_repair"]["changes"] > 0
     assert (baseline_dir / "candidate/protocol.docx").read_bytes() != (repaired_dir / "candidate/protocol.docx").read_bytes()
+
+
+def _visible_formatting_fingerprint(path):
+    document = Document(path)
+    paragraph_layout = tuple(
+        (
+            paragraph.text,
+            paragraph.style.name,
+            paragraph.alignment,
+            paragraph.paragraph_format.keep_with_next,
+            paragraph.paragraph_format.page_break_before,
+        )
+        for paragraph in document.paragraphs
+    )
+    page_geometry = tuple(
+        (
+            section.page_width,
+            section.page_height,
+            section.left_margin,
+            section.right_margin,
+            section.top_margin,
+            section.bottom_margin,
+            section.header_distance,
+            section.footer_distance,
+        )
+        for section in document.sections
+    )
+    tables = tuple(
+        tuple(tuple((cell.text, cell.width) for cell in row.cells) for row in table.rows)
+        for table in document.tables
+    )
+    running_text = tuple(
+        (
+            tuple(paragraph.text for paragraph in section.header.paragraphs),
+            tuple(paragraph.text for paragraph in section.footer.paragraphs),
+        )
+        for section in document.sections
+    )
+    return paragraph_layout, page_geometry, tables, running_text
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "icf_family", "candidate_names"),
+    (
+        ("prospective-acceptance-source.json", "Advarra", ("protocol.docx", "icf.docx")),
+        ("prospective-acceptance-source.json", "Sterling", ("protocol.docx", "icf.docx")),
+        ("ambispective-acceptance-source.json", "Advarra", ("protocol.docx", "icf.docx")),
+        ("ambispective-acceptance-source.json", "Sterling", ("protocol.docx", "icf.docx")),
+        ("retrospective-acceptance-source.json", None, ("protocol.docx",)),
+    ),
+)
+def test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatting(
+    tmp_path,
+    monkeypatch,
+    fixture_name,
+    icf_family,
+    candidate_names,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+    if icf_family is not None:
+        reference["meta"]["icf_template"] = icf_family
+    model = {"protocol": [], "icf": {}, "prs": {}}
+    baseline_dir = tmp_path / "baseline"
+    parallel_identity_dir = tmp_path / "parallel-identity"
+    monkeypatch.setattr(zipfile.time, "time", lambda: 1_800_000_000.0)
+
+    baseline = render_documents(ROOT, baseline_dir, reference, model)
+    bundle = contracted_template_bundle(ROOT, reference)
+    parallel = render_documents(ROOT, parallel_identity_dir, reference, model)
+
+    assert baseline["status"] == parallel["status"] == "passed"
+    assert len(bundle["identity_sha256"]) == 64
+    for candidate_name in candidate_names:
+        baseline_path = baseline_dir / "candidate" / candidate_name
+        parallel_path = parallel_identity_dir / "candidate" / candidate_name
+        assert baseline_path.read_bytes() == parallel_path.read_bytes()
+        assert _visible_formatting_fingerprint(baseline_path) == _visible_formatting_fingerprint(parallel_path)
 
 
 def test_layout_retry_persists_repair_and_the_original_operation_deadline(tmp_path, monkeypatch):

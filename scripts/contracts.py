@@ -11,13 +11,54 @@ import copy
 import hashlib
 import json
 import re
+import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from xml.etree import ElementTree as ET
 
 
 CONTRACT_VERSION = "clinical-documents-v2.9"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
+CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v1"
+APPROVED_FONT_PLAN_VERSION = "approved-font-plan/v1"
+
+BUNDLED_FONT_FILES = {
+    "Liberation Sans": "LiberationSans-Regular.ttf",
+    "Liberation Serif": "LiberationSerif-Regular.ttf",
+    "Liberation Mono": "LiberationMono-Regular.ttf",
+}
+
+APPROVED_PACKAGED_FONT_FALLBACKS = {
+    "arial": "Liberation Sans",
+    "arial unicode ms": "Liberation Sans",
+    "aptos": "Liberation Sans",
+    "calibri": "Liberation Sans",
+    "dejavu sans": "Liberation Sans",
+    "helvetica": "Liberation Sans",
+    "noto sans": "Liberation Sans",
+    "noto sans symbols": "Liberation Sans",
+    "segoe ui symbol": "Liberation Sans",
+    "symbol": "Liberation Sans",
+    "verdana": "Liberation Sans",
+    "times new roman": "Liberation Serif",
+    "courier new": "Liberation Mono",
+}
+
+PACKAGED_FONT_ASSETS = (
+    "assets/fallback-fonts/LiberationMono-Bold.ttf",
+    "assets/fallback-fonts/LiberationMono-BoldItalic.ttf",
+    "assets/fallback-fonts/LiberationMono-Italic.ttf",
+    "assets/fallback-fonts/LiberationMono-Regular.ttf",
+    "assets/fallback-fonts/LiberationSans-Bold.ttf",
+    "assets/fallback-fonts/LiberationSans-BoldItalic.ttf",
+    "assets/fallback-fonts/LiberationSans-Italic.ttf",
+    "assets/fallback-fonts/LiberationSans-Regular.ttf",
+    "assets/fallback-fonts/LiberationSerif-Bold.ttf",
+    "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf",
+    "assets/fallback-fonts/LiberationSerif-Italic.ttf",
+    "assets/fallback-fonts/LiberationSerif-Regular.ttf",
+)
 
 DOCUMENT_SETS: dict[str, tuple[str, ...]] = {
     "Prospective": ("protocol.docx", "icf.docx", "study.xml"),
@@ -115,6 +156,20 @@ class BatchSpec:
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
+
+
+class ContractedTemplateBundleError(ValueError):
+    """One fail-closed error for an incomplete or inconsistent bundle."""
+
+    def __init__(self, problems: Iterable[str]):
+        details = tuple(dict.fromkeys(str(problem) for problem in problems if str(problem)))
+        self.finding = {
+            "category": "contract",
+            "field": "contracted_template_bundle",
+            "issue": "Contracted Template Bundle is incomplete or inconsistent: " + "; ".join(details),
+            "required": "Restore one complete contracted resource set and retry before drafting.",
+        }
+        super().__init__(self.finding["issue"])
 
 
 PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
@@ -687,6 +742,199 @@ def contract_hash(reference: Mapping[str, Any]) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+_PROTOCOL_TEMPLATES = {
+    "Prospective": "assets/client-templates/docx/prospective-protocol.template.docx",
+    "Ambispective": "assets/client-templates/docx/ambispective-protocol.template.docx",
+    "Retrospective": "assets/client-templates/docx/retrospective-protocol.template.docx",
+}
+
+_ICF_TEMPLATES = {
+    ("Prospective", "Advarra"): "assets/client-templates/docx/prospective-icf.template.docx",
+    ("Prospective", "Sterling"): "assets/client-templates/docx/sterling-icf.template.docx",
+    ("Ambispective", "Advarra"): "assets/client-templates/docx/ambispective-icf.template.docx",
+    ("Ambispective", "Sterling"): "assets/client-templates/docx/sterling-icf.template.docx",
+}
+
+_CLIENT_AUTHORITIES = {
+    "protocol": "assets/client-templates/reference/protocol-reference.docx",
+    "Advarra": "assets/client-templates/reference/advarra-icf-reference.docx",
+    "Sterling": "assets/client-templates/reference/sterling-icf-reference.docx",
+}
+
+_PRS_RESOURCES = {
+    "generation_template": "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+    "structural_reference": "assets/client-templates/reference/prs-manual-reference.xml",
+}
+
+_BOILERPLATE_RESOURCE = "references/fixed-clinical-boilerplate.json"
+
+
+def _sha256_path(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _identity_hash(value: Mapping[str, Any]) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _governed_asset_problem(path: Path, relative: str) -> str | None:
+    if path.suffix.casefold() == ".docx":
+        try:
+            with zipfile.ZipFile(path) as package:
+                names = set(package.namelist())
+                required = {"[Content_Types].xml", "word/document.xml"}
+                if missing := sorted(required - names):
+                    return f"governed DOCX lacks required package parts: {relative} ({', '.join(missing)})"
+                if corrupt := package.testzip():
+                    return f"governed DOCX has a corrupt package part: {relative} ({corrupt})"
+                for name in names:
+                    if name.endswith((".xml", ".rels")):
+                        ET.fromstring(package.read(name))
+        except (OSError, ET.ParseError, KeyError, zipfile.BadZipFile) as exc:
+            return f"governed DOCX is invalid: {relative} ({exc})"
+    elif relative in _PRS_RESOURCES.values():
+        try:
+            root = ET.parse(path).getroot()
+        except (OSError, ET.ParseError) as exc:
+            return f"governed PRS XML is invalid: {relative} ({exc})"
+        local_name = root.tag.rsplit("}", 1)[-1]
+        child_names = [child.tag.rsplit("}", 1)[-1] for child in root]
+        if local_name != "study_collection" or child_names.count("clinical_study") != 1:
+            return f"governed PRS XML has an inconsistent study_collection structure: {relative}"
+    elif path.suffix.casefold() == ".ttf":
+        try:
+            header = path.read_bytes()
+            if len(header) < 12 or header[:4] not in {b"\x00\x01\x00\x00", b"OTTO", b"true", b"typ1"}:
+                return f"governed packaged font has an invalid sfnt header: {relative}"
+            table_count = int.from_bytes(header[4:6], "big")
+            directory_end = 12 + (16 * table_count)
+            if not table_count or directory_end > len(header):
+                return f"governed packaged font has an invalid table directory: {relative}"
+            for offset in range(12, directory_end, 16):
+                table_offset = int.from_bytes(header[offset + 8:offset + 12], "big")
+                table_length = int.from_bytes(header[offset + 12:offset + 16], "big")
+                if table_offset + table_length > len(header):
+                    return f"governed packaged font has an out-of-range table: {relative}"
+        except OSError as exc:
+            return f"governed packaged font is unreadable: {relative} ({exc})"
+    return None
+
+
+def contracted_template_bundle(repo_root: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
+    """Resolve the one complete governed resource identity for a study selection."""
+    root = repo_root.resolve()
+    problems: list[str] = []
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    if branch not in DOCUMENT_SETS:
+        raise ContractedTemplateBundleError(("study branch is missing or uncontracted",))
+
+    icf_family: str | None = None
+    if branch != "Retrospective":
+        raw_family = str(get_path(reference, "meta.icf_template", "")).strip()
+        icf_family = next((family for family in ("Advarra", "Sterling") if family.casefold() == raw_family.casefold()), None)
+        if icf_family is None:
+            raise ContractedTemplateBundleError(("ICF Template Choice is missing or uncontracted",))
+
+    resource_hashes: dict[str, str] = {}
+
+    def resource(relative: str) -> dict[str, str]:
+        path = root / relative
+        if not path.is_file():
+            problems.append(f"governed resource is missing: {relative}")
+            digest = ""
+        else:
+            try:
+                digest = _sha256_path(path)
+                if problem := _governed_asset_problem(path, relative):
+                    problems.append(problem)
+            except OSError as exc:
+                problems.append(f"governed resource cannot be read: {relative} ({exc})")
+                digest = ""
+        resource_hashes[relative] = digest
+        return {"path": relative, "sha256": digest}
+
+    contracted_templates = {"protocol": resource(_PROTOCOL_TEMPLATES[branch])}
+    client_authorities = {"protocol": resource(_CLIENT_AUTHORITIES["protocol"])}
+    if icf_family is not None:
+        contracted_templates["icf"] = resource(_ICF_TEMPLATES[(branch, icf_family)])
+        client_authorities["icf"] = resource(_CLIENT_AUTHORITIES[icf_family])
+
+    prs_authority = (
+        {name: resource(relative) for name, relative in _PRS_RESOURCES.items()}
+        if branch != "Retrospective"
+        else None
+    )
+    boilerplate = resource(_BOILERPLATE_RESOURCE)
+    boilerplate_payload: dict[str, Any] = {}
+    if boilerplate["sha256"]:
+        try:
+            value = json.loads((root / _BOILERPLATE_RESOURCE).read_text(encoding="utf-8"))
+            if isinstance(value, dict):
+                boilerplate_payload = value
+            else:
+                problems.append("Fixed Clinical Boilerplate is not a JSON object")
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            problems.append(f"Fixed Clinical Boilerplate is unreadable: {exc}")
+    if boilerplate_payload.get("version") != BOILERPLATE_VERSION:
+        problems.append("Fixed Clinical Boilerplate version does not match the Document Section Contract")
+    sections = boilerplate_payload.get("sections")
+    if not isinstance(sections, dict) or not all(isinstance(key, str) and isinstance(value, str) for key, value in sections.items()):
+        problems.append("Fixed Clinical Boilerplate must contain a string map named sections")
+        sections = {}
+    governed_sections = list(protocol_contract(branch))
+    if icf_family is not None:
+        governed_sections.extend(icf_contract(branch, icf_family))
+    missing_boilerplate = sorted({section.boilerplate_key for section in governed_sections if section.boilerplate_key and section.boilerplate_key not in sections})
+    if missing_boilerplate:
+        problems.append("Document Section Contract references missing Fixed Clinical Boilerplate: " + ", ".join(missing_boilerplate))
+
+    font_assets = {relative: resource(relative) for relative in PACKAGED_FONT_ASSETS}
+    fallback_targets = set(APPROVED_PACKAGED_FONT_FALLBACKS.values())
+    if fallback_targets != set(BUNDLED_FONT_FILES):
+        problems.append("approved fallback families and packaged font families do not match")
+    for family, filename in BUNDLED_FONT_FILES.items():
+        relative = f"assets/fallback-fonts/{filename}"
+        if relative not in font_assets:
+            problems.append(f"approved fallback family lacks its regular packaged font: {family}")
+    font_plan_payload = {
+        "version": APPROVED_FONT_PLAN_VERSION,
+        "available_font_policy": "preserve",
+        "missing_font_policy": "approved_packaged_substitute",
+        "unknown_inventory_policy": "preserve_then_resolve_by_smoke_render",
+        "approved_fallbacks": dict(sorted(APPROVED_PACKAGED_FONT_FALLBACKS.items())),
+        "packaged_families": dict(sorted(BUNDLED_FONT_FILES.items())),
+        "packaged_font_assets": font_assets,
+    }
+    approved_font_plan = {**font_plan_payload, "sha256": _identity_hash(font_plan_payload)}
+
+    if problems:
+        raise ContractedTemplateBundleError(problems)
+
+    payload = {
+        "schema_version": CONTRACTED_TEMPLATE_BUNDLE_SCHEMA,
+        "selection": {"study_type": branch, "icf_family": icf_family},
+        "contracted_templates": contracted_templates,
+        "client_template_authorities": client_authorities,
+        "document_section_contract": {
+            "version": CONTRACT_VERSION,
+            "sha256": contract_hash(reference),
+        },
+        "fixed_clinical_boilerplate": {
+            "version": BOILERPLATE_VERSION,
+            **boilerplate,
+        },
+        "approved_font_plan": approved_font_plan,
+        "prs_authority": prs_authority,
+        "resource_hashes": dict(sorted(resource_hashes.items())),
+    }
+    return {**payload, "identity_sha256": _identity_hash(payload)}
+
+
 EDITABLE_ROOTS = ("meta", "study", "parties", "sites", "population", "design", "objectives", "endpoints", "procedures", "statistics", "safety", "ethics", "confidentiality", "risks_benefits", "regulatory")
 OPERATIONAL_META = {"document_set", "run_id"}
 FIELD_RE = re.compile(r"<!--\s*field:\s*([^>]+?)\s*-->(.*?)<!--\s*/field\s*-->", re.DOTALL | re.I)
@@ -838,9 +1086,10 @@ def repair_report(findings: Iterable[Mapping[str, Any]]) -> str:
 
 
 __all__ = [
-    "BOILERPLATE_VERSION", "CONTRACT_VERSION", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE",
-    "BatchSpec", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
-    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "document_set",
+    "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES",
+    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS",
+    "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
+    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth",
     "icf_contract", "icf_retained_sections", "protocol_contract", "repair_report", "set_path", "source_contract", "source_truth_markdown",
 ]

@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import BOILERPLATE_VERSION, ICF_RETAINED_SHELL_SECTIONS, canonical_study_type, get_path, icf_contract, icf_retained_sections, protocol_contract
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, canonical_study_type, get_path, icf_contract, icf_retained_sections, protocol_contract
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -91,28 +91,6 @@ PAGE_RENDERER_BACKENDS = (
     "imagemagick",
     "pymupdf",
 )
-
-BUNDLED_FONT_FILES = {
-    "Liberation Sans": "LiberationSans-Regular.ttf",
-    "Liberation Serif": "LiberationSerif-Regular.ttf",
-    "Liberation Mono": "LiberationMono-Regular.ttf",
-}
-
-APPROVED_PACKAGED_FONT_FALLBACKS = {
-    "arial": "Liberation Sans",
-    "arial unicode ms": "Liberation Sans",
-    "aptos": "Liberation Sans",
-    "calibri": "Liberation Sans",
-    "dejavu sans": "Liberation Sans",
-    "helvetica": "Liberation Sans",
-    "noto sans": "Liberation Sans",
-    "noto sans symbols": "Liberation Sans",
-    "segoe ui symbol": "Liberation Sans",
-    "symbol": "Liberation Sans",
-    "verdana": "Liberation Sans",
-    "times new roman": "Liberation Serif",
-    "courier new": "Liberation Mono",
-}
 
 _PAGE_RENDERER_EXECUTABLES = {
     "pdftoppm": ("pdftoppm",),

@@ -1,5 +1,6 @@
 import json
 import hashlib
+import shutil
 from datetime import date
 from pathlib import Path
 
@@ -194,6 +195,31 @@ def test_sparse_complete_approval_cannot_create_post_approval_source_questions(t
     }
     assert set(risk_benefit_contracts) == {"risks-benefits.risks", "risks-benefits.benefits", "icf.risks", "icf.benefits"}
     assert all(contract["fixed_boilerplate"] for contract in risk_benefit_contracts.values())
+
+
+def test_incomplete_contracted_template_bundle_blocks_before_drafting(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    assert approve(run_dir, approved_by="reviewer")["status"] == "passed"
+
+    broken_release = tmp_path / "broken-release"
+    shutil.copytree(ROOT / "assets", broken_release / "assets")
+    shutil.copytree(ROOT / "references", broken_release / "references")
+    scripts = broken_release / "scripts"
+    scripts.mkdir()
+    (broken_release / "assets/client-templates/docx/prospective-protocol.template.docx").unlink()
+    monkeypatch.setattr(workflow, "SCRIPT_DIR", scripts)
+
+    result = generate(run_dir)
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "contracted_template_bundle"
+    assert len(result["findings"]) == 1
+    assert result["findings"][0]["field"] == "contracted_template_bundle"
+    assert not list((run_dir / "revisions").glob("*/hermes/requests/*.json"))
 
 
 def test_awaiting_hermes_exposes_path_only_response_bound_handoffs(tmp_path, monkeypatch):

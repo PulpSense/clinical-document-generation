@@ -25,7 +25,7 @@ from typing import Any, Callable, Mapping
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
-from contracts import batch_plan, canonical_study_type, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
+from contracts import ContractedTemplateBundleError, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, preflight, quality_report, render_pages, renderer, renderers, sha256_file as quality_sha256
@@ -1456,6 +1456,10 @@ def generate(
 ) -> dict[str, Any]:
     """Advance one approved revision until it needs Hermes work or passes."""
     run_dir = run_dir.resolve(); reference_path, working_reference = _reference(run_dir)
+    try:
+        contracted_template_bundle(SCRIPT_DIR.parent, working_reference)
+    except ContractedTemplateBundleError as exc:
+        return _repair_block(run_dir, "contracted_template_bundle", [exc.finding])
     approved, approval_issue = _approval_valid(run_dir, working_reference)
     revision_id = str(working_reference.get("approval", {}).get("revision_id") or "")
     revision_dir = run_dir / "revisions" / revision_id
