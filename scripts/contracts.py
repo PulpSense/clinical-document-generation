@@ -24,6 +24,32 @@ CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
 APPROVED_FONT_PLAN_VERSION = "approved-font-plan/v1"
 
+RECOVERY_POLICIES = {
+    "adapter_fault": "advance_adapter",
+    "font_capability_uncertainty": "bounded_smoke_render",
+    "document_structure_defect": "preserve_and_stop",
+    "visual_defect": "targeted_layout_repair",
+    "drafting_defect": "retry_drafting_target",
+    "verifier_transient": "retry_verifier",
+    "transport_fault": "retry_exact_bytes",
+}
+
+
+def recovery_finding(
+    finding: Mapping[str, Any],
+    recovery_class: str,
+    *,
+    action: str | None = None,
+) -> dict[str, Any]:
+    """Attach one governed Recovery Class without interpreting issue prose."""
+    if recovery_class not in RECOVERY_POLICIES:
+        raise ValueError(f"Unknown Recovery Class: {recovery_class}")
+    return {
+        **dict(finding),
+        "recovery_class": recovery_class,
+        "action": action or RECOVERY_POLICIES[recovery_class],
+    }
+
 LAYOUT_REPAIR_RULES = {
     "protocol": ("heading_cohesion", "body_pagination", "table_pagination"),
     "icf": ("heading_cohesion", "table_pagination"),
@@ -1109,9 +1135,9 @@ def repair_report(findings: Iterable[Mapping[str, Any]]) -> str:
 
 __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES",
-    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS",
+    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth",
-    "icf_contract", "icf_retained_sections", "protocol_contract", "repair_report", "set_path", "source_contract", "source_truth_markdown",
+    "icf_contract", "icf_retained_sections", "protocol_contract", "recovery_finding", "repair_report", "set_path", "source_contract", "source_truth_markdown",
 ]

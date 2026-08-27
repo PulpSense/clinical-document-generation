@@ -911,7 +911,9 @@ def test_visual_gate_rejects_unassessed_pages(tmp_path):
     (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
     (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
     findings, _ = validate_verifications(tmp_path)
-    assert any(item["category"] == "visual" for item in findings)
+    incomplete = next(item for item in findings if item["field"] == "page_assessments")
+    assert incomplete["recovery_class"] == "verifier_transient"
+    assert incomplete["action"] == "retry_verifier"
 
 
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
@@ -983,6 +985,23 @@ def test_raw_document_word_count_alone_does_not_block_delivery(tmp_path):
     assert audit_docx(path) == []
 
 
+def test_docx_audit_assigns_recovery_classes_at_the_finding_producer(tmp_path):
+    from docx.oxml import OxmlElement
+
+    path = tmp_path / "governed.docx"
+    document = Document()
+    document.add_paragraph("Unresolved {study_title}")
+    document.settings.element.append(OxmlElement("w:trackRevisions"))
+    document.save(path)
+
+    findings = audit_docx(path)
+
+    drafting = next(item for item in findings if "Unresolved template token" in item["issue"])
+    structure = next(item for item in findings if "Tracked changes" in item["issue"])
+    assert (drafting["recovery_class"], drafting["action"]) == ("drafting_defect", "retry_drafting_target")
+    assert (structure["recovery_class"], structure["action"]) == ("document_structure_defect", "preserve_and_stop")
+
+
 def test_generic_content_pass_without_per_section_evidence_is_rejected(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
@@ -1011,7 +1030,9 @@ def test_visual_response_is_rejected_after_any_bound_artifact_changes(tmp_path):
         original = path.read_bytes()
         path.write_bytes(b"changed")
         findings, _ = validate_verifications(tmp_path)
-        assert any("stale" in item["issue"] and relative in item["issue"] for item in findings)
+        stale = next(item for item in findings if "stale" in item["issue"] and relative in item["issue"])
+        assert stale["recovery_class"] == "document_structure_defect"
+        assert stale["action"] == "preserve_and_stop"
         path.write_bytes(original)
 
 

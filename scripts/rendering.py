@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, recovery_finding
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -2337,36 +2337,42 @@ def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
     return True
 
 
-def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict[str, str]]:
+def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict[str, Any]]:
     document = Document(path)
     paragraph_texts = [paragraph.text for paragraph in _all_paragraphs(document)]
     text = "\n".join(paragraph_texts)
-    findings = [{"category": "rendering", "field": path.name, "issue": f"Unresolved template token: {token}"} for token in sorted(set(TOKEN.findall(text)))]
+    findings = [
+        recovery_finding(
+            {"category": "rendering", "field": path.name, "issue": f"Unresolved template token: {token}"},
+            "drafting_defect",
+        )
+        for token in sorted(set(TOKEN.findall(text)))
+    ]
     if INTERNAL_LANGUAGE.search(text) or "evidence_refs" in text or "{\"" in text:
-        findings.append({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."})
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, "drafting_defect"))
     if AUTHORING_LANGUAGE.search(text):
-        findings.append({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."})
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "drafting_defect"))
     duplicate = next((match for paragraph_text in paragraph_texts if (match := DUPLICATE_WORD.search(paragraph_text))), None)
     if duplicate:
-        findings.append({"category": "rendering", "field": path.name, "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively."})
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively."}, "drafting_defect"))
     for phrase in required_phrases:
         if phrase and phrase.casefold() not in text.casefold():
-            findings.append({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"})
+            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, "drafting_defect"))
     with zipfile.ZipFile(path) as package:
         names = set(package.namelist())
         if names & _REVIEW_PARTS:
-            findings.append({"category": "rendering", "field": path.name, "issue": "Comments or reviewer identity parts remain in the DOCX package."})
+            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Comments or reviewer identity parts remain in the DOCX package."}, "document_structure_defect"))
         review_xml = "\n".join(
             package.read(name).decode("utf-8", errors="ignore")
             for name in names
             if name.endswith((".xml", ".rels"))
         )
     if any(marker in review_xml for marker in ("trackRevisions", "commentRangeStart", "commentReference", "<w:del", "<w:moveFrom")):
-        findings.append({"category": "rendering", "field": path.name, "issue": "Tracked changes, comments, or hidden review markup remain in the DOCX package."})
+        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Tracked changes, comments, or hidden review markup remain in the DOCX package."}, "document_structure_defect"))
     if path.stem == "icf":
         non_heading = [paragraph.text.strip() for paragraph in document.paragraphs if _is_icf_heading(paragraph) and not paragraph.style.name.casefold().startswith("heading")]
         if non_heading:
-            findings.append({"category": "rendering", "field": path.name, "issue": f"Visible ICF headings lack Word heading styles: {non_heading}"})
+            findings.append(recovery_finding({"category": "rendering", "field": path.name, "target_ids": ["layout:icf"], "issue": f"Visible ICF headings lack Word heading styles: {non_heading}"}, "visual_defect"))
     return findings
 
 

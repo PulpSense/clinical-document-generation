@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, protocol_contract
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, protocol_contract, recovery_finding
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -40,33 +40,8 @@ VISUAL_CHECKS = (
     "excessive_whitespace", "artificial_pagination",
 )
 TRANSIENT_REVIEW_STATUSES = {"retryable_error", "transient_error", "unavailable", "temporarily_unavailable"}
-RECOVERY_POLICIES = {
-    "adapter_fault": "advance_adapter",
-    "font_capability_uncertainty": "bounded_smoke_render",
-    "document_structure_defect": "preserve_and_stop",
-    "visual_defect": "targeted_layout_repair",
-    "drafting_defect": "retry_drafting_target",
-    "verifier_transient": "retry_verifier",
-    "transport_fault": "retry_exact_bytes",
-}
 _MAC_FONT_NAMES: set[str] | None = None
 _WINDOWS_FONT_NAMES: set[str] | None = None
-
-
-def recovery_finding(
-    finding: Mapping[str, Any],
-    recovery_class: str,
-    *,
-    action: str | None = None,
-) -> dict[str, Any]:
-    """Attach one governed Recovery Class without interpreting issue prose."""
-    if recovery_class not in RECOVERY_POLICIES:
-        raise ValueError(f"Unknown Recovery Class: {recovery_class}")
-    return {
-        **dict(finding),
-        "recovery_class": recovery_class,
-        "action": action or RECOVERY_POLICIES[recovery_class],
-    }
 
 SYMBOL_FONT_FALLBACKS = (
     "Apple Symbols",
@@ -1302,11 +1277,32 @@ def render_assurance(
             if not selected_artifacts or path.stem in selected_artifacts
         ]
         all_candidate_paths = [path for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
-        structural_evidence = {
-            **structural_evidence,
+        post_rebuild_validation = {
+            **dict(structural_validation),
             "candidate_files": _artifact_hashes(revision_dir, all_candidate_paths),
-            "revalidated_after_substitution": True,
         }
+        structural_evidence, structural_finding = _validated_candidate_structure(
+            revision_dir,
+            post_rebuild_validation,
+            all_candidate_paths,
+        )
+        structural_evidence["revalidated_after_substitution"] = structural_finding is None
+        if structural_finding is not None or not candidate_paths:
+            finding = structural_finding or recovery_finding({
+                "category": "document-structure",
+                "field": "candidate",
+                "issue": "The rebuilt candidate does not contain the selected DOCX artifacts.",
+            }, "document_structure_defect")
+            return {
+                "schema_version": "render-assurance/v1",
+                "status": "blocked",
+                "fonts": fonts,
+                "font_substitutions": substitutions,
+                "candidate": {"files": _artifact_hashes(revision_dir, all_candidate_paths)},
+                "structural_validation": structural_evidence,
+                "render": {"status": "not_run", "findings": [finding]},
+                "findings": [finding],
+            }
 
     office_candidates = (
         [dict(item) for item in renderer_identities]
@@ -1577,20 +1573,20 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
         for section_id, title in icf_retained_sections(branch, icf_template):
             if title.casefold() not in icf_visible:
-                findings.append({
+                findings.append(recovery_finding({
                     "category": "content",
                     "field": section_id,
                     "target_ids": ["layout:icf"],
                     "issue": f"Required retained ICF section is missing from the client shell: {title}",
-                })
+                }, "document_structure_defect"))
         signature_marker = "signature of participant"
         if signature_marker not in icf_visible:
-            findings.append({
+            findings.append(recovery_finding({
                 "category": "content",
                 "field": "icf.signature-block",
                 "target_ids": ["layout:icf"],
                 "issue": "Required participant signature block is missing from the ICF.",
-            })
+            }, "document_structure_defect"))
         stale_icf_claims = {
             "eye tests and procedures": "icf",
             "routine cataract surgery": "icf",
@@ -1620,7 +1616,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 findings.append({"category": "content", "field": "icf.procedures", "target_ids": ["icf.procedures"], "issue": "ICF omits the approved minimum interval without participation in another study before screening."})
             xml_path = revision_dir / "candidate/study.xml"
             if xml_path.is_file() and not day_pattern.search(xml_path.read_text(encoding="utf-8")):
-                findings.append({"category": "content", "field": "prs.eligibility", "target_ids": ["layout:xml"], "issue": "PRS XML omits the approved minimum interval without participation in another study before screening."})
+                findings.append(recovery_finding({"category": "content", "field": "prs.eligibility", "target_ids": ["layout:xml"], "issue": "PRS XML omits the approved minimum interval without participation in another study before screening."}, "document_structure_defect"))
         consent_to_sign = any(phrase in icf_visible for phrase in (
             "should not sign",
             "if you would like to participate, you will be asked to sign",
@@ -1628,7 +1624,11 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         ))
         if not consent_to_sign:
             findings.append({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."})
-    return findings
+    return [
+        item if item.get("recovery_class") in RECOVERY_POLICIES
+        else recovery_finding(item, "drafting_defect")
+        for item in findings
+    ]
 
 
 def create_verification_requests(
@@ -1737,26 +1737,26 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
     for request_path, request in request_records:
         response_path = revision_dir / request["response_path"]
         evidence_key = request["task"] if task_counts[str(request.get("task"))] == 1 else request["request_id"]
+        verification_target = "verification:visual" if request["task"] == "rendered_page_visual_verification" else "verification:content"
         if not response_path.is_file():
-            findings.append({"category": "verification", "field": request["task"], "issue": "Independent Hermes verification response is missing."}); continue
+            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
         try: response = _json(response_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            findings.append({"category": "verification", "field": request["task"], "issue": f"Invalid verification response: {exc}"}); continue
+            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
         for key, expected in (("schema_version", RESPONSE_SCHEMA), ("request_id", request["request_id"]), ("request_sha256", request["request_sha256"]), ("task", request["task"])):
-            if response.get(key) != expected: findings.append({"category": "verification", "field": key, "issue": f"Verification response binding mismatch for {key}."})
+            if response.get(key) != expected: findings.append(recovery_finding({"category": "verification", "field": key, "issue": f"Verification response binding mismatch for {key}."}, "document_structure_defect"))
         producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
-        if not _text(producer.get("model_id")): findings.append({"category": "verification", "field": "producer.model_id", "issue": "Verifier identity is missing."})
+        if not _text(producer.get("model_id")): findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "issue": "Verifier identity is missing."}, "verifier_transient"))
         error = response.get("error") if isinstance(response.get("error"), Mapping) else {}
         error_type = _text(error.get("type")).casefold()
         transient = str(response.get("status") or "").casefold() in TRANSIENT_REVIEW_STATUSES or error_type in {
             "api_unavailable", "connection_error", "rate_limit", "timeout", "service_unavailable"
         }
         if transient:
-            target = "verification:visual" if request["task"] == "rendered_page_visual_verification" else "verification:content"
             findings.append(recovery_finding({
                 "category": "reviewer-transient",
                 "field": request["task"],
-                "target_ids": [target],
+                "target_ids": [verification_target],
                 "issue": _text(error.get("message")) or "Independent Hermes verifier reported a transient API failure.",
             }, "verifier_transient"))
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
@@ -1785,32 +1785,32 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
                 if path.is_file():
                     actual = _content_sha256(path) if artifact.get("content_sha256") else sha256_file(path)
                 if not path.is_file() or actual != expected:
-                    findings.append({"category": "verification", "field": request["task"], "issue": f"Verification request is stale for {artifact.get('path')}."})
+                    findings.append(recovery_finding({"category": "verification", "field": request["task"], "issue": f"Verification request is stale for {artifact.get('path')}."}, "document_structure_defect"))
             else:
                 for key in ("docx", "pdf"):
                     path = revision_dir / str(artifact.get(key))
                     if not path.is_file() or sha256_file(path) != artifact.get(f"{key}_sha256"):
-                        findings.append({"category": "visual", "field": artifact.get("artifact", key), "target_ids": [f"layout:{artifact.get('artifact', key)}"], "issue": f"Visual verification request is stale for {artifact.get(key)}."})
+                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", key), "issue": f"Visual verification request is stale for {artifact.get(key)}."}, "document_structure_defect"))
                 for page in artifact.get("pages", []):
                     path = revision_dir / str(page.get("path"))
                     if not path.is_file() or sha256_file(path) != page.get("sha256"):
-                        findings.append({"category": "visual", "field": artifact.get("artifact", "page"), "target_ids": [f"layout:{artifact.get('artifact', 'page')}"], "issue": f"Visual verification request is stale for {page.get('path')}."})
+                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", "page"), "issue": f"Visual verification request is stale for {page.get('path')}."}, "document_structure_defect"))
         if request["task"] == "clinical_content_verification":
             expected_sections = {(item["artifact"], item["section_id"]) for item in request.get("sections", [])}
             valid_section_rows = [item for item in response.get("section_assessments", []) if isinstance(item, Mapping) and item.get("status") == "passed" and set(item.get("checks", [])) == set(CONTENT_CHECKS)]
             assessed_sections = {(item.get("artifact"), item.get("section_id")) for item in valid_section_rows}
             if expected_sections != assessed_sections or len(valid_section_rows) != len(expected_sections):
-                findings.append({"category": "verification", "field": request["task"], "issue": f"Every contracted section and content check must be explicitly assessed; expected {len(expected_sections)}, accepted {len(assessed_sections)}."})
+                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": f"Every contracted section and content check must be explicitly assessed; expected {len(expected_sections)}, accepted {len(assessed_sections)}."}, "verifier_transient"))
             expected_cross = set(request.get("cross_document_checks", []))
             valid_cross_rows = [item for item in response.get("cross_document_assessments", []) if isinstance(item, Mapping) and item.get("status") == "passed"]
             assessed_cross = {item.get("check") for item in valid_cross_rows}
             if expected_cross != assessed_cross or len(valid_cross_rows) != len(expected_cross):
-                findings.append({"category": "verification", "field": request["task"], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."})
+                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, "verifier_transient"))
         if request["task"] == "rendered_page_visual_verification":
             expected_pages = {(a["artifact"], p["page"], p["sha256"]) for a in request.get("artifacts", []) for p in a.get("pages", [])}
             valid_page_rows = [p for p in response.get("page_assessments", []) if isinstance(p, Mapping) and p.get("status") == "passed" and set(p.get("checks", [])) == set(VISUAL_CHECKS)]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
-            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append({"category": "visual", "field": "page_assessments", "target_ids": ["verification:visual"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."})
+            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))
         evidence[evidence_key] = {
             "request": request_path.relative_to(revision_dir).as_posix(),
             "request_sha256": sha256_file(request_path),
@@ -1824,20 +1824,12 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
 
 
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
-    findings = [recovery_finding(item, "drafting_defect") for item in deterministic_content_check(revision_dir, reference)]
-    findings.extend(
-        item if item.get("recovery_class") in RECOVERY_POLICIES
-        else recovery_finding(item, "visual_defect" if item.get("category") == "visual" else "adapter_fault")
-        for item in render_report.get("findings", [])
-    )
+    findings = deterministic_content_check(revision_dir, reference)
+    findings.extend(dict(item) for item in render_report.get("findings", []))
     if xml_report:
         findings.extend(recovery_finding(item, "document_structure_defect") for item in xml_report.get("findings", []))
     verification_findings, evidence = validate_verifications(revision_dir)
-    findings.extend(
-        item if item.get("recovery_class") in RECOVERY_POLICIES
-        else recovery_finding(item, "visual_defect" if item.get("category") == "visual" else "verifier_transient")
-        for item in verification_findings
-    )
+    findings.extend(verification_findings)
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 

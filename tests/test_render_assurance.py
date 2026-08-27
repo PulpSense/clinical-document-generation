@@ -335,3 +335,38 @@ def test_render_assurance_rejects_an_incomplete_branch_candidate(tmp_path):
     assert report["render"]["status"] == "not_run"
     assert report["findings"][0]["recovery_class"] == "document_structure_defect"
     assert "complete structurally validated" in report["findings"][0]["issue"]
+
+
+def test_render_assurance_revalidates_the_exact_candidate_after_font_substitution(tmp_path):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    document = Document()
+    run = document.add_paragraph().add_run("Missing font")
+    run.font.name = "Missing Sans"
+    document.save(candidate / "protocol.docx")
+    (candidate / "study.xml").write_text("<study />", encoding="utf-8")
+
+    def rebuild(_substitutions):
+        (candidate / "study.xml").unlink()
+        return {"status": "passed"}
+
+    report = render_assurance(
+        ROOT,
+        tmp_path,
+        {},
+        contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(
+            tmp_path,
+            "protocol.docx",
+            "study.xml",
+        ),
+        renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
+        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        font_probe=lambda font, **_kwargs: (False, "missing") if font == "Missing Sans" else (True, "available"),
+        rebuild_candidate=rebuild,
+    )
+
+    assert report["status"] == "blocked"
+    assert report["render"]["status"] == "not_run"
+    assert report["findings"][0]["recovery_class"] == "document_structure_defect"
+    assert report["structural_validation"]["revalidated_after_substitution"] is False
