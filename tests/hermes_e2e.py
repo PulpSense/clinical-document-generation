@@ -24,7 +24,7 @@ APPROVED_INPUT_NORMALIZATIONS = {
     "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f",
 }
 REPO_ROOT = Path(__file__).resolve().parents[1]
-OPERATION_BUDGET_SECONDS = 900.0
+OPERATION_BUDGET_SECONDS = 1800.0
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
 DEFAULT_INPUT = Path.home() / "Downloads/clinical-document-generation-required-inputs/ambispective-required-only.md"
@@ -37,6 +37,11 @@ FIRST_WAVE_BATCHES = frozenset(
         "icf-narrative",
     }
 )
+
+
+def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
+    study_type = str((reference.get("meta") or {}).get("study_type") or "").casefold()
+    return frozenset({"protocol.docx"}) if study_type == "retrospective" else EXPECTED_OUTPUTS
 
 
 @dataclass
@@ -202,6 +207,7 @@ def inspect_run(
     child_returncode: int | None,
 ) -> dict[str, Any]:
     reference = _read_json(run_dir / "reference/study.reference.json") or {}
+    required_outputs = expected_outputs(reference)
     revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
     revision_dir = run_dir / "revisions" / revision_id
     request_rows: list[dict[str, Any]] = []
@@ -332,7 +338,8 @@ def inspect_run(
         outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
     elif (
         final_result.get("status") == "passed"
-        and output_files == EXPECTED_OUTPUTS
+        and output_files == required_outputs
+        and bool((final_result.get("delivery") or {}).get("confirmed"))
         and not missing_response_paths
         and not invalid_response_paths
         and not recorded_response_paths
@@ -366,7 +373,8 @@ def inspect_run(
         "candidate_created": (revision_dir / "candidate").is_dir(),
         "output_published": output_dir.is_dir(),
         "output_files": sorted(output_files),
-        "required_outputs": sorted(EXPECTED_OUTPUTS),
+        "required_outputs": sorted(required_outputs),
+        "delivery": final_result.get("delivery"),
         "retry_limit_violations": retry_limit_violations,
         "input_provenance": _read_json(run_dir / "reference/input-provenance.json"),
         "repair_report": repair_report_path.read_text(encoding="utf-8") if repair_report_path.is_file() else None,
@@ -688,7 +696,7 @@ def run_real_hermes(
         handoffs = final_result.get("handoffs") or []
         if not revision_id or not handoffs:
             break
-        remaining = timeout_seconds - (time.monotonic() - started)
+        remaining = budget.child_timeout()
         wave_timed_out, missing = _run_handoff_wave(
             run_dir,
             run_dir / "revisions" / revision_id,
@@ -701,14 +709,51 @@ def run_real_hermes(
             break
         if missing:
             break
+    if final_result.get("status") == "passed" and not timed_out:
+        try:
+            scripts = REPO_ROOT / "scripts"
+            if str(scripts) not in sys.path:
+                sys.path.insert(0, str(scripts))
+            from workflow import confirm_desktop_delivery, desktop_attachment_reply
+
+            manifest_path = run_dir / str(final_result.get("manifest") or "")
+            manifest = _read_json(manifest_path)
+            if manifest is None:
+                raise ValueError("The passing workflow did not expose a readable Generation Manifest.")
+            reply = final_result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
+            delivery = confirm_desktop_delivery(
+                manifest,
+                reply,
+                lambda path: Path(path).read_bytes(),
+                deadline=float(budget.state()["deadline_monotonic"]),
+                clock=budget.clock,
+            )
+            final_result = {
+                **final_result,
+                "status": "passed" if delivery["confirmed"] else "blocked",
+                "stage": "desktop_delivery",
+                "delivery": delivery,
+            }
+        except (OSError, TypeError, ValueError) as exc:
+            final_result = {
+                **final_result,
+                "status": "blocked",
+                "stage": "desktop_delivery",
+                "delivery": {
+                    "status": "blocked",
+                    "confirmed": False,
+                    "findings": [{"category": "delivery", "field": "attachments", "issue": str(exc)}],
+                },
+            }
     if budget.expired() or budget.remaining() <= budget.cleanup_reserve_seconds:
         timed_out = True
         final_result = {"status": "timeout", "stage": final_result.get("stage", "generate")}
 
+    operation_elapsed = max(0.0, budget.clock() - float(budget.state()["started_monotonic"]))
     report = inspect_run(
         run_dir,
         final_result=final_result,
-        elapsed_seconds=round(time.monotonic() - started, 3),
+        elapsed_seconds=round(operation_elapsed, 3),
         timed_out=timed_out,
         child_returncode=child_returncode,
     )

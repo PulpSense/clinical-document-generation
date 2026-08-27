@@ -118,7 +118,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 84. As a reviewer, I want Repair Report findings classified as source evidence, drafting, contradiction, structure, renderer, or visual failures, so that remediation is routed correctly.
 85. As a client, I want standards-compliant DOCX output, so that files can be opened and edited in Microsoft Word.
 86. As a client, I want Microsoft Word treated as the compatibility target, so that local fallback rendering is not mistaken for the client's environment.
-87. As a QA reviewer, I want the Active Renderer selected in the order Word, LibreOffice, then Pages, so that the strongest available local evidence is used.
+87. As a QA reviewer, I want the Active Renderer selected in the order Word, installed LibreOffice, Pages, then the verified release-local LibreOffice fallback, so that the strongest available local evidence is used without making the host a prerequisite.
 88. As a QA reviewer, I want the Active Renderer identity recorded, so that every visual claim names the environment that produced it.
 89. As a QA reviewer, I want the workflow forbidden from claiming Word validation unless Word produced the evidence, so that validation statements remain truthful.
 90. As a QA reviewer, I want a missing renderer to prevent a visual-pass claim, so that structural validation is not confused with rendered validation.
@@ -132,6 +132,8 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 98. As a maintainer, I want a Generation Manifest recording source, contracts, boilerplate, templates, model, renderer, evidence, and artifact hashes, so that every result is reproducible.
 99. As a maintainer, I want six focused production modules behind one public workflow, so that the codebase remains manageable.
 100. As a maintainer, I want the old script collection removed only after the Branch Acceptance Corpus passes, so that simplification does not sacrifice proven behavior.
+101. As a QA reviewer, I want environment and reviewer transport failures to exhaust verified local fallbacks while genuine visual defects still trigger repair, so that mandatory Visual QA is neither skipped nor falsely failed.
+102. As an administrator, I want installation activation to be conditional on an end-to-end Render Assurance smoke and to retain the previous verified release, so that updates are atomic.
 
 ## Implementation Decisions
 
@@ -192,7 +194,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 - One package-wide read-only content verifier checks source fidelity, section substance, and Cross-Document Consistency after assembly.
 - One package-wide read-only visual verifier inspects every rendered Protocol and ICF page after deterministic checks produce render evidence.
 - Verifiers return findings and retry targets and cannot approve source, rewrite documents, mutate artifacts, or release files.
-- Normal Prospective and Ambispective runs use five drafting tasks and two verification tasks. Normal Retrospective runs use three drafting tasks and two verification tasks.
+- Normal Prospective and Ambispective runs use five drafting tasks, one content-verification task, and two concurrent document-scoped visual-verification tasks. Normal Retrospective runs use three drafting tasks, one content-verification task, and one visual-verification task.
 
 ### Retry and reuse behavior
 
@@ -244,10 +246,12 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 
 - DOCX generation does not require an office application and targets standards-compliant Microsoft Word output.
 - Microsoft Word desktop is the Client Rendering Authority for the current client.
-- The Active Renderer is selected in the order Microsoft Word, LibreOffice, then Pages.
+- The Active Renderer is selected in the order Microsoft Word, installed LibreOffice, Pages, then the release-local verified LibreOffice fallback.
 - The Generation Manifest records the Active Renderer and binds render evidence to artifact hashes.
 - Passing evidence proves the artifact only under the renderer that produced it. The workflow never reports Word validation unless Word produced the evidence.
-- If no Active Renderer is available, structural generation may complete internally, but Visual QA does not pass and the Branch Document Set is not reported as passed.
+- Candidate construction precedes Render Assurance capability resolution. Installation guarantees a local fallback path; an unexpected total capability loss retains the complete candidate internally but cannot publish the Branch Document Set.
+- Unknown font inventory is decided through render evidence. Proven missing fonts use a recorded approved compatible mapping, including release-packaged fonts.
+- A delegated visual-review failure routes the same exact page-image request to the parent reviewer; deterministic checks alone cannot pass Visual QA.
 - Visual QA inspects every page of every generated Protocol and ICF.
 - Zero-tolerance visual defects include unresolved placeholders, clipping, overlap, unexpected blank pages, orphan headings, split table rows, overflowing tables, duplicate sections, inconsistent styles, missing headers or footers, and TOC mismatches.
 - Natural content-driven pagination is allowed and is not a defect by itself.
@@ -357,9 +361,10 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 
 ### Renderer and visual behavior
 
-- Renderer discovery tests the priority Word, LibreOffice, then Pages.
+- Renderer discovery tests Word, installed LibreOffice, Pages, then the verified release-local LibreOffice fallback.
 - Evidence records the renderer identity and never labels fallback evidence as Word evidence.
-- A no-renderer environment can create structurally valid DOCX internally but cannot pass Visual QA or final Branch Document Set readiness.
+- Environment and tooling faults exercise renderer, page-renderer, font, and parent-review fallbacks without being mislabeled as document defects.
+- Installation tests prove failed smoke leaves the active release unchanged and successful activation retains the previous verified release.
 - Every page of representative Protocol and ICF outputs is rendered and inspected.
 - Visual assertions cover title pages, document control, TOC, dense sections, long lists, signatures, tables, page boundaries, headers, footers, and final pages.
 - Layout retry tests rebuild from the clean Contracted Template and stop after three total attempts.
@@ -377,8 +382,8 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 ### Performance and cost behavior
 
 - Measure normal runs by branch, including drafting waves, deterministic assembly, render passes, verification, and delivery.
-- The performance target is under ten minutes in normal conditions, not a correctness timeout.
-- Prospective and Ambispective normal runs use five drafting tasks and two verification tasks before retries; Retrospective uses three drafting tasks and two verification tasks.
+- The performance target is 10–12 minutes in normal conditions, not a correctness timeout; the hard operation ceiling is 30 minutes.
+- Prospective and Ambispective normal runs use five drafting tasks, one content-verification task, and two concurrent document-scoped visual-verification tasks before retries; Retrospective uses three drafting tasks, one content-verification task, and one visual-verification task.
 - Tests detect accidental extra agent calls, regeneration of accepted batches, or serial execution of independent first-wave batches.
 - Correctness and atomic delivery are never weakened to satisfy a latency or model-cost target.
 

@@ -6,10 +6,12 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
+import importlib.util
 import json
 import os
 import platform
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
@@ -25,24 +27,38 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import batch_plan, canonical_study_type, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import _template_fonts, create_verification_requests, pending_verifications, preflight, quality_report, render_pages, renderer, sha256_file as quality_sha256
+from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, preflight, quality_report, render_pages, renderer, renderers, sha256_file as quality_sha256
 from rendering import render_documents, template_paths
 
 
 REFERENCE = Path("reference/study.reference.json")
 MAX_VERIFICATION_ATTEMPTS = 3
 DESKTOP_DELIVERY_RETRIES = 2
-DESKTOP_OPERATION_BUDGET_SECONDS = 900.0
+NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
+NORMAL_RUNTIME_TARGET_MAX_SECONDS = 720.0
+DESKTOP_OPERATION_BUDGET_SECONDS = 1800.0
 RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
+INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
+
+
+def performance_classification(elapsed_seconds: float) -> str:
+    """Classify measured runtime without turning the target into a timeout."""
+    if elapsed_seconds > DESKTOP_OPERATION_BUDGET_SECONDS:
+        return "deadline_exceeded"
+    if elapsed_seconds < NORMAL_RUNTIME_TARGET_MIN_SECONDS:
+        return "below_target_window"
+    if elapsed_seconds <= NORMAL_RUNTIME_TARGET_MAX_SECONDS:
+        return "target_window"
+    return "above_target_within_deadline"
 
 
 def _release_excluded(path: Path) -> bool:
     """Return whether a path belongs to development-only or sensitive data."""
     parts = set(path.parts)
-    if parts & {".git", ".scratch", "runs", ".hermes", ".test-venv", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "tests", "input", "inputs", "source-data", "patient-data", "evidence", "output"}:
+    if parts & {".git", ".scratch", "runs", ".hermes", ".test-venv", ".venv", "venv", "runtime", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "tests", "input", "inputs", "source-data", "patient-data", "evidence", "output"}:
         return True
     name = path.name.casefold()
-    if name in {".env", ".env.local", "artifact.md", ".coverage"} or name.endswith((".pem", ".key", ".p12", ".pfx", ".sqlite", ".sqlite3")):
+    if name in {".env", ".env.local", "artifact.md", ".coverage", INSTALLATION_ASSURANCE.casefold()} or name.endswith((".pem", ".key", ".p12", ".pfx", ".sqlite", ".sqlite3")):
         return True
     return False
 
@@ -73,9 +89,10 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
     for path in templates:
         if path.suffix.casefold() == ".docx":
             font_inventory[path.relative_to(repo_root).as_posix()] = sorted(_template_fonts(path))
+    required_font_names = sorted({font for fonts in font_inventory.values() for font in fonts})
     implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
     manifest = {
-        "schema_version": "hermes-release-manifest/v1",
+        "schema_version": "hermes-release-manifest/v2",
         "package_root": "clinical-document-generation",
         "package_purpose": "Installable runtime for the reviewed clinical document workflow.",
         "installation": {
@@ -83,17 +100,21 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
             "runtime": "Python 3.10+",
             "dependencies": "requirements.txt",
             "install_as_direct_child_of": "Hermes skills directory",
-            "required_external_tools": ["Microsoft Word, LibreOffice, or Apple Pages", "pdftoppm"],
+            "activation": "atomic after end-to-end Render Assurance smoke; previous verified release retained",
+            "required_external_tools": [],
         },
         "inventory": {
             "implementation": implementation_files,
             "templates_and_contracts": [item["path"] for item in entries if item["path"].startswith(("assets/", "references/"))],
             "font_identities": font_inventory,
+            "font_fallbacks": {font: [_approved_packaged_font_fallback(font)] for font in required_font_names},
             "renderer_at_packaging": renderer(environment=os.environ),
+            "page_renderer_fallbacks": list(PAGE_RENDERER_BACKENDS),
+            "page_renderer_at_packaging": page_renderer(environment=os.environ),
             "harness": {"python": platform.python_version(), "platform": platform.platform()},
             "model": "Hermes Desktop runtime; model identity is recorded per generation evidence.",
         },
-        "excluded_classes": ["git metadata", "development virtual environments", "credentials", "patient/source data", "old run outputs", "development tests"],
+        "excluded_classes": ["git metadata", "development virtual environments", "credentials", "patient/source data", "old run outputs", "development tests", "installed runtime and assurance evidence"],
         "files": entries,
     }
     manifest_payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
@@ -122,6 +143,242 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         "archive_bytes": output_path.stat().st_size,
         "manifest": f"clinical-document-generation/{RELEASE_MANIFEST}",
     }
+
+
+def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
+    manifest_path = skill_root / RELEASE_MANIFEST
+    if not manifest_path.is_file():
+        return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": "Release manifest is missing."}]
+    try:
+        manifest = _read(manifest_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": str(exc)}]
+    findings = []
+    for item in manifest.get("files", []):
+        path = skill_root / str(item.get("path") or "")
+        try:
+            path.resolve().relative_to(skill_root.resolve())
+        except ValueError:
+            findings.append({"category": "installation", "field": str(path), "issue": "Manifest path escapes the skill root."})
+            continue
+        if not path.is_file():
+            findings.append({"category": "installation", "field": str(item.get("path")), "issue": "Packaged file is missing."})
+        elif sha256_file(path) != item.get("sha256"):
+            findings.append({"category": "installation", "field": str(item.get("path")), "issue": "Packaged file hash does not match the release manifest."})
+    return findings
+
+
+def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) -> dict[str, Any]:
+    """Prove that an extracted release owns a complete local assurance path."""
+    skill_root = skill_root.resolve()
+    findings = _manifest_integrity(skill_root)
+    fallback_fonts = skill_root / "assets/fallback-fonts"
+    if not any(fallback_fonts.glob("*.ttf")):
+        findings.append({"category": "installation", "field": "fallback_fonts", "issue": "No packaged compatible fonts are present."})
+    reference = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}
+    fallback_renderers = [
+        item for item in renderers(skill_root=skill_root)
+        if item.get("source") == "verified fallback stack"
+    ]
+    fallback_pages = [
+        item for item in page_renderers(skill_root=skill_root)
+        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+    ]
+    assurance = preflight(
+        skill_root,
+        reference,
+        deadline_seconds=deadline_seconds,
+        renderer_identities=fallback_renderers,
+        page_renderer_identities=fallback_pages,
+    )
+    if assurance.get("status") != "passed":
+        findings.extend(assurance.get("findings", []))
+    candidates = assurance.get("renderer_candidates") or []
+    if not fallback_renderers:
+        findings.append({"category": "installation", "field": "fallback_renderer", "issue": "The versioned local LibreOffice fallback was not discovered."})
+    if not fallback_pages:
+        findings.append({"category": "installation", "field": "fallback_page_renderer", "issue": "The versioned local PyMuPDF page renderer was not discovered."})
+    return {
+        "status": "passed" if not findings else "blocked",
+        "renderer": assurance.get("renderer"),
+        "renderer_candidates": candidates,
+        "page_renderer": assurance.get("page_renderer"),
+        "fonts": assurance.get("fonts", {}),
+        "smoke": assurance.get("smoke", {}),
+        "findings": findings,
+    }
+
+
+def _provisionable_libreoffice() -> tuple[Path, Path] | None:
+    """Return (tree root, relative executable) for a locally reusable runtime."""
+    system = platform.system()
+    if system == "Darwin":
+        roots = [Path("/Applications/LibreOffice.app")]
+        cache = Path.home() / ".cache/codex-runtimes"
+        roots.extend(sorted(cache.glob("*/dependencies/native/libreoffice-headless/libreoffice/*.app")))
+        for root in roots:
+            executable = root / "Contents/MacOS/soffice"
+            if executable.is_file() and os.access(executable, os.X_OK):
+                return root, executable.relative_to(root)
+    for identity in renderers():
+        if identity.get("kind") != "LibreOffice":
+            continue
+        executable = Path(str(identity["path"])).resolve()
+        if executable.is_file() and os.access(executable, os.X_OK):
+            root = executable.parent.parent if executable.parent.name == "program" else executable.parent
+            return root, executable.relative_to(root)
+    return None
+
+
+def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
+    """Copy the installed PyMuPDF package into the versioned fallback stack."""
+    runtime_python = skill_root / "runtime/python"
+    existing = [
+        item for item in page_renderers(skill_root=skill_root)
+        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+    ]
+    if existing:
+        return {"status": "passed", "page_renderer": existing[0], "provisioned": False}
+    spec = importlib.util.find_spec("pymupdf")
+    if spec is None or spec.origin is None:
+        return {"status": "blocked", "findings": [{"category": "installation", "field": "fallback_page_renderer", "issue": "PyMuPDF is not installed locally and cannot be provisioned."}]}
+    source = Path(spec.origin).resolve().parent
+    destination = runtime_python / "pymupdf"
+    runtime_python.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, destination)
+    identity = next(
+        item for item in page_renderers(skill_root=skill_root)
+        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+    )
+    return {"status": "passed", "page_renderer": identity, "provisioned": True}
+
+
+def provision_fallback_stack(skill_root: Path) -> dict[str, Any]:
+    """Provision version-local DOCX and page renderers without changing the host."""
+    skill_root = skill_root.resolve()
+    runtime_root = skill_root / "runtime"
+    existing = renderers(skill_root=skill_root)
+    page_provision = _provision_page_renderer(skill_root)
+    if page_provision.get("status") != "passed":
+        return page_provision
+    if any(item.get("source") == "verified fallback stack" for item in existing):
+        return {
+            "status": "passed",
+            "renderer": next(item for item in existing if item.get("source") == "verified fallback stack"),
+            "page_renderer": page_provision["page_renderer"],
+            "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
+        }
+    source = _provisionable_libreoffice()
+    if source is None:
+        return {"status": "blocked", "findings": [{"category": "installation", "field": "fallback_renderer", "issue": "No local LibreOffice runtime is available to provision."}]}
+    source_root, relative_executable = source
+    destination = runtime_root / source_root.name
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copytree(source_root, destination, copy_function=os.link)
+    except OSError:
+        shutil.rmtree(destination, ignore_errors=True)
+        shutil.copytree(source_root, destination)
+    executable = destination / relative_executable
+    return {
+        "status": "passed",
+        "renderer": {"kind": "LibreOffice", "path": str(executable), "source": "verified fallback stack", "platform": platform.system()},
+        "page_renderer": page_provision["page_renderer"],
+        "provisioned": {"renderer": True, "page_renderer": page_provision["provisioned"]},
+    }
+
+
+def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> Any:
+    """Rewrite staged absolute paths to their post-activation location."""
+    if isinstance(value, Mapping):
+        return {str(key): _relocate_paths(item, source_root, destination_root) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_relocate_paths(item, source_root, destination_root) for item in value]
+    if isinstance(value, str):
+        source = str(source_root)
+        if value == source or value.startswith(source + os.sep):
+            return str(destination_root) + value[len(source):]
+    return value
+
+
+def install_release(
+    archive_path: Path,
+    skills_dir: Path,
+    *,
+    verifier: Callable[[Path], Mapping[str, Any]] | None = None,
+    provisioner: Callable[[Path], Mapping[str, Any]] = provision_fallback_stack,
+) -> dict[str, Any]:
+    """Smoke, then atomically activate an installable skill archive."""
+    archive_path = archive_path.expanduser().resolve()
+    skills_dir = skills_dir.expanduser().resolve()
+    skills_dir.mkdir(parents=True, exist_ok=True)
+    staging_root = Path(tempfile.mkdtemp(prefix=".clinical-document-generation.install-", dir=skills_dir))
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    candidate = staging_root / "clinical-document-generation"
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            for info in archive.infolist():
+                target = (staging_root / info.filename).resolve()
+                try:
+                    target.relative_to(staging_root)
+                except ValueError as exc:
+                    raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
+            archive.extractall(staging_root)
+        provision = dict(provisioner(candidate))
+        if provision.get("status") != "passed":
+            return {"status": "blocked", "stage": "provision", "findings": list(provision.get("findings", [])), "active_release_retained": active.is_dir()}
+        if verifier is None:
+            completed = subprocess.run(
+                [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
+                cwd=candidate,
+                text=True,
+                capture_output=True,
+                timeout=180,
+            )
+            try:
+                assurance = json.loads(completed.stdout)
+            except json.JSONDecodeError:
+                assurance = {
+                    "status": "blocked",
+                    "findings": [{"category": "installation", "field": "smoke", "issue": completed.stderr or completed.stdout or "Installation smoke returned no JSON."}],
+                }
+            if completed.returncode and assurance.get("status") == "passed":
+                assurance = {"status": "blocked", "findings": [{"category": "installation", "field": "smoke", "issue": completed.stderr or "Installation smoke process failed."}]}
+        else:
+            assurance = dict(verifier(candidate))
+        if assurance.get("status") != "passed":
+            return {"status": "blocked", "stage": "installation_smoke", "findings": list(assurance.get("findings", [])), "active_release_retained": active.is_dir()}
+        recorded_provision = _relocate_paths(provision, candidate, active)
+        recorded_assurance = _relocate_paths(assurance, candidate, active)
+        _write(candidate / INSTALLATION_ASSURANCE, {
+            "status": "passed",
+            "verified_at": datetime.now(timezone.utc).isoformat(),
+            "provision": recorded_provision,
+            "assurance": recorded_assurance,
+        })
+        displaced_previous = None
+        if previous.exists():
+            displaced_previous = skills_dir / f".clinical-document-generation.previous-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
+            os.replace(previous, displaced_previous)
+        if active.exists():
+            os.replace(active, previous)
+        try:
+            os.replace(candidate, active)
+        except Exception:
+            if previous.exists() and not active.exists():
+                os.replace(previous, active)
+            raise
+        return {
+            "status": "passed",
+            "stage": "activated",
+            "active": str(active),
+            "previous": str(previous) if previous.exists() else None,
+            "displaced_previous": str(displaced_previous) if displaced_previous else None,
+            "assurance": recorded_assurance,
+        }
+    finally:
+        shutil.rmtree(staging_root, ignore_errors=True)
 
 
 @dataclass(frozen=True)
@@ -367,12 +624,16 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: list[Path], findings: li
     handoffs = []
     for path in paths:
         request = _read(path)
-        handoffs.append({
+        handoff = {
             "request_path": path.relative_to(revision_dir).as_posix(),
             "response_path": str(request["response_path"]),
             "task": str(request["task"]),
             "batch_id": request.get("batch_id"),
-        })
+        }
+        if request.get("task") == "rendered_page_visual_verification":
+            handoff["fallback_owner"] = "parent"
+            handoff["completion_requirement"] = "inspect_every_bound_page_image"
+        handoffs.append(handoff)
     return {
         "status": "awaiting_hermes",
         "stage": stage,
@@ -384,7 +645,15 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: list[Path], findings: li
     }
 
 
-def _candidate_fingerprint(repo_root: Path, revision_dir: Path, reference: Mapping[str, Any], model: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+def _candidate_fingerprint(
+    repo_root: Path,
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    model: Mapping[str, Any],
+    *,
+    font_substitutions: Mapping[str, str] | None = None,
+    layout_repair_level: int = 0,
+) -> tuple[str, dict[str, Any]]:
     protocol_template, icf_template = template_paths(repo_root, reference)
     templates = [path for path in (protocol_template, icf_template) if path is not None]
     if canonical_study_type(get_path(reference, "meta.study_type")) != "Retrospective":
@@ -400,6 +669,8 @@ def _candidate_fingerprint(repo_root: Path, revision_dir: Path, reference: Mappi
         "implementation": {path.name: sha256_file(path) for path in implementation_files},
         "accepted_drafts": {path.relative_to(revision_dir).as_posix(): sha256_file(path) for path in accepted_files},
         "merged_model_sha256": sha256_value(model),
+        "font_substitutions": dict(sorted((font_substitutions or {}).items())),
+        "layout_repair_level": int(layout_repair_level),
     }
     return sha256_value(payload), payload
 
@@ -436,6 +707,20 @@ def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, 
     build = {"fingerprint": fingerprint, "governing_resources": dict(governing), "candidate_files": candidate_files, "document_report": dict(document_report), "xml_report": dict(xml_report) if xml_report else None, "render_report": dict(render_report)}
     _write(revision_dir / "candidate-build.json", build)
     return build
+
+
+def _candidate_outputs(revision_dir: Path) -> list[dict[str, Any]]:
+    """Describe retained artifacts that have not passed the Delivery Gate."""
+    return [
+        {
+            "path": path.relative_to(revision_dir).as_posix(),
+            "sha256": sha256_file(path),
+            "bytes": path.stat().st_size,
+            "delivery_status": "internal_candidate",
+        }
+        for path in sorted((revision_dir / "candidate").glob("*"))
+        if path.is_file()
+    ]
 
 
 def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | None = None) -> dict[str, Any]:
@@ -491,6 +776,7 @@ def confirm_desktop_delivery(
     *,
     deadline: float | None = None,
     retries: int = DESKTOP_DELIVERY_RETRIES,
+    clock: Callable[[], float] | None = None,
 ) -> dict[str, Any]:
     """Retrieve and open every attachment, preserving the manifest bytes.
 
@@ -498,6 +784,7 @@ def confirm_desktop_delivery(
     obtained by opening the link, rather than merely echoing a path. Retries
     reuse the same validated attachment and never invoke generation again.
     """
+    clock = clock or time.monotonic
     expected = desktop_attachment_reply(manifest)["attachments"]
     actual = reply.get("attachments") if isinstance(reply, Mapping) else None
     findings = []
@@ -515,7 +802,7 @@ def confirm_desktop_delivery(
         opened_current = False
         while attempts <= retries:
             attempts += 1
-            if deadline is not None and time.monotonic() >= deadline:
+            if deadline is not None and clock() >= deadline:
                 last_issue = "Desktop delivery deadline expired."
                 break
             try:
@@ -548,6 +835,7 @@ def run_desktop_operation(
     run_dir: Path,
     *,
     handoff_runner: Callable[[list[Mapping[str, Any]], float], Any],
+    fallback_handoff_runner: Callable[[list[Mapping[str, Any]], float], Any] | None = None,
     opener: Callable[[str], bytes],
     operation_id: str = "default",
     budget_seconds: float = DESKTOP_OPERATION_BUDGET_SECONDS,
@@ -598,19 +886,41 @@ def run_desktop_operation(
         return dict(result or payload)
 
     def finish(result: Mapping[str, Any]) -> dict[str, Any]:
-        return save(str(result.get("status", "blocked")), result)
+        elapsed = max(0.0, clock() - started)
+        measured = {
+            **result,
+            "elapsed_seconds": round(elapsed, 3),
+            "performance_classification": performance_classification(elapsed),
+            "target_window_seconds": [
+                NORMAL_RUNTIME_TARGET_MIN_SECONDS,
+                NORMAL_RUNTIME_TARGET_MAX_SECONDS,
+            ],
+            "operation_deadline_seconds": DESKTOP_OPERATION_BUDGET_SECONDS,
+        }
+        return save(str(measured.get("status", "blocked")), measured)
 
     while True:
         remaining = deadline - clock()
         if remaining <= 0:
+            retained = []
+            try:
+                _, current_reference = _reference(run_dir)
+                current_revision = str(current_reference.get("approval", {}).get("revision_id") or "")
+                if current_revision:
+                    retained = _candidate_outputs(run_dir / "revisions" / current_revision)
+            except (OSError, ValueError, json.JSONDecodeError):
+                pass
             return finish({
                 "status": "timeout",
                 "stage": "desktop_operation",
                 "deadline_monotonic": deadline,
                 "findings": [{"category": "timeout", "field": "operation", "issue": "The post-approval Desktop operation deadline expired."}],
+                "candidate_outputs": retained,
                 "client_outputs": [],
             })
-        result = generate(run_dir)
+        result = generate(run_dir, operation_deadline=deadline, clock=clock)
+        if deadline - clock() <= 0:
+            continue
         stage = str(result.get("stage") or "generate")
         stage_history.append({"stage": stage, "status": result.get("status"), "remaining_seconds": round(remaining, 3)})
         save("running")
@@ -625,7 +935,36 @@ def run_desktop_operation(
                 continue
             try:
                 handoff_runner(handoffs, remaining)
+                revision_id = str(result.get("revision_id") or "")
+                fallback_handoffs = [
+                    item for item in handoffs
+                    if item.get("fallback_owner") == "parent"
+                    and revision_id
+                    and not (run_dir / "revisions" / revision_id / str(item.get("response_path") or "")).is_file()
+                ]
+                if fallback_handoffs:
+                    remaining = deadline - clock()
+                    if remaining > 0:
+                        if fallback_handoff_runner is not None:
+                            fallback_handoff_runner(fallback_handoffs, remaining)
+                        else:
+                            parent_handoffs = [{**item, "reviewer_owner": "parent"} for item in fallback_handoffs]
+                            handoff_runner(parent_handoffs, remaining)
             except Exception as exc:
+                fallback_handoffs = [item for item in handoffs if item.get("fallback_owner") == "parent"]
+                if fallback_handoffs:
+                    remaining = deadline - clock()
+                    if remaining > 0:
+                        try:
+                            if fallback_handoff_runner is not None:
+                                fallback_handoff_runner(fallback_handoffs, remaining)
+                            else:
+                                parent_handoffs = [{**item, "reviewer_owner": "parent"} for item in fallback_handoffs]
+                                handoff_runner(parent_handoffs, remaining)
+                        except Exception as fallback_exc:
+                            exc = RuntimeError(f"Delegated reviewer failed ({exc}); parent reviewer fallback failed ({fallback_exc})")
+                        else:
+                            continue
                 return finish({
                     "status": "blocked",
                     "stage": "hermes_handoff",
@@ -650,7 +989,7 @@ def run_desktop_operation(
                 "client_outputs": [],
             })
         reply = result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
-        delivery = confirm_desktop_delivery(manifest, reply, opener, deadline=deadline)
+        delivery = confirm_desktop_delivery(manifest, reply, opener, deadline=deadline, clock=clock)
         final = {
             **result,
             "status": "passed" if delivery["confirmed"] else "blocked",
@@ -783,6 +1122,9 @@ def _quality_retry(
     prior_attempts: Mapping[str, int],
     findings: list[Mapping[str, Any]],
     stage: str,
+    *,
+    operation_deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
     """Retry draftable targets; deterministic layout defects require an actual repair."""
     _archive_failed_attempt(revision_dir, stage, findings)
@@ -889,6 +1231,10 @@ def _quality_retry(
         if created:
             return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
     if has_layout_target:
+        generation = working_reference.setdefault("generation", {})
+        generation["layout_repair_level"] = min(3, int(generation.get("layout_repair_level", 0)) + 1)
+        generation["layout_repair_findings"] = normalized
+        _write(reference_path, working_reference)
         for relative in (
             "candidate",
             "rendered",
@@ -906,10 +1252,16 @@ def _quality_retry(
             if task is not None
         }
         _clear_verification_responses(revision_dir, tasks or None)
-    return generate(run_dir)
+    return generate(run_dir, operation_deadline=operation_deadline, clock=clock)
 
 
-def generate(run_dir: Path, **_: Any) -> dict[str, Any]:
+def generate(
+    run_dir: Path,
+    *,
+    operation_deadline: float | None = None,
+    clock: Callable[[], float] = time.monotonic,
+    **_: Any,
+) -> dict[str, Any]:
     """Advance one approved revision until it needs Hermes work or passes."""
     run_dir = run_dir.resolve(); reference_path, working_reference = _reference(run_dir)
     approved, approval_issue = _approval_valid(run_dir, working_reference)
@@ -941,15 +1293,8 @@ def generate(run_dir: Path, **_: Any) -> dict[str, Any]:
     elif prior_governing_sha256 is None:
         state["governing_sha256"] = governing_sha256
         _write(reference_path, working_reference)
-    preflight_report = state.get("renderer_preflight")
-    if not isinstance(preflight_report, Mapping) or preflight_report.get("status") != "passed":
-        preflight_report = preflight(SCRIPT_DIR.parent, reference)
-        if preflight_report["status"] != "passed":
-            state["renderer_preflight"] = preflight_report
-            _write(reference_path, working_reference)
-            return {"status": "blocked", "stage": "renderer_preflight", "findings": preflight_report["findings"], "renderer_preflight": preflight_report, "client_outputs": []}
-        state["renderer_preflight"] = preflight_report
-        _write(reference_path, working_reference)
+    recorded_preflight = state.get("renderer_preflight")
+    preflight_report = recorded_preflight if isinstance(recorded_preflight, Mapping) and recorded_preflight.get("status") == "passed" else None
     attempts = state.setdefault("attempts", {})
     persisted_exhaustion = [
         {"category": "retry", "field": str(target), "issue": f"Retry limit reached after {MAX_ATTEMPTS} attempts.", "required": "Reviewer intervention before a new approved revision."}
@@ -974,13 +1319,32 @@ def generate(run_dir: Path, **_: Any) -> dict[str, Any]:
     if missing: return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
 
     model = merged_drafts(revision_dir, reference)
-    fingerprint, governing = _candidate_fingerprint(SCRIPT_DIR.parent, revision_dir, reference, model)
-    build = _cached_build(revision_dir, fingerprint)
+    font_substitutions = {
+        str(source): str(target)
+        for source, target in dict((preflight_report or {}).get("font_substitutions") or {}).items()
+    }
+    layout_repair_level = int(state.get("layout_repair_level", 0))
+    fingerprint, governing = _candidate_fingerprint(
+        SCRIPT_DIR.parent,
+        revision_dir,
+        reference,
+        model,
+        font_substitutions=font_substitutions,
+        layout_repair_level=layout_repair_level,
+    )
+    build = _cached_build(revision_dir, fingerprint) if preflight_report is not None else None
     if build is None:
-        document_report = render_documents(SCRIPT_DIR.parent, revision_dir, reference, model)
+        document_report = render_documents(
+            SCRIPT_DIR.parent,
+            revision_dir,
+            reference,
+            model,
+            font_substitutions=font_substitutions,
+            layout_repair_level=layout_repair_level,
+        )
         if document_report["status"] != "passed":
             findings = [{**finding, "target_ids": [f"layout:{item['artifact']}"]} for item in document_report["artifacts"] for finding in item["findings"]]
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering")
+            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", operation_deadline=operation_deadline, clock=clock)
         xml_report = None
         if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
             template = SCRIPT_DIR.parent / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml"
@@ -993,11 +1357,85 @@ def generate(run_dir: Path, **_: Any) -> dict[str, Any]:
             )
             if xml_report["status"] != "passed":
                 findings = [{**finding, "target_ids": ["layout:xml"]} for finding in xml_report["findings"]]
-                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "xml")
-        render_report = render_pages(revision_dir, renderer_identity=preflight_report["renderer"])
+                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "xml", operation_deadline=operation_deadline, clock=clock)
+
+        # Candidate construction is independent from the host's render stack.
+        # Only after a complete branch candidate exists do we resolve mandatory
+        # Render Assurance capabilities and, when genuinely needed, rebuild the
+        # DOCX bytes with an approved compatible font substitution.
+        if preflight_report is None:
+            remaining = 30.0 if operation_deadline is None else operation_deadline - clock()
+            if remaining <= 0:
+                return {
+                    "status": "timeout",
+                    "stage": "render_assurance",
+                    "findings": [{"category": "timeout", "field": "operation", "issue": "The persisted Desktop operation deadline expired before Render Assurance."}],
+                    "candidate_outputs": _candidate_outputs(revision_dir),
+                    "client_outputs": [],
+                }
+            preflight_report = preflight(
+                SCRIPT_DIR.parent,
+                reference,
+                deadline_seconds=min(30.0, remaining),
+                clock=clock,
+            )
+            state["renderer_preflight"] = preflight_report
+            _write(reference_path, working_reference)
+            if preflight_report["status"] != "passed":
+                return {
+                    "status": "blocked",
+                    "stage": "render_assurance",
+                    "findings": preflight_report["findings"],
+                    "render_assurance": preflight_report,
+                    "candidate_outputs": _candidate_outputs(revision_dir),
+                    "client_outputs": [],
+                }
+            resolved_substitutions = {
+                str(source): str(target)
+                for source, target in dict(preflight_report.get("font_substitutions") or {}).items()
+            }
+            if resolved_substitutions != font_substitutions:
+                font_substitutions = resolved_substitutions
+                document_report = render_documents(
+                    SCRIPT_DIR.parent,
+                    revision_dir,
+                    reference,
+                    model,
+                    font_substitutions=font_substitutions,
+                    layout_repair_level=layout_repair_level,
+                )
+                if document_report["status"] != "passed":
+                    findings = [{**finding, "target_ids": [f"layout:{item['artifact']}"]} for item in document_report["artifacts"] for finding in item["findings"]]
+                    return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", operation_deadline=operation_deadline, clock=clock)
+                fingerprint, governing = _candidate_fingerprint(
+                    SCRIPT_DIR.parent,
+                    revision_dir,
+                    reference,
+                    model,
+                    font_substitutions=font_substitutions,
+                    layout_repair_level=layout_repair_level,
+                )
+        render_report = render_pages(
+            revision_dir,
+            renderer_identity=preflight_report["renderer"],
+            page_renderer_identity=preflight_report.get("page_renderer"),
+            renderer_identities=preflight_report.get("renderer_candidates"),
+            page_renderer_identities=preflight_report.get("page_renderer_candidates"),
+            deadline_monotonic=operation_deadline,
+            clock=clock,
+        )
         if render_report["status"] != "passed":
             findings = [{**finding, "target_ids": ["layout:documents"]} for finding in render_report["findings"]]
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa")
+            if findings and all(finding.get("category") == "renderer" for finding in findings):
+                return {
+                    "status": "blocked",
+                    "stage": "render_assurance",
+                    "findings": findings,
+                    "render_assurance": {"preflight": preflight_report, "render": render_report},
+                    "candidate_outputs": _candidate_outputs(revision_dir),
+                    "client_outputs": [],
+                }
+            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", operation_deadline=operation_deadline, clock=clock)
         build = _record_build(revision_dir, fingerprint, governing, document_report, xml_report, render_report)
     else:
         document_report = build["document_report"]
@@ -1007,8 +1445,9 @@ def generate(run_dir: Path, **_: Any) -> dict[str, Any]:
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
+    final_quality["render_assurance"] = {"preflight": preflight_report, "render": render_report}
     if final_quality["status"] != "passed":
-        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality")
+        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", operation_deadline=operation_deadline, clock=clock)
     return _publish(run_dir, revision_dir, reference, final_quality)
 
 
@@ -1101,9 +1540,13 @@ def run_release_gate(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an installable release archive")
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an installable release archive"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a release archive"); parser.add_argument("--skills-dir", help="Hermes skills directory for --install-release")
     args = parser.parse_args(argv)
     if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
+    elif args.verify_installation: result = verify_installation(SCRIPT_DIR.parent)
+    elif args.install_release:
+        if not args.skills_dir: parser.error("--skills-dir is required with --install-release")
+        result = install_release(Path(args.install_release), Path(args.skills_dir))
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     else:
         if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless --release-gate is used")
@@ -1112,7 +1555,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "package_release", "prepare", "run_desktop_operation", "run_release_gate", "validate"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

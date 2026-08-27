@@ -1,316 +1,1151 @@
-"""Drafting seam for Hermes batch orchestration.
+"""Hermes drafting handoff, response validation, merging, and retries.
 
-The model-facing boundary is represented by recorded, structured requests and
-responses.  Deterministic source-grounded drafting is used when no live Hermes
-adapter is installed; Python still owns validation, merging, and delivery.
+Production code in this module never writes clinical prose and never calls a
+model. It writes scoped request JSON and consumes response JSON supplied by
+the Hermes orchestration in ``SKILL.md``. ``RecordedHandoff`` is an
+acceptance-test adapter, not a production drafting path.
 """
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from retrospective import SectionDraft, merge_section_drafts, retrospective_batch_plan
-from prospective import (
-    ProspectiveDraftingBatch,
-    branch_batch_plan,
-    merge_prospective_drafts,
-    prospective_batch_plan,
-    scoped_batch_input,
-    verify_prospective_sections,
+from contracts import (
+    BOILERPLATE_VERSION,
+    CONTRACT_VERSION,
+    FORBIDDEN_DRAFT_LANGUAGE,
+    BatchSpec,
+    SectionSpec,
+    batch_plan,
+    canonical_study_type,
+    contract_hash,
+    get_path,
+    icf_contract,
+    meaningful,
+    protocol_contract,
 )
-from icf import icf_contract, unified_icf_batch, verify_icf_sections
-from complete_protocol import with_complete_protocol
 
 
-@dataclass(frozen=True)
-class DraftingBatch:
-    """A stable, named group of section IDs assigned to one drafting pass."""
-
-    batch_id: str
-    section_ids: tuple[str, ...]
-    prerequisite_ids: tuple[str, ...] = ()
-
-
-def plan_batches(batch_specs: Iterable[DraftingBatch]) -> tuple[DraftingBatch, ...]:
-    """Normalize a drafting topology without invoking an external model."""
-    batches = tuple(batch_specs)
-    if len({batch.batch_id for batch in batches}) != len(batches):
-        raise ValueError("Drafting batch IDs must be unique.")
-    return batches
+REQUEST_SCHEMA = "hermes-request/v2"
+RESPONSE_SCHEMA = "hermes-response/v2"
+TOPOLOGY_VERSION = "clinical-drafting-v1"
+PROMPT_VERSION = "section-drafting-v8-release-facing-client-authority"
+MAX_ATTEMPTS = 3
+PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
+IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
 
-def plan_retrospective_batches() -> tuple[DraftingBatch, ...]:
-    """Expose the retrospective topology through the DraftingBatch seam."""
-    return tuple(
-        DraftingBatch(item["batch_id"], tuple(item["section_ids"]))
-        for item in retrospective_batch_plan()
-    )
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
-def plan_prospective_batches() -> tuple[ProspectiveDraftingBatch, ...]:
-    """Expose the three stable Protocol batches for both forward branches."""
-    return prospective_batch_plan()
+def sha256_value(value: Any) -> str:
+    return hashlib.sha256(_canonical(value)).hexdigest()
 
 
-def _section_id_by_number(number: str) -> str:
-    """Resolve a generated section number against the stable contract ID."""
-    from prospective import prospective_contract
-
-    normalized = str(number).rstrip(".")
-    for section in prospective_contract():
-        if section.number.rstrip(".") == normalized:
-            return section.section_id
-    raise ValueError(f"Generated Prospective section has no contract ID: {number}")
+def request_sha256(request: Mapping[str, Any]) -> str:
+    unsigned = copy.deepcopy(dict(request))
+    unsigned.pop("request_sha256", None)
+    return sha256_value(unsigned)
 
 
-def draft_prospective_protocol(
-    reference: Mapping[str, Any],
-    *,
-    run_dir: Path | None = None,
-    study_type: str = "Prospective",
-    icf_template: str = "Advarra",
-) -> dict[str, Any]:
-    """Draft, validate, and merge the three Protocol batches.
-
-    The generated section payload is intentionally kept structured.  Each
-    request contains only its approved field families and contract sections;
-    the complete source reference is never written into a batch request.
-    """
-    protocol_batches = branch_batch_plan(study_type, icf_template)[:3]
-    from prospective import prospective_contract
-
-    contract_ids = tuple(item.section_id for item in prospective_contract())
-    completed = with_complete_protocol(dict(reference))
-    generated = completed.get("generated") if isinstance(completed.get("generated"), dict) else {}
-    protocol = generated.get("protocol") if isinstance(generated.get("protocol"), dict) else {}
-    generated_sections = protocol.get("sections") if isinstance(protocol.get("sections"), list) else []
-    by_id: dict[str, SectionDraft] = {}
-    for section in generated_sections:
-        if not isinstance(section, dict):
-            continue
-        section_id = _section_id_by_number(str(section.get("number", "")))
-        paragraphs = tuple(
-            str(value).strip() for value in section.get("paragraphs", []) if str(value).strip()
-        )
-        lists = tuple(
-            tuple(str(value).strip() for value in items if str(value).strip())
-            for items in section.get("lists", [])
-            if isinstance(items, list)
-        )
-        tables = tuple(item for item in section.get("tables", []) if isinstance(item, dict))
-        content = "\n\n".join(paragraphs + tuple(item for items in lists for item in items))
-        by_id[section_id] = SectionDraft(
-            section_id,
-            content,
-            batch_id="",
-            paragraphs=paragraphs,
-            lists=lists,
-            tables=tables,
-            number=str(section.get("number", "")),
-            title=str(section.get("title", "")),
-        )
-
-    drafts: list[SectionDraft] = []
-    requests: list[dict[str, Any]] = []
-    for batch in protocol_batches:
-        scoped = scoped_batch_input(reference, batch)
-        target_ids = tuple(
-            section_id
-            for section_id in contract_ids
-            if section_id in batch.section_ids
-            or any(section_id.startswith(parent + ".") for parent in batch.section_ids)
-        )
-        requests.append({
-            "batch_id": batch.batch_id,
-            "section_ids": list(target_ids),
-            "approved_field_families": list(batch.approved_field_families),
-            "prerequisite_ids": list(batch.prerequisite_ids),
-            "approved_input": scoped,
-        })
-        for section_id in target_ids:
-            draft = by_id.get(section_id)
-            if draft is None:
-                drafts.append(SectionDraft(section_id, batch_id=batch.batch_id))
-            else:
-                drafts.append(SectionDraft(
-                    draft.section_id, draft.content, draft.attempt, batch.batch_id,
-                    draft.accepted, draft.paragraphs, draft.lists, draft.tables,
-                    draft.number, draft.title,
-                ))
-
-    merged = merge_prospective_drafts(drafts)
-    findings = verify_prospective_sections(merged)
-    if findings:
-        raise ValueError("Prospective Section Draft verification failed: " + "; ".join(item["section_id"] for item in findings))
-
-    merged_sections = []
-    for draft in merged:
-        merged_sections.append({
-            "number": draft.number,
-            "title": draft.title,
-            "paragraphs": list(draft.paragraphs) or ([draft.content] if draft.content else []),
-            "lists": [list(items) for items in draft.lists],
-            "tables": list(draft.tables),
-        })
-    result_contract = (
-        "prospective-1-19-v1" if study_type.casefold() == "prospective" else "ambispective-1-19-v1"
-    )
-    completed["generated"]["protocol"]["sections"] = merged_sections  # type: ignore[index]
-    completed["generated"]["protocol"]["drafting_contract_version"] = result_contract  # type: ignore[index]
-    result = {
-        "status": "passed",
-        "contract_version": result_contract,
-        "batches": requests,
-        "section_drafts": [
-            {"section_id": draft.section_id, "batch_id": draft.batch_id, "attempt": draft.attempt, "accepted": draft.accepted}
-            for draft in merged
-        ],
-        "completed_batch_ids": [batch.batch_id for batch in protocol_batches],
-        "verification": {"status": "passed", "findings": []},
-    }
-    if run_dir is not None:
-        path = run_dir / "logs/protocol-drafting.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return {"reference": completed, "report": result, "drafts": merged}
+def request_hash_valid(request: Mapping[str, Any]) -> bool:
+    supplied = str(request.get("request_sha256") or "")
+    return bool(supplied) and supplied == request_sha256(request)
 
 
-def draft_prs_narrative(
-    reference: Mapping[str, Any],
-    *,
-    run_dir: Path | None = None,
-    prerequisite_report: Mapping[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Run the narrow PRS narrative batch after accepted Protocol Foundations.
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
-    The batch may produce only the two prose fields consumed by the PRS XML
-    mapper.  XML structure, field mapping, and escaping remain deterministic
-    Python responsibilities.
-    """
-    if prerequisite_report is not None:
-        verification = prerequisite_report.get("verification")
-        completed_batch_ids = prerequisite_report.get("completed_batch_ids", [])
-        if prerequisite_report.get("status") != "passed" or "protocol-foundations" not in completed_batch_ids or (
-            isinstance(verification, Mapping) and verification.get("status") != "passed"
-        ):
-            raise ValueError("PRS narrative batch requires passed Protocol Foundations")
 
-    study = reference.get("study") if isinstance(reference.get("study"), Mapping) else {}
-    objectives = reference.get("objectives") if isinstance(reference.get("objectives"), Mapping) else {}
-    generated = reference.get("generated") if isinstance(reference.get("generated"), Mapping) else {}
-    protocol = generated.get("protocol") if isinstance(generated.get("protocol"), Mapping) else {}
-    design = reference.get("design") if isinstance(reference.get("design"), Mapping) else {}
+def _write_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    brief = str(
-        protocol.get("study_design")
-        or protocol.get("studyDesignLong")
-        or design.get("study_design")
-        or study.get("background")
-        or ""
-    ).strip()
-    detailed_parts = [
-        str(study.get("background") or "").strip(),
-        str(objectives.get("primary") or "").strip(),
-        str(objectives.get("secondary") or "").strip(),
+
+def _read_json(path: Path) -> dict[str, Any]:
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError(f"Expected a JSON object: {path}")
+    return value
+
+
+def _request_ledger_path(revision_dir: Path, request_id: str) -> Path:
+    # Hermes may write requests/responses, but it must not be able to rewrite
+    # the producer-owned trust record used to authenticate those requests.
+    return revision_dir / "request-ledger" / f"{request_id}.json"
+
+
+def _request_constraints() -> list[str]:
+    return [
+        "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+        "Use only supplied approved evidence and listed Fixed Clinical Boilerplate.",
+        "Listed Fixed Clinical Boilerplate is authorized non-study-specific content. It is not invention when reproduced accurately and kept consistent across documents.",
+        "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include the applicable boilerplate and all material source facts unless they are genuinely redundant.",
+        "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims.",
+        "Return exactly one result for every requested section ID.",
+        "Use only the drafted or fixed_boilerplate outcome. Sparse sections must use their listed Fixed Clinical Boilerplate.",
+        "Return structured section content, not a whole document or document markup.",
+        "Use participant-facing language for ICF sections.",
+        "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
+        "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+        "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+        "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
     ]
-    detailed = "\n\n".join(part for part in detailed_parts if part)
-    narrative = {"brief_summary": brief, "detailed_description": detailed}
 
-    from prs_xml import merge_narrative
 
-    result = merge_narrative(dict(reference), narrative)
-    report = {
-        "status": "passed",
-        "batch_id": "prs-narrative",
-        "section_ids": ["prs-narrative"],
-        "approved_field_families": ["study", "objectives", "design", "endpoints", "generated"],
-        "prerequisite_ids": ["protocol-foundations"],
-        "draft": narrative,
-        "completed_batch_ids": ["prs-narrative"],
-        "verification": {"status": "passed", "findings": [], "xml_markup_emitted": False},
+def _prs_section_payload(target: str) -> dict[str, Any]:
+    contracts = {
+        "prs.brief-summary": {
+            "minimum_evidence": ["study.title", "study.hypothesis", "objectives.primary", "endpoints.primary", "design.study_design"],
+            "content_expectations": ["Give a concise public summary of the study purpose, hypothesis, primary endpoint, and design using all material approved facts."],
+        },
+        "prs.detailed-description": {
+            "minimum_evidence": [
+                "study.background", "study.hypothesis", "objectives.primary", "design.study_design",
+                "endpoints.primary", "endpoints.secondary", "population.study_population", "procedures.assessments",
+            ],
+            "content_expectations": ["Explain the approved background, hypothesis, objectives, design, population, procedures, and every endpoint in registry-ready prose."],
+        },
     }
-    if run_dir is not None:
-        path = run_dir / "logs/prs-narrative-drafting.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return {"reference": result, "report": report}
+    contract = contracts[target]
+    return {
+        "section_id": target,
+        "required": True,
+        "allowed_modes": ["agent_draft"],
+        "minimum_evidence": contract["minimum_evidence"],
+        "fixed_boilerplate": [],
+        "content_expectations": contract["content_expectations"],
+        "source_coverage": "all_material_items" if target == "prs.detailed-description" else "all_material_evidence",
+    }
 
 
-def draft_prospective_icf(
+def _expected_section_contracts(
+    repo_root: Path,
     reference: Mapping[str, Any],
+    batch: BatchSpec,
+    targets: Iterable[str],
+) -> list[dict[str, Any]]:
+    target_list = list(targets)
+    if batch.artifact == "prs":
+        allowed = {"prs.brief-summary", "prs.detailed-description"}
+        if not target_list or not set(target_list) <= allowed:
+            raise ValueError("PRS narrative requests may target only brief and detailed descriptions.")
+        return [_prs_section_payload(target) for target in target_list]
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    known = (
+        {section.section_id: section for section in protocol_contract(branch)}
+        if batch.artifact == "protocol"
+        else {section.section_id: section for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra")))}
+    )
+    unknown = sorted(set(target_list) - set(known))
+    if unknown:
+        raise ValueError(f"Draft request contains unknown section IDs: {', '.join(unknown)}")
+    boilerplate = load_boilerplate(repo_root)
+    return [_section_payload(known[target], boilerplate) for target in target_list]
+
+
+def _request_matches_approved_reference(revision_dir: Path, request: Mapping[str, Any]) -> bool:
+    """Reconstruct every source-bearing request field from the immutable approval snapshot."""
+    snapshot_path = revision_dir / "approved-reference.json"
+    if not snapshot_path.is_file():
+        return False
+    try:
+        repo_root = Path(__file__).resolve().parents[1]
+        reference = _read_json(snapshot_path)
+        branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+        icf_template = get_path(reference, "meta.icf_template")
+        plan = batch_plan(branch, str(icf_template or "Advarra"))
+        batch = next(item for item in plan if item.batch_id == request.get("batch_id"))
+        contracts = request.get("section_contracts")
+        if not isinstance(contracts, list):
+            return False
+        targets = [str(item.get("section_id")) for item in contracts if isinstance(item, Mapping)]
+        attempts = request.get("attempts")
+        if not targets or not isinstance(attempts, Mapping) or set(map(str, attempts)) != set(targets):
+            return False
+        expected_governing = governing_resources(repo_root, reference)
+        scoped = _scoped_source(reference, batch.field_families)
+        expected_contracts = _expected_section_contracts(repo_root, reference, batch, targets)
+        expected_task = "prs_narrative_drafting" if batch.artifact == "prs" else "section_drafting"
+        request_id = str(request.get("request_id") or "")
+        wave = str(request.get("wave") or "")
+        normalized_attempts = {target: int(attempts[target]) for target in targets}
+        expected_request_id = _request_id(
+            str(request.get("revision_id") or ""),
+            batch.batch_id,
+            normalized_attempts,
+            wave,
+            sha256_value(expected_governing),
+        )
+        return all((
+            request.get("schema_version") == REQUEST_SCHEMA,
+            request_id == expected_request_id,
+            request.get("task") == expected_task,
+            request.get("artifact") == batch.artifact,
+            request.get("branch") == {"study_type": branch, "icf_template": icf_template},
+            request.get("topology_version") == TOPOLOGY_VERSION,
+            request.get("prompt_version") == PROMPT_VERSION,
+            request.get("governing_resources") == expected_governing,
+            request.get("approved_source") == scoped,
+            request.get("approved_input") == _source_items(scoped),
+            contracts == expected_contracts,
+            request.get("constraints") == _request_constraints(),
+            request.get("response_path") == f"hermes/responses/{request_id}.json",
+            set(targets) <= set(batch.section_ids),
+            all(1 <= attempt <= MAX_ATTEMPTS for attempt in normalized_attempts.values()),
+        ))
+    except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError):
+        return False
+
+
+def _trusted_request_valid(revision_dir: Path, request: Mapping[str, Any]) -> bool:
+    request_id = str(request.get("request_id") or "")
+    record_path = _request_ledger_path(revision_dir, request_id)
+    if not request_id or not record_path.is_file():
+        return False
+    try:
+        record = _read_json(record_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    return (
+        record.get("request_id") == request_id
+        and record.get("request_sha256") == request.get("request_sha256")
+        and record.get("request_sha256") == request_sha256(request)
+        and _request_matches_approved_reference(revision_dir, request)
+    )
+
+
+def load_boilerplate(repo_root: Path) -> dict[str, str]:
+    payload = _read_json(repo_root / "references/fixed-clinical-boilerplate.json")
+    if payload.get("version") != BOILERPLATE_VERSION:
+        raise ValueError("Fixed Clinical Boilerplate version does not match the contract.")
+    sections = payload.get("sections")
+    if not isinstance(sections, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in sections.items()):
+        raise ValueError("Fixed Clinical Boilerplate must contain a string map named sections.")
+    return dict(sections)
+
+
+def governing_resources(repo_root: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    template_root = repo_root / "assets/client-templates/docx"
+    templates = [template_root / ("retrospective-protocol.template.docx" if branch == "Retrospective" else "ambispective-protocol.template.docx" if branch == "Ambispective" else "prospective-protocol.template.docx")]
+    if branch != "Retrospective":
+        choice = str(get_path(reference, "meta.icf_template", "Advarra")).casefold()
+        templates.append(template_root / ("sterling-icf.template.docx" if choice == "sterling" else "ambispective-icf.template.docx" if branch == "Ambispective" else "prospective-icf.template.docx"))
+        templates.append(repo_root / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml")
+        templates.append(repo_root / "assets/client-templates/reference/prs-manual-reference.xml")
+    templates.append(repo_root / "assets/client-templates/reference/protocol-reference.docx")
+    boilerplate_path = repo_root / "references/fixed-clinical-boilerplate.json"
+    implementation = [repo_root / "scripts" / name for name in IMPLEMENTATION_FILES]
+    return {
+        "approved_source_sha256": get_path(reference, "approval.source_sha256"),
+        "section_contract_sha256": contract_hash(reference),
+        "boilerplate_version": BOILERPLATE_VERSION,
+        "boilerplate_sha256": sha256_file(boilerplate_path),
+        "template_sha256": {path.relative_to(repo_root).as_posix(): sha256_file(path) for path in templates},
+        "implementation_sha256": {path.relative_to(repo_root).as_posix(): sha256_file(path) for path in implementation},
+        "topology_version": TOPOLOGY_VERSION,
+        "prompt_version": PROMPT_VERSION,
+        "producer_policy": "nonempty-model-id",
+    }
+
+
+def _scoped_source(reference: Mapping[str, Any], families: Iterable[str]) -> dict[str, Any]:
+    return {family: copy.deepcopy(reference[family]) for family in families if family in reference}
+
+
+def _source_items(value: Any, prefix: str = "") -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(child, Mapping):
+                items.extend(_source_items(child, path))
+            else:
+                items.append({"path": path, "value": child, "sha256": sha256_value(child)})
+    return items
+
+
+def _section_payload(section: SectionSpec, boilerplate: Mapping[str, str]) -> dict[str, Any]:
+    allowed = ["agent_draft"]
+    boilerplate_items: list[dict[str, str]] = []
+    if section.boilerplate_key:
+        allowed.append("fixed_boilerplate")
+        text = boilerplate.get(section.boilerplate_key)
+        if not text:
+            raise ValueError(f"Missing Fixed Clinical Boilerplate: {section.boilerplate_key}")
+        boilerplate_items.append({"boilerplate_id": section.boilerplate_key, "text": text, "sha256": sha256_value(text)})
+    return {
+        "section_id": section.section_id,
+        "number": section.number,
+        "title": section.title,
+        "role": section.role,
+        "required": section.required,
+        "allowed_modes": allowed,
+        "minimum_evidence": list(section.evidence),
+        "fixed_boilerplate": boilerplate_items,
+        "content_expectations": list(section.content_expectations),
+        "source_coverage": section.source_coverage,
+    }
+
+
+def _request_id(revision_id: str, batch_id: str, attempts: Mapping[str, int], wave: str, governing_sha256: str = "") -> str:
+    attempt = max(attempts.values(), default=1)
+    target_key = sha256_value({"targets": sorted(attempts), "governing": governing_sha256})[:8]
+    return f"{revision_id}.draft.{batch_id}.{wave}.a{attempt}.{target_key}"
+
+
+def accepted_draft(revision_dir: Path, section_id: str, expected_governing: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
+    path = revision_dir / "hermes/accepted" / f"{section_id.replace('/', '_')}.json"
+    if not path.is_file():
+        return None
+    draft = _read_json(path)
+    if expected_governing is not None and draft.get("governing_resources") != dict(expected_governing):
+        return None
+    request_id = str(draft.get("request_id") or "")
+    accepted_request_path = revision_dir / "hermes/accepted-requests" / f"{request_id}.json"
+    if not request_id or not accepted_request_path.is_file():
+        return None
+    accepted_request = _read_json(accepted_request_path)
+    if not _trusted_request_valid(revision_dir, accepted_request) or draft.get("request_sha256") != accepted_request.get("request_sha256"):
+        return None
+    if expected_governing is not None and accepted_request.get("governing_resources") != dict(expected_governing):
+        return None
+    return draft
+
+
+def accepted_prs_record(revision_dir: Path, expected_governing: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    path = revision_dir / "hermes/accepted/prs-narrative.json"
+    if not path.is_file():
+        return {}
+    accepted = _read_json(path)
+    if expected_governing is not None and accepted.get("governing_resources") != dict(expected_governing):
+        return {}
+    request_id = str(accepted.get("request_id") or "")
+    request_path = revision_dir / "hermes/accepted-requests" / f"{request_id}.json"
+    if not request_id or not request_path.is_file():
+        return {}
+    request = _read_json(request_path)
+    if not _trusted_request_valid(revision_dir, request) or accepted.get("request_sha256") != request.get("request_sha256"):
+        return {}
+    return accepted
+
+
+def accepted_context(revision_dir: Path, batch: BatchSpec, expected_governing: Mapping[str, Any]) -> list[dict[str, Any]]:
+    if batch.batch_id != "prs-narrative":
+        return []
+    foundations = next((item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations"), None)
+    return [draft for section_id in (foundations.section_ids if foundations else ()) if (draft := accepted_draft(revision_dir, section_id, expected_governing))]
+
+
+def create_drafting_request(
     *,
-    run_dir: Path | None = None,
-    study_type: str = "Prospective",
-    icf_template: str = "Advarra",
-) -> dict[str, Any]:
-    """Draft and merge the one participant-facing ICF batch.
-
-    The ICF batch receives only approved study families.  Its section-keyed
-    drafts are retained in the reference so the generated candidate and its
-    audit trail share the same deterministic contract.
-    """
-    batch = unified_icf_batch(study_type, icf_template)
-    scoped = scoped_batch_input(reference, batch)
-    fields = reference.get("template_fields") if isinstance(reference.get("template_fields"), Mapping) else {}
-    field_map = {
-        "PURPOSE": ("AI_studyPurpose",),
-        "WHAT WILL HAPPEN DURING THE STUDY": ("AI_icfVisitsOverview", "AI_visitsDetails"),
-        "LENGTH OF THE STUDY AND NUMBER OF PARTICIPANTS EXPECTED": ("AI_visitsAndLength",),
-        "SIDE EFFECTS AND OTHER RISKS": ("AI_interventionPossibleSideEffects",),
-        "POSSIBLE BENEFITS OF THE STUDY": ("AI_benefits",),
-        "PAYMENT FOR BEING IN THE STUDY": ("AI_payment",),
-        "ADDITIONAL COSTS": ("AI_costs",),
-        "ALTERNATIVES TO PARTICIPATION": ("AI_alternatives",),
-        "RELEASE OF MEDICAL RECORDS AND PRIVACY": ("AI_privacy",),
-    }
-    drafts: list[SectionDraft] = []
-    for section in icf_contract(study_type, icf_template):
-        values = [str(fields.get(key, "")).strip() for key in field_map.get(section.title, ()) if fields.get(key)]
-        if section.title == "LEGAL RIGHTS":
-            values.append("The approved Advarra client language preserves the participant's legal rights without referring to a nonexistent injury section.")
-        if section.placement:
-            values.append("The approved source requires the existing-records disclosure within the study-procedures section.")
-        if not values:
-            # Legal and signature sections are supplied by the selected client
-            # template; retain an explicit section-keyed record without
-            # inventing study facts.
-            values.append(f"The selected {icf_template} client template supplies the approved {section.title.casefold()} language.")
-        drafts.append(SectionDraft(section.section_id, "\n\n".join(values), batch_id=batch.batch_id))
-
-    findings = verify_icf_sections(drafts, study_type, icf_template)
-    if findings:
-        raise ValueError("ICF Section Draft verification failed: " + "; ".join(item["section_id"] for item in findings))
-    merged = tuple(drafts)
-    report = {
-        "status": "passed",
+    repo_root: Path,
+    revision_dir: Path,
+    revision_id: str,
+    reference: Mapping[str, Any],
+    batch: BatchSpec,
+    target_ids: Iterable[str] | None = None,
+    attempts: Mapping[str, int],
+    wave: str,
+    findings: Iterable[Mapping[str, Any]] = (),
+) -> Path:
+    snapshot_path = revision_dir / "approved-reference.json"
+    if not snapshot_path.is_file():
+        _write_json(snapshot_path, reference)
+    elif _read_json(snapshot_path) != dict(reference):
+        raise ValueError("Drafting reference does not match the immutable approved-reference snapshot.")
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    targets = tuple(target_ids or batch.section_ids)
+    sections = _expected_section_contracts(repo_root, reference, batch, targets)
+    scoped = _scoped_source(reference, batch.field_families)
+    governing = governing_resources(repo_root, reference)
+    request_id = _request_id(revision_id, batch.batch_id, attempts, wave, sha256_value(governing))
+    response_path = revision_dir / "hermes/responses" / f"{request_id}.json"
+    payload: dict[str, Any] = {
+        "schema_version": REQUEST_SCHEMA,
+        "request_id": request_id,
+        "revision_id": revision_id,
+        "task": "section_drafting" if batch.artifact != "prs" else "prs_narrative_drafting",
+        "wave": wave,
         "batch_id": batch.batch_id,
-        "section_ids": list(batch.section_ids),
-        "approved_field_families": list(batch.approved_field_families),
-        "prerequisite_ids": list(batch.prerequisite_ids),
-        "approved_input": scoped,
-        "section_drafts": [
-            {"section_id": draft.section_id, "batch_id": draft.batch_id, "content": draft.content, "accepted": draft.accepted}
-            for draft in merged
-        ],
-        "verification": {"status": "passed", "findings": []},
+        "artifact": batch.artifact,
+        "branch": {"study_type": branch, "icf_template": get_path(reference, "meta.icf_template")},
+        "topology_version": TOPOLOGY_VERSION,
+        "prompt_version": PROMPT_VERSION,
+        "governing_resources": governing,
+        "attempts": {target: int(attempts[target]) for target in targets},
+        "approved_input": _source_items(scoped),
+        "approved_source": scoped,
+        "section_contracts": sections,
+        "accepted_context": accepted_context(revision_dir, batch, governing),
+        "prior_target_drafts": [draft for target in targets if (draft := accepted_draft(revision_dir, target, governing))],
+        "findings": [dict(item) for item in findings],
+        "constraints": _request_constraints(),
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
     }
-    result = dict(reference)
-    generated = result.setdefault("generated", {})
-    if not isinstance(generated, dict):
-        generated = {}
-        result["generated"] = generated
-    generated["icf"] = {
-        "drafting_contract_version": f"{icf_template.casefold()}-{study_type.casefold()}-v1",
-        "sections": report["section_drafts"],
-    }
-    if run_dir is not None:
-        path = run_dir / "logs/icf-drafting.json"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return {"reference": result, "report": report, "drafts": merged}
+    payload["request_sha256"] = request_sha256(payload)
+    request_path = revision_dir / "hermes/requests" / f"{request_id}.json"
+    ledger_path = _request_ledger_path(revision_dir, request_id)
+    if ledger_path.is_file():
+        recorded = _read_json(ledger_path)
+        if recorded.get("request_sha256") != payload["request_sha256"]:
+            raise ValueError(f"Draft request identity collision: {request_id}")
+    _write_json(request_path, payload)
+    _write_json(ledger_path, {"request_id": request_id, "request_sha256": payload["request_sha256"]})
+    return request_path
 
 
-__all__ = ["DraftingBatch", "ProspectiveDraftingBatch", "SectionDraft", "plan_batches", "plan_retrospective_batches", "plan_prospective_batches", "draft_prospective_protocol", "draft_prs_narrative", "draft_prospective_icf", "retrospective_batch_plan", "prospective_batch_plan", "merge_section_drafts"]
+def _response_path(revision_dir: Path, request: Mapping[str, Any]) -> Path:
+    return revision_dir / str(request["response_path"])
+
+
+def _request_metadata_current(request: Mapping[str, Any], expected_governing: Mapping[str, Any] | None = None) -> bool:
+    if request.get("schema_version") != REQUEST_SCHEMA or request.get("prompt_version") != PROMPT_VERSION:
+        return False
+    return expected_governing is None or request.get("governing_resources") == dict(expected_governing)
+
+
+def _current_request(revision_dir: Path, request: Mapping[str, Any], expected_governing: Mapping[str, Any] | None = None) -> bool:
+    return _request_metadata_current(request, expected_governing) and _trusted_request_valid(revision_dir, request)
+
+
+def pending_requests(revision_dir: Path, expected_governing: Mapping[str, Any] | None = None) -> list[Path]:
+    result = []
+    for path in sorted((revision_dir / "hermes/requests").glob("*.json")):
+        request = _read_json(path)
+        if not _current_request(revision_dir, request, expected_governing):
+            continue
+        if not _response_path(revision_dir, request).is_file() and not (revision_dir / "hermes/accepted-requests" / path.name).is_file():
+            result.append(path)
+    return result
+
+
+def _allowed_evidence(request: Mapping[str, Any]) -> set[str]:
+    return {f"source:{item.get('path')}" for item in request.get("approved_input", []) if isinstance(item, Mapping)}
+
+
+_GROUNDING_STOPWORDS = {
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "in", "is", "it",
+    "of", "on", "or", "that", "the", "their", "this", "to", "was", "were", "will", "with",
+    "approved", "clinical", "evaluation", "participant", "participants", "prospective", "research",
+    "retrospective", "study", "subject", "subjects",
+}
+
+
+def _leaf_texts(value: Any) -> list[str]:
+    if isinstance(value, Mapping):
+        return [text for child in value.values() for text in _leaf_texts(child)]
+    if isinstance(value, list):
+        return [text for child in value for text in _leaf_texts(child)]
+    text = str(value or "").strip()
+    return [text] if text else []
+
+
+def _grounding_tokens(value: str) -> set[str]:
+    return {
+        token.rstrip("s")
+        for token in re.findall(r"[A-Za-z0-9]+", value.casefold())
+        if (len(token) > 1 or token.isdigit()) and token not in _GROUNDING_STOPWORDS
+    }
+
+
+def _evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
+    """Require observable anchors for every material scalar supplied by a cited source path."""
+    content_tokens = _grounding_tokens(content)
+    leaves = _leaf_texts(value)
+    if not leaves:
+        return True
+    negative_source_values = {"none", "no", "n/a", "na", "not applicable"}
+    negative_content_tokens = {"no", "not", "none", "without", "neither"}
+    if all(leaf.casefold().strip().rstrip(".") in negative_source_values for leaf in leaves):
+        return bool(content_tokens & negative_content_tokens)
+    if not all_items:
+        expected = set().union(*(_grounding_tokens(leaf) for leaf in leaves))
+        if not expected:
+            return True
+        required = 1 if len(expected) == 1 else 2 if len(expected) <= 8 else 3
+        return len(expected & content_tokens) >= required
+    for leaf in leaves:
+        expected = _grounding_tokens(leaf)
+        if not expected:
+            expected = {token.rstrip("s") for token in re.findall(r"[A-Za-z0-9]+", leaf.casefold()) if token}
+        if not expected:
+            continue
+        required = 1 if len(expected) == 1 else 2 if len(expected) <= 8 else 3
+        if len(expected & content_tokens) < required:
+            return False
+    return True
+
+
+def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
+    source = {
+        str(item.get("path")): item.get("value")
+        for item in request.get("approved_input", [])
+        if isinstance(item, Mapping)
+    }
+    return {
+        path: source[path]
+        for path in map(str, contract.get("minimum_evidence", []))
+        if path in source and _leaf_texts(source[path])
+    }
+
+
+def _coverage_findings(
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    section_id: str,
+    content: str,
+    evidence_refs: Iterable[str],
+) -> list[dict[str, Any]]:
+    if contract.get("source_coverage") not in {"all_material_evidence", "all_material_items"}:
+        return []
+    material = _material_source(request, contract)
+    cited = set(map(str, evidence_refs))
+    missing = [path for path in material if f"source:{path}" not in cited]
+    findings: list[dict[str, Any]] = []
+    if missing:
+        findings.append({
+            "category": "drafting",
+            "field": section_id,
+            "issue": f"Section omits material approved evidence: {', '.join(missing)}.",
+            "next_action": "Cover every material minimum_evidence value; do not replace supplied detail with generic prose.",
+        })
+    all_items = contract.get("source_coverage") == "all_material_items"
+    ungrounded = [path for path, value in material.items() if f"source:{path}" in cited and not _evidence_grounded(content, value, all_items=all_items)]
+    if ungrounded:
+        findings.append({
+            "category": "drafting",
+            "field": section_id,
+            "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",
+            "next_action": "Revise the section so each cited source contributes its concrete names, values, time points, criteria, or clinical concepts.",
+        })
+    return findings
+
+
+def _validate_paragraph(paragraph: Any, request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    findings: list[dict[str, Any]] = []
+    if not isinstance(paragraph, Mapping):
+        return None, [{"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}]
+    text = str(paragraph.get("text") or "").strip()
+    evidence_refs = paragraph.get("evidence_refs") if isinstance(paragraph.get("evidence_refs"), list) else []
+    boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
+    if len(text.split()) < 5:
+        findings.append({"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."})
+    lowered = text.casefold()
+    if PLACEHOLDER.search(text) or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE):
+        findings.append({"category": "drafting", "field": section_id, "issue": "Section contains a placeholder or internal drafting language.", "next_action": "Replace it with supported client-facing prose."})
+    request_evidence = _allowed_evidence(request)
+    section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
+    invalid_evidence = sorted(set(map(str, evidence_refs)) - request_evidence)
+    unrelated_evidence = sorted(set(map(str, evidence_refs)) - section_evidence) if evidence_refs else []
+    allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
+    invalid_boilerplate = sorted(set(map(str, boilerplate_refs)) - allowed_boilerplate)
+    if invalid_evidence:
+        findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported evidence references: {', '.join(invalid_evidence)}", "next_action": "Cite only evidence included in the request."})
+    elif unrelated_evidence:
+        findings.append({"category": "drafting", "field": section_id, "issue": f"Evidence is not approved for this section: {', '.join(unrelated_evidence)}", "next_action": "Cite the section's listed evidence or Fixed Clinical Boilerplate."})
+    if invalid_boilerplate:
+        findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported boilerplate references: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
+    if not evidence_refs and not boilerplate_refs:
+        findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": "Cite its approved support."})
+    return {"text": text, "evidence_refs": list(map(str, evidence_refs)), "boilerplate_refs": list(map(str, boilerplate_refs))}, findings
+
+
+def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    if not isinstance(group, Mapping):
+        return None, [{"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}]
+    items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
+    evidence_refs = list(map(str, group.get("evidence_refs") or [])); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
+    findings: list[dict[str, Any]] = []
+    if not items or any(PLACEHOLDER.search(item) or len(item.split()) < 2 for item in items):
+        findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
+    section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
+    invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)
+    allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
+    invalid_boilerplate = sorted(set(boilerplate_refs) - allowed_boilerplate)
+    if invalid_evidence or unrelated: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported section evidence: {', '.join(invalid_evidence or unrelated)}", "next_action": "Cite only listed section evidence."})
+    if invalid_boilerplate: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported boilerplate: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
+    if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": "Cite its approved support."})
+    return {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}, findings
+
+
+def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    findings: list[dict[str, Any]] = []
+    for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
+        expected = RESPONSE_SCHEMA if field == "schema_version" else request.get(field)
+        if response.get(field) != expected:
+            findings.append({"category": "drafting", "field": field, "issue": f"Response binding mismatch for {field}.", "next_action": "Return the exact request identifiers and schema."})
+    producer = response.get("producer")
+    if not isinstance(producer, Mapping) or not str(producer.get("model_id") or "").strip():
+        findings.append({"category": "drafting", "field": "producer.model_id", "issue": "Response does not identify the producing model.", "next_action": "Record the actual model identity."})
+    if findings:
+        return None, findings
+    if request.get("task") == "prs_narrative_drafting":
+        narrative = response.get("narrative")
+        section_ids = {"brief_summary": "prs.brief-summary", "detailed_description": "prs.detailed-description"}
+        contracts = {str(item.get("section_id")): item for item in request.get("section_contracts", []) if isinstance(item, Mapping)}
+        expected_keys = {key for key, section_id in section_ids.items() if section_id in contracts}
+        if not isinstance(narrative, Mapping) or set(narrative) != expected_keys:
+            findings.append({"category": "drafting", "field": "prs-narrative", "target_ids": sorted(contracts), "issue": f"PRS response must contain exactly the requested narrative values: {sorted(expected_keys)}.", "next_action": "Return only the requested narrative fields."})
+            return None, findings
+        clean: dict[str, Any] = {}
+        for key, item in narrative.items():
+            section_id = section_ids[key]
+            section_finding_count = len(findings)
+            if not isinstance(item, Mapping):
+                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative item is not an object.", "next_action": "Return text and evidence_refs."})
+                continue
+            text = str(item.get("text") or "").strip()
+            if re.search(r"</?[A-Za-z_][^>]*>", text) or len(text.split()) < 8:
+                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty, too short, or contains XML markup.", "next_action": "Return source-grounded prose only."})
+            evidence_refs = list(map(str, item.get("evidence_refs") or []))
+            contract = contracts.get(section_id, {})
+            invalid = sorted(set(evidence_refs) - _allowed_evidence(request))
+            target_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
+            unrelated = sorted(set(evidence_refs) - target_evidence)
+            if invalid:
+                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"PRS narrative cites unsupported evidence: {', '.join(invalid)}", "next_action": "Cite only approved request evidence."})
+            elif unrelated:
+                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"Evidence is not approved for this target: {', '.join(unrelated)}", "next_action": "Cite only the target's listed minimum_evidence."})
+            elif not evidence_refs:
+                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative lacks valid approved evidence references.", "next_action": "Cite the target's listed minimum_evidence."})
+            findings.extend(_coverage_findings(request, contract, section_id, text, evidence_refs))
+            for finding in findings[section_finding_count:]:
+                finding["target_ids"] = [section_id]
+            if len(findings) == section_finding_count:
+                clean[key] = {
+                    "text": text,
+                    "evidence_refs": evidence_refs,
+                    "producer": dict(producer),
+                    "request_id": request.get("request_id"),
+                    "request_sha256": request.get("request_sha256"),
+                }
+        accepted = {"kind": "prs", "narrative": clean, "producer": dict(producer), "governing_resources": dict(request.get("governing_resources", {})), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256")}
+        return (accepted if clean else None), findings
+    expected_contracts = {item["section_id"]: item for item in request.get("section_contracts", [])}
+    results = response.get("section_results")
+    if not isinstance(results, list):
+        return None, findings + [{"category": "drafting", "field": request.get("batch_id"), "issue": "Response has no section_results list.", "next_action": "Return one result per requested section."}]
+    result_ids = [str(item.get("section_id")) for item in results if isinstance(item, Mapping)]
+    if len(result_ids) != len(set(result_ids)):
+        findings.append({"category": "drafting", "field": request.get("batch_id"), "issue": "Response repeats a section ID.", "next_action": "Return each requested section exactly once."})
+    missing = sorted(set(expected_contracts) - set(result_ids))
+    unknown = sorted(set(result_ids) - set(expected_contracts))
+    if missing or unknown:
+        findings.append({"category": "drafting", "field": request.get("batch_id"), "issue": f"Section response mismatch; missing={missing}, unknown={unknown}.", "next_action": "Return exactly the requested section IDs."})
+    if findings:
+        return None, findings
+    accepted: list[dict[str, Any]] = []
+    for item in results:
+        if not isinstance(item, Mapping) or str(item.get("section_id")) not in expected_contracts:
+            continue
+        section_id = str(item["section_id"])
+        section_finding_count = len(findings)
+        outcome = str(item.get("outcome") or "")
+        if outcome == "source_gap":
+            findings.append({"category": "drafting", "field": section_id, "issue": "Post-approval drafting attempted to reopen source intake.", "required": ", ".join(map(str, expected_contracts[section_id].get("minimum_evidence") or [])), "next_action": "Retry from the approved evidence and listed Fixed Clinical Boilerplate without requesting more reviewer input."})
+            continue
+        if outcome not in {"drafted", "fixed_boilerplate"}:
+            findings.append({"category": "drafting", "field": section_id, "issue": "Unknown section outcome.", "next_action": "Use drafted or fixed_boilerplate."})
+            continue
+        paragraphs = item.get("paragraphs") if isinstance(item.get("paragraphs"), list) else []
+        clean_paragraphs: list[dict[str, Any]] = []
+        for paragraph in paragraphs:
+            clean, paragraph_findings = _validate_paragraph(paragraph, request, expected_contracts[section_id], section_id)
+            findings.extend(paragraph_findings)
+            if clean:
+                clean_paragraphs.append(clean)
+        raw_lists = item.get("lists") if isinstance(item.get("lists"), list) else []
+        lists = []
+        for group in raw_lists:
+            clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id)
+            findings.extend(list_findings)
+            if clean_group: lists.append(clean_group)
+        combined_content = "\n".join(
+            [paragraph["text"] for paragraph in clean_paragraphs]
+            + [item for group in lists for item in group["items"]]
+        )
+        combined_evidence = [
+            evidence
+            for content_item in [*clean_paragraphs, *lists]
+            for evidence in content_item.get("evidence_refs", [])
+        ]
+        findings.extend(_coverage_findings(
+            request,
+            expected_contracts[section_id],
+            section_id,
+            combined_content,
+            combined_evidence,
+        ))
+        if not clean_paragraphs and not lists:
+            findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
+        if len(findings) == section_finding_count:
+            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
+    return {"kind": "sections", "drafts": accepted}, findings
+
+
+def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Validate available Hermes responses and persist only accepted drafts."""
+    findings: list[dict[str, Any]] = []
+    for request_path in sorted((revision_dir / "hermes/requests").glob("*.json")):
+        accepted_request = revision_dir / "hermes/accepted-requests" / request_path.name
+        request = _read_json(request_path)
+        if not _request_metadata_current(request, expected_governing):
+            continue
+        target_ids = [str(item.get("section_id")) for item in request.get("section_contracts", []) if isinstance(item, Mapping)]
+        if not _trusted_request_valid(revision_dir, request):
+            findings.append({
+                "category": "request-integrity",
+                "field": str(request.get("batch_id") or request_path.stem),
+                "target_ids": target_ids,
+                "issue": "Drafting request content does not match the trusted hash recorded when the request was created.",
+                "required": "Restore the deterministic request or create a new approved revision.",
+            })
+            continue
+        if accepted_request.is_file():
+            recorded = _read_json(accepted_request)
+            if not _trusted_request_valid(revision_dir, recorded) or _canonical(recorded) != _canonical(request):
+                findings.append({
+                    "category": "request-integrity",
+                    "field": str(request.get("batch_id") or request_path.stem),
+                    "target_ids": target_ids,
+                    "issue": "Accepted drafting request no longer matches the immutable request record.",
+                    "required": "Restore the accepted request or create a new approved revision.",
+                })
+            continue
+        response_path = _response_path(revision_dir, request)
+        if not response_path.is_file():
+            continue
+        if (revision_dir / "hermes/rejected" / response_path.name).is_file():
+            continue
+        try:
+            response = _read_json(response_path)
+            accepted, response_findings = validate_response(request, response)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            accepted, response_findings = None, [{
+                "category": "drafting",
+                "field": request.get("batch_id", "unknown"),
+                "issue": f"Hermes response could not be read: {exc}",
+                "next_action": "Replace it with valid response JSON.",
+            }]
+        for finding in response_findings:
+            field = str(finding.get("field") or "")
+            finding["target_ids"] = [field] if field in target_ids else target_ids
+        if accepted:
+            if accepted["kind"] == "prs":
+                accepted_path = revision_dir / "hermes/accepted/prs-narrative.json"
+                if accepted_path.is_file():
+                    existing = _read_json(accepted_path)
+                    if existing.get("governing_resources") == accepted.get("governing_resources"):
+                        merged = dict(existing)
+                        merged["narrative"] = {**dict(existing.get("narrative") or {}), **dict(accepted.get("narrative") or {})}
+                        accepted = merged
+                _write_json(accepted_path, accepted)
+            else:
+                for draft in accepted["drafts"]:
+                    _write_json(revision_dir / "hermes/accepted" / f"{draft['section_id'].replace('/', '_')}.json", draft)
+        has_accepted_content = bool(
+            accepted
+            and (
+                (accepted.get("kind") == "sections" and accepted.get("drafts"))
+                or (accepted.get("kind") == "prs" and accepted.get("narrative"))
+            )
+        )
+        if has_accepted_content:
+            accepted_request.parent.mkdir(parents=True, exist_ok=True)
+            accepted_request.write_text(request_path.read_text(encoding="utf-8"), encoding="utf-8")
+        if response_findings:
+            findings.extend(response_findings)
+            rejected = revision_dir / "hermes/rejected" / response_path.name
+            _write_json(rejected, {"request": request_path.name, "findings": response_findings})
+            continue
+        if not accepted:
+            continue
+    return findings
+
+
+def missing_drafts(revision_dir: Path, reference: Mapping[str, Any], repo_root: Path | None = None) -> list[str]:
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    expected = governing_resources(repo_root, reference) if repo_root is not None else None
+    required = [section.section_id for section in protocol_contract(branch) if section.role != "container"]
+    if branch != "Retrospective":
+        required.extend(section.section_id for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))))
+        prs_record = accepted_prs_record(revision_dir, expected)
+        narrative = prs_record.get("narrative", {})
+        if not isinstance(narrative, Mapping):
+            narrative = {}
+        if "brief_summary" not in narrative:
+            required.append("prs.brief-summary")
+        if "detailed_description" not in narrative:
+            required.append("prs.detailed-description")
+    return [section_id for section_id in required if section_id.startswith("prs.") or accepted_draft(revision_dir, section_id, expected) is None]
+
+
+def schedule_requests(
+    *,
+    repo_root: Path,
+    revision_dir: Path,
+    revision_id: str,
+    reference: Mapping[str, Any],
+    attempts: Mapping[str, int] | None = None,
+    wave: str = "initial",
+    findings: Iterable[Mapping[str, Any]] = (),
+) -> list[Path]:
+    """Create one scoped request per ready batch; prerequisites are explicit."""
+    attempts = dict(attempts or {})
+    expected = governing_resources(repo_root, reference)
+    created: list[Path] = []
+    finding_list = list(findings)
+    plan = batch_plan(
+        str(get_path(reference, "meta.study_type", "")),
+        str(get_path(reference, "meta.icf_template", "Advarra")),
+    )
+    for batch in plan:
+        if batch.prerequisites and any(
+            any(accepted_draft(revision_dir, section_id, expected) is None for section_id in prerequisite.section_ids)
+            for prerequisite_id in batch.prerequisites
+            for prerequisite in plan
+            if prerequisite.batch_id == prerequisite_id
+        ):
+            continue
+        if batch.artifact == "prs":
+            prs_record = accepted_prs_record(revision_dir, expected)
+            narrative = prs_record.get("narrative", {})
+            narrative = narrative if isinstance(narrative, Mapping) else {}
+            key_by_target = {"prs.brief-summary": "brief_summary", "prs.detailed-description": "detailed_description"}
+            targets = [target for target in batch.section_ids if key_by_target[target] not in narrative]
+        else:
+            targets = [section_id for section_id in batch.section_ids if accepted_draft(revision_dir, section_id, expected) is None]
+        if not targets:
+            continue
+        target_findings = [item for item in finding_list if item.get("field") in targets or item.get("field") == batch.batch_id or any(target in targets for target in item.get("target_ids", []) if isinstance(item.get("target_ids"), list))]
+        target_attempts = {target: int(attempts.get(target, 1)) for target in targets}
+        targets = [target for target in targets if target_attempts[target] <= MAX_ATTEMPTS]
+        target_attempts = {target: target_attempts[target] for target in targets}
+        if not targets:
+            continue
+        request_id = _request_id(revision_id, batch.batch_id, target_attempts, wave, sha256_value(expected))
+        existing = revision_dir / "hermes/requests" / f"{request_id}.json"
+        if existing.is_file():
+            continue
+        created.append(create_drafting_request(
+            repo_root=repo_root,
+            revision_dir=revision_dir,
+            revision_id=revision_id,
+            reference=reference,
+            batch=batch,
+            target_ids=targets,
+            attempts=target_attempts,
+            wave=wave,
+            findings=target_findings,
+        ))
+    return created
+
+
+def merged_drafts(revision_dir: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the deterministic, section-addressed generation model."""
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    protocol: list[dict[str, Any]] = []
+    for section in protocol_contract(branch):
+        entry = section.public()
+        draft = accepted_draft(revision_dir, section.section_id)
+        entry["paragraphs"] = list(draft.get("paragraphs") or []) if draft else []
+        entry["lists"] = list(draft.get("lists") or []) if draft else []
+        protocol.append(entry)
+    icf = {}
+    for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))):
+        draft = accepted_draft(revision_dir, section.section_id)
+        icf[section.section_id] = draft or {}
+    prs = accepted_prs_record(revision_dir).get("narrative", {})
+    return {"protocol": protocol, "icf": icf, "prs": prs}
+
+
+def retry_attempts(findings: Iterable[Mapping[str, Any]], prior: Mapping[str, int]) -> tuple[dict[str, int], list[dict[str, Any]]]:
+    """Increment only retryable targets; source intake is closed after approval."""
+    attempts = dict(prior)
+    exhausted: list[dict[str, Any]] = []
+    retry_targets: dict[str, Mapping[str, Any]] = {}
+    for finding in findings:
+        if finding.get("category") in {"source-evidence", "request-integrity"}: continue
+        targets = finding.get("target_ids") if isinstance(finding.get("target_ids"), list) else [finding.get("field")]
+        for target in targets:
+            if target: retry_targets.setdefault(str(target), finding)
+    for target, finding in retry_targets.items():
+        next_attempt = int(attempts.get(target, 1)) + 1; attempts[target] = next_attempt
+        if next_attempt > MAX_ATTEMPTS:
+            exhausted.append({**dict(finding), "field": target, "issue": f"Retry limit reached after {MAX_ATTEMPTS} attempts. {finding.get('issue', '')}".strip()})
+    return attempts, exhausted
+
+
+def invalidate_accepted_targets(revision_dir: Path, target_ids: Iterable[str]) -> None:
+    targets = {str(target) for target in target_ids}
+    prs_path = revision_dir / "hermes/accepted/prs-narrative.json"
+    if targets & {"prs.brief-summary", "prs.detailed-description"} and prs_path.is_file():
+        accepted = _read_json(prs_path)
+        narrative = dict(accepted.get("narrative") or {})
+        if "prs.brief-summary" in targets:
+            narrative.pop("brief_summary", None)
+        if "prs.detailed-description" in targets:
+            narrative.pop("detailed_description", None)
+        if narrative:
+            accepted["narrative"] = narrative
+            _write_json(prs_path, accepted)
+        else:
+            prs_path.unlink()
+    for target in targets:
+        if target.startswith("prs."):
+            continue
+        (revision_dir / "hermes/accepted" / f"{target.replace('/', '_')}.json").unlink(missing_ok=True)
+
+
+def response_template(request: Mapping[str, Any], *, model_id: str = "Hermes subagent") -> dict[str, Any]:
+    """Return the exact response envelope a Hermes subagent must fill."""
+    base = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "revision_id": request["revision_id"],
+        "task": request["task"],
+        "batch_id": request["batch_id"],
+        "producer": {"model_id": model_id},
+    }
+    if request["task"] == "prs_narrative_drafting":
+        keys = {
+            "prs.brief-summary": "brief_summary",
+            "prs.detailed-description": "detailed_description",
+        }
+        base["narrative"] = {
+            keys[section["section_id"]]: {"text": "", "evidence_refs": []}
+            for section in request["section_contracts"]
+        }
+    else:
+        base["section_results"] = [{
+            "section_id": section["section_id"],
+            "outcome": "drafted",
+            "paragraphs": [{"text": "", "evidence_refs": [], "boilerplate_refs": []}],
+            "lists": [],
+        } for section in request["section_contracts"]]
+    return base
+
+
+def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Deterministic acceptance fixture adapter; never used in production."""
+    response = response_template(request, model_id="RecordedAcceptance/v1")
+    source = {str(item.get("path")): item.get("value") for item in request.get("approved_input", []) if isinstance(item, Mapping)}
+
+    def value_text(value: Any) -> str:
+        if isinstance(value, str): return value.strip()
+        if isinstance(value, Mapping):
+            return "; ".join(value_text(item) for item in value.values() if value_text(item))
+        if isinstance(value, list): return "; ".join(value_text(item) for item in value if value_text(item))
+        return "" if value is None else str(value)
+
+    evidence = [(path, value_text(value)) for path, value in source.items() if value_text(value)]
+    if request["task"] == "prs_narrative_drafting":
+        title = next((value for path, value in evidence if path == "study.title"), "The approved study")
+        background = next((value for path, value in evidence if path == "study.background"), title)
+        hypothesis = next((value for path, value in evidence if path == "study.hypothesis"), "")
+        objective = next((value for path, value in evidence if path.startswith("objectives.primary")), background)
+        design = next((value for path, value in evidence if path == "design.study_design"), "")
+        endpoint = next((value for path, value in evidence if path == "endpoints.primary"), "")
+        secondary_endpoints = next((value for path, value in evidence if path == "endpoints.secondary"), "")
+        population = next((value for path, value in evidence if path == "population.study_population"), "")
+        assessments = next((value for path, value in evidence if path == "procedures.assessments"), "")
+        narratives = {
+            "brief_summary": {
+                "text": " ".join(filter(None, [
+                    f"{title}.",
+                    f"The primary objective is {objective}.",
+                    f"The study hypothesis is {hypothesis}." if hypothesis else "",
+                    f"The primary endpoint is {endpoint}." if endpoint else "",
+                    f"The approved study design is {design}.",
+                ])),
+                "evidence_refs": [
+                    "source:study.title", "source:study.hypothesis", "source:objectives.primary",
+                    "source:endpoints.primary", "source:design.study_design",
+                ],
+            },
+            "detailed_description": {
+                "text": "\n\n".join(filter(None, [
+                    f"Background: {background}.",
+                    f"Study hypothesis: {hypothesis}." if hypothesis else "",
+                    f"Primary objective: {objective}.",
+                    f"Study design: {design}.",
+                    f"Study population: {population}.",
+                    f"Study procedures and assessments: {assessments}.",
+                    f"Primary endpoint: {endpoint}.",
+                    f"Secondary endpoints: {secondary_endpoints}." if secondary_endpoints else "",
+                ])),
+                "evidence_refs": [
+                    "source:study.background", "source:study.hypothesis", "source:objectives.primary", "source:design.study_design",
+                    "source:population.study_population", "source:procedures.assessments", "source:endpoints.primary", "source:endpoints.secondary",
+                ],
+            },
+        }
+        available_refs = {f"source:{path}" for path, _value in evidence}
+        for value in narratives.values():
+            value["evidence_refs"] = [ref for ref in value["evidence_refs"] if ref in available_refs]
+        response["narrative"] = {key: value for key, value in narratives.items() if key in response["narrative"]}
+        return response
+    for result, contract in zip(response["section_results"], request["section_contracts"]):
+        fixed = contract.get("fixed_boilerplate") or []
+        allowed_paths = [path for path in contract.get("minimum_evidence", []) if path in source and value_text(source[path])]
+        section_id = str(contract.get("section_id"))
+        if section_id == "study-procedure.enrollment" and fixed and allowed_paths:
+            block = fixed[0]
+            assessment_values = _leaf_texts(source.get("procedures.assessments"))
+            assessments = "; ".join(assessment_values).rstrip(".")
+            raw_schedule = source.get("procedures.visit_schedule_table") or source.get("procedures.visit_schedule") or []
+            visit_items = []
+            if isinstance(raw_schedule, list):
+                for index, item in enumerate(raw_schedule, 1):
+                    if isinstance(item, Mapping):
+                        number = value_text(item.get("visitNumber")) or str(index)
+                        name = value_text(item.get("visitName") or item.get("visit")) or f"Visit {number}"
+                        crf = value_text(item.get("CRFnumber"))
+                        crf_label = crf if crf.casefold().startswith("crf") else f"CRF {crf}" if crf else ""
+                        details = [
+                            value_text(item.get("visitWindow") or item.get("timing")),
+                            crf_label,
+                        ]
+                        detail = "; ".join(value for value in details if value)
+                        visit_items.append(f"Visit {number}: {name}{f' ({detail})' if detail else ''}.")
+                    elif value_text(item):
+                        visit_items.append(f"Visit {index}: {value_text(item)}.")
+            timeline = value_text(source.get("study.timeline")).rstrip(".")
+            detail_parts = []
+            if assessments:
+                detail_parts.append(f"The record review includes these approved assessments: {assessments}.")
+            if timeline:
+                detail_parts.append(f"The study timeline is {timeline}.")
+            detail_refs = [
+                f"source:{path}"
+                for path in ("procedures.assessments", "study.timeline")
+                if path in allowed_paths
+            ]
+            result["outcome"] = "drafted"
+            result["paragraphs"] = [
+                {"text": block["text"], "evidence_refs": [], "boilerplate_refs": [block["boilerplate_id"]]},
+            ]
+            if detail_parts:
+                result["paragraphs"].append({
+                    "text": " ".join(detail_parts),
+                    "evidence_refs": detail_refs,
+                    "boilerplate_refs": [],
+                })
+            if visit_items:
+                result["lists"] = [{
+                    "items": visit_items,
+                    "evidence_refs": ["source:procedures.visit_schedule_table"],
+                    "boilerplate_refs": [],
+                }]
+        elif fixed:
+            block = fixed[0]
+            result["outcome"] = "fixed_boilerplate"
+            result["paragraphs"] = [{"text": block["text"], "evidence_refs": [], "boilerplate_refs": [block["boilerplate_id"]]}]
+        elif allowed_paths:
+            path = allowed_paths[0]; value = value_text(source[path])
+            if section_id == "introduction": prose = value.rstrip(".") + "."
+            elif section_id == "objectives":
+                primary = value_text(source.get("objectives.primary")).rstrip(".")
+                secondary = value_text(source.get("objectives.secondary")).rstrip(".")
+                prose = f"The primary objective of this study is to {primary.removesuffix(' outcomes').casefold()} outcomes."
+                if secondary:
+                    prose += f" The secondary objective is to {secondary.removesuffix(' outcomes').casefold()} outcomes."
+            elif section_id.startswith("subjects.population"): prose = f"The study population consists of {value.rstrip('.').casefold()}."
+            elif section_id.endswith("inclusion"): prose = f"Participants must meet the following inclusion requirements: {value.rstrip('.')} ."
+            elif section_id.endswith("eligibility"):
+                inclusion = value_text(source.get("population.inclusion_criteria")).rstrip(".")
+                exclusion = value_text(source.get("population.exclusion_criteria")).rstrip(".")
+                prose = f"Participants must meet these inclusion criteria: {inclusion}. Participants are excluded when these criteria apply: {exclusion}."
+            elif section_id.endswith("exclusion"): prose = f"Eligibility will be determined using these criteria: {value.rstrip('.')} ."
+            elif section_id == "icf.study-purpose": prose = f"The purpose of this study is to {value.rstrip('.').removesuffix(' outcomes').casefold()} outcomes."
+            elif section_id == "icf.procedures": prose = f"If you choose to take part, the study team will complete these assessments: {value.rstrip('.')} ."
+            elif section_id == "icf.duration": prose = f"Your participation is expected to last {value.rstrip('.')} ."
+            elif section_id == "icf.risks": prose = f"The possible risks or discomforts include {value.rstrip('.').casefold()}."
+            elif section_id == "icf.benefits": prose = value.rstrip(".") + "."
+            elif section_id == "icf.payment": prose = f"For this study, {value.rstrip('.').casefold()}."
+            elif section_id == "study-design.design":
+                design_text = value.rstrip('.').casefold()
+                article = "an" if design_text[:1] in "aeiou" else "a"
+                prose = f"This is {article} {design_text}."
+            elif section_id == "study-procedure.visits": prose = f"Study visits and examinations include {value.rstrip('.')} ."
+            elif section_id == "study-procedure.measurements": prose = f"At applicable visits, the study methods and measurements include {value.rstrip('.')} ."
+            elif section_id == "evaluation-procedures": prose = f"The standard evaluations include {value.rstrip('.')} ."
+            elif section_id == "analysis-plan.datasets": prose = "The analysis data sets will be organized around the outcome and safety-event summaries."
+            elif section_id == "analysis-plan.methodology": prose = "The planned method is descriptive summarization of outcomes and safety events."
+            elif section_id == "analysis-plan.considerations": prose = "Interpretation will separately consider outcome summaries and safety-event summaries."
+            elif section_id == "sample-size":
+                sample_size = value_text(source.get("population.sample_size")).rstrip(".")
+                justification = value_text(source.get("population.sample_justification")).rstrip(".")
+                prose = f"The planned sample size is {sample_size}."
+                if justification:
+                    prose += f" This sample size was selected to support {justification.casefold()}."
+            elif section_id.startswith("risks-benefits.risks"): prose = f"The study risks include {value.rstrip('.').casefold()} ."
+            elif section_id.startswith("risks-benefits.benefits"): prose = value.rstrip(".") + "."
+            else: prose = f"For {str(contract.get('title') or section_id).casefold()}, the study will use {value.rstrip('.')} ."
+            prose = prose.replace(" .", ".")
+            refs = [f"source:{item}" for item in allowed_paths if value_text(source.get(item))]
+            result["paragraphs"] = [{"text": prose, "evidence_refs": refs, "boilerplate_refs": []}]
+        elif evidence:
+            path, value = evidence[0]
+            result["paragraphs"] = [{"text": f"The study information specifies that {value.rstrip('.')}.", "evidence_refs": [f"source:{path}"], "boilerplate_refs": []}]
+        else:
+            result.update({"outcome": "drafted", "paragraphs": []})
+    for result, contract in zip(response["section_results"], request["section_contracts"]):
+        allowed_paths = [
+            path for path in contract.get("minimum_evidence", [])
+            if path in source and value_text(source[path])
+        ]
+        existing = "\n".join(
+            [str(item.get("text") or "") for item in result.get("paragraphs", []) if isinstance(item, Mapping)]
+            + [str(value) for group in result.get("lists", []) if isinstance(group, Mapping) for value in group.get("items", [])]
+        )
+        used_refs = {
+            str(ref)
+            for item in [*result.get("paragraphs", []), *result.get("lists", [])]
+            if isinstance(item, Mapping)
+            for ref in item.get("evidence_refs", [])
+        }
+        all_items = contract.get("source_coverage") == "all_material_items"
+        for path in allowed_paths:
+            ref = f"source:{path}"
+            if ref in used_refs and _evidence_grounded(existing, source[path], all_items=all_items):
+                continue
+            label = path.rsplit(".", 1)[-1].replace("_", " ")
+            section_label = str(contract.get("title") or result.get("section_id") or "section").strip().casefold()
+            if path == "procedures.minimum_days_before_screening_without_participation":
+                text = (
+                    f"At least {value_text(source[path]).rstrip('.')} days without participation "
+                    "in another study are required before screening."
+                )
+            else:
+                text = (
+                    f"For {section_label}, the approved {label} is "
+                    f"{value_text(source[path]).rstrip('.')} ."
+                ).replace(" .", ".")
+            result.setdefault("paragraphs", []).append({"text": text, "evidence_refs": [ref], "boilerplate_refs": []})
+            existing += "\n" + text
+            used_refs.add(ref)
+        if allowed_paths and result.get("outcome") == "fixed_boilerplate":
+            result["outcome"] = "drafted"
+    return response
+
+
+__all__ = [
+    "MAX_ATTEMPTS", "accepted_draft", "create_drafting_request", "ingest_responses",
+    "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
+    "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
+]

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
+import importlib.util
 import json
+import os
 import platform
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import zipfile
@@ -36,6 +40,88 @@ VISUAL_CHECKS = (
 )
 TRANSIENT_REVIEW_STATUSES = {"retryable_error", "transient_error", "unavailable", "temporarily_unavailable"}
 _MAC_FONT_NAMES: set[str] | None = None
+_WINDOWS_FONT_NAMES: set[str] | None = None
+
+SYMBOL_FONT_FALLBACKS = (
+    "Apple Symbols",
+    "Segoe UI Symbol",
+    "Arial Unicode MS",
+    "Arial Unicode",
+    "Symbol",
+    "DejaVu Sans",
+    "Noto Sans",
+    "Arial",
+    "Helvetica",
+    "Liberation Sans",
+)
+SANS_FONT_FALLBACKS = (
+    "Arial",
+    "Helvetica",
+    "Aptos",
+    "Calibri",
+    "Liberation Sans",
+    "DejaVu Sans",
+    "Noto Sans",
+    "Verdana",
+)
+SERIF_FONT_FALLBACKS = (
+    "Times New Roman",
+    "Times",
+    "Liberation Serif",
+    "DejaVu Serif",
+    "Georgia",
+    "Cambria",
+    "Noto Serif",
+)
+MONOSPACE_FONT_FALLBACKS = (
+    "Courier New",
+    "Menlo",
+    "Consolas",
+    "Liberation Mono",
+    "DejaVu Sans Mono",
+    "Noto Sans Mono",
+)
+
+PAGE_RENDERER_BACKENDS = (
+    "pdftoppm",
+    "pdftocairo",
+    "mutool",
+    "ghostscript",
+    "imagemagick",
+    "pymupdf",
+)
+
+BUNDLED_FONT_FILES = {
+    "Liberation Sans": "LiberationSans-Regular.ttf",
+    "Liberation Serif": "LiberationSerif-Regular.ttf",
+    "Liberation Mono": "LiberationMono-Regular.ttf",
+}
+
+APPROVED_PACKAGED_FONT_FALLBACKS = {
+    "arial": "Liberation Sans",
+    "arial unicode ms": "Liberation Sans",
+    "aptos": "Liberation Sans",
+    "calibri": "Liberation Sans",
+    "dejavu sans": "Liberation Sans",
+    "helvetica": "Liberation Sans",
+    "noto sans": "Liberation Sans",
+    "noto sans symbols": "Liberation Sans",
+    "segoe ui symbol": "Liberation Sans",
+    "symbol": "Liberation Sans",
+    "verdana": "Liberation Sans",
+    "times new roman": "Liberation Serif",
+    "courier new": "Liberation Mono",
+}
+
+_PAGE_RENDERER_EXECUTABLES = {
+    "pdftoppm": ("pdftoppm",),
+    "pdftocairo": ("pdftocairo",),
+    "mutool": ("mutool",),
+    "ghostscript": ("gs", "gswin64c", "gswin32c"),
+    "imagemagick": ("magick",),
+}
+
+
 def _text(value: Any) -> str:
     return "" if value is None else str(value).strip()
 
@@ -57,83 +143,556 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def renderer(*, environment: Mapping[str, str] | None = None) -> dict[str, Any] | None:
-    """Discover an installed renderer and report its honest identity."""
+def _executable_candidates(
+    names: Iterable[str],
+    *,
+    environment: Mapping[str, str] | None = None,
+    home: Path | None = None,
+) -> Iterable[tuple[Path, str]]:
+    """Yield PATH and common installation candidates without changing the host."""
+    search_path = (environment or {}).get("PATH") if environment is not None else None
+    yielded: set[str] = set()
+    for name in names:
+        if path := shutil.which(name, path=search_path):
+            resolved = str(Path(path).resolve())
+            yielded.add(resolved.casefold())
+            yield Path(resolved), "PATH"
+
+    user_home = (home or Path.home()).expanduser()
+    directories = [
+        user_home / ".hermes/bin",
+        Path(sys.executable).resolve().parent,
+        Path("/opt/homebrew/bin"),
+        Path("/usr/local/bin"),
+        Path("/usr/bin"),
+        Path("/bin"),
+    ]
+    sources = {
+        str(user_home / ".hermes/bin"): "Hermes bundled tools",
+        str(Path(sys.executable).resolve().parent): "Python environment",
+    }
+    bundled_tools_root = user_home / ".cache/codex-runtimes"
+    if bundled_tools_root.is_dir():
+        for pattern in ("*/dependencies/bin/override", "*/dependencies/bin/fallback"):
+            for directory in sorted(bundled_tools_root.glob(pattern)):
+                directories.append(directory)
+                sources[str(directory)] = "bundled workspace tools"
+    for variable in ("ProgramFiles", "ProgramFiles(x86)", "ProgramData"):
+        if value := (environment or os.environ).get(variable):
+            base = Path(value)
+            directories.extend((base / "LibreOffice/program", base / "ImageMagick", base / "chocolatey/bin"))
+            directories.extend(sorted(base.glob("ImageMagick-*")))
+            directories.extend(sorted(base.glob("gs/gs*/bin")))
+
+    for directory in directories:
+        for name in names:
+            candidates = (directory / name, directory / f"{name}.exe")
+            for candidate in candidates:
+                if not candidate.is_file() or not os.access(candidate, os.X_OK):
+                    continue
+                resolved = str(candidate.resolve())
+                key = resolved.casefold()
+                if key in yielded:
+                    continue
+                yielded.add(key)
+                yield Path(resolved), sources.get(str(directory), "common installation path")
+
+
+def page_renderers(
+    *,
+    environment: Mapping[str, str] | None = None,
+    home: Path | None = None,
+    skill_root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """List installed PDF page renderers in governed fallback order."""
+    identities = []
+    if skill_root is not None:
+        runtime_python = Path(skill_root).resolve() / "runtime/python"
+        for module_name in ("pymupdf", "fitz"):
+            if (runtime_python / module_name / "__init__.py").is_file():
+                identities.append({
+                    "kind": "pymupdf",
+                    "path": f"python:{module_name}",
+                    "module": module_name,
+                    "python_path": str(runtime_python),
+                    "version": "release-owned",
+                    "source": "verified fallback stack",
+                })
+                break
+    has_release_pymupdf = any(item.get("kind") == "pymupdf" for item in identities)
+    for kind in PAGE_RENDERER_BACKENDS:
+        if kind == "pymupdf":
+            if has_release_pymupdf:
+                continue
+            for module_name in ("pymupdf", "fitz"):
+                try:
+                    if importlib.util.find_spec(module_name) is None:
+                        continue
+                    module = importlib.import_module(module_name)
+                    version = getattr(module, "VersionBind", "installed Python package")
+                except (ImportError, RuntimeError, ValueError):
+                    continue
+                identities.append({"kind": kind, "path": f"python:{module_name}", "module": module_name, "version": str(version), "source": "Python environment"})
+                break
+            continue
+        for path, source in _executable_candidates(_PAGE_RENDERER_EXECUTABLES[kind], environment=environment, home=home):
+            identities.append({"kind": kind, "path": str(path), "source": source})
+    return identities
+
+
+def page_renderer(
+    *,
+    environment: Mapping[str, str] | None = None,
+    home: Path | None = None,
+    skill_root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Return the preferred installed PDF page renderer."""
+    identities = page_renderers(environment=environment, home=home, skill_root=skill_root)
+    return identities[0] if identities else None
+
+
+def _ordered_page_images(output_dir: Path) -> list[Path]:
+    def key(path: Path) -> tuple[int, str]:
+        match = re.search(r"(\d+)(?=\.png$)", path.name)
+        return (int(match.group(1)) if match else -1, path.name)
+    return sorted(output_dir.glob("page*.png"), key=key)
+
+
+def rasterize_pdf(
+    pdf: Path,
+    output_dir: Path,
+    identity: Mapping[str, Any],
+    *,
+    first_page_only: bool = False,
+    dpi: int = 130,
+    timeout_seconds: float = 180.0,
+    environment: Mapping[str, str] | None = None,
+) -> list[Path]:
+    """Render PDF pages and normalize every backend to deterministic page-N names."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    for stale in output_dir.glob("page*.png"):
+        stale.unlink()
+    kind = str(identity["kind"])
+    path = str(identity["path"])
+    prefix = output_dir / "page"
+    command: list[str] | None = None
+    if kind == "pdftoppm":
+        command = [path, "-png", "-r", str(dpi)]
+        if first_page_only:
+            command.extend(("-f", "1", "-singlefile"))
+        command.extend((str(pdf), str(prefix)))
+    elif kind == "pdftocairo":
+        command = [path, "-png", "-r", str(dpi)]
+        if first_page_only:
+            command.extend(("-f", "1", "-l", "1", "-singlefile"))
+        command.extend((str(pdf), str(prefix)))
+    elif kind == "mutool":
+        command = [path, "draw", "-F", "png", "-r", str(dpi), "-o", str(output_dir / "page-%d.png"), str(pdf)]
+        if first_page_only:
+            command.append("1")
+    elif kind == "ghostscript":
+        command = [path, "-dSAFER", "-dBATCH", "-dNOPAUSE", "-sDEVICE=png16m", f"-r{dpi}"]
+        if first_page_only:
+            command.extend(("-dFirstPage=1", "-dLastPage=1"))
+        command.extend((f"-sOutputFile={output_dir / 'page-%d.png'}", str(pdf)))
+    elif kind == "imagemagick":
+        source = f"{pdf}[0]" if first_page_only else str(pdf)
+        command = [path, "-density", str(dpi), source, str(output_dir / "page-%d.png")]
+    elif kind == "pymupdf":
+        module_name = str(identity.get("module") or str(identity["path"]).partition(":")[2] or "pymupdf")
+        python_path = str(identity.get("python_path") or "")
+        inserted = False
+        previous_modules: dict[str, Any] = {}
+        if python_path and python_path not in sys.path:
+            sys.path.insert(0, python_path)
+            inserted = True
+        if python_path:
+            for name in list(sys.modules):
+                if name == module_name or name.startswith(module_name + "."):
+                    previous_modules[name] = sys.modules.pop(name)
+        document = None
+        try:
+            pymupdf = importlib.import_module(module_name)
+            if python_path:
+                module_file = Path(str(getattr(pymupdf, "__file__", ""))).resolve()
+                try:
+                    module_file.relative_to(Path(python_path).resolve())
+                except ValueError as exc:
+                    raise RuntimeError(f"PyMuPDF resolved outside the verified fallback stack: {module_file}") from exc
+            document = pymupdf.open(pdf)
+            count = min(len(document), 1) if first_page_only else len(document)
+            matrix = pymupdf.Matrix(dpi / 72.0, dpi / 72.0)
+            for index in range(count):
+                document[index].get_pixmap(matrix=matrix, alpha=False).save(output_dir / f"page-{index + 1}.png")
+        except ImportError as exc:
+            raise RuntimeError(f"PyMuPDF page renderer is unavailable: {exc}") from exc
+        finally:
+            if document is not None:
+                document.close()
+            if python_path:
+                for name in list(sys.modules):
+                    if name == module_name or name.startswith(module_name + "."):
+                        sys.modules.pop(name, None)
+                sys.modules.update(previous_modules)
+            if inserted:
+                sys.path.remove(python_path)
+    else:
+        raise RuntimeError(f"Unsupported page renderer: {kind}")
+
+    if command is not None:
+        result = subprocess.run(
+            command,
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+            env=dict(environment) if environment else None,
+        )
+        if result.returncode:
+            detail = (result.stderr or result.stdout).strip()
+            raise RuntimeError(f"{kind} page-image export failed: {detail}")
+
+    pages = _ordered_page_images(output_dir)
+    if not pages:
+        raise RuntimeError(f"{kind} page-image export produced no PNG pages.")
+    temporary = []
+    for index, page in enumerate(pages, 1):
+        target = output_dir / f".normalized-{index}.png"
+        page.replace(target)
+        temporary.append(target)
+    normalized = []
+    for index, page in enumerate(temporary, 1):
+        target = output_dir / ("page.png" if first_page_only else f"page-{index}.png")
+        page.replace(target)
+        normalized.append(target)
+    return normalized
+
+
+def renderers(
+    *,
+    environment: Mapping[str, str] | None = None,
+    skill_root: Path | None = None,
+    deadline_monotonic: float | None = None,
+    clock: Any = time.monotonic,
+) -> list[dict[str, Any]]:
+    """List usable DOCX renderers in governed fidelity/fallback order."""
     search_path = (environment or {}).get("PATH") if environment is not None else None
     system = platform.system()
+    identities: list[dict[str, Any]] = []
+    yielded: set[str] = set()
+
+    def append(identity: dict[str, Any]) -> None:
+        key = str(identity.get("path", "")).casefold()
+        if key and key not in yielded:
+            yielded.add(key)
+            identities.append(identity)
+
+    def probe_timeout(cap: float = 20.0) -> float | None:
+        if deadline_monotonic is None:
+            return cap
+        remaining = deadline_monotonic - clock()
+        return min(cap, remaining) if remaining > 0 else None
+
     if system == "Windows":
         try:
-            import win32com.client
-            word = win32com.client.DispatchEx("Word.Application")
-            version = str(word.Version); word.Quit()
-            return {"kind": "Microsoft Word", "path": "COM:Word.Application", "version": version, "platform": "Windows"}
-        except Exception:
+            if importlib.util.find_spec("win32com.client") is not None:
+                append({"kind": "Microsoft Word", "path": "COM:Word.Application", "version": "installed COM application", "platform": "Windows", "source": "host application"})
+        except (ImportError, ValueError):
             pass
     if system == "Darwin" and Path("/Applications/Microsoft Word.app").exists():
-        return {"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "version": "installed macOS application"}
-    for executable in ("libreoffice", "soffice"):
-        if path := shutil.which(executable, path=search_path):
+        append({"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "version": "installed macOS application", "platform": "Darwin", "source": "host application"})
+    office_candidates = list(_executable_candidates(("libreoffice", "soffice"), environment=environment))
+    if system == "Darwin":
+        office_candidates.append((Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"), "macOS application"))
+    for candidate, source in office_candidates:
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            path = str(candidate)
+            timeout = probe_timeout()
+            if timeout is None:
+                break
             try:
-                result = subprocess.run([path, "--version"], text=True, capture_output=True, timeout=20, env=dict(environment) if environment else None)
+                result = subprocess.run([path, "--version"], text=True, capture_output=True, timeout=timeout, env=dict(environment) if environment else None)
             except (OSError, subprocess.TimeoutExpired):
                 continue
             if result.returncode == 0:
-                return {"kind": "LibreOffice", "path": path, "version": result.stdout.strip(), "platform": system}
+                append({"kind": "LibreOffice", "path": path, "version": result.stdout.strip(), "platform": system, "source": source})
     if system == "Darwin" and Path("/Applications/Pages.app").exists():
-        return {"kind": "Pages", "path": "/Applications/Pages.app", "version": "installed macOS application"}
-    return None
+        append({"kind": "Pages", "path": "/Applications/Pages.app", "version": "installed macOS application", "platform": "Darwin", "source": "host application"})
+
+    root = (skill_root or Path(__file__).resolve().parents[1]).resolve()
+    bundled_patterns = (
+        "runtime/**/Contents/MacOS/soffice",
+        "runtime/**/program/soffice.exe",
+        "runtime/**/program/soffice",
+        "runtime/**/soffice",
+    )
+    for pattern in bundled_patterns:
+        for candidate in sorted(root.glob(pattern)):
+            if not candidate.is_file() or not os.access(candidate, os.X_OK):
+                continue
+            timeout = probe_timeout()
+            if timeout is None:
+                return identities
+            try:
+                result = subprocess.run([str(candidate), "--version"], text=True, capture_output=True, timeout=timeout, env=dict(environment) if environment else None)
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            if result.returncode == 0:
+                append({
+                    "kind": "LibreOffice",
+                    "path": str(candidate.resolve()),
+                    "version": result.stdout.strip(),
+                    "platform": system,
+                    "source": "verified fallback stack",
+                })
+    return identities
+
+
+def renderer(
+    *,
+    environment: Mapping[str, str] | None = None,
+    skill_root: Path | None = None,
+) -> dict[str, Any] | None:
+    """Return the preferred renderer from the governed fallback ladder."""
+    identities = renderers(environment=environment, skill_root=skill_root)
+    return identities[0] if identities else None
 
 
 def _template_fonts(path: Path) -> set[str]:
-    """Read declared font families without changing the client template."""
+    """Return font families that can render visible text in the DOCX stories.
+
+    Word stores fonts for dormant styles and alternate writing systems alongside
+    the fonts used by visible runs.  Requiring every declaration makes renderer
+    preflight depend on fonts that cannot affect an English document.  Resolve
+    each visible run through its run, character-style, paragraph-style, and
+    document-default hierarchy instead.
+    """
     namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    ns = {"w": namespace}
+    attr = lambda name: f"{{{namespace}}}{name}"
     fonts: set[str] = set()
+
+    def font_values(element: ET._Element | None) -> dict[str, str]:
+        if element is None:
+            return {}
+        node = element.find("w:rPr/w:rFonts", ns) if element.tag != attr("rPr") else element.find("w:rFonts", ns)
+        if node is None:
+            return {}
+        return {
+            key: value.strip()
+            for key in ("ascii", "hAnsi", "eastAsia", "cs")
+            if (value := node.get(attr(key))) and value.strip()
+        }
+
+    def scripts(text: str) -> set[str]:
+        required: set[str] = set()
+        for character in text:
+            codepoint = ord(character)
+            if character.isspace() or character.isascii():
+                required.add("ascii")
+            elif (
+                0x3040 <= codepoint <= 0x30FF
+                or 0x3400 <= codepoint <= 0x9FFF
+                or 0xAC00 <= codepoint <= 0xD7AF
+                or 0xF900 <= codepoint <= 0xFAFF
+            ):
+                required.add("eastAsia")
+            elif (
+                0x0590 <= codepoint <= 0x08FF
+                or 0x0900 <= codepoint <= 0x0DFF
+                or 0xFB1D <= codepoint <= 0xFEFC
+            ):
+                required.add("cs")
+            else:
+                required.add("hAnsi")
+        return required or {"ascii"}
+
     with zipfile.ZipFile(path) as package:
-        for name in ("word/document.xml", "word/styles.xml", "word/header1.xml", "word/footer1.xml"):
-            if name not in package.namelist():
-                continue
+        styles: dict[str, tuple[str | None, dict[str, str]]] = {}
+        defaults: dict[str, str] = {}
+        if "word/styles.xml" in package.namelist():
+            styles_root = ET.fromstring(package.read("word/styles.xml"))
+            defaults = font_values(styles_root.find("w:docDefaults/w:rPrDefault/w:rPr", ns))
+            for style in styles_root.findall("w:style", ns):
+                style_id = style.get(attr("styleId"))
+                if not style_id:
+                    continue
+                based_on = style.find("w:basedOn", ns)
+                styles[style_id] = (
+                    based_on.get(attr("val")) if based_on is not None else None,
+                    font_values(style),
+                )
+
+        def style_fonts(style_id: str | None) -> dict[str, str]:
+            resolved: dict[str, str] = {}
+            seen: set[str] = set()
+            while style_id and style_id not in seen:
+                seen.add(style_id)
+                based_on, declared = styles.get(style_id, (None, {}))
+                for key, value in declared.items():
+                    resolved.setdefault(key, value)
+                style_id = based_on
+            return resolved
+
+        story_names = [
+            name for name in package.namelist()
+            if name == "word/document.xml"
+            or re.fullmatch(r"word/(?:header|footer)\d+\.xml", name)
+            or name in {"word/footnotes.xml", "word/endnotes.xml", "word/comments.xml"}
+        ]
+        for name in story_names:
             root = ET.fromstring(package.read(name))
-            for element in root.iter(f"{{{namespace}}}rFonts"):
-                for attribute in ("ascii", "hAnsi", "eastAsia", "cs"):
-                    value = element.get(f"{{{namespace}}}{attribute}")
-                    if value:
+            for run in root.iter(attr("r")):
+                text = "".join(node.text or "" for node in run.findall("w:t", ns))
+                symbols = run.findall("w:sym", ns)
+                if not text.strip() and not symbols:
+                    continue
+                for symbol in symbols:
+                    if value := symbol.get(attr("font")):
                         fonts.add(value.strip())
+
+                direct = font_values(run.find("w:rPr", ns))
+                run_style = run.find("w:rPr/w:rStyle", ns)
+                character = style_fonts(run_style.get(attr("val")) if run_style is not None else None)
+                paragraph = run.getparent()
+                while paragraph is not None and paragraph.tag != attr("p"):
+                    paragraph = paragraph.getparent()
+                paragraph_style = paragraph.find("w:pPr/w:pStyle", ns) if paragraph is not None else None
+                inherited = style_fonts(paragraph_style.get(attr("val")) if paragraph_style is not None else None)
+                sources = (direct, character, inherited, defaults)
+                for script in scripts(text):
+                    fallbacks = {
+                        "ascii": ("ascii", "hAnsi"),
+                        "hAnsi": ("hAnsi", "ascii"),
+                        "eastAsia": ("eastAsia", "hAnsi", "ascii"),
+                        "cs": ("cs", "hAnsi", "ascii"),
+                    }[script]
+                    selected = next(
+                        (source[key] for source in sources for key in fallbacks if key in source),
+                        None,
+                    )
+                    if selected:
+                        fonts.add(selected)
     return fonts
 
 
-def _font_probe(font: str, *, environment: Mapping[str, str] | None = None) -> tuple[bool, str]:
-    global _MAC_FONT_NAMES
+def _font_probe(
+    font: str,
+    *,
+    environment: Mapping[str, str] | None = None,
+    timeout_seconds: float = 10.0,
+) -> tuple[bool | None, str]:
+    global _MAC_FONT_NAMES, _WINDOWS_FONT_NAMES
     executable = shutil.which("fc-match", path=(environment or {}).get("PATH"))
     if not executable and platform.system() == "Darwin":
         try:
             if _MAC_FONT_NAMES is None:
-                result = subprocess.run(["/usr/sbin/system_profiler", "SPFontsDataType", "-json"], text=True, capture_output=True, timeout=10)
+                result = subprocess.run(["/usr/sbin/system_profiler", "SPFontsDataType", "-json"], text=True, capture_output=True, timeout=max(0.001, min(10.0, timeout_seconds)))
                 if result.returncode != 0:
                     raise RuntimeError(result.stderr.strip() or "system_profiler failed")
                 entries = json.loads(result.stdout).get("SPFontsDataType", [])
-                _MAC_FONT_NAMES = {str(item.get("_name", "")).casefold() for item in entries if isinstance(item, Mapping)}
+                _MAC_FONT_NAMES = set()
+                for item in entries:
+                    if not isinstance(item, Mapping):
+                        continue
+                    _MAC_FONT_NAMES.add(str(item.get("_name", "")).casefold())
+                    for face in item.get("typefaces", []):
+                        if not isinstance(face, Mapping):
+                            continue
+                        for key in ("_name", "family", "fullname"):
+                            if value := str(face.get(key, "")).strip():
+                                _MAC_FONT_NAMES.add(value.casefold())
             normalized_font = font.casefold()
             available = any(
                 name.removesuffix(".ttf").removesuffix(".otf").removesuffix(".ttc").removesuffix(" bold").removesuffix(" italic").strip() == normalized_font
                 for name in _MAC_FONT_NAMES
             )
             return available, "macOS system font inventory"
-        except (OSError, subprocess.TimeoutExpired, ValueError, json.JSONDecodeError):
+        except (OSError, RuntimeError, subprocess.TimeoutExpired, ValueError, json.JSONDecodeError):
+            pass
+    if not executable and platform.system() == "Windows":
+        try:
+            if _WINDOWS_FONT_NAMES is None:
+                import winreg
+                _WINDOWS_FONT_NAMES = set()
+                key_path = r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"
+                for hive in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                    try:
+                        with winreg.OpenKey(hive, key_path) as key:
+                            for index in range(winreg.QueryInfoKey(key)[1]):
+                                name, filename, _kind = winreg.EnumValue(key, index)
+                                _WINDOWS_FONT_NAMES.add(re.sub(r"\s*\([^)]*\)\s*$", "", str(name)).casefold())
+                                _WINDOWS_FONT_NAMES.add(Path(str(filename)).stem.casefold())
+                    except OSError:
+                        continue
+            normalized_font = font.casefold()
+            return normalized_font in _WINDOWS_FONT_NAMES, "Windows system font inventory"
+        except (ImportError, OSError):
             pass
     if not executable:
-        return False, "fontconfig fc-match is not installed; required font availability cannot be verified."
+        return None, "font inventory is unavailable; availability will be decided by render evidence."
     try:
         result = subprocess.run(
             [executable, "-f", "%{family}", font],
             text=True,
             capture_output=True,
-            timeout=5,
+            timeout=max(0.001, min(5.0, timeout_seconds)),
             env=dict(environment) if environment else None,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return False, f"font probe failed: {exc}"
+        return None, f"font probe unavailable: {exc}"
     families = {part.strip().casefold() for part in result.stdout.split(",") if part.strip()}
     return result.returncode == 0 and font.casefold() in families, result.stdout.strip()
+
+
+def _bundled_font_path(repo_root: Path, font: str) -> Path | None:
+    filename = BUNDLED_FONT_FILES.get(font)
+    if not filename:
+        return None
+    path = repo_root / "assets/fallback-fonts" / filename
+    return path if path.is_file() else None
+
+
+def _runtime_environment(repo_root: Path, environment: Mapping[str, str] | None) -> dict[str, str]:
+    runtime = dict(environment or os.environ)
+    font_dir = repo_root / "assets/fallback-fonts"
+    if font_dir.is_dir():
+        existing = runtime.get("SAL_FONTPATH", "")
+        runtime["SAL_FONTPATH"] = os.pathsep.join(part for part in (str(font_dir), existing) if part)
+    return runtime
+
+
+def _font_fallback_candidates(font: str) -> tuple[str, ...]:
+    """Return visually compatible cross-platform fallbacks in preference order."""
+    normalized = font.casefold()
+    if "symbol" in normalized or "dingbat" in normalized or "wingding" in normalized:
+        candidates = SYMBOL_FONT_FALLBACKS
+    elif any(marker in normalized for marker in ("mono", "courier", "consolas", "menlo", "code")):
+        candidates = MONOSPACE_FONT_FALLBACKS
+    elif any(marker in normalized for marker in ("serif", "times", "georgia", "cambria", "garamond", "minion")):
+        candidates = SERIF_FONT_FALLBACKS
+    else:
+        candidates = SANS_FONT_FALLBACKS
+    seen = {normalized}
+    ordered = []
+    for candidate in candidates:
+        key = candidate.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(candidate)
+    return tuple(ordered)
+
+
+def _approved_packaged_font_fallback(font: str) -> str:
+    """Map a missing template font to one audited release-owned substitute."""
+    normalized = font.casefold().strip()
+    if normalized in APPROVED_PACKAGED_FONT_FALLBACKS:
+        return APPROVED_PACKAGED_FONT_FALLBACKS[normalized]
+    if any(marker in normalized for marker in ("mono", "courier", "consolas", "menlo", "code")):
+        return "Liberation Mono"
+    if any(marker in normalized for marker in ("serif", "times", "georgia", "cambria", "garamond", "minion")):
+        return "Liberation Serif"
+    return "Liberation Sans"
 
 
 def preflight(
@@ -142,55 +701,173 @@ def preflight(
     *,
     deadline_seconds: float = 30.0,
     environment: Mapping[str, str] | None = None,
+    renderer_identities: Iterable[Mapping[str, Any]] | None = None,
+    page_renderer_identities: Iterable[Mapping[str, Any]] | None = None,
+    clock: Any = time.monotonic,
 ) -> dict[str, Any]:
-    """Verify renderer, fonts, PDF export, and page-image tooling before drafting."""
-    started = time.monotonic()
-    identity = renderer(environment=environment)
+    """Resolve and smoke-test Render Assurance capabilities.
+
+    Inventory uncertainty is evidence to test, not evidence of absence. The
+    function only blocks after every local renderer/page-renderer combination
+    has failed its disposable render.
+    """
+    started = clock()
+    deadline = started + max(0.0, deadline_seconds)
+
+    def remaining() -> float:
+        return max(0.0, deadline - clock())
+
+    runtime_environment = _runtime_environment(repo_root, environment)
+    renderer_candidates = (
+        [dict(item) for item in renderer_identities]
+        if renderer_identities is not None
+        else renderers(
+            environment=runtime_environment,
+            skill_root=repo_root,
+            deadline_monotonic=deadline,
+            clock=clock,
+        )
+    )
+    page_candidates = (
+        [dict(item) for item in page_renderer_identities]
+        if page_renderer_identities is not None
+        else page_renderers(environment=runtime_environment, skill_root=repo_root) if remaining() > 0 else []
+    )
+    identity = None
+    page_identity = None
+    renderer_attempts: list[dict[str, Any]] = []
+    page_attempts: list[dict[str, Any]] = []
     findings: list[dict[str, Any]] = []
-    if identity is None:
-        findings.append({"category": "renderer", "field": "renderer", "issue": "No supported Word, LibreOffice, or Pages renderer is installed."})
     protocol_template, icf_template = template_paths(repo_root, reference)
     templates = [path for path in (protocol_template, icf_template) if path is not None]
     required_fonts = sorted({font for path in templates for font in _template_fonts(path)})
     font_results: dict[str, Any] = {}
-    if identity is not None:
-        for font in required_fonts:
-            available, detail = _font_probe(font, environment=environment)
-            font_results[font] = {"available": available, "match": detail}
-            if not available:
-                findings.append({"category": "renderer", "field": f"font:{font}", "issue": f"Required font {font!r} is unavailable or could not be verified: {detail}"})
+    font_substitutions: dict[str, str] = {}
+    bundled_substitution = False
+    for font in required_fonts:
+        probe_remaining = remaining()
+        if probe_remaining <= 0:
+            font_results[font] = {"available": None, "match": "Render Assurance deadline expired before font inventory."}
+            continue
+        available, detail = _font_probe(font, environment=runtime_environment, timeout_seconds=probe_remaining)
+        font_results[font] = {"available": available, "match": detail}
+        if available is not False:
+            continue
+        candidate = _approved_packaged_font_fallback(font)
+        bundled = _bundled_font_path(repo_root, candidate)
+        if bundled is not None:
+            font_substitutions[font] = candidate
+            font_results[font].update({
+                "substitute": candidate,
+                "substitute_match": f"bundled approved compatible font: {bundled.relative_to(repo_root)}",
+            })
+            bundled_substitution = True
+        else:
+            font_results[font]["attempted_fallbacks"] = [candidate]
     smoke: dict[str, Any] = {"status": "not_run"}
-    if identity is not None and not findings and time.monotonic() - started < deadline_seconds:
-        try:
-            with tempfile.TemporaryDirectory(prefix="hermes-renderer-preflight-") as directory:
-                root = Path(directory)
-                source = root / "preflight.docx"
-                document = Document()
-                document.add_paragraph("Hermes renderer preflight")
-                document.save(source)
-                pdf = _render_pdf(source, root, identity, environment=environment, timeout_seconds=max(1.0, deadline_seconds - (time.monotonic() - started)))
+    if renderer_candidates and page_candidates and remaining() > 0:
+        with tempfile.TemporaryDirectory(prefix="hermes-renderer-preflight-") as directory:
+            root = Path(directory)
+            source = root / "preflight.docx"
+            document = Document()
+            document.add_paragraph("Hermes renderer preflight")
+            for font in required_fonts:
+                selected = font_substitutions.get(font, font)
+                run = document.add_paragraph().add_run(f"{selected}: Aa 123 •")
+                run.font.name = selected
+                fonts = run._element.get_or_add_rPr().get_or_add_rFonts()
+                for attribute in ("ascii", "hAnsi", "eastAsia", "cs"):
+                    fonts.set(qn(f"w:{attribute}"), selected)
+            document.save(source)
+            for candidate_renderer in renderer_candidates:
+                attempt_remaining = remaining()
+                if attempt_remaining <= 0:
+                    break
+                if bundled_substitution and candidate_renderer.get("kind") != "LibreOffice":
+                    renderer_attempts.append({
+                        "renderer": candidate_renderer,
+                        "status": "skipped",
+                        "issue": "Bundled fallback fonts are isolated to the verified LibreOffice runtime.",
+                    })
+                    continue
+                try:
+                    pdf = _render_pdf(
+                        source,
+                        root,
+                        candidate_renderer,
+                        environment=runtime_environment,
+                        timeout_seconds=max(0.001, attempt_remaining),
+                    )
+                except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                    renderer_attempts.append({"renderer": candidate_renderer, "status": "failed", "issue": str(exc)})
+                    continue
                 page_dir = root / "pages"
-                page_dir.mkdir()
-                result = subprocess.run(
-                    [shutil.which("pdftoppm", path=(environment or {}).get("PATH")) or "pdftoppm", "-png", "-f", "1", "-singlefile", str(pdf), str(page_dir / "page")],
-                    text=True,
-                    capture_output=True,
-                    timeout=max(1.0, deadline_seconds - (time.monotonic() - started)),
-                    env=dict(environment) if environment else None,
-                )
-                page = page_dir / "page.png"
-                if result.returncode or not page.is_file():
-                    raise RuntimeError(f"Page-image export failed: {result.stderr or result.stdout}")
-                smoke = {"status": "passed", "pdf": "disposable/preflight.pdf", "page_image": "disposable/preflight.png", "pages": len(PdfReader(pdf).pages)}
-        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-            findings.append({"category": "renderer", "field": "preflight", "issue": str(exc)})
-            smoke = {"status": "blocked", "issue": str(exc)}
-    elif identity is not None and not findings:
-        findings.append({"category": "renderer", "field": "preflight", "issue": f"Renderer preflight exceeded its {deadline_seconds:.1f}s deadline."})
-    elapsed = time.monotonic() - started
-    if elapsed > deadline_seconds:
+                for candidate_page_renderer in page_candidates:
+                    attempt_remaining = remaining()
+                    if attempt_remaining <= 0:
+                        break
+                    try:
+                        rasterize_pdf(
+                            pdf,
+                            page_dir,
+                            candidate_page_renderer,
+                            first_page_only=True,
+                            timeout_seconds=max(0.001, attempt_remaining),
+                            environment=runtime_environment,
+                        )
+                    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                        page_attempts.append({"renderer": candidate_page_renderer, "status": "failed", "issue": str(exc)})
+                        continue
+                    identity = candidate_renderer
+                    page_identity = candidate_page_renderer
+                    renderer_attempts.append({"renderer": candidate_renderer, "status": "passed"})
+                    page_attempts.append({"renderer": candidate_page_renderer, "status": "passed"})
+                    smoke = {"status": "passed", "pdf": "disposable/preflight.pdf", "page_image": "disposable/preflight.png", "pages": len(PdfReader(pdf).pages)}
+                    break
+                if identity is not None:
+                    break
+                renderer_attempts.append({
+                    "renderer": candidate_renderer,
+                    "status": "failed",
+                    "issue": "Every available page renderer failed for this renderer.",
+                })
+    if identity is None:
+        if not renderer_candidates:
+            issue = "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."
+            field = "renderer"
+        elif not page_candidates:
+            issue = "No supported PDF page renderer is available, including bundled PyMuPDF."
+            field = "page_renderer"
+        else:
+            issue = "Every local renderer/page-renderer combination failed its smoke render."
+            field = "preflight"
+        findings.append({"category": "renderer", "field": field, "issue": issue})
+        smoke = {"status": "blocked", "issue": issue}
+    else:
+        for font, result in font_results.items():
+            if result.get("available") is None:
+                result["resolution"] = "render_verified"
+    elapsed = clock() - started
+    if elapsed > deadline_seconds and identity is None:
         findings.append({"category": "renderer", "field": "preflight", "issue": f"Renderer preflight exceeded its {deadline_seconds:.1f}s deadline ({elapsed:.3f}s)."})
-    return {"status": "passed" if not findings else "blocked", "renderer": identity, "required_fonts": required_fonts, "fonts": font_results, "smoke": smoke, "deadline_seconds": deadline_seconds, "elapsed_seconds": round(elapsed, 3), "findings": findings}
+    ordered_renderers = ([identity] if identity else []) + [candidate for candidate in renderer_candidates if candidate != identity]
+    ordered_page_renderers = ([page_identity] if page_identity else []) + [candidate for candidate in page_candidates if candidate != page_identity]
+    return {
+        "status": "passed" if not findings else "blocked",
+        "renderer": identity,
+        "renderer_candidates": ordered_renderers,
+        "renderer_attempts": renderer_attempts,
+        "page_renderer": page_identity,
+        "page_renderer_candidates": ordered_page_renderers,
+        "page_renderer_attempts": page_attempts,
+        "required_fonts": required_fonts,
+        "fonts": font_results,
+        "font_substitutions": font_substitutions,
+        "smoke": smoke,
+        "deadline_seconds": deadline_seconds,
+        "elapsed_seconds": round(elapsed, 3),
+        "findings": findings,
+    }
 
 
 def _render_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any], *, environment: Mapping[str, str] | None = None, timeout_seconds: float = 180.0) -> Path:
@@ -201,42 +878,38 @@ def _render_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any], *, en
             raise RuntimeError(f"LibreOffice PDF export failed: {result.stderr or result.stdout}")
         return path
     if identity.get("platform") == "Windows":
-        return _windows_word_pdf(docx, output_dir)
-    return _mac_pdf(docx, output_dir, identity)
+        return _windows_word_pdf(docx, output_dir, timeout_seconds=timeout_seconds)
+    return _mac_pdf(docx, output_dir, identity, timeout_seconds=timeout_seconds)
 
 
-def _libreoffice_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any]) -> Path:
-    result = subprocess.run([str(identity["path"]), "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(docx)], text=True, capture_output=True, timeout=180)
-    path = output_dir / f"{docx.stem}.pdf"
-    if result.returncode or not path.is_file(): raise RuntimeError(f"LibreOffice PDF export failed: {result.stderr or result.stdout}")
-    return path
-
-
-def _mac_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any]) -> Path:
+def _mac_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any], *, timeout_seconds: float = 180.0) -> Path:
     app = "Microsoft Word" if identity["kind"] == "Microsoft Word" else "Pages"
     output = output_dir / f"{docx.stem}.pdf"
     if app == "Microsoft Word":
         script = 'on run argv\nset src to POSIX file (item 1 of argv)\nset dst to POSIX file (item 2 of argv)\ntell application "Microsoft Word"\nset d to open src\nsave as d file name dst file format format PDF\nclose d saving no\nend tell\nend run'
     else:
         script = 'on run argv\nset src to POSIX file (item 1 of argv)\nset dst to POSIX file (item 2 of argv)\ntell application "Pages"\nset d to open src\nexport d to dst as PDF\nclose d saving no\nend tell\nend run'
-    result = subprocess.run(["osascript", "-e", script, str(docx), str(output)], text=True, capture_output=True, timeout=180)
+    result = subprocess.run(["osascript", "-e", script, str(docx), str(output)], text=True, capture_output=True, timeout=timeout_seconds)
     if result.returncode or not output.is_file(): raise RuntimeError(f"{app} PDF export failed: {result.stderr or result.stdout}")
     return output
 
 
-def _windows_word_pdf(docx: Path, output_dir: Path) -> Path:
-    import win32com.client
+def _windows_word_pdf(docx: Path, output_dir: Path, *, timeout_seconds: float = 180.0) -> Path:
     output = output_dir / f"{docx.stem}.pdf"
-    word = win32com.client.DispatchEx("Word.Application")
-    word.Visible = False
-    document = None
-    try:
-        document = word.Documents.Open(str(docx.resolve()), ReadOnly=True)
-        document.ExportAsFixedFormat(str(output.resolve()), 17)
-    finally:
-        if document is not None:
-            document.Close(False)
-        word.Quit()
+    script = (
+        "import sys\nimport win32com.client\n"
+        "word=win32com.client.DispatchEx('Word.Application'); word.Visible=False; document=None\n"
+        "try:\n document=word.Documents.Open(sys.argv[1], ReadOnly=True); document.ExportAsFixedFormat(sys.argv[2], 17)\n"
+        "finally:\n document.Close(False) if document is not None else None; word.Quit()\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(docx.resolve()), str(output.resolve())],
+        text=True,
+        capture_output=True,
+        timeout=timeout_seconds,
+    )
+    if result.returncode:
+        raise RuntimeError(f"Microsoft Word PDF export failed: {result.stderr or result.stdout}")
     if not output.is_file(): raise RuntimeError("Microsoft Word PDF export did not produce a file.")
     return output
 
@@ -257,31 +930,106 @@ def _blank_pdf_pages(path: Path) -> list[int]:
     return blank
 
 
-def render_pages(revision_dir: Path, *, renderer_identity: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    identity = dict(renderer_identity) if renderer_identity is not None else renderer()
-    if identity is None: return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Word, LibreOffice, or Pages renderer is installed."}]}
-    render_root = revision_dir / "rendered"; render_root.mkdir(parents=True, exist_ok=True)
-    artifacts = []; findings: list[dict[str, Any]] = []
-    try:
-        for docx in sorted((revision_dir / "candidate").glob("*.docx")):
-            if identity["kind"] == "LibreOffice": pdf = _libreoffice_pdf(docx, render_root, identity)
-            elif identity.get("platform") == "Windows": pdf = _windows_word_pdf(docx, render_root)
-            else: pdf = _mac_pdf(docx, render_root, identity)
-            for _ in range(3):
-                if not refresh_toc_from_pdf(docx, pdf): break
-                pdf.unlink(missing_ok=True)
-                if identity["kind"] == "LibreOffice": pdf = _libreoffice_pdf(docx, render_root, identity)
-                elif identity.get("platform") == "Windows": pdf = _windows_word_pdf(docx, render_root)
-                else: pdf = _mac_pdf(docx, render_root, identity)
-            page_dir = render_root / docx.stem; page_dir.mkdir(parents=True, exist_ok=True)
-            for stale_page in page_dir.glob("page-*.png"):
-                stale_page.unlink()
-            prefix = page_dir / "page"
-            command = [shutil.which("pdftoppm") or "pdftoppm", "-png", "-r", "130", str(pdf), str(prefix)]
-            result = subprocess.run(command, text=True, capture_output=True, timeout=180)
-            pages = sorted(page_dir.glob("page-*.png"))
-            expected = len(PdfReader(pdf).pages)
-            if result.returncode or len(pages) != expected or expected == 0: raise RuntimeError(f"Page rendering failed for {docx.name}: expected {expected}, got {len(pages)}. {result.stderr}")
+def render_pages(
+    revision_dir: Path,
+    *,
+    renderer_identity: Mapping[str, Any] | None = None,
+    page_renderer_identity: Mapping[str, Any] | None = None,
+    renderer_identities: Iterable[Mapping[str, Any]] | None = None,
+    page_renderer_identities: Iterable[Mapping[str, Any]] | None = None,
+    deadline_monotonic: float | None = None,
+    clock: Any = time.monotonic,
+) -> dict[str, Any]:
+    repo_root = Path(__file__).resolve().parents[1]
+    runtime_environment = _runtime_environment(repo_root, None)
+    renderer_candidates = [dict(item) for item in (renderer_identities or [])]
+    if renderer_identity is not None:
+        renderer_candidates = [dict(renderer_identity), *[item for item in renderer_candidates if dict(item) != dict(renderer_identity)]]
+    if not renderer_candidates:
+        renderer_candidates = renderers(environment=runtime_environment, skill_root=repo_root)
+    page_candidates = [dict(item) for item in (page_renderer_identities or [])]
+    if page_renderer_identity is not None:
+        page_candidates = [dict(page_renderer_identity), *[item for item in page_candidates if dict(item) != dict(page_renderer_identity)]]
+    if not page_candidates:
+        page_candidates = page_renderers(environment=runtime_environment, skill_root=repo_root)
+    if not renderer_candidates:
+        return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."}]}
+    if not page_candidates:
+        return {"status": "blocked", "renderer": renderer_candidates[0], "findings": [{"category": "renderer", "field": "page_renderer", "issue": "No supported PDF page renderer is available."}]}
+
+    render_root = revision_dir / "rendered"
+    renderer_attempts: list[dict[str, Any]] = []
+    page_attempts: list[dict[str, Any]] = []
+    docx_paths = sorted((revision_dir / "candidate").glob("*.docx"))
+    for renderer_index, identity in enumerate(renderer_candidates, 1):
+        remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
+        if remaining <= 0:
+            break
+        attempt_root = revision_dir / ".render-attempts" / f"renderer-{renderer_index}"
+        if attempt_root.exists():
+            shutil.rmtree(attempt_root)
+        attempt_root.mkdir(parents=True)
+        pdfs: dict[Path, Path] = {}
+        try:
+            for docx in docx_paths:
+                remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired("DOCX rendering", 0)
+                pdf = _render_pdf(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
+                for _ in range(3):
+                    if not refresh_toc_from_pdf(docx, pdf):
+                        break
+                    pdf.unlink(missing_ok=True)
+                    remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired("DOCX rendering", 0)
+                    pdf = _render_pdf(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
+                pdfs[docx] = pdf
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            renderer_attempts.append({"renderer": identity, "status": "failed", "issue": str(exc)})
+            continue
+
+        selected_page_renderer = None
+        selected_pages: dict[Path, list[Path]] = {}
+        for candidate in page_candidates:
+            current_pages: dict[Path, list[Path]] = {}
+            try:
+                for docx, pdf in pdfs.items():
+                    remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired("PDF page rendering", 0)
+                    page_dir = attempt_root / docx.stem / str(candidate["kind"])
+                    pages = rasterize_pdf(pdf, page_dir, candidate, dpi=130, timeout_seconds=min(180.0, remaining), environment=runtime_environment)
+                    expected = len(PdfReader(pdf).pages)
+                    if len(pages) != expected or expected == 0:
+                        raise RuntimeError(f"Page rendering failed for {docx.name}: expected {expected}, got {len(pages)}.")
+                    current_pages[docx] = pages
+            except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+                page_attempts.append({"renderer": candidate, "status": "failed", "issue": str(exc)})
+                continue
+            selected_page_renderer = candidate
+            selected_pages = current_pages
+            page_attempts.append({"renderer": candidate, "status": "passed"})
+            break
+        if selected_page_renderer is None:
+            renderer_attempts.append({"renderer": identity, "status": "failed", "issue": "Every available page renderer failed for the exported PDFs."})
+            continue
+
+        findings: list[dict[str, Any]] = []
+        artifacts = []
+        if render_root.exists():
+            shutil.rmtree(render_root)
+        render_root.mkdir(parents=True)
+        for docx, source_pdf in pdfs.items():
+            pdf = render_root / source_pdf.name
+            shutil.copy2(source_pdf, pdf)
+            page_dir = render_root / docx.stem
+            page_dir.mkdir()
+            pages = []
+            for index, source_page in enumerate(selected_pages[docx], 1):
+                page = page_dir / f"page-{index}.png"
+                shutil.copy2(source_page, page)
+                pages.append(page)
             for page_number in _blank_pdf_pages(pdf):
                 findings.append({
                     "category": "visual",
@@ -291,10 +1039,30 @@ def render_pages(revision_dir: Path, *, renderer_identity: Mapping[str, Any] | N
                     "target_ids": [f"layout:{docx.stem}"],
                     "issue": f"Rendered {docx.stem} contains a textless page at page {page_number}.",
                 })
-            artifacts.append({"artifact": docx.stem, "docx": docx.relative_to(revision_dir).as_posix(), "docx_sha256": sha256_file(docx), "pdf": pdf.relative_to(revision_dir).as_posix(), "pdf_sha256": sha256_file(pdf), "pages": [{"page": i, "path": page.relative_to(revision_dir).as_posix(), "sha256": sha256_file(page)} for i, page in enumerate(pages, 1)]})
-    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
-        return {"status": "blocked", "renderer": identity, "findings": [{"category": "renderer", "field": "rendering", "issue": str(exc)}]}
-    return {"status": "passed" if not findings else "blocked", "renderer": identity, "artifacts": artifacts, "findings": findings}
+            artifacts.append({
+                "artifact": docx.stem,
+                "docx": docx.relative_to(revision_dir).as_posix(),
+                "docx_sha256": sha256_file(docx),
+                "pdf": pdf.relative_to(revision_dir).as_posix(),
+                "pdf_sha256": sha256_file(pdf),
+                "pages": [{"page": i, "path": page.relative_to(revision_dir).as_posix(), "sha256": sha256_file(page)} for i, page in enumerate(pages, 1)],
+            })
+        renderer_attempts.append({"renderer": identity, "status": "passed"})
+        return {
+            "status": "passed" if not findings else "blocked",
+            "renderer": identity,
+            "renderer_attempts": renderer_attempts,
+            "page_renderer": selected_page_renderer,
+            "page_renderer_attempts": page_attempts,
+            "artifacts": artifacts,
+            "findings": findings,
+        }
+    return {
+        "status": "blocked",
+        "renderer_attempts": renderer_attempts,
+        "page_renderer_attempts": page_attempts,
+        "findings": [{"category": "renderer", "field": "rendering", "issue": "Every local renderer/page-renderer combination failed."}],
+    }
 
 
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -386,11 +1154,21 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             current_section = heading_to_id.get(heading_key(paragraph.text), current_section)
             continue
         key = text.casefold()
-        if len(text.split()) >= 8 and key in seen and seen[key] != current_section:
-            findings.append({"category": "content", "field": current_section or "protocol", "target_ids": sorted({seen[key], current_section}), "issue": f"Exact paragraph is duplicated across protocol sections {seen[key]} and {current_section}."})
+        if len(text.split()) >= 8 and key in seen:
+            if seen[key] == current_section:
+                findings.append({"category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."})
+            else:
+                findings.append({"category": "content", "field": current_section or "protocol", "target_ids": sorted({seen[key], current_section}), "issue": f"Exact paragraph is duplicated across protocol sections {seen[key]} and {current_section}."})
         elif len(text.split()) >= 8:
             seen[key] = current_section
     if branch == "Retrospective":
+        if "approved visit schedule table is" in normalized_visible:
+            findings.append({
+                "category": "content",
+                "field": "study-procedure.enrollment",
+                "target_ids": ["study-procedure.enrollment"],
+                "issue": "Retrospective study procedure contains flattened visit-schedule serialization instead of readable client-facing content.",
+            })
         for field in ("population.inclusion_criteria", "population.exclusion_criteria"):
             value = get_path(reference, field, [])
             items = value if isinstance(value, list) else [value]
@@ -486,8 +1264,29 @@ def create_verification_requests(revision_dir: Path, reference: Mapping[str, Any
         raise ValueError("Verification boilerplate does not match the content contract.")
     payloads = [
         {"schema_version": VERIFY_SCHEMA, "request_id": f"{revision_dir.name}.verify.content", "task": "clinical_content_verification", "revision_id": revision_dir.name, "artifacts": content_files, "approved_source": reference, "authorized_boilerplate": authorized_boilerplate, "sections": sections, "checks": list(CONTENT_CHECKS), "cross_document_checks": list(CROSS_DOCUMENT_CHECKS), "instructions": "Assess every listed section against every content check and assess every cross-document check. Findings must include target_ids for affected section IDs. Treat exact authorized Fixed Clinical Boilerplate as approved non-study-specific content, not invention. Do not fail optional fields, dates, instruments, scoring rules, denominators, or policies that are absent from the approved source; instead fail only an unsupported affirmative claim or an omission of supplied material evidence. A document-control date may default from approval, while an unknown version must remain blank and must not be failed merely for being unknown.", "response_path": f"hermes/verification-responses/{revision_dir.name}.verify.content.json"},
-        {"schema_version": VERIFY_SCHEMA, "request_id": f"{revision_dir.name}.verify.visual", "task": "rendered_page_visual_verification", "revision_id": revision_dir.name, "renderer": render_report.get("renderer"), "artifacts": render_report.get("artifacts", []), "checks": list(VISUAL_CHECKS), "instructions": "Inspect every supplied page image. Do not infer pass from file existence or document text.", "response_path": f"hermes/verification-responses/{revision_dir.name}.verify.visual.json"},
     ]
+    visual_artifacts = list(render_report.get("artifacts", []))
+    visual_batches = [[artifact] for artifact in visual_artifacts] or [[]]
+    for index, artifacts in enumerate(visual_batches, start=1):
+        artifact_name = str(artifacts[0].get("artifact", "documents")) if artifacts else "documents"
+        artifact_id = re.sub(r"[^a-z0-9]+", "-", artifact_name.casefold()).strip("-") or f"document-{index}"
+        request_id = f"{revision_dir.name}.verify.visual.{artifact_id}"
+        payloads.append({
+            "schema_version": VERIFY_SCHEMA,
+            "request_id": request_id,
+            "task": "rendered_page_visual_verification",
+            "revision_id": revision_dir.name,
+            "renderer": render_report.get("renderer"),
+            "artifacts": artifacts,
+            "checks": list(VISUAL_CHECKS),
+            "instructions": "Inspect every supplied page image for this document. Do not infer pass from file existence or document text.",
+            "reviewer_policy": {
+                "image_inspection_required": True,
+                "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",
+                "deterministic_checks_alone_can_pass": False,
+            },
+            "response_path": f"hermes/verification-responses/{request_id}.json",
+        })
     for payload in payloads:
         payload["request_sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     expected = {payload["request_id"]: payload for payload in payloads}
@@ -521,8 +1320,17 @@ def pending_verifications(revision_dir: Path) -> list[Path]:
 
 def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     findings: list[dict[str, Any]] = []; evidence: dict[str, Any] = {}
-    for request_path in sorted((revision_dir / "hermes/verification-requests").glob("*.json")):
-        request = _json(request_path); response_path = revision_dir / request["response_path"]
+    request_records = [
+        (request_path, _json(request_path))
+        for request_path in sorted((revision_dir / "hermes/verification-requests").glob("*.json"))
+    ]
+    task_counts: dict[str, int] = {}
+    for _, request in request_records:
+        task = str(request.get("task"))
+        task_counts[task] = task_counts.get(task, 0) + 1
+    for request_path, request in request_records:
+        response_path = revision_dir / request["response_path"]
+        evidence_key = request["task"] if task_counts[str(request.get("task"))] == 1 else request["request_id"]
         if not response_path.is_file():
             findings.append({"category": "verification", "field": request["task"], "issue": "Independent Hermes verification response is missing."}); continue
         try: response = _json(response_path)
@@ -545,7 +1353,7 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
                 "target_ids": [target],
                 "issue": _text(error.get("message")) or "Independent Hermes verifier reported a transient API failure.",
             })
-            evidence[request["task"]] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient"}
+            evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient"}
             continue
         issues = response.get("findings") if isinstance(response.get("findings"), list) else []
         if response.get("status") != "passed" or issues:
@@ -590,7 +1398,7 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
             valid_page_rows = [p for p in response.get("page_assessments", []) if isinstance(p, Mapping) and p.get("status") == "passed" and set(p.get("checks", [])) == set(VISUAL_CHECKS)]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
             if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append({"category": "visual", "field": "page_assessments", "target_ids": ["verification:visual"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."})
-        evidence[request["task"]] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer}
+        evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer}
     return findings, evidence
 
 
@@ -602,4 +1410,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "pending_verifications", "preflight", "quality_report", "render_pages", "renderer", "sha256_file", "validate_verifications"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications"]

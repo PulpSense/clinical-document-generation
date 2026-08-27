@@ -44,7 +44,7 @@ APPROVED SOURCE CHANGES
 The production implementation will contain six Python scripts:
 
 - `workflow.py`: the only public entrypoint; controls preparation, approval, validation, generation, retries, and delivery.
-- `contracts.py`: defines the required inputs for each study branch and the required sections for each document.
+- `contracts.py`: defines required inputs, study branches, section contracts, and Source-of-Truth parsing.
 - `drafting.py`: assigns sections to subagents, manages targeted retries, and merges accepted drafts by stable section ID.
 - `rendering.py`: creates the Protocol and ICF DOCX files using the bundled client templates.
 - `quality.py`: checks content, shared facts, document structure, visual rendering, and release readiness.
@@ -60,7 +60,7 @@ clinical-document-generation/
 |-- README.md                   # Installation and usage guide
 |-- scripts/
 |   |-- workflow.py             # Public workflow and delivery loop
-|   |-- contracts.py            # Branch and document requirements
+|   |-- contracts.py         # Branch, source, and section contracts
 |   |-- drafting.py             # Subagent assignments and retries
 |   |-- rendering.py            # Protocol and ICF DOCX generation
 |   |-- quality.py              # Content, formatting, and release checks

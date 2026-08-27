@@ -211,6 +211,44 @@ def test_input_provenance_requires_an_explicit_approved_normalization(tmp_path: 
         raise AssertionError("unbound normalized source was accepted")
 
 
+def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delivery(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    revision_id = "r-test"
+    (run_dir / "reference").mkdir(parents=True)
+    (run_dir / "output").mkdir()
+    (run_dir / "reference/study.reference.json").write_text(
+        json.dumps({
+            "meta": {"study_type": "Retrospective"},
+            "approval": {"revision_id": revision_id},
+        }),
+        encoding="utf-8",
+    )
+    (run_dir / "output/protocol.docx").write_bytes(b"published")
+
+    without_delivery = inspect_run(
+        run_dir,
+        final_result={"status": "passed", "stage": "delivery"},
+        elapsed_seconds=1.0,
+        timed_out=False,
+        child_returncode=0,
+    )
+    with_delivery = inspect_run(
+        run_dir,
+        final_result={
+            "status": "passed",
+            "stage": "desktop_delivery",
+            "delivery": {"confirmed": True},
+        },
+        elapsed_seconds=1.0,
+        timed_out=False,
+        child_returncode=0,
+    )
+
+    assert without_delivery["outcome"] != DiagnosticOutcome.PASSED.value
+    assert with_delivery["outcome"] == DiagnosticOutcome.PASSED.value
+    assert with_delivery["required_outputs"] == ["protocol.docx"]
+
+
 def test_diagnostic_collects_stage_history_rejections_and_first_wave_concurrency(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
     revision_id = "r-test"

@@ -12,6 +12,10 @@ _Avoid_: good protocol, actual protocol, sample protocol
 A retained client protocol example bundled with the skill so each run can follow the established client document shape without requiring the client to upload an example again.
 _Avoid_: uploaded example, temporary reference, sample file
 
+**Client Template Authority**:
+A retained client DOCX that defines the Layout Contract and, for an ICF family, the Client ICF Language. Its study-specific values are reference data and never evidence for another study.
+_Avoid_: sample document, content source, generic template
+
 **Source Intake Packet**:
 One or more client-provided source files, notes, references, emails, PDFs, DOCX files, or Markdown files used to produce the reviewed source-of-truth Markdown.
 _Avoid_: messy input, client dump, source blob
@@ -114,6 +118,14 @@ _Avoid_: active renderer, local renderer, whatever opens it
 The best supported document renderer available on the generation host—preferred in the order Microsoft Word, LibreOffice, then Pages—and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
 _Avoid_: Client Rendering Authority, generic renderer, invisible converter
 
+**Verified Fallback Stack**:
+The release-owned assurance capability that keeps mandatory Visual QA available when preferred host capabilities fail. Its verified identity belongs to the active skill release.
+_Avoid_: optional dependency, best-effort tooling, host assumption
+
+**Render Assurance**:
+The mandatory evidence-backed result showing that the exact Generated Protocol and Generated ICF bytes were rendered and visually reviewed under an identified Active Renderer. An environment or tooling fault leaves assurance unresolved rather than failed; a genuine visual defect must be repaired and reassessed.
+_Avoid_: render status, preflight pass, renderer availability
+
 **Visual QA**:
 The deterministic and visual-agent review of rendered evidence that rejects unresolved placeholders, clipped content, unexpected blank pages, orphaned headings, split table rows, overflowing tables, duplicate sections, inconsistent styles, missing headers or footers, and TOC/page mismatches. Natural content-driven pagination is allowed.
 _Avoid_: format check, PDF check, eyeballing
@@ -123,8 +135,16 @@ The branch of the workflow that produces prospective-study protocol documents fr
 _Avoid_: protocol path, prospective generation, GP path
 
 **Layout Contract**:
-The Reference Protocol’s branding, heading hierarchy, headers, footers, tables, and general visual character as rendered by the Client Rendering Authority. Study-specific content may paginate naturally; exact reference page breaks and page numbers are not required.
+The client reference’s page geometry, branding, typography, styles, heading hierarchy, numbering, headers, footers, tables, signature structures, document-control layout, and general visual character as rendered by the Client Rendering Authority. Study-specific content may paginate naturally; exact reference page breaks and page numbers are not required, and known Presentation Defects are not preserved.
 _Avoid_: exact page clone, formatting preference, style goal, desired look
+
+**Document Control Date**:
+The reviewer-editable date displayed in generated Protocol document-control surfaces using the client format `dd MMM yyyy`. When absent from the Source Intake Packet, it defaults to the Source-of-Truth preparation date and remains stable across approval, retries, and later rendering.
+_Avoid_: generation date, current render date, automatic timestamp
+
+**Document Control Version**:
+The reviewer-controlled Protocol version displayed consistently in applicable document-control surfaces. It remains blank when absent from the Canonical Approved Source and is never defaulted from a Client Template Authority.
+_Avoid_: template version, automatic version, default 1.0
 
 **Word TOC**:
 A real Microsoft Word table-of-contents field configured to refresh when opened, with locally validated cached display values produced after final content insertion and repagination by the Active Renderer.
@@ -155,7 +175,7 @@ Renderer behavior that creates or repeats DOCX paragraphs, list items, or table 
 _Avoid_: text replacement, blob insertion, newline stuffing
 
 **Content Completeness Gate**:
-A Delivery Gate that verifies every required leaf section and major table uses an allowed content mode, covers its declared evidence, contains no unresolved placeholder, makes no unsupported study-specific claim, and does not contradict the Canonical Approved Source or another section.
+A Delivery Gate that verifies every required leaf section and major table satisfies its section-specific drafting expectations, covers all material declared evidence and Operational Detail, contains no unresolved placeholder, makes no unsupported study-specific claim, and does not contradict the Canonical Approved Source or another section. Reference-calibrated content density may identify suspiciously compressed drafting, but raw word count alone never establishes completeness.
 _Avoid_: word-count check, rough completeness review
 
 **Operational Detail**:

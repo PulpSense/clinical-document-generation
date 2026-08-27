@@ -91,7 +91,7 @@ def test_desktop_operation_routes_handoffs_then_confirms_the_published_manifest(
     manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
     manifest_path.parent.mkdir(parents=True)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    monkeypatch.setattr(workflow, "generate", lambda run_dir: next(results))
+    monkeypatch.setattr(workflow, "generate", lambda run_dir, **_kwargs: next(results))
 
     def route(handoffs, remaining_seconds):
         calls.append((handoffs, remaining_seconds))
@@ -112,10 +112,66 @@ def test_desktop_operation_routes_handoffs_then_confirms_the_published_manifest(
     assert state["operation_id"] == "default"
 
 
+def test_desktop_operation_uses_parent_visual_review_when_delegated_review_fails(tmp_path, monkeypatch):
+    handoff = {
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+        "task": "rendered_page_visual_verification",
+        "fallback_owner": "parent",
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "passed", "stage": "delivery", "manifest": "revisions/r1/delivery-manifest.json"},
+    ])
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    parent_reviews = []
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        fallback_handoff_runner=lambda handoffs, _remaining: parent_reviews.extend(handoffs),
+        opener=lambda path: b"1234" if path.endswith("Protocol final.docx") else b"567",
+        budget_seconds=30,
+    )
+
+    assert result["status"] == "passed"
+    assert parent_reviews == [handoff]
+
+
+def test_desktop_operation_routes_parent_takeover_without_an_optional_second_runner(tmp_path, monkeypatch):
+    handoff = {
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+        "task": "rendered_page_visual_verification",
+        "fallback_owner": "parent",
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    routed = []
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda handoffs, _remaining: routed.append(handoffs),
+        opener=lambda _path: b"unused",
+        budget_seconds=30,
+    )
+
+    assert result["status"] == "blocked"
+    assert len(routed) == 2
+    assert routed[1][0]["response_path"] == handoff["response_path"]
+    assert routed[1][0]["reviewer_owner"] == "parent"
+
+
 def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_after_timeout(tmp_path, monkeypatch):
     now = [100.0]
     generated = []
-    monkeypatch.setattr(workflow, "generate", lambda run_dir: generated.append(True) or {
+    monkeypatch.setattr(workflow, "generate", lambda run_dir, **_kwargs: generated.append(True) or {
         "status": "awaiting_hermes",
         "stage": "drafting",
         "handoffs": [{"request_path": "draft.json"}],
@@ -150,7 +206,7 @@ def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fa
     manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
     manifest_path.parent.mkdir(parents=True)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-    monkeypatch.setattr(workflow, "generate", lambda run_dir: {
+    monkeypatch.setattr(workflow, "generate", lambda run_dir, **_kwargs: {
         "status": "passed",
         "stage": "delivery",
         "manifest": "revisions/r1/delivery-manifest.json",
@@ -166,3 +222,43 @@ def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fa
     assert result["status"] == "blocked"
     assert result["stage"] == "desktop_delivery"
     assert result["delivery"]["confirmed"] is False
+
+
+def test_runtime_target_is_ten_to_twelve_minutes_with_a_thirty_minute_ceiling():
+    assert workflow.NORMAL_RUNTIME_TARGET_MIN_SECONDS == 600.0
+    assert workflow.NORMAL_RUNTIME_TARGET_MAX_SECONDS == 720.0
+    assert workflow.DESKTOP_OPERATION_BUDGET_SECONDS == 1800.0
+    assert workflow.performance_classification(599.0) == "below_target_window"
+    assert workflow.performance_classification(600.0) == "target_window"
+    assert workflow.performance_classification(720.0) == "target_window"
+    assert workflow.performance_classification(721.0) == "above_target_within_deadline"
+    assert workflow.performance_classification(1800.0) == "above_target_within_deadline"
+    assert workflow.performance_classification(1800.001) == "deadline_exceeded"
+
+
+def test_desktop_operation_continues_after_fifteen_minutes(tmp_path, monkeypatch):
+    now = [100.0]
+    manifest = _manifest()
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    def generated(_run_dir, **_kwargs):
+        now[0] = 1001.0
+        return {
+            "status": "passed",
+            "stage": "delivery",
+            "manifest": "revisions/r1/delivery-manifest.json",
+        }
+
+    monkeypatch.setattr(workflow, "generate", generated)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_: None,
+        opener=lambda path: b"1234" if path.endswith("Protocol final.docx") else b"567",
+        clock=lambda: now[0],
+    )
+
+    assert result["status"] == "passed"
+    assert result["elapsed_seconds"] == 901.0
+    assert result["performance_classification"] == "above_target_within_deadline"
