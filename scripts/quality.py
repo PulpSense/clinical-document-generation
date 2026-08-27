@@ -1588,10 +1588,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 "issue": "Required participant signature block is missing from the ICF.",
             }, "document_structure_defect"))
         stale_icf_claims = {
-            "eye tests and procedures": "icf",
-            "routine cataract surgery": "icf",
-            "company that makes the handpiece": "icf",
-            "no additional side effects or risks expected": "icf",
+            "eye tests and procedures": "icf.procedures",
+            "routine cataract surgery": "icf.study-purpose",
+            "company that makes the handpiece": "icf.study-purpose",
+            "no additional side effects or risks expected": "icf.risks",
             "not to be used for participant enrollment": "icf.study-purpose",
             "advarra institutional review board": "icf.privacy",
             "all charges for medical care": "icf.injury",
@@ -1624,11 +1624,18 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         ))
         if not consent_to_sign:
             findings.append(recovery_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, "document_structure_defect"))
-    return [
-        item if item.get("recovery_class") in RECOVERY_POLICIES
-        else recovery_finding(item, "drafting_defect")
-        for item in findings
-    ]
+    governed = []
+    for item in findings:
+        if item.get("recovery_class") in RECOVERY_POLICIES:
+            governed.append(item)
+            continue
+        targets = item.get("target_ids") if isinstance(item.get("target_ids"), list) else []
+        unlocalized = not targets or any(str(target).strip().casefold() in {"", "protocol", "icf"} for target in targets)
+        governed.append(recovery_finding(
+            item,
+            "document_structure_defect" if unlocalized else "drafting_defect",
+        ))
+    return governed
 
 
 def create_verification_requests(

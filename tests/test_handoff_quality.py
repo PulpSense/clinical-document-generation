@@ -620,6 +620,44 @@ def test_protocol_leaf_heading_without_body_content_is_blocked(tmp_path):
     )
 
 
+def test_unlocalized_protocol_duplicate_stops_as_a_structural_defect(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    candidate = revision / "candidate"
+    candidate.mkdir(parents=True)
+    document = Document()
+    document.add_paragraph(reference["study"]["title"])
+    repeated = "This repeated paragraph appears before any contracted section heading is recognized."
+    document.add_paragraph(repeated)
+    document.add_paragraph(repeated)
+    for section in __import__("contracts").protocol_contract("Retrospective"):
+        style = "Heading 1" if section.number.count(".") == 1 else "Heading 2"
+        document.add_paragraph(f"{section.number} {section.title}", style=style)
+        if section.role == "leaf":
+            document.add_paragraph(f"Complete source-grounded content for {section.title.lower()} is present in this section.")
+    document.save(candidate / "protocol.docx")
+
+    findings = deterministic_content_check(revision, reference)
+    duplicate = next(item for item in findings if "duplicated in protocol section protocol" in item["issue"])
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {}},
+        reference,
+        revision,
+        {},
+        [duplicate],
+        "quality",
+    )
+
+    assert (duplicate["recovery_class"], duplicate["action"]) == ("document_structure_defect", "preserve_and_stop")
+    assert result["stage"] == "document_structure"
+
+
 def test_complete_bundle_is_part_of_governing_resources():
     resources = governing_resources(ROOT, fixture())
     bundle = resources["contracted_template_bundle"]
