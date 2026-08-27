@@ -22,13 +22,15 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
+from docx import Document
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
 from contracts import ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, preflight, quality_report, render_pages, renderer, renderers, sha256_file as quality_sha256
+from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, recovery_finding, render_assurance, renderer, renderers, sha256_file as quality_sha256
 from rendering import render_documents
 
 
@@ -323,27 +325,42 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
         item for item in page_renderers(skill_root=skill_root)
         if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
     ]
-    assurance = preflight(
-        skill_root,
-        reference,
-        deadline_seconds=deadline_seconds,
-        renderer_identities=fallback_renderers,
-        page_renderer_identities=fallback_pages,
-    )
+    with tempfile.TemporaryDirectory(prefix="clinical-installation-assurance-") as directory:
+        revision_dir = Path(directory)
+        candidate_dir = revision_dir / "candidate"
+        candidate_dir.mkdir()
+        document = Document()
+        run = document.add_paragraph().add_run("Clinical document installation smoke")
+        run.font.name = "Liberation Sans"
+        document.save(candidate_dir / "installation-smoke.docx")
+        assurance = render_assurance(
+            skill_root,
+            revision_dir,
+            reference,
+            deadline_seconds=deadline_seconds,
+            renderer_identities=fallback_renderers,
+            page_renderer_identities=fallback_pages,
+            rebuild_candidate=lambda _substitutions: {"status": "passed"},
+        )
     if assurance.get("status") != "passed":
         findings.extend(assurance.get("findings", []))
-    candidates = assurance.get("renderer_candidates") or []
+    render_evidence = assurance.get("render", {})
+    candidates = [attempt.get("adapter") for attempt in render_evidence.get("renderer_attempts", []) if attempt.get("adapter")]
     if not fallback_renderers:
         findings.append({"category": "installation", "field": "fallback_renderer", "issue": "The versioned local LibreOffice fallback was not discovered."})
     if not fallback_pages:
         findings.append({"category": "installation", "field": "fallback_page_renderer", "issue": "The versioned local PyMuPDF page renderer was not discovered."})
     return {
         "status": "passed" if not findings else "blocked",
-        "renderer": assurance.get("renderer"),
+        "renderer": render_evidence.get("renderer"),
         "renderer_candidates": candidates,
-        "page_renderer": assurance.get("page_renderer"),
+        "page_renderer": render_evidence.get("page_renderer"),
         "fonts": assurance.get("fonts", {}),
-        "smoke": assurance.get("smoke", {}),
+        "smoke": {
+            "status": assurance.get("status"),
+            "pages": sum(len(item.get("pages", [])) for item in render_evidence.get("artifacts", [])),
+        },
+        "render_assurance": assurance,
         "findings": findings,
     }
 
@@ -906,6 +923,53 @@ def _record_build(revision_dir: Path, fingerprint: str, governing: Mapping[str, 
     return build
 
 
+def _cached_candidate_structure(revision_dir: Path, fingerprint: str) -> dict[str, Any] | None:
+    path = revision_dir / "candidate-structure.json"
+    if not path.is_file():
+        return None
+    try:
+        snapshot = _read(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    if snapshot.get("fingerprint") != fingerprint:
+        return None
+    for artifact in snapshot.get("candidate_files", []):
+        target = revision_dir / str(artifact.get("path"))
+        if not target.is_file() or sha256_file(target) != artifact.get("sha256"):
+            return None
+    return snapshot
+
+
+def _record_candidate_structure(
+    revision_dir: Path,
+    fingerprint: str,
+    governing: Mapping[str, Any],
+    contracted_bundle: Mapping[str, Any],
+    document_report: Mapping[str, Any],
+    xml_report: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    snapshot = {
+        "fingerprint": fingerprint,
+        "governing_resources": dict(governing),
+        "contracted_template_bundle": dict(contracted_bundle),
+        "candidate_files": [
+            {
+                "path": path.relative_to(revision_dir).as_posix(),
+                "sha256": sha256_file(path),
+                "bytes": path.stat().st_size,
+            }
+            for path in sorted((revision_dir / "candidate").glob("*"))
+            if path.is_file()
+        ],
+        "document_report": dict(document_report),
+        "xml_report": dict(xml_report) if xml_report else None,
+        "font_substitutions": dict(governing.get("font_substitutions") or {}),
+        "status": "structurally_valid",
+    }
+    _write(revision_dir / "candidate-structure.json", snapshot)
+    return snapshot
+
+
 def _merge_artifact_reports(prior: Mapping[str, Any], current: Mapping[str, Any]) -> dict[str, Any]:
     """Replace only newly generated artifact rows in a complete prior report."""
     def rows(report: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
@@ -1035,7 +1099,7 @@ def confirm_desktop_delivery(
         return tuple(item.get(key) for key in ("filename", "path", "sha256", "bytes"))
 
     if not isinstance(actual, list) or [identity(item) for item in actual if isinstance(item, Mapping)] != [identity(item) for item in expected]:
-        findings.append({"category": "delivery", "field": "attachments", "issue": "Desktop reply attachments do not match the immutable Generation Manifest."})
+        findings.append(recovery_finding({"category": "delivery", "field": "attachments", "issue": "Desktop reply attachments do not match the immutable Generation Manifest."}, "transport_fault"))
     if findings:
         return {"status": "blocked", "confirmed": False, "findings": findings, "attempts": 0}
     opened = []
@@ -1063,7 +1127,7 @@ def confirm_desktop_delivery(
         else:
             last_issue = last_issue or "Desktop file transfer failed."
         if not opened_current:
-            findings.append({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."})
+            findings.append(recovery_finding({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."}, "transport_fault"))
             break
     return {
         "status": "confirmed" if not findings else "blocked",
@@ -1683,8 +1747,6 @@ def generate(
     elif prior_governing_sha256 is None:
         state["governing_sha256"] = governing_sha256
         _write(reference_path, working_reference)
-    recorded_preflight = state.get("renderer_preflight")
-    preflight_report = recorded_preflight if isinstance(recorded_preflight, Mapping) and recorded_preflight.get("status") == "passed" else None
     attempts = state.setdefault("attempts", {})
     persisted_exhaustion = [
         {"category": "retry", "field": str(target), "issue": f"Retry limit reached after {MAX_ATTEMPTS} attempts.", "required": "Reviewer intervention before a new approved revision."}
@@ -1693,7 +1755,11 @@ def generate(
     if persisted_exhaustion:
         path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(persisted_exhaustion), encoding="utf-8")
         return {"status": "blocked", "stage": "retry_limit", "findings": persisted_exhaustion, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-    drafting_findings = ingest_responses(revision_dir, expected_governing)
+    drafting_findings = [
+        finding if finding.get("category") in {"source-evidence", "request-integrity"}
+        else recovery_finding(finding, "drafting_defect")
+        for finding in ingest_responses(revision_dir, expected_governing)
+    ]
     if drafting_findings:
         attempts, exhausted = retry_attempts(drafting_findings, attempts); state["attempts"] = attempts; _write(reference_path, working_reference)
         source_gaps = [item for item in drafting_findings if item.get("category") in {"source-evidence", "request-integrity"}]
@@ -1711,7 +1777,7 @@ def generate(
     model = merged_drafts(revision_dir, reference, expected_governing)
     font_substitutions = {
         str(source): str(target)
-        for source, target in dict((preflight_report or {}).get("font_substitutions") or {}).items()
+        for source, target in dict(state.get("font_substitutions") or {}).items()
     }
     layout_repairs = {
         str(artifact): tuple(_normalized_layout_repair_records(rules))
@@ -1741,137 +1807,128 @@ def generate(
         if prior_build and repair_artifacts and _unaffected_build_is_valid(revision_dir, prior_build, repair_artifacts)
         else set()
     )
-    build = _cached_build(revision_dir, fingerprint) if preflight_report is not None else None
+    build = _cached_build(revision_dir, fingerprint)
+    structure = _cached_candidate_structure(revision_dir, fingerprint)
+    assurance_report: dict[str, Any] | None = None
     if build is None:
-        document_report = render_documents(
+        if structure is not None:
+            document_report = structure["document_report"]
+            xml_report = structure.get("xml_report")
+        else:
+            document_report = render_documents(
+                SCRIPT_DIR.parent,
+                revision_dir,
+                reference,
+                model,
+                contracted_bundle=bundle,
+                font_substitutions=font_substitutions,
+                artifact_names=partial_repair or None,
+                layout_repairs=layout_repairs,
+            )
+            if partial_repair:
+                document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
+            if document_report["status"] != "passed":
+                findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
+                if classification_block is not None:
+                    return classification_block
+                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
+            xml_report = prior_build.get("xml_report") if partial_repair else None
+            if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
+                if xml_report is None or not (revision_dir / "candidate/study.xml").is_file():
+                    prs_authority = bundle["prs_authority"]
+                    template = SCRIPT_DIR.parent / str(prs_authority["generation_template"]["path"])
+                    xml_report = generate_xml(
+                        template,
+                        revision_dir / "candidate/study.xml",
+                        reference,
+                        model.get("prs", {}),
+                        structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
+                    )
+                if xml_report["status"] != "passed":
+                    findings = [
+                        {**finding, "category": "document-structure", "recovery_class": "document_structure_defect", "action": "preserve_and_stop"}
+                        for finding in xml_report["findings"]
+                    ]
+                    return _repair_block(run_dir, "xml", findings, candidate_outputs=_candidate_outputs(revision_dir))
+            structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report)
+
+        remaining = 180.0 if operation_deadline is None else operation_deadline - clock()
+        if remaining <= 0:
+            return {
+                "status": "timeout",
+                "stage": "render_assurance",
+                "findings": [{"category": "timeout", "field": "operation", "issue": "The persisted Desktop operation deadline expired before Render Assurance."}],
+                "candidate_outputs": _candidate_outputs(revision_dir),
+                "client_outputs": [],
+            }
+
+        def rebuild_with_substitutions(resolved: Mapping[str, str]) -> dict[str, Any]:
+            nonlocal document_report
+            document_report = render_documents(
+                SCRIPT_DIR.parent,
+                revision_dir,
+                reference,
+                model,
+                contracted_bundle=bundle,
+                font_substitutions=resolved,
+                artifact_names=partial_repair or None,
+                layout_repairs=layout_repairs,
+            )
+            if partial_repair:
+                document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
+            return document_report
+
+        assurance_report = render_assurance(
             SCRIPT_DIR.parent,
             revision_dir,
             reference,
-            model,
             contracted_bundle=bundle,
-            font_substitutions=font_substitutions,
+            candidate_font_substitutions=font_substitutions,
+            rebuild_candidate=rebuild_with_substitutions,
             artifact_names=partial_repair or None,
-            layout_repairs=layout_repairs,
-        )
-        if partial_repair:
-            document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
-        if document_report["status"] != "passed":
-            findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
-            if classification_block is not None:
-                return classification_block
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
-        xml_report = prior_build.get("xml_report") if partial_repair else None
-        if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
-            if xml_report is None or not (revision_dir / "candidate/study.xml").is_file():
-                prs_authority = bundle["prs_authority"]
-                template = SCRIPT_DIR.parent / str(prs_authority["generation_template"]["path"])
-                xml_report = generate_xml(
-                    template,
-                    revision_dir / "candidate/study.xml",
-                    reference,
-                    model.get("prs", {}),
-                    structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
-                )
-            if xml_report["status"] != "passed":
-                findings = [
-                    {**finding, "category": "document-structure"}
-                    for finding in xml_report["findings"]
-                ]
-                return _repair_block(
-                    run_dir,
-                    "xml",
-                    findings,
-                    candidate_outputs=_candidate_outputs(revision_dir),
-                )
-
-        # Candidate construction is independent from the host's render stack.
-        # Only after a complete branch candidate exists do we resolve mandatory
-        # Render Assurance capabilities and, when genuinely needed, rebuild the
-        # DOCX bytes with an approved compatible font substitution.
-        if preflight_report is None:
-            remaining = 30.0 if operation_deadline is None else operation_deadline - clock()
-            if remaining <= 0:
-                return {
-                    "status": "timeout",
-                    "stage": "render_assurance",
-                    "findings": [{"category": "timeout", "field": "operation", "issue": "The persisted Desktop operation deadline expired before Render Assurance."}],
-                    "candidate_outputs": _candidate_outputs(revision_dir),
-                    "client_outputs": [],
-                }
-            preflight_report = preflight(
-                SCRIPT_DIR.parent,
-                reference,
-                contracted_bundle=bundle,
-                deadline_seconds=min(30.0, remaining),
-                clock=clock,
-            )
-            state["renderer_preflight"] = preflight_report
-            _write(reference_path, working_reference)
-            if preflight_report["status"] != "passed":
-                return {
-                    "status": "blocked",
-                    "stage": "render_assurance",
-                    "findings": preflight_report["findings"],
-                    "render_assurance": preflight_report,
-                    "candidate_outputs": _candidate_outputs(revision_dir),
-                    "client_outputs": [],
-                }
-            resolved_substitutions = {
-                str(source): str(target)
-                for source, target in dict(preflight_report.get("font_substitutions") or {}).items()
-            }
-            if resolved_substitutions != font_substitutions:
-                font_substitutions = resolved_substitutions
-                document_report = render_documents(
-                    SCRIPT_DIR.parent,
-                    revision_dir,
-                    reference,
-                    model,
-                    contracted_bundle=bundle,
-                    font_substitutions=font_substitutions,
-                    layout_repairs=layout_repairs,
-                )
-                if document_report["status"] != "passed":
-                    findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
-                    if classification_block is not None:
-                        return classification_block
-                    return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
-                fingerprint, governing = _candidate_fingerprint(
-                    SCRIPT_DIR.parent,
-                    revision_dir,
-                    reference,
-                    model,
-                    contracted_bundle=bundle,
-                    font_substitutions=font_substitutions,
-                    layout_repairs=layout_repairs,
-                )
-        render_report = render_pages(
-            revision_dir,
-            artifact_names=partial_repair or None,
-            contracted_bundle=bundle,
-            renderer_identity=preflight_report["renderer"],
-            page_renderer_identity=preflight_report.get("page_renderer"),
-            renderer_identities=preflight_report.get("renderer_candidates"),
-            page_renderer_identities=preflight_report.get("page_renderer_candidates"),
+            deadline_seconds=min(180.0, remaining),
             deadline_monotonic=operation_deadline,
             clock=clock,
         )
+        resolved_substitutions = {
+            str(source): str(target)
+            for source, target in dict(assurance_report.get("font_substitutions") or {}).items()
+        }
+        if resolved_substitutions != font_substitutions:
+            font_substitutions = resolved_substitutions
+            state["font_substitutions"] = font_substitutions
+            fingerprint, governing = _candidate_fingerprint(
+                SCRIPT_DIR.parent,
+                revision_dir,
+                reference,
+                model,
+                contracted_bundle=bundle,
+                font_substitutions=font_substitutions,
+                layout_repairs=layout_repairs,
+            )
+            structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report)
+        state["render_assurance"] = assurance_report
+        state.pop("renderer_preflight", None)
+        structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report)
+        _write(reference_path, working_reference)
+        render_report = dict(assurance_report.get("render") or {})
         if partial_repair and render_report.get("status") == "passed":
             render_report = _merge_artifact_reports(prior_build.get("render_report", {}), render_report)
-        if render_report["status"] != "passed":
+            assurance_report["render"] = render_report
+        if assurance_report.get("status") != "passed":
             findings = [
-                {
-                    **finding,
-                    "target_ids": [f"layout:{finding.get('artifact') or 'documents'}"],
-                }
-                for finding in render_report["findings"]
+                {**finding, "target_ids": finding.get("target_ids") or [f"layout:{finding.get('artifact') or 'documents'}"]}
+                for finding in assurance_report.get("findings", [])
             ]
-            if findings and all(finding.get("category") == "renderer" for finding in findings):
+            if findings and all(finding.get("recovery_class") == "adapter_fault" for finding in findings):
+                diagnostic_path = run_dir / "reference/render-assurance-diagnostic.md"
+                diagnostic_path.write_text(repair_report(findings), encoding="utf-8")
                 return {
                     "status": "blocked",
                     "stage": "render_assurance",
                     "findings": findings,
-                    "render_assurance": {"preflight": preflight_report, "render": render_report},
+                    "render_assurance": assurance_report,
+                    "repair_report": diagnostic_path.relative_to(run_dir).as_posix(),
                     "candidate_outputs": _candidate_outputs(revision_dir),
                     "client_outputs": [],
                 }
@@ -1881,13 +1938,21 @@ def generate(
         document_report = build["document_report"]
         xml_report = build.get("xml_report")
         render_report = build["render_report"]
+        recorded_assurance = state.get("render_assurance")
+        assurance_report = dict(recorded_assurance) if isinstance(recorded_assurance, Mapping) else {
+            "schema_version": "render-assurance/v1",
+            "status": "passed",
+            "font_substitutions": font_substitutions,
+            "render": render_report,
+            "findings": [],
+        }
     if state.pop("pending_layout_artifacts", None) is not None:
         _write(reference_path, working_reference)
     create_verification_requests(revision_dir, reference, render_report, contracted_bundle=bundle)
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
-    final_quality["render_assurance"] = {"preflight": preflight_report, "render": render_report}
+    final_quality["render_assurance"] = assurance_report
     if final_quality["status"] != "passed":
         return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock)
     return _publish(run_dir, revision_dir, reference, final_quality)

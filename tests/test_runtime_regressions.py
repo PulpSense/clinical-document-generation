@@ -1040,6 +1040,8 @@ def test_transient_verifier_failure_is_classified_for_retry_without_accepting_qa
     assert len(findings) == 1
     assert findings[0]["category"] == "reviewer-transient"
     assert findings[0]["target_ids"] == ["verification:content"]
+    assert findings[0]["recovery_class"] == "verifier_transient"
+    assert findings[0]["action"] == "retry_verifier"
 
 
 def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):

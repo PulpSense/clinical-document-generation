@@ -72,6 +72,8 @@ def test_desktop_confirmation_blocks_mismatch_and_does_not_certify_quality(tmp_p
     assert result["status"] == "blocked"
     assert result["confirmed"] is False
     assert result["findings"][0]["category"] == "delivery"
+    assert result["findings"][0]["recovery_class"] == "transport_fault"
+    assert result["findings"][0]["action"] == "retry_exact_bytes"
 
 
 def test_desktop_confirmation_blocks_missing_attachment_without_opening_anything(tmp_path):

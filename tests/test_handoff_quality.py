@@ -20,17 +20,8 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _allow_renderer_preflight(monkeypatch):
-    monkeypatch.setattr(workflow, "preflight", lambda *_args, **_kwargs: {
-        "status": "passed",
-        "renderer": {"kind": "LibreOffice", "path": "/test/soffice", "version": "test", "platform": "test"},
-        "required_fonts": [],
-        "fonts": {},
-        "smoke": {"status": "passed"},
-        "deadline_seconds": 30.0,
-        "elapsed_seconds": 0.0,
-        "findings": [],
-    })
+def _require_renderer():
+    assert workflow.renderer() is not None
 
 
 def acceptance_verification(request):
@@ -167,7 +158,7 @@ def test_recorded_acceptance_spells_out_the_screening_interval_with_units(tmp_pa
 
 
 def test_sparse_complete_approval_cannot_create_post_approval_source_questions(tmp_path, monkeypatch):
-    _allow_renderer_preflight(monkeypatch)
+    _require_renderer()
     reference = fixture()
     reference["risks_benefits"] = {
         "compensation_or_reimbursement": reference["risks_benefits"]["compensation_or_reimbursement"]
@@ -200,7 +191,7 @@ def test_sparse_complete_approval_cannot_create_post_approval_source_questions(t
 
 
 def test_desktop_drafting_requests_bind_the_complete_contracted_template_bundle(tmp_path, monkeypatch):
-    _allow_renderer_preflight(monkeypatch)
+    _require_renderer()
     reference = fixture()
     run_dir = tmp_path / "run"
     reference_path = run_dir / "reference/study.reference.json"
@@ -251,7 +242,7 @@ def test_incomplete_contracted_template_bundle_blocks_before_drafting(tmp_path, 
 
 
 def test_awaiting_hermes_exposes_path_only_response_bound_handoffs(tmp_path, monkeypatch):
-    _allow_renderer_preflight(monkeypatch)
+    _require_renderer()
     run_dir = tmp_path / "run"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
@@ -293,14 +284,15 @@ def test_environment_failure_retains_a_complete_candidate_built_before_render_as
         response_path.parent.mkdir(parents=True, exist_ok=True)
         response_path.write_text(json.dumps(response), encoding="utf-8")
 
-    working = json.loads(reference_path.read_text(encoding="utf-8"))
-    working.get("generation", {}).pop("renderer_preflight", None)
-    reference_path.write_text(json.dumps(working), encoding="utf-8")
-    monkeypatch.setattr(workflow, "preflight", lambda *_args, **_kwargs: {
+    monkeypatch.setattr(workflow, "render_assurance", lambda *_args, **_kwargs: {
+        "schema_version": "render-assurance/v1",
         "status": "blocked",
-        "renderer": None,
+        "fonts": {},
         "font_substitutions": {},
-        "findings": [{"category": "renderer", "field": "renderer", "issue": "fallback stack unavailable"}],
+        "candidate": {"files": []},
+        "render": {"status": "blocked", "renderer_attempts": [], "page_renderer_attempts": [], "findings": []},
+        "findings": [{"category": "renderer", "field": "renderer", "recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "issue": "fallback stack unavailable"}],
+        "diagnostic": {"recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "office_attempts": [], "page_attempts": []},
     })
 
     result = generate(run_dir)
@@ -310,6 +302,58 @@ def test_environment_failure_retains_a_complete_candidate_built_before_render_as
     assert (revision_dir / "candidate/protocol.docx").is_file()
     assert [item["path"] for item in result["candidate_outputs"]] == ["candidate/protocol.docx"]
     assert result["client_outputs"] == []
+
+
+def test_repeated_adapter_exhaustion_reuses_candidate_without_drafting_or_regeneration(tmp_path, monkeypatch):
+    reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    approval = approve(run_dir, approved_by="reviewer")
+    drafting = generate(run_dir)
+    revision_dir = run_dir / "revisions" / approval["revision_id"]
+    for relative in drafting["requests"]:
+        request = json.loads((revision_dir / relative).read_text(encoding="utf-8"))
+        response_path = revision_dir / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(recorded_acceptance_response(request)), encoding="utf-8")
+
+    renders = 0
+    real_render_documents = workflow.render_documents
+
+    def counted_render(*args, **kwargs):
+        nonlocal renders
+        renders += 1
+        return real_render_documents(*args, **kwargs)
+
+    def exhausted(*_args, **_kwargs):
+        candidate = revision_dir / "candidate/protocol.docx"
+        return {
+            "schema_version": "render-assurance/v1",
+            "status": "blocked",
+            "fonts": {},
+            "font_substitutions": {},
+            "candidate": {"files": [{"path": "candidate/protocol.docx", "sha256": hashlib.sha256(candidate.read_bytes()).hexdigest(), "bytes": candidate.stat().st_size}]},
+            "render": {"status": "blocked", "renderer_attempts": [], "page_renderer_attempts": [], "findings": []},
+            "findings": [{"category": "renderer", "field": "rendering", "recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "issue": "all adapters exhausted"}],
+            "diagnostic": {"recovery_class": "adapter_fault", "action": "preserve_candidate_and_stop", "office_attempts": [], "page_attempts": []},
+        }
+
+    monkeypatch.setattr(workflow, "render_documents", counted_render)
+    monkeypatch.setattr(workflow, "render_assurance", exhausted)
+
+    first = generate(run_dir)
+    candidate_hash = hashlib.sha256((revision_dir / "candidate/protocol.docx").read_bytes()).hexdigest()
+    second = generate(run_dir)
+    state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
+
+    assert first["stage"] == second["stage"] == "render_assurance"
+    assert first["repair_report"] == second["repair_report"] == "reference/render-assurance-diagnostic.md"
+    assert hashlib.sha256((revision_dir / "candidate/protocol.docx").read_bytes()).hexdigest() == candidate_hash
+    assert renders == 1
+    assert state["attempts"] == {}
 
 
 def test_generation_routes_legacy_missing_prs_study_type_to_source_review(tmp_path):
@@ -990,7 +1034,7 @@ def test_generation_rejects_study_input_mutation_after_approval(tmp_path):
 
 
 def test_generation_keeps_exhausted_retry_blocked_across_restart(tmp_path, monkeypatch):
-    _allow_renderer_preflight(monkeypatch)
+    _require_renderer()
     run_dir = tmp_path / "run"; reference_path = run_dir / "reference/study.reference.json"; reference_path.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
     assert prepare(run_dir)["status"] == "awaiting_approval"

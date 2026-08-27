@@ -40,8 +40,33 @@ VISUAL_CHECKS = (
     "excessive_whitespace", "artificial_pagination",
 )
 TRANSIENT_REVIEW_STATUSES = {"retryable_error", "transient_error", "unavailable", "temporarily_unavailable"}
+RECOVERY_POLICIES = {
+    "adapter_fault": "advance_adapter",
+    "font_capability_uncertainty": "bounded_smoke_render",
+    "document_structure_defect": "preserve_and_stop",
+    "visual_defect": "targeted_layout_repair",
+    "drafting_defect": "retry_drafting_target",
+    "verifier_transient": "retry_verifier",
+    "transport_fault": "retry_exact_bytes",
+}
 _MAC_FONT_NAMES: set[str] | None = None
 _WINDOWS_FONT_NAMES: set[str] | None = None
+
+
+def recovery_finding(
+    finding: Mapping[str, Any],
+    recovery_class: str,
+    *,
+    action: str | None = None,
+) -> dict[str, Any]:
+    """Attach one governed Recovery Class without interpreting issue prose."""
+    if recovery_class not in RECOVERY_POLICIES:
+        raise ValueError(f"Unknown Recovery Class: {recovery_class}")
+    return {
+        **dict(finding),
+        "recovery_class": recovery_class,
+        "action": action or RECOVERY_POLICIES[recovery_class],
+    }
 
 SYMBOL_FONT_FALLBACKS = (
     "Apple Symbols",
@@ -991,18 +1016,26 @@ def render_pages(
     page_renderer_identities: Iterable[Mapping[str, Any]] | None = None,
     deadline_monotonic: float | None = None,
     clock: Any = time.monotonic,
+    font_evidence: Mapping[str, Any] | None = None,
+    font_substitutions: Mapping[str, str] | None = None,
+    office_exporter: Any = None,
+    page_exporter: Any = None,
+    blank_page_detector: Any = None,
 ) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
     runtime_environment = _runtime_environment(repo_root, None, contracted_bundle)
+    export_docx = office_exporter or _render_pdf
+    export_pages = page_exporter or rasterize_pdf
+    find_blank_pages = blank_page_detector or _blank_pdf_pages
     renderer_candidates = [dict(item) for item in (renderer_identities or [])]
     if renderer_identity is not None:
         renderer_candidates = [dict(renderer_identity), *[item for item in renderer_candidates if dict(item) != dict(renderer_identity)]]
-    if not renderer_candidates:
+    if not renderer_candidates and renderer_identities is None and renderer_identity is None:
         renderer_candidates = renderers(environment=runtime_environment, skill_root=repo_root)
     page_candidates = [dict(item) for item in (page_renderer_identities or [])]
     if page_renderer_identity is not None:
         page_candidates = [dict(page_renderer_identity), *[item for item in page_candidates if dict(item) != dict(page_renderer_identity)]]
-    if not page_candidates:
+    if not page_candidates and page_renderer_identities is None and page_renderer_identity is None:
         page_candidates = page_renderers(environment=runtime_environment, skill_root=repo_root)
     if not renderer_candidates:
         return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."}]}
@@ -1032,7 +1065,7 @@ def render_pages(
                 remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
                 if remaining <= 0:
                     raise subprocess.TimeoutExpired("DOCX rendering", 0)
-                pdf = _render_pdf(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
+                pdf = export_docx(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
                 for _ in range(3):
                     if not refresh_toc_from_pdf(docx, pdf):
                         break
@@ -1040,7 +1073,7 @@ def render_pages(
                     remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
                     if remaining <= 0:
                         raise subprocess.TimeoutExpired("DOCX rendering", 0)
-                    pdf = _render_pdf(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
+                    pdf = export_docx(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
                 pdfs[docx] = pdf
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
             renderer_attempts.append({"renderer": identity, "status": "failed", "issue": str(exc)})
@@ -1056,7 +1089,7 @@ def render_pages(
                     if remaining <= 0:
                         raise subprocess.TimeoutExpired("PDF page rendering", 0)
                     page_dir = attempt_root / docx.stem / str(candidate["kind"])
-                    pages = rasterize_pdf(pdf, page_dir, candidate, dpi=130, timeout_seconds=min(180.0, remaining), environment=runtime_environment)
+                    pages = export_pages(pdf, page_dir, candidate, dpi=130, timeout_seconds=min(180.0, remaining), environment=runtime_environment)
                     expected = len(PdfReader(pdf).pages)
                     if len(pages) != expected or expected == 0:
                         raise RuntimeError(f"Page rendering failed for {docx.name}: expected {expected}, got {len(pages)}.")
@@ -1089,7 +1122,7 @@ def render_pages(
                 page = page_dir / f"page-{index}.png"
                 shutil.copy2(source_page, page)
                 pages.append(page)
-            for page_number in _blank_pdf_pages(pdf):
+            for page_number in find_blank_pages(pdf):
                 findings.append({
                     "category": "visual",
                     "field": docx.stem,
@@ -1102,6 +1135,8 @@ def render_pages(
                 "artifact": docx.stem,
                 "renderer": identity,
                 "page_renderer": selected_page_renderer,
+                "font_evidence": dict(font_evidence or {}),
+                "font_substitutions": dict(font_substitutions or {}),
                 "docx": docx.relative_to(revision_dir).as_posix(),
                 "docx_sha256": sha256_file(docx),
                 "pdf": pdf.relative_to(revision_dir).as_posix(),
@@ -1124,6 +1159,226 @@ def render_pages(
         "page_renderer_attempts": page_attempts,
         "findings": [{"category": "renderer", "field": "rendering", "issue": "Every local renderer/page-renderer combination failed."}],
     }
+
+
+def render_assurance(
+    repo_root: Path,
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+    candidate_font_substitutions: Mapping[str, str] | None = None,
+    rebuild_candidate: Any = None,
+    artifact_names: Iterable[str] | None = None,
+    renderer_identities: Iterable[Mapping[str, Any]] | None = None,
+    page_renderer_identities: Iterable[Mapping[str, Any]] | None = None,
+    deadline_seconds: float = 180.0,
+    deadline_monotonic: float | None = None,
+    clock: Any = time.monotonic,
+    font_probe: Any = None,
+    office_exporter: Any = None,
+    page_exporter: Any = None,
+    blank_page_detector: Any = None,
+) -> dict[str, Any]:
+    """Resolve fonts and render one complete candidate through one assurance seam."""
+    started = clock()
+    deadline = deadline_monotonic if deadline_monotonic is not None else started + max(0.0, deadline_seconds)
+    bundle = contracted_bundle or contracted_template_bundle(repo_root, reference)
+    approved_font_plan = bundle["approved_font_plan"]
+    runtime_environment = _runtime_environment(repo_root, None, bundle)
+    selected_artifacts = set(artifact_names or ())
+    all_candidate_paths = [path for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
+    candidate_paths = [
+        path
+        for path in all_candidate_paths
+        if path.suffix.casefold() == ".docx"
+        if not selected_artifacts or path.stem in selected_artifacts
+    ]
+    if not candidate_paths:
+        finding = recovery_finding({
+            "category": "document-structure",
+            "field": "candidate",
+            "issue": "Render Assurance requires a complete structurally validated DOCX candidate.",
+        }, "document_structure_defect")
+        return {
+            "schema_version": "render-assurance/v1",
+            "status": "blocked",
+            "fonts": {},
+            "font_substitutions": {},
+            "candidate": {"files": []},
+            "render": {"status": "not_run", "findings": [finding]},
+            "findings": [finding],
+        }
+
+    required_fonts = sorted({font for path in candidate_paths for font in _template_fonts(path)})
+    probe = font_probe or _font_probe
+    fonts: dict[str, dict[str, Any]] = {}
+    substitutions: dict[str, str] = {}
+    for font in required_fonts:
+        remaining = max(0.0, deadline - clock())
+        if remaining <= 0:
+            available, detail = None, "Render Assurance deadline expired before font inventory."
+        else:
+            available, detail = probe(font, environment=runtime_environment, timeout_seconds=remaining)
+        state = "available" if available is True else "missing-or-unusable" if available is False else "unknown"
+        evidence = {"state": state, "match": detail}
+        if state == "unknown":
+            evidence.update({
+                "recovery_class": "font_capability_uncertainty",
+                "action": RECOVERY_POLICIES["font_capability_uncertainty"],
+            })
+        if state == "missing-or-unusable":
+            substitute = _approved_packaged_font_fallback(font, approved_font_plan)
+            bundled = _bundled_font_path(repo_root, substitute, approved_font_plan)
+            if bundled is not None:
+                substitutions[font] = substitute
+                evidence.update({
+                    "substitute": substitute,
+                    "substitute_match": f"bundled approved compatible font: {bundled.relative_to(repo_root)}",
+                })
+            else:
+                evidence["attempted_fallbacks"] = [substitute]
+        fonts[font] = evidence
+
+    prior_substitutions = dict(candidate_font_substitutions or {})
+    if substitutions != prior_substitutions:
+        if rebuild_candidate is None:
+            finding = recovery_finding({
+                "category": "document-structure",
+                "field": "font_substitutions",
+                "issue": "The candidate must be rebuilt with the selected approved font substitutions before rendering.",
+            }, "document_structure_defect")
+            return {
+                "schema_version": "render-assurance/v1",
+                "status": "blocked",
+                "fonts": fonts,
+                "font_substitutions": substitutions,
+                "candidate": {"files": _artifact_hashes(revision_dir, all_candidate_paths)},
+                "render": {"status": "not_run", "findings": [finding]},
+                "findings": [finding],
+            }
+        rebuild_report = rebuild_candidate(substitutions)
+        if rebuild_report.get("status") != "passed":
+            findings = [recovery_finding(finding, "document_structure_defect") for finding in (rebuild_report.get("findings") or [{
+                "category": "document-structure",
+                "field": "font_substitutions",
+                "issue": "The candidate could not be rebuilt with approved font substitutions.",
+            }])]
+            return {
+                "schema_version": "render-assurance/v1",
+                "status": "blocked",
+                "fonts": fonts,
+                "font_substitutions": substitutions,
+                "candidate": {"files": _artifact_hashes(revision_dir, all_candidate_paths)},
+                "render": {"status": "not_run", "findings": findings},
+                "findings": findings,
+            }
+        candidate_paths = [
+            path
+            for path in sorted((revision_dir / "candidate").glob("*.docx"))
+            if not selected_artifacts or path.stem in selected_artifacts
+        ]
+        all_candidate_paths = [path for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()]
+
+    office_candidates = (
+        [dict(item) for item in renderer_identities]
+        if renderer_identities is not None
+        else renderers(environment=runtime_environment, skill_root=repo_root, deadline_monotonic=deadline, clock=clock)
+    )
+    page_candidates = (
+        [dict(item) for item in page_renderer_identities]
+        if page_renderer_identities is not None
+        else page_renderers(environment=runtime_environment, skill_root=repo_root)
+    )
+    render_report = render_pages(
+        revision_dir,
+        artifact_names=artifact_names,
+        contracted_bundle=bundle,
+        renderer_identities=office_candidates,
+        page_renderer_identities=page_candidates,
+        deadline_monotonic=deadline,
+        clock=clock,
+        font_evidence=fonts,
+        font_substitutions=substitutions,
+        office_exporter=office_exporter,
+        page_exporter=page_exporter,
+        blank_page_detector=blank_page_detector,
+    )
+    render_report["renderer_attempts"] = _governed_adapter_attempts(render_report.get("renderer_attempts", []))
+    render_report["page_renderer_attempts"] = _governed_adapter_attempts(render_report.get("page_renderer_attempts", []))
+    governed_findings = []
+    for raw in render_report.get("findings", []):
+        finding = dict(raw)
+        if finding.get("category") == "visual":
+            finding.update({
+                "recovery_class": "visual_defect",
+                "action": RECOVERY_POLICIES["visual_defect"],
+            })
+        elif finding.get("category") == "renderer":
+            finding.update({
+                "recovery_class": "adapter_fault",
+                "action": "preserve_candidate_and_stop",
+            })
+        governed_findings.append(finding)
+    render_report["findings"] = governed_findings
+    if render_report.get("status") == "passed":
+        for evidence in fonts.values():
+            if evidence["state"] == "unknown":
+                evidence["resolution"] = "render_verified"
+        for artifact in render_report.get("artifacts", []):
+            artifact["font_evidence"] = fonts
+    report = {
+        "schema_version": "render-assurance/v1",
+        "status": render_report.get("status", "blocked"),
+        "fonts": fonts,
+        "font_substitutions": substitutions,
+        "candidate": {
+            "files": _artifact_hashes(revision_dir, all_candidate_paths),
+            "font_evidence": fonts,
+            "font_substitutions": substitutions,
+        },
+        "render": render_report,
+        "findings": governed_findings,
+        "elapsed_seconds": round(clock() - started, 3),
+    }
+    if report["status"] != "passed" and governed_findings and all(
+        finding.get("recovery_class") == "adapter_fault" for finding in governed_findings
+    ):
+        report["diagnostic"] = {
+            "recovery_class": "adapter_fault",
+            "action": "preserve_candidate_and_stop",
+            "office_attempts": render_report["renderer_attempts"],
+            "page_attempts": render_report["page_renderer_attempts"],
+            "font_evidence": fonts,
+            "font_substitutions": substitutions,
+            "candidate_files": report["candidate"]["files"],
+        }
+    return report
+
+
+def _governed_adapter_attempts(attempts: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    governed = []
+    for raw in attempts:
+        attempt = {"adapter": dict(raw.get("renderer") or raw.get("adapter") or {}), "status": raw.get("status")}
+        if raw.get("status") in {"failed", "skipped"}:
+            attempt.update({
+                "recovery_class": "adapter_fault",
+                "action": RECOVERY_POLICIES["adapter_fault"],
+                "issue": str(raw.get("issue") or "Adapter did not complete."),
+            })
+        governed.append(attempt)
+    return governed
+
+
+def _artifact_hashes(revision_dir: Path, paths: Iterable[Path]) -> list[dict[str, Any]]:
+    return [
+        {
+            "path": path.relative_to(revision_dir).as_posix(),
+            "sha256": sha256_file(path),
+            "bytes": path.stat().st_size,
+        }
+        for path in paths
+    ]
 
 
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1430,12 +1685,12 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
         }
         if transient:
             target = "verification:visual" if request["task"] == "rendered_page_visual_verification" else "verification:content"
-            findings.append({
+            findings.append(recovery_finding({
                 "category": "reviewer-transient",
                 "field": request["task"],
                 "target_ids": [target],
                 "issue": _text(error.get("message")) or "Independent Hermes verifier reported a transient API failure.",
-            })
+            }, "verifier_transient"))
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
         issues = response.get("findings") if isinstance(response.get("findings"), list) else []
@@ -1450,7 +1705,10 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
                     finding["target_ids"] = [f"layout:{source.get('artifact') or 'documents'}"]
                 elif not finding.get("target_ids"):
                     finding["target_ids"] = ["verification:content"]
-                findings.append(finding)
+                findings.append(recovery_finding(
+                    finding,
+                    "visual_defect" if category == "visual" else "drafting_defect",
+                ))
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
@@ -1505,4 +1763,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications"]

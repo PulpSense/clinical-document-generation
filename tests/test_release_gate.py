@@ -13,19 +13,8 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _allow_renderer_preflight(monkeypatch):
-    identity = workflow.renderer()
-    assert identity is not None
-    monkeypatch.setattr(workflow, "preflight", lambda *_args, **_kwargs: {
-        "status": "passed",
-        "renderer": identity,
-        "required_fonts": [],
-        "fonts": {},
-        "smoke": {"status": "passed"},
-        "deadline_seconds": 30.0,
-        "elapsed_seconds": 0.0,
-        "findings": [],
-    })
+def _require_renderer():
+    assert workflow.renderer() is not None
 
 
 def acceptance_verification(request):
@@ -67,7 +56,7 @@ def _section_geometry(document: Document) -> tuple[tuple[int | None, ...], ...]:
 
 
 def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch):
-    _allow_renderer_preflight(monkeypatch)
+    _require_renderer()
     report = run_release_gate(ROOT, verification_responder=acceptance_verification)
     assert report["status"] == "structural_passed"
     assert report["assurance"] == "synthetic-structural-only"
@@ -121,7 +110,7 @@ def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch)
 
 
 def test_recorded_drafting_keeps_release_gate_assurance_structural_with_external_verification(monkeypatch):
-    _allow_renderer_preflight(monkeypatch)
+    _require_renderer()
     report = run_release_gate(ROOT, verification_responder=external_verification)
 
     assert report["status"] == "structural_passed"

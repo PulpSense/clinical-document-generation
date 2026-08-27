@@ -125,7 +125,7 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
     assert assurance["assurance"]["renderer"]["path"] == str(active / "runtime/soffice")
 
 
-def test_installation_smoke_requires_the_release_owned_page_renderer(tmp_path, monkeypatch):
+def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_renderer(tmp_path, monkeypatch):
     bundled = {
         "kind": "pymupdf",
         "path": "python:pymupdf",
@@ -139,19 +139,28 @@ def test_installation_smoke_requires_the_release_owned_page_renderer(tmp_path, m
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{"kind": "LibreOffice", "source": "verified fallback stack"}])
     monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [host, bundled])
 
-    def fake_preflight(_root, _reference, **kwargs):
+    def fake_assurance(_root, revision_dir, _reference, **kwargs):
         observed["pages"] = kwargs["page_renderer_identities"]
+        observed["candidate"] = (revision_dir / "candidate/installation-smoke.docx").is_file()
         return {
+            "schema_version": "render-assurance/v1",
             "status": "passed",
-            "renderer": {"kind": "LibreOffice", "source": "verified fallback stack"},
-            "renderer_candidates": [],
-            "page_renderer": bundled,
             "fonts": {},
-            "smoke": {"status": "passed"},
+            "font_substitutions": {},
+            "candidate": {"files": []},
+            "render": {
+                "status": "passed",
+                "renderer": {"kind": "LibreOffice", "source": "verified fallback stack"},
+                "page_renderer": bundled,
+                "renderer_attempts": [],
+                "page_renderer_attempts": [],
+                "artifacts": [],
+                "findings": [],
+            },
             "findings": [],
         }
 
-    monkeypatch.setattr(workflow, "preflight", fake_preflight)
+    monkeypatch.setattr(workflow, "render_assurance", fake_assurance)
     fallback_fonts = tmp_path / "assets/fallback-fonts"
     fallback_fonts.mkdir(parents=True)
     (fallback_fonts / "font.ttf").write_bytes(b"font")
@@ -160,3 +169,4 @@ def test_installation_smoke_requires_the_release_owned_page_renderer(tmp_path, m
 
     assert result["status"] == "passed"
     assert observed["pages"] == [bundled]
+    assert observed["candidate"] is True
