@@ -840,6 +840,40 @@ def test_terminal_desktop_delivery_is_invalidated_when_the_release_fingerprint_c
     assert result["client_outputs"] == []
 
 
+def test_terminal_desktop_delivery_is_invalidated_when_governed_configuration_changes(tmp_path):
+    state_path = tmp_path / "logs/desktop-operation.json"
+    state_path.parent.mkdir(parents=True)
+    state_path.write_text(json.dumps({
+        "operation_id": "default",
+        "status": "blocked",
+        "release_identity": {
+            "package_fingerprint": "same-release",
+            "hermes_configuration": {"max_turns": 40},
+        },
+        "result": {"status": "blocked", "stage": "quality", "client_outputs": []},
+    }), encoding="utf-8")
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        release_identity={
+            "package_fingerprint": "same-release",
+            "hermes_configuration": {"max_turns": 80},
+        },
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "release_identity"
+    assert "configuration" in result["findings"][0]["issue"]
+
+
+def test_desktop_operation_state_path_uses_the_workflow_slug(tmp_path):
+    assert workflow.desktop_operation_state_path(tmp_path, "Case 42 / Sterling") == (
+        tmp_path / "logs/desktop-operation-case-42-sterling.json"
+    )
+
+
 def test_terminal_desktop_delivery_is_revalidated_against_accessible_output_bytes(tmp_path, monkeypatch):
     reference_path = tmp_path / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)

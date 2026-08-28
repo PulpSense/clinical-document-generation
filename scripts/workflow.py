@@ -705,6 +705,13 @@ def _slug(value: Any) -> str:
     return "-".join(part for part in text.split("-") if part)[:60] or "study"
 
 
+def desktop_operation_state_path(run_dir: Path, operation_id: str = "default") -> Path:
+    """Return the canonical persisted-state path for one Desktop operation."""
+    operation_key = _slug(operation_id)
+    name = "desktop-operation.json" if operation_key == "default" else f"desktop-operation-{operation_key}.json"
+    return Path(run_dir).resolve() / "logs" / name
+
+
 def _source_path(run_dir: Path, reference: Mapping[str, Any]) -> Path:
     recorded = reference.get("source", {}).get("source_of_truth_file") if isinstance(reference.get("source"), Mapping) else None
     if recorded:
@@ -1353,10 +1360,7 @@ def run_desktop_operation(
     def epoch_now() -> float:
         return process_epoch_anchor + max(0.0, clock() - process_monotonic_anchor)
 
-    operation_key = _slug(operation_id)
-    state_path = run_dir / "logs" / (
-        "desktop-operation.json" if operation_key == "default" else f"desktop-operation-{operation_key}.json"
-    )
+    state_path = desktop_operation_state_path(run_dir, operation_id)
     try:
         persisted = _read(state_path) if state_path.is_file() else {}
     except (OSError, ValueError, json.JSONDecodeError):
@@ -1368,18 +1372,14 @@ def run_desktop_operation(
     if persisted.get("operation_id") not in {None, operation_id}:
         raise ValueError("Desktop operation state belongs to a different operation.")
     recorded_release_identity = persisted.get("release_identity")
-    if (
-        isinstance(recorded_release_identity, Mapping)
-        and recorded_release_identity.get("package_fingerprint")
-        != current_release_identity.get("package_fingerprint")
-    ):
+    if isinstance(recorded_release_identity, Mapping) and dict(recorded_release_identity) != current_release_identity:
         return {
             "status": "blocked",
             "stage": "release_identity",
             "findings": [{
                 "category": "release",
-                "field": "package_fingerprint",
-                "issue": "Desktop operation evidence belongs to a different Promoted Release fingerprint.",
+                "field": "release_identity",
+                "issue": "Desktop operation evidence belongs to a different Promoted Release or governed configuration identity.",
             }],
             "client_outputs": [],
         }
@@ -2630,7 +2630,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

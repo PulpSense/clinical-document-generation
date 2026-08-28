@@ -24,11 +24,17 @@ APPROVED_INPUT_NORMALIZATIONS = {
     "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f",
 }
 REPO_ROOT = Path(__file__).resolve().parents[1]
+CERTIFICATION_FIXTURE_ROOT = REPO_ROOT / "tests/fixtures/release-certification"
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
 CERTIFICATION_RUNTIME_CEILING_SECONDS = 900.0
-DEFAULT_INPUT = Path.home() / "Downloads/clinical-document-generation-required-inputs/ambispective-required-only.md"
-DEFAULT_BASELINE = REPO_ROOT / "runs/AS-SP-001-9-sterling"
+DEFAULT_HERMES_CONFIGURATION = {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": True,
+    "reasoning_configuration": "Hermes Desktop governed default",
+}
 FIRST_WAVE_BATCHES = frozenset(
     {
         "protocol-foundations",
@@ -102,6 +108,61 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def certification_fixture(
+    fixture_id: str,
+    *,
+    fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
+) -> dict[str, Any]:
+    """Load one immutable, explicitly synthetic certification fixture."""
+    root = fixture_root.resolve()
+    fixture_dir = (root / fixture_id).resolve()
+    try:
+        fixture_dir.relative_to(root)
+    except ValueError as exc:
+        raise ValueError("Certification fixture identity escapes its repository root.") from exc
+    manifest = _read_json(fixture_dir / "fixture.json")
+    if manifest is None or manifest.get("schema_version") != "release-certification-fixture/v1":
+        raise ValueError(f"Certification fixture {fixture_id!r} has no valid manifest.")
+    if manifest.get("fixture_id") != fixture_id:
+        raise ValueError("Certification fixture identity does not match its directory.")
+    if manifest.get("synthetic") is not True or manifest.get("contains_private_data") is not False:
+        raise ValueError("Release Certification accepts only explicitly synthetic, non-private fixtures.")
+    expected = set(manifest.get("expected_outputs") or [])
+    branch_expected = (
+        {"protocol.docx"}
+        if str(manifest.get("study_type") or "").casefold() == "retrospective"
+        else set(EXPECTED_OUTPUTS)
+    )
+    if expected != branch_expected:
+        raise ValueError("Certification fixture expected outputs do not match its study branch.")
+    artifact_paths: dict[str, Path] = {}
+    artifacts = manifest.get("artifacts")
+    required_artifacts = {"source_input", "approved_source", "approved_reference"}
+    if not isinstance(artifacts, Mapping) or set(artifacts) != required_artifacts:
+        raise ValueError("Certification fixture must declare its complete reviewed artifact set.")
+    for name in sorted(required_artifacts):
+        item = artifacts[name]
+        if not isinstance(item, Mapping):
+            raise ValueError(f"Certification fixture artifact {name!r} is invalid.")
+        path = (fixture_dir / str(item.get("path") or "")).resolve()
+        try:
+            path.relative_to(fixture_dir)
+        except ValueError as exc:
+            raise ValueError(f"Certification fixture artifact {name!r} escapes its fixture.") from exc
+        if not path.is_file() or _sha256(path) != item.get("sha256"):
+            raise ValueError(f"Certification fixture artifact {name!r} hash does not match.")
+        artifact_paths[name] = path
+    reference = _read_json(artifact_paths["approved_reference"])
+    if reference is None:
+        raise ValueError("Certification fixture approved reference is not valid JSON.")
+    meta = reference.get("meta") or {}
+    if meta.get("study_type") != manifest.get("study_type"):
+        raise ValueError("Certification fixture study branch does not match its approved reference.")
+    if manifest.get("study_type") != "Retrospective" and meta.get("icf_template") != manifest.get("icf_family"):
+        raise ValueError("Certification fixture ICF family does not match its approved reference.")
+    return {**manifest, "artifact_paths": artifact_paths}
 
 
 def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
@@ -214,6 +275,7 @@ def inspect_run(
     invalid_response_paths: list[str] = []
     recorded_response_paths: list[str] = []
     stable_target_attempts: dict[str, list[int]] = {}
+    model_identifiers: set[str] = set()
 
     drafting_request_paths = sorted((revision_dir / "hermes/requests").glob("*.json"))
     verification_request_paths = sorted((revision_dir / "hermes/verification-requests").glob("*.json"))
@@ -237,6 +299,8 @@ def inspect_run(
                 )):
                     invalid_response_paths.append(response_relative)
                 model_id = str((response.get("producer") or {}).get("model_id") or "")
+                if model_id:
+                    model_identifiers.add(model_id)
                 if "recorded_acceptance_response" in model_id.casefold():
                     recorded_response_paths.append(response_relative)
         for target, attempt in (request.get("attempts") or {}).items():
@@ -348,6 +412,11 @@ def inspect_run(
         outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
     elif valid_delivery:
         outcome = DiagnosticOutcome.PASSED
+    elif (
+        final_result.get("status") == "blocked"
+        and final_result.get("stage") == "layout_repair_classification"
+    ):
+        outcome = DiagnosticOutcome.BLOCKED
     elif missing_response_paths or invalid_response_paths or recorded_response_paths or invalid_rejection_paths:
         outcome = DiagnosticOutcome.INVALID_HERMES_RESPONSE
     elif final_result.get("status") == "blocked":
@@ -378,6 +447,7 @@ def inspect_run(
         "required_outputs": sorted(required_outputs),
         "delivery": final_result.get("delivery"),
         "retry_limit_violations": retry_limit_violations,
+        "model_identifiers": sorted(model_identifiers),
         "input_provenance": _read_json(run_dir / "reference/input-provenance.json"),
         "repair_report": repair_report_path.read_text(encoding="utf-8") if repair_report_path.is_file() else None,
     }
@@ -465,32 +535,42 @@ def _workflow(
     return result, completed.returncode
 
 
-def prepare_disposable_run(
-    baseline: Path,
-    source_input: Path,
+def prepare_certification_run(
+    fixture_id: str,
     run_dir: Path,
     *,
-    workflow_root: Path = REPO_ROOT,
+    workflow_root: Path,
+    fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
+    """Create a fresh governed run from one repository-owned certification fixture."""
     if run_dir.exists():
-        raise FileExistsError(f"Diagnostic run already exists: {run_dir}")
+        raise FileExistsError(f"Certification run already exists: {run_dir}")
+    fixture = certification_fixture(fixture_id, fixture_root=fixture_root)
+    artifacts = fixture["artifact_paths"]
     reference_dir = run_dir / "reference"
     input_dir = run_dir / "input"
     reference_dir.mkdir(parents=True)
     input_dir.mkdir()
-    provenance = input_provenance(source_input, baseline / "reference/source-of-truth.md")
-    shutil.copy2(baseline / "reference/study.reference.json", reference_dir / "study.reference.json")
-    shutil.copy2(baseline / "reference/source-of-truth.md", reference_dir / "source-of-truth.md")
-    shutil.copy2(source_input, input_dir / source_input.name)
+    shutil.copy2(artifacts["source_input"], input_dir / "source-input.md")
+    shutil.copy2(artifacts["approved_source"], reference_dir / "source-of-truth.md")
+    shutil.copy2(artifacts["approved_reference"], reference_dir / "study.reference.json")
+    normalization = fixture.get("approved_normalization") or {}
+    provenance = input_provenance(
+        input_dir / "source-input.md",
+        reference_dir / "source-of-truth.md",
+        approved_normalizations={
+            str(normalization.get("source_input_sha256") or ""):
+            str(normalization.get("approved_source_sha256") or ""),
+        },
+    )
     (reference_dir / "input-provenance.json").write_text(
-        json.dumps(
-            {
-                **provenance,
-                "input_path": f"input/{source_input.name}",
-                "approved_source_path": "reference/source-of-truth.md",
-            },
-            indent=2,
-        ) + "\n",
+        json.dumps({
+            **provenance,
+            "fixture_id": fixture_id,
+            "synthetic": True,
+            "input_path": "input/source-input.md",
+            "approved_source_path": "reference/source-of-truth.md",
+        }, indent=2) + "\n",
         encoding="utf-8",
     )
     reference = _read_json(reference_dir / "study.reference.json") or {}
@@ -510,11 +590,17 @@ def prepare_disposable_run(
         workflow_root=workflow_root,
     )
     if result.get("status") != "passed":
-        raise RuntimeError(f"Could not create governed diagnostic revision: {json.dumps(result)}")
+        raise RuntimeError(f"Could not create governed certification revision: {json.dumps(result)}")
     return result
 
 
-def _agent_prompt(skill_root: Path, revision_dir: Path, handoff: Mapping[str, Any]) -> str:
+def _agent_prompt(
+    skill_root: Path,
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+    *,
+    hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
+) -> str:
     request_path = revision_dir / str(handoff["request_path"])
     response_path = revision_dir / str(handoff["response_path"])
     task = str(handoff.get("task") or "")
@@ -527,6 +613,17 @@ def _agent_prompt(skill_root: Path, revision_dir: Path, handoff: Mapping[str, An
         if verification
         else "Draft only the requested sections from the closed approved evidence package."
     )
+    preservation_notes = "\n".join(
+        f"- {str(note).strip()}"
+        for note in hermes_configuration.get("layout_preservation_notes") or []
+        if str(note).strip()
+    )
+    preservation_rule = (
+        "\nLayout Preservation Baseline. Do not normalize or redesign these authority-derived features:\n"
+        f"{preservation_notes}\n"
+        if verification and preservation_notes
+        else ""
+    )
     return f"""Complete one isolated clinical-document Hermes handoff.
 
 Certified skill: {skill_root}
@@ -536,6 +633,7 @@ Response: {response_path}
 Task: {task}
 
 Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
+{preservation_rule}
 Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. Use a truthful nonempty producer.model_id. Run the repository's real validator before finishing. Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
@@ -621,6 +719,47 @@ def _response_is_bound(
     ))
 
 
+def wait_for_parent_visual_review(
+    run_dir: Path,
+    handoffs: Sequence[Mapping[str, Any]],
+    remaining_seconds: float,
+    *,
+    progress: Callable[[str, float], None] | None = None,
+) -> None:
+    """Wait inside the original operation for Desktop-parent page review evidence."""
+    reference = _read_json(run_dir / "reference/study.reference.json") or {}
+    revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
+    revision_dir = run_dir / "revisions" / revision_id
+    marker_path = run_dir / "logs/desktop-parent-visual-review.json"
+    response_paths = [str(item.get("response_path") or "") for item in handoffs]
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def record(status: str) -> None:
+        marker_path.write_text(json.dumps({
+            "status": status,
+            "revision_id": revision_id,
+            "request_paths": [str(item.get("request_path") or "") for item in handoffs],
+            "response_paths": response_paths,
+            "completion_requirement": "Desktop parent must inspect every bound page image.",
+        }, indent=2) + "\n", encoding="utf-8")
+
+    record("awaiting_desktop_parent")
+    started = time.monotonic()
+    deadline = started + max(0.0, remaining_seconds)
+    last_progress = started
+    while time.monotonic() < deadline:
+        if all(_response_is_bound(revision_dir, handoff) for handoff in handoffs):
+            record("completed")
+            return
+        observed = time.monotonic()
+        if progress is not None and observed - last_progress >= PROGRESS_INTERVAL_SECONDS:
+            progress("desktop_parent_visual_review", max(0.0, deadline - observed))
+            last_progress = observed
+        time.sleep(0.1)
+    record("expired")
+    raise RuntimeError("Desktop-parent visual review did not complete before the original operation deadline.")
+
+
 def _run_handoff_wave(
     run_dir: Path,
     revision_dir: Path,
@@ -630,8 +769,11 @@ def _run_handoff_wave(
     skill_root: Path = REPO_ROOT,
     sandbox: bool = False,
     progress: Any | None = None,
+    hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
 ) -> tuple[bool, list[str]]:
-    processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], float, Path, Path]] = []
+    processes: list[
+        tuple[subprocess.Popen[str], Mapping[str, Any], float, Path, Path, Path | None]
+    ] = []
     for handoff in handoffs:
         request_id = Path(str(handoff["request_path"])).stem
         stdout_path = run_dir / "logs/hermes-agents" / f"{request_id}.stdout.log"
@@ -642,15 +784,21 @@ def _run_handoff_wave(
             "hermes",
             "chat",
             "-q",
-            _agent_prompt(skill_root, revision_dir, handoff),
+            _agent_prompt(
+                skill_root,
+                revision_dir,
+                handoff,
+                hermes_configuration=hermes_configuration,
+            ),
             "--source",
-            "clinical-real-e2e",
+            str(hermes_configuration["source"]),
             "--max-turns",
-            "80",
+            str(hermes_configuration["max_turns"]),
             "--skills",
-            "clinical-document-drafting",
-            "--safe-mode",
+            str(hermes_configuration["skill"]),
         ]
+        if hermes_configuration.get("safe_mode") is True:
+            command.append("--safe-mode")
         sandbox_profile = None
         if sandbox:
             command, sandbox_profile = sandbox_command(skill_root, run_dir, command)
@@ -667,25 +815,30 @@ def _run_handoff_wave(
                 text=True,
                 start_new_session=True,
             )
-        processes.append((process, handoff, started, stdout_path, stderr_path))
-        if sandbox_profile is not None:
-            sandbox_profile.unlink(missing_ok=True)
+        processes.append(
+            (process, handoff, started, stdout_path, stderr_path, sandbox_profile)
+        )
 
     handoff_by_process = {
         id(process): handoff
-        for process, handoff, _, _, _ in processes
+        for process, handoff, _, _, _, _ in processes
     }
-    timed_out, completions = _wait_for_processes(
-        [process for process, _, _, _, _ in processes],
-        timeout_seconds=timeout_seconds,
-        progress=progress,
-        completion_check=lambda process: _response_is_bound(
-            revision_dir,
-            handoff_by_process[id(process)],
-        ),
-    )
+    try:
+        timed_out, completions = _wait_for_processes(
+            [process for process, _, _, _, _, _ in processes],
+            timeout_seconds=timeout_seconds,
+            progress=progress,
+            completion_check=lambda process: _response_is_bound(
+                revision_dir,
+                handoff_by_process[id(process)],
+            ),
+        )
+    finally:
+        for _, _, _, _, _, sandbox_profile in processes:
+            if sandbox_profile is not None:
+                sandbox_profile.unlink(missing_ok=True)
     missing: list[str] = []
-    for process, handoff, started, stdout_path, stderr_path in processes:
+    for process, handoff, started, stdout_path, stderr_path, _ in processes:
         returncode, ended = completions[id(process)]
         response_relative = str(handoff["response_path"])
         response_path = revision_dir / response_relative
@@ -718,14 +871,21 @@ def run_release_certification_operation(
     desktop_operation: Any | None = None,
     release_identity: Mapping[str, Any] | None = None,
     parent_visual_reviewer: Callable[[list[Mapping[str, Any]], float], None] | None = None,
+    hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
+    state_path_resolver: Callable[[Path, str], Path] | None = None,
 ) -> dict[str, Any]:
     release_root = release_root.resolve()
     if desktop_operation is None:
         certified_workflow, certified_identity = _certified_release(release_root)
         desktop_operation = certified_workflow.run_desktop_operation
+        state_path_resolver = certified_workflow.desktop_operation_state_path
         release_identity = certified_identity
     elif not str((release_identity or {}).get("package_fingerprint") or ""):
         raise ValueError("An injected controlled operation requires an explicit release fingerprint.")
+    release_identity = {
+        **dict(release_identity or {}),
+        "hermes_configuration": dict(hermes_configuration),
+    }
     progress_started = time.monotonic()
     last_progress = [progress_started]
 
@@ -757,6 +917,7 @@ def run_release_certification_operation(
                 "waiting",
                 max(0.0, remaining_seconds - (observed_at - wave_started)),
             ),
+            hermes_configuration=hermes_configuration,
         )
 
     def parent_visual_fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
@@ -788,6 +949,59 @@ def run_release_certification_operation(
         timed_out=timed_out,
         child_returncode=None,
     )
+    if state_path_resolver is None:
+        operation_module = sys.modules.get(str(getattr(desktop_operation, "__module__", "")))
+        state_path_resolver = getattr(operation_module, "desktop_operation_state_path", None)
+    if state_path_resolver is None:
+        raise ValueError("The Desktop operation must expose its canonical persisted-state path resolver.")
+    state_path = state_path_resolver(run_dir, operation_id)
+    state = _read_json(state_path) or {}
+    report["certification_scope"] = "single_case_tracer"
+    report["release_certification_status"] = "not_full_corpus"
+    report["release_identity"] = dict(release_identity)
+    report["hermes_configuration"] = dict(hermes_configuration)
+    report["desktop_operation_evidence"] = {
+        key: state.get(key)
+        for key in (
+            "started_at", "deadline_at", "runtime_history", "stage_history",
+            "stage_timings", "attempt_counters", "soft_budget_events", "cleanup",
+        )
+    }
+    manifest = _read_json(run_dir / str(final_result.get("manifest") or "")) or {}
+    manifest_path = run_dir / str(final_result.get("manifest") or "")
+    render_evidence = ((manifest.get("quality") or {}).get("render_assurance") or {}).get("render") or {}
+    report["adapter_attempts"] = {
+        "renderer": list(render_evidence.get("renderer_attempts") or []),
+        "page_renderer": list(render_evidence.get("page_renderer_attempts") or []),
+    }
+    report["bound_evidence"] = {}
+    for name, path in (
+        ("desktop_operation_state", state_path),
+        ("delivery_manifest", manifest_path),
+    ):
+        if path.is_file():
+            report["bound_evidence"][name] = {
+                "path": path.relative_to(run_dir).as_posix(),
+                "sha256": _sha256(path),
+                "bytes": path.stat().st_size,
+            }
+    delivery_confirmed = bool((final_result.get("delivery") or {}).get("confirmed"))
+    output_evidence = []
+    for item in manifest.get("client_outputs") or []:
+        path = run_dir / str(item.get("path") or "")
+        confirmed = bool(
+            delivery_confirmed
+            and path.is_file()
+            and path.stat().st_size == int(item.get("bytes") or -1)
+            and _sha256(path) == item.get("sha256")
+        )
+        output_evidence.append({
+            "path": item.get("path"),
+            "sha256": item.get("sha256"),
+            "bytes": item.get("bytes"),
+            "confirmed": confirmed,
+        })
+    report["output_evidence"] = output_evidence
     report_path = run_dir / "logs/hermes-integration-report.json"
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return report
@@ -795,18 +1009,19 @@ def run_release_certification_operation(
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT)
-    parser.add_argument("--baseline-run", type=Path, default=DEFAULT_BASELINE)
+    parser.add_argument("--fixture", default="ambispective-sterling")
     parser.add_argument("--run-root", type=Path, default=Path("/tmp/clinical-hermes-real-e2e"))
     parser.add_argument("--release-root", type=Path, required=True)
     parser.add_argument("--operation-id", default="default")
     args = parser.parse_args(argv)
-    run_dir = args.run_root / datetime.now(timezone.utc).strftime("run-%Y%m%dT%H%M%SZ")
+    run_dir = args.run_root / datetime.now(timezone.utc).strftime(
+        f"{args.fixture}-%Y%m%dT%H%M%SZ"
+    )
     release_root = args.release_root.resolve()
     _certified_release(release_root)
-    prepare_disposable_run(
-        args.baseline_run.resolve(),
-        args.input.resolve(),
+    fixture = certification_fixture(args.fixture)
+    prepare_certification_run(
+        args.fixture,
         run_dir,
         workflow_root=release_root,
     )
@@ -814,6 +1029,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_dir,
         release_root=release_root,
         operation_id=args.operation_id,
+        hermes_configuration=fixture["hermes_configuration"],
+        parent_visual_reviewer=lambda handoffs, remaining: wait_for_parent_visual_review(
+            run_dir,
+            handoffs,
+            remaining,
+            progress=lambda stage, available: _append_json_line(
+                run_dir / "logs/hermes-integration-events.jsonl",
+                {
+                    "at": datetime.now(timezone.utc).isoformat(),
+                    "status": "running",
+                    "stage": stage,
+                    "remaining_seconds": round(available, 3),
+                },
+            ),
+        ),
     )
     print(json.dumps(report, indent=2, ensure_ascii=False))
     return 0 if report["outcome"] == DiagnosticOutcome.PASSED.value else 1

@@ -1,0 +1,57 @@
+{
+  "schema_version": "release-certification-attempt-ledger/v1",
+  "ticket": 42,
+  "fixture_id": "ambispective-sterling",
+  "source_input_sha256": "b54328aa5f7f26b53109e4eccb5efc4665a2ed23a90e169da4c7a9aa6c6c768b",
+  "candidate_package_fingerprint": "4956157b1fe23b413d3c734f244babd6b2bcdd2aa30e110b44324e1079c45cd1",
+  "candidate_git_commit": "8d880a48f87f8403e35979efb75c68549aeb9066",
+  "like_for_like_comparison": {
+    "baseline_attempt": "parent-fallback-missing",
+    "candidate_attempt": "single-case-pass",
+    "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108"
+  },
+  "attempts": [
+    {
+      "id": "sandbox-profile-lifetime",
+      "classification": "failing_reproduction",
+      "outcome": "aborted-after-governed-diagnostic",
+      "finding": "The sandbox profile was deleted immediately after launch, causing sandbox-exec exit 65 and repeated same-request dispatches.",
+      "measured_stage_seconds": {
+        "generate": 10.742,
+        "drafting": 144.388
+      },
+      "retained_local_evidence": "/tmp/clinical-issue42-baseline/run-20260827T231125Z/logs/desktop-operation-issue-42-baseline-py311.json",
+      "retained_evidence_sha256": "71e5cbd2854f8a797b71906ecb5e68944fc50393d122d45c5658b1b6ca9f3b7d"
+    },
+    {
+      "id": "authority-caption-reproduction",
+      "classification": "failing_reproduction",
+      "outcome": "invalid-Hermes-response",
+      "elapsed_seconds": 579.018,
+      "finding": "The independent visual verifier treated an authority-preserved two-line caption as a numbering/style defect.",
+      "configuration_note": "Pre-calibration verifier configuration; excluded from the like-for-like timing comparison.",
+      "retained_local_evidence": "/tmp/clinical-issue42-candidate/ambispective-sterling-20260827T231829Z/logs/hermes-integration-report.json",
+      "retained_evidence_sha256": "b4c9273ef489bac5ed10962b6ff9ea195494766c3063fd872579b44f8e949714"
+    },
+    {
+      "id": "parent-fallback-missing",
+      "classification": "like_for_like_baseline",
+      "outcome": "invalid-Hermes-response",
+      "elapsed_seconds": 647.898,
+      "finding": "The Desktop Operation correctly requested parent visual fallback, but the real adapter did not yet provide its governed callback.",
+      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "retained_local_evidence": "/tmp/clinical-issue42-final/ambispective-sterling-20260827T232958Z/logs/hermes-integration-report.json",
+      "retained_evidence_sha256": "e3db46ffbb459c9a5da6b78ac68fd70163c50491d51f44e83a9b26739138c555"
+    },
+    {
+      "id": "single-case-pass",
+      "classification": "like_for_like_candidate",
+      "outcome": "passed",
+      "elapsed_seconds": 813.914,
+      "under_15_minutes": true,
+      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "retained_local_evidence": "/tmp/clinical-issue42-certified/ambispective-sterling-20260827T234202Z/logs/hermes-integration-report.json",
+      "retained_evidence_sha256": "63d58a1dfcab0ba35b32f92a9d1d35b6a5d78e7d486bb145165fee7a2c4e1ad2"
+    }
+  ]
+}

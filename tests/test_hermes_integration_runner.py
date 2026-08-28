@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -8,17 +9,116 @@ import sys
 from hermes_e2e import (
     EXPECTED_OUTPUTS,
     DiagnosticOutcome,
+    _agent_prompt,
     _certified_release,
     _run_handoff_wave,
     _wait_for_processes,
+    certification_fixture,
     _workflow,
     input_provenance,
     inspect_run,
+    prepare_certification_run,
     run_release_certification_operation,
     subprocess_environment,
     sandbox_command,
+    wait_for_parent_visual_review,
 )
 import workflow
+
+
+def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_path: Path) -> None:
+    fixture_dir = tmp_path / "ambispective-sterling"
+    fixture_dir.mkdir()
+    source_input = fixture_dir / "source-input.md"
+    approved_source = fixture_dir / "approved-source.md"
+    approved_reference = fixture_dir / "approved-reference.json"
+    source_input.write_text("explicitly synthetic input\n", encoding="utf-8")
+    approved_source.write_text("explicitly reviewed synthetic source\n", encoding="utf-8")
+    approved_reference.write_text(json.dumps({
+        "meta": {"study_type": "Ambispective", "icf_template": "Sterling"},
+        "approval": {"status": "approved"},
+    }), encoding="utf-8")
+    hashes = {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in (source_input, approved_source, approved_reference)
+    }
+    (fixture_dir / "fixture.json").write_text(json.dumps({
+        "schema_version": "release-certification-fixture/v1",
+        "fixture_id": "ambispective-sterling",
+        "synthetic": True,
+        "contains_private_data": False,
+        "study_type": "Ambispective",
+        "icf_family": "Sterling",
+        "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
+        "artifacts": {
+            "source_input": {"path": "source-input.md", "sha256": hashes["source-input.md"]},
+            "approved_source": {"path": "approved-source.md", "sha256": hashes["approved-source.md"]},
+            "approved_reference": {"path": "approved-reference.json", "sha256": hashes["approved-reference.json"]},
+        },
+        "hermes_configuration": {
+            "source": "clinical-release-certification",
+            "max_turns": 80,
+            "skill": "clinical-document-drafting",
+            "safe_mode": True,
+        },
+    }), encoding="utf-8")
+
+    fixture = certification_fixture("ambispective-sterling", fixture_root=tmp_path)
+
+    assert fixture["synthetic"] is True
+    assert fixture["contains_private_data"] is False
+    assert fixture["expected_outputs"] == ["icf.docx", "protocol.docx", "study.xml"]
+    assert fixture["artifact_paths"]["approved_reference"] == approved_reference.resolve()
+
+    source_input.write_text("mutated\n", encoding="utf-8")
+    try:
+        certification_fixture("ambispective-sterling", fixture_root=tmp_path)
+    except ValueError as exc:
+        assert "hash" in str(exc).casefold()
+    else:
+        raise AssertionError("A mutated certification fixture was accepted.")
+
+
+def test_repository_certification_fixture_prepares_an_independent_approved_run(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+
+    result = prepare_certification_run(
+        "ambispective-sterling",
+        run_dir,
+        workflow_root=Path(__file__).resolve().parents[1],
+    )
+
+    assert result["status"] == "passed"
+    assert (run_dir / "input/source-input.md").is_file()
+    assert (run_dir / "reference/source-of-truth.md").is_file()
+    reference = json.loads((run_dir / "reference/study.reference.json").read_text())
+    assert reference["meta"]["study_type"] == "Ambispective"
+    assert reference["meta"]["icf_template"] == "Sterling"
+    assert reference["approval"]["approved_by"] == "Hermes Release Certification"
+    provenance = json.loads((run_dir / "reference/input-provenance.json").read_text())
+    assert provenance["fixture_id"] == "ambispective-sterling"
+    assert provenance["synthetic"] is True
+    assert provenance["status"] == "approved_normalization"
+
+
+def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: Path) -> None:
+    prompt = _agent_prompt(
+        tmp_path / "release",
+        tmp_path / "revision",
+        {
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "task": "rendered_page_visual_verification",
+        },
+        hermes_configuration={
+            "layout_preservation_notes": [
+                "The two-line Table 13.3.-1 contact caption is authority-preserved."
+            ],
+        },
+    )
+
+    assert "The two-line Table 13.3.-1 contact caption is authority-preserved." in prompt
+    assert "Do not normalize" in prompt
 
 
 def test_diagnostic_reports_invalid_hermes_response_for_a_missing_response(tmp_path: Path) -> None:
@@ -96,6 +196,13 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
         release_root=Path(__file__).resolve().parents[1],
         desktop_operation=workflow.run_desktop_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        hermes_configuration={
+            "source": "clinical-release-certification",
+            "max_turns": 80,
+            "skill": "clinical-document-drafting",
+            "safe_mode": True,
+            "reasoning_configuration": "Hermes Desktop governed default",
+        },
     )
 
     assert report["outcome"] == DiagnosticOutcome.PASSED.value
@@ -103,6 +210,24 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
     assert not (run_dir / "logs/hermes-operation.json").exists()
     state = json.loads((run_dir / "logs/desktop-operation.json").read_text())
     assert state["result"]["delivery"]["confirmed"] is True
+    assert report["release_identity"]["package_fingerprint"] == "controlled-candidate"
+    assert report["hermes_configuration"]["safe_mode"] is True
+    assert report["desktop_operation_evidence"]["stage_timings"] == state["stage_timings"]
+    assert report["certification_scope"] == "single_case_tracer"
+    assert report["release_certification_status"] == "not_full_corpus"
+    assert report["adapter_attempts"] == {"renderer": [], "page_renderer": []}
+    assert report["bound_evidence"]["delivery_manifest"]["sha256"] == hashlib.sha256(
+        manifest_path.read_bytes()
+    ).hexdigest()
+    assert report["bound_evidence"]["desktop_operation_state"]["path"] == (
+        "logs/desktop-operation.json"
+    )
+    assert report["output_evidence"] == [{
+        "path": "output/protocol.docx",
+        "sha256": "b04e5ea201bb040cae53f693f6a38a3e00b62da6039ca248fecd59b7fc842894",
+        "bytes": len(payload),
+        "confirmed": True,
+    }]
 
 
 def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_path: Path) -> None:
@@ -124,9 +249,85 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
         desktop_operation=controlled_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
         parent_visual_reviewer=lambda handoffs, remaining: parent_reviews.append((handoffs, remaining)),
+        state_path_resolver=workflow.desktop_operation_state_path,
     )
 
     assert parent_reviews == [([handoff], 12.0)]
+
+
+def test_parent_visual_review_waits_for_bound_desktop_responses(tmp_path: Path) -> None:
+    revision = tmp_path / "revisions/r-test"
+    request_path = revision / "hermes/verification-requests/visual.json"
+    response_path = revision / "hermes/verification-responses/visual.json"
+    response_path.parent.mkdir(parents=True)
+    request_path.parent.mkdir(parents=True)
+    (tmp_path / "reference").mkdir()
+    (tmp_path / "reference/study.reference.json").write_text(json.dumps({
+        "approval": {"revision_id": "r-test"},
+    }), encoding="utf-8")
+    request = {
+        "request_id": "visual",
+        "request_sha256": "a" * 64,
+        "task": "rendered_page_visual_verification",
+        "response_path": "hermes/verification-responses/visual.json",
+    }
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.write_text(json.dumps({
+        "request_id": "visual",
+        "request_sha256": "a" * 64,
+        "task": "rendered_page_visual_verification",
+        "producer": {"model_id": "desktop-parent/gpt-5.6-sol"},
+    }), encoding="utf-8")
+
+    wait_for_parent_visual_review(
+        tmp_path,
+        [{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "task": "rendered_page_visual_verification",
+        }],
+        1.0,
+    )
+
+    marker = json.loads((tmp_path / "logs/desktop-parent-visual-review.json").read_text())
+    assert marker["status"] == "completed"
+    assert marker["response_paths"] == ["hermes/verification-responses/visual.json"]
+
+
+def test_parent_visual_review_reports_progress_while_waiting(tmp_path: Path, monkeypatch) -> None:
+    revision = tmp_path / "revisions/r-test"
+    request_path = revision / "hermes/verification-requests/visual.json"
+    request_path.parent.mkdir(parents=True)
+    (tmp_path / "reference").mkdir()
+    (tmp_path / "reference/study.reference.json").write_text(json.dumps({
+        "approval": {"revision_id": "r-test"},
+    }), encoding="utf-8")
+    request_path.write_text(json.dumps({
+        "request_id": "visual",
+        "request_sha256": "a" * 64,
+        "task": "rendered_page_visual_verification",
+    }), encoding="utf-8")
+    ticks = iter([0.0, 0.0, 61.0, 62.0])
+    monkeypatch.setattr("hermes_e2e.time.monotonic", lambda: next(ticks))
+    monkeypatch.setattr("hermes_e2e.time.sleep", lambda _seconds: None)
+    progress = []
+
+    try:
+        wait_for_parent_visual_review(
+            tmp_path,
+            [{
+                "request_path": "hermes/verification-requests/visual.json",
+                "response_path": "hermes/verification-responses/visual.json",
+                "task": "rendered_page_visual_verification",
+            }],
+            62.0,
+            progress=lambda stage, remaining: progress.append((stage, remaining)),
+        )
+    except RuntimeError:
+        pass
+
+    assert progress
+    assert progress[0][0] == "desktop_parent_visual_review"
 
 
 def test_real_release_certification_rejects_the_editable_checkout() -> None:
@@ -281,6 +482,47 @@ def test_handoff_wave_closes_parent_log_handles(tmp_path: Path, monkeypatch) -> 
     assert all(handle.closed for handle in captured_handles)
 
 
+def test_handoff_wave_keeps_sandbox_profile_until_the_worker_finishes(tmp_path: Path, monkeypatch) -> None:
+    profile = tmp_path / "worker.sb"
+    profile.write_text("(version 1)\n(allow default)\n", encoding="utf-8")
+
+    class CompletedProcess:
+        pid = 12345
+        returncode = 0
+
+        def poll(self):
+            return 0
+
+    monkeypatch.setattr(
+        "hermes_e2e.sandbox_command",
+        lambda _root, _run_dir, command: (["sandbox-exec", "-f", str(profile), *command], profile),
+    )
+    monkeypatch.setattr(subprocess, "Popen", lambda *_args, **_kwargs: CompletedProcess())
+
+    def observed_wait(processes, **_kwargs):
+        assert profile.is_file()
+        return False, {id(processes[0]): (0, 2.0)}
+
+    monkeypatch.setattr("hermes_e2e._wait_for_processes", observed_wait)
+    revision = tmp_path / "run/revisions/r-test"
+    revision.mkdir(parents=True)
+
+    _run_handoff_wave(
+        tmp_path / "run",
+        revision,
+        [{
+            "request_path": "hermes/requests/draft-1.json",
+            "response_path": "hermes/responses/draft-1.json",
+            "task": "section_drafting",
+            "batch_id": "protocol-foundations",
+        }],
+        timeout_seconds=1.0,
+        sandbox=True,
+    )
+
+    assert not profile.exists()
+
+
 def test_workflow_subprocess_timeout_is_reported_explicitly(tmp_path: Path, monkeypatch) -> None:
     def raise_timeout(*args, **kwargs):
         raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
@@ -376,6 +618,39 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
     assert slow_delivery["outcome"] == DiagnosticOutcome.NON_CERTIFYING_RUNTIME.value
     assert slow_delivery["output_published"] is True
     assert with_delivery["required_outputs"] == ["protocol.docx"]
+
+
+def test_diagnostic_preserves_a_classified_layout_blocker_after_response_invalidation(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    requests = revision / "hermes/verification-requests"
+    requests.mkdir(parents=True)
+    (run_dir / "reference").mkdir()
+    (run_dir / "reference/study.reference.json").write_text(json.dumps({
+        "meta": {"study_type": "Retrospective"},
+        "approval": {"revision_id": "r-test"},
+    }), encoding="utf-8")
+    (requests / "visual.json").write_text(json.dumps({
+        "request_id": "visual",
+        "request_sha256": "a" * 64,
+        "task": "rendered_page_visual_verification",
+        "response_path": "hermes/verification-responses/visual.json",
+    }), encoding="utf-8")
+
+    report = inspect_run(
+        run_dir,
+        final_result={
+            "status": "blocked",
+            "stage": "layout_repair_classification",
+            "findings": [{"category": "visual", "issue": "authority feature misclassified"}],
+        },
+        elapsed_seconds=10.0,
+        timed_out=False,
+        child_returncode=None,
+    )
+
+    assert report["outcome"] == DiagnosticOutcome.BLOCKED.value
+    assert report["missing_response_paths"] == ["hermes/verification-responses/visual.json"]
 
 
 def test_diagnostic_collects_stage_history_rejections_and_first_wave_concurrency(tmp_path: Path) -> None:

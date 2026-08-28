@@ -85,17 +85,36 @@ state binds the release fingerprint and compatible runtimes to the original UTC
 deadline, exact pending handoffs, attempt counters, stage timing and soft-budget
 diagnostics, cleanup evidence, and immutable terminal result.
 
-Real certification requires an extracted, hash-valid candidate rather than the
+One real certification tracer requires an extracted, hash-valid candidate rather than the
 editable checkout:
 
 ```bash
-"$CLINICAL_PYTHON" tests/hermes_e2e.py --release-root /absolute/path/to/extracted/clinical-document-generation
+candidate_dir="$(mktemp -d /tmp/clinical-release-candidate.XXXXXX)"
+"$CLINICAL_PYTHON" scripts/workflow.py --package-release "$candidate_dir/release.zip"
+unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
+"$CLINICAL_PYTHON" tests/hermes_e2e.py \
+  --fixture ambispective-sterling \
+  --release-root "$candidate_dir/extracted/clinical-document-generation"
 ```
 
 The adapter loads `run_desktop_operation` from that candidate, launches Hermes
 with the candidate read-only, and binds the operation to its release-manifest
 fingerprint. Its cleanup reserve remains inside the one 30-minute operation;
-there is no shorter certification timeout.
+there is no shorter certification timeout. A successful single fixture is
+case evidence only; it does not certify a release until the complete three-study
+corpus has passed.
+
+Certification fixtures live under `tests/fixtures/release-certification/`.
+Each fixture manifest explicitly declares synthetic/non-private provenance,
+hashes its source input, reviewed Source-of-Truth, and approved reference, fixes
+the exact branch output set and governed Hermes configuration, and may declare
+authority-derived Layout Preservation notes. A run is always prepared from
+those repository bytes into a fresh directory; ignored runs, Downloads, and
+prior Hermes sessions are not inputs. The durable report is written to
+`<run>/logs/hermes-integration-report.json`. If the visual-review soft budget
+expires, `<run>/logs/desktop-parent-visual-review.json` identifies the exact
+page requests the Desktop parent must inspect and bind inside the unchanged
+operation deadline.
 
 The normal approval-to-accessible-files target is 10–12 minutes. The target is
 not a cutoff. The complete operation, including retries, verification,
