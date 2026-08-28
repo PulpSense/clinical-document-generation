@@ -126,7 +126,7 @@ def _certify_archive(archive_path: Path) -> None:
         "case_order": ["retrospective", "ambispective-sterling", "prospective-advarra"],
         "cases": [passing_case(fixture) for fixture in workflow.CERTIFICATION_CASE_ORDER],
         "findings": [],
-        "completed_at": "2026-08-28T00:00:00+00:00",
+        "completed_at": "2026-08-28T00:02:00+00:00",
     }
     report_path = archive_path.with_suffix(".certification.json")
     report_path.write_text(json.dumps(report), encoding="utf-8")
