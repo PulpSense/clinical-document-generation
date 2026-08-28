@@ -329,6 +329,14 @@ def _package_release_tree(
             font_inventory[path.relative_to(repo_root).as_posix()] = sorted(_template_fonts(path))
     required_font_names = sorted({font for fonts in font_inventory.values() for font in fonts})
     approved_font_plan = bundles[0]["approved_font_plan"]
+    certification_configuration_sha256 = {}
+    for fixture_id in CERTIFICATION_CASE_ORDER:
+        fixture_path = repo_root / "tests/fixtures/release-certification" / fixture_id / "fixture.json"
+        try:
+            fixture = _read(fixture_path)
+            certification_configuration_sha256[fixture_id] = sha256_value(fixture["hermes_configuration"])
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Release packaging requires the governed certification fixture: {fixture_id}") from exc
     pdf_renderer = dict(PDF_PAGE_RENDERER)
     pdf_renderer_wheel = repo_root / pdf_renderer["wheel"]
     if (
@@ -362,6 +370,7 @@ def _package_release_tree(
             "pdf_page_renderer": pdf_renderer,
             "harness": {"python": platform.python_version(), "platform": platform.platform()},
             "model": "Hermes Desktop runtime; model identity is recorded per generation evidence.",
+            "certification_configuration_sha256": certification_configuration_sha256,
         },
         "excluded_classes": ["git metadata", "development virtual environments", "credentials", "patient/source data", "old run outputs", "development tests", "installed runtime and assurance evidence"],
         "files": entries,
@@ -535,6 +544,19 @@ def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -
     return findings
 
 
+def _is_sha256(value: Any) -> bool:
+    text = str(value or "")
+    return len(text) == 64 and all(character in "0123456789abcdef" for character in text.casefold())
+
+
+def _valid_utc_timestamp(value: Any) -> bool:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None
+
+
 def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Verify that the embedded full-corpus report certifies this exact candidate."""
     report_path = skill_root / RELEASE_CERTIFICATION
@@ -546,8 +568,9 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
     identity = report.get("release_identity") or {}
     cases = report.get("cases") or []
     case_order = report.get("case_order") or []
-    configuration = report.get("hermes_configuration") or {}
-    configuration_sha256 = sha256_value(configuration)
+    configurations = report.get("hermes_configurations") or {}
+    expected_configuration_hashes = (manifest.get("inventory") or {}).get("certification_configuration_sha256") or {}
+    layout_evidence = report.get("layout_preservation_evidence") or {}
     valid = (
         report.get("schema_version") == "release-certification-corpus/v1"
         and report.get("status") == "passed"
@@ -555,10 +578,27 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
         and not report.get("findings")
         and identity.get("package_fingerprint") == manifest.get("package_fingerprint")
         and identity.get("git_commit") == manifest.get("git_commit")
-        and len(str(report.get("preflight_evidence_sha256") or "")) == 64
-        and bool(report.get("layout_preservation_evidence"))
-        and bool(report.get("completed_at"))
-        and configuration == CERTIFIED_HERMES_CONFIGURATION
+        and _is_sha256(report.get("preflight_evidence_sha256"))
+        and layout_evidence.get("status") == "passed"
+        and layout_evidence.get("returncode") == 0
+        and _is_sha256(layout_evidence.get("sha256"))
+        and set(layout_evidence.get("coverage") or []) == {
+            "Prospective/Advarra", "Prospective/Sterling", "Ambispective/Advarra",
+            "Ambispective/Sterling", "Retrospective/Protocol",
+        }
+        and _valid_utc_timestamp(layout_evidence.get("started_at"))
+        and _valid_utc_timestamp(layout_evidence.get("completed_at"))
+        and _valid_utc_timestamp(report.get("completed_at"))
+        and set(configurations) == set(CERTIFICATION_CASE_ORDER)
+        and expected_configuration_hashes == {
+            fixture_id: sha256_value(configurations.get(fixture_id) or {})
+            for fixture_id in CERTIFICATION_CASE_ORDER
+        }
+        and all(
+            all(configuration.get(key) == expected for key, expected in CERTIFIED_HERMES_CONFIGURATION.items())
+            and bool(configuration.get("layout_preservation_notes"))
+            for configuration in configurations.values()
+        )
         and tuple(case_order) == CERTIFICATION_CASE_ORDER
         and tuple(case.get("fixture_id") for case in cases) == CERTIFICATION_CASE_ORDER
     )
@@ -588,7 +628,7 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
             and all(
                 item.get("confirmed") is True
                 and int(item.get("bytes") or 0) > 0
-                and len(str(item.get("sha256") or "")) == 64
+                and _is_sha256(item.get("sha256"))
                 for item in output_by_path.values()
             )
         )
@@ -598,17 +638,20 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
                 item.get("status") == "passed"
                 and int(item.get("page_count") or 0) > 0
                 and int(item.get("page_count") or 0) == len(item.get("page_sha256") or [])
-                and all(len(str(digest)) == 64 for digest in item.get("page_sha256") or [])
+                and all(_is_sha256(digest) for digest in item.get("page_sha256") or [])
                 and set(item.get("checks") or []) == CERTIFICATION_VISUAL_CHECKS
-                and len(str(item.get("request_sha256") or "")) == 64
-                and len(str(item.get("response_sha256") or "")) == 64
-                and len(str(item.get("pdf_sha256") or "")) == 64
-                and len(str(item.get("docx_sha256") or "")) == 64
+                and _is_sha256(item.get("request_sha256"))
+                and _is_sha256(item.get("response_sha256"))
+                and _is_sha256(item.get("pdf_sha256"))
+                and _is_sha256(item.get("docx_sha256"))
+                and item.get("producer_model_id") == CERTIFIED_HERMES_CONFIGURATION["model_identifier"]
                 and item.get("docx_sha256") == output_by_path.get(f"output/{artifact}.docx", {}).get("sha256")
                 for artifact, item in visual.items()
             )
         )
         render_assurance_evidence = case.get("render_assurance") or {}
+        page_renderer_evidence = render_assurance_evidence.get("active_page_renderer") or {}
+        expected_page_renderer = (manifest.get("inventory") or {}).get("pdf_page_renderer") or {}
         expected_gate_statuses = {gate: "passed" for gate in CERTIFICATION_GATES}
         if fixture_id == "retrospective":
             expected_gate_statuses["prs_xml"] = "not_applicable"
@@ -616,9 +659,9 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
             case.get("status") == "passed",
             not case.get("findings"),
             case.get("release_identity") == identity,
-            case.get("hermes_configuration_sha256") == configuration_sha256,
+            case.get("hermes_configuration_sha256") == expected_configuration_hashes.get(fixture_id),
             set(case.get("model_identifiers") or []) == {CERTIFIED_HERMES_CONFIGURATION["model_identifier"]},
-            len(str(case.get("report_sha256") or "")) == 64,
+            _is_sha256(case.get("report_sha256")),
             runtime_valid,
             desktop_elapsed > 0.0,
             case.get("within_approved_runtime") is True,
@@ -627,9 +670,10 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
             case.get("layout_checks") == {"natural_section_3_flow": "passed", "no_orphan_headings": "passed"},
             visual_valid,
             (render_assurance_evidence.get("active_renderer") or {}).get("kind") in {"Microsoft Word", "LibreOffice"},
-            (render_assurance_evidence.get("active_page_renderer") or {}).get("kind") == "pypdfium2",
-            len(str(case.get("contracted_template_bundle_identity") or "")) == 64,
-            len(str(case.get("layout_preservation_baseline_identity") or "")) == 64,
+            all(page_renderer_evidence.get(key) == expected_page_renderer.get(key) for key in ("kind", "version", "wheel", "wheel_sha256")),
+            page_renderer_evidence.get("source") == "release-owned runtime",
+            _is_sha256(case.get("contracted_template_bundle_identity")),
+            _is_sha256(case.get("layout_preservation_baseline_identity")),
         ))
     if not valid:
         return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, model, and configuration."}]
@@ -732,7 +776,6 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
             in_external = False
         if in_external and stripped.startswith("- "):
             entries.append(stripped[2:].strip().strip("'\""))
-    clinical_entries = [entry for entry in entries if "clinical-document-generation" in entry]
     governed = {
         key: scalars.get(("skills", "clinical_document_generation", key))
         for key in CERTIFIED_HERMES_CONFIGURATION
@@ -750,7 +793,8 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
         scalars.get(("agent", "reasoning_effort")) == "medium",
         host_turns_sufficient,
     ))
-    if clinical_entries != [str(active)] or not governed_matches or not host_matches:
+    normalized_entries = [str(Path(entry).expanduser().resolve()) for entry in entries]
+    if normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
         return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
     return []
 

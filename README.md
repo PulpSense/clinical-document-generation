@@ -133,7 +133,8 @@ those governed command results and logs, the clean commit and package fingerprin
 approved synthetic fixture, governed Hermes settings and observed model IDs,
 Contracted Template Bundle and Layout Preservation identities, exact delivered
 bytes, all quality gates, every rendered page and check, delivery confirmation,
-and sub-15-minute case timing. Recorded drafting or synthetic verification remains
+Retrospective timing below 15 minutes, and the explicitly approved Ambispective
+and Prospective ceiling of 18 minutes. Recorded drafting or synthetic verification remains
 labelled structural-only in preflight evidence and cannot satisfy the live gate.
 
 Certification fixtures live under `tests/fixtures/release-certification/`.
@@ -222,9 +223,11 @@ Desktop operation remains governed by the single 30-minute budget. A passing
 Generation Manifest is not delivery: the Desktop parent must expose exactly its
 client outputs as attachments, retrieve each file through the actual opener,
 and confirm byte length and SHA-256 before reporting success.
-Release Certification additionally requires completion within 15 minutes; a
-slower valid operation may still deliver before the 30-minute correctness
-ceiling, but receives a non-certifying runtime outcome.
+Release Certification requires Retrospective completion below 15 minutes and
+permits Ambispective and Prospective through 18 minutes under the approved
+exception when every other gate passes. A slower valid operation may still
+deliver before the 30-minute correctness ceiling, but receives a non-certifying
+runtime outcome.
 
 Before installation, the same `config.yaml` must select only the active path and
 declare the certified launch settings under `skills.clinical_document_generation`:

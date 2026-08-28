@@ -32,7 +32,10 @@ def _certify_archive(archive_path: Path) -> None:
         "package_fingerprint": manifest["package_fingerprint"],
         "git_commit": manifest["git_commit"],
     }
-    configuration = dict(workflow.CERTIFIED_HERMES_CONFIGURATION)
+    configurations = {
+        fixture: json.loads((ROOT / f"tests/fixtures/release-certification/{fixture}/fixture.json").read_text())["hermes_configuration"]
+        for fixture in workflow.CERTIFICATION_CASE_ORDER
+    }
 
     def passing_case(fixture: str) -> dict:
         output_paths = (
@@ -58,7 +61,7 @@ def _certify_archive(archive_path: Path) -> None:
             "within_approved_runtime": True,
             "report_sha256": "d" * 64,
             "release_identity": identity,
-            "hermes_configuration_sha256": workflow.sha256_value(configuration),
+            "hermes_configuration_sha256": workflow.sha256_value(configurations[fixture]),
             "model_identifiers": ["gpt-5.6-sol"],
             "output_evidence": list(outputs.values()),
             "gate_statuses": gates,
@@ -79,7 +82,10 @@ def _certify_archive(archive_path: Path) -> None:
             },
             "render_assurance": {
                 "active_renderer": {"kind": "LibreOffice"},
-                "active_page_renderer": {"kind": "pypdfium2"},
+                "active_page_renderer": {
+                    **workflow.PDF_PAGE_RENDERER,
+                    "source": "release-owned runtime",
+                },
             },
             "contracted_template_bundle_identity": "3" * 64,
             "layout_preservation_baseline_identity": "4" * 64,
@@ -90,9 +96,20 @@ def _certify_archive(archive_path: Path) -> None:
         "status": "passed",
         "certification_scope": "complete_three_case_corpus",
         "release_identity": identity,
-        "hermes_configuration": configuration,
+        "hermes_configurations": configurations,
         "preflight_evidence_sha256": "a" * 64,
-        "layout_preservation_evidence": {"status": "passed"},
+        "layout_preservation_evidence": {
+            "status": "passed",
+            "returncode": 0,
+            "sha256": "b" * 64,
+            "started_at": "2026-08-28T00:00:00+00:00",
+            "completed_at": "2026-08-28T00:01:00+00:00",
+            "coverage": [
+                "Prospective/Advarra", "Prospective/Sterling",
+                "Ambispective/Advarra", "Ambispective/Sterling",
+                "Retrospective/Protocol",
+            ],
+        },
         "case_order": ["retrospective", "ambispective-sterling", "prospective-advarra"],
         "cases": [passing_case(fixture) for fixture in workflow.CERTIFICATION_CASE_ORDER],
         "findings": [],
@@ -447,6 +464,35 @@ def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
             "clinical-document-generation/./RELEASE-CERTIFICATION.json",
             b"{}",
         )
+
+
+def test_certification_binding_rejects_nested_identity_mutations(tmp_path):
+    raw_archive = tmp_path / "raw.zip"
+    package_release(ROOT, raw_archive)
+    template_archive = tmp_path / "template.zip"
+    shutil.copy2(raw_archive, template_archive)
+    _certify_archive(raw_archive)
+    report_path = raw_archive.with_suffix(".certification.json")
+    baseline = json.loads(report_path.read_text(encoding="utf-8"))
+
+    mutations = (
+        lambda report: report["layout_preservation_evidence"].update(status="failed"),
+        lambda report: report["cases"][0]["visual_qa"]["protocol"].update(producer_model_id="other-model"),
+        lambda report: report["cases"][0]["render_assurance"]["active_page_renderer"].update(version="0.0.0"),
+        lambda report: report.update(completed_at="not-a-timestamp"),
+        lambda report: report["cases"][0].update(report_sha256="z" * 64),
+        lambda report: report["hermes_configurations"]["retrospective"].update(layout_preservation_notes=["mutated"]),
+    )
+    for index, mutate in enumerate(mutations):
+        candidate = tmp_path / f"candidate-{index}.zip"
+        shutil.copy2(template_archive, candidate)
+        report = json.loads(json.dumps(baseline))
+        mutate(report)
+        mutated_report = tmp_path / f"mutated-{index}.json"
+        mutated_report.write_text(json.dumps(report), encoding="utf-8")
+
+        with pytest.raises(ValueError, match="does not pass and bind"):
+            bind_release_certification(candidate, mutated_report)
     skills_dir = tmp_path / "skills"
     with pytest.raises(ValueError, match="duplicate normalized target"):
         install_release(

@@ -72,6 +72,12 @@ hashes every packaged file and records implementation, template, contract,
 font, renderer, harness, and model provenance. It excludes development
 environments, credentials, source/patient data, old runs, and tests.
 
+Run certification in the fixed order Retrospective, Ambispective–Sterling,
+Prospective–Advarra. Retrospective must remain below 15 minutes. The approved
+Ambispective and Prospective exception permits completion through 18 minutes
+only when rendering, every-page Visual QA, formatting preservation, content,
+delivery, and every other certification gate pass unchanged.
+
 The release gate never fabricates verifier approval. If it returns
 `awaiting_hermes`, run the returned content and every-page visual verification
 requests, save their exact responses, then resume the same corpus with:
