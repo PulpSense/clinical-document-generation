@@ -729,7 +729,7 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
             base_indent = indent
             continue
         if in_external and stripped and indent <= base_indent:
-            break
+            in_external = False
         if in_external and stripped.startswith("- "):
             entries.append(stripped[2:].strip().strip("'\""))
     clinical_entries = [entry for entry in entries if "clinical-document-generation" in entry]
