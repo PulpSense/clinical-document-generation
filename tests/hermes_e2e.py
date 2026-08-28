@@ -343,6 +343,8 @@ def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
     module = importlib.util.module_from_spec(specification)
     dependency_names = ("contracts", "drafting", "rendering", "quality", "prs_xml")
     previous_modules = {name: sys.modules.get(name) for name in dependency_names}
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
     sys.path.insert(0, str(scripts))
     sys.modules[module_name] = module
     try:
@@ -353,6 +355,7 @@ def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
         sys.modules.pop(module_name, None)
         raise
     finally:
+        sys.dont_write_bytecode = previous_dont_write_bytecode
         sys.path.remove(str(scripts))
         for name, previous in previous_modules.items():
             if previous is None:
