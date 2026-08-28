@@ -94,22 +94,7 @@ def verification_request_hash_valid(request: Mapping[str, Any]) -> bool:
     supplied = str(request.get("request_sha256") or "")
     return bool(supplied) and supplied == verification_request_sha256(request)
 
-PAGE_RENDERER_BACKENDS = (
-    "pdftoppm",
-    "pdftocairo",
-    "mutool",
-    "ghostscript",
-    "imagemagick",
-    "pymupdf",
-)
-
-_PAGE_RENDERER_EXECUTABLES = {
-    "pdftoppm": ("pdftoppm",),
-    "pdftocairo": ("pdftocairo",),
-    "mutool": ("mutool",),
-    "ghostscript": ("gs", "gswin64c", "gswin32c"),
-    "imagemagick": ("magick",),
-}
+PAGE_RENDERER_BACKENDS = ("pypdfium2",)
 
 
 def _text(value: Any) -> str:
@@ -218,40 +203,35 @@ def page_renderers(
     home: Path | None = None,
     skill_root: Path | None = None,
 ) -> list[dict[str, Any]]:
-    """List installed PDF page renderers in governed fallback order."""
-    identities = []
-    if skill_root is not None:
-        runtime_python = Path(skill_root).resolve() / "runtime/python"
-        for module_name in ("pymupdf", "fitz"):
-            if (runtime_python / module_name / "__init__.py").is_file():
-                identities.append({
-                    "kind": "pymupdf",
-                    "path": f"python:{module_name}",
-                    "module": module_name,
-                    "python_path": str(runtime_python),
-                    "version": "release-owned",
-                    "source": "verified fallback stack",
-                })
-                break
-    has_release_pymupdf = any(item.get("kind") == "pymupdf" for item in identities)
-    for kind in PAGE_RENDERER_BACKENDS:
-        if kind == "pymupdf":
-            if has_release_pymupdf:
-                continue
-            for module_name in ("pymupdf", "fitz"):
-                try:
-                    if importlib.util.find_spec(module_name) is None:
-                        continue
-                    module = importlib.import_module(module_name)
-                    version = getattr(module, "VersionBind", "installed Python package")
-                except (ImportError, RuntimeError, ValueError):
-                    continue
-                identities.append({"kind": kind, "path": f"python:{module_name}", "module": module_name, "version": str(version), "source": "Python environment"})
-                break
-            continue
-        for path, source in _executable_candidates(_PAGE_RENDERER_EXECUTABLES[kind], environment=environment, home=home):
-            identities.append({"kind": kind, "path": str(path), "source": source})
-    return identities
+    """Return the one release-owned PDFium page renderer, if provisioned."""
+    del environment, home
+    if skill_root is None:
+        return []
+    runtime_root = Path(skill_root).resolve() / "runtime"
+    runtime_python = runtime_root / "python"
+    identity_path = runtime_root / "PDF-RENDERER.json"
+    if not (
+        identity_path.is_file()
+        and (runtime_python / "pypdfium2/__init__.py").is_file()
+        and (runtime_python / "pypdfium2_raw/__init__.py").is_file()
+    ):
+        return []
+    try:
+        recorded = _json(identity_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return []
+    if recorded.get("kind") != "pypdfium2":
+        return []
+    return [{
+        "kind": "pypdfium2",
+        "path": "python:pypdfium2",
+        "module": "pypdfium2",
+        "python_path": str(runtime_python),
+        "version": str(recorded.get("version") or ""),
+        "source": "release-owned runtime",
+        "wheel": str(recorded.get("wheel") or ""),
+        "wheel_sha256": str(recorded.get("wheel_sha256") or ""),
+    }]
 
 
 def page_renderer(
@@ -290,62 +270,46 @@ def rasterize_pdf(
     path = str(identity["path"])
     prefix = output_dir / "page"
     command: list[str] | None = None
-    if kind == "pdftoppm":
-        command = [path, "-png", "-r", str(dpi)]
-        if first_page_only:
-            command.extend(("-f", "1", "-singlefile"))
-        command.extend((str(pdf), str(prefix)))
-    elif kind == "pdftocairo":
-        command = [path, "-png", "-r", str(dpi)]
-        if first_page_only:
-            command.extend(("-f", "1", "-l", "1", "-singlefile"))
-        command.extend((str(pdf), str(prefix)))
-    elif kind == "mutool":
-        command = [path, "draw", "-F", "png", "-r", str(dpi), "-o", str(output_dir / "page-%d.png"), str(pdf)]
-        if first_page_only:
-            command.append("1")
-    elif kind == "ghostscript":
-        command = [path, "-dSAFER", "-dBATCH", "-dNOPAUSE", "-sDEVICE=png16m", f"-r{dpi}"]
-        if first_page_only:
-            command.extend(("-dFirstPage=1", "-dLastPage=1"))
-        command.extend((f"-sOutputFile={output_dir / 'page-%d.png'}", str(pdf)))
-    elif kind == "imagemagick":
-        source = f"{pdf}[0]" if first_page_only else str(pdf)
-        command = [path, "-density", str(dpi), source, str(output_dir / "page-%d.png")]
-    elif kind == "pymupdf":
-        module_name = str(identity.get("module") or str(identity["path"]).partition(":")[2] or "pymupdf")
+    if kind == "pypdfium2":
+        module_name = str(identity.get("module") or "pypdfium2")
         python_path = str(identity.get("python_path") or "")
         inserted = False
         previous_modules: dict[str, Any] = {}
         if python_path and python_path not in sys.path:
             sys.path.insert(0, python_path)
             inserted = True
+        module_roots = ("pypdfium2", "pypdfium2_raw", "pypdfium2_cfg")
         if python_path:
             for name in list(sys.modules):
-                if name == module_name or name.startswith(module_name + "."):
+                if any(name == root or name.startswith(root + ".") for root in module_roots):
                     previous_modules[name] = sys.modules.pop(name)
         document = None
         try:
-            pymupdf = importlib.import_module(module_name)
+            pdfium = importlib.import_module(module_name)
             if python_path:
-                module_file = Path(str(getattr(pymupdf, "__file__", ""))).resolve()
+                module_file = Path(str(getattr(pdfium, "__file__", ""))).resolve()
                 try:
                     module_file.relative_to(Path(python_path).resolve())
                 except ValueError as exc:
-                    raise RuntimeError(f"PyMuPDF resolved outside the verified fallback stack: {module_file}") from exc
-            document = pymupdf.open(pdf)
+                    raise RuntimeError(f"pypdfium2 resolved outside the release-owned runtime: {module_file}") from exc
+            document = pdfium.PdfDocument(str(pdf))
             count = min(len(document), 1) if first_page_only else len(document)
-            matrix = pymupdf.Matrix(dpi / 72.0, dpi / 72.0)
             for index in range(count):
-                document[index].get_pixmap(matrix=matrix, alpha=False).save(output_dir / f"page-{index + 1}.png")
+                page = document[index]
+                bitmap = page.render(scale=dpi / 72.0)
+                try:
+                    bitmap.to_pil().save(output_dir / f"page-{index + 1}.png")
+                finally:
+                    bitmap.close()
+                    page.close()
         except ImportError as exc:
-            raise RuntimeError(f"PyMuPDF page renderer is unavailable: {exc}") from exc
+            raise RuntimeError(f"The release-owned pypdfium2 page renderer is unavailable: {exc}") from exc
         finally:
             if document is not None:
                 document.close()
             if python_path:
                 for name in list(sys.modules):
-                    if name == module_name or name.startswith(module_name + "."):
+                    if any(name == root or name.startswith(root + ".") for root in module_roots):
                         sys.modules.pop(name, None)
                 sys.modules.update(previous_modules)
             if inserted:

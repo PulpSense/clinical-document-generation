@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
-import importlib.util
 import json
 import math
 import os
@@ -502,25 +501,91 @@ def _provisionable_libreoffice() -> tuple[Path, Path] | None:
 
 
 def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
-    """Copy the installed PyMuPDF package into the versioned fallback stack."""
-    runtime_python = skill_root / "runtime/python"
-    existing = [
-        item for item in page_renderers(skill_root=skill_root)
-        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
-    ]
+    """Install the manifest-bound pypdfium2 wheel without host discovery."""
+    skill_root = skill_root.resolve()
+    runtime_root = skill_root / "runtime"
+    runtime_python = runtime_root / "python"
+    existing = page_renderers(skill_root=skill_root)
     if existing:
         return {"status": "passed", "page_renderer": existing[0], "provisioned": False}
-    spec = importlib.util.find_spec("pymupdf")
-    if spec is None or spec.origin is None:
-        return {"status": "blocked", "findings": [{"category": "installation", "field": "fallback_page_renderer", "issue": "PyMuPDF is not installed locally and cannot be provisioned."}]}
-    source = Path(spec.origin).resolve().parent
-    destination = runtime_python / "pymupdf"
-    runtime_python.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, destination)
-    identity = next(
-        item for item in page_renderers(skill_root=skill_root)
-        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+    try:
+        manifest = _read(skill_root / RELEASE_MANIFEST)
+        identity = dict(manifest["inventory"]["pdf_page_renderer"])
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The release manifest does not identify its one packaged pypdfium2 renderer.",
+        }]}
+    if identity.get("kind") != "pypdfium2":
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The release manifest must identify pypdfium2 as its only PDF page renderer.",
+        }]}
+    wheel_relative = Path(str(identity.get("wheel") or ""))
+    wheel = (skill_root / wheel_relative).resolve()
+    try:
+        wheel.relative_to(skill_root)
+    except ValueError:
+        wheel = Path()
+    expected_hash = str(identity.get("wheel_sha256") or "")
+    if not wheel.is_file() or not expected_hash or sha256_file(wheel) != expected_hash:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The packaged pypdfium2 wheel is missing or does not match its release-manifest hash.",
+        }]}
+    platform_tag = str(identity.get("platform") or "")
+    host = f"{platform.system()} {platform.machine()}"
+    compatible = (
+        platform.system() == "Darwin"
+        and "macosx" in platform_tag
+        and platform.machine().casefold() in platform_tag.casefold()
     )
+    if not compatible:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": f"Packaged pypdfium2 targets {platform_tag}; this host is {host}.",
+        }]}
+    staged_python = runtime_root / ".pypdfium2-install"
+    shutil.rmtree(staged_python, ignore_errors=True)
+    staged_python.mkdir(parents=True)
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            for member in archive.infolist():
+                target = (staged_python / member.filename).resolve()
+                try:
+                    target.relative_to(staged_python.resolve())
+                except ValueError as exc:
+                    raise ValueError("The packaged pypdfium2 wheel contains an escaping path.") from exc
+                if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError("The packaged pypdfium2 wheel contains an unsupported symbolic link.")
+            archive.extractall(staged_python)
+        shutil.rmtree(runtime_python, ignore_errors=True)
+        os.replace(staged_python, runtime_python)
+        _write(runtime_root / "PDF-RENDERER.json", {
+            "kind": "pypdfium2",
+            "version": str(identity.get("version") or ""),
+            "wheel": wheel_relative.as_posix(),
+            "wheel_sha256": expected_hash,
+        })
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        shutil.rmtree(staged_python, ignore_errors=True)
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": f"The packaged pypdfium2 wheel could not be installed: {exc}",
+        }]}
+    installed = page_renderers(skill_root=skill_root)
+    if len(installed) != 1:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The release-owned pypdfium2 runtime could not be discovered after installation.",
+        }]}
+    identity = installed[0]
     return {"status": "passed", "page_renderer": identity, "provisioned": True}
 
 

@@ -1,4 +1,5 @@
 import json
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -6,10 +7,82 @@ from pathlib import Path
 
 import workflow
 from hermes_e2e import _certified_release
-from workflow import install_release, package_release, verify_installation
+from pypdf import PdfWriter
+from quality import rasterize_pdf
+from workflow import (
+    install_release,
+    package_release,
+    provision_fallback_stack,
+    verify_installation,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
+PDFIUM_WHEEL = "pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
+PDFIUM_SHA256 = "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4"
+
+
+def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
+    skill_root = tmp_path / "clinical-document-generation"
+    wheel_dir = skill_root / "assets/runtime-wheels"
+    wheel_dir.mkdir(parents=True)
+    shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
+    (skill_root / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({
+            "inventory": {
+                "pdf_page_renderer": {
+                    "kind": "pypdfium2",
+                    "version": "5.13.0",
+                    "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+                    "wheel_sha256": PDFIUM_SHA256,
+                    "platform": "macosx_13_0_arm64",
+                }
+            }
+        }),
+        encoding="utf-8",
+    )
+    office = {
+        "kind": "LibreOffice",
+        "path": str(skill_root / "runtime/LibreOffice.app/Contents/MacOS/soffice"),
+        "source": "verified fallback stack",
+    }
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [office])
+
+    result = provision_fallback_stack(skill_root)
+
+    assert result == {
+        "status": "passed",
+        "renderer": office,
+        "page_renderer": {
+            "kind": "pypdfium2",
+            "path": "python:pypdfium2",
+            "module": "pypdfium2",
+            "python_path": str(skill_root / "runtime/python"),
+            "version": "5.13.0",
+            "source": "release-owned runtime",
+            "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "wheel_sha256": PDFIUM_SHA256,
+        },
+        "provisioned": {"renderer": False, "page_renderer": True},
+    }
+    assert (skill_root / "runtime/python/pypdfium2/__init__.py").is_file()
+    assert (skill_root / "runtime/python/pypdfium2_raw/libpdfium.dylib").is_file()
+    assert json.loads((skill_root / "runtime/PDF-RENDERER.json").read_text()) == {
+        "kind": "pypdfium2",
+        "version": "5.13.0",
+        "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+        "wheel_sha256": PDFIUM_SHA256,
+    }
+    pdf = tmp_path / "one-page.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    with pdf.open("wb") as handle:
+        writer.write(handle)
+
+    pages = rasterize_pdf(pdf, tmp_path / "pages", result["page_renderer"])
+
+    assert [page.name for page in pages] == ["page-1.png"]
+    assert pages[0].read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_release_package_contains_hashed_runtime_and_excludes_development_data(tmp_path):

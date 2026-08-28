@@ -5,10 +5,44 @@ from docx import Document
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from quality import RECOVERY_POLICIES, render_assurance
+from quality import RECOVERY_POLICIES, page_renderers, render_assurance
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_release_owned_pdfium_is_the_only_page_renderer(tmp_path):
+    runtime = tmp_path / "runtime"
+    runtime_python = runtime / "python"
+    (runtime_python / "pypdfium2").mkdir(parents=True)
+    (runtime_python / "pypdfium2/__init__.py").write_text("", encoding="utf-8")
+    (runtime_python / "pypdfium2_raw").mkdir()
+    (runtime_python / "pypdfium2_raw/__init__.py").write_text("", encoding="utf-8")
+    (runtime / "PDF-RENDERER.json").write_text(
+        """{
+  "kind": "pypdfium2",
+  "version": "5.13.0",
+  "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
+  "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4"
+}\n""",
+        encoding="utf-8",
+    )
+
+    assert page_renderers(
+        environment={"PATH": "/usr/bin:/opt/homebrew/bin"},
+        skill_root=tmp_path,
+    ) == [
+        {
+            "kind": "pypdfium2",
+            "path": "python:pypdfium2",
+            "module": "pypdfium2",
+            "python_path": str(runtime_python),
+            "version": "5.13.0",
+            "source": "release-owned runtime",
+            "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
+            "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
+        }
+    ]
 
 
 def test_recovery_classes_have_one_governed_action_each():
