@@ -474,7 +474,9 @@ def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -
             findings.append({"category": "installation", "field": str(item.get("path")), "issue": "Packaged file is missing."})
         elif sha256_file(path) != item.get("sha256") or path.stat().st_size != int(item.get("bytes", -1)):
             findings.append({"category": "installation", "field": str(item.get("path")), "issue": "Packaged file hash does not match the release manifest."})
-    permitted_state = {RELEASE_CERTIFICATION, INSTALLATION_ASSURANCE, PROMOTION_RECORD, RELEASE_MANIFEST}
+    permitted_state = {RELEASE_CERTIFICATION, RELEASE_MANIFEST}
+    if allow_runtime_state:
+        permitted_state.update({INSTALLATION_ASSURANCE, PROMOTION_RECORD})
     actual = {
         path.relative_to(skill_root).as_posix()
         for path in skill_root.rglob("*")
@@ -538,6 +540,18 @@ def bind_release_certification(archive_path: Path, report_path: Path) -> dict[st
     with tempfile.TemporaryDirectory(prefix="clinical-certification-bind-") as directory:
         extracted = Path(directory) / "extracted"
         with zipfile.ZipFile(archive_path) as source:
+            seen: set[str] = set()
+            for info in source.infolist():
+                if info.filename in seen:
+                    raise ValueError(f"Release archive contains a duplicate path: {info.filename}")
+                seen.add(info.filename)
+                target_path = (extracted / info.filename).resolve()
+                try:
+                    target_path.relative_to(extracted.resolve())
+                except ValueError as exc:
+                    raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
+                if (info.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
             source.extractall(extracted)
         candidate = extracted / "clinical-document-generation"
         (candidate / RELEASE_CERTIFICATION).write_bytes(report_bytes)
@@ -869,7 +883,11 @@ def install_release(
     candidate = staging_root / "clinical-document-generation"
     try:
         with zipfile.ZipFile(archive_path) as archive:
+            seen: set[str] = set()
             for info in archive.infolist():
+                if info.filename in seen:
+                    raise ValueError(f"Release archive contains a duplicate path: {info.filename}")
+                seen.add(info.filename)
                 target = (staging_root / info.filename).resolve()
                 try:
                     target.relative_to(staging_root)
