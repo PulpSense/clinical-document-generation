@@ -78,6 +78,123 @@ def test_drafting_request_is_scoped_and_hash_bound(tmp_path):
     assert accepted and not findings
 
 
+def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp_path):
+    reference = fixture()
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
+    path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-duplicate-reproduction",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(path.read_text(encoding="utf-8"))
+    assert any("exact sentence or paragraph" in item for item in request["constraints"])
+    response = recorded_acceptance_response(request)
+    visits = next(item for item in response["section_results"] if item["section_id"] == "study-procedure.visits")
+    evaluation = next(item for item in response["section_results"] if item["section_id"] == "evaluation-procedures")
+    evaluation["paragraphs"] = json.loads(json.dumps(visits["paragraphs"]))
+    evaluation["lists"] = json.loads(json.dumps(visits["lists"]))
+
+    accepted, findings = validate_response(request, response)
+
+    assert accepted is None
+    duplicate_findings = [item for item in findings if "duplicated across separately contracted" in item["issue"]]
+    assert duplicate_findings
+    assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures", "study-procedure.visits"]
+
+
+def test_fixed_boilerplate_outcome_cannot_bypass_duplicate_prose_gate(tmp_path):
+    reference = fixture()
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
+    path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-duplicate-boilerplate-bypass",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    visits = next(item for item in response["section_results"] if item["section_id"] == "study-procedure.visits")
+    evaluation = next(item for item in response["section_results"] if item["section_id"] == "evaluation-procedures")
+    evaluation["paragraphs"] = json.loads(json.dumps(visits["paragraphs"]))
+    evaluation["lists"] = json.loads(json.dumps(visits["lists"]))
+    visits["outcome"] = "fixed_boilerplate"
+    evaluation["outcome"] = "fixed_boilerplate"
+
+    accepted, findings = validate_response(request, response)
+
+    assert accepted is None
+    assert {
+        item["field"]
+        for item in findings
+        if "does not authorize the fixed_boilerplate outcome" in item["issue"]
+    } == {"study-procedure.visits", "evaluation-procedures"}
+    assert any("duplicated across separately contracted" in item["issue"] for item in findings)
+
+
+def test_fixed_boilerplate_outcome_rejects_case_mutated_contract_text(tmp_path):
+    reference = fixture()
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
+    path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-mutated-boilerplate",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    consent = next(item for item in response["section_results"] if item["section_id"] == "study-procedure.consent")
+    assert consent["outcome"] == "fixed_boilerplate"
+    consent["paragraphs"][0]["text"] = consent["paragraphs"][0]["text"].upper()
+
+    accepted, findings = validate_response(request, response)
+
+    assert accepted is None
+    assert any(
+        item["field"] == "study-procedure.consent"
+        and "not its exact authorized boilerplate" in item["issue"]
+        for item in findings
+    )
+
+
+def test_authorized_boilerplate_does_not_hide_an_unauthorized_cross_section_copy(tmp_path):
+    reference = fixture()
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations")
+    path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-asymmetric-boilerplate-copy",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    bias_contract = next(item for item in request["section_contracts"] if item["section_id"] == "study-design.bias")
+    introduction = next(item for item in response["section_results"] if item["section_id"] == "introduction")
+    introduction["paragraphs"].append({
+        "text": bias_contract["fixed_boilerplate"][0]["text"],
+        "evidence_refs": ["source:study.background"],
+        "boilerplate_refs": [],
+    })
+
+    accepted, findings = validate_response(request, response)
+
+    assert accepted is None
+    duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
+    assert duplicate["target_ids"] == ["introduction", "study-design.bias"]
+
+
 def test_mutated_drafting_request_with_stale_hash_is_blocked_before_response_ingestion(tmp_path):
     reference = fixture()
     batch = batch_plan("Prospective")[0]

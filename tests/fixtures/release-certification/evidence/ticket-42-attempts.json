@@ -52,6 +52,44 @@
       "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
       "retained_local_evidence": "/tmp/clinical-issue42-certified/ambispective-sterling-20260827T234202Z/logs/hermes-integration-report.json",
       "retained_evidence_sha256": "63d58a1dfcab0ba35b32f92a9d1d35b6a5d78e7d486bb145165fee7a2c4e1ad2"
+    },
+    {
+      "id": "final-candidate-verification-timeout",
+      "classification": "controlled_slow_attempt",
+      "outcome": "timeout",
+      "elapsed_seconds": 1800.564,
+      "candidate_package_fingerprint": "81e28358bf72b07cc31e701d48191c32bb721d396b59bc81265d72c90b30c538",
+      "candidate_git_commit": "c9b4b109f1e32e806f08c1b92fed61edd3b2b4fb",
+      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "diagnosis": "Independent verification consumed 1045.039 seconds because verifier agents explored production code before response serialization; the final content call stalled until the correctness ceiling. Separately contracted Protocol sections repeatedly contained identical visit prose, consuming 212.419 seconds of targeted drafting retry. The adapter then exposed a /tmp versus /private/tmp report-path alias defect after governed cleanup.",
+      "measured_stage_seconds": {
+        "generate": 54.278,
+        "drafting": 163.341,
+        "candidate": 6.045,
+        "render_assurance": 38.432,
+        "independent_verification": 1045.039,
+        "drafting_retry": 212.419
+      },
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      },
+      "failed_attempt_evidence": [
+        {
+          "path": "/tmp/clinical-issue42-c9b4b10/ambispective-sterling-20260828T002917Z/revisions/r-0afe456df29b/attempts/quality-a01/attempt-manifest.json",
+          "sha256": "a90372e4a646d9b0cf3adc5f60c0ce1befe12807633153fc3960478aafd230a5"
+        },
+        {
+          "path": "/tmp/clinical-issue42-c9b4b10/ambispective-sterling-20260828T002917Z/revisions/r-0afe456df29b/attempts/quality-a02/attempt-manifest.json",
+          "sha256": "1e88803011f9763a1b1acbef2d48ab7043cf2938093f3acf30311fec36cbc944"
+        },
+        {
+          "path": "/tmp/clinical-issue42-c9b4b10/ambispective-sterling-20260828T002917Z/revisions/r-0afe456df29b/attempts/quality-a03/attempt-manifest.json",
+          "sha256": "b83b3b05b4ddd4580877ea65d05f341cf1ccb7a368185943a413cef56aef9e76"
+        }
+      ],
+      "retained_local_evidence": "/tmp/clinical-issue42-c9b4b10/ambispective-sterling-20260828T002917Z/logs/desktop-operation.json",
+      "retained_evidence_sha256": "5929174063561385a52832576feefe1ad848dbb973d885572cade5d4894698a2"
     }
   ]
 }

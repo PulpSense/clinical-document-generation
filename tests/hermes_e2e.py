@@ -604,15 +604,19 @@ def _agent_prompt(
     request_path = revision_dir / str(handoff["request_path"])
     response_path = revision_dir / str(handoff["response_path"])
     task = str(handoff.get("task") or "")
-    verification = task in {
-        "clinical_content_verification",
-        "rendered_page_visual_verification",
-    }
-    verification_rule = (
-        "Act as an independent verifier. Inspect every requested item; for visual verification, load and inspect every page PNG with the vision tool."
-        if verification
-        else "Draft only the requested sections from the closed approved evidence package."
-    )
+    visual_verification = task == "rendered_page_visual_verification"
+    if task == "rendered_page_visual_verification":
+        verification_rule = (
+            "Act as an independent verifier. Load and inspect every supplied page PNG with the vision tool, assess every listed check for every page, then write the bound response promptly. "
+            "Do not inspect production code or tests; the request contains the complete governed evidence and response contract."
+        )
+    elif task == "clinical_content_verification":
+        verification_rule = (
+            "Act as an independent verifier. Use the request's bound extracts and assessment matrices directly, assess every requested section and cross-document check, then write the bound response promptly. "
+            "Do not inspect production code or tests; the request contains the complete governed evidence and response contract."
+        )
+    else:
+        verification_rule = "Draft only the requested sections from the closed approved evidence package."
     preservation_notes = "\n".join(
         f"- {str(note).strip()}"
         for note in hermes_configuration.get("layout_preservation_notes") or []
@@ -621,7 +625,7 @@ def _agent_prompt(
     preservation_rule = (
         "\nLayout Preservation Baseline. Do not normalize or redesign these authority-derived features:\n"
         f"{preservation_notes}\n"
-        if verification and preservation_notes
+        if visual_verification and preservation_notes
         else ""
     )
     return f"""Complete one isolated clinical-document Hermes handoff.
@@ -874,6 +878,7 @@ def run_release_certification_operation(
     hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
     state_path_resolver: Callable[[Path, str], Path] | None = None,
 ) -> dict[str, Any]:
+    run_dir = run_dir.resolve()
     release_root = release_root.resolve()
     if desktop_operation is None:
         certified_workflow, certified_identity = _certified_release(release_root)

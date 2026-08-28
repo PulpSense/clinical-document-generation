@@ -24,6 +24,7 @@ from hermes_e2e import (
     wait_for_parent_visual_review,
 )
 import workflow
+import drafting
 
 
 def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_path: Path) -> None:
@@ -119,6 +120,33 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
 
     assert "The two-line Table 13.3.-1 contact caption is authority-preserved." in prompt
     assert "Do not normalize" in prompt
+    assert "Do not inspect production code or tests" in prompt
+
+
+def test_content_verifier_prompt_goes_directly_to_bound_evidence(tmp_path: Path) -> None:
+    prompt = _agent_prompt(
+        tmp_path / "release",
+        tmp_path / "revision",
+        {
+            "request_path": "hermes/verification-requests/content.json",
+            "response_path": "hermes/verification-responses/content.json",
+            "task": "clinical_content_verification",
+        },
+        hermes_configuration={
+            "layout_preservation_notes": ["Visual-only authority note."],
+        },
+    )
+
+    assert "Use the request's bound extracts and assessment matrices directly" in prompt
+    assert "Do not inspect production code or tests" in prompt
+    assert "Run the repository's real validator" in prompt
+    assert "Visual-only authority note." not in prompt
+
+
+def test_drafting_constraints_require_independent_section_prose() -> None:
+    constraints = drafting._request_constraints()
+
+    assert any("exact sentence or paragraph" in item for item in constraints)
 
 
 def test_diagnostic_reports_invalid_hermes_response_for_a_missing_response(tmp_path: Path) -> None:
@@ -253,6 +281,29 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
     )
 
     assert parent_reviews == [([handoff], 12.0)]
+
+
+def test_release_report_handles_a_resolved_state_path_behind_a_symlink(tmp_path: Path) -> None:
+    real_run = tmp_path / "real-run"
+    real_run.mkdir()
+    alias = tmp_path / "alias-run"
+    alias.symlink_to(real_run, target_is_directory=True)
+
+    def controlled_operation(run_dir, **kwargs):
+        state_path = workflow.desktop_operation_state_path(run_dir, kwargs["operation_id"])
+        state_path.parent.mkdir(parents=True)
+        state_path.write_text(json.dumps({"status": "blocked"}), encoding="utf-8")
+        return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
+
+    report = run_release_certification_operation(
+        alias,
+        release_root=tmp_path,
+        desktop_operation=controlled_operation,
+        release_identity={"package_fingerprint": "controlled-candidate"},
+        state_path_resolver=workflow.desktop_operation_state_path,
+    )
+
+    assert report["bound_evidence"]["desktop_operation_state"]["path"] == "logs/desktop-operation.json"
 
 
 def test_parent_visual_review_waits_for_bound_desktop_responses(tmp_path: Path) -> None:

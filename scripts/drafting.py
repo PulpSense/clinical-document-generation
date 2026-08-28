@@ -96,6 +96,7 @@ def _request_constraints() -> list[str]:
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections must use their listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
+        "Write separately contracted sections independently; do not repeat an exact sentence or paragraph across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it.",
         "Use participant-facing language for ICF sections.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
@@ -610,6 +611,63 @@ def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str
     return {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}, findings
 
 
+def _normalized_prose(value: Any) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
+
+
+def _raw_content_items(item: Mapping[str, Any]) -> list[tuple[str, list[str], list[str]]]:
+    content: list[tuple[str, list[str], list[str]]] = []
+    for paragraph in item.get("paragraphs") or []:
+        if isinstance(paragraph, Mapping):
+            content.append((
+                str(paragraph.get("text") or ""),
+                list(map(str, paragraph.get("evidence_refs") or [])),
+                list(map(str, paragraph.get("boilerplate_refs") or [])),
+            ))
+    for group in item.get("lists") or []:
+        if not isinstance(group, Mapping):
+            continue
+        evidence_refs = list(map(str, group.get("evidence_refs") or []))
+        boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
+        for value in group.get("items") or []:
+            content.append((str(value), evidence_refs, boilerplate_refs))
+    return content
+
+
+def _is_authorized_boilerplate_content(
+    text: str,
+    evidence_refs: list[str],
+    boilerplate_refs: list[str],
+    contract: Mapping[str, Any],
+) -> bool:
+    if evidence_refs or len(boilerplate_refs) != 1:
+        return False
+    boilerplate_ref = boilerplate_refs[0]
+    return any(
+        isinstance(block, Mapping)
+        and str(block.get("boilerplate_id") or "") == boilerplate_ref
+        and str(block.get("text") or "") == text
+        and str(block.get("sha256") or "") == sha256_value(text)
+        for block in contract.get("fixed_boilerplate") or []
+    )
+
+
+def _fixed_outcome_is_authorized(item: Mapping[str, Any], contract: Mapping[str, Any]) -> bool:
+    if "fixed_boilerplate" not in contract.get("allowed_modes", []):
+        return False
+    fixed = [block for block in contract.get("fixed_boilerplate") or [] if isinstance(block, Mapping)]
+    paragraphs = [paragraph for paragraph in item.get("paragraphs") or [] if isinstance(paragraph, Mapping)]
+    if item.get("lists") or len(paragraphs) != len(fixed) or not fixed:
+        return False
+    return all(
+        str(paragraph.get("text") or "") == str(block.get("text") or "")
+        and str(block.get("sha256") or "") == sha256_value(paragraph.get("text"))
+        and not (paragraph.get("evidence_refs") or [])
+        and list(map(str, paragraph.get("boilerplate_refs") or [])) == [str(block.get("boilerplate_id") or "")]
+        for paragraph, block in zip(paragraphs, fixed)
+    )
+
+
 def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
@@ -674,6 +732,56 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
     unknown = sorted(set(result_ids) - set(expected_contracts))
     if missing or unknown:
         findings.append({"category": "drafting", "field": request.get("batch_id"), "issue": f"Section response mismatch; missing={missing}, unknown={unknown}.", "next_action": "Return exactly the requested section IDs."})
+    for item in results:
+        if not isinstance(item, Mapping) or str(item.get("section_id")) not in expected_contracts:
+            continue
+        section_id = str(item["section_id"])
+        contract = expected_contracts[section_id]
+        outcome = str(item.get("outcome") or "")
+        if outcome == "drafted" and "agent_draft" not in contract.get("allowed_modes", []):
+            findings.append({
+                "category": "drafting",
+                "field": section_id,
+                "target_ids": [section_id],
+                "issue": "The section contract does not authorize the drafted outcome.",
+                "next_action": "Use only a mode explicitly authorized by the section contract.",
+            })
+        elif outcome == "fixed_boilerplate" and not _fixed_outcome_is_authorized(item, contract):
+            findings.append({
+                "category": "drafting",
+                "field": section_id,
+                "target_ids": [section_id],
+                "issue": "The section contract does not authorize the fixed_boilerplate outcome or the returned content is not its exact authorized boilerplate.",
+                "next_action": "Use the exact listed Fixed Clinical Boilerplate with its matching boilerplate reference, or return an authorized agent draft.",
+            })
+    seen_content: dict[str, tuple[str, bool]] = {}
+    for item in results:
+        if not isinstance(item, Mapping):
+            continue
+        section_id = str(item.get("section_id") or "")
+        contract = expected_contracts.get(section_id, {})
+        for text, evidence_refs, boilerplate_refs in _raw_content_items(item):
+            key = _normalized_prose(text)
+            authorized_boilerplate = _is_authorized_boilerplate_content(
+                text, evidence_refs, boilerplate_refs, contract
+            )
+            prior = seen_content.get(key)
+            if (
+                len(key.split()) >= 8
+                and prior
+                and prior[0] != section_id
+                and not (prior[1] and authorized_boilerplate)
+            ):
+                prior_section = prior[0]
+                findings.append({
+                    "category": "drafting",
+                    "field": section_id,
+                    "target_ids": sorted({prior_section, section_id}),
+                    "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
+                    "next_action": "Rewrite each target with independent source-grounded prose.",
+                })
+            elif len(key.split()) >= 8 and not prior:
+                seen_content[key] = (section_id, authorized_boilerplate)
     if findings:
         return None, findings
     accepted: list[dict[str, Any]] = []
