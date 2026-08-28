@@ -474,3 +474,40 @@ def test_retrospective_multisite_count_is_not_compared_with_the_single_required_
     reference["design"]["study_design"] = "Retrospective multicenter record review"
 
     assert not any(item["field"] == "design.number_of_sites" for item in input_findings(reference))
+
+
+def test_retrospective_safety_roles_require_structured_party_responsibility_records():
+    reference = fixture("retrospective-acceptance-source.json")
+    assert not any(item["field"] == "safety.roles" for item in input_findings(reference))
+
+    malformed_values = [
+        "The investigator assesses and reports safety events.",
+        [{"party": {"name": "investigator"}, "responsibilities": "assess_safety_events"}],
+        [{"party": "investigator", "responsibilities": ["assess_safety_events"]}],
+        [{"party": "investigator", "responsibilities": "assess_safety_events", "extra": "x"}],
+        [{"party": "investigator", "responsibilities": "unknown_concept"}],
+        [
+            {"party": "investigator", "responsibilities": "assess_safety_events"},
+            {"party": "Investigator", "responsibilities": "report_safety_events"},
+        ],
+        [
+            {"party": "sponsor", "responsibilities": "assess_safety_events"},
+            {"party": "the sponsor", "responsibilities": "report_safety_events"},
+        ],
+        [
+            {"party": "study physician", "responsibilities": "assess_safety_events"},
+            {"party": "study-physician", "responsibilities": "report_safety_events"},
+        ],
+        [
+            {"party": "José Müller", "responsibilities": "assess_safety_events"},
+            {"party": "Jose\u0301 Mu\u0308ller", "responsibilities": "report_safety_events"},
+        ],
+    ]
+    for malformed in malformed_values:
+        working = fixture("retrospective-acceptance-source.json")
+        working["safety"]["roles"] = malformed
+        finding = next(
+            item for item in input_findings(working)
+            if item["field"] == "safety.roles"
+        )
+        assert "structured party/responsibility records" in finding["issue"]

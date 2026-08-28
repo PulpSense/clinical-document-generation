@@ -288,7 +288,9 @@ Descriptive summaries of outcomes and safety events.
 
 ### Safety / Roles
 <!-- field: safety.roles -->
-The investigator assesses and reports safety events.
+| party | responsibilities |
+| --- | --- |
+| investigator | assess_safety_events; report_safety_events |
 <!-- /field -->
 
 ### Risks Benefits / Risks

@@ -17,16 +17,16 @@
     },
     "approved_source": {
       "path": "approved-source.md",
-      "sha256": "a7eb2d67fcceba1b9b017f64674ef53063bf9a717f8c888446530a95ff8a6a6f"
+      "sha256": "1264725b55da3af2e4ff08f79bed6e46dca22da2fe9672c1d47de92385b2860d"
     },
     "approved_reference": {
       "path": "approved-reference.json",
-      "sha256": "bbc317fd361e66c381a54784e09f0f8c93cedc2c5d54b964b234d24a0cd02dbe"
+      "sha256": "4bb0cd18d1ebc43396f07aff05eb8e6ebc3d784e5e63936e3a3a76bcef0651ca"
     }
   },
   "approved_normalization": {
     "source_input_sha256": "c4fae8835a097cb2d3aaf6ae03723588f9c4d7cc2d704752aac9d80f5fa3c61d",
-    "approved_source_sha256": "a7eb2d67fcceba1b9b017f64674ef53063bf9a717f8c888446530a95ff8a6a6f"
+    "approved_source_sha256": "1264725b55da3af2e4ff08f79bed6e46dca22da2fe9672c1d47de92385b2860d"
   },
   "hermes_configuration": {
     "source": "clinical-release-certification",

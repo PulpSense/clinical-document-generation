@@ -507,6 +507,956 @@ def test_retrospective_objectives_omitting_secondary_objective_and_hypothesis_ar
     )
 
 
+def _retrospective_safety_request(tmp_path, reference, revision_id):
+    batch = next(
+        item for item in batch_plan("Retrospective")
+        if item.batch_id == "protocol-analysis-and-oversight"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id=revision_id,
+        reference=reference,
+        batch=batch,
+        attempts={section_id: 1 for section_id in batch.section_ids},
+        wave="initial",
+    )
+    return json.loads(request_path.read_text(encoding="utf-8"))
+
+
+def _replace_safety_result(response, text):
+    safety_result = next(
+        item for item in response["section_results"]
+        if item["section_id"] == "quality-safety"
+    )
+    safety_result["paragraphs"] = [{
+        "text": text,
+        "evidence_refs": ["source:safety.roles", "source:risks_benefits.risks"],
+        "boilerplate_refs": [],
+    }]
+    safety_result["lists"] = []
+
+
+def test_retrospective_safety_contract_binds_structured_approved_parties(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/release-certification/retrospective/approved-reference.json"
+    ).read_text(encoding="utf-8"))
+    request = _retrospective_safety_request(tmp_path, reference, "r-retrospective-safety-role")
+    safety = next(
+        item for item in request["section_contracts"]
+        if item["section_id"] == "quality-safety"
+    )
+
+    assert "safety.roles" in safety["minimum_evidence"]
+    safety_role = next(
+        item for item in request["approved_input"]
+        if item["path"] == "safety.roles"
+    )
+    assert safety_role["value"] == [{
+        "party": "investigator",
+        "responsibilities": "assess_safety_events; report_safety_events",
+    }]
+
+    response = recorded_acceptance_response(request)
+    _replace_safety_result(
+        response,
+        "Safety events are assessed and reported. Risks include privacy loss from chart review.",
+    )
+
+    accepted, findings = validate_response(request, response)
+    accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
+
+    assert "quality-safety" not in accepted_ids
+    assert any(
+        item["field"] == "quality-safety" and "approved safety role" in item["issue"]
+        for item in findings
+    )
+
+
+def test_retrospective_safety_contract_requires_every_structured_party_but_allows_paraphrase(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/release-certification/retrospective/approved-reference.json"
+    ).read_text(encoding="utf-8"))
+    reference["safety"]["roles"] = [
+        {"party": "study physician", "responsibilities": "assess_safety_events"},
+        {"party": "sponsor", "responsibilities": "report_safety_events"},
+    ]
+    request = _retrospective_safety_request(
+        tmp_path,
+        reference,
+        "r-retrospective-structured-safety-roles",
+    )
+    response = recorded_acceptance_response(request)
+    _replace_safety_result(
+        response,
+        "The study physician evaluates adverse events. Approved risks include device discomfort and privacy risks.",
+    )
+
+    accepted, findings = validate_response(request, response)
+    accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
+
+    assert "quality-safety" not in accepted_ids
+    assert any(
+        item["field"] == "quality-safety" and "approved safety role" in item["issue"]
+        for item in findings
+    )
+
+    swapped = recorded_acceptance_response(request)
+    _replace_safety_result(
+        swapped,
+        (
+            "The study physician reports adverse events while the sponsor evaluates them. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_swapped, swapped_findings = validate_response(request, swapped)
+    accepted_swapped_ids = {
+        draft["section_id"] for draft in (accepted_swapped or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_swapped_ids
+    assert any(
+        item["field"] == "quality-safety" and "approved safety role" in item["issue"]
+        for item in swapped_findings
+    )
+
+    negated = recorded_acceptance_response(request)
+    _replace_safety_result(
+        negated,
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor does not report those events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_negated, negated_findings = validate_response(request, negated)
+    accepted_negated_ids = {
+        draft["section_id"] for draft in (accepted_negated or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_negated_ids
+    assert any(
+        item["field"] == "quality-safety" and "approved safety role" in item["issue"]
+        for item in negated_findings
+    )
+
+    invalid_assignment_phrasings = [
+        (
+            "The study physician evaluates adverse events. "
+            "Safety events are reported to the sponsor. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor receives reports of adverse events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor is explicitly not considered to be responsible for reporting adverse events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reviews reports of adverse events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports enrollment metrics. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor evaluates and reports adverse events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports enrollment metrics and is aware of safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "After safety events were reviewed, enrollment metrics were reported by the sponsor. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports enrollment metrics to the safety committee. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor receives enrollment data and reports it. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "Enrollment metrics rather than safety events were reported by the sponsor. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "Enrollment metrics instead of safety events were reported by the sponsor. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. The IRB reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor and IRB report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "Safety events are reported by the sponsor and IRB. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. Safety events are reviewed by the IRB. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor or IRB reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor as well as the IRB reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor together with the IRB reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor & IRB report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor and Emily report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor and family report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events alongside IRB. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "Safety events are reported by the sponsor and Emily. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "Safety events are reported by the sponsor and family. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor and the clinical study report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor and Will report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor and Doe report safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "Alongside IRB the sponsor reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "IRB alongside the sponsor reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor plus IRB reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events and IRB does too. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor assesses safety events and IRB reports them. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events and Will does. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events and Doe does. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events and Will reports them. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events and the study reports them. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reporting safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor communication safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB is responsible for safety-event management. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB communication of safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB handles safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB is the safety authority. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The sponsor reports enrollment metrics. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB oversees AE reporting. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB oversees safety reporting. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The sponsor monitors AEs. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB monitors safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB reviews safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB reports safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "Safety is reported by the IRB. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB performs safety reporting. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB communicates safety information. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB has safety oversight. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB is the safety lead. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB record-reviews safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB chart-reviews safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The IRB data-reviews safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        *(
+            (
+                "The study physician evaluates adverse events. "
+                "The sponsor reports safety events. "
+                f"The IRB {verb} safety. "
+                "Approved risks include device discomfort and privacy risks."
+            )
+            for verb in ("supervises", "coordinates", "administers", "owns", "directs")
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "Safety data are provided by the chart review conducted by the IRB. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "The chart review board supervises safety. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+        *(
+            (
+                "The study physician evaluates adverse events. "
+                "The sponsor reports safety events. "
+                f"{unsupported_assignment} "
+                "Approved risks include device discomfort and privacy risks."
+            )
+            for unsupported_assignment in (
+                "Safety oversight belongs to the IRB.",
+                "Safety responsibility rests with the IRB.",
+                "Safety is the IRB responsibility.",
+                "Safety has the IRB as lead.",
+                "Safety is overseen through the IRB.",
+                "Safety officer reports events.",
+                "The safety officer reports events.",
+                "Clinical safety lead monitors incidents.",
+                "Safety committee is responsible for AE reporting.",
+                (
+                    "For quality complaints and adverse events the approved risks include device discomfort "
+                    "and privacy risk and the IRB reports safety events."
+                ),
+                (
+                    "For quality complaints and adverse events approved risks include device discomfort "
+                    "while the IRB supervises safety."
+                ),
+                (
+                    "For quality complaints and adverse events the IRB reports safety events and approved "
+                    "risks include device discomfort."
+                ),
+            )
+        ),
+    ]
+    for invalid_text in invalid_assignment_phrasings:
+        invalid = recorded_acceptance_response(request)
+        _replace_safety_result(invalid, invalid_text)
+        accepted_invalid, invalid_findings = validate_response(request, invalid)
+        accepted_invalid_ids = {
+            draft["section_id"] for draft in (accepted_invalid or {}).get("drafts", [])
+        }
+        assert "quality-safety" not in accepted_invalid_ids, invalid_text
+        assert any(
+            item["field"] == "quality-safety" and "approved safety role" in item["issue"]
+            for item in invalid_findings
+        )
+
+    coordinated_reference = json.loads(json.dumps(reference))
+    coordinated_reference["safety"]["roles"] = [
+        {
+            "party": "study physician",
+            "responsibilities": "assess_safety_events; report_safety_events",
+        },
+        {
+            "party": "sponsor",
+            "responsibilities": "assess_safety_events; report_safety_events",
+        },
+    ]
+    coordinated_request = _retrospective_safety_request(
+        tmp_path / "coordinated",
+        coordinated_reference,
+        "r-retrospective-coordinated-safety-roles",
+    )
+    coordinated = recorded_acceptance_response(coordinated_request)
+    _replace_safety_result(
+        coordinated,
+        (
+            "The study physician and sponsor evaluate and report adverse events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_coordinated, coordinated_findings = validate_response(
+        coordinated_request,
+        coordinated,
+    )
+    accepted_coordinated_ids = {
+        draft["section_id"] for draft in (accepted_coordinated or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_coordinated_ids
+    assert any(item["field"] == "quality-safety" for item in coordinated_findings)
+
+    passive = recorded_acceptance_response(request)
+    _replace_safety_result(
+        passive,
+        (
+            "Adverse events are evaluated by the study physician and reported by the sponsor. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_passive, passive_findings = validate_response(request, passive)
+    accepted_passive_ids = {
+        draft["section_id"] for draft in (accepted_passive or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_passive_ids
+    assert any(item["field"] == "quality-safety" for item in passive_findings)
+
+    modified_passive = recorded_acceptance_response(request)
+    _replace_safety_result(
+        modified_passive,
+        (
+            "Safety events are evaluated independently by the study physician and reported by the sponsor. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_modified_passive, modified_passive_findings = validate_response(
+        request,
+        modified_passive,
+    )
+    accepted_modified_passive_ids = {
+        draft["section_id"]
+        for draft in (accepted_modified_passive or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_modified_passive_ids
+    assert any(
+        item["field"] == "quality-safety" for item in modified_passive_findings
+    )
+
+    shared_passive_reference = json.loads(json.dumps(reference))
+    shared_passive_reference["safety"]["roles"] = [{
+        "party": "study physician",
+        "responsibilities": "assess_safety_events; report_safety_events",
+    }]
+    shared_passive_request = _retrospective_safety_request(
+        tmp_path / "shared-passive",
+        shared_passive_reference,
+        "r-retrospective-shared-passive-safety-role",
+    )
+    for invalid_direct_text in (
+        "The study physician assesses or reports safety events.",
+        "The study physician assessment and reporting safety events.",
+        "The study physician reports and AEs.",
+        "The study physician assesses and safety events.",
+        "The study physician assesses and reports and safety events.",
+    ):
+        invalid_direct = recorded_acceptance_response(shared_passive_request)
+        _replace_safety_result(
+            invalid_direct,
+            invalid_direct_text + " Approved risks include device discomfort and privacy risks.",
+        )
+        accepted_invalid_direct, invalid_direct_findings = validate_response(
+            shared_passive_request,
+            invalid_direct,
+        )
+        accepted_invalid_direct_ids = {
+            draft["section_id"]
+            for draft in (accepted_invalid_direct or {}).get("drafts", [])
+        }
+        assert "quality-safety" not in accepted_invalid_direct_ids
+        assert any(
+            item["field"] == "quality-safety" for item in invalid_direct_findings
+        )
+    shared_passive = recorded_acceptance_response(shared_passive_request)
+    _replace_safety_result(
+        shared_passive,
+        (
+            "Safety events are assessed and reported by the study physician. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_shared_passive, shared_passive_findings = validate_response(
+        shared_passive_request,
+        shared_passive,
+    )
+    accepted_shared_passive_ids = {
+        draft["section_id"]
+        for draft in (accepted_shared_passive or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_shared_passive_ids
+    assert any(
+        item["field"] == "quality-safety" for item in shared_passive_findings
+    )
+
+    shared_agents_reference = json.loads(json.dumps(reference))
+    shared_agents_reference["safety"]["roles"] = [
+        {"party": "study physician", "responsibilities": "assess_safety_events"},
+        {"party": "sponsor", "responsibilities": "assess_safety_events"},
+    ]
+    shared_agents_request = _retrospective_safety_request(
+        tmp_path / "shared-agents",
+        shared_agents_reference,
+        "r-retrospective-shared-passive-agents",
+    )
+    for shared_agents_text in (
+        "Safety events are assessed by the study physician and sponsor.",
+        "Safety events are assessed jointly by the study physician and sponsor.",
+    ):
+        shared_agents = recorded_acceptance_response(shared_agents_request)
+        _replace_safety_result(
+            shared_agents,
+            shared_agents_text + " Approved risks include device discomfort and privacy risks.",
+        )
+        accepted_shared_agents, shared_agents_findings = validate_response(
+            shared_agents_request,
+            shared_agents,
+        )
+        accepted_shared_agents_ids = {
+            draft["section_id"]
+            for draft in (accepted_shared_agents or {}).get("drafts", [])
+        }
+        assert "quality-safety" not in accepted_shared_agents_ids
+        assert any(
+            item["field"] == "quality-safety" for item in shared_agents_findings
+        )
+
+    contrast = recorded_acceptance_response(request)
+    _replace_safety_result(
+        contrast,
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor does not assess events but reports them. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_contrast, contrast_findings = validate_response(request, contrast)
+    accepted_contrast_ids = {
+        draft["section_id"] for draft in (accepted_contrast or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" not in accepted_contrast_ids
+    assert any(item["field"] == "quality-safety" for item in contrast_findings)
+
+    overlapping_roles = [
+        {"party": "physician", "responsibilities": "assess_safety_events"},
+        {"party": "study physician", "responsibilities": "report_safety_events"},
+    ]
+    overlap_reference = json.loads(json.dumps(reference))
+    overlap_reference["safety"]["roles"] = overlapping_roles
+    overlap_request = _retrospective_safety_request(
+        tmp_path / "overlap-omission",
+        overlap_reference,
+        "r-retrospective-overlap-omission",
+    )
+    overlap = recorded_acceptance_response(overlap_request)
+    _replace_safety_result(
+        overlap,
+        (
+            "The study physician assesses and reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+    accepted_overlap, overlap_findings = validate_response(overlap_request, overlap)
+    accepted_overlap_ids = {
+        draft["section_id"] for draft in (accepted_overlap or {}).get("drafts", [])
+    }
+    assert "quality-safety" not in accepted_overlap_ids
+    assert any(item["field"] == "quality-safety" for item in overlap_findings)
+
+    for index, ordered_roles in enumerate((overlapping_roles, list(reversed(overlapping_roles)))):
+        ordered_reference = json.loads(json.dumps(reference))
+        ordered_reference["safety"]["roles"] = ordered_roles
+        ordered_request = _retrospective_safety_request(
+            tmp_path / f"overlap-order-{index}",
+            ordered_reference,
+            f"r-retrospective-overlap-order-{index}",
+        )
+        ordered = recorded_acceptance_response(ordered_request)
+        _replace_safety_result(
+            ordered,
+            (
+                "The physician assesses safety events. "
+                "The study physician reports safety events. "
+                "Approved risks include device discomfort and privacy risks."
+            ),
+        )
+        accepted_ordered, ordered_findings = validate_response(ordered_request, ordered)
+        accepted_ordered_ids = {
+            draft["section_id"]
+            for draft in (accepted_ordered or {}).get("drafts", [])
+        }
+        assert "quality-safety" in accepted_ordered_ids
+        assert not any(item["field"] == "quality-safety" for item in ordered_findings)
+
+    unicode_reference = json.loads(json.dumps(reference))
+    unicode_reference["safety"]["roles"] = [{
+        "party": "José Müller",
+        "responsibilities": "assess_safety_events; report_safety_events",
+    }]
+    unicode_request = _retrospective_safety_request(
+        tmp_path / "unicode-party",
+        unicode_reference,
+        "r-retrospective-unicode-safety-role",
+    )
+    unicode_response = recorded_acceptance_response(unicode_request)
+    _replace_safety_result(
+        unicode_response,
+        (
+            "José Müller assesses and reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+    accepted_unicode, unicode_findings = validate_response(
+        unicode_request,
+        unicode_response,
+    )
+    accepted_unicode_ids = {
+        draft["section_id"] for draft in (accepted_unicode or {}).get("drafts", [])
+    }
+    assert "quality-safety" in accepted_unicode_ids
+    assert not any(item["field"] == "quality-safety" for item in unicode_findings)
+
+    period_party_reference = json.loads(json.dumps(reference))
+    period_party_reference["safety"]["roles"] = [{
+        "party": "Dr. José Müller",
+        "responsibilities": "assess_safety_events; report_safety_events",
+    }]
+    period_party_request = _retrospective_safety_request(
+        tmp_path / "period-party",
+        period_party_reference,
+        "r-retrospective-period-safety-role",
+    )
+    period_party = recorded_acceptance_response(period_party_request)
+    _replace_safety_result(
+        period_party,
+        (
+            "The Dr. José Müller assesses and reports safety events promptly. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+    accepted_period_party, period_party_findings = validate_response(
+        period_party_request,
+        period_party,
+    )
+    accepted_period_party_ids = {
+        draft["section_id"]
+        for draft in (accepted_period_party or {}).get("drafts", [])
+    }
+    assert "quality-safety" in accepted_period_party_ids
+    assert not any(
+        item["field"] == "quality-safety" for item in period_party_findings
+    )
+
+    for index, exact_party in enumerate(("Acme Inc.", "Dr.", "Straße Safety GmbH", "İrem")):
+        exact_reference = json.loads(json.dumps(reference))
+        exact_reference["safety"]["roles"] = [{
+            "party": exact_party,
+            "responsibilities": "assess_safety_events; report_safety_events",
+        }]
+        exact_request = _retrospective_safety_request(
+            tmp_path / f"exact-party-{index}",
+            exact_reference,
+            f"r-retrospective-exact-safety-role-{index}",
+        )
+        exact_response = recorded_acceptance_response(exact_request)
+        accepted_exact, exact_findings = validate_response(exact_request, exact_response)
+        accepted_exact_ids = {
+            draft["section_id"]
+            for draft in (accepted_exact or {}).get("drafts", [])
+        }
+        assert "quality-safety" in accepted_exact_ids, exact_party
+        assert not any(
+            item["field"] == "quality-safety" for item in exact_findings
+        ), exact_party
+
+    truncated_unicode = recorded_acceptance_response(unicode_request)
+    _replace_safety_result(
+        truncated_unicode,
+        (
+            "Jos Müller assesses and reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+    accepted_truncated, truncated_findings = validate_response(
+        unicode_request,
+        truncated_unicode,
+    )
+    accepted_truncated_ids = {
+        draft["section_id"]
+        for draft in (accepted_truncated or {}).get("drafts", [])
+    }
+    assert "quality-safety" not in accepted_truncated_ids
+    assert any(item["field"] == "quality-safety" for item in truncated_findings)
+
+    article_reference = json.loads(json.dumps(reference))
+    article_reference["safety"]["roles"] = [{
+        "party": "The sponsor",
+        "responsibilities": "report_safety_events",
+    }]
+    article_request = _retrospective_safety_request(
+        tmp_path / "article-party",
+        article_reference,
+        "r-retrospective-article-safety-role",
+    )
+    article_response = recorded_acceptance_response(article_request)
+    article_result = next(
+        item for item in article_response["section_results"]
+        if item["section_id"] == "quality-safety"
+    )
+    article_text = " ".join(
+        paragraph["text"] for paragraph in article_result["paragraphs"]
+    )
+    assert "The The sponsor" not in article_text
+    accepted_article, article_findings = validate_response(
+        article_request,
+        article_response,
+    )
+    accepted_article_ids = {
+        draft["section_id"] for draft in (accepted_article or {}).get("drafts", [])
+    }
+    assert "quality-safety" in accepted_article_ids
+    assert not any(item["field"] == "quality-safety" for item in article_findings)
+
+    for coordinated_objects in (
+        "The sponsor reports AEs and SAEs.",
+        "The sponsor reports adverse events and quality complaints.",
+    ):
+        object_coordination = recorded_acceptance_response(request)
+        _replace_safety_result(
+            object_coordination,
+            (
+                "The study physician evaluates adverse events. "
+                f"{coordinated_objects} "
+                "Approved risks include device discomfort and privacy risks."
+            ),
+        )
+        accepted_objects, object_findings = validate_response(
+            request,
+            object_coordination,
+        )
+        accepted_object_ids = {
+            draft["section_id"]
+            for draft in (accepted_objects or {}).get("drafts", [])
+        }
+        assert "quality-safety" in accepted_object_ids, coordinated_objects
+        assert not any(
+            item["field"] == "quality-safety" for item in object_findings
+        ), coordinated_objects
+
+    for descriptive_clause in (
+        "The chart review summarized safety events.",
+        "Safety-event chart review was completed.",
+        "Safety data are provided by the chart review.",
+        "Retrospective safety data were summarized from the chart review.",
+        "Available safety events were summarized from the record review.",
+        "Historical safety information was included in the data review.",
+    ):
+        descriptive = recorded_acceptance_response(request)
+        _replace_safety_result(
+            descriptive,
+            (
+                "The study physician evaluates adverse events. "
+                "The sponsor reports safety events. "
+                f"{descriptive_clause} "
+                "Approved risks include device discomfort and privacy risks."
+            ),
+        )
+        accepted_descriptive, descriptive_findings = validate_response(
+            request,
+            descriptive,
+        )
+        accepted_descriptive_ids = {
+            draft["section_id"]
+            for draft in (accepted_descriptive or {}).get("drafts", [])
+        }
+        assert "quality-safety" in accepted_descriptive_ids, descriptive_clause
+        assert not any(
+            item["field"] == "quality-safety" for item in descriptive_findings
+        ), descriptive_clause
+
+    paraphrase = recorded_acceptance_response(request)
+    _replace_safety_result(
+        paraphrase,
+        (
+            "The study physician evaluates adverse events. "
+            "The sponsor reports safety events. "
+            "Approved risks include device discomfort and privacy risks."
+        ),
+    )
+
+    accepted_paraphrase, paraphrase_findings = validate_response(request, paraphrase)
+    accepted_paraphrase_ids = {
+        draft["section_id"] for draft in (accepted_paraphrase or {}).get("drafts", [])
+    }
+
+    assert "quality-safety" in accepted_paraphrase_ids
+    assert not any(item["field"] == "quality-safety" for item in paraphrase_findings)
+
+
 def test_client_protocol_template_renders_source_supported_schedule_of_assessments(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     report = render_documents(ROOT, tmp_path, reference, {

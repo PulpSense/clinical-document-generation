@@ -138,7 +138,12 @@
     "minimum_days_before_screening_without_participation": 30
   },
   "safety": {
-    "roles": "The investigator assesses and reports safety events."
+    "roles": [
+      {
+        "party": "investigator",
+        "responsibilities": "assess_safety_events; report_safety_events"
+      }
+    ]
   },
   "risks_benefits": {
     "risks": "Device discomfort and privacy risks.",

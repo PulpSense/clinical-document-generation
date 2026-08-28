@@ -245,6 +245,60 @@
         "owned_processes_reaped": true,
         "late_responses_ignored": true
       }
+    },
+    {
+      "id": "retrospective-safety-role-and-reverification-delay",
+      "classification": "rejected_candidate",
+      "outcome": "failed_third_real_case_slow",
+      "candidate_git_commit": "976b22ca535d54b490dfa9427e25a2438eef2c4f",
+      "candidate_package_fingerprint": "a6b9ec6e70bc80c897aac1a3c5ed346cb8e8091c870b94c05a7e17fbe55b05d4",
+      "candidate_archive_sha256": "b7bcbc3b350af6b8533f76fca89e0631f6fffe65a6428bb26125b4914c199c98",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "ece8b595daa40bd4462c77959f00838a441d7ec790eed0a57de089ad9d0f55aa",
+      "repository_regression_test_count": 333,
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 369.284,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 369.385,
+        "under_15_minutes": true,
+        "case_report_sha256": "3c10a994c9e517ced37cfdea771ecf61a8d4969b7a8f96974c143efe8396584e",
+        "desktop_operation_state_sha256": "9e9e2b48ec29cb4ff5d8bd343d485bf5cfe2ead1b50a4e3e3a500ed737498133"
+      },
+      "second_case": {
+        "fixture_id": "prospective-advarra",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 342.22,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 342.364,
+        "under_15_minutes": true,
+        "case_report_sha256": "05d07041b810bbe27466999805558b1a64ba4339c213a070f5138ad09f981ce9",
+        "desktop_operation_state_sha256": "f39f23f3f823f2451a4b4fd276d0051717a9d5ccee54ee9cd027e428ae5a2688"
+      },
+      "failed_case": {
+        "fixture_id": "retrospective",
+        "operation_outcome": "non-certifying-runtime",
+        "desktop_operation_elapsed_seconds": 1071.559,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 1071.64,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "all_quality_gates_passed": true,
+        "delivery_confirmed": true,
+        "case_report_sha256": "5d4e842df69b7a43cd674703a466a9bcd5b5faf7ed88931d5b990e096cf9ce58",
+        "desktop_operation_state_sha256": "bd09a467da21ecd7be35d549b392c2260c55584fbe9e683f38c3024c33bcc776",
+        "visual_review": {
+          "status": "passed",
+          "protocol_pages": 4,
+          "checks_per_page": 14,
+          "producer_model_id": "gpt-5.6-sol"
+        }
+      },
+      "finding": "The initial Retrospective Section 12 handoff did not authorize the approved investigator safety-event role, so independent content verification correctly forced a localized retry. The first retry then cited that source field outside the section contract and required a second drafting attempt; the repeated verification wave and governed Desktop-parent visual fallback pushed an otherwise fully passing delivery to 1071.640 seconds.",
+      "measured_fix": "Bind safety.roles into the Retrospective quality-safety minimum-evidence contract so the first parallel drafting wave must include the approved investigator role and avoids the measured localized drafting and complete reverification cycle.",
+      "corpus_report_sha256": "ea06b06905aea6de9604850aad4a81d8a5ae4f240dd804d9e9d3a14a0676b105",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
     }
   ]
 }

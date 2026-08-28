@@ -114,6 +114,7 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
         "failed_third_real_case",
         "failed_second_real_case_slow",
         "failed_first_real_case_invalid_hermes_response",
+        "failed_third_real_case_slow",
     ]
     assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
     retrospective_attempt = next(

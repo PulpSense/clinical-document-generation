@@ -12,6 +12,7 @@ import copy
 import hashlib
 import json
 import re
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -20,6 +21,7 @@ from contracts import (
     BOILERPLATE_VERSION,
     CONTRACT_VERSION,
     FORBIDDEN_DRAFT_LANGUAGE,
+    SAFETY_ROLE_RESPONSIBILITY_CONCEPTS,
     BatchSpec,
     SectionSpec,
     batch_plan,
@@ -491,6 +493,282 @@ def _grounding_tokens(value: str) -> set[str]:
     }
 
 
+def _party_words(value: str) -> list[str]:
+    return re.findall(r"[^\W_]+|\d+", unicodedata.normalize("NFC", value).casefold())
+
+
+_SAFETY_RESPONSIBILITY_ACTION_TOKENS = {
+    "assess_safety_events": {
+        "asse", "assess", "assesse", "assessed", "assessing", "assessment",
+        "evaluate", "evaluated", "evaluating", "evaluation",
+        "investigate", "investigated", "investigating", "investigation",
+        "monitor", "monitored", "monitoring", "review", "reviewed", "reviewing",
+    },
+    "report_safety_events": {
+        "communicate", "communicated", "communicating", "communication",
+        "document", "documented", "documenting", "documentation",
+        "escalate", "escalated", "escalating", "escalation",
+        "notify", "notified", "notifying", "notification",
+        "report", "reported", "reporting", "submit", "submitted", "submitting", "submission",
+    },
+}
+_SAFETY_DIRECT_ACTION_TOKENS = {
+    "assess_safety_events": {
+        "asse", "assess", "assesse", "assessed",
+        "evaluate", "evaluated",
+        "investigate", "investigated",
+        "monitor", "monitored",
+        "review", "reviewed",
+    },
+    "report_safety_events": {
+        "communicate", "communicated",
+        "document", "documented",
+        "escalate", "escalated",
+        "notify", "notified",
+        "report", "reported",
+        "submit", "submitted",
+    },
+}
+_SAFETY_NEGATION_TOKENS = {"no", "not", "never", "neither", "nor", "without"}
+_SAFETY_EVENT_OBJECT_TOKENS = {"ae", "complaint", "event", "incident", "sae"}
+_SAFETY_OBJECT_MODIFIERS = {
+    "adverse", "all", "any", "approved", "clinical", "device", "potential",
+    "quality", "related", "safety", "serious", "study", "such", "suspected", "the", "these", "those",
+}
+_SAFETY_TRAILING_ADVERBS = {"directly", "independently", "promptly"}
+_SAFETY_DESCRIPTIVE_REVIEW_OBJECTS = {"chart", "data", "document", "record"}
+
+
+def _structured_safety_role_records(value: Any) -> list[tuple[str, set[str], set[str]]]:
+    """Return exact party labels/tokens and controlled responsibilities."""
+    if not isinstance(value, list):
+        return []
+    records: list[tuple[str, set[str], set[str]]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        party = unicodedata.normalize("NFC", str(item.get("party") or "").strip())
+        party_tokens = set(_party_words(party))
+        responsibilities = {
+            part.strip()
+            for part in str(item.get("responsibilities") or "").split(";")
+            if part.strip() in SAFETY_ROLE_RESPONSIBILITY_CONCEPTS
+        }
+        if party_tokens and responsibilities:
+            records.append((party, party_tokens, responsibilities))
+    return records
+
+
+def _structured_safety_role_prose(value: Any) -> str:
+    """Render governed safety responsibilities as one party-bound sentence per record."""
+    sentences = []
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, Mapping):
+            continue
+        party = str(item.get("party") or "").strip()
+        concepts = {
+            part.strip()
+            for part in str(item.get("responsibilities") or "").split(";")
+        }
+        actions = []
+        if "assess_safety_events" in concepts:
+            actions.append("assesses safety events")
+        if "report_safety_events" in concepts:
+            actions.append("reports safety events")
+        if party and actions:
+            subject = party if party.casefold().startswith("the ") else f"The {party}"
+            sentences.append(f"{subject} {' and '.join(actions)}.")
+    return " ".join(sentences)
+
+
+def _maximal_approved_party_spans(
+    text: str,
+    role_records: list[tuple[str, set[str], set[str]]],
+) -> list[tuple[str, int, int]]:
+    """Resolve exact party mentions longest-first so overlapping labels stay distinct."""
+    text = unicodedata.normalize("NFC", text)
+    folded_parts: list[str] = []
+    folded_offsets: list[int] = []
+    for index, character in enumerate(text):
+        folded = character.casefold()
+        folded_parts.append(folded)
+        folded_offsets.extend([index] * len(folded))
+    folded_text = "".join(folded_parts)
+    candidates: list[tuple[str, int, int]] = []
+    for party, _party_tokens, _responsibilities in role_records:
+        folded_party = unicodedata.normalize("NFC", party).casefold().strip()
+        if folded_party.startswith("the "):
+            folded_party = folded_party[4:].lstrip()
+        parts = folded_party.split()
+        if not parts:
+            continue
+        source = r"\s+".join(map(re.escape, parts))
+        for match in re.finditer(
+            rf"(?<!\w)(?:the\s+)?{source}(?!\w)",
+            folded_text,
+        ):
+            candidates.append((
+                party,
+                folded_offsets[match.start()],
+                folded_offsets[match.end() - 1] + 1,
+            ))
+    selected: list[tuple[str, int, int]] = []
+    for candidate in sorted(candidates, key=lambda item: (-(item[2] - item[1]), item[1], item[0].casefold())):
+        if any(candidate[1] < end and start < candidate[2] for _party, start, end in selected):
+            continue
+        selected.append(candidate)
+    return sorted(selected, key=lambda item: item[1])
+
+
+def _is_descriptive_safety_clause(
+    tokens: list[str],
+    approved_risk_tokens: list[str],
+) -> bool:
+    """Accept only complete actor-free boundary, risk, and record-review shapes."""
+    exact_descriptions = {
+        ("safety", "event", "chart", "review", "wa", "completed"),
+        ("safety", "data", "are", "provided", "by", "the", "chart", "review"),
+    }
+    if tuple(tokens) in exact_descriptions:
+        return True
+    risk_prefixes = (
+        ["for", "quality", "complaint", "and", "adverse", "event", "the", "approved", "risk", "i"],
+        ["for", "quality", "complaint", "and", "adverse", "event", "approved", "risk", "include"],
+    )
+    if approved_risk_tokens and any(
+        tokens == [*prefix, *approved_risk_tokens] for prefix in risk_prefixes
+    ):
+        return True
+    review_tokens = tokens[1:] if tokens[:1] == ["the"] else tokens
+    if (
+        len(review_tokens) >= 5
+        and review_tokens[0] in _SAFETY_DESCRIPTIVE_REVIEW_OBJECTS
+        and review_tokens[1] == "review"
+        and review_tokens[2] in {"contained", "identified", "included", "summarized"}
+        and review_tokens[3] in {"adverse", "approved", "quality", "safety", "serious"}
+        and review_tokens[4] in _SAFETY_EVENT_OBJECT_TOKENS
+        and len(review_tokens) == 5
+    ):
+        return True
+    retrospective_tokens = tokens[1:] if tokens[:1] in (["available"], ["historical"], ["retrospective"]) else tokens
+    if (
+        len(retrospective_tokens) == 8
+        and retrospective_tokens[0] == "safety"
+        and retrospective_tokens[1] in {"data", "event", "information"}
+        and retrospective_tokens[2] in {"wa", "were"}
+        and retrospective_tokens[3] in {"abstracted", "included", "summarized"}
+        and retrospective_tokens[4] in {"from", "in"}
+        and retrospective_tokens[5] == "the"
+        and retrospective_tokens[6] in _SAFETY_DESCRIPTIVE_REVIEW_OBJECTS
+        and retrospective_tokens[7] == "review"
+    ):
+        return True
+    return False
+
+
+def _direct_safety_role_errors(
+    content: str,
+    role_records: list[tuple[str, set[str], set[str]]],
+    approved_risks: Any,
+) -> list[str]:
+    """Validate the governed one-party/direct-action/safety-object sentence grammar."""
+    normalized_content = unicodedata.normalize("NFC", content)
+    action_concepts = {
+        token: concept
+        for concept, tokens in _SAFETY_DIRECT_ACTION_TOKENS.items()
+        for token in tokens
+    }
+    all_actions = set(action_concepts)
+    responsibility_claim_tokens = set().union(
+        *_SAFETY_RESPONSIBILITY_ACTION_TOKENS.values()
+    )
+    approved = {party.casefold(): responsibilities for party, _tokens, responsibilities in role_records}
+    approved_risk_tokens = [
+        token.rstrip("s")
+        for leaf in _leaf_texts(approved_risks)
+        for token in _party_words(leaf)
+    ]
+    seen: set[str] = set()
+    errors: list[str] = []
+    protected_content = list(normalized_content)
+    for _party, start, end in _maximal_approved_party_spans(normalized_content, role_records):
+        for index in range(start, end):
+            if protected_content[index] == ".":
+                protected_content[index] = "\u2024"
+    for clause in re.split(r"[.!?;\n]+", "".join(protected_content)):
+        clause = clause.replace("\u2024", ".")
+        clause = clause.strip()
+        if not clause:
+            continue
+        tokens = [word.rstrip("s") for word in _party_words(clause)]
+        token_set = set(tokens)
+        spans = _maximal_approved_party_spans(clause, role_records)
+        has_event_object = bool(token_set & _SAFETY_EVENT_OBJECT_TOKENS)
+        safety_context = has_event_object or "safety" in token_set
+        approved_party_claim = bool(
+            spans and token_set & responsibility_claim_tokens
+        )
+        if not (safety_context or approved_party_claim):
+            continue
+        if not spans and _is_descriptive_safety_clause(tokens, approved_risk_tokens):
+            continue
+        if len(spans) != 1 or clause[:spans[0][1]].strip():
+            errors.append("unapproved-or-nondirect-party")
+            continue
+        party, _start, end = spans[0]
+        predicate = [word.rstrip("s") for word in _party_words(clause[end:])]
+        while predicate and predicate[-1] in _SAFETY_TRAILING_ADVERBS:
+            predicate.pop()
+        if not predicate or set(predicate) & _SAFETY_NEGATION_TOKENS:
+            errors.append(f"{party}:invalid-direct-statement")
+            continue
+        concepts: set[str] = set()
+        segments: list[list[str]] = [[]]
+        for token in predicate:
+            if token == "and":
+                segments.append([])
+            else:
+                segments[-1].append(token)
+        has_explicit_object = False
+        previous_had_object = False
+        valid_chain = bool(segments) and all(segments)
+        for segment in segments:
+            if not valid_chain:
+                break
+            concept = action_concepts.get(segment[0])
+            if concept:
+                concepts.add(concept)
+                object_tokens = segment[1:]
+            elif concepts and previous_had_object:
+                object_tokens = segment
+            else:
+                valid_chain = False
+                break
+            event_count = sum(
+                token in _SAFETY_EVENT_OBJECT_TOKENS for token in object_tokens
+            )
+            if (object_tokens and event_count != 1) or any(
+                token not in (_SAFETY_EVENT_OBJECT_TOKENS | _SAFETY_OBJECT_MODIFIERS)
+                for token in object_tokens
+            ):
+                valid_chain = False
+                break
+            previous_had_object = event_count == 1
+            has_explicit_object = has_explicit_object or previous_had_object
+        if not valid_chain or not has_explicit_object:
+            errors.append(f"{party}:invalid-action-chain")
+            continue
+        party_key = party.casefold()
+        if concepts != approved.get(party_key, set()):
+            errors.append(f"{party}:responsibility-mismatch")
+            continue
+        seen.add(party_key)
+    for party, _party_tokens, _responsibilities in role_records:
+        if party.casefold() not in seen:
+            errors.append(f"{party}:missing-direct-statement")
+    return errors
+
+
 def _evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
     """Require observable anchors for every material scalar supplied by a cited source path."""
     content_tokens = _grounding_tokens(content)
@@ -538,6 +816,7 @@ def _coverage_findings(
     section_id: str,
     content: str,
     evidence_refs: Iterable[str],
+    role_content: str | None = None,
 ) -> list[dict[str, Any]]:
     if contract.get("source_coverage") not in {"all_material_evidence", "all_material_items"}:
         return []
@@ -553,7 +832,13 @@ def _coverage_findings(
             "next_action": "Cover every material minimum_evidence value; do not replace supplied detail with generic prose.",
         })
     all_items = contract.get("source_coverage") == "all_material_items"
-    ungrounded = [path for path, value in material.items() if f"source:{path}" in cited and not _evidence_grounded(content, value, all_items=all_items)]
+    ungrounded = [
+        path
+        for path, value in material.items()
+        if f"source:{path}" in cited
+        and not (section_id == "quality-safety" and path == "safety.roles")
+        and not _evidence_grounded(content, value, all_items=all_items)
+    ]
     if ungrounded:
         findings.append({
             "category": "drafting",
@@ -561,6 +846,31 @@ def _coverage_findings(
             "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",
             "next_action": "Revise the section so each cited source contributes its concrete names, values, time points, criteria, or clinical concepts.",
         })
+    if section_id == "quality-safety" and "safety.roles" in material:
+        role_records = _structured_safety_role_records(material["safety.roles"])
+        if not role_records:
+            findings.append({
+                "category": "drafting",
+                "field": section_id,
+                "issue": "Approved safety roles are not structured party/responsibility records.",
+                "next_action": "Return to Source Review and record every responsible party separately from its responsibilities.",
+            })
+        missing_assignments = _direct_safety_role_errors(
+            content if role_content is None else role_content,
+            role_records,
+            material.get("risks_benefits.risks"),
+        )
+        if missing_assignments:
+            findings.append({
+                "category": "drafting",
+                "field": section_id,
+                "issue": (
+                    "Section omits the approved safety role assignment: "
+                    + ", ".join(missing_assignments)
+                    + "."
+                ),
+                "next_action": "Name every approved party and state each assigned safety responsibility in that party's sentence.",
+            })
     return findings
 
 
@@ -836,12 +1146,34 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             for content_item in [*clean_paragraphs, *lists]
             for evidence in content_item.get("evidence_refs", [])
         ]
+        role_content_parts = [
+            paragraph["text"]
+            for paragraph in clean_paragraphs
+            if not _is_authorized_boilerplate_content(
+                paragraph["text"],
+                paragraph.get("evidence_refs", []),
+                paragraph.get("boilerplate_refs", []),
+                expected_contracts[section_id],
+            )
+        ]
+        role_content_parts.extend(
+            value
+            for group in lists
+            if not _is_authorized_boilerplate_content(
+                "\n".join(group["items"]),
+                group.get("evidence_refs", []),
+                group.get("boilerplate_refs", []),
+                expected_contracts[section_id],
+            )
+            for value in group["items"]
+        )
         findings.extend(_coverage_findings(
             request,
             expected_contracts[section_id],
             section_id,
             combined_content,
             combined_evidence,
+            "\n".join(role_content_parts),
         ))
         if not clean_paragraphs and not lists:
             findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
@@ -1268,7 +1600,13 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
             result["paragraphs"] = [{"text": block["text"], "evidence_refs": [], "boilerplate_refs": [block["boilerplate_id"]]}]
         elif allowed_paths:
             path = allowed_paths[0]; value = value_text(source[path])
-            if section_id == "introduction": prose = value.rstrip(".") + "."
+            if section_id == "quality-safety" and isinstance(source.get("safety.roles"), list):
+                role_prose = _structured_safety_role_prose(source["safety.roles"])
+                risks = value_text(source.get("risks_benefits.risks")).rstrip(".")
+                prose = role_prose
+                if risks:
+                    prose += f" Approved risks include {risks.casefold()}."
+            elif section_id == "introduction": prose = value.rstrip(".") + "."
             elif section_id == "objectives":
                 primary = value_text(source.get("objectives.primary")).rstrip(".")
                 secondary = value_text(source.get("objectives.secondary")).rstrip(".")
@@ -1316,6 +1654,7 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
         else:
             result.update({"outcome": "drafted", "paragraphs": []})
     for result, contract in zip(response["section_results"], request["section_contracts"]):
+        section_id = str(contract.get("section_id"))
         allowed_paths = [
             path for path in contract.get("minimum_evidence", [])
             if path in source and value_text(source[path])
@@ -1342,6 +1681,8 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
                     f"At least {value_text(source[path]).rstrip('.')} days without participation "
                     "in another study are required before screening."
                 )
+            elif section_id == "quality-safety" and path == "safety.roles":
+                text = _structured_safety_role_prose(source[path])
             else:
                 text = (
                     f"For {section_label}, the approved {label} is "

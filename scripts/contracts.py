@@ -11,6 +11,7 @@ import copy
 import hashlib
 import json
 import re
+import unicodedata
 import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -18,11 +19,15 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.12"
+CONTRACT_VERSION = "clinical-documents-v2.13"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
 APPROVED_FONT_PLAN_VERSION = "approved-font-plan/v1"
+SAFETY_ROLE_RESPONSIBILITY_CONCEPTS = {
+    "assess_safety_events",
+    "report_safety_events",
+}
 
 RECOVERY_POLICIES = {
     "adapter_fault": "advance_adapter",
@@ -262,6 +267,7 @@ RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("population.sample_size"),
     RequiredInput("population.sample_justification", ("statistics.sample_size_justification",)),
     RequiredInput("statistics.analysis_plan"),
+    RequiredInput("safety.roles", kind="records"),
     RequiredInput("parties.irb.name"),
     RequiredInput("parties.irb.address"),
     RequiredInput("parties.sponsor.name"),
@@ -292,6 +298,11 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "analysis-plan.methodology": "Explain the approved statistical methods and map them explicitly to every supplied primary and secondary endpoint.",
         "analysis-plan.considerations": "Explain the approved analysis conventions and interpretation considerations, including only source-supported handling of paired or missing observations.",
         "sample-size": "State the approved sample size and explain its approved justification.",
+        "quality-safety": (
+            "For each approved safety.roles record, write a separate direct active-voice sentence beginning "
+            "with the exact approved party name, state only that party's approved safety-event responsibilities, "
+            "and name no other responsible party; also explain the approved risks and safety boundary."
+        ),
         "icf.study-purpose": "Explain the study purpose, hypothesis, primary endpoint, and background in clear participant-facing language.",
         "icf.procedures": "Explain every approved visit, procedure, and minimum interval without participation in another study before screening in participant-facing sequence.",
         "icf.duration": "State the approved participation duration and relevant time points.",
@@ -407,7 +418,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("analysis-plan.considerations", "9.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
     _section_spec("sample-size", "10.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification")),
     _section_spec("confidentiality", "11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("risks_benefits.privacy", "confidentiality.data_handling"), "retrospective-confidentiality"),
-    _section_spec("quality-safety", "12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", "protocol-analysis-and-oversight", ("risks_benefits.risks",), "retrospective-safety"),
+    _section_spec("quality-safety", "12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", "protocol-analysis-and-oversight", ("risks_benefits.risks", "safety.roles"), "retrospective-safety"),
     _section_spec("ethics", "13.", "GCP, ICH AND ETHICAL CONSIDERATIONS", "protocol-analysis-and-oversight", ("parties.irb.name",), "ethics"),
 )
 
@@ -652,6 +663,30 @@ def _scheduled_duration_days(reference: Mapping[str, Any]) -> float | None:
     return max(durations) if durations else None
 
 
+def _valid_safety_role_record(item: Any) -> bool:
+    if (
+        not isinstance(item, Mapping)
+        or set(item) != {"party", "responsibilities"}
+        or not isinstance(item.get("party"), str)
+        or not meaningful(item.get("party"))
+        or not isinstance(item.get("responsibilities"), str)
+    ):
+        return False
+    concepts = {
+        part.strip()
+        for part in item["responsibilities"].split(";")
+        if part.strip()
+    }
+    return bool(concepts) and concepts <= SAFETY_ROLE_RESPONSIBILITY_CONCEPTS
+
+
+def _safety_party_identity(value: str) -> str:
+    words = re.findall(r"[^\W_]+|\d+", unicodedata.normalize("NFC", value).casefold())
+    if words[:1] == ["the"]:
+        words = words[1:]
+    return " ".join(words)
+
+
 def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     branch = canonical_study_type(get_path(reference, "meta.study_type"))
     if not branch:
@@ -709,6 +744,23 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.measure", "issue": "Outcome measure is missing.", "required": "Reviewer-approved outcome measure."})
                 if not meaningful(time_frame):
                     findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.time_frame", "issue": "Outcome time frame is missing.", "required": "Reviewer-approved outcome time frame."})
+    else:
+        safety_roles = get_path(reference, "safety.roles")
+        if (
+            not isinstance(safety_roles, list)
+            or not safety_roles
+            or any(not _valid_safety_role_record(item) for item in safety_roles)
+            or len({_safety_party_identity(item["party"]) for item in safety_roles if isinstance(item, Mapping)}) != len(safety_roles)
+        ):
+            findings.append({
+                "category": "source-evidence",
+                "field": "safety.roles",
+                "issue": "Retrospective safety roles must be structured party/responsibility records.",
+                "required": (
+                    "One or more exact {party, responsibilities} text records; responsibilities use "
+                    "semicolon-separated assess_safety_events/report_safety_events concepts."
+                ),
+            })
     count = get_path(reference, "design.number_of_sites")
     sites = _site_group(reference, "site_facilities")
     try:
@@ -1138,7 +1190,7 @@ def repair_report(findings: Iterable[Mapping[str, Any]]) -> str:
 
 __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES",
-    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES",
+    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth",
