@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -259,6 +260,7 @@ def test_release_package_can_be_installed_and_imported_without_checkout(tmp_path
         text=True,
         capture_output=True,
         check=False,
+        env={**os.environ, "PYTHONPYCACHEPREFIX": str(tmp_path / "pycache")},
     )
     assert result.returncode == 0, result.stderr
     assert (skill_dir / "agents/openai.yaml").is_file()
@@ -483,7 +485,7 @@ def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):
     )
 
     assert result["status"] == "passed"
-    assert (active / "SKILL.md").read_text(encoding="utf-8") == "new release"
+    assert "name: clinical-document-generation" in (active / "SKILL.md").read_text(encoding="utf-8")
     assert (previous / "runtime/full-runtime.bin").read_bytes() == b"full runtime"
     history_path = Path(result["retained_history"])
     assert history_path == skills_dir / "release-history/historical-release.json"

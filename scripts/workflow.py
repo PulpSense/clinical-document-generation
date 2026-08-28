@@ -444,7 +444,7 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         return _package_release_tree(snapshot_root, output_path, git_commit=commit)
 
 
-def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
+def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -> list[dict[str, Any]]:
     manifest_path = skill_root / RELEASE_MANIFEST
     if not manifest_path.is_file():
         return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": "Release manifest is missing."}]
@@ -478,7 +478,14 @@ def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
     actual = {
         path.relative_to(skill_root).as_posix()
         for path in skill_root.rglob("*")
-        if path.is_file() and "runtime" not in path.relative_to(skill_root).parts
+        if path.is_file() and not (
+            allow_runtime_state
+            and (
+                "runtime" in path.relative_to(skill_root).parts
+                or "__pycache__" in path.relative_to(skill_root).parts
+                or path.suffix == ".pyc"
+            )
+        )
     }
     extras = sorted(actual - declared - permitted_state)
     if extras:
@@ -534,7 +541,7 @@ def bind_release_certification(archive_path: Path, report_path: Path) -> dict[st
             source.extractall(extracted)
         candidate = extracted / "clinical-document-generation"
         (candidate / RELEASE_CERTIFICATION).write_bytes(report_bytes)
-        integrity = _manifest_integrity(candidate)
+        integrity = _manifest_integrity(candidate, allow_runtime_state=False)
         _, certification_findings = _certification_attestation(candidate)
         if integrity or certification_findings:
             issues = integrity + certification_findings
@@ -871,7 +878,7 @@ def install_release(
                 if (info.external_attr >> 16) & 0o170000 == 0o120000:
                     raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
             archive.extractall(staging_root)
-        integrity = _manifest_integrity(candidate)
+        integrity = _manifest_integrity(candidate, allow_runtime_state=False)
         certification, certification_findings = _certification_attestation(candidate)
         discovery_findings = _validate_hermes_discovery(hermes_config_path.expanduser().resolve(), active)
         if integrity or certification_findings or discovery_findings:
