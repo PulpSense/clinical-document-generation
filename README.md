@@ -104,6 +104,37 @@ there is no shorter certification timeout. A successful single fixture is
 case evidence only; it does not certify a release until the complete three-study
 corpus has passed.
 
+The complete live gate runs the declared cases sequentially against one package
+fingerprint and stops at the first failed, blocked, or slow case while retaining
+that attempt. It requires hash-bound evidence that static checks, the deterministic
+six-case Branch Acceptance Corpus, and the repository regression suite passed
+before any real model call:
+
+```bash
+"$CLINICAL_PYTHON" tests/hermes_e2e.py \
+  --run-preflight \
+  --preflight-evidence /absolute/path/release-certification-preflight.json \
+  --release-root /absolute/path/to/extracted/clinical-document-generation
+
+"$CLINICAL_PYTHON" tests/hermes_e2e.py \
+  --corpus \
+  --preflight-evidence /absolute/path/release-certification-preflight.json \
+  --run-root /absolute/path/to/isolated-certification-runs \
+  --release-root /absolute/path/to/extracted/clinical-document-generation
+```
+
+The harness creates the preflight evidence by checking a clean candidate commit,
+compiling exactly the six production modules, running the identical-content
+five-family Layout Preservation corpus, running the deterministic six-case Branch
+Acceptance Corpus, and then running the complete repository suite. The resulting
+`release-certification-corpus.json` is the only full-corpus pass signal. It binds
+those governed command results and logs, the clean commit and package fingerprint, each
+approved synthetic fixture, governed Hermes settings and observed model IDs,
+Contracted Template Bundle and Layout Preservation identities, exact delivered
+bytes, all quality gates, every rendered page and check, delivery confirmation,
+and sub-15-minute case timing. Recorded drafting or synthetic verification remains
+labelled structural-only in preflight evidence and cannot satisfy the live gate.
+
 Certification fixtures live under `tests/fixtures/release-certification/`.
 Each fixture manifest explicitly declares synthetic/non-private provenance,
 hashes its source input, reviewed Source-of-Truth, and approved reference, fixes

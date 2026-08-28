@@ -1,0 +1,41 @@
+{
+  "schema_version": "release-certification-fixture/v1",
+  "fixture_id": "retrospective",
+  "synthetic": true,
+  "contains_private_data": false,
+  "privacy_statement": "Repository-owned synthetic study. Names, organizations, contacts, identifiers, and clinical facts are fictional and contain no client or patient data.",
+  "review_status": "approved for release certification",
+  "study_type": "Retrospective",
+  "icf_family": null,
+  "expected_outputs": [
+    "protocol.docx"
+  ],
+  "artifacts": {
+    "source_input": {
+      "path": "source-input.md",
+      "sha256": "c4fae8835a097cb2d3aaf6ae03723588f9c4d7cc2d704752aac9d80f5fa3c61d"
+    },
+    "approved_source": {
+      "path": "approved-source.md",
+      "sha256": "a7eb2d67fcceba1b9b017f64674ef53063bf9a717f8c888446530a95ff8a6a6f"
+    },
+    "approved_reference": {
+      "path": "approved-reference.json",
+      "sha256": "bbc317fd361e66c381a54784e09f0f8c93cedc2c5d54b964b234d24a0cd02dbe"
+    }
+  },
+  "approved_normalization": {
+    "source_input_sha256": "c4fae8835a097cb2d3aaf6ae03723588f9c4d7cc2d704752aac9d80f5fa3c61d",
+    "approved_source_sha256": "a7eb2d67fcceba1b9b017f64674ef53063bf9a717f8c888446530a95ff8a6a6f"
+  },
+  "hermes_configuration": {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": true,
+    "reasoning_configuration": "Hermes Desktop governed default",
+    "layout_preservation_notes": [
+      "The Retrospective Protocol retains the authority-derived front matter, table of contents, heading hierarchy, tables, headers, and footers; only natural body-section flow and orphan prevention are expected."
+    ]
+  }
+}

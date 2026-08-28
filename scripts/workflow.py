@@ -1372,6 +1372,22 @@ def run_desktop_operation(
     current_release_identity = dict(release_identity or _active_release_identity(SCRIPT_DIR.parent))
     if not str(current_release_identity.get("package_fingerprint") or ""):
         raise ValueError("Desktop operation release identity requires a package fingerprint.")
+    try:
+        _, operation_reference = _reference(run_dir)
+    except FileNotFoundError:
+        operation_reference = {}
+    operation_approval = operation_reference.get("approval") or {}
+    current_approval_identity = (
+        {
+            key: operation_approval.get(key)
+            for key in (
+                "status", "approved_by", "approved_at", "revision_id", "source_sha256",
+                "approved_reference_sha256", "governing_sha256",
+            )
+        }
+        if operation_approval
+        else None
+    )
     soft_budgets = {
         str(stage): float(seconds)
         for stage, seconds in (DESKTOP_STAGE_SOFT_BUDGETS if stage_soft_budgets is None else stage_soft_budgets).items()
@@ -1403,6 +1419,18 @@ def run_desktop_operation(
                 "category": "release",
                 "field": "release_identity",
                 "issue": "Desktop operation evidence belongs to a different Promoted Release or governed configuration identity.",
+            }],
+            "client_outputs": [],
+        }
+    recorded_approval_identity = persisted.get("approval_identity")
+    if isinstance(recorded_approval_identity, Mapping) and dict(recorded_approval_identity) != current_approval_identity:
+        return {
+            "status": "blocked",
+            "stage": "approval_identity",
+            "findings": [{
+                "category": "approval",
+                "field": "approval_identity",
+                "issue": "Desktop operation evidence belongs to a different approved immutable revision.",
             }],
             "client_outputs": [],
         }
@@ -1553,6 +1581,7 @@ def run_desktop_operation(
             "runtime": current_runtime,
             "runtime_history": runtime_history,
             "release_identity": current_release_identity,
+            "approval_identity": current_approval_identity,
             "status": status,
             "stage": current_stage,
             "stage_history": stage_history,

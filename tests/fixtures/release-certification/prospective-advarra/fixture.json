@@ -1,0 +1,43 @@
+{
+  "schema_version": "release-certification-fixture/v1",
+  "fixture_id": "prospective-advarra",
+  "synthetic": true,
+  "contains_private_data": false,
+  "privacy_statement": "Repository-owned synthetic study. Names, organizations, contacts, identifiers, and clinical facts are fictional and contain no client or patient data.",
+  "review_status": "approved for release certification",
+  "study_type": "Prospective",
+  "icf_family": "Advarra",
+  "expected_outputs": [
+    "icf.docx",
+    "protocol.docx",
+    "study.xml"
+  ],
+  "artifacts": {
+    "source_input": {
+      "path": "source-input.md",
+      "sha256": "79f426e0698d89710627bd16cb4b66c7c46bb6522ccc60be9f60d3ef2459bedc"
+    },
+    "approved_source": {
+      "path": "approved-source.md",
+      "sha256": "6ebd16b2e26404c341ac4dab270c9d9ccbf0be179de750dcda4204e5072b62ec"
+    },
+    "approved_reference": {
+      "path": "approved-reference.json",
+      "sha256": "f073a4ea7de4175fc4492dc54f4d856fd9f65049cc502ca6ceb03a41439c6ec3"
+    }
+  },
+  "approved_normalization": {
+    "source_input_sha256": "79f426e0698d89710627bd16cb4b66c7c46bb6522ccc60be9f60d3ef2459bedc",
+    "approved_source_sha256": "6ebd16b2e26404c341ac4dab270c9d9ccbf0be179de750dcda4204e5072b62ec"
+  },
+  "hermes_configuration": {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": true,
+    "reasoning_configuration": "Hermes Desktop governed default",
+    "layout_preservation_notes": [
+      "The Advarra ICF family retains its authority-derived headings, consent language, and signature-table structure; those features are not style defects."
+    ]
+  }
+}

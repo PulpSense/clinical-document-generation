@@ -1,0 +1,215 @@
+{
+  "meta": {
+    "study_type": "Prospective",
+    "document_set": [
+      "protocol_docx",
+      "icf_docx",
+      "xml"
+    ],
+    "protocol_number": "PS-AD-001",
+    "version": "1.0",
+    "date": "21 Aug 2026",
+    "icf_template": "Advarra"
+  },
+  "approval": {
+    "status": "approved",
+    "approved_by": "Release Certification Fixture"
+  },
+  "source": {
+    "source_of_truth_file": "reference/source-of-truth.md",
+    "field_candidates": {}
+  },
+  "study": {
+    "title": "PS-AD-001 Sentinel Patch Evaluation",
+    "timeline": "3 months",
+    "short_title": "PS-AD-001 Sentinel Patch",
+    "background": "A prospective evaluation of a wearable monitoring device.",
+    "hypothesis": "Prospective monitoring will describe recovery."
+  },
+  "population": {
+    "study_population": "Adults with the target condition.",
+    "sample_size": "40 participants",
+    "sample_justification": "Descriptive estimates with expected attrition.",
+    "minimum_age": "18 Years",
+    "maximum_age": "80 Years",
+    "inclusion_criteria": [
+      "Adults with the target condition."
+    ],
+    "exclusion_criteria": [
+      "Unable to complete follow-up."
+    ],
+    "sample_size_evidence": [
+      {
+        "evidence": "Planned sample",
+        "value": "40 participants",
+        "source": "Approved source"
+      }
+    ]
+  },
+  "parties": {
+    "sponsor": {
+      "name": "Aurora Recovery Research",
+      "address": "1 Research Way"
+    },
+    "principal_investigator": {
+      "name": "Alex Investigator",
+      "title": "MD"
+    },
+    "sub_investigators": "None",
+    "irb": {
+      "name": "Example IRB",
+      "affiliation": "Independent",
+      "phone": "555-0100",
+      "email": "irb@example.org",
+      "address": "1 Review Way"
+    },
+    "study_coordinator": {
+      "name": "Jordan Coordinator",
+      "title": "CRC",
+      "business_phone": "555-0101",
+      "office_phone": "555-0102",
+      "email": "jordan@example.org"
+    }
+  },
+  "sites": [
+    {
+      "facility": {
+        "name": "Site One"
+      },
+      "contact": {
+        "name": "Jordan Coordinator",
+        "email": "jordan@example.org"
+      },
+      "investigators": [
+        {
+          "name": "Alex Investigator",
+          "degrees": "MD"
+        }
+      ]
+    }
+  ],
+  "design": {
+    "study_design": "Prospective, single-center, single-arm observational study.",
+    "number_of_sites": 1,
+    "masking": "None",
+    "arms": [
+      {
+        "name": "Sentinel Patch",
+        "description": "Single observational cohort."
+      }
+    ],
+    "intervention_name": "Sentinel Patch",
+    "intervention_type": "Device"
+  },
+  "endpoints": {
+    "primary": [
+      {
+        "label": "Primary outcome",
+        "time_point": "Month 3"
+      }
+    ],
+    "secondary": [
+      {
+        "label": "Safety outcome",
+        "time_point": "Month 3"
+      }
+    ]
+  },
+  "procedures": {
+    "assessments": [
+      "Baseline",
+      "Month 1",
+      "Month 3"
+    ],
+    "retention": "Reminder calls support follow-up.",
+    "discontinuation": "Participants may withdraw at any time.",
+    "replacement": "No replacement participants are planned.",
+    "visit_schedule_table": [
+      {
+        "visitNumber": "1",
+        "visitName": "Baseline",
+        "visitWindow": "Day 0",
+        "CRFnumber": "BL"
+      },
+      {
+        "visitNumber": "2",
+        "visitName": "Month 1",
+        "visitWindow": "Day 30 +/- 7",
+        "CRFnumber": "M1"
+      },
+      {
+        "visitNumber": "3",
+        "visitName": "Month 3",
+        "visitWindow": "Day 90 +/- 7",
+        "CRFnumber": "M3"
+      }
+    ],
+    "visit_schedule": [
+      {
+        "visit": "Baseline",
+        "timing": "Day 0",
+        "procedures": [
+          "Consent",
+          "Device initiation"
+        ]
+      }
+    ],
+    "minimum_days_before_screening_without_participation": 30
+  },
+  "safety": {
+    "roles": "The investigator assesses and reports safety events."
+  },
+  "risks_benefits": {
+    "risks": "Device discomfort and privacy risks.",
+    "benefits": "No direct benefit is guaranteed.",
+    "injury_handling": "Research-related concerns will be reported to the investigator.",
+    "privacy": "Records will be stored confidentially.",
+    "compensation_or_reimbursement": "No compensation is planned."
+  },
+  "template_fields": {
+    "data_driven_tables": {
+      "sample_size_evidence": {
+        "columns": [
+          {
+            "key": "evidence",
+            "label": "Evidence"
+          },
+          {
+            "key": "value",
+            "label": "Value"
+          },
+          {
+            "key": "source",
+            "label": "Source"
+          }
+        ],
+        "rows": [
+          {
+            "evidence": "Planned sample",
+            "value": "40",
+            "source": "Approved source"
+          }
+        ]
+      }
+    }
+  },
+  "statistics": {
+    "analysis_plan": "Descriptive summaries of outcomes and safety events.",
+    "sample_size_evidence": [
+      {
+        "evidence": "Planned sample",
+        "value": "40 participants",
+        "source": "Approved source"
+      }
+    ]
+  },
+  "objectives": {
+    "primary": [
+      "Describe recovery outcomes."
+    ],
+    "secondary": [
+      "Describe safety and usability."
+    ]
+  },
+  "regulatory": {"prs": {"study_type": "Observational", "observational_study_design": "Cohort", "study_uid": "S000H9K100000099"}}
+}

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
 import sys
 
 from hermes_e2e import (
+    CERTIFICATION_CORPUS,
+    CERTIFICATION_LAYOUT_COVERAGE,
+    CERTIFICATION_VISUAL_CHECKS,
+    DETERMINISTIC_BRANCH_ACCEPTANCE_CASES,
     EXPECTED_OUTPUTS,
     DiagnosticOutcome,
     _agent_prompt,
@@ -14,17 +19,24 @@ from hermes_e2e import (
     _run_handoff_wave,
     _wait_for_processes,
     certification_fixture,
+    certification_corpus,
+    certify_release_corpus,
     _workflow,
     input_provenance,
     inspect_run,
     prepare_certification_run,
     run_release_certification_operation,
+    run_release_certification_corpus,
     subprocess_environment,
     sandbox_command,
     wait_for_parent_visual_review,
 )
 import workflow
 import drafting
+import hermes_e2e
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_path: Path) -> None:
@@ -80,6 +92,721 @@ def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_
         raise AssertionError("A mutated certification fixture was accepted.")
 
 
+def test_repository_certification_corpus_covers_every_live_release_branch() -> None:
+    fixtures = certification_corpus()
+
+    assert tuple(fixture["fixture_id"] for fixture in fixtures) == CERTIFICATION_CORPUS
+    assert {
+        (fixture["study_type"], fixture.get("icf_family"))
+        for fixture in fixtures
+    } == {
+        ("Ambispective", "Sterling"),
+        ("Prospective", "Advarra"),
+        ("Retrospective", None),
+    }
+    assert all(fixture["synthetic"] is True for fixture in fixtures)
+    assert all(fixture["contains_private_data"] is False for fixture in fixtures)
+    assert all(fixture["review_status"] == "approved for release certification" for fixture in fixtures)
+    assert all(fixture["privacy_statement"] for fixture in fixtures)
+    assert {
+        fixture["fixture_id"]: fixture["expected_outputs"]
+        for fixture in fixtures
+    } == {
+        "ambispective-sterling": ["icf.docx", "protocol.docx", "study.xml"],
+        "prospective-advarra": ["icf.docx", "protocol.docx", "study.xml"],
+        "retrospective": ["protocol.docx"],
+    }
+    governed = {
+        json.dumps(
+            {
+                key: fixture["hermes_configuration"][key]
+                for key in (
+                    "source", "max_turns", "skill", "safe_mode",
+                    "reasoning_configuration",
+                )
+            },
+            sort_keys=True,
+        )
+        for fixture in fixtures
+    }
+    assert len(governed) == 1
+
+
+def _write_corpus_preflight(tmp_path: Path) -> Path:
+    logs = tmp_path / "preflight-logs"
+    logs.mkdir()
+    checks = {}
+    command_arguments = {
+        "static_release_checks": [
+            "-m", "py_compile", *(f"scripts/{name}.py" for name in ("workflow", "contracts", "drafting", "rendering", "quality", "prs_xml")), "tests/hermes_e2e.py",
+        ],
+        "layout_preservation_corpus": [
+            "-m", "pytest",
+            "tests/test_runtime_regressions.py::test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatting",
+            "tests/test_client_output_acceptance.py::test_every_protocol_and_icf_family_uses_natural_body_pagination",
+            "-q",
+        ],
+        "deterministic_branch_acceptance_corpus": [
+            "-m", "pytest", "tests/test_release_gate.py::test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets", "-q",
+        ],
+        "repository_regression_suite": ["-m", "pytest", "-q"],
+    }
+    for index, (name, arguments) in enumerate(command_arguments.items()):
+        path = logs / f"{name}.log"
+        path.write_text(f"{name}: passed\n", encoding="utf-8")
+        checks[name] = {
+            "status": "passed",
+            "command": [sys.executable, *arguments],
+            "returncode": 0,
+            "started_at": f"2026-08-27T23:{56 + index:02d}:00+00:00",
+            "completed_at": (
+                "2026-08-28T00:00:00+00:00"
+                if index == 3
+                else f"2026-08-27T23:{57 + index:02d}:00+00:00"
+            ),
+            "log_path": path.relative_to(tmp_path).as_posix(),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    checks["layout_preservation_corpus"]["coverage"] = list(CERTIFICATION_LAYOUT_COVERAGE)
+    checks["deterministic_branch_acceptance_corpus"].update({
+        "assurance": "recorded-drafting-structural-only",
+        "case_ids": list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES),
+    })
+    checks["repository_regression_suite"]["test_count"] = 313
+    path = tmp_path / "preflight.json"
+    path.write_text(json.dumps({
+        "schema_version": "release-certification-preflight/v1",
+        "status": "passed",
+        "completed_at": "2026-08-28T00:00:00+00:00",
+        "candidate": {
+            "package_fingerprint": "candidate-fingerprint",
+            "git_commit": "a" * 40,
+        },
+        "repository_clean": True,
+        "producer": {
+            "path": "tests/hermes_e2e.py",
+            "sha256": hashlib.sha256((ROOT / "tests/hermes_e2e.py").read_bytes()).hexdigest(),
+            "git_commit": "a" * 40,
+        },
+        "checks": checks,
+    }), encoding="utf-8")
+    return path
+
+
+def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_seconds: float = 600.0) -> Path:
+    fixture = certification_fixture(fixture_id)
+    run_dir = tmp_path / fixture_id
+    logs = run_dir / "logs"
+    logs.mkdir(parents=True)
+    revision = run_dir / "revisions/r-test"
+    manifest_path = revision / "delivery-manifest.json"
+    output_dir = run_dir / "output"
+    output_dir.mkdir()
+    (run_dir / "input").mkdir()
+    (run_dir / "reference").mkdir()
+    (run_dir / "input/source-input.md").write_bytes(fixture["artifact_paths"]["source_input"].read_bytes())
+    (run_dir / "reference/source-of-truth.md").write_bytes(fixture["artifact_paths"]["approved_source"].read_bytes())
+    approved_reference = json.loads(fixture["artifact_paths"]["approved_reference"].read_text())
+    bundle = {
+        "identity_sha256": "c" * 64,
+        "layout_preservation_baseline": {"sha256": "d" * 64},
+    }
+    approved_reference["approval"] = {
+        "status": "approved",
+        "approved_by": "Hermes Release Certification",
+        "approved_at": "2026-08-28T00:00:00+00:00",
+        "revision_id": "r-test",
+        "source_sha256": hashlib.sha256((run_dir / "reference/source-of-truth.md").read_bytes()).hexdigest(),
+    }
+    approved_reference["approval"]["governing_sha256"] = drafting.sha256_value(
+        drafting.governing_resources(ROOT, approved_reference, contracted_bundle=bundle)
+    )
+    run_reference = run_dir / "reference/study.reference.json"
+    run_reference.write_text(json.dumps(approved_reference), encoding="utf-8")
+    (revision / "approved-source.md").parent.mkdir(parents=True, exist_ok=True)
+    (revision / "approved-source.md").write_bytes((run_dir / "reference/source-of-truth.md").read_bytes())
+    (revision / "approved-reference.json").write_bytes(run_reference.read_bytes())
+    approved_reference["approval"]["approved_reference_sha256"] = hashlib.sha256(
+        (revision / "approved-reference.json").read_bytes()
+    ).hexdigest()
+    run_reference.write_text(json.dumps(approved_reference), encoding="utf-8")
+    accepted_dir = revision / "hermes/accepted"
+    accepted_requests_dir = revision / "hermes/accepted-requests"
+    accepted_dir.mkdir(parents=True)
+    accepted_requests_dir.mkdir(parents=True)
+    drafting_request = accepted_requests_dir / "draft-1.json"
+    drafting_request.write_text(json.dumps({
+        "request_id": "draft-1",
+        "request_sha256": "3" * 64,
+        "task": "section_drafting",
+    }), encoding="utf-8")
+    accepted_draft = accepted_dir / "protocol.synopsis.json"
+    accepted_draft.write_text(json.dumps({
+        "section_id": "protocol.synopsis",
+        "request_id": "draft-1",
+        "request_sha256": "3" * 64,
+        "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+    }), encoding="utf-8")
+    drafting_evidence = [{
+        "path": accepted_draft.relative_to(revision).as_posix(),
+        "sha256": hashlib.sha256(accepted_draft.read_bytes()).hexdigest(),
+        "request_id": "draft-1",
+        "request_sha256": "3" * 64,
+        "accepted_request_path": drafting_request.relative_to(revision).as_posix(),
+        "accepted_request_file_sha256": hashlib.sha256(drafting_request.read_bytes()).hexdigest(),
+        "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+    }]
+    manifest_outputs = []
+    for name in fixture["expected_outputs"]:
+        output = output_dir / name
+        output.write_bytes(f"delivered {fixture_id} {name}\n".encode())
+        manifest_outputs.append({
+            "path": f"output/{name}",
+            "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+            "bytes": output.stat().st_size,
+        })
+    outputs = [{**item, "confirmed": True} for item in manifest_outputs]
+    verification = {}
+    content_request = revision / "hermes/verification-requests/content.json"
+    content_response = revision / "hermes/verification-responses/content.json"
+    content_response.parent.mkdir(parents=True)
+    content_request.parent.mkdir(parents=True)
+    content_request.write_text(json.dumps({
+        "request_id": "content",
+        "request_sha256": "1" * 64,
+        "task": "clinical_content_verification",
+    }), encoding="utf-8")
+    content_response.write_text(json.dumps({
+        "request_id": "content",
+        "request_sha256": "1" * 64,
+        "task": "clinical_content_verification",
+        "status": "passed",
+        "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+        "section_assessments": [{"artifact": "protocol", "section_id": "protocol.title-page", "status": "passed"}],
+        "cross_document_assessments": [{"check": "study_title", "status": "passed"}],
+    }), encoding="utf-8")
+    verification["clinical_content_verification"] = {
+        "request": content_request.relative_to(revision).as_posix(),
+        "request_sha256": hashlib.sha256(content_request.read_bytes()).hexdigest(),
+        "response": content_response.relative_to(revision).as_posix(),
+        "response_sha256": hashlib.sha256(content_response.read_bytes()).hexdigest(),
+    }
+    render_artifacts = []
+    docx_artifacts = {}
+    active_renderer = {"kind": "LibreOffice", "path": "/controlled/soffice"}
+    active_page_renderer = {"kind": "pymupdf", "path": "python:pymupdf"}
+    fonts = {"Arial": {"state": "available", "match": "controlled font inventory"}}
+    for output in manifest_outputs:
+        if not output["path"].endswith(".docx"):
+            continue
+        artifact = Path(output["path"]).stem
+        candidate = revision / f"candidate/{artifact}.docx"
+        pdf = revision / f"rendered/{artifact}.pdf"
+        page = revision / f"rendered/{artifact}/page-1.png"
+        page.parent.mkdir(parents=True)
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        candidate.write_bytes((run_dir / output["path"]).read_bytes())
+        pdf.write_bytes(f"pdf {artifact}\n".encode())
+        page.write_bytes(f"page {artifact}\n".encode())
+        pages = [{
+            "page": 1,
+            "path": page.relative_to(revision).as_posix(),
+            "sha256": hashlib.sha256(page.read_bytes()).hexdigest(),
+        }]
+        render_artifact = {
+            "artifact": artifact,
+            "renderer": active_renderer,
+            "page_renderer": active_page_renderer,
+            "font_evidence": fonts,
+            "font_substitutions": {},
+            "docx": candidate.relative_to(revision).as_posix(),
+            "docx_sha256": output["sha256"],
+            "pdf": pdf.relative_to(revision).as_posix(),
+            "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+            "pages": pages,
+        }
+        render_artifacts.append(render_artifact)
+        visual_request = revision / f"hermes/verification-requests/visual-{artifact}.json"
+        visual_response = revision / f"hermes/verification-responses/visual-{artifact}.json"
+        visual_request.write_text(json.dumps({
+            "request_id": f"visual-{artifact}",
+            "request_sha256": "2" * 64,
+            "task": "rendered_page_visual_verification",
+        }), encoding="utf-8")
+        visual_response.write_text(json.dumps({
+            "request_id": f"visual-{artifact}",
+            "request_sha256": "2" * 64,
+            "task": "rendered_page_visual_verification",
+            "status": "passed",
+            "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+            "page_assessments": [{
+                "artifact": artifact,
+                "page": 1,
+                "sha256": pages[0]["sha256"],
+                "status": "passed",
+                "checks": sorted(CERTIFICATION_VISUAL_CHECKS),
+            }],
+        }), encoding="utf-8")
+        verification[f"visual-{artifact}"] = {
+            "request": visual_request.relative_to(revision).as_posix(),
+            "request_sha256": hashlib.sha256(visual_request.read_bytes()).hexdigest(),
+            "response": visual_response.relative_to(revision).as_posix(),
+            "response_sha256": hashlib.sha256(visual_response.read_bytes()).hexdigest(),
+            "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+            "artifacts": [render_artifact],
+        }
+        docx_artifacts[artifact] = {
+            "status": "passed",
+            "request_sha256": hashlib.sha256(visual_request.read_bytes()).hexdigest(),
+            "response_sha256": hashlib.sha256(visual_response.read_bytes()).hexdigest(),
+            "producer_model_id": "openai-codex/gpt-5.6-sol",
+            "docx_sha256": render_artifact["docx_sha256"],
+            "pdf_sha256": render_artifact["pdf_sha256"],
+            "page_count": 1,
+            "page_sha256": [pages[0]["sha256"]],
+            "checks": sorted(CERTIFICATION_VISUAL_CHECKS),
+        }
+    manifest = {
+        "status": "passed",
+        "revision_id": "r-test",
+        "study_type": fixture["study_type"],
+        "approved_source_sha256": hashlib.sha256((revision / "approved-source.md").read_bytes()).hexdigest(),
+        "approved_reference_sha256": hashlib.sha256((revision / "approved-reference.json").read_bytes()).hexdigest(),
+        "client_outputs": manifest_outputs,
+        "contracted_template_bundle": bundle,
+        "drafting_evidence": drafting_evidence,
+        "quality": {
+            "status": "passed",
+            "render_assurance": {
+                "fonts": fonts,
+                "font_substitutions": {},
+                "structural_validation": {"status": "structurally_valid"},
+                "render": {
+                    "status": "passed",
+                    "renderer": active_renderer,
+                    "page_renderer": active_page_renderer,
+                    "renderer_attempts": [{"adapter": active_renderer, "status": "passed"}],
+                    "page_renderer_attempts": [{"adapter": active_page_renderer, "status": "passed"}],
+                    "artifacts": render_artifacts,
+                },
+            },
+            "verification_evidence": verification,
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    identity = {
+        "package_fingerprint": "candidate-fingerprint",
+        "git_commit": "a" * 40,
+        "hermes_configuration": fixture["hermes_configuration"],
+    }
+    state = logs / "desktop-operation.json"
+    state.write_text(json.dumps({
+        "status": "passed",
+        "started_at": "2026-08-28T00:01:00+00:00",
+        "deadline_at": "2026-08-28T00:31:00+00:00",
+        "budget_seconds": 1800.0,
+        "release_identity": identity,
+        "approval_identity": {
+            key: approved_reference["approval"].get(key)
+            for key in (
+                "status", "approved_by", "approved_at", "revision_id", "source_sha256",
+                "approved_reference_sha256", "governing_sha256",
+            )
+        },
+        "cleanup": {"owned_processes_reaped": True},
+        "result": {
+            "status": "passed",
+            "elapsed_seconds": elapsed_seconds,
+            "manifest": manifest_path.relative_to(run_dir).as_posix(),
+            "delivery": {
+                "confirmed": True,
+                "opened": [
+                    {
+                        "filename": Path(item["path"]).name,
+                        "sha256": item["sha256"],
+                        "bytes": item["bytes"],
+                    }
+                    for item in manifest_outputs
+                ],
+            },
+        },
+    }), encoding="utf-8")
+    report = {
+        "outcome": "passed",
+        "elapsed_seconds": elapsed_seconds,
+        "release_identity": identity,
+        "hermes_configuration": fixture["hermes_configuration"],
+        "input_provenance": {
+            "fixture_id": fixture_id,
+            "synthetic": True,
+            "contains_private_data": False,
+            "fixture_manifest_sha256": hashlib.sha256(
+                (fixture["artifact_paths"]["source_input"].parent / "fixture.json").read_bytes()
+            ).hexdigest(),
+        },
+        "model_identifiers": ["openai-codex/gpt-5.6-sol"],
+        "missing_response_paths": [],
+        "invalid_response_paths": [],
+        "recorded_response_paths": [],
+        "invalid_rejection_paths": [],
+        "required_outputs": fixture["expected_outputs"],
+        "output_evidence": outputs,
+        "desktop_operation_evidence": {
+            "started_at": "2026-08-28T00:01:00+00:00",
+            "deadline_at": "2026-08-28T00:31:00+00:00",
+        },
+        "approval_to_confirmed_retrieval_evidence": {
+            "status": "approved",
+            "approved_by": "Hermes Release Certification",
+            "approved_at": "2026-08-28T00:00:00+00:00",
+            "revision_id": "r-test",
+            "source_sha256": hashlib.sha256((revision / "approved-source.md").read_bytes()).hexdigest(),
+            "approved_reference_sha256": approved_reference["approval"]["approved_reference_sha256"],
+            "governing_sha256": approved_reference["approval"]["governing_sha256"],
+            "confirmed_retrieval_at": (
+                datetime.fromisoformat("2026-08-28T00:01:00+00:00")
+                + timedelta(seconds=elapsed_seconds)
+            ).isoformat(),
+            "elapsed_seconds": round(60.0 + elapsed_seconds, 3),
+        },
+        "bound_evidence": {
+            "desktop_operation_state": {
+                "path": "logs/desktop-operation.json",
+                "sha256": hashlib.sha256(state.read_bytes()).hexdigest(),
+                "bytes": state.stat().st_size,
+            },
+            "delivery_manifest": {
+                "path": "revisions/r-test/delivery-manifest.json",
+                "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                "bytes": manifest_path.stat().st_size,
+            },
+        },
+        "certification_case_evidence": {
+            "fixture_id": fixture_id,
+            "gate_statuses": {
+                "source": "passed",
+                "content": "passed",
+                "document_structure": "passed",
+                "prs_xml": "not_applicable" if fixture_id == "retrospective" else "passed",
+                "package": "passed",
+                "cross_document_consistency": "passed",
+                "render_assurance": "passed",
+                "every_page_visual_qa": "passed",
+                "delivery_confirmation": "passed",
+            },
+            "layout_checks": {
+                "natural_section_3_flow": "passed",
+                "no_orphan_headings": "passed",
+            },
+            "visual_qa": docx_artifacts,
+            "contracted_template_bundle_identity": "c" * 64,
+            "layout_preservation_baseline_identity": "d" * 64,
+        },
+    }
+    path = logs / "hermes-integration-report.json"
+    path.write_text(json.dumps(report), encoding="utf-8")
+    return path
+
+
+def _use_controlled_certified_release(monkeypatch) -> Path:
+    class ControlledWorkflow:
+        SCRIPT_DIR = Path("/controlled/immutable/release/scripts")
+
+        @staticmethod
+        def verification_response_is_complete(_revision_dir, _request_path):
+            return True
+
+        @staticmethod
+        def missing_drafts(_revision_dir, _reference, _repo_root, *, contracted_bundle):
+            governing = drafting.governing_resources(
+                ROOT,
+                _reference,
+                contracted_bundle=contracted_bundle,
+            )
+            return [] if governing["approved_source_sha256"] else ["approval.source_sha256"]
+
+        _approval_valid = staticmethod(workflow._approval_valid)
+
+    monkeypatch.setattr(
+        "hermes_e2e._certified_release",
+        lambda _release_root: (
+            ControlledWorkflow,
+            {"package_fingerprint": "candidate-fingerprint", "git_commit": "a" * 40},
+        ),
+    )
+    return Path("/controlled/immutable/release")
+
+
+def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    assert result["status"] == "passed"
+    assert result["certification_scope"] == "complete_three_case_corpus"
+    assert result["case_order"] == list(CERTIFICATION_CORPUS)
+    assert all(case["status"] == "passed" for case in result["cases"])
+    assert all(case["under_15_minutes"] is True for case in result["cases"])
+    assert result["release_identity"] == {
+        "package_fingerprint": "candidate-fingerprint",
+        "git_commit": "a" * 40,
+    }
+
+
+def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(
+            tmp_path,
+            fixture_id,
+            elapsed_seconds=900.0 if fixture_id == "prospective-advarra" else 600.0,
+        )
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    assert result["status"] == "failed"
+    assert [case["fixture_id"] for case in result["cases"]] == list(CERTIFICATION_CORPUS)
+    assert next(case for case in result["cases"] if case["fixture_id"] == "prospective-advarra")["status"] == "failed"
+    assert any("not below 900 seconds" in finding for finding in result["findings"])
+
+
+def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(
+            tmp_path,
+            fixture_id,
+            elapsed_seconds=840.0 if fixture_id == "ambispective-sterling" else 600.0,
+        )
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    first = result["cases"][0]
+    assert result["status"] == "failed"
+    assert first["desktop_operation_elapsed_seconds"] == 840.0
+    assert first["elapsed_seconds"] == 900.0
+    assert first["under_15_minutes"] is False
+    assert any("Approval-to-confirmed-retrieval" in finding for finding in first["findings"])
+
+
+def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(
+            tmp_path,
+            fixture_id,
+            elapsed_seconds=840.0 if fixture_id == "ambispective-sterling" else 600.0,
+        )
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    report = json.loads(reports[0].read_text())
+    run_dir = reports[0].parent.parent
+    snapshot_path = run_dir / "revisions/r-test/approved-reference.json"
+    snapshot = json.loads(snapshot_path.read_text())
+    snapshot["approval"]["approved_at"] = "2026-08-28T00:01:00+00:00"
+    snapshot_path.write_text(json.dumps(snapshot), encoding="utf-8")
+    forged_snapshot_sha = hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+    manifest_path = run_dir / "revisions/r-test/delivery-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["approved_reference_sha256"] = forged_snapshot_sha
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    report["bound_evidence"]["delivery_manifest"].update({
+        "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+        "bytes": manifest_path.stat().st_size,
+    })
+    report["approval_to_confirmed_retrieval_evidence"].update({
+        "approved_at": "2026-08-28T00:01:00+00:00",
+        "approved_reference_sha256": forged_snapshot_sha,
+        "elapsed_seconds": 840.0,
+    })
+    reports[0].write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    first = result["cases"][0]
+    assert result["status"] == "failed"
+    assert first["status"] == "failed"
+    assert any("immutable revision" in finding for finding in first["findings"])
+
+
+def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_path: Path, monkeypatch) -> None:
+    fixtures = [
+        {"fixture_id": fixture_id, "hermes_configuration": {}}
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    launched: list[str] = []
+    git_outputs = iter(["a" * 40 + "\n", ""])
+    monkeypatch.setattr(hermes_e2e, "_certified_release", lambda _root: (
+        object(),
+        {"package_fingerprint": "candidate-fingerprint", "git_commit": "a" * 40},
+    ))
+    monkeypatch.setattr(hermes_e2e, "_preflight_evidence", lambda *_args, **_kwargs: ({}, []))
+    monkeypatch.setattr(hermes_e2e.subprocess, "run", lambda *_args, **_kwargs: subprocess.CompletedProcess(
+        args=[], returncode=0, stdout=next(git_outputs), stderr="",
+    ))
+    monkeypatch.setattr(hermes_e2e, "certification_corpus", lambda **_kwargs: fixtures)
+    monkeypatch.setattr(hermes_e2e, "prepare_certification_run", lambda fixture_id, *_args, **_kwargs: launched.append(f"prepare:{fixture_id}"))
+
+    def slow_operation(run_dir, **_kwargs):
+        launched.append(f"run:{run_dir.name}")
+        return {
+            "outcome": "passed",
+            "elapsed_seconds": 899.0,
+            "approval_to_confirmed_retrieval_evidence": {"elapsed_seconds": 900.0},
+        }
+
+    monkeypatch.setattr(hermes_e2e, "run_release_certification_operation", slow_operation)
+    monkeypatch.setattr(hermes_e2e, "certify_release_corpus", lambda paths, **_kwargs: {
+        "attempted_reports": [path.parent.parent.name for path in paths],
+    })
+
+    result = run_release_certification_corpus(
+        release_root=tmp_path / "release",
+        run_root=tmp_path / "runs",
+        preflight_path=tmp_path / "preflight.json",
+    )
+
+    assert launched == ["prepare:ambispective-sterling", "run:ambispective-sterling"]
+    assert result["attempted_reports"] == ["ambispective-sterling"]
+
+
+def test_corpus_reducer_rehashes_actual_outputs_and_rejects_unauthorized_gate_waivers(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    (tmp_path / "prospective-advarra/output/protocol.docx").write_bytes(b"mutated after delivery")
+    retrospective = json.loads(reports[-1].read_text())
+    retrospective["certification_case_evidence"]["gate_statuses"]["content"] = "not_applicable"
+    reports[-1].write_text(json.dumps(retrospective), encoding="utf-8")
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    assert result["status"] == "failed"
+    assert any("Delivered bytes do not match" in finding for finding in result["findings"])
+    assert any("unauthorized not-applicable" in finding for finding in result["findings"])
+
+
+def test_corpus_reducer_requires_governed_preflight_layout_and_chronology(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    payload = json.loads(preflight.read_text())
+    payload["producer"]["sha256"] = "0" * 64
+    payload["checks"]["layout_preservation_corpus"]["coverage"] = ["Prospective/Advarra"]
+    payload["completed_at"] = "not-a-timestamp"
+    preflight.write_text(json.dumps(payload), encoding="utf-8")
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    assert result["status"] == "failed"
+    assert any("exact certification harness" in finding for finding in result["findings"])
+    assert any("every Protocol and ICF layout family" in finding for finding in result["findings"])
+    assert any("completion timestamp is invalid" in finding for finding in result["findings"])
+
+
+def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    report = json.loads(reports[0].read_text())
+    report["model_identifiers"] = ["openai-codex/gpt-FORGED"]
+    for item in report["certification_case_evidence"]["visual_qa"].values():
+        item["page_sha256"] = ["0" * 64 for _ in item["page_sha256"]]
+    reports[0].write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports,
+        release_root=release_root,
+        preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert any("model identifiers do not match" in finding for finding in result["findings"])
+    assert any("Visual QA summary does not match" in finding for finding in result["findings"])
+    assert result["cases"][0]["model_identifiers"] == ["openai-codex/gpt-5.6-sol"]
+    assert all(
+        digest != "0" * 64
+        for item in result["cases"][0]["visual_qa"].values()
+        for digest in item["page_sha256"]
+    )
+
+
+def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tmp_path: Path, monkeypatch) -> None:
+    class RejectingWorkflow:
+        SCRIPT_DIR = Path("/controlled/immutable/release/scripts")
+
+        @staticmethod
+        def verification_response_is_complete(_revision_dir, _request_path):
+            return False
+
+        @staticmethod
+        def missing_drafts(_revision_dir, _reference, _repo_root, *, contracted_bundle):
+            governing = drafting.governing_resources(
+                ROOT,
+                _reference,
+                contracted_bundle=contracted_bundle,
+            )
+            return [] if governing["approved_source_sha256"] else ["approval.source_sha256"]
+
+        _approval_valid = staticmethod(workflow._approval_valid)
+
+    monkeypatch.setattr(
+        "hermes_e2e._certified_release",
+        lambda _release_root: (
+            RejectingWorkflow,
+            {"package_fingerprint": "candidate-fingerprint", "git_commit": "a" * 40},
+        ),
+    )
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    report = json.loads(reports[0].read_text())
+    state_path = reports[0].parent / "desktop-operation.json"
+    state = json.loads(state_path.read_text())
+    state["result"]["elapsed_seconds"] = 1000.0
+    state["result"]["delivery"]["opened"] = []
+    state_path.write_text(json.dumps(state), encoding="utf-8")
+    report["bound_evidence"]["desktop_operation_state"].update({
+        "sha256": hashlib.sha256(state_path.read_bytes()).hexdigest(),
+        "bytes": state_path.stat().st_size,
+    })
+    reports[0].write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports,
+        release_root=Path("/controlled/immutable/release"),
+        preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert any("persisted Desktop operation" in finding for finding in result["findings"])
+    assert any("opener confirmation" in finding for finding in result["findings"])
+    assert any("Independent content" in finding for finding in result["findings"])
+
+
 def test_repository_certification_fixture_prepares_an_independent_approved_run(tmp_path: Path) -> None:
     run_dir = tmp_path / "run"
 
@@ -100,6 +827,20 @@ def test_repository_certification_fixture_prepares_an_independent_approved_run(t
     assert provenance["fixture_id"] == "ambispective-sterling"
     assert provenance["synthetic"] is True
     assert provenance["status"] == "approved_normalization"
+    assert provenance["review_status"] == "approved for release certification"
+    assert provenance["contains_private_data"] is False
+    assert provenance["expected_outputs"] == ["icf.docx", "protocol.docx", "study.xml"]
+    assert provenance["fixture_manifest_sha256"] == hashlib.sha256(
+        (ROOT / "tests/fixtures/release-certification/ambispective-sterling/fixture.json").read_bytes()
+    ).hexdigest()
+    assert provenance["hermes_configuration_sha256"] == hashlib.sha256(
+        json.dumps(
+            certification_fixture("ambispective-sterling")["hermes_configuration"],
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode()
+    ).hexdigest()
 
 
 def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: Path) -> None:
