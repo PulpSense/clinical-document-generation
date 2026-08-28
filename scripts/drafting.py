@@ -668,6 +668,34 @@ def _fixed_outcome_is_authorized(item: Mapping[str, Any], contract: Mapping[str,
     )
 
 
+def _cross_section_duplicate_pairs(
+    records: Iterable[tuple[str, Mapping[str, Any], Mapping[str, Any]]],
+) -> list[tuple[str, str]]:
+    """Return section pairs that repeat non-boilerplate prose of eight words or more."""
+    seen: dict[str, tuple[str, bool]] = {}
+    duplicate_pairs: set[tuple[str, str]] = set()
+    for section_id, item, contract in records:
+        for text, evidence_refs, boilerplate_refs in _raw_content_items(item):
+            key = _normalized_prose(text)
+            if len(key.split()) < 8:
+                continue
+            authorized_boilerplate = _is_authorized_boilerplate_content(
+                text,
+                evidence_refs,
+                boilerplate_refs,
+                contract,
+            )
+            prior = seen.get(key)
+            if prior is None:
+                seen[key] = (section_id, authorized_boilerplate)
+                continue
+            prior_section, prior_boilerplate = prior
+            if prior_section == section_id or (prior_boilerplate and authorized_boilerplate):
+                continue
+            duplicate_pairs.add(tuple(sorted((prior_section, section_id))))
+    return sorted(duplicate_pairs)
+
+
 def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
@@ -754,34 +782,20 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 "issue": "The section contract does not authorize the fixed_boilerplate outcome or the returned content is not its exact authorized boilerplate.",
                 "next_action": "Use the exact listed Fixed Clinical Boilerplate with its matching boilerplate reference, or return an authorized agent draft.",
             })
-    seen_content: dict[str, tuple[str, bool]] = {}
-    for item in results:
-        if not isinstance(item, Mapping):
-            continue
-        section_id = str(item.get("section_id") or "")
-        contract = expected_contracts.get(section_id, {})
-        for text, evidence_refs, boilerplate_refs in _raw_content_items(item):
-            key = _normalized_prose(text)
-            authorized_boilerplate = _is_authorized_boilerplate_content(
-                text, evidence_refs, boilerplate_refs, contract
-            )
-            prior = seen_content.get(key)
-            if (
-                len(key.split()) >= 8
-                and prior
-                and prior[0] != section_id
-                and not (prior[1] and authorized_boilerplate)
-            ):
-                prior_section = prior[0]
-                findings.append({
-                    "category": "drafting",
-                    "field": section_id,
-                    "target_ids": sorted({prior_section, section_id}),
-                    "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
-                    "next_action": "Rewrite each target with independent source-grounded prose.",
-                })
-            elif len(key.split()) >= 8 and not prior:
-                seen_content[key] = (section_id, authorized_boilerplate)
+    duplicate_records = (
+        (section_id, item, expected_contracts[section_id])
+        for item in results
+        if isinstance(item, Mapping)
+        and (section_id := str(item.get("section_id") or "")) in expected_contracts
+    )
+    for prior_section, section_id in _cross_section_duplicate_pairs(duplicate_records):
+        findings.append({
+            "category": "drafting",
+            "field": section_id,
+            "target_ids": [prior_section, section_id],
+            "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
+            "next_action": "Rewrite each target with independent source-grounded prose.",
+        })
     if findings:
         return None, findings
     accepted: list[dict[str, Any]] = []
@@ -1024,6 +1038,42 @@ def merged_drafts(
         icf[section.section_id] = draft or {}
     prs = accepted_prs_record(revision_dir, expected_governing).get("narrative", {})
     return {"protocol": protocol, "icf": icf, "prs": prs}
+
+
+def accepted_cross_section_duplicate_findings(
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    expected_governing: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Find authenticated Protocol prose collisions before candidate rendering."""
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    records: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
+    for section in protocol_contract(branch):
+        draft = accepted_draft(revision_dir, section.section_id, expected_governing)
+        if draft is None:
+            continue
+        request = _read_json(
+            revision_dir / "hermes/accepted-requests" / f"{draft['request_id']}.json"
+        )
+        contract = next(
+            (
+                item for item in request.get("section_contracts") or []
+                if isinstance(item, Mapping) and item.get("section_id") == section.section_id
+            ),
+            {},
+        )
+        records.append((section.section_id, draft, contract))
+    return [
+        {
+            "category": "content",
+            "field": current,
+            "target_ids": [prior, current],
+            "issue": f"Exact prose is duplicated across authenticated Protocol sections {prior} and {current} before rendering.",
+            "recovery_class": "drafting_defect",
+            "action": "retry_drafting_target",
+        }
+        for prior, current in _cross_section_duplicate_pairs(records)
+    ]
 
 
 def retry_attempts(findings: Iterable[Mapping[str, Any]], prior: Mapping[str, int]) -> tuple[dict[str, int], list[dict[str, Any]]]:
@@ -1299,7 +1349,7 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
-    "MAX_ATTEMPTS", "accepted_draft", "create_drafting_request", "ingest_responses",
+    "MAX_ATTEMPTS", "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
     "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
     "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
 ]

@@ -9,7 +9,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from pypdf import PdfWriter
 
 from contracts import batch_plan, contracted_template_bundle
-from drafting import accepted_draft, create_drafting_request, governing_resources, ingest_responses, pending_requests, recorded_acceptance_response, response_template, retry_attempts, schedule_requests, sha256_value, validate_response
+from drafting import accepted_cross_section_duplicate_findings, accepted_draft, create_drafting_request, governing_resources, ingest_responses, pending_requests, recorded_acceptance_response, response_template, retry_attempts, schedule_requests, sha256_value, validate_response
 from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS, create_verification_requests, deterministic_content_check, validate_verifications, verification_request_sha256
 from contracts import icf_retained_sections
 from rendering import audit_docx
@@ -104,6 +104,90 @@ def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp
     duplicate_findings = [item for item in findings if "duplicated across separately contracted" in item["issue"]]
     assert duplicate_findings
     assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures", "study-procedure.visits"]
+
+
+def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp_path):
+    reference = fixture()
+    for batch_id, section_id in (
+        ("protocol-foundations", "objectives"),
+        ("protocol-operations", "study-procedure.measurements"),
+    ):
+        batch = next(item for item in batch_plan("Prospective") if item.batch_id == batch_id)
+        path = create_drafting_request(
+            repo_root=ROOT,
+            revision_dir=tmp_path,
+            revision_id="r-cross-batch-duplicate",
+            reference=reference,
+            batch=batch,
+            attempts={item: 1 for item in batch.section_ids},
+            wave="initial",
+        )
+        request = json.loads(path.read_text(encoding="utf-8"))
+        response = recorded_acceptance_response(request)
+        target = next(item for item in response["section_results"] if item["section_id"] == section_id)
+        target["paragraphs"].append({
+            "text": "The approved hypothesis states that prospective monitoring will describe recovery.",
+            "evidence_refs": ["source:study.hypothesis"],
+            "boilerplate_refs": [],
+        })
+        response_path = tmp_path / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    governing = governing_resources(ROOT, reference)
+    assert ingest_responses(tmp_path, governing) == []
+
+    findings = accepted_cross_section_duplicate_findings(tmp_path, reference, governing)
+
+    assert len(findings) == 1
+    assert findings[0]["target_ids"] == ["objectives", "study-procedure.measurements"]
+    assert findings[0]["recovery_class"] == "drafting_defect"
+    assert findings[0]["action"] == "retry_drafting_target"
+
+
+def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    approval = approve(run_dir, approved_by="reviewer")
+    revision_dir = run_dir / "revisions" / approval["revision_id"]
+    shared_text = "The approved hypothesis states that prospective monitoring will describe recovery."
+
+    drafting = generate(run_dir)
+    for relative in drafting["requests"]:
+        request = json.loads((revision_dir / relative).read_text(encoding="utf-8"))
+        response = recorded_acceptance_response(request)
+        for result in response.get("section_results", []):
+            if result["section_id"] in {"objectives", "study-procedure.measurements"}:
+                result["paragraphs"].append({
+                    "text": shared_text,
+                    "evidence_refs": ["source:study.hypothesis"],
+                    "boilerplate_refs": [],
+                })
+        response_path = revision_dir / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    dependent = generate(run_dir)
+    for relative in dependent["requests"]:
+        request = json.loads((revision_dir / relative).read_text(encoding="utf-8"))
+        response_path = revision_dir / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(recorded_acceptance_response(request)), encoding="utf-8")
+
+    monkeypatch.setattr(
+        workflow,
+        "render_documents",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("rendered too early")),
+    )
+    result = generate(run_dir)
+
+    assert result["status"] == "awaiting_hermes"
+    assert result["stage"] == "drafting_retry"
+    assert {item["field"] for item in result["findings"]} == {"study-procedure.measurements"}
+    assert not (revision_dir / "candidate").exists()
 
 
 def test_fixed_boilerplate_outcome_cannot_bypass_duplicate_prose_gate(tmp_path):

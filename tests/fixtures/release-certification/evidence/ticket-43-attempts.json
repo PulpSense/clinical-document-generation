@@ -165,6 +165,51 @@
         "owned_processes_reaped": true,
         "late_responses_ignored": true
       }
+    },
+    {
+      "id": "pre-render-cross-batch-prose-collision",
+      "classification": "rejected_candidate",
+      "outcome": "failed_second_real_case_slow",
+      "candidate_git_commit": "c6339e82f94d5c023ca438b829bd940ac19523f1",
+      "candidate_package_fingerprint": "3f0c9c2a3b613018b9f9e54f117a1bcf9e60096b84b4ea9cbd4ba34b52b8d482",
+      "candidate_archive_sha256": "db6567dfd3fc7c79021c29c6a74763997220f41eca5d9a7ddc177d55b662de8b",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "b9d3447431ad208667229f7ca420c35465dd486cf6ceeebabc504978a1d70806",
+      "repository_regression_test_count": 328,
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 598.511,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 598.605,
+        "under_15_minutes": true,
+        "case_report_sha256": "e9fc9472537802ab0cfb87cb3156e6dacdbe5172426709ed306cccbdd3067105"
+      },
+      "failed_case": {
+        "fixture_id": "prospective-advarra",
+        "operation_outcome": "non-certifying-runtime",
+        "desktop_operation_elapsed_seconds": 931.621,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 931.766,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "all_quality_gates_passed": true,
+        "delivery_confirmed": true,
+        "case_report_sha256": "26a27293062aed0c00859997f43a19c01caa93b213815408c2915ee334cf7101",
+        "desktop_operation_state_sha256": "84042c6085e58a62845299279114763d3e24e5c1fe046dbc3efa2e5637ab8094",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 6,
+          "protocol_pages": 9,
+          "checks_per_page": 14,
+          "producer_model_id": "desktop-parent/gpt-5.6-sol"
+        }
+      },
+      "finding": "Two exact source-grounded paragraphs were independently repeated across the Objectives and Study Methods and Measurements batches. The deterministic collision was discovered only after the first candidate render and independent verification wave, forcing a 116.636-second localized drafting retry and a second complete quality wave.",
+      "measured_fix": "Detect exact prose collisions across all authenticated accepted Protocol drafts before candidate rendering and route only the colliding section targets through the existing governed drafting-retry policy.",
+      "corpus_report_sha256": "1d0fd64609ea4020dcfe1d4bcf7d4a04bed15db8183d864466f4c915fc893d31",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
     }
   ]
 }

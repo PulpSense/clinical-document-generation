@@ -112,9 +112,14 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
         "failed_first_real_case",
         "failed_second_real_case",
         "failed_third_real_case",
+        "failed_second_real_case_slow",
     ]
     assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
-    assert ledger["attempts"][-1]["failed_case"]["final_content_response_sha256"] == (
+    retrospective_attempt = next(
+        attempt for attempt in ledger["attempts"]
+        if attempt["id"] == "retrospective-objectives-and-canonical-reference-identity"
+    )
+    assert retrospective_attempt["failed_case"]["final_content_response_sha256"] == (
         "f1a3207d7a7cd770e3689ce12152d8d5c96de4d491c14399dcb38bcfe3dafe28"
     )
     assert "/tmp/" not in path.read_text(encoding="utf-8")

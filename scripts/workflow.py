@@ -29,7 +29,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
-from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
+from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
@@ -2372,6 +2372,26 @@ def generate(
     if created or pending: return _awaiting(revision_dir, stage="drafting", paths=pending or created)
     missing = missing_drafts(revision_dir, reference, SCRIPT_DIR.parent, contracted_bundle=bundle)
     if missing: return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
+    duplicate_findings = accepted_cross_section_duplicate_findings(
+        revision_dir,
+        reference,
+        expected_governing,
+    )
+    if duplicate_findings:
+        return _quality_retry(
+            run_dir,
+            reference_path,
+            working_reference,
+            reference,
+            revision_dir,
+            attempts,
+            duplicate_findings,
+            "pre_render_content",
+            contracted_bundle=bundle,
+            operation_deadline=operation_deadline,
+            clock=clock,
+            stage_observer=stage_observer,
+        )
 
     observe_stage("drafting")
     model = merged_drafts(revision_dir, reference, expected_governing)
