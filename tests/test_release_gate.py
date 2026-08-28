@@ -5,6 +5,7 @@ from docx import Document
 
 from contracts import contracted_template_bundle
 from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS
+import quality
 from rendering import template_paths
 from workflow import run_release_gate
 import workflow
@@ -13,8 +14,18 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _require_renderer():
+def _require_renderer(monkeypatch):
     assert workflow.renderer() is not None
+    monkeypatch.setattr(
+        quality,
+        "page_renderers",
+        lambda **_kwargs: [{
+            "kind": "pypdfium2",
+            "path": "python:pypdfium2",
+            "module": "pypdfium2",
+            "source": "pinned test dependency",
+        }],
+    )
 
 
 def acceptance_verification(request):
@@ -56,7 +67,7 @@ def _section_geometry(document: Document) -> tuple[tuple[int | None, ...], ...]:
 
 
 def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch):
-    _require_renderer()
+    _require_renderer(monkeypatch)
     report = run_release_gate(ROOT, verification_responder=acceptance_verification)
     assert report["status"] == "structural_passed"
     assert report["assurance"] == "synthetic-structural-only"
@@ -110,15 +121,15 @@ def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch)
 
 
 def test_recorded_drafting_keeps_release_gate_assurance_structural_with_external_verification(monkeypatch):
-    _require_renderer()
+    _require_renderer(monkeypatch)
     report = run_release_gate(ROOT, verification_responder=external_verification)
 
     assert report["status"] == "structural_passed"
     assert report["assurance"] == "recorded-drafting-structural-only"
 
 
-def test_controlled_release_adapter_drives_the_complete_desktop_operation(tmp_path):
-    _require_renderer()
+def test_controlled_release_adapter_drives_the_complete_desktop_operation(tmp_path, monkeypatch):
+    _require_renderer(monkeypatch)
     run_dir = tmp_path / "controlled-retrospective"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)

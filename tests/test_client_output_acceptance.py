@@ -2059,7 +2059,15 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path):
         output = tmp_path / f"{reference['meta']['study_type']}-{icf_family or 'none'}"
 
         document_report = render_documents(ROOT, output, reference, {"protocol": [], "icf": {}, "prs": {}})
-        render_report = render_pages(output)
+        render_report = render_pages(
+            output,
+            page_renderer_identities=[{
+                "kind": "pypdfium2",
+                "path": "python:pypdfium2",
+                "module": "pypdfium2",
+                "source": "pinned test dependency",
+            }],
+        )
 
         assert document_report["status"] == "passed"
         assert render_report["status"] == "passed"
@@ -2235,7 +2243,15 @@ def test_rendered_ambispective_section_three_flows_after_investigator_agreement(
     reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
     render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
 
-    report = render_pages(tmp_path)
+    report = render_pages(
+        tmp_path,
+        page_renderer_identities=[{
+            "kind": "pypdfium2",
+            "path": "python:pypdfium2",
+            "module": "pypdfium2",
+            "source": "pinned test dependency",
+        }],
+    )
 
     assert report["status"] == "passed"
     protocol = next(item for item in report["artifacts"] if item["artifact"] == "protocol")

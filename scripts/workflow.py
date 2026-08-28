@@ -2693,7 +2693,11 @@ def generate(
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
 
         observe_stage("candidate")
-        remaining = 180.0 if operation_deadline is None else operation_deadline - clock()
+        remaining = (
+            DESKTOP_OPERATION_BUDGET_SECONDS
+            if operation_deadline is None
+            else operation_deadline - clock()
+        )
         if remaining <= 0:
             return {
                 "status": "timeout",
@@ -2728,7 +2732,7 @@ def generate(
             candidate_font_substitutions=font_substitutions,
             rebuild_candidate=rebuild_with_substitutions,
             artifact_names=partial_repair or None,
-            deadline_seconds=min(180.0, remaining),
+            deadline_seconds=remaining,
             deadline_monotonic=operation_deadline,
             clock=clock,
         )
