@@ -65,7 +65,9 @@ replaces the active `clinical-document-generation` directory. A failed smoke
 leaves the previous verified release active. The archive contains
 `RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
 also requires Hermes `skills.external_dirs` to name only the promoted active
-path and records the activation in `PROMOTION-RECORD.json`. The manifest
+path, validates the certified model/reasoning/safe-mode/turn settings declared
+under `skills.clinical_document_generation`, and records the activation in
+`PROMOTION-RECORD.json`. The manifest
 hashes every packaged file and records implementation, template, contract,
 font, renderer, harness, and model provenance. It excludes development
 environments, credentials, source/patient data, old runs, and tests.

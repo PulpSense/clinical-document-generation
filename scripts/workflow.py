@@ -60,6 +60,31 @@ PDF_PAGE_RENDERER = {
     "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
     "platform": "macosx_13_0_arm64",
 }
+PRODUCTION_MODULES = {
+    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
+}
+CERTIFIED_HERMES_CONFIGURATION = {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": True,
+    "model_identifier": "gpt-5.6-sol",
+    "reasoning_configuration": "Hermes Desktop governed default",
+}
+CERTIFICATION_CASE_ORDER = (
+    "retrospective", "ambispective-sterling", "prospective-advarra",
+)
+CERTIFICATION_GATES = {
+    "source", "content", "document_structure", "prs_xml", "package",
+    "cross_document_consistency", "render_assurance", "every_page_visual_qa",
+    "delivery_confirmation",
+}
+CERTIFICATION_VISUAL_CHECKS = {
+    "artificial_pagination", "bad_table_split", "blank_page", "clipping",
+    "duplicate_section", "excessive_whitespace", "footer_collision",
+    "inconsistent_style", "missing_header_footer", "orphan_heading",
+    "overflow", "overlap", "toc_mismatch", "unreadable_text",
+}
 
 
 class OperationDeadlineExpired(RuntimeError):
@@ -259,9 +284,24 @@ def _package_release_tree(
     output_path = output_path.expanduser().resolve()
     if output_path == repo_root or repo_root in output_path.parents:
         raise ValueError("Release archive must be outside the skill repository.")
+    actual_modules = {path.name for path in (repo_root / "scripts").glob("*.py")}
+    if actual_modules != PRODUCTION_MODULES:
+        raise ValueError(
+            "Release packaging requires exactly the six production Python modules: "
+            + ", ".join(sorted(PRODUCTION_MODULES))
+        )
+    exact_files = {"SKILL.md", "README.md", "CONTEXT.md", "requirements.txt", "agents/openai.yaml"}
     files = [
         path for path in sorted(repo_root.rglob("*"))
-        if path.is_file() and not _release_excluded(path.relative_to(repo_root))
+        if path.is_file()
+        and (
+            path.relative_to(repo_root).as_posix() in exact_files
+            or path.relative_to(repo_root).parts[0] in {"assets", "references"}
+            or (
+                path.relative_to(repo_root).parts[0] == "scripts"
+                and path.name in PRODUCTION_MODULES
+            )
+        )
     ]
     if not files:
         raise ValueError("No release files were found.")
@@ -298,7 +338,7 @@ def _package_release_tree(
         raise ValueError(
             "The pinned pypdfium2 wheel is missing or does not match its governed hash."
         )
-    implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
+    implementation_files = sorted(f"scripts/{name}" for name in PRODUCTION_MODULES)
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
         "git_commit": git_commit,
@@ -505,7 +545,9 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
         return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": f"A valid embedded Release Certification report is required: {exc}"}]
     identity = report.get("release_identity") or {}
     cases = report.get("cases") or []
-    required_cases = {"retrospective", "ambispective-sterling", "prospective-advarra"}
+    case_order = report.get("case_order") or []
+    configuration = report.get("hermes_configuration") or {}
+    configuration_sha256 = sha256_value(configuration)
     valid = (
         report.get("schema_version") == "release-certification-corpus/v1"
         and report.get("status") == "passed"
@@ -513,19 +555,107 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
         and not report.get("findings")
         and identity.get("package_fingerprint") == manifest.get("package_fingerprint")
         and identity.get("git_commit") == manifest.get("git_commit")
-        and bool(report.get("preflight_evidence_sha256"))
-        and {case.get("fixture_id") for case in cases} == required_cases
-        and all(
-            case.get("status") == "passed"
-            and case.get("release_identity") == identity
-            and len(str(case.get("hermes_configuration_sha256") or "")) == 64
-            and bool(case.get("model_identifiers"))
-            for case in cases
-        )
+        and len(str(report.get("preflight_evidence_sha256") or "")) == 64
+        and bool(report.get("layout_preservation_evidence"))
+        and bool(report.get("completed_at"))
+        and configuration == CERTIFIED_HERMES_CONFIGURATION
+        and tuple(case_order) == CERTIFICATION_CASE_ORDER
+        and tuple(case.get("fixture_id") for case in cases) == CERTIFICATION_CASE_ORDER
     )
+    for case in cases:
+        fixture_id = str(case.get("fixture_id") or "")
+        outputs = case.get("output_evidence") or []
+        expected_outputs = (
+            {"output/protocol.docx"}
+            if fixture_id == "retrospective"
+            else {"output/protocol.docx", "output/icf.docx", "output/study.xml"}
+        )
+        output_by_path = {str(item.get("path") or ""): item for item in outputs}
+        visual = case.get("visual_qa") or {}
+        expected_visual = {Path(path).stem for path in expected_outputs if path.endswith(".docx")}
+        try:
+            elapsed = float(case.get("elapsed_seconds"))
+            desktop_elapsed = float(case.get("desktop_operation_elapsed_seconds"))
+        except (TypeError, ValueError):
+            elapsed = desktop_elapsed = -1.0
+        runtime_valid = (
+            0.0 < elapsed < 900.0
+            if fixture_id == "retrospective"
+            else 0.0 < elapsed <= 1080.0
+        )
+        output_valid = (
+            set(output_by_path) == expected_outputs
+            and all(
+                item.get("confirmed") is True
+                and int(item.get("bytes") or 0) > 0
+                and len(str(item.get("sha256") or "")) == 64
+                for item in output_by_path.values()
+            )
+        )
+        visual_valid = (
+            set(visual) == expected_visual
+            and all(
+                item.get("status") == "passed"
+                and int(item.get("page_count") or 0) > 0
+                and int(item.get("page_count") or 0) == len(item.get("page_sha256") or [])
+                and all(len(str(digest)) == 64 for digest in item.get("page_sha256") or [])
+                and set(item.get("checks") or []) == CERTIFICATION_VISUAL_CHECKS
+                and len(str(item.get("request_sha256") or "")) == 64
+                and len(str(item.get("response_sha256") or "")) == 64
+                and len(str(item.get("pdf_sha256") or "")) == 64
+                and len(str(item.get("docx_sha256") or "")) == 64
+                and item.get("docx_sha256") == output_by_path.get(f"output/{artifact}.docx", {}).get("sha256")
+                for artifact, item in visual.items()
+            )
+        )
+        render_assurance_evidence = case.get("render_assurance") or {}
+        expected_gate_statuses = {gate: "passed" for gate in CERTIFICATION_GATES}
+        if fixture_id == "retrospective":
+            expected_gate_statuses["prs_xml"] = "not_applicable"
+        valid = valid and all((
+            case.get("status") == "passed",
+            not case.get("findings"),
+            case.get("release_identity") == identity,
+            case.get("hermes_configuration_sha256") == configuration_sha256,
+            set(case.get("model_identifiers") or []) == {CERTIFIED_HERMES_CONFIGURATION["model_identifier"]},
+            len(str(case.get("report_sha256") or "")) == 64,
+            runtime_valid,
+            desktop_elapsed > 0.0,
+            case.get("within_approved_runtime") is True,
+            output_valid,
+            case.get("gate_statuses") == expected_gate_statuses,
+            case.get("layout_checks") == {"natural_section_3_flow": "passed", "no_orphan_headings": "passed"},
+            visual_valid,
+            (render_assurance_evidence.get("active_renderer") or {}).get("kind") in {"Microsoft Word", "LibreOffice"},
+            (render_assurance_evidence.get("active_page_renderer") or {}).get("kind") == "pypdfium2",
+            len(str(case.get("contracted_template_bundle_identity") or "")) == 64,
+            len(str(case.get("layout_preservation_baseline_identity") or "")) == 64,
+        ))
     if not valid:
         return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, model, and configuration."}]
     return report, []
+
+
+def _validated_archive_members(archive: zipfile.ZipFile, extraction_root: Path) -> list[zipfile.ZipInfo]:
+    """Reject every ambiguous archive member before extraction."""
+    root = extraction_root.resolve()
+    targets: set[str] = set()
+    members = archive.infolist()
+    for info in members:
+        target = (root / info.filename).resolve()
+        try:
+            relative = target.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
+        if not relative.parts or relative.parts[0] != "clinical-document-generation":
+            raise ValueError(f"Release archive member is outside its one package root: {info.filename}")
+        key = str(target).casefold()
+        if key in targets:
+            raise ValueError(f"Release archive contains duplicate normalized target: {info.filename}")
+        targets.add(key)
+        if (info.external_attr >> 16) & 0o170000 == 0o120000:
+            raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
+    return members
 
 
 def bind_release_certification(archive_path: Path, report_path: Path) -> dict[str, Any]:
@@ -540,18 +670,7 @@ def bind_release_certification(archive_path: Path, report_path: Path) -> dict[st
     with tempfile.TemporaryDirectory(prefix="clinical-certification-bind-") as directory:
         extracted = Path(directory) / "extracted"
         with zipfile.ZipFile(archive_path) as source:
-            seen: set[str] = set()
-            for info in source.infolist():
-                if info.filename in seen:
-                    raise ValueError(f"Release archive contains a duplicate path: {info.filename}")
-                seen.add(info.filename)
-                target_path = (extracted / info.filename).resolve()
-                try:
-                    target_path.relative_to(extracted.resolve())
-                except ValueError as exc:
-                    raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
-                if (info.external_attr >> 16) & 0o170000 == 0o120000:
-                    raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
+            _validated_archive_members(source, extracted)
             source.extractall(extracted)
         candidate = extracted / "clinical-document-generation"
         (candidate / RELEASE_CERTIFICATION).write_bytes(report_bytes)
@@ -588,11 +707,23 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     except OSError as exc:
         return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes configuration cannot be read: {exc}"}]
     entries: list[str] = []
+    scalars: dict[tuple[str, ...], str] = {}
+    stack: list[tuple[int, str]] = []
     in_external = False
     base_indent = 0
     for line in lines:
         stripped = line.strip()
         indent = len(line) - len(line.lstrip())
+        if stripped and not stripped.startswith(("#", "- ")) and ":" in stripped:
+            key, raw_value = stripped.split(":", 1)
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            path = tuple(item[1] for item in stack) + (key.strip(),)
+            value = raw_value.strip().strip("'\"")
+            if value:
+                scalars[path] = value
+            else:
+                stack.append((indent, key.strip()))
         if stripped == "external_dirs:":
             in_external = True
             base_indent = indent
@@ -602,8 +733,25 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
         if in_external and stripped.startswith("- "):
             entries.append(stripped[2:].strip().strip("'\""))
     clinical_entries = [entry for entry in entries if "clinical-document-generation" in entry]
-    if clinical_entries != [str(active)]:
-        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes skills.external_dirs must contain only the Promoted Release path: {active}"}]
+    governed = {
+        key: scalars.get(("skills", "clinical_document_generation", key))
+        for key in CERTIFIED_HERMES_CONFIGURATION
+    }
+    governed_matches = all(
+        str(governed[key]).casefold() == str(expected).casefold()
+        for key, expected in CERTIFIED_HERMES_CONFIGURATION.items()
+    )
+    try:
+        host_turns_sufficient = int(scalars.get(("agent", "max_turns"), "0")) >= int(CERTIFIED_HERMES_CONFIGURATION["max_turns"])
+    except ValueError:
+        host_turns_sufficient = False
+    host_matches = all((
+        scalars.get(("model", "default")) == CERTIFIED_HERMES_CONFIGURATION["model_identifier"],
+        scalars.get(("agent", "reasoning_effort")) == "medium",
+        host_turns_sufficient,
+    ))
+    if clinical_entries != [str(active)] or not governed_matches or not host_matches:
+        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
     return []
 
 
@@ -883,18 +1031,7 @@ def install_release(
     candidate = staging_root / "clinical-document-generation"
     try:
         with zipfile.ZipFile(archive_path) as archive:
-            seen: set[str] = set()
-            for info in archive.infolist():
-                if info.filename in seen:
-                    raise ValueError(f"Release archive contains a duplicate path: {info.filename}")
-                seen.add(info.filename)
-                target = (staging_root / info.filename).resolve()
-                try:
-                    target.relative_to(staging_root)
-                except ValueError as exc:
-                    raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
-                if (info.external_attr >> 16) & 0o170000 == 0o120000:
-                    raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
+            _validated_archive_members(archive, staging_root)
             archive.extractall(staging_root)
         integrity = _manifest_integrity(candidate, allow_runtime_state=False)
         certification, certification_findings = _certification_attestation(candidate)

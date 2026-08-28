@@ -2264,6 +2264,7 @@ def certify_release_corpus(
         "status": "passed" if not findings else "failed",
         "certification_scope": "complete_three_case_corpus",
         "release_identity": release_identity,
+        "hermes_configuration": dict(fixtures[CERTIFICATION_CORPUS[0]]["hermes_configuration"]),
         "preflight_evidence_sha256": _sha256(preflight_path.resolve()) if preflight_path.is_file() else None,
         "layout_preservation_evidence": (preflight.get("checks") or {}).get("layout_preservation_corpus"),
         "case_order": list(CERTIFICATION_CORPUS),

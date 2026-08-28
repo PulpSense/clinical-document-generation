@@ -32,24 +32,71 @@ def _certify_archive(archive_path: Path) -> None:
         "package_fingerprint": manifest["package_fingerprint"],
         "git_commit": manifest["git_commit"],
     }
+    configuration = dict(workflow.CERTIFIED_HERMES_CONFIGURATION)
+
+    def passing_case(fixture: str) -> dict:
+        output_paths = (
+            ["output/protocol.docx"]
+            if fixture == "retrospective"
+            else ["output/protocol.docx", "output/icf.docx", "output/study.xml"]
+        )
+        outputs = {
+            path: {"path": path, "sha256": "c" * 64, "bytes": 100, "confirmed": True}
+            for path in output_paths
+        }
+        visual_artifacts = [Path(path).stem for path in output_paths if path.endswith(".docx")]
+        gates = {gate: "passed" for gate in workflow.CERTIFICATION_GATES}
+        if fixture == "retrospective":
+            gates["prs_xml"] = "not_applicable"
+        return {
+            "fixture_id": fixture,
+            "status": "passed",
+            "findings": [],
+            "elapsed_seconds": 600.0,
+            "desktop_operation_elapsed_seconds": 599.0,
+            "under_15_minutes": True,
+            "within_approved_runtime": True,
+            "report_sha256": "d" * 64,
+            "release_identity": identity,
+            "hermes_configuration_sha256": workflow.sha256_value(configuration),
+            "model_identifiers": ["gpt-5.6-sol"],
+            "output_evidence": list(outputs.values()),
+            "gate_statuses": gates,
+            "layout_checks": {"natural_section_3_flow": "passed", "no_orphan_headings": "passed"},
+            "visual_qa": {
+                artifact: {
+                    "status": "passed",
+                    "request_sha256": "e" * 64,
+                    "response_sha256": "f" * 64,
+                    "producer_model_id": "gpt-5.6-sol",
+                    "docx_sha256": outputs[f"output/{artifact}.docx"]["sha256"],
+                    "pdf_sha256": "1" * 64,
+                    "page_count": 1,
+                    "page_sha256": ["2" * 64],
+                    "checks": sorted(workflow.CERTIFICATION_VISUAL_CHECKS),
+                }
+                for artifact in visual_artifacts
+            },
+            "render_assurance": {
+                "active_renderer": {"kind": "LibreOffice"},
+                "active_page_renderer": {"kind": "pypdfium2"},
+            },
+            "contracted_template_bundle_identity": "3" * 64,
+            "layout_preservation_baseline_identity": "4" * 64,
+        }
+
     report = {
         "schema_version": "release-certification-corpus/v1",
         "status": "passed",
         "certification_scope": "complete_three_case_corpus",
         "release_identity": identity,
+        "hermes_configuration": configuration,
         "preflight_evidence_sha256": "a" * 64,
+        "layout_preservation_evidence": {"status": "passed"},
         "case_order": ["retrospective", "ambispective-sterling", "prospective-advarra"],
-        "cases": [
-            {
-                "fixture_id": fixture,
-                "status": "passed",
-                "release_identity": identity,
-                "hermes_configuration_sha256": "b" * 64,
-                "model_identifiers": ["gpt-5.6-sol"],
-            }
-            for fixture in ("retrospective", "ambispective-sterling", "prospective-advarra")
-        ],
+        "cases": [passing_case(fixture) for fixture in workflow.CERTIFICATION_CASE_ORDER],
         "findings": [],
+        "completed_at": "2026-08-28T00:00:00+00:00",
     }
     report_path = archive_path.with_suffix(".certification.json")
     report_path.write_text(json.dumps(report), encoding="utf-8")
@@ -59,7 +106,16 @@ def _certify_archive(archive_path: Path) -> None:
 def _hermes_config(skills_dir: Path) -> Path:
     path = skills_dir.parent / "config.yaml"
     path.write_text(
-        "skills:\n  external_dirs:\n    - " + str(skills_dir / "clinical-document-generation") + "\n",
+        "model:\n  default: gpt-5.6-sol\n"
+        "agent:\n  max_turns: 500\n  reasoning_effort: medium\n"
+        "skills:\n  external_dirs:\n    - " + str(skills_dir / "clinical-document-generation") + "\n"
+        "  clinical_document_generation:\n"
+        "    source: clinical-release-certification\n"
+        "    max_turns: 80\n"
+        "    skill: clinical-document-drafting\n"
+        "    safe_mode: true\n"
+        "    model_identifier: gpt-5.6-sol\n"
+        "    reasoning_configuration: Hermes Desktop governed default\n",
         encoding="utf-8",
     )
     return path
@@ -196,6 +252,8 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         assert prefix + "assets/fallback-fonts/LICENSE_LIBERATION" in names
         assert prefix + "assets/client-templates/reference/advarra-icf-reference.docx" in names
         assert prefix + f"assets/runtime-wheels/{PDFIUM_WHEEL}" in names
+        assert not any(name.startswith(prefix + "docs/") for name in names)
+        assert not any(name == prefix + ".gitignore" for name in names)
         assert not any(
             "/runtime-wheels/" in name and not name.endswith(PDFIUM_WHEEL)
             for name in names
@@ -218,6 +276,9 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         assert result["git_commit"] == manifest["git_commit"]
         assert manifest["installation"]["entrypoint"] == "SKILL.md"
         assert manifest["inventory"]["implementation"]
+        assert set(manifest["inventory"]["implementation"]) == {
+            f"scripts/{name}" for name in workflow.PRODUCTION_MODULES
+        }
         bundles = manifest["inventory"]["contracted_template_bundles"]
         governed = manifest["inventory"]["governed_resources"]
         assert len(bundles) == 5
@@ -359,6 +420,42 @@ def test_unsigned_or_unlisted_release_cannot_displace_active(tmp_path):
     assert any("Unlisted packaged files" in finding["issue"] for finding in unlisted["findings"])
     assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
 
+
+def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        manifest = json.loads(archive.read("clinical-document-generation/RELEASE-MANIFEST.json"))
+    skeletal = tmp_path / "skeletal.json"
+    skeletal.write_text(json.dumps({
+        "schema_version": "release-certification-corpus/v1",
+        "status": "passed",
+        "certification_scope": "complete_three_case_corpus",
+        "release_identity": {
+            "git_commit": manifest["git_commit"],
+            "package_fingerprint": manifest["package_fingerprint"],
+        },
+        "findings": [],
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="does not pass and bind"):
+        bind_release_certification(archive_path, skeletal)
+
+    _certify_archive(archive_path)
+    with zipfile.ZipFile(archive_path, "a") as archive:
+        archive.writestr(
+            "clinical-document-generation/./RELEASE-CERTIFICATION.json",
+            b"{}",
+        )
+    skills_dir = tmp_path / "skills"
+    with pytest.raises(ValueError, match="duplicate normalized target"):
+        install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=_hermes_config(skills_dir),
+            verifier=lambda _candidate: {"status": "passed"},
+            provisioner=lambda _candidate: {"status": "passed"},
+        )
 
 def test_incompatible_hermes_discovery_stops_before_activation(tmp_path):
     archive_path = tmp_path / "release.zip"
