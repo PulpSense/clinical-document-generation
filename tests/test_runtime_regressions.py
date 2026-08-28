@@ -125,10 +125,11 @@ def test_renderer_preflight_uses_the_selected_page_renderer(tmp_path, monkeypatc
 
 def test_renderer_preflight_stops_when_the_release_owned_pdfium_fails(monkeypatch):
     renderer_identity = {"kind": "LibreOffice", "path": "/usr/bin/soffice", "version": "test", "platform": "Linux"}
+    word_identity = {"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "platform": "Darwin"}
     broken = {"kind": "pypdfium2", "path": "python:pypdfium2", "source": "release-owned runtime"}
     unapproved = {"kind": "pdftoppm", "path": "/usr/bin/pdftoppm", "source": "PATH"}
     attempts = []
-    monkeypatch.setattr(quality, "renderers", lambda **_: [renderer_identity])
+    monkeypatch.setattr(quality, "renderers", lambda **_: [renderer_identity, word_identity])
     monkeypatch.setattr(quality, "page_renderers", lambda **_: [broken, unapproved])
     monkeypatch.setattr(quality, "_font_probe", lambda *_args, **_kwargs: (True, "test-font"))
 
@@ -156,6 +157,7 @@ def test_renderer_preflight_stops_when_the_release_owned_pdfium_fails(monkeypatc
     assert report["page_renderer_attempts"] == [
         {"renderer": broken, "status": "failed", "issue": "controlled PDFium failure"},
     ]
+    assert len(report["renderer_attempts"]) == 1
 
 
 def test_renderer_preflight_uses_a_packaged_font_when_host_fonts_are_missing(monkeypatch):
@@ -266,7 +268,7 @@ def test_macos_renderer_honors_the_callers_remaining_deadline(tmp_path, monkeypa
     quality._render_pdf(
         source,
         tmp_path,
-        {"kind": "Pages", "path": "/Applications/Pages.app", "platform": "Darwin"},
+        {"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "platform": "Darwin"},
         timeout_seconds=7.5,
     )
 
@@ -593,7 +595,7 @@ def test_document_report_failure_preserves_a_governed_drafting_route_through_qua
 
 def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
     prior = {
-        "renderer": {"kind": "Pages"},
+        "renderer": {"kind": "Microsoft Word"},
         "page_renderer": {"kind": "pypdfium2"},
         "artifacts": [
             {"artifact": "icf", "pages": []},
@@ -627,7 +629,7 @@ def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
 
     assert icf_request["request_sha256"] == initial_request["request_sha256"]
     assert response_path.is_file()
-    assert icf_request["renderer"] == {"kind": "Pages"}
+    assert icf_request["renderer"] == {"kind": "Microsoft Word"}
     assert protocol_request["renderer"] == {"kind": "LibreOffice"}
     assert assurance["render"] == assurance_render == merged
 

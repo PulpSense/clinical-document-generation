@@ -1,11 +1,12 @@
 import hashlib
+import zipfile
 from pathlib import Path
 
 from docx import Document
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 
-from quality import RECOVERY_POLICIES, page_renderers, render_assurance
+from quality import RECOVERY_POLICIES, page_renderers, rasterize_pdf, render_assurance
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,13 +19,28 @@ def test_release_owned_pdfium_is_the_only_page_renderer(tmp_path):
     (runtime_python / "pypdfium2/__init__.py").write_text("", encoding="utf-8")
     (runtime_python / "pypdfium2_raw").mkdir()
     (runtime_python / "pypdfium2_raw/__init__.py").write_text("", encoding="utf-8")
+    wheel = tmp_path / "assets/runtime-wheels/pdfium.whl"
+    wheel.parent.mkdir(parents=True)
+    wheel.write_bytes(b"governed wheel")
+    files = {
+        "pypdfium2/__init__.py": hashlib.sha256(b"").hexdigest(),
+        "pypdfium2_raw/__init__.py": hashlib.sha256(b"").hexdigest(),
+    }
+    (tmp_path / "RELEASE-MANIFEST.json").write_text(
+        __import__("json").dumps({"inventory": {"pdf_page_renderer": {
+            "kind": "pypdfium2", "version": "5.13.0",
+            "wheel": "assets/runtime-wheels/pdfium.whl",
+            "wheel_sha256": hashlib.sha256(b"governed wheel").hexdigest(),
+            "platform": "macosx_13_0_arm64",
+        }}}), encoding="utf-8",
+    )
     (runtime / "PDF-RENDERER.json").write_text(
-        """{
-  "kind": "pypdfium2",
-  "version": "5.13.0",
-  "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
-  "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4"
-}\n""",
+        __import__("json").dumps({
+            "kind": "pypdfium2", "version": "5.13.0",
+            "wheel": "assets/runtime-wheels/pdfium.whl",
+            "wheel_sha256": hashlib.sha256(b"governed wheel").hexdigest(),
+            "platform": "macosx_13_0_arm64", "installed_files": files,
+        }),
         encoding="utf-8",
     )
 
@@ -39,10 +55,29 @@ def test_release_owned_pdfium_is_the_only_page_renderer(tmp_path):
             "python_path": str(runtime_python),
             "version": "5.13.0",
             "source": "release-owned runtime",
-            "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
-            "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
+            "wheel": "assets/runtime-wheels/pdfium.whl",
+            "wheel_sha256": hashlib.sha256(b"governed wheel").hexdigest(),
         }
     ]
+
+
+def test_pdfium_rasterization_does_not_require_optional_pillow(tmp_path, monkeypatch):
+    pdf = tmp_path / "one-page.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=72, height=72)
+    with pdf.open("wb") as handle:
+        writer.write(handle)
+    monkeypatch.setitem(__import__("sys").modules, "PIL", None)
+    runtime_python = tmp_path / "runtime-python"
+    with zipfile.ZipFile(ROOT / "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl") as wheel:
+        wheel.extractall(runtime_python)
+
+    pages = rasterize_pdf(pdf, tmp_path / "pages", {
+        "kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2",
+        "python_path": str(runtime_python),
+    })
+
+    assert pages[0].read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
 
 def test_recovery_classes_have_one_governed_action_each():

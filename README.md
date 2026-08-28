@@ -91,6 +91,8 @@ editable checkout:
 candidate_dir="$(mktemp -d /tmp/clinical-release-candidate.XXXXXX)"
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release "$candidate_dir/release.zip"
 unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
+"$CLINICAL_PYTHON" "$candidate_dir/extracted/clinical-document-generation/scripts/workflow.py" \
+  --provision-candidate
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --fixture ambispective-sterling \
   --release-root "$candidate_dir/extracted/clinical-document-generation"
@@ -162,7 +164,8 @@ operation to obtain a new deadline.
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 # Build a clean release archive outside the checkout
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
-"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
+"$CLINICAL_PYTHON" scripts/workflow.py --bind-certification /absolute/path/release-certification-corpus.json --release-archive /absolute/path/clinical-document-generation-release.zip
+"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills --hermes-config /absolute/path/to/hermes/config.yaml
 "$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
 "$CLINICAL_PYTHON" scripts/workflow.py --rollback-release --skills-dir /absolute/path/to/hermes/skills
 ```
@@ -187,8 +190,9 @@ Prospective and Ambispective publish Protocol + ICF + PRS XML. Retrospective pub
 
 ## Hermes installation
 
-For a release, build the archive with `--package-release` and activate it with
-`--install-release`. The installer stages the candidate, verifies host Word or
+For a release, build the immutable candidate with `--package-release`, certify
+its extracted and provisioned bytes, embed the passing full-corpus report with
+`--bind-certification`, and activate it with `--install-release`. The installer stages the candidate, verifies host Word or
 LibreOffice, installs its packaged PDFium runtime offline, verifies package hashes, renders a DOCX, rasterizes a page,
 checks the packaged fonts, and atomically swaps it into the Hermes skills
 directory. A failed update retains the previous verified release. The archive
@@ -203,10 +207,16 @@ source/patient data, old runs, and tests. Register the extracted root as
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py \
   --install-release /absolute/path/clinical-document-generation-release.zip \
-  --skills-dir /absolute/path/to/hermes/skills
+  --skills-dir /absolute/path/to/hermes/skills \
+  --hermes-config /absolute/path/to/hermes/config.yaml
 ```
 
-The installed `INSTALLATION-ASSURANCE.json` records the verified renderer,
+The installer refuses an unsigned archive, a mismatched fingerprint, unlisted
+files, stale model/configuration evidence, or a Hermes configuration that points
+at an editable copy. The installed `PROMOTION-RECORD.json` binds the commit,
+fingerprint, embedded certification report, model/configuration hashes, runtime
+assurance, activation time, and sole promoted discovery path.
+`INSTALLATION-ASSURANCE.json` records the verified renderer,
 page renderer, fonts, and smoke result. Installation is setup; the post-approval
 Desktop operation remains governed by the single 30-minute budget. A passing
 Generation Manifest is not delivery: the Desktop parent must expose exactly its

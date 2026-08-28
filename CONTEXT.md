@@ -123,7 +123,7 @@ The office application used by the client to open the delivered DOCX; Microsoft 
 _Avoid_: active renderer, local renderer, whatever opens it
 
 **Active Renderer**:
-The best supported document renderer available on the generation host—preferred in the order Microsoft Word, LibreOffice, then Pages—and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
+The supported document renderer available on the generation host—Microsoft Word or LibreOffice—and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
 _Avoid_: Client Rendering Authority, generic renderer, invisible converter
 
 **Verified Fallback Stack**:

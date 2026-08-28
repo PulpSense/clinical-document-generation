@@ -10,11 +10,13 @@ import os
 import platform
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
 import time
 import zipfile
+import zlib
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -207,7 +209,8 @@ def page_renderers(
     del environment, home
     if skill_root is None:
         return []
-    runtime_root = Path(skill_root).resolve() / "runtime"
+    resolved_root = Path(skill_root).resolve()
+    runtime_root = resolved_root / "runtime"
     runtime_python = runtime_root / "python"
     identity_path = runtime_root / "PDF-RENDERER.json"
     if not (
@@ -218,9 +221,33 @@ def page_renderers(
         return []
     try:
         recorded = _json(identity_path)
+        manifest_identity = _json(resolved_root / "RELEASE-MANIFEST.json")["inventory"]["pdf_page_renderer"]
     except (OSError, ValueError, json.JSONDecodeError):
         return []
-    if recorded.get("kind") != "pypdfium2":
+    except (KeyError, TypeError):
+        return []
+    identity_fields = ("kind", "version", "wheel", "wheel_sha256", "platform")
+    if (
+        recorded.get("kind") != "pypdfium2"
+        or any(recorded.get(field) != manifest_identity.get(field) for field in identity_fields)
+    ):
+        return []
+    wheel = (resolved_root / str(recorded.get("wheel") or "")).resolve()
+    try:
+        wheel.relative_to(resolved_root)
+    except ValueError:
+        return []
+    if not wheel.is_file() or sha256_file(wheel) != recorded.get("wheel_sha256"):
+        return []
+    installed_files = recorded.get("installed_files")
+    if not isinstance(installed_files, dict) or not installed_files:
+        return []
+    actual_files = {
+        path.relative_to(runtime_python).as_posix(): sha256_file(path)
+        for path in runtime_python.rglob("*")
+        if path.is_file()
+    }
+    if actual_files != installed_files:
         return []
     return [{
         "kind": "pypdfium2",
@@ -232,6 +259,30 @@ def page_renderers(
         "wheel": str(recorded.get("wheel") or ""),
         "wheel_sha256": str(recorded.get("wheel_sha256") or ""),
     }]
+
+
+def _write_pdfium_png(bitmap: Any, output: Path) -> None:
+    """Write PDFium's reverse-byte-order RGB buffer with only the standard library."""
+    width = int(bitmap.width)
+    height = int(bitmap.height)
+    stride = int(bitmap.stride)
+    raw = bytes(bitmap.buffer)
+    scanlines = b"".join(
+        b"\x00" + raw[offset:offset + width * 3]
+        for offset in range(0, stride * height, stride)
+    )
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        payload = kind + data
+        return struct.pack(">I", len(data)) + payload + struct.pack(">I", zlib.crc32(payload) & 0xFFFFFFFF)
+
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    output.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", header)
+        + chunk(b"IDAT", zlib.compress(scanlines))
+        + chunk(b"IEND", b"")
+    )
 
 
 def page_renderer(
@@ -294,6 +345,8 @@ def rasterize_pdf(
                 if any(name == root or name.startswith(root + ".") for root in module_roots):
                     previous_modules[name] = sys.modules.pop(name)
         document = None
+        previous_dont_write_bytecode = sys.dont_write_bytecode
+        sys.dont_write_bytecode = True
         try:
             pdfium = importlib.import_module(module_name)
             if python_path:
@@ -306,15 +359,18 @@ def rasterize_pdf(
             count = min(len(document), 1) if first_page_only else len(document)
             for index in range(count):
                 page = document[index]
-                bitmap = page.render(scale=dpi / 72.0)
+                bitmap = page.render(scale=dpi / 72.0, rev_byteorder=True)
                 try:
-                    bitmap.to_pil().save(output_dir / f"page-{index + 1}.png")
+                    if int(bitmap.format) != 2:
+                        raise RuntimeError(f"PDFium returned unsupported bitmap format {bitmap.format}.")
+                    _write_pdfium_png(bitmap, output_dir / f"page-{index + 1}.png")
                 finally:
                     bitmap.close()
                     page.close()
         except ImportError as exc:
             raise RuntimeError(f"The release-owned pypdfium2 page renderer is unavailable: {exc}") from exc
         finally:
+            sys.dont_write_bytecode = previous_dont_write_bytecode
             if document is not None:
                 document.close()
             if python_path:
@@ -403,9 +459,6 @@ def renderers(
                 continue
             if result.returncode == 0:
                 append({"kind": "LibreOffice", "path": path, "version": result.stdout.strip(), "platform": system, "source": source})
-    if system == "Darwin" and Path("/Applications/Pages.app").exists():
-        append({"kind": "Pages", "path": "/Applications/Pages.app", "version": "installed macOS application", "platform": "Darwin", "source": "host application"})
-
     root = (skill_root or Path(__file__).resolve().parents[1]).resolve()
     bundled_patterns = (
         "runtime/**/Contents/MacOS/soffice",
@@ -813,6 +866,7 @@ def preflight(
                 for attribute in ("ascii", "hAnsi", "eastAsia", "cs"):
                     fonts.set(qn(f"w:{attribute}"), selected)
             document.save(source)
+            page_renderer_failed = False
             for candidate_renderer in renderer_candidates:
                 attempt_remaining = remaining()
                 if attempt_remaining <= 0:
@@ -851,7 +905,8 @@ def preflight(
                         )
                     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                         page_attempts.append({"renderer": candidate_page_renderer, "status": "failed", "issue": str(exc)})
-                        continue
+                        page_renderer_failed = True
+                        break
                     identity = candidate_renderer
                     page_identity = candidate_page_renderer
                     renderer_attempts.append({"renderer": candidate_renderer, "status": "passed"})
@@ -860,6 +915,13 @@ def preflight(
                     break
                 if identity is not None:
                     break
+                if page_renderer_failed:
+                    renderer_attempts.append({
+                        "renderer": candidate_renderer,
+                        "status": "failed",
+                        "issue": "The release-owned pypdfium2 page renderer failed; no office renderer retry is permitted.",
+                    })
+                    break
                 renderer_attempts.append({
                     "renderer": candidate_renderer,
                     "status": "failed",
@@ -867,13 +929,17 @@ def preflight(
                 })
     if identity is None:
         if not renderer_candidates:
-            issue = "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."
+            issue = "No supported Microsoft Word or LibreOffice renderer is available."
             field = "renderer"
         elif not page_candidates:
             issue = "The release-owned pypdfium2 page renderer is unavailable."
             field = "page_renderer"
         else:
-            issue = "Every local renderer/page-renderer combination failed its smoke render."
+            issue = (
+                "The release-owned pypdfium2 page renderer failed; Render Assurance stopped exactly."
+                if page_attempts else
+                "Every supported office renderer failed its smoke render."
+            )
             field = "preflight"
         findings.append({"category": "renderer", "field": field, "issue": issue})
         smoke = {"status": "blocked", "issue": issue}
@@ -918,12 +984,11 @@ def _render_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any], *, en
 
 
 def _mac_pdf(docx: Path, output_dir: Path, identity: Mapping[str, Any], *, timeout_seconds: float = 180.0) -> Path:
-    app = "Microsoft Word" if identity["kind"] == "Microsoft Word" else "Pages"
+    if identity.get("kind") != "Microsoft Word":
+        raise RuntimeError("Only Microsoft Word or LibreOffice may convert DOCX to PDF.")
+    app = "Microsoft Word"
     output = output_dir / f"{docx.stem}.pdf"
-    if app == "Microsoft Word":
-        script = 'on run argv\nset src to POSIX file (item 1 of argv)\nset dst to POSIX file (item 2 of argv)\ntell application "Microsoft Word"\nset d to open src\nsave as d file name dst file format format PDF\nclose d saving no\nend tell\nend run'
-    else:
-        script = 'on run argv\nset src to POSIX file (item 1 of argv)\nset dst to POSIX file (item 2 of argv)\ntell application "Pages"\nset d to open src\nexport d to dst as PDF\nclose d saving no\nend tell\nend run'
+    script = 'on run argv\nset src to POSIX file (item 1 of argv)\nset dst to POSIX file (item 2 of argv)\ntell application "Microsoft Word"\nset d to open src\nsave as d file name dst file format format PDF\nclose d saving no\nend tell\nend run'
     result = subprocess.run(["osascript", "-e", script, str(docx), str(output)], text=True, capture_output=True, timeout=timeout_seconds)
     if result.returncode or not output.is_file(): raise RuntimeError(f"{app} PDF export failed: {result.stderr or result.stdout}")
     return output
@@ -1012,7 +1077,7 @@ def render_pages(
         page_candidates = page_renderers(environment=runtime_environment, skill_root=repo_root)
     page_candidates = _one_pdfium_renderer(page_candidates)
     if not renderer_candidates:
-        return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."}]}
+        return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Microsoft Word or LibreOffice renderer is available."}]}
     if not page_candidates:
         return {"status": "blocked", "renderer": renderer_candidates[0], "findings": [{"category": "renderer", "field": "page_renderer", "issue": "No supported PDF page renderer is available."}]}
 

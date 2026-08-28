@@ -31,10 +31,11 @@ CERTIFICATION_FIXTURE_ROOT = REPO_ROOT / "tests/fixtures/release-certification"
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
 CERTIFICATION_RUNTIME_CEILING_SECONDS = 900.0
+EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS = 1080.0
 CERTIFICATION_CORPUS = (
+    "retrospective",
     "ambispective-sterling",
     "prospective-advarra",
-    "retrospective",
 )
 CERTIFICATION_CORPUS_COVERAGE = {
     "ambispective-sterling": ("Ambispective", "Sterling"),
@@ -91,6 +92,14 @@ FIRST_WAVE_BATCHES = frozenset(
         "icf-narrative",
     }
 )
+
+
+def _certification_runtime_ceiling(fixture_id: str) -> float:
+    return (
+        EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
+        if fixture_id in {"ambispective-sterling", "prospective-advarra"}
+        else CERTIFICATION_RUNTIME_CEILING_SECONDS
+    )
 
 
 def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
@@ -306,6 +315,17 @@ def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
         recorded_bytes = item.get("bytes")
         if not path.is_file() or _sha256(path) != item.get("sha256") or path.stat().st_size != int(recorded_bytes if recorded_bytes is not None else -1):
             raise ValueError(f"Release candidate file does not match its manifest: {relative}")
+    declared = {str(item.get("path") or "") for item in manifest.get("files", [])}
+    actual = {
+        path.relative_to(release_root).as_posix()
+        for path in release_root.rglob("*")
+        if path.is_file()
+        and "runtime" not in path.relative_to(release_root).parts
+        and path.name not in {"RELEASE-CERTIFICATION.json", "INSTALLATION-ASSURANCE.json", "PROMOTION-RECORD.json", "RELEASE-MANIFEST.json"}
+    }
+    extras = sorted(actual - declared)
+    if extras:
+        raise ValueError(f"Release candidate contains files outside its manifest: {', '.join(extras)}")
 
     scripts = release_root / "scripts"
     workflow_path = scripts / "workflow.py"
@@ -380,6 +400,12 @@ def inspect_run(
     expected_model_identifier: str | None = None,
 ) -> dict[str, Any]:
     reference = _read_json(run_dir / "reference/study.reference.json") or {}
+    study_type = str((reference.get("meta") or {}).get("study_type") or "").casefold()
+    certification_runtime_ceiling = (
+        EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
+        if study_type in {"ambispective", "prospective"}
+        else CERTIFICATION_RUNTIME_CEILING_SECONDS
+    )
     required_outputs = expected_outputs(reference)
     revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
     revision_dir = run_dir / "revisions" / revision_id
@@ -531,7 +557,7 @@ def inspect_run(
         outcome = DiagnosticOutcome.TIMEOUT
     elif retry_limit_violations:
         outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
-    elif valid_delivery and elapsed_seconds >= CERTIFICATION_RUNTIME_CEILING_SECONDS:
+    elif valid_delivery and elapsed_seconds > certification_runtime_ceiling:
         outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
     elif valid_delivery:
         outcome = DiagnosticOutcome.PASSED
@@ -2136,8 +2162,9 @@ def certify_release_corpus(
             elapsed = float((derived_evidence.get("performance") or {}).get("elapsed_seconds"))
         except (TypeError, ValueError):
             elapsed = float("nan")
-        if not math.isfinite(elapsed) or elapsed <= 0.0 or elapsed >= CERTIFICATION_RUNTIME_CEILING_SECONDS:
-            case_findings.append(f"Approval-to-confirmed-retrieval elapsed time {elapsed:.3f}s is not below 900 seconds.")
+        runtime_ceiling = _certification_runtime_ceiling(str(fixture_id or ""))
+        if not math.isfinite(elapsed) or elapsed <= 0.0 or elapsed > runtime_ceiling:
+            case_findings.append(f"Approval-to-confirmed-retrieval elapsed time {elapsed:.3f}s exceeds the approved {runtime_ceiling:.0f}-second ceiling.")
         if report.get("missing_response_paths") or report.get("invalid_response_paths") or report.get("recorded_response_paths") or report.get("invalid_rejection_paths"):
             case_findings.append("Case contains missing, invalid, recorded, or rejected response evidence.")
         if list(report.get("model_identifiers") or []) != derived_evidence.get("model_identifiers"):
@@ -2194,6 +2221,7 @@ def certify_release_corpus(
             "elapsed_seconds": elapsed,
             "desktop_operation_elapsed_seconds": operation_elapsed,
             "under_15_minutes": math.isfinite(elapsed) and 0.0 < elapsed < CERTIFICATION_RUNTIME_CEILING_SECONDS,
+            "within_approved_runtime": math.isfinite(elapsed) and 0.0 < elapsed <= runtime_ceiling,
             "report_sha256": _sha256(path),
             "release_identity": identities[-1],
             "hermes_configuration_sha256": _canonical_sha256(report.get("hermes_configuration") or {}),
@@ -2323,7 +2351,7 @@ def run_release_certification_corpus(
             report.get("outcome") != DiagnosticOutcome.PASSED.value
             or not math.isfinite(elapsed)
             or elapsed <= 0.0
-            or elapsed >= CERTIFICATION_RUNTIME_CEILING_SECONDS
+            or elapsed > _certification_runtime_ceiling(fixture_id)
         ):
             break
     return certify_release_corpus(

@@ -47,19 +47,25 @@ Python 3.10+ path.
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
-"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
+"$CLINICAL_PYTHON" scripts/workflow.py --bind-certification /absolute/path/release-certification-corpus.json --release-archive /absolute/path/clinical-document-generation-release.zip
+"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills --hermes-config /absolute/path/to/hermes/config.yaml
 "$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
 "$CLINICAL_PYTHON" scripts/workflow.py --rollback-release --skills-dir /absolute/path/to/hermes/skills
 ```
 
-`--package-release` creates the installable candidate from the current
-checkout. Activate it with `--install-release`; direct extraction is not a
+`--package-release` creates the immutable candidate from the current clean
+commit. Provision the extracted certification candidate with
+`--provision-candidate`, run the full real corpus, and embed its passing report
+with `--bind-certification`. Only that one certified archive may be activated
+with `--install-release`; direct extraction is not a
 supported update path. Installation verifies host Word or LibreOffice, installs
 the one manifest-bound `pypdfium2` wheel offline, runs an end-to-end
 render/page-image smoke, and only then atomically
 replaces the active `clinical-document-generation` directory. A failed smoke
 leaves the previous verified release active. The archive contains
-`RELEASE-MANIFEST.json`, which
+`RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
+also requires Hermes `skills.external_dirs` to name only the promoted active
+path and records the activation in `PROMOTION-RECORD.json`. The manifest
 hashes every packaged file and records implementation, template, contract,
 font, renderer, harness, and model provenance. It excludes development
 environments, credentials, source/patient data, old runs, and tests.
