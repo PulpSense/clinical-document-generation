@@ -772,6 +772,7 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     stack: list[tuple[int, str]] = []
     in_external = False
     base_indent = 0
+    external_definitions = 0
     for line in lines:
         stripped = line.strip()
         indent = len(line) - len(line.lstrip())
@@ -794,8 +795,11 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
             else:
                 stack.append((indent, key.strip()))
         if stripped == "external_dirs:":
-            in_external = True
-            base_indent = indent
+            exact_external = tuple(item[1] for item in stack) == ("skills", "external_dirs")
+            in_external = exact_external
+            if exact_external:
+                external_definitions += 1
+                base_indent = indent
             continue
         if in_external and stripped and indent <= base_indent:
             in_external = False
@@ -816,7 +820,7 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
         host_turns_sufficient,
     ))
     normalized_entries = [str(Path(entry).expanduser().resolve()) for entry in entries]
-    if normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
+    if external_definitions != 1 or normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
         return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
     return []
 

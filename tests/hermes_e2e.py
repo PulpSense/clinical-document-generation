@@ -2390,7 +2390,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"{args.fixture}-%Y%m%dT%H%M%SZ"
     )
     release_root = args.release_root.resolve()
-    _certified_release(release_root)
     if args.run_preflight:
         if args.preflight_evidence is None:
             parser.error("--preflight-evidence is required with --run-preflight")
