@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 
 import workflow
+import quality
 from hermes_e2e import _certified_release
 from pypdf import PdfWriter
 from quality import rasterize_pdf
@@ -15,7 +16,7 @@ from workflow import (
     bind_release_certification,
     install_release,
     package_release,
-    provision_fallback_stack,
+    provision_render_assurance,
     verify_installation,
 )
 
@@ -190,7 +191,7 @@ def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
     }
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [office])
 
-    result = provision_fallback_stack(skill_root)
+    result = provision_render_assurance(skill_root)
 
     assert result == {
         "status": "passed",
@@ -227,10 +228,38 @@ def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
     with pdf.open("wb") as handle:
         writer.write(handle)
 
+    monkeypatch.setattr(quality, "__file__", str(skill_root / "scripts/quality.py"))
     pages = rasterize_pdf(pdf, tmp_path / "pages", result["page_renderer"])
 
     assert [page.name for page in pages] == ["page-1.png"]
     assert pages[0].read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def test_release_installation_fails_closed_without_a_host_office_renderer(tmp_path, monkeypatch):
+    skill_root = tmp_path / "clinical-document-generation"
+    wheel_dir = skill_root / "assets/runtime-wheels"
+    wheel_dir.mkdir(parents=True)
+    shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
+    (skill_root / "RELEASE-MANIFEST.json").write_text(json.dumps({
+        "inventory": {"pdf_page_renderer": {
+            "kind": "pypdfium2",
+            "version": "5.13.0",
+            "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "wheel_sha256": PDFIUM_SHA256,
+            "platform": "macosx_13_0_arm64",
+        }}
+    }), encoding="utf-8")
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [])
+
+    assert provision_render_assurance(skill_root) == {
+        "status": "blocked",
+        "findings": [{
+            "category": "installation",
+            "field": "office_renderer",
+            "code": "installation.office_renderer_required",
+            "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
+        }],
+    }
 
 
 def test_release_renderer_rejects_and_repairs_tampered_runtime(tmp_path, monkeypatch):
@@ -251,13 +280,13 @@ def test_release_renderer_rejects_and_repairs_tampered_runtime(tmp_path, monkeyp
         "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
     }])
 
-    assert provision_fallback_stack(skill_root)["status"] == "passed"
+    assert provision_render_assurance(skill_root)["status"] == "passed"
     target = skill_root / "runtime/python/pypdfium2/__init__.py"
     expected = target.read_bytes()
     target.write_text("tampered", encoding="utf-8")
 
     assert workflow.page_renderers(skill_root=skill_root) == []
-    repaired = provision_fallback_stack(skill_root)
+    repaired = provision_render_assurance(skill_root)
 
     assert repaired["status"] == "passed"
     assert repaired["provisioned"]["page_renderer"] is True
@@ -732,7 +761,7 @@ def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_re
     }
     observed = {}
     monkeypatch.setattr(workflow, "_manifest_integrity", lambda _root: [])
-    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{"kind": "LibreOffice", "source": "verified fallback stack"}])
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{"kind": "LibreOffice", "source": "host prerequisite"}])
     monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [bundled])
 
     def fake_assurance(_root, revision_dir, _reference, **kwargs):
@@ -753,7 +782,7 @@ def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_re
             "candidate": {"files": []},
             "render": {
                 "status": "passed",
-                "renderer": {"kind": "LibreOffice", "source": "verified fallback stack"},
+                "renderer": {"kind": "LibreOffice", "source": "host prerequisite"},
                 "page_renderer": bundled,
                 "renderer_attempts": [],
                 "page_renderer_attempts": [],

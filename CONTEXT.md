@@ -115,20 +115,28 @@ A bundled template with an explicit Document Section Contract and acceptance cov
 _Avoid_: arbitrary DOCX, drop-in template, compatible file
 
 **Renderer**:
-An available document application or converter used to open a DOCX and produce a visual PDF or page image for quality review.
+An identified office application used to open a DOCX and produce the PDF used for quality review.
 _Avoid_: exporter, converter, editor
 
 **Client Rendering Authority**:
 The office application used by the client to open the delivered DOCX; Microsoft Word desktop is the current client’s renderer. It is the compatibility target, even when a different Active Renderer performs local Visual QA.
 _Avoid_: active renderer, local renderer, whatever opens it
 
+**Host Office Renderer**:
+Microsoft Word or LibreOffice on the generation host, verified during installation and used only for DOCX-to-PDF conversion. It is a declared host prerequisite and is never copied into or discovered from the release runtime.
+_Avoid_: packaged office fallback, release-owned renderer, Pages
+
 **Active Renderer**:
-The supported document renderer available on the generation host—Microsoft Word or LibreOffice—and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
+The Host Office Renderer selected for one render attempt and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
 _Avoid_: Client Rendering Authority, generic renderer, invisible converter
 
-**Verified Fallback Stack**:
-The release-owned assurance capability comprising approved compatible fonts and the single manifest-bound PDFium page renderer. Host Microsoft Word or LibreOffice remains a verified installation prerequisite for DOCX-to-PDF rendering. Its verified identity belongs to the active skill release.
-_Avoid_: optional dependency, best-effort tooling, host assumption
+**Release-Owned Page Renderer**:
+The single manifest-bound `pypdfium2` runtime that converts the Host Office Renderer’s exact PDF bytes into every page image used by Visual QA. It is installed offline from the pinned release wheel and never falls through to another PDF backend.
+_Avoid_: host page renderer, PDF fallback ladder, mutable runtime marker
+
+**Release-Owned Render Assurance Assets**:
+The Release-Owned Page Renderer and approved compatible fonts whose immutable identities belong to the active skill release. These assets supplement but do not replace the Host Office Renderer prerequisite.
+_Avoid_: packaged office suite, optional dependency, best-effort tooling
 
 **Render Assurance**:
 The mandatory evidence-backed result showing that the exact Generated Protocol and Generated ICF bytes were rendered and visually reviewed under an identified Active Renderer. An environment or tooling fault leaves assurance unresolved rather than failed; a genuine visual defect must be repaired and reassessed.

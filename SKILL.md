@@ -99,7 +99,8 @@ scripts/
 ```
 
 Do not add a second workflow entrypoint. The installation-owned `runtime/`
-directory is the only renderer fallback location inside an active release.
+directory contains only the manifest-bound PDFium runtime and packaged fonts
+used by Render Assurance; host Word or LibreOffice remains the DOCX renderer.
 
 ## Full loop
 

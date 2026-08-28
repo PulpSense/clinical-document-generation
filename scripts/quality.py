@@ -181,9 +181,7 @@ def _executable_candidates(
     for variable in ("ProgramFiles", "ProgramFiles(x86)", "ProgramData"):
         if value := (environment or os.environ).get(variable):
             base = Path(value)
-            directories.extend((base / "LibreOffice/program", base / "ImageMagick", base / "chocolatey/bin"))
-            directories.extend(sorted(base.glob("ImageMagick-*")))
-            directories.extend(sorted(base.glob("gs/gs*/bin")))
+            directories.extend((base / "LibreOffice/program", base / "chocolatey/bin"))
 
     for directory in directories:
         for name in names:
@@ -296,13 +294,36 @@ def page_renderer(
     return identities[0] if identities else None
 
 
+def _is_release_owned_pdfium_identity(identity: Mapping[str, Any]) -> bool:
+    """Return whether an identity names the installed release-owned runtime."""
+    python_path = Path(str(identity.get("python_path") or "")).expanduser()
+    return (
+        identity.get("kind") == "pypdfium2"
+        and identity.get("path") == "python:pypdfium2"
+        and identity.get("module") == "pypdfium2"
+        and identity.get("source") == "release-owned runtime"
+        and python_path.is_absolute()
+        and python_path.name == "python"
+        and python_path.parent.name == "runtime"
+    )
+
+
 def _one_pdfium_renderer(
     identities: Iterable[Mapping[str, Any]],
+    *,
+    skill_root: Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Keep one governed PDFium identity and discard every alternate backend."""
-    for identity in identities:
-        if identity.get("kind") == "pypdfium2":
-            return [dict(identity)]
+    """Keep one identity verified against this release's manifest and runtime."""
+    candidates = [dict(identity) for identity in identities if _is_release_owned_pdfium_identity(identity)]
+    if skill_root is None:
+        return candidates[:1]
+    verified = page_renderers(skill_root=skill_root)
+    identity_fields = (
+        "kind", "path", "module", "python_path", "version", "source", "wheel", "wheel_sha256",
+    )
+    for identity in candidates:
+        if any(all(identity.get(field) == known.get(field) for field in identity_fields) for known in verified):
+            return [identity]
     return []
 
 
@@ -320,80 +341,67 @@ def rasterize_pdf(
     *,
     first_page_only: bool = False,
     dpi: int = 130,
-    timeout_seconds: float = 180.0,
-    environment: Mapping[str, str] | None = None,
 ) -> list[Path]:
-    """Render PDF pages and normalize every backend to deterministic page-N names."""
+    """Render PDF pages with the current release's manifest-bound PDFium runtime."""
     output_dir.mkdir(parents=True, exist_ok=True)
     for stale in output_dir.glob("page*.png"):
         stale.unlink()
     kind = str(identity["kind"])
-    path = str(identity["path"])
-    prefix = output_dir / "page"
-    command: list[str] | None = None
-    if kind == "pypdfium2":
-        module_name = str(identity.get("module") or "pypdfium2")
-        python_path = str(identity.get("python_path") or "")
-        inserted = False
-        previous_modules: dict[str, Any] = {}
-        if python_path and python_path not in sys.path:
-            sys.path.insert(0, python_path)
-            inserted = True
-        module_roots = ("pypdfium2", "pypdfium2_raw", "pypdfium2_cfg")
-        if python_path:
-            for name in list(sys.modules):
-                if any(name == root or name.startswith(root + ".") for root in module_roots):
-                    previous_modules[name] = sys.modules.pop(name)
-        document = None
-        previous_dont_write_bytecode = sys.dont_write_bytecode
-        sys.dont_write_bytecode = True
-        try:
-            pdfium = importlib.import_module(module_name)
-            if python_path:
-                module_file = Path(str(getattr(pdfium, "__file__", ""))).resolve()
-                try:
-                    module_file.relative_to(Path(python_path).resolve())
-                except ValueError as exc:
-                    raise RuntimeError(f"pypdfium2 resolved outside the release-owned runtime: {module_file}") from exc
-            document = pdfium.PdfDocument(str(pdf))
-            count = min(len(document), 1) if first_page_only else len(document)
-            for index in range(count):
-                page = document[index]
-                bitmap = page.render(scale=dpi / 72.0, rev_byteorder=True)
-                try:
-                    if int(bitmap.format) != 2:
-                        raise RuntimeError(f"PDFium returned unsupported bitmap format {bitmap.format}.")
-                    _write_pdfium_png(bitmap, output_dir / f"page-{index + 1}.png")
-                finally:
-                    bitmap.close()
-                    page.close()
-        except ImportError as exc:
-            raise RuntimeError(f"The release-owned pypdfium2 page renderer is unavailable: {exc}") from exc
-        finally:
-            sys.dont_write_bytecode = previous_dont_write_bytecode
-            if document is not None:
-                document.close()
-            if python_path:
-                for name in list(sys.modules):
-                    if any(name == root or name.startswith(root + ".") for root in module_roots):
-                        sys.modules.pop(name, None)
-                sys.modules.update(previous_modules)
-            if inserted:
-                sys.path.remove(python_path)
-    else:
+    if kind != "pypdfium2":
         raise RuntimeError(f"Unsupported page renderer: {kind}")
 
-    if command is not None:
-        result = subprocess.run(
-            command,
-            text=True,
-            capture_output=True,
-            timeout=timeout_seconds,
-            env=dict(environment) if environment else None,
+    release_root = Path(__file__).resolve().parents[1]
+    governed = _one_pdfium_renderer([identity], skill_root=release_root)
+    if not governed:
+        raise RuntimeError(
+            "PDF page rendering requires the manifest-verified release-owned runtime."
         )
-        if result.returncode:
-            detail = (result.stderr or result.stdout).strip()
-            raise RuntimeError(f"{kind} page-image export failed: {detail}")
+    identity = governed[0]
+    module_name = str(identity["module"])
+    python_path = str(identity["python_path"])
+    inserted = False
+    previous_modules: dict[str, Any] = {}
+    if python_path not in sys.path:
+        sys.path.insert(0, python_path)
+        inserted = True
+    module_roots = ("pypdfium2", "pypdfium2_raw", "pypdfium2_cfg")
+    for name in list(sys.modules):
+        if any(name == root or name.startswith(root + ".") for root in module_roots):
+            previous_modules[name] = sys.modules.pop(name)
+    document = None
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
+    try:
+        pdfium = importlib.import_module(module_name)
+        module_file = Path(str(getattr(pdfium, "__file__", ""))).resolve()
+        try:
+            module_file.relative_to(Path(python_path).resolve())
+        except ValueError as exc:
+            raise RuntimeError(f"pypdfium2 resolved outside the release-owned runtime: {module_file}") from exc
+        document = pdfium.PdfDocument(str(pdf))
+        count = min(len(document), 1) if first_page_only else len(document)
+        for index in range(count):
+            page = document[index]
+            bitmap = page.render(scale=dpi / 72.0, rev_byteorder=True)
+            try:
+                if int(bitmap.format) != 2:
+                    raise RuntimeError(f"PDFium returned unsupported bitmap format {bitmap.format}.")
+                _write_pdfium_png(bitmap, output_dir / f"page-{index + 1}.png")
+            finally:
+                bitmap.close()
+                page.close()
+    except ImportError as exc:
+        raise RuntimeError(f"The release-owned pypdfium2 page renderer is unavailable: {exc}") from exc
+    finally:
+        sys.dont_write_bytecode = previous_dont_write_bytecode
+        if document is not None:
+            document.close()
+        for name in list(sys.modules):
+            if any(name == root or name.startswith(root + ".") for root in module_roots):
+                sys.modules.pop(name, None)
+        sys.modules.update(previous_modules)
+        if inserted:
+            sys.path.remove(python_path)
 
     pages = _ordered_page_images(output_dir)
     if not pages:
@@ -418,7 +426,8 @@ def renderers(
     deadline_monotonic: float | None = None,
     clock: Any = time.monotonic,
 ) -> list[dict[str, Any]]:
-    """List usable DOCX renderers in governed fidelity/fallback order."""
+    """List supported host DOCX renderers in governed fidelity order."""
+    del skill_root
     search_path = (environment or {}).get("PATH") if environment is not None else None
     system = platform.system()
     identities: list[dict[str, Any]] = []
@@ -459,32 +468,6 @@ def renderers(
                 continue
             if result.returncode == 0:
                 append({"kind": "LibreOffice", "path": path, "version": result.stdout.strip(), "platform": system, "source": source})
-    root = (skill_root or Path(__file__).resolve().parents[1]).resolve()
-    bundled_patterns = (
-        "runtime/**/Contents/MacOS/soffice",
-        "runtime/**/program/soffice.exe",
-        "runtime/**/program/soffice",
-        "runtime/**/soffice",
-    )
-    for pattern in bundled_patterns:
-        for candidate in sorted(root.glob(pattern)):
-            if not candidate.is_file() or not os.access(candidate, os.X_OK):
-                continue
-            timeout = probe_timeout()
-            if timeout is None:
-                return identities
-            try:
-                result = subprocess.run([str(candidate), "--version"], text=True, capture_output=True, timeout=timeout, env=dict(environment) if environment else None)
-            except (OSError, subprocess.TimeoutExpired):
-                continue
-            if result.returncode == 0:
-                append({
-                    "kind": "LibreOffice",
-                    "path": str(candidate.resolve()),
-                    "version": result.stdout.strip(),
-                    "platform": system,
-                    "source": "verified fallback stack",
-                })
     return identities
 
 
@@ -493,7 +476,7 @@ def renderer(
     environment: Mapping[str, str] | None = None,
     skill_root: Path | None = None,
 ) -> dict[str, Any] | None:
-    """Return the preferred renderer from the governed fallback ladder."""
+    """Return the preferred supported host office renderer."""
     identities = renderers(environment=environment, skill_root=skill_root)
     return identities[0] if identities else None
 
@@ -818,7 +801,8 @@ def preflight(
     page_candidates = _one_pdfium_renderer(
         [dict(item) for item in page_renderer_identities]
         if page_renderer_identities is not None
-        else page_renderers(environment=runtime_environment, skill_root=repo_root) if remaining() > 0 else []
+        else page_renderers(environment=runtime_environment, skill_root=repo_root) if remaining() > 0 else [],
+        skill_root=repo_root,
     )
     identity = None
     page_identity = None
@@ -900,8 +884,6 @@ def preflight(
                             page_dir,
                             candidate_page_renderer,
                             first_page_only=True,
-                            timeout_seconds=max(0.001, attempt_remaining),
-                            environment=runtime_environment,
                         )
                     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
                         page_attempts.append({"renderer": candidate_page_renderer, "status": "failed", "issue": str(exc)})
@@ -1075,7 +1057,7 @@ def render_pages(
         page_candidates = [dict(page_renderer_identity), *[item for item in page_candidates if dict(item) != dict(page_renderer_identity)]]
     if not page_candidates and page_renderer_identities is None and page_renderer_identity is None:
         page_candidates = page_renderers(environment=runtime_environment, skill_root=repo_root)
-    page_candidates = _one_pdfium_renderer(page_candidates)
+    page_candidates = _one_pdfium_renderer(page_candidates, skill_root=repo_root)
     if not renderer_candidates:
         return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Microsoft Word or LibreOffice renderer is available."}]}
     if not page_candidates:
@@ -1121,7 +1103,7 @@ def render_pages(
                     if remaining <= 0:
                         raise subprocess.TimeoutExpired("PDF page rendering", 0)
                     page_dir = attempt_root / docx.stem / str(candidate["kind"])
-                    pages = export_pages(pdf, page_dir, candidate, dpi=130, timeout_seconds=min(180.0, remaining), environment=runtime_environment)
+                    pages = export_pages(pdf, page_dir, candidate, dpi=130)
                     expected = len(PdfReader(pdf).pages)
                     if len(pages) != expected or expected == 0:
                         raise RuntimeError(f"Page rendering failed for {docx.name}: expected {expected}, got {len(pages)}.")
@@ -1373,7 +1355,8 @@ def render_assurance(
     page_candidates = _one_pdfium_renderer(
         [dict(item) for item in page_renderer_identities]
         if page_renderer_identities is not None
-        else page_renderers(environment=runtime_environment, skill_root=repo_root)
+        else page_renderers(environment=runtime_environment, skill_root=repo_root),
+        skill_root=repo_root,
     )
     render_report = render_pages(
         revision_dir,
