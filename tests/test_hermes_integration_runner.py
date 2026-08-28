@@ -725,7 +725,7 @@ def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: P
     first = next(case for case in result["cases"] if case["fixture_id"] == "ambispective-sterling")
     assert result["status"] == "failed"
     assert first["desktop_operation_elapsed_seconds"] == 1080.001
-    assert first["elapsed_seconds"] == 1080.001
+    assert first["elapsed_seconds"] == 1140.001
     assert first["under_15_minutes"] is False
     assert any("Approval-to-confirmed-retrieval" in finding for finding in first["findings"])
 
