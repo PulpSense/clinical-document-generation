@@ -78,18 +78,16 @@ The Protocol document-control date defaults during Source-of-Truth preparation
 to `dd MMM yyyy` when absent. Version is reviewer-controlled and remains blank
 when absent; it is never inherited from an authority document.
 
-For QA, the workflow uses the first working renderer in this order:
+For QA, the workflow uses a verified host renderer in this order:
 
 1. Microsoft Word
 2. Installed LibreOffice
-3. Apple Pages
-4. The release-local verified LibreOffice fallback
 
 The renderer produces a PDF and a PNG for every page. Delivery remains blocked
 unless an independent visual response assesses every page hash for clipping,
 overlap, overflow, blank pages, table splits, footer collisions, readability,
 duplicate sections, style consistency, headers/footers, and TOC accuracy.
-Tool failure advances through the local fallback stack. A successfully rendered
+Office tool failure may advance between Word and LibreOffice. PDF-to-image rendering always uses the one packaged `pypdfium2` runtime and stops if it fails. A successfully rendered
 defect triggers repair on that renderer, while an unassessed page remains a
 blocker—not a warning.
 The deterministic gate also rejects blank and near-blank continuation pages even

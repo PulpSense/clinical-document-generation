@@ -8,9 +8,9 @@ Future Hermes clinical-document runs target 10–12 minutes and have one persist
 - Construct the complete Protocol/ICF/PRS candidate before terminal Render Assurance capability resolution.
 - Keep Visual QA mandatory. At least one reviewer inspects every exact bound page image; deterministic checks alone cannot pass it. Evidence records the exact DOCX, PDF, and page-image hashes and becomes stale if any of those bytes change.
 - Keep all rendering and review local. A delegated visual-review timeout routes the same request to the parent reviewer.
-- Try Microsoft Word, installed LibreOffice, Pages, then a release-local verified LibreOffice fallback. Tool failure advances; a genuine visual defect triggers repair on the renderer that exposed it.
+- Require host Microsoft Word or LibreOffice for DOCX-to-PDF rendering. Tool failure may advance between those office renderers; a genuine visual defect triggers repair on the renderer that exposed it.
 - Treat font evidence as available, missing, or unknown. Unknown inventory is decided through an actual render. Proven missing fonts use an approved compatible packaged fallback and record the substitution.
-- Package/provision a renderer, page renderer, and compatible fonts. A release activates only after an end-to-end smoke test; failed activation leaves the previous verified release active.
+- Package exactly one pinned `pypdfium2` page renderer and compatible fonts. Never discover an alternate PDF backend. A release activates only after an end-to-end host-office/PDFium smoke test; failed activation leaves the previous verified release active.
 - Record renderer, page-renderer, reviewer, font, substitution, attempt, and exact-artifact evidence in internal manifests without adding technical notices to clinical documents.
 - Preserve the complete branch package atomically. Invalid source, corrupt templates, unsupported content, structural invalidity, or a genuine visual defect may block delivery.
 - At the 30-minute ceiling, retain a complete unresolved candidate internally and publish no client outputs.

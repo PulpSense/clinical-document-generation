@@ -658,6 +658,64 @@ def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> An
     return value
 
 
+def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
+    completed = subprocess.run(
+        [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
+        cwd=candidate,
+        text=True,
+        capture_output=True,
+        timeout=180,
+    )
+    try:
+        assurance = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        assurance = {
+            "status": "blocked",
+            "findings": [{
+                "category": "installation",
+                "field": "smoke",
+                "issue": completed.stderr or completed.stdout or "Installation smoke returned no JSON.",
+            }],
+        }
+    if completed.returncode and assurance.get("status") == "passed":
+        return {
+            "status": "blocked",
+            "findings": [{
+                "category": "installation",
+                "field": "smoke",
+                "issue": completed.stderr or "Installation smoke process failed.",
+            }],
+        }
+    return dict(assurance)
+
+
+def _retain_lightweight_release_history(
+    release: Path,
+    skills_dir: Path,
+) -> Path:
+    identity = _active_release_identity(release)
+    certification: dict[str, Any] = {}
+    promotion_path = release / "PROMOTION-RECORD.json"
+    if promotion_path.is_file():
+        try:
+            certification = dict(_read(promotion_path).get("certification") or {})
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            certification = {}
+    fingerprint = str(identity["package_fingerprint"])
+    history_key = "".join(
+        character for character in fingerprint
+        if character.isalnum() or character in "-_"
+    )
+    history_path = skills_dir / "release-history" / f"{history_key}.json"
+    _write(history_path, {
+        "schema_version": "release-history/v1",
+        "git_commit": identity.get("git_commit"),
+        "package_fingerprint": fingerprint,
+        "certification": certification,
+    })
+    return history_path
+
+
 def install_release(
     archive_path: Path,
     skills_dir: Path,
@@ -685,25 +743,11 @@ def install_release(
         provision = dict(provisioner(candidate))
         if provision.get("status") != "passed":
             return {"status": "blocked", "stage": "provision", "findings": list(provision.get("findings", [])), "active_release_retained": active.is_dir()}
-        if verifier is None:
-            completed = subprocess.run(
-                [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
-                cwd=candidate,
-                text=True,
-                capture_output=True,
-                timeout=180,
-            )
-            try:
-                assurance = json.loads(completed.stdout)
-            except json.JSONDecodeError:
-                assurance = {
-                    "status": "blocked",
-                    "findings": [{"category": "installation", "field": "smoke", "issue": completed.stderr or completed.stdout or "Installation smoke returned no JSON."}],
-                }
-            if completed.returncode and assurance.get("status") == "passed":
-                assurance = {"status": "blocked", "findings": [{"category": "installation", "field": "smoke", "issue": completed.stderr or "Installation smoke process failed."}]}
-        else:
-            assurance = dict(verifier(candidate))
+        assurance = (
+            _installation_smoke_result(candidate)
+            if verifier is None
+            else dict(verifier(candidate))
+        )
         if assurance.get("status") != "passed":
             return {"status": "blocked", "stage": "installation_smoke", "findings": list(assurance.get("findings", [])), "active_release_retained": active.is_dir()}
         recorded_provision = _relocate_paths(provision, candidate, active)
@@ -715,7 +759,9 @@ def install_release(
             "assurance": recorded_assurance,
         })
         displaced_previous = None
+        retained_history = None
         if previous.exists():
+            retained_history = _retain_lightweight_release_history(previous, skills_dir)
             displaced_previous = skills_dir / f".clinical-document-generation.previous-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             os.replace(previous, displaced_previous)
         if active.exists():
@@ -725,17 +771,105 @@ def install_release(
         except Exception:
             if previous.exists() and not active.exists():
                 os.replace(previous, active)
+            if displaced_previous is not None and displaced_previous.exists() and not previous.exists():
+                os.replace(displaced_previous, previous)
+            if retained_history is not None:
+                retained_history.unlink(missing_ok=True)
             raise
+        if displaced_previous is not None:
+            shutil.rmtree(displaced_previous)
         return {
             "status": "passed",
             "stage": "activated",
             "active": str(active),
             "previous": str(previous) if previous.exists() else None,
-            "displaced_previous": str(displaced_previous) if displaced_previous else None,
+            "retained_history": str(retained_history) if retained_history else None,
             "assurance": recorded_assurance,
         }
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
+
+
+def rollback_release(
+    skills_dir: Path,
+    *,
+    verifier: Callable[[Path], Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Verify and atomically restore the previous release, quarantining active."""
+    skills_dir = skills_dir.expanduser().resolve()
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    if not active.is_dir() or not previous.is_dir():
+        return {
+            "status": "blocked",
+            "stage": "rollback_precondition",
+            "findings": [{
+                "category": "installation",
+                "field": "rollback",
+                "issue": "Rollback requires complete active and immediately previous releases.",
+            }],
+            "active_release_retained": active.is_dir(),
+            "previous_release_retained": previous.is_dir(),
+        }
+    assurance = (
+        _installation_smoke_result(previous)
+        if verifier is None
+        else dict(verifier(previous))
+    )
+    if assurance.get("status") != "passed":
+        return {
+            "status": "blocked",
+            "stage": "rollback_smoke",
+            "findings": list(assurance.get("findings", [])),
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    try:
+        manifest = _read(active / RELEASE_MANIFEST)
+        fingerprint = str(manifest.get("package_fingerprint") or "")
+    except (OSError, ValueError, json.JSONDecodeError):
+        fingerprint = ""
+    if not fingerprint:
+        return {
+            "status": "blocked",
+            "stage": "rollback_identity",
+            "findings": [{
+                "category": "installation",
+                "field": "package_fingerprint",
+                "issue": "The active release has no package fingerprint and cannot be quarantined safely.",
+            }],
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    quarantine_key = "".join(character for character in fingerprint if character.isalnum() or character in "-_")
+    quarantine = skills_dir / f".clinical-document-generation.quarantine-{quarantine_key}"
+    if quarantine.exists():
+        return {
+            "status": "blocked",
+            "stage": "rollback_quarantine",
+            "findings": [{
+                "category": "installation",
+                "field": "quarantine",
+                "issue": f"Rollback quarantine already exists: {quarantine}",
+            }],
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    os.replace(active, quarantine)
+    try:
+        os.replace(previous, active)
+    except Exception:
+        if quarantine.exists() and not active.exists():
+            os.replace(quarantine, active)
+        raise
+    return {
+        "status": "passed",
+        "stage": "rolled_back",
+        "active": str(active),
+        "quarantined": str(quarantine),
+        "assurance": assurance,
+        "historical_run_revisions_rewritten": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -2779,13 +2913,16 @@ def run_release_gate(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an installable release archive"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a release archive"); parser.add_argument("--skills-dir", help="Hermes skills directory for --install-release")
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an installable release archive"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback")
     args = parser.parse_args(argv)
     if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.verify_installation: result = verify_installation(SCRIPT_DIR.parent)
     elif args.install_release:
         if not args.skills_dir: parser.error("--skills-dir is required with --install-release")
         result = install_release(Path(args.install_release), Path(args.skills_dir))
+    elif args.rollback_release:
+        if not args.skills_dir: parser.error("--skills-dir is required with --rollback-release")
+        result = rollback_release(Path(args.skills_dir))
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     else:
         if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless --release-gate is used")
@@ -2794,7 +2931,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

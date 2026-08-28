@@ -39,14 +39,13 @@ See [SKILL.md](SKILL.md) for the exact Hermes orchestration and retry loop.
 
 - Python 3.10+
 - Dependencies in `requirements.txt`
-- Preferred host renderers: Microsoft Word, LibreOffice, then Apple Pages
-- A version-local LibreOffice fallback provisioned during activation
-- Page-image fallbacks ending in required PyMuPDF
+- Required host renderer: Microsoft Word or LibreOffice
+- One release-owned page renderer: pinned `pypdfium2` 5.13.0
 - No Node.js or TypeScript
 
-Activation provisions and smoke-tests a release-owned LibreOffice renderer, a release-owned PyMuPDF page renderer, and packaged compatible fonts. Preferred host tools remain first in the runtime ladder, but their absence cannot make the active release incapable of Visual QA. Normal generation never installs packages, fonts, or changes machine configuration. It builds the complete candidate before resolving Render Assurance, treats unknown font inventory as a render test rather than a missing font, maps proven-missing fonts only to explicit packaged Liberation substitutes, and records every fallback in the manifest.
+Activation verifies host Word or LibreOffice, installs the manifest-bound `pypdfium2` wheel offline into the release runtime, and smoke-tests that exact DOCX-to-PDF-to-PNG path with the packaged compatible fonts. No alternate PDF renderer is discovered or used. Normal generation never installs packages, fonts, or changes machine configuration. It builds the complete candidate before resolving Render Assurance, treats unknown font inventory as a render test rather than a missing font, and maps proven-missing fonts only to explicit packaged Liberation substitutes.
 
-The client outputs are standard `.docx` and `.xml` files. Microsoft Word is not required on the authoring computer; the workflow uses the best installed renderer for local QA and keeps the output Word-compatible.
+The client outputs are standard `.docx` and `.xml` files. The authoring host must provide Microsoft Word or LibreOffice for DOCX rendering; the workflow records which application produced the local QA evidence.
 
 Protocol and ICF rendering begins from the bundled client Word families. The renderer preserves their visual design, replaces study-specific Protocol bodies with accepted drafts, keeps applicable ICF regulatory language, removes example-study leakage, and blocks empty or near-empty rendered pages.
 
@@ -165,6 +164,7 @@ operation to obtain a new deadline.
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
 "$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
 "$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
+"$CLINICAL_PYTHON" scripts/workflow.py --rollback-release --skills-dir /absolute/path/to/hermes/skills
 ```
 
 The first release-gate command may return `awaiting_hermes` with independent
@@ -188,8 +188,8 @@ Prospective and Ambispective publish Protocol + ICF + PRS XML. Retrospective pub
 ## Hermes installation
 
 For a release, build the archive with `--package-release` and activate it with
-`--install-release`. The installer stages the candidate, provisions its local
-fallback runtime, verifies package hashes, renders a DOCX, rasterizes a page,
+`--install-release`. The installer stages the candidate, verifies host Word or
+LibreOffice, installs its packaged PDFium runtime offline, verifies package hashes, renders a DOCX, rasterizes a page,
 checks the packaged fonts, and atomically swaps it into the Hermes skills
 directory. A failed update retains the previous verified release. The archive
 includes the templates, contracts,
@@ -215,5 +215,12 @@ and confirm byte length and SHA-256 before reporting success.
 Release Certification additionally requires completion within 15 minutes; a
 slower valid operation may still deliver before the 30-minute correctness
 ceiling, but receives a non-certifying runtime outcome.
+
+`--rollback-release` verifies the immediately previous release before one
+atomic swap, restores it as active, and quarantines the suspect release without
+rewriting historical Run Revisions. Activation retains complete runtime
+material only for active and immediately previous releases; displaced older
+releases become lightweight identity and certification records under
+`release-history/`.
 
 The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.

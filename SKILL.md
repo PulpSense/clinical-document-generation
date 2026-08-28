@@ -49,12 +49,14 @@ Python 3.10+ path.
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
 "$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
 "$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
+"$CLINICAL_PYTHON" scripts/workflow.py --rollback-release --skills-dir /absolute/path/to/hermes/skills
 ```
 
 `--package-release` creates the installable candidate from the current
 checkout. Activate it with `--install-release`; direct extraction is not a
-supported update path. Installation provisions the version-local fallback
-stack, runs an end-to-end render/page-image smoke, and only then atomically
+supported update path. Installation verifies host Word or LibreOffice, installs
+the one manifest-bound `pypdfium2` wheel offline, runs an end-to-end
+render/page-image smoke, and only then atomically
 replaces the active `clinical-document-generation` directory. A failed smoke
 leaves the previous verified release active. The archive contains
 `RELEASE-MANIFEST.json`, which
@@ -234,9 +236,9 @@ The visual verifier must use image inspection. File existence, DOCX text extract
 
 The deterministic render gate also rejects pages with no meaningful body content, even when a running header or page number is present. A signature or continuation sentence may not be stranded on an otherwise empty page.
 
-Candidate construction does not depend on the render environment. Build the complete Protocol/ICF/XML candidate first, then resolve Render Assurance in this order: Microsoft Word, installed LibreOffice, Apple Pages, and the version-local verified LibreOffice fallback. Tool failure advances to the next renderer; a successfully rendered visual defect stays bound to that renderer and enters repair instead of switching to obtain an easier pass. Page rendering independently exhausts Poppler `pdftoppm`, Poppler `pdftocairo`, MuPDF `mutool`, Ghostscript, ImageMagick, and packaged PyMuPDF.
+Candidate construction does not depend on the render environment. Build the complete Protocol/ICF/XML candidate first, then resolve DOCX rendering through host Microsoft Word or LibreOffice. Tool failure may advance between those office renderers; a successfully rendered visual defect stays bound to that renderer and enters repair instead of switching to obtain an easier pass. Page rendering always uses the release-owned `pypdfium2` 5.13.0 runtime. If PDFium fails, stop with the governed diagnostic; never discover or use another PDF backend.
 
-Font evidence is tri-state. `available` preserves the declared font; `missing` selects the explicit release-owned compatible Liberation mapping and writes that substitution into the candidate; `unknown` preserves the declared font and decides capability through the disposable render smoke. Heuristic host substitutions are not accepted, and “cannot inspect” is never treated as “missing.” The manifest records renderer attempts, page-renderer attempts, font evidence, substitutions, exact artifact hashes, and page-image review. Installation owns provisioning of both LibreOffice and PyMuPDF; normal generation remains read-only.
+Font evidence is tri-state. `available` preserves the declared font; `missing` selects the explicit release-owned compatible Liberation mapping and writes that substitution into the candidate; `unknown` preserves the declared font and decides capability through the disposable render smoke. Heuristic host substitutions are not accepted, and “cannot inspect” is never treated as “missing.” The manifest records renderer attempts, the one PDFium identity, font evidence, substitutions, exact artifact hashes, and page-image review. Installation owns offline PDFium provisioning and verifies the host office prerequisite; normal generation remains read-only.
 
 ## Word template authorities
 

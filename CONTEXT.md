@@ -127,7 +127,7 @@ The best supported document renderer available on the generation host—preferre
 _Avoid_: Client Rendering Authority, generic renderer, invisible converter
 
 **Verified Fallback Stack**:
-The release-owned assurance capability that keeps mandatory Visual QA available when preferred host capabilities fail. Its verified identity belongs to the active skill release.
+The release-owned assurance capability comprising approved compatible fonts and the single manifest-bound PDFium page renderer. Host Microsoft Word or LibreOffice remains a verified installation prerequisite for DOCX-to-PDF rendering. Its verified identity belongs to the active skill release.
 _Avoid_: optional dependency, best-effort tooling, host assumption
 
 **Render Assurance**:

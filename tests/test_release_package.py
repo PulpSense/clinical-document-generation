@@ -235,6 +235,121 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
     assert assurance["assurance"]["renderer"]["path"] == str(active / "runtime/soffice")
 
 
+def test_one_rollback_operation_verifies_previous_and_quarantines_active(tmp_path):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    for release, fingerprint, marker in (
+        (active, "suspect-fingerprint", "suspect"),
+        (previous, "verified-fingerprint", "verified previous"),
+    ):
+        release.mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(
+            json.dumps({"package_fingerprint": fingerprint}),
+            encoding="utf-8",
+        )
+    historical_revision = skills_dir / "runs/revision-1.json"
+    historical_revision.parent.mkdir()
+    historical_revision.write_text('{"package_fingerprint":"suspect-fingerprint"}', encoding="utf-8")
+    verified = []
+
+    result = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda release: verified.append(release) or {"status": "passed"},
+    )
+
+    assert result["status"] == "passed"
+    assert result["stage"] == "rolled_back"
+    assert verified == [previous]
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
+    quarantine = Path(result["quarantined"])
+    assert quarantine.parent == skills_dir
+    assert quarantine.name == ".clinical-document-generation.quarantine-suspect-fingerprint"
+    assert (quarantine / "marker.txt").read_text(encoding="utf-8") == "suspect"
+    assert not previous.exists()
+    assert historical_revision.read_text(encoding="utf-8") == (
+        '{"package_fingerprint":"suspect-fingerprint"}'
+    )
+
+
+def test_failed_rollback_verification_leaves_active_and_previous_unchanged(tmp_path):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("active", encoding="utf-8")
+    (previous / "marker.txt").write_text("previous", encoding="utf-8")
+
+    result = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {
+            "status": "blocked",
+            "findings": [{"issue": "controlled smoke failure"}],
+        },
+    )
+
+    assert result == {
+        "status": "blocked",
+        "stage": "rollback_smoke",
+        "findings": [{"issue": "controlled smoke failure"}],
+        "active_release_retained": True,
+        "previous_release_retained": True,
+    }
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous"
+
+
+def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr("clinical-document-generation/SKILL.md", "new release")
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    for release, fingerprint in (
+        (active, "immediate-previous"),
+        (previous, "historical-release"),
+    ):
+        (release / "runtime").mkdir(parents=True)
+        (release / "runtime/full-runtime.bin").write_bytes(b"full runtime")
+        (release / "RELEASE-MANIFEST.json").write_text(
+            json.dumps({
+                "git_commit": f"commit-{fingerprint}",
+                "package_fingerprint": fingerprint,
+            }),
+            encoding="utf-8",
+        )
+    (previous / "PROMOTION-RECORD.json").write_text(
+        json.dumps({"certification": {"status": "passed", "report_sha256": "report-hash"}}),
+        encoding="utf-8",
+    )
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {"status": "passed"},
+    )
+
+    assert result["status"] == "passed"
+    assert (active / "SKILL.md").read_text(encoding="utf-8") == "new release"
+    assert (previous / "runtime/full-runtime.bin").read_bytes() == b"full runtime"
+    history_path = Path(result["retained_history"])
+    assert history_path == skills_dir / "release-history/historical-release.json"
+    assert json.loads(history_path.read_text(encoding="utf-8")) == {
+        "schema_version": "release-history/v1",
+        "git_commit": "commit-historical-release",
+        "package_fingerprint": "historical-release",
+        "certification": {"status": "passed", "report_sha256": "report-hash"},
+    }
+    assert not any(
+        path.name.startswith(".clinical-document-generation.previous-")
+        for path in skills_dir.iterdir()
+    )
+
+
 def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_renderer(tmp_path, monkeypatch):
     bundled = {
         "kind": "pypdfium2",

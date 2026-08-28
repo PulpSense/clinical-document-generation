@@ -7,7 +7,7 @@ Use the repository root as the Hermes skill directory and follow `SKILL.md`.
 - Python 3.10+
 - `python3 -m pip install -r requirements.txt`
 - A release activated through `workflow.py --install-release`
-- Preferred host applications are optional; the verified local fallback stack is mandatory
+- Host Microsoft Word or LibreOffice is mandatory; the release-owned PDFium runtime is installed offline
 
 No Node.js or TypeScript is used.
 
@@ -52,5 +52,5 @@ resume it with `python3 scripts/workflow.py --release-gate --release-gate-root
 pass all six branch/richness cases. A missing renderer, unassessed page, invalid
 response binding, missing section, unresolved token, XML mismatch, or
 approval/source-hash mismatch blocks all client outputs. Renderer and tool
-failures first exhaust the verified fallback stack; a complete candidate is
+office failures may advance between Word and LibreOffice, but PDFium failure stops with one diagnostic; a complete candidate is
 retained internally when the Delivery Gate remains unresolved.
