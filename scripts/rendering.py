@@ -1365,6 +1365,32 @@ def _remove_advarra_example_study_prose(document: Document) -> None:
             paragraph._element.getparent().remove(paragraph._element)
 
 
+def _normalize_advarra_legal_rights(document: Document, reference: Mapping[str, Any]) -> None:
+    """Retain the Advarra Legal Rights shell while carrying supplied injury handling."""
+    injury_handling = _text(get_path(reference, "risks_benefits.injury_handling"))
+    if not injury_handling:
+        return
+    heading = next((
+        paragraph for paragraph in document.paragraphs
+        if _icf_heading_key(paragraph.text) == _icf_heading_key("LEGAL RIGHTS")
+    ), None)
+    if heading is None:
+        return
+    heading_texts = {
+        _icf_heading_key(title)
+        for title in set(_ADVARRA_ICF_HEADINGS.values()) | _ADVARRA_RETAINED_HEADINGS
+    }
+    elements, exemplar = _icf_section_elements(document, heading, heading_texts)
+    if any(
+        element.tag == qn("w:p")
+        and " ".join(Paragraph(element, document).text.split()) == " ".join(injury_handling.split())
+        for element in elements
+    ):
+        return
+    anchor = elements[-1] if elements else heading._p
+    _insert_icf_blocks(document, anchor, [(injury_handling, False)], exemplar)
+
+
 def _normalize_icf_withdrawal(document: Document, boilerplate: Mapping[str, str]) -> None:
     paragraphs = list(document.paragraphs)
     start = next((
@@ -2226,6 +2252,8 @@ def _template_document(
             _normalize_advarra_contact_sections(document, reference, boilerplate)
         _normalize_icf_front_matter(document, reference)
         _normalize_source_bound_shell(document, reference, icf=True)
+        if not sterling:
+            _normalize_advarra_legal_rights(document, reference)
         _apply_icf_authority_layout(document, authority, model, sterling=sterling)
         _normalize_icf_preferences(document)
         _compact_icf_signature_end(document)

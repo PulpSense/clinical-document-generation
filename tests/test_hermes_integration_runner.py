@@ -17,6 +17,7 @@ from hermes_e2e import (
     DiagnosticOutcome,
     _agent_prompt,
     _certified_release,
+    _response_is_bound,
     _run_handoff_wave,
     _wait_for_processes,
     certification_fixture,
@@ -35,9 +36,69 @@ from hermes_e2e import (
 import workflow
 import drafting
 import hermes_e2e
+import quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path, Path, Path]:
+    request_path = revision_dir / "hermes/verification-requests/visual.json"
+    response_path = revision_dir / "hermes/verification-responses/visual.json"
+    docx_path = revision_dir / "candidate/protocol.docx"
+    pdf_path = revision_dir / "rendered/protocol.pdf"
+    page_path = revision_dir / "rendered/protocol/page-1.png"
+    for path, payload in (
+        (docx_path, b"bound docx bytes"),
+        (pdf_path, b"bound pdf bytes"),
+        (page_path, b"bound page bytes"),
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "visual",
+        "task": "rendered_page_visual_verification",
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+        "checks": list(quality.VISUAL_CHECKS),
+        "artifacts": [{
+            "artifact": "protocol",
+            "docx": docx_path.relative_to(revision_dir).as_posix(),
+            "docx_sha256": quality.sha256_file(docx_path),
+            "pdf": pdf_path.relative_to(revision_dir).as_posix(),
+            "pdf_sha256": quality.sha256_file(pdf_path),
+            "pages": [{
+                "path": page_path.relative_to(revision_dir).as_posix(),
+                "page": 1,
+                "sha256": quality.sha256_file(page_path),
+            }],
+        }],
+    }
+    request["request_sha256"] = quality.verification_request_sha256(request)
+    request_path.parent.mkdir(parents=True, exist_ok=True)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response_path.write_text(json.dumps({
+        "schema_version": quality.RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "status": "passed",
+        "findings": [],
+        "producer": {"model_id": "hermes/test"},
+        "page_assessments": [{
+            "artifact": "protocol",
+            "page": 1,
+            "sha256": quality.sha256_file(page_path),
+            "status": "passed",
+            "checks": list(quality.VISUAL_CHECKS),
+        }],
+    }), encoding="utf-8")
+    handoff = {
+        "request_path": request_path.relative_to(revision_dir).as_posix(),
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+    }
+    return handoff, request_path, response_path, page_path
 
 
 def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_paths() -> None:
@@ -48,6 +109,7 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
     assert [attempt["outcome"] for attempt in ledger["attempts"]] == [
         "failed_preflight",
         "failed_first_real_case",
+        "failed_second_real_case",
     ]
     assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
     assert "/tmp/" not in path.read_text(encoding="utf-8")
@@ -1042,7 +1104,8 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
         release_root=tmp_path,
         desktop_operation=controlled_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
-        parent_visual_reviewer=lambda handoffs, remaining: parent_reviews.append((handoffs, remaining)),
+        parent_visual_reviewer=lambda handoffs, remaining, _validator: parent_reviews.append((handoffs, remaining)),
+        verification_response_validator=quality.verification_response_is_complete,
         state_path_resolver=workflow.desktop_operation_state_path,
     )
 
@@ -1074,36 +1137,16 @@ def test_release_report_handles_a_resolved_state_path_behind_a_symlink(tmp_path:
 
 def test_parent_visual_review_waits_for_bound_desktop_responses(tmp_path: Path) -> None:
     revision = tmp_path / "revisions/r-test"
-    request_path = revision / "hermes/verification-requests/visual.json"
-    response_path = revision / "hermes/verification-responses/visual.json"
-    response_path.parent.mkdir(parents=True)
-    request_path.parent.mkdir(parents=True)
+    handoff, _, _, _ = _write_complete_visual_verification(revision)
     (tmp_path / "reference").mkdir()
     (tmp_path / "reference/study.reference.json").write_text(json.dumps({
         "approval": {"revision_id": "r-test"},
     }), encoding="utf-8")
-    request = {
-        "request_id": "visual",
-        "request_sha256": "a" * 64,
-        "task": "rendered_page_visual_verification",
-        "response_path": "hermes/verification-responses/visual.json",
-    }
-    request_path.write_text(json.dumps(request), encoding="utf-8")
-    response_path.write_text(json.dumps({
-        "request_id": "visual",
-        "request_sha256": "a" * 64,
-        "task": "rendered_page_visual_verification",
-        "producer": {"model_id": "desktop-parent/gpt-5.6-sol"},
-    }), encoding="utf-8")
-
     wait_for_parent_visual_review(
         tmp_path,
-        [{
-            "request_path": "hermes/verification-requests/visual.json",
-            "response_path": "hermes/verification-responses/visual.json",
-            "task": "rendered_page_visual_verification",
-        }],
+        [handoff],
         1.0,
+        response_is_complete=quality.verification_response_is_complete,
     )
 
     marker = json.loads((tmp_path / "logs/desktop-parent-visual-review.json").read_text())
@@ -1138,6 +1181,7 @@ def test_parent_visual_review_reports_progress_while_waiting(tmp_path: Path, mon
                 "task": "rendered_page_visual_verification",
             }],
             62.0,
+            response_is_complete=quality.verification_response_is_complete,
             progress=lambda stage, remaining: progress.append((stage, remaining)),
         )
     except RuntimeError:
@@ -1241,6 +1285,48 @@ def test_bound_response_completion_terminates_and_reaps_the_owned_worker(monkeyp
     assert signals == [(process.pid, 15)]
 
 
+def test_bound_but_incomplete_visual_pass_is_not_terminal(tmp_path: Path) -> None:
+    revision_dir = tmp_path / "revision"
+    handoff, _, response_path, _ = _write_complete_visual_verification(revision_dir)
+    response = json.loads(response_path.read_text(encoding="utf-8"))
+    response["page_assessments"] = []
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    assert _response_is_bound(
+        revision_dir,
+        handoff,
+        quality.verification_response_is_complete,
+    ) is False
+
+
+def test_complete_visual_pass_is_terminal(tmp_path: Path) -> None:
+    revision_dir = tmp_path / "revision"
+    handoff, request_path, _, page_path = _write_complete_visual_verification(revision_dir)
+
+    assert _response_is_bound(
+        revision_dir,
+        handoff,
+        quality.verification_response_is_complete,
+    ) is True
+
+    page_path.write_bytes(b"mutated page bytes")
+    assert _response_is_bound(
+        revision_dir,
+        handoff,
+        quality.verification_response_is_complete,
+    ) is False
+
+    page_path.write_bytes(b"bound page bytes")
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request["instructions"] = "unhashed mutation"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    assert _response_is_bound(
+        revision_dir,
+        handoff,
+        quality.verification_response_is_complete,
+    ) is False
+
+
 def test_wait_reports_progress_while_workers_are_still_running(monkeypatch) -> None:
     class CompletesOnSecondPoll:
         pid = 12345
@@ -1293,6 +1379,7 @@ def test_handoff_wave_closes_parent_log_handles(tmp_path: Path, monkeypatch) -> 
             "batch_id": "protocol-foundations",
         }],
         timeout_seconds=1.0,
+        response_is_complete=quality.verification_response_is_complete,
     )
 
     assert captured_handles
@@ -1334,6 +1421,7 @@ def test_handoff_wave_keeps_sandbox_profile_until_the_worker_finishes(tmp_path: 
             "batch_id": "protocol-foundations",
         }],
         timeout_seconds=1.0,
+        response_is_complete=quality.verification_response_is_complete,
         sandbox=True,
     )
 

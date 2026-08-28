@@ -382,6 +382,17 @@ def test_prospective_advarra_repairs_legal_rights_without_inventing_injury_secti
     assert "This draft must not create a template section." not in visible
     assert "The above statement" not in visible
     assert "You do not lose any legal rights by signing and dating this consent document." in visible
+    assert reference["risks_benefits"]["injury_handling"] in visible
+
+
+def test_ambispective_advarra_carries_approved_injury_handling_in_legal_rights(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "prs": {}, "icf": {}})
+    visible = _visible_text(Document(tmp_path / "candidate/icf.docx"))
+
+    assert "LEGAL RIGHTS" in visible
+    assert reference["risks_benefits"]["injury_handling"] in visible
 
 
 def test_shallow_section_draft_cannot_pass_content_depth_gate(tmp_path):
@@ -412,6 +423,49 @@ def test_shallow_section_draft_cannot_pass_content_depth_gate(tmp_path):
 
     assert "introduction" not in accepted_ids
     assert any(item["field"] == "introduction" for item in findings)
+
+
+def test_completion_drafts_omitting_approved_follow_up_visits_are_rejected(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/release-certification/prospective-advarra/approved-reference.json"
+    ).read_text(encoding="utf-8"))
+    batch = next(item for item in batch_plan("Prospective", "Advarra") if item.batch_id == "protocol-operations")
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-completion-coverage",
+        reference=reference,
+        batch=batch,
+        attempts={section_id: 1 for section_id in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    completion_ids = {"endpoint-criteria.completion", "endpoint-criteria.study-completion"}
+    for result in response["section_results"]:
+        if result["section_id"] not in completion_ids:
+            continue
+        subject = "participant" if result["section_id"] == "endpoint-criteria.completion" else "study"
+        result["paragraphs"] = [{
+            "text": f"The {subject} reaches completion after the Baseline visit on Day 0 within the 3-month timeline.",
+            "evidence_refs": [
+                "source:study.timeline",
+                "source:procedures.visit_schedule",
+                "source:procedures.assessments",
+            ],
+            "boilerplate_refs": [],
+        }]
+        result["lists"] = []
+
+    accepted, findings = validate_response(request, response)
+    accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
+
+    assert not completion_ids & accepted_ids
+    assert completion_ids <= {item["field"] for item in findings}
+    assert all(
+        any("material facts are not observable" in item["issue"] for item in findings if item["field"] == section_id)
+        for section_id in completion_ids
+    )
 
 
 def test_client_protocol_template_renders_source_supported_schedule_of_assessments(tmp_path):

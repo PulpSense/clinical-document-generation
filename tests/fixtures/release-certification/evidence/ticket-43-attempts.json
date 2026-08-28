@@ -49,6 +49,56 @@
         "owned_processes_reaped": true,
         "late_responses_ignored": true
       }
+    },
+    {
+      "id": "prospective-completion-coverage-and-premature-review-completion",
+      "classification": "rejected_candidate",
+      "outcome": "failed_second_real_case",
+      "candidate_git_commit": "a41b0441f9bb5d553d06bd2a676a82f367cd5e89",
+      "candidate_package_fingerprint": "14e3818ad5ffb5ad53e481a3bf104015802a79e2d2bafbf0607a7eec8e68e4d3",
+      "candidate_archive_sha256": "7a141b0e1b0b5529efbc04792a4ff0c89a50e5915bee3e669eae470aa8dc710e",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "4840d1a64058590be0b80a8254b786086fc13363328badc0520fafd9e1d22e82",
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "outcome": "passed",
+        "desktop_operation_elapsed_seconds": 594.797,
+        "under_15_minutes": true,
+        "case_report_sha256": "29c6abdc0d8ac49116739e0d49bb212577cde7fea24a6c3bb7ca0cee2f92fdad",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 5,
+          "protocol_pages": 12,
+          "checks_per_page": 14,
+          "producer_model_id": "openai-codex/gpt-5.6-sol"
+        }
+      },
+      "failed_case": {
+        "fixture_id": "prospective-advarra",
+        "desktop_operation_elapsed_seconds": 998.546,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "operation_outcome": "invalid-Hermes-response",
+        "case_report_sha256": "7c7041e1c4694db6f8a4f5efe5cdaa3563d6cb146582e164c306cd03ef643545",
+        "desktop_operation_state_sha256": "1eed41f5bdf7e96594ffdc8d4057fe8a370ab76e1984b63485cffa38faf93ebb",
+        "repair_report_sha256": "c1423fda3d7a5957e958c9ccaa030a1399ae67165c1b9d28228f9816e4ff0f95",
+        "first_content_response_sha256": "c28a142bbaa47d27ec33db600a74f2d5149ecc01d9b1232b2509c016469258b5",
+        "second_content_response_sha256": "e3399f8f48ab31e5892228cd7d59e5bd68833363c04f3a02383d4e0a27e15529",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 6,
+          "protocol_pages": 9,
+          "checks_per_page": 14,
+          "producer_model_id": "desktop-parent/gpt-5.6-sol"
+        }
+      },
+      "finding": "Protocol Sections 18.1 and 18.5 repeatedly omitted the approved Month 1 and Month 3 visits, and the handoff watcher terminated visual reviewers as soon as a response was bound even when its pass schema was incomplete.",
+      "remediation": "Require terminal, structurally complete verification responses before reaping Hermes reviewers and make every approved visit and time point an item-complete obligation for both completion sections.",
+      "corpus_report_sha256": "dbdf684b5e7175342b86c5888ab7f3be26b2c1bc954418ee1986bbfcc95a0d81",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
     }
   ]
 }

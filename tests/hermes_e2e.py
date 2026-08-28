@@ -838,17 +838,11 @@ def _wait_for_processes(
 def _response_is_bound(
     revision_dir: Path,
     handoff: Mapping[str, Any],
+    response_is_complete: Callable[[Path, Path], bool],
 ) -> bool:
-    request = _read_json(revision_dir / str(handoff.get("request_path") or ""))
-    response = _read_json(revision_dir / str(handoff.get("response_path") or ""))
-    if request is None or response is None:
-        return False
-    return not any((
-        response.get("request_id") != request.get("request_id"),
-        response.get("request_sha256") != request.get("request_sha256"),
-        response.get("task") != request.get("task"),
-        not str((response.get("producer") or {}).get("model_id") or "").strip(),
-    ))
+    """Delegate terminal-pass authentication to the immutable candidate validator."""
+    request_path = revision_dir / str(handoff.get("request_path") or "")
+    return response_is_complete(revision_dir, request_path)
 
 
 def wait_for_parent_visual_review(
@@ -856,6 +850,7 @@ def wait_for_parent_visual_review(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
     *,
+    response_is_complete: Callable[[Path, Path], bool],
     progress: Callable[[str, float], None] | None = None,
 ) -> None:
     """Wait inside the original operation for Desktop-parent page review evidence."""
@@ -880,7 +875,7 @@ def wait_for_parent_visual_review(
     deadline = started + max(0.0, remaining_seconds)
     last_progress = started
     while time.monotonic() < deadline:
-        if all(_response_is_bound(revision_dir, handoff) for handoff in handoffs):
+        if all(_response_is_bound(revision_dir, handoff, response_is_complete) for handoff in handoffs):
             record("completed")
             return
         observed = time.monotonic()
@@ -898,6 +893,7 @@ def _run_handoff_wave(
     handoffs: Sequence[Mapping[str, Any]],
     *,
     timeout_seconds: float,
+    response_is_complete: Callable[[Path, Path], bool],
     skill_root: Path = REPO_ROOT,
     sandbox: bool = False,
     progress: Any | None = None,
@@ -963,6 +959,7 @@ def _run_handoff_wave(
             completion_check=lambda process: _response_is_bound(
                 revision_dir,
                 handoff_by_process[id(process)],
+                response_is_complete,
             ),
         )
     finally:
@@ -1002,7 +999,8 @@ def run_release_certification_operation(
     operation_id: str = "default",
     desktop_operation: Any | None = None,
     release_identity: Mapping[str, Any] | None = None,
-    parent_visual_reviewer: Callable[[list[Mapping[str, Any]], float], None] | None = None,
+    parent_visual_reviewer: Callable[[list[Mapping[str, Any]], float, Callable[[Path, Path], bool] | None], None] | None = None,
+    verification_response_validator: Callable[[Path, Path], bool] | None = None,
     hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
     state_path_resolver: Callable[[Path, str], Path] | None = None,
 ) -> dict[str, Any]:
@@ -1012,6 +1010,7 @@ def run_release_certification_operation(
         certified_workflow, certified_identity = _certified_release(release_root)
         desktop_operation = certified_workflow.run_desktop_operation
         state_path_resolver = certified_workflow.desktop_operation_state_path
+        verification_response_validator = certified_workflow.verification_response_is_complete
         release_identity = certified_identity
     elif not str((release_identity or {}).get("package_fingerprint") or ""):
         raise ValueError("An injected controlled operation requires an explicit release fingerprint.")
@@ -1034,6 +1033,8 @@ def run_release_certification_operation(
         last_progress[0] = observed
 
     def handoff_runner(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        if verification_response_validator is None:
+            raise RuntimeError("The controlled operation has no candidate verification validator.")
         reference = _read_json(run_dir / "reference/study.reference.json") or {}
         revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
         if not revision_id:
@@ -1044,6 +1045,7 @@ def run_release_certification_operation(
             run_dir / "revisions" / revision_id,
             handoffs,
             timeout_seconds=max(0.0, remaining_seconds - CLEANUP_RESERVE_SECONDS),
+            response_is_complete=verification_response_validator,
             skill_root=release_root,
             sandbox=True,
             progress=lambda observed_at: progress(
@@ -1058,7 +1060,9 @@ def run_release_certification_operation(
             raise RuntimeError(
                 "The delegated visual reviewer failed; Release Certification requires the Desktop parent to inspect every bound page and write the response."
             )
-        parent_visual_reviewer(handoffs, remaining_seconds)
+        if verification_response_validator is None:
+            raise RuntimeError("The controlled operation has no candidate verification validator.")
+        parent_visual_reviewer(handoffs, remaining_seconds, verification_response_validator)
 
     final_result = desktop_operation(
         run_dir,
@@ -2211,10 +2215,11 @@ def run_release_certification_corpus(
             release_root=release_root,
             operation_id=f"{operation_id}-{fixture_id}",
             hermes_configuration=fixture["hermes_configuration"],
-            parent_visual_reviewer=lambda handoffs, remaining, current=run_dir: wait_for_parent_visual_review(
+            parent_visual_reviewer=lambda handoffs, remaining, validator, current=run_dir: wait_for_parent_visual_review(
                 current,
                 handoffs,
                 remaining,
+                response_is_complete=validator,
                 progress=lambda stage, available: _append_json_line(
                     current / "logs/hermes-integration-events.jsonl",
                     {
@@ -2296,10 +2301,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         release_root=release_root,
         operation_id=args.operation_id,
         hermes_configuration=fixture["hermes_configuration"],
-        parent_visual_reviewer=lambda handoffs, remaining: wait_for_parent_visual_review(
+        parent_visual_reviewer=lambda handoffs, remaining, validator: wait_for_parent_visual_review(
             run_dir,
             handoffs,
             remaining,
+            response_is_complete=validator,
             progress=lambda stage, available: _append_json_line(
                 run_dir / "logs/hermes-integration-events.jsonl",
                 {

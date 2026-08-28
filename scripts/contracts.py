@@ -18,7 +18,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.10"
+CONTRACT_VERSION = "clinical-documents-v2.11"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -286,6 +286,8 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "study-procedure.measurements": "Account for every approved assessment and endpoint in operational language, including the supplied time points; do not invent an instrument, scoring rule, denominator, or definition that is absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
         "evaluation-procedures": "Account for every approved assessment and visit in the Schedule of Assessments narrative.",
+        "endpoint-criteria.completion": "Name every approved visit and time point, then state the participant-completion rule without omitting supplied follow-up.",
+        "endpoint-criteria.study-completion": "Name every approved visit and time point, then state the study-completion rule without omitting supplied follow-up.",
         "analysis-plan.datasets": "Identify the analysis populations or data sets supported by the approved analysis plan.",
         "analysis-plan.methodology": "Explain the approved statistical methods and map them explicitly to every supplied primary and secondary endpoint.",
         "analysis-plan.considerations": "Explain the approved analysis conventions and interpretation considerations, including only source-supported handling of paired or missing observations.",
@@ -309,7 +311,8 @@ def _source_coverage(section_id: str) -> str:
         "objectives",
         "subjects.inclusion", "subjects.exclusion", "subjects.eligibility",
         "study-procedure.visits", "study-procedure.measurements", "study-procedure.enrollment",
-        "evaluation-procedures", "icf.procedures",
+        "evaluation-procedures", "endpoint-criteria.completion",
+        "endpoint-criteria.study-completion", "icf.procedures",
     }
     return "all_material_items" if section_id in item_complete_sections else "all_material_evidence"
 
@@ -374,11 +377,11 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),
     _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.injury_handling"), "injury"),
     _section_spec("endpoint-criteria", "18.", "STUDY ENDPOINT CRITERIA", role="container"),
-    _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("study.timeline", "procedures.visit_schedule"), "completion"),
+    _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "completion"),
     _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation",), "discontinuation"),
     _section_spec("endpoint-criteria.termination", "18.3.", "Patient Termination", "protocol-operations", ("procedures.termination", "risks_benefits.risks"), "termination"),
     _section_spec("endpoint-criteria.study-termination", "18.4.", "Study Termination", "protocol-operations", ("procedures.study_termination",), "study-termination"),
-    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule"), "study-completion"),
+    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion"),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks",), "protocol-sparse-risks"),
     _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits",), "protocol-sparse-benefits"),
