@@ -468,6 +468,45 @@ def test_completion_drafts_omitting_approved_follow_up_visits_are_rejected(tmp_p
     )
 
 
+def test_retrospective_objectives_omitting_secondary_objective_and_hypothesis_are_rejected(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/release-certification/retrospective/approved-reference.json"
+    ).read_text(encoding="utf-8"))
+    batch = next(item for item in batch_plan("Retrospective") if item.batch_id == "protocol-foundations")
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-retrospective-objective-coverage",
+        reference=reference,
+        batch=batch,
+        attempts={section_id: 1 for section_id in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    objectives = next(item for item in response["section_results"] if item["section_id"] == "objectives")
+    objectives["paragraphs"] = [{
+        "text": "The primary objective is to describe recovery outcomes, measured as the Primary outcome at Month 3.",
+        "evidence_refs": [
+            f"source:{path}"
+            for path in next(
+                item for item in request["section_contracts"] if item["section_id"] == "objectives"
+            )["minimum_evidence"]
+        ],
+        "boilerplate_refs": [],
+    }]
+    objectives["lists"] = []
+
+    accepted, findings = validate_response(request, response)
+    accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
+
+    assert "objectives" not in accepted_ids
+    assert any(
+        item["field"] == "objectives" and "material facts are not observable" in item["issue"]
+        for item in findings
+    )
+
+
 def test_client_protocol_template_renders_source_supported_schedule_of_assessments(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     report = render_documents(ROOT, tmp_path, reference, {

@@ -18,7 +18,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.11"
+CONTRACT_VERSION = "clinical-documents-v2.12"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -391,8 +391,8 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("title-page", "1.", "TITLE PAGE", role="container"),
     _section_spec("investigator-agreement", "2.", "INVESTIGATOR AGREEMENT", role="container"),
     _section_spec("table-of-contents", "3.", "TABLE OF CONTENTS", role="container"),
-    _section_spec("introduction", "4.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.unmet_need")),
-    _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "endpoints.primary")),
+    _section_spec("introduction", "4.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.unmet_need", "study.title", "study.hypothesis", "endpoints.primary")),
+    _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary")),
     _section_spec("subjects", "6.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria")),

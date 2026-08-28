@@ -16,6 +16,7 @@ from hermes_e2e import (
     EXPECTED_OUTPUTS,
     DiagnosticOutcome,
     _agent_prompt,
+    _canonical_reviewed_fixture_reference,
     _certified_release,
     _response_is_bound,
     _run_handoff_wave,
@@ -110,8 +111,12 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
         "failed_preflight",
         "failed_first_real_case",
         "failed_second_real_case",
+        "failed_third_real_case",
     ]
     assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
+    assert ledger["attempts"][-1]["failed_case"]["final_content_response_sha256"] == (
+        "f1a3207d7a7cd770e3689ce12152d8d5c96de4d491c14399dcb38bcfe3dafe28"
+    )
     assert "/tmp/" not in path.read_text(encoding="utf-8")
 
 
@@ -282,7 +287,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
     (run_dir / "reference").mkdir()
     (run_dir / "input/source-input.md").write_bytes(fixture["artifact_paths"]["source_input"].read_bytes())
     (run_dir / "reference/source-of-truth.md").write_bytes(fixture["artifact_paths"]["approved_source"].read_bytes())
-    approved_reference = json.loads(fixture["artifact_paths"]["approved_reference"].read_text())
+    approved_reference = _canonical_reviewed_fixture_reference(fixture, workflow)
     bundle = {
         "identity_sha256": "c" * 64,
         "layout_preservation_baseline": {"sha256": "d" * 64},
@@ -587,6 +592,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
 def _use_controlled_certified_release(monkeypatch) -> Path:
     class ControlledWorkflow:
         SCRIPT_DIR = Path("/controlled/immutable/release/scripts")
+        parse_source_truth = staticmethod(workflow.parse_source_truth)
 
         @staticmethod
         def verification_response_is_complete(_revision_dir, _request_path):
@@ -623,7 +629,7 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
 
     result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
 
-    assert result["status"] == "passed"
+    assert result["status"] == "passed", json.dumps(result, indent=2)
     assert result["certification_scope"] == "complete_three_case_corpus"
     assert result["case_order"] == list(CERTIFICATION_CORPUS)
     assert all(case["status"] == "passed" for case in result["cases"])
@@ -831,6 +837,7 @@ def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path
 def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tmp_path: Path, monkeypatch) -> None:
     class RejectingWorkflow:
         SCRIPT_DIR = Path("/controlled/immutable/release/scripts")
+        parse_source_truth = staticmethod(workflow.parse_source_truth)
 
         @staticmethod
         def verification_response_is_complete(_revision_dir, _request_path):
@@ -919,6 +926,19 @@ def test_repository_certification_fixture_prepares_an_independent_approved_run(t
     ).hexdigest()
 
 
+def test_reviewed_fixture_identity_uses_the_governed_canonical_reference() -> None:
+    fixture = certification_fixture("prospective-advarra")
+    raw = json.loads(fixture["artifact_paths"]["approved_reference"].read_text(encoding="utf-8"))
+
+    canonical = _canonical_reviewed_fixture_reference(fixture, workflow)
+
+    assert canonical != raw
+    assert canonical["design"]["number_of_sites"] == "1"
+    assert canonical["procedures"]["minimum_days_before_screening_without_participation"] == "30"
+    assert canonical["procedures"]["visit_schedule"][0]["procedures"] == "Consent; Device initiation"
+    assert "template_fields" not in canonical
+
+
 def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: Path) -> None:
     prompt = _agent_prompt(
         tmp_path / "release",
@@ -960,6 +980,8 @@ def test_content_verifier_prompt_goes_directly_to_bound_evidence(tmp_path: Path)
     assert "Do not inspect production code or tests" in prompt
     assert "verification_response_is_complete" in prompt
     assert "Do not use a shell heredoc" in prompt
+    assert "canonical DOCX content hashes, not raw file hashes" in prompt
+    assert "Never compare them with shasum" in prompt
     assert "Visual-only authority note." not in prompt
     validator_command = next(line for line in prompt.splitlines() if "verification_response_is_complete" in line)
     command = shlex.split(validator_command)

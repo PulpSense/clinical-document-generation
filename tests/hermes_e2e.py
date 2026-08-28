@@ -256,6 +256,25 @@ def certification_corpus(
     return fixtures
 
 
+def _canonical_reviewed_fixture_reference(
+    fixture: Mapping[str, Any],
+    certified_workflow: Any,
+) -> dict[str, Any]:
+    """Re-derive the reviewed reference through the governed Markdown parser."""
+    fixture_paths = fixture["artifact_paths"]
+    prior_reference = _read_json(fixture_paths["approved_reference"])
+    if prior_reference is None:
+        raise ValueError("Certification fixture approved reference is not valid JSON.")
+    parsed = certified_workflow.parse_source_truth(
+        fixture_paths["approved_source"].read_text(encoding="utf-8"),
+        prior_reference,
+    )
+    canonical = dict(parsed)
+    canonical.pop("approval", None)
+    canonical.pop("generation", None)
+    return canonical
+
+
 def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
     """Load a hash-valid immutable candidate workflow for real certification."""
     release_root = release_root.resolve()
@@ -716,6 +735,7 @@ def _agent_prompt(
     elif task == "clinical_content_verification":
         verification_rule = (
             "Act as an independent verifier. Use the request's bound extracts and assessment matrices directly, assess every requested section and cross-document check, then write the bound response promptly. "
+            "Artifact fields named content_sha256 are canonical DOCX content hashes, not raw file hashes. Never compare them with shasum, sha256sum, or a raw-byte digest, and do not fail a check because those different hash domains disagree. "
             "Do not inspect production code or tests; the request contains the complete governed evidence and response contract."
         )
     else:
@@ -1617,16 +1637,14 @@ def _case_artifact_findings(
         ):
             findings.append("Approved Source-of-Truth identity is not bound to the Delivery Manifest.")
         actual_reference = _read_json(revision_reference)
-        fixture_reference = _read_json(fixture_paths["approved_reference"])
-        if actual_reference is None or fixture_reference is None:
+        if actual_reference is None:
             findings.append("Approved structured reference is missing or invalid.")
         else:
             actual_comparison = dict(actual_reference)
-            fixture_comparison = dict(fixture_reference)
-            for value in (actual_comparison, fixture_comparison):
-                value.pop("approval", None)
-                value.pop("generation", None)
-            if actual_comparison != fixture_comparison or manifest.get("approved_reference_sha256") != _sha256(revision_reference):
+            actual_comparison.pop("approval", None)
+            actual_comparison.pop("generation", None)
+            reviewed_comparison = _canonical_reviewed_fixture_reference(fixture, certified_workflow)
+            if actual_comparison != reviewed_comparison or manifest.get("approved_reference_sha256") != _sha256(revision_reference):
                 findings.append("Approved structured reference identity does not match the reviewed fixture.")
     quality = manifest.get("quality") or {}
     assurance = quality.get("render_assurance") or {}

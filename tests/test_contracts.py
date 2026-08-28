@@ -224,12 +224,14 @@ def test_screening_washout_is_contractually_bound_to_protocol_and_icf():
 
 def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     protocol = {section.section_id: section for section in protocol_contract("Prospective")}
+    retrospective = {section.section_id: section for section in protocol_contract("Retrospective")}
     icf = {section.section_id: section for section in ICF_STUDY_SECTIONS}
 
     assert {"study.hypothesis", "endpoints.primary"} <= set(protocol["introduction"].evidence)
     assert {"study.hypothesis", "endpoints.primary", "endpoints.secondary"} <= set(protocol["objectives"].evidence)
     assert {"study.hypothesis", "endpoints.primary", "endpoints.secondary"} <= set(protocol["study-procedure.measurements"].evidence)
     assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["analysis-plan.methodology"].evidence)
+    assert {"study.hypothesis", "objectives.secondary", "endpoints.primary", "endpoints.secondary"} <= set(retrospective["objectives"].evidence)
     assert {"study.hypothesis", "endpoints.primary"} <= set(icf["icf.study-purpose"].evidence)
 
 

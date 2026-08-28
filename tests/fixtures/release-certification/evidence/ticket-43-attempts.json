@@ -99,6 +99,72 @@
         "owned_processes_reaped": true,
         "late_responses_ignored": true
       }
+    },
+    {
+      "id": "retrospective-objectives-and-canonical-reference-identity",
+      "classification": "rejected_candidate",
+      "outcome": "failed_third_real_case",
+      "candidate_git_commit": "47ba11b465f7f3d4b6a7c2ac05e78ce55ddb0819",
+      "candidate_package_fingerprint": "2fd1f097526f55f527294aa7a5680e097376abee79b199a0fbc8c4a4fd83d6ac",
+      "candidate_archive_sha256": "92df4399889c144283334816cfbacaec7ce20369d0ca631e8d3c6206dbf89cdb",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "a3fde46cd3c6e9e8c2b01f34e579cf88d2e9943b580a78f36f4ae3400e5b6dc8",
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 657.672,
+        "under_15_minutes": true,
+        "case_report_sha256": "6e4b830043b9fbdc3f5a1a6b6c01ae390eb82d4bbbc73192a43415224e462de7",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 5,
+          "protocol_pages": 12,
+          "checks_per_page": 14
+        }
+      },
+      "second_case": {
+        "fixture_id": "prospective-advarra",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 701.244,
+        "approval_confirmed_elapsed_seconds": 701.383,
+        "under_15_minutes": true,
+        "case_report_sha256": "8ef9bb386637fc0d1fba01fd79f5d8a943700cc41ca163513bb2c1333e7f2ba3",
+        "desktop_operation_state_sha256": "476808592ddf4b3eab19a5c3a1414f7b8d89221bbf994f007b8813b0d9b54a0b",
+        "corpus_validation_outcome": "failed",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 6,
+          "protocol_pages": 9,
+          "checks_per_page": 14
+        }
+      },
+      "failed_case": {
+        "fixture_id": "retrospective",
+        "desktop_operation_elapsed_seconds": 1139.156,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "operation_outcome": "invalid-Hermes-response",
+        "case_report_sha256": "25eccbd3bb489f2925d58743bd51f5c26af908148882540a6a67a0d923fa9161",
+        "desktop_operation_state_sha256": "7423a86765fd60cdfd0de6028c9d809c16986f5c3e834611c85a1acddab041ca",
+        "final_content_response_sha256": "f1a3207d7a7cd770e3689ce12152d8d5c96de4d491c14399dcb38bcfe3dafe28",
+        "visual_review": {
+          "status": "passed",
+          "protocol_pages": 4,
+          "checks_per_page": 14,
+          "producer_model_id": "desktop-parent/gpt-5.6-sol"
+        }
+      },
+      "findings": [
+        "The corpus compared the raw reviewed structured fixture to the production-normalized approved reference even though governed Markdown parsing intentionally normalizes scalar types and strips template-only fields.",
+        "Retrospective Protocol Section 5 omitted the approved secondary objective and distinct hypothesis because its minimum evidence authorized only the primary objective and primary endpoint.",
+        "The content verifier compared a canonical DOCX content hash to the raw file hash, triggering an unnecessary drafting retry and extending the operation beyond the 15-minute target."
+      ],
+      "remediation": "Compare the governed revision to the canonical reference re-derived from the hash-bound approved source, deepen retrospective objective evidence to every approved construct, and explicitly prohibit raw-file comparison for canonical DOCX content hashes.",
+      "corpus_report_sha256": "2a5994cd5a8c61e2c357d9153b5c9b86f8f7d08f55a906c6da7ab3332ee2cacd",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
     }
   ]
 }
