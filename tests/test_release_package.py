@@ -102,6 +102,11 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         assert prefix + "assets/fallback-fonts/LiberationSans-Regular.ttf" in names
         assert prefix + "assets/fallback-fonts/LICENSE_LIBERATION" in names
         assert prefix + "assets/client-templates/reference/advarra-icf-reference.docx" in names
+        assert prefix + f"assets/runtime-wheels/{PDFIUM_WHEEL}" in names
+        assert not any(
+            "/runtime-wheels/" in name and not name.endswith(PDFIUM_WHEEL)
+            for name in names
+        )
         assert not any(".test-venv/" in name or ".hermes/" in name for name in names)
         assert not any("/runtime/" in name or name.endswith("/INSTALLATION-ASSURANCE.json") for name in names)
         assert not any(".pytest_cache/" in name or "/source-data/" in name or "/patient-data/" in name for name in names)
@@ -133,14 +138,18 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         for bundle in bundles:
             assert all(packaged_hashes[path] == digest for path, digest in bundle["resource_hashes"].items())
         assert manifest["inventory"]["font_fallbacks"]["Noto Sans Symbols"] == ["Liberation Sans"]
-        assert manifest["inventory"]["page_renderer_fallbacks"][:5] == [
-            "pdftoppm",
-            "pdftocairo",
-            "mutool",
-            "ghostscript",
-            "imagemagick",
+        assert manifest["inventory"]["pdf_page_renderer"] == {
+            "kind": "pypdfium2",
+            "version": "5.13.0",
+            "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "wheel_sha256": PDFIUM_SHA256,
+            "platform": "macosx_13_0_arm64",
+        }
+        assert "page_renderer_fallbacks" not in manifest["inventory"]
+        assert "page_renderer_at_packaging" not in manifest["inventory"]
+        assert manifest["installation"]["required_external_tools"] == [
+            "Microsoft Word or LibreOffice"
         ]
-        assert manifest["installation"]["required_external_tools"] == []
         assert "atomic" in manifest["installation"]["activation"]
         assert manifest["excluded_classes"]
 

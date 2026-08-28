@@ -30,7 +30,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256, verification_response_is_complete
+from quality import _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -51,6 +51,13 @@ DESKTOP_STAGE_SOFT_BUDGETS = {
 RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
 INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
 MINIMUM_PYTHON_VERSION = (3, 10)
+PDF_PAGE_RENDERER = {
+    "kind": "pypdfium2",
+    "version": "5.13.0",
+    "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
+    "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
+    "platform": "macosx_13_0_arm64",
+}
 
 
 class OperationDeadlineExpired(RuntimeError):
@@ -280,6 +287,15 @@ def _package_release_tree(
             font_inventory[path.relative_to(repo_root).as_posix()] = sorted(_template_fonts(path))
     required_font_names = sorted({font for fonts in font_inventory.values() for font in fonts})
     approved_font_plan = bundles[0]["approved_font_plan"]
+    pdf_renderer = dict(PDF_PAGE_RENDERER)
+    pdf_renderer_wheel = repo_root / pdf_renderer["wheel"]
+    if (
+        not pdf_renderer_wheel.is_file()
+        or sha256_file(pdf_renderer_wheel) != pdf_renderer["wheel_sha256"]
+    ):
+        raise ValueError(
+            "The pinned pypdfium2 wheel is missing or does not match its governed hash."
+        )
     implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
@@ -292,7 +308,7 @@ def _package_release_tree(
             "dependencies": "requirements.txt",
             "install_as_direct_child_of": "Hermes skills directory",
             "activation": "atomic after end-to-end Render Assurance smoke; previous verified release retained",
-            "required_external_tools": [],
+            "required_external_tools": ["Microsoft Word or LibreOffice"],
         },
         "inventory": {
             "implementation": implementation_files,
@@ -301,8 +317,7 @@ def _package_release_tree(
             "font_identities": font_inventory,
             "font_fallbacks": {font: [_approved_packaged_font_fallback(font, approved_font_plan)] for font in required_font_names},
             "renderer_at_packaging": renderer(environment=os.environ),
-            "page_renderer_fallbacks": list(PAGE_RENDERER_BACKENDS),
-            "page_renderer_at_packaging": page_renderer(environment=os.environ),
+            "pdf_page_renderer": pdf_renderer,
             "harness": {"python": platform.python_version(), "platform": platform.platform()},
             "model": "Hermes Desktop runtime; model identity is recorded per generation evidence.",
         },
