@@ -407,6 +407,82 @@ def test_visual_soft_budget_routes_early_parent_fallback_without_shortening_the_
     assert state["deadline_at_epoch"] == 1_030.0
 
 
+def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only_the_stall(tmp_path, monkeypatch):
+    now = [0.0]
+    handoffs = [
+        {
+            "request_id": "r1.verify.content",
+            "request_sha256": "c" * 64,
+            "request_path": "hermes/verification-requests/content.json",
+            "response_path": "hermes/verification-responses/content.json",
+            "task": "clinical_content_verification",
+        },
+        {
+            "request_id": "r1.verify.visual.protocol",
+            "request_sha256": "p" * 64,
+            "request_path": "hermes/verification-requests/protocol.json",
+            "response_path": "hermes/verification-responses/protocol.json",
+            "task": "rendered_page_visual_verification",
+            "fallback_owner": "parent",
+        },
+        {
+            "request_id": "r1.verify.visual.icf",
+            "request_sha256": "i" * 64,
+            "request_path": "hermes/verification-requests/icf.json",
+            "response_path": "hermes/verification-responses/icf.json",
+            "task": "rendered_page_visual_verification",
+            "fallback_owner": "parent",
+        },
+    ]
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": handoffs},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    primary_timeouts = []
+    parent_reviews = []
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+
+    def primary(received_handoffs, timeout_seconds):
+        primary_timeouts.append(timeout_seconds)
+        response_root = tmp_path / "revisions/r1/hermes/verification-responses"
+        response_root.mkdir(parents=True, exist_ok=True)
+        for handoff in received_handoffs[:2]:
+            response = {
+                "request_id": handoff["request_id"],
+                "request_sha256": handoff["request_sha256"],
+                "task": handoff["task"],
+            }
+            (tmp_path / "revisions/r1" / handoff["response_path"]).write_text(
+                json.dumps(response), encoding="utf-8"
+            )
+        (tmp_path / "revisions/r1" / received_handoffs[2]["response_path"]).write_text(
+            "{}", encoding="utf-8"
+        )
+        now[0] += timeout_seconds
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=primary,
+        fallback_handoff_runner=lambda handoffs, _remaining: parent_reviews.extend(handoffs),
+        opener=lambda _path: b"unused",
+        budget_seconds=1_800.0,
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert primary_timeouts == [240.0]
+    assert parent_reviews == [handoffs[2]]
+    assert state["soft_budget_events"] == [{
+        "stage": "independent_verification",
+        "budget_seconds": 240.0,
+        "elapsed_seconds": 240.0,
+        "action": "early_parent_fallback",
+    }]
+    assert state["deadline_at_epoch"] == 2_800.0
+
+
 def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):
     now = [0.0]
     handoff = {

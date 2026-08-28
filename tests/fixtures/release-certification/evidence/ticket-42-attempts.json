@@ -90,6 +90,38 @@
       ],
       "retained_local_evidence": "/tmp/clinical-issue42-c9b4b10/ambispective-sterling-20260828T002917Z/logs/desktop-operation.json",
       "retained_evidence_sha256": "5929174063561385a52832576feefe1ad848dbb973d885572cade5d4894698a2"
+    },
+    {
+      "id": "hash-bound-candidate-slow-correctness-pass",
+      "classification": "controlled_slow_attempt",
+      "outcome": "non-certifying-runtime",
+      "elapsed_seconds": 1077.288,
+      "under_15_minutes": false,
+      "candidate_package_fingerprint": "ce602b2e5b0a2a652f04f9069c583028e133814e72c18c4cb9421a2a5aa7c41c",
+      "candidate_git_commit": "b86294d8d50ac7dccaae183a1afcf142936dc665",
+      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "diagnosis": "The clean immutable candidate completed every content, rendering, every-page visual, delivery, and cleanup gate, but independent verification consumed 449.757 seconds. A delegated ICF verifier did not serialize within the 360-second soft budget; the exact-page Desktop-parent fallback and repaired-candidate re-verification were correct but pushed confirmed delivery 177.288 seconds beyond the certification limit.",
+      "measured_stage_seconds": {
+        "generate": 38.42,
+        "drafting": 116.832,
+        "drafting_retry": 181.114,
+        "candidate": 3.97,
+        "render_assurance": 28.66,
+        "independent_verification": 449.757,
+        "delivery": 0.013
+      },
+      "output_evidence": {
+        "icf.docx": "8c31a6d6d0c5cb54fd08e54789f269e48eaec974355e5cac13f5880cb0d63b6f",
+        "protocol.docx": "18cb6540684b89d23fc9681f6f4bef8184333ce2019070dbbc8a538f89436fc2",
+        "study.xml": "73f065c565953d4d1db00f8a9f36e08c4ab6875e16de2f4cb55fcdf7963efe00"
+      },
+      "delivery_confirmed": true,
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      },
+      "retained_local_evidence": "/tmp/clinical-issue42-b86294d.IxEhCN/runs/ambispective-sterling-20260828T012917Z/logs/hermes-integration-report.json",
+      "retained_evidence_sha256": "f043f44f2412ed7567f64d0f30f5adc4084810cf2b7ad79168fab8f3416124ff"
     }
   ]
 }

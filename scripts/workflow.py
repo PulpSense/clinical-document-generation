@@ -45,7 +45,7 @@ DESKTOP_STAGE_SOFT_BUDGETS = {
     "drafting": 480.0,
     "candidate": 120.0,
     "render_assurance": 300.0,
-    "independent_verification": 360.0,
+    "independent_verification": 240.0,
     "delivery": 60.0,
     "desktop_delivery": 60.0,
 }
@@ -1314,6 +1314,23 @@ def _desktop_delivery_set_finding(
     }
 
 
+def _handoff_response_is_bound(
+    run_dir: Path,
+    revision_id: str,
+    handoff: Mapping[str, Any],
+) -> bool:
+    response_path = run_dir / "revisions" / revision_id / str(handoff.get("response_path") or "")
+    try:
+        response = json.loads(response_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return isinstance(response, Mapping) and not any((
+        response.get("request_id") != handoff.get("request_id"),
+        response.get("request_sha256") != handoff.get("request_sha256"),
+        response.get("task") != handoff.get("task"),
+    ))
+
+
 def run_desktop_operation(
     run_dir: Path,
     *,
@@ -1739,7 +1756,7 @@ def run_desktop_operation(
                     item for item in handoffs
                     if item.get("fallback_owner") == "parent"
                     and revision_id
-                    and not (run_dir / "revisions" / revision_id / str(item.get("response_path") or "")).is_file()
+                    and not _handoff_response_is_bound(run_dir, revision_id, item)
                 ]
                 if fallback_handoffs:
                     remaining = remaining_seconds()
