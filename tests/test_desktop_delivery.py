@@ -5,6 +5,7 @@ import subprocess
 import pytest
 
 import workflow
+from quality import RESPONSE_SCHEMA, VISUAL_CHECKS, verification_request_sha256
 
 
 def _manifest():
@@ -407,33 +408,92 @@ def test_visual_soft_budget_routes_early_parent_fallback_without_shortening_the_
     assert state["deadline_at_epoch"] == 1_030.0
 
 
+def _visual_handoff_fixture(tmp_path, artifact):
+    revision = tmp_path / "revisions/r1"
+    files = {
+        f"candidate/{artifact}.docx": f"{artifact}-docx".encode(),
+        f"rendered/{artifact}.pdf": f"{artifact}-pdf".encode(),
+        f"rendered/{artifact}/page-1.png": f"{artifact}-page-1".encode(),
+    }
+    for relative, payload in files.items():
+        path = revision / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+    digest = {relative: workflow.sha256_file(revision / relative) for relative in files}
+    request_id = f"r1.verify.visual.{artifact}"
+    request_path = f"hermes/verification-requests/{artifact}.json"
+    response_path = f"hermes/verification-responses/{artifact}.json"
+    handoff = {
+        "request_path": request_path,
+        "response_path": response_path,
+        "task": "rendered_page_visual_verification",
+        "fallback_owner": "parent",
+    }
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": request_id,
+        "task": handoff["task"],
+        "response_path": response_path,
+        "checks": list(VISUAL_CHECKS),
+        "artifacts": [{
+            "artifact": artifact,
+            "docx": f"candidate/{artifact}.docx",
+            "docx_sha256": digest[f"candidate/{artifact}.docx"],
+            "pdf": f"rendered/{artifact}.pdf",
+            "pdf_sha256": digest[f"rendered/{artifact}.pdf"],
+            "pages": [{
+                "page": 1,
+                "path": f"rendered/{artifact}/page-1.png",
+                "sha256": digest[f"rendered/{artifact}/page-1.png"],
+            }],
+        }],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    handoff["request_id"] = request_id
+    handoff["request_sha256"] = request["request_sha256"]
+    request_file = revision / request_path
+    request_file.parent.mkdir(parents=True, exist_ok=True)
+    request_file.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request_id,
+        "request_sha256": request["request_sha256"],
+        "task": handoff["task"],
+        "producer": {"model_id": "test-verifier"},
+        "status": "passed",
+        "findings": [],
+        "page_assessments": [{
+            "artifact": artifact,
+            "page": 1,
+            "sha256": digest[f"rendered/{artifact}/page-1.png"],
+            "status": "passed",
+            "checks": list(VISUAL_CHECKS),
+        }],
+    }
+    return handoff, request, response
+
+
 def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only_the_stall(tmp_path, monkeypatch):
     now = [0.0]
-    handoffs = [
-        {
-            "request_id": "r1.verify.content",
-            "request_sha256": "c" * 64,
-            "request_path": "hermes/verification-requests/content.json",
-            "response_path": "hermes/verification-responses/content.json",
-            "task": "clinical_content_verification",
-        },
-        {
-            "request_id": "r1.verify.visual.protocol",
-            "request_sha256": "p" * 64,
-            "request_path": "hermes/verification-requests/protocol.json",
-            "response_path": "hermes/verification-responses/protocol.json",
-            "task": "rendered_page_visual_verification",
-            "fallback_owner": "parent",
-        },
-        {
-            "request_id": "r1.verify.visual.icf",
-            "request_sha256": "i" * 64,
-            "request_path": "hermes/verification-requests/icf.json",
-            "response_path": "hermes/verification-responses/icf.json",
-            "task": "rendered_page_visual_verification",
-            "fallback_owner": "parent",
-        },
-    ]
+    protocol_handoff, protocol_request, protocol_response = _visual_handoff_fixture(tmp_path, "protocol")
+    icf_handoff, icf_request, _ = _visual_handoff_fixture(tmp_path, "icf")
+    content_handoff = {
+        "request_path": "hermes/verification-requests/content.json",
+        "response_path": "hermes/verification-responses/content.json",
+        "task": "clinical_content_verification",
+    }
+    content_request = {
+        "request_id": "r1.verify.content",
+        "request_sha256": "c" * 64,
+        "task": content_handoff["task"],
+        "response_path": content_handoff["response_path"],
+    }
+    content_handoff["request_id"] = content_request["request_id"]
+    content_handoff["request_sha256"] = content_request["request_sha256"]
+    content_request_path = tmp_path / "revisions/r1" / content_handoff["request_path"]
+    content_request_path.parent.mkdir(parents=True, exist_ok=True)
+    content_request_path.write_text(json.dumps(content_request), encoding="utf-8")
+    handoffs = [content_handoff, protocol_handoff, icf_handoff]
     results = iter([
         {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": handoffs},
         {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
@@ -446,17 +506,20 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
         primary_timeouts.append(timeout_seconds)
         response_root = tmp_path / "revisions/r1/hermes/verification-responses"
         response_root.mkdir(parents=True, exist_ok=True)
-        for handoff in received_handoffs[:2]:
-            response = {
-                "request_id": handoff["request_id"],
-                "request_sha256": handoff["request_sha256"],
-                "task": handoff["task"],
-            }
-            (tmp_path / "revisions/r1" / handoff["response_path"]).write_text(
-                json.dumps(response), encoding="utf-8"
-            )
+        content_response = {
+            "request_id": content_request["request_id"],
+            "request_sha256": content_request["request_sha256"],
+            "task": content_request["task"],
+        }
+        response_root.joinpath("content.json").write_text(json.dumps(content_response), encoding="utf-8")
+        response_root.joinpath("protocol.json").write_text(json.dumps(protocol_response), encoding="utf-8")
         (tmp_path / "revisions/r1" / received_handoffs[2]["response_path"]).write_text(
-            "{}", encoding="utf-8"
+            json.dumps({
+                "request_id": icf_request["request_id"],
+                "request_sha256": icf_request["request_sha256"],
+                "task": icf_request["task"],
+            }),
+            encoding="utf-8",
         )
         now[0] += timeout_seconds
 
@@ -481,6 +544,65 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
         "action": "early_parent_fallback",
     }]
     assert state["deadline_at_epoch"] == 2_800.0
+
+
+def test_verifier_exception_falls_back_only_for_incomplete_parent_work(tmp_path, monkeypatch):
+    protocol_handoff, _, protocol_response = _visual_handoff_fixture(tmp_path, "protocol")
+    icf_handoff, _, _ = _visual_handoff_fixture(tmp_path, "icf")
+    handoffs = [protocol_handoff, icf_handoff]
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": handoffs},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    parent_reviews = []
+
+    def primary(_handoffs, _timeout_seconds):
+        response = tmp_path / "revisions/r1" / protocol_handoff["response_path"]
+        response.parent.mkdir(parents=True, exist_ok=True)
+        response.write_text(json.dumps(protocol_response), encoding="utf-8")
+        raise RuntimeError("adapter failed after partial completion")
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=primary,
+        fallback_handoff_runner=lambda pending, _remaining: parent_reviews.extend(pending),
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert parent_reviews == [icf_handoff]
+
+
+def test_mutated_visual_request_cannot_suppress_parent_fallback(tmp_path, monkeypatch):
+    handoff, request, response = _visual_handoff_fixture(tmp_path, "protocol")
+    request["artifacts"][0]["pages"] = []
+    request["request_sha256"] = verification_request_sha256(request)
+    response["request_sha256"] = request["request_sha256"]
+    response["page_assessments"] = []
+    request_path = tmp_path / "revisions/r1" / handoff["request_path"]
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    parent_reviews = []
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        fallback_handoff_runner=lambda pending, _remaining: parent_reviews.extend(pending),
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert parent_reviews == [handoff]
 
 
 def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):

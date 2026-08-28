@@ -10,7 +10,7 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
 
 from contracts import contracted_template_bundle
-from quality import RESPONSE_SCHEMA, validate_verifications
+from quality import RESPONSE_SCHEMA, validate_verifications, verification_request_sha256
 import quality
 from rendering import render_documents
 import rendering
@@ -1073,13 +1073,13 @@ def test_transient_verifier_failure_is_classified_for_retry_without_accepting_qa
     request = {
         "schema_version": "hermes-verification/v1",
         "request_id": "r.verify.content",
-        "request_sha256": "request-hash",
         "task": "clinical_content_verification",
         "response_path": "hermes/verification-responses/r.verify.content.json",
         "sections": [],
         "cross_document_checks": [],
         "artifacts": [],
     }
+    request["request_sha256"] = verification_request_sha256(request)
     (requests / "content.json").write_text(json.dumps(request), encoding="utf-8")
     response = {
         "schema_version": RESPONSE_SCHEMA,
@@ -1107,8 +1107,15 @@ def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     requests = revision / "hermes/verification-requests"
     requests.mkdir(parents=True)
     for task in ("clinical_content_verification", "rendered_page_visual_verification"):
+        request = {
+            "schema_version": "hermes-verification/v1",
+            "request_id": f"r.verify.{task}",
+            "task": task,
+            "response_path": f"hermes/verification-responses/{task}.json",
+        }
+        request["request_sha256"] = verification_request_sha256(request)
         (requests / f"{task}.json").write_text(
-            json.dumps({"task": task, "response_path": f"hermes/verification-responses/{task}.json"}),
+            json.dumps(request),
             encoding="utf-8",
         )
     run_dir = tmp_path / "run"

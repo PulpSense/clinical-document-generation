@@ -122,6 +122,38 @@
       },
       "retained_local_evidence": "/tmp/clinical-issue42-b86294d.IxEhCN/runs/ambispective-sterling-20260828T012917Z/logs/hermes-integration-report.json",
       "retained_evidence_sha256": "f043f44f2412ed7567f64d0f30f5adc4084810cf2b7ad79168fab8f3416124ff"
+    },
+    {
+      "id": "real-handoff-binding-diagnostic",
+      "classification": "controlled_slow_attempt",
+      "outcome": "non-certifying-runtime",
+      "elapsed_seconds": 1003.03,
+      "under_15_minutes": false,
+      "candidate_package_fingerprint": "9b66a0f134edc5e004b4d088dfec34cee896ea8c6eab79ed22f67af0bc0f6fcb",
+      "candidate_git_commit": "b1160cd88231ad5ba48bdf6e413e98e6df33a3c2",
+      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "diagnosis": "The immutable candidate passed every content, rendering, every-page visual, delivery, and cleanup gate, but the Desktop fallback initially requested both visual reviews after Hermes had already completed ICF. Real handoffs carry signed request and response paths rather than request identity fields inline, so the mixed-wave helper could not recognize the bound ICF response. The unnecessary repeat review plus the polling delay consumed enough time to miss the certification target.",
+      "measured_stage_seconds": {
+        "generate": 38.091,
+        "drafting": 194.796,
+        "drafting_retry": 69.038,
+        "candidate": 4.158,
+        "render_assurance": 29.023,
+        "independent_verification": 317.66,
+        "delivery": 0.013
+      },
+      "output_evidence": {
+        "icf.docx": "f729612ae825f579d6675e9ad2c031eb5ad8d891e5862718cfd87f82a8dbf13a",
+        "protocol.docx": "a633b022b0254c233ba7006f4cee9abaafcaef77500eec53b059a0b984b3d175",
+        "study.xml": "0d67ff6935d27a4721624230496c7e5349224bc4dc1694835e73c37c3b1fa7cd"
+      },
+      "delivery_confirmed": true,
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      },
+      "retained_local_evidence": "/tmp/clinical-issue42-b1160cd.0TMh4L/runs/ambispective-sterling-20260828T020101Z/logs/hermes-integration-report.json",
+      "retained_evidence_sha256": "57d558cdfc6b2b1fa76efa5b7e4dfe11237b820cf85d74916ef6f8dfe3acaf6d"
     }
   ]
 }

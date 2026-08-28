@@ -31,7 +31,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256
+from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -923,6 +923,8 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: list[Path], findings: li
             "batch_id": request.get("batch_id"),
         }
         if request.get("task") == "rendered_page_visual_verification":
+            handoff["request_id"] = str(request["request_id"])
+            handoff["request_sha256"] = str(request["request_sha256"])
             handoff["fallback_owner"] = "parent"
             handoff["completion_requirement"] = "inspect_every_bound_page_image"
         handoffs.append(handoff)
@@ -1319,16 +1321,20 @@ def _handoff_response_is_bound(
     revision_id: str,
     handoff: Mapping[str, Any],
 ) -> bool:
-    response_path = run_dir / "revisions" / revision_id / str(handoff.get("response_path") or "")
+    revision_dir = run_dir / "revisions" / revision_id
+    request_path = revision_dir / str(handoff.get("request_path") or "")
     try:
-        response = json.loads(response_path.read_text(encoding="utf-8"))
+        request = json.loads(request_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
-    return isinstance(response, Mapping) and not any((
-        response.get("request_id") != handoff.get("request_id"),
-        response.get("request_sha256") != handoff.get("request_sha256"),
-        response.get("task") != handoff.get("task"),
-    ))
+    return (
+        isinstance(request, Mapping)
+        and request.get("request_id") == handoff.get("request_id")
+        and request.get("request_sha256") == handoff.get("request_sha256")
+        and request.get("response_path") == handoff.get("response_path")
+        and request.get("task") == handoff.get("task")
+        and verification_response_is_complete(revision_dir, request_path)
+    )
 
 
 def run_desktop_operation(
@@ -1767,7 +1773,13 @@ def run_desktop_operation(
                             parent_handoffs = [{**item, "reviewer_owner": "parent"} for item in fallback_handoffs]
                             handoff_runner(parent_handoffs, remaining)
             except Exception as exc:
-                fallback_handoffs = [item for item in handoffs if item.get("fallback_owner") == "parent"]
+                revision_id = str(result.get("revision_id") or "")
+                fallback_handoffs = [
+                    item for item in handoffs
+                    if item.get("fallback_owner") == "parent"
+                    and revision_id
+                    and not _handoff_response_is_bound(run_dir, revision_id, item)
+                ]
                 if fallback_handoffs:
                     remaining = remaining_seconds()
                     if remaining > 0:

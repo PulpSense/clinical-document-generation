@@ -83,6 +83,17 @@ MONOSPACE_FONT_FALLBACKS = (
     "Noto Sans Mono",
 )
 
+
+def verification_request_sha256(request: Mapping[str, Any]) -> str:
+    unsigned = dict(request)
+    unsigned.pop("request_sha256", None)
+    return hashlib.sha256(json.dumps(unsigned, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def verification_request_hash_valid(request: Mapping[str, Any]) -> bool:
+    supplied = str(request.get("request_sha256") or "")
+    return bool(supplied) and supplied == verification_request_sha256(request)
+
 PAGE_RENDERER_BACKENDS = (
     "pdftoppm",
     "pdftocairo",
@@ -1714,7 +1725,7 @@ def create_verification_requests(
         })
     for payload in payloads:
         payload["contracted_template_bundle"] = bundle
-        payload["request_sha256"] = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        payload["request_sha256"] = verification_request_sha256(payload)
     expected = {payload["request_id"]: payload for payload in payloads}
     existing_paths = sorted(requests.glob("*.json"))
     existing = {}
@@ -1725,7 +1736,11 @@ def create_verification_requests(
             existing[path.name] = (path, {})
     for request_id, (path, request) in existing.items():
         replacement = expected.get(request_id)
-        if replacement is not None and request.get("request_sha256") == replacement["request_sha256"]:
+        if (
+            replacement is not None
+            and verification_request_hash_valid(request)
+            and request.get("request_sha256") == replacement["request_sha256"]
+        ):
             continue
         response_path = request.get("response_path")
         if response_path:
@@ -1745,11 +1760,31 @@ def pending_verifications(revision_dir: Path) -> list[Path]:
     return pending
 
 
-def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def verification_response_is_complete(revision_dir: Path, request_path: Path) -> bool:
+    """Return whether one current, bound verifier response satisfies its full pass contract."""
+    try:
+        request = _json(request_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    if not verification_request_hash_valid(request):
+        return False
+    findings, _ = validate_verifications(revision_dir, request_paths=[request_path])
+    return not findings
+
+
+def validate_verifications(
+    revision_dir: Path,
+    *,
+    request_paths: Iterable[Path] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     findings: list[dict[str, Any]] = []; evidence: dict[str, Any] = {}
     request_records = [
         (request_path, _json(request_path))
-        for request_path in sorted((revision_dir / "hermes/verification-requests").glob("*.json"))
+        for request_path in sorted(
+            request_paths
+            if request_paths is not None
+            else (revision_dir / "hermes/verification-requests").glob("*.json")
+        )
     ]
     task_counts: dict[str, int] = {}
     for _, request in request_records:
@@ -1759,6 +1794,14 @@ def validate_verifications(revision_dir: Path) -> tuple[list[dict[str, Any]], di
         response_path = revision_dir / request["response_path"]
         evidence_key = request["task"] if task_counts[str(request.get("task"))] == 1 else request["request_id"]
         verification_target = "verification:visual" if request["task"] == "rendered_page_visual_verification" else "verification:content"
+        if not verification_request_hash_valid(request):
+            findings.append(recovery_finding({
+                "category": "verification",
+                "field": "request_sha256",
+                "target_ids": [verification_target],
+                "issue": "Verification request body does not match its declared request hash.",
+            }, "document_structure_defect"))
+            continue
         if not response_path.is_file():
             findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
         try: response = _json(response_path)
@@ -1854,4 +1897,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]

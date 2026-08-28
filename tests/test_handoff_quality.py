@@ -10,7 +10,7 @@ from pypdf import PdfWriter
 
 from contracts import batch_plan, contracted_template_bundle
 from drafting import accepted_draft, create_drafting_request, governing_resources, ingest_responses, pending_requests, recorded_acceptance_response, response_template, retry_attempts, schedule_requests, sha256_value, validate_response
-from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS, create_verification_requests, deterministic_content_check, validate_verifications
+from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS, create_verification_requests, deterministic_content_check, validate_verifications, verification_request_sha256
 from contracts import icf_retained_sections
 from rendering import audit_docx
 from workflow import approve, generate, prepare, validate
@@ -1078,8 +1078,9 @@ def test_prs_narrative_rejects_evidence_outside_the_target_contract(tmp_path):
 def test_visual_gate_rejects_unassessed_pages(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "request_sha256": "abc", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": [{"page": 1, "sha256": "one"}, {"page": 2, "sha256": "two"}]}]}
-    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": "abc", "task": request["task"], "producer": {"model_id": "test"}, "status": "passed", "findings": [], "page_assessments": [{"artifact": "protocol", "page": 1, "sha256": "one", "status": "passed", "checks": list(VISUAL_CHECKS)}]}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": [{"page": 1, "sha256": "one"}, {"page": 2, "sha256": "two"}]}]}
+    request["request_sha256"] = verification_request_sha256(request)
+    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test"}, "status": "passed", "findings": [], "page_assessments": [{"artifact": "protocol", "page": 1, "sha256": "one", "status": "passed", "checks": list(VISUAL_CHECKS)}]}
     (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
     (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
     findings, _ = validate_verifications(tmp_path)
@@ -1091,11 +1092,12 @@ def test_visual_gate_rejects_unassessed_pages(tmp_path):
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "request_sha256": "abc", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": []}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": []}
+    request["request_sha256"] = verification_request_sha256(request)
     response = {
         "schema_version": RESPONSE_SCHEMA,
         "request_id": request["request_id"],
-        "request_sha256": "abc",
+        "request_sha256": request["request_sha256"],
         "task": request["task"],
         "producer": {"model_id": "test"},
         "status": "failed",
@@ -1177,8 +1179,9 @@ def test_docx_audit_assigns_recovery_classes_at_the_finding_producer(tmp_path):
 def test_generic_content_pass_without_per_section_evidence_is_rejected(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.content", "request_sha256": "abc", "task": "clinical_content_verification", "response_path": "hermes/verification-responses/r.verify.content.json", "artifacts": [], "sections": [{"artifact": "protocol", "section_id": "introduction"}], "checks": list(CONTENT_CHECKS), "cross_document_checks": ["study_title"]}
-    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": "abc", "task": request["task"], "producer": {"model_id": "test"}, "status": "passed", "findings": []}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.content", "task": "clinical_content_verification", "response_path": "hermes/verification-responses/r.verify.content.json", "artifacts": [], "sections": [{"artifact": "protocol", "section_id": "introduction"}], "checks": list(CONTENT_CHECKS), "cross_document_checks": ["study_title"]}
+    request["request_sha256"] = verification_request_sha256(request)
+    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test"}, "status": "passed", "findings": []}
     (request_dir / "r.verify.content.json").write_text(json.dumps(request), encoding="utf-8")
     (response_dir / "r.verify.content.json").write_text(json.dumps(response), encoding="utf-8")
     findings, _ = validate_verifications(tmp_path)
@@ -1190,7 +1193,8 @@ def test_visual_response_is_rejected_after_any_bound_artifact_changes(tmp_path):
     for relative, data in (("candidate/protocol.docx", b"docx"), ("rendered/protocol.pdf", b"pdf"), ("rendered/protocol/page-1.png", b"png")):
         path = tmp_path / relative; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
     digest = lambda relative: hashlib.sha256((tmp_path / relative).read_bytes()).hexdigest()
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "request_sha256": "abc", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "docx": "candidate/protocol.docx", "docx_sha256": digest("candidate/protocol.docx"), "pdf": "rendered/protocol.pdf", "pdf_sha256": digest("rendered/protocol.pdf"), "pages": [{"page": 1, "path": "rendered/protocol/page-1.png", "sha256": digest("rendered/protocol/page-1.png")}]}], "checks": list(VISUAL_CHECKS)}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "docx": "candidate/protocol.docx", "docx_sha256": digest("candidate/protocol.docx"), "pdf": "rendered/protocol.pdf", "pdf_sha256": digest("rendered/protocol.pdf"), "pages": [{"page": 1, "path": "rendered/protocol/page-1.png", "sha256": digest("rendered/protocol/page-1.png")}]}], "checks": list(VISUAL_CHECKS)}
+    request["request_sha256"] = verification_request_sha256(request)
     request_path = request_dir / "r.verify.visual.json"; request_path.write_text(json.dumps(request), encoding="utf-8")
     response_path = tmp_path / request["response_path"]; response_path.parent.mkdir(parents=True); response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
     for relative in (
