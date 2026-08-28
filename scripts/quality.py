@@ -245,6 +245,16 @@ def page_renderer(
     return identities[0] if identities else None
 
 
+def _one_pdfium_renderer(
+    identities: Iterable[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep one governed PDFium identity and discard every alternate backend."""
+    for identity in identities:
+        if identity.get("kind") == "pypdfium2":
+            return [dict(identity)]
+    return []
+
+
 def _ordered_page_images(output_dir: Path) -> list[Path]:
     def key(path: Path) -> tuple[int, str]:
         match = re.search(r"(\d+)(?=\.png$)", path.name)
@@ -752,7 +762,7 @@ def preflight(
             clock=clock,
         )
     )
-    page_candidates = (
+    page_candidates = _one_pdfium_renderer(
         [dict(item) for item in page_renderer_identities]
         if page_renderer_identities is not None
         else page_renderers(environment=runtime_environment, skill_root=repo_root) if remaining() > 0 else []
@@ -860,7 +870,7 @@ def preflight(
             issue = "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."
             field = "renderer"
         elif not page_candidates:
-            issue = "No supported PDF page renderer is available, including bundled PyMuPDF."
+            issue = "The release-owned pypdfium2 page renderer is unavailable."
             field = "page_renderer"
         else:
             issue = "Every local renderer/page-renderer combination failed its smoke render."
@@ -1000,6 +1010,7 @@ def render_pages(
         page_candidates = [dict(page_renderer_identity), *[item for item in page_candidates if dict(item) != dict(page_renderer_identity)]]
     if not page_candidates and page_renderer_identities is None and page_renderer_identity is None:
         page_candidates = page_renderers(environment=runtime_environment, skill_root=repo_root)
+    page_candidates = _one_pdfium_renderer(page_candidates)
     if not renderer_candidates:
         return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Word, LibreOffice, Pages, or verified fallback renderer is available."}]}
     if not page_candidates:
@@ -1058,8 +1069,18 @@ def render_pages(
             page_attempts.append({"renderer": candidate, "status": "passed"})
             break
         if selected_page_renderer is None:
-            renderer_attempts.append({"renderer": identity, "status": "failed", "issue": "Every available page renderer failed for the exported PDFs."})
-            continue
+            return {
+                "status": "blocked",
+                "renderer_attempts": renderer_attempts,
+                "page_renderer_attempts": page_attempts,
+                "findings": [{
+                    "category": "renderer",
+                    "field": "rendering",
+                    "issue": "The release-owned pypdfium2 page renderer failed.",
+                    "recovery_class": "adapter_fault",
+                    "action": "stop",
+                }],
+            }
 
         findings: list[dict[str, Any]] = []
         artifacts = []
@@ -1284,7 +1305,7 @@ def render_assurance(
         if renderer_identities is not None
         else renderers(environment=runtime_environment, skill_root=repo_root, deadline_monotonic=deadline, clock=clock)
     )
-    page_candidates = (
+    page_candidates = _one_pdfium_renderer(
         [dict(item) for item in page_renderer_identities]
         if page_renderer_identities is not None
         else page_renderers(environment=runtime_environment, skill_root=repo_root)
@@ -1304,7 +1325,10 @@ def render_assurance(
         blank_page_detector=blank_page_detector,
     )
     render_report["renderer_attempts"] = _governed_adapter_attempts(render_report.get("renderer_attempts", []))
-    render_report["page_renderer_attempts"] = _governed_adapter_attempts(render_report.get("page_renderer_attempts", []))
+    render_report["page_renderer_attempts"] = _governed_adapter_attempts(
+        render_report.get("page_renderer_attempts", []),
+        failure_action="stop",
+    )
     governed_findings = []
     for raw in render_report.get("findings", []):
         finding = dict(raw)
@@ -1313,7 +1337,7 @@ def render_assurance(
                 "recovery_class": "visual_defect",
                 "action": RECOVERY_POLICIES["visual_defect"],
             })
-        elif finding.get("category") == "renderer":
+        elif finding.get("category") == "renderer" and not finding.get("recovery_class"):
             finding = recovery_finding(finding, "adapter_fault")
         governed_findings.append(finding)
     render_report["findings"] = governed_findings
@@ -1395,14 +1419,18 @@ def _validated_candidate_structure(
     }, "document_structure_defect")
 
 
-def _governed_adapter_attempts(attempts: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def _governed_adapter_attempts(
+    attempts: Iterable[Mapping[str, Any]],
+    *,
+    failure_action: str | None = None,
+) -> list[dict[str, Any]]:
     governed = []
     for raw in attempts:
         attempt = {"adapter": dict(raw.get("renderer") or raw.get("adapter") or {}), "status": raw.get("status")}
         if raw.get("status") in {"failed", "skipped"}:
             attempt.update({
                 "recovery_class": "adapter_fault",
-                "action": RECOVERY_POLICIES["adapter_fault"],
+                "action": failure_action or RECOVERY_POLICIES["adapter_fault"],
                 "issue": str(raw.get("issue") or "Adapter did not complete."),
             })
         governed.append(attempt)

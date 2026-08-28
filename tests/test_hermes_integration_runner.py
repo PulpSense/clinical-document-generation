@@ -421,7 +421,7 @@ def _write_passing_case_report(
     render_artifacts = []
     docx_artifacts = {}
     active_renderer = {"kind": "LibreOffice", "path": "/controlled/soffice"}
-    active_page_renderer = {"kind": "pymupdf", "path": "python:pymupdf"}
+    active_page_renderer = {"kind": "pypdfium2", "path": "python:pypdfium2"}
     fonts = {"Arial": {"state": "available", "match": "controlled font inventory"}}
     for output in manifest_outputs:
         if not output["path"].endswith(".docx"):

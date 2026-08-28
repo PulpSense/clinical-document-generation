@@ -222,17 +222,16 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
 
 def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_renderer(tmp_path, monkeypatch):
     bundled = {
-        "kind": "pymupdf",
-        "path": "python:pymupdf",
-        "module": "pymupdf",
+        "kind": "pypdfium2",
+        "path": "python:pypdfium2",
+        "module": "pypdfium2",
         "python_path": str(tmp_path / "runtime/python"),
-        "source": "verified fallback stack",
+        "source": "release-owned runtime",
     }
-    host = {"kind": "pdftoppm", "path": "/usr/bin/pdftoppm", "source": "PATH"}
     observed = {}
     monkeypatch.setattr(workflow, "_manifest_integrity", lambda _root: [])
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{"kind": "LibreOffice", "source": "verified fallback stack"}])
-    monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [host, bundled])
+    monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [bundled])
 
     def fake_assurance(_root, revision_dir, _reference, **kwargs):
         observed["pages"] = kwargs["page_renderer_identities"]

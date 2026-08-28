@@ -140,7 +140,7 @@ def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exa
         return [page]
 
     office = {"kind": "LibreOffice", "path": "/controlled/soffice"}
-    pages = {"kind": "pymupdf", "path": "python:pymupdf"}
+    pages = {"kind": "pypdfium2", "path": "python:pypdfium2"}
     report = render_assurance(
         ROOT,
         tmp_path,
@@ -187,8 +187,7 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
     original = (candidate / "protocol.docx").read_bytes()
     word = {"kind": "Microsoft Word", "path": "/controlled/word"}
     libreoffice = {"kind": "LibreOffice", "path": "/controlled/soffice"}
-    poppler = {"kind": "pdftoppm", "path": "/controlled/pdftoppm"}
-    pymupdf = {"kind": "pymupdf", "path": "python:pymupdf"}
+    pdfium = {"kind": "pypdfium2", "path": "python:pypdfium2"}
 
     def export(docx, output_dir, identity, **_kwargs):
         if identity == word:
@@ -198,8 +197,6 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
         return pdf
 
     def rasterize(_pdf, output_dir, identity, **_kwargs):
-        if identity == poppler:
-            raise RuntimeError("controlled page failure")
         output_dir.mkdir(parents=True, exist_ok=True)
         page = output_dir / "page-1.png"
         page.write_bytes(b"page image")
@@ -212,7 +209,7 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
         contracted_bundle=_bundle(),
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[word, libreoffice],
-        page_renderer_identities=[poppler, pymupdf],
+        page_renderer_identities=[pdfium],
         font_probe=lambda _font, **_kwargs: (True, "available"),
         office_exporter=export,
         page_exporter=rasterize,
@@ -232,15 +229,68 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
         {"adapter": libreoffice, "status": "passed"},
     ]
     assert report["render"]["page_renderer_attempts"] == [
-        {
-            "adapter": poppler,
-            "status": "failed",
-            "recovery_class": "adapter_fault",
-            "action": "advance_adapter",
-            "issue": "controlled page failure",
-        },
-        {"adapter": pymupdf, "status": "passed"},
+        {"adapter": pdfium, "status": "passed"},
     ]
+
+
+def test_render_assurance_stops_when_the_one_pdfium_renderer_fails(tmp_path):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    document = Document()
+    document.add_paragraph("Complete candidate")
+    document.save(candidate / "protocol.docx")
+    pdfium = {"kind": "pypdfium2", "path": "python:pypdfium2"}
+    unapproved_host_renderer = {
+        "kind": "pdftoppm",
+        "path": "/controlled/pdftoppm",
+    }
+
+    def export(docx, output_dir, _identity, **_kwargs):
+        pdf = output_dir / f"{docx.stem}.pdf"
+        _write_text_pdf(pdf)
+        return pdf
+
+    used = []
+
+    def rasterize(_pdf, output_dir, identity, **_kwargs):
+        used.append(identity)
+        if identity == pdfium:
+            raise RuntimeError("controlled PDFium failure")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        page = output_dir / "page-1.png"
+        page.write_bytes(b"unapproved page image")
+        return [page]
+
+    report = render_assurance(
+        ROOT,
+        tmp_path,
+        {},
+        contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, "protocol.docx"),
+        renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
+        page_renderer_identities=[pdfium, unapproved_host_renderer],
+        font_probe=lambda _font, **_kwargs: (True, "available"),
+        office_exporter=export,
+        page_exporter=rasterize,
+        blank_page_detector=lambda _pdf: [],
+    )
+
+    assert report["status"] == "blocked"
+    assert used == [pdfium]
+    assert report["render"]["page_renderer_attempts"] == [{
+        "adapter": pdfium,
+        "status": "failed",
+        "recovery_class": "adapter_fault",
+        "action": "stop",
+        "issue": "controlled PDFium failure",
+    }]
+    assert report["findings"] == [{
+        "category": "renderer",
+        "field": "rendering",
+        "issue": "The release-owned pypdfium2 page renderer failed.",
+        "recovery_class": "adapter_fault",
+        "action": "stop",
+    }]
 
 
 def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnostic(tmp_path):
@@ -265,7 +315,7 @@ def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnosti
         contracted_bundle=_bundle(),
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[word, libreoffice],
-        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
         font_probe=lambda _font, **_kwargs: (True, "available"),
         office_exporter=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("controlled failure")),
         page_exporter=lambda *_args, **_kwargs: [],
@@ -320,7 +370,7 @@ def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp
         contracted_bundle=_bundle(),
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
-        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
         font_probe=probe,
         rebuild_candidate=rebuild,
         office_exporter=fail_export,
@@ -334,7 +384,7 @@ def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         candidate_font_substitutions=first["font_substitutions"],
         renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
-        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
         font_probe=probe,
         rebuild_candidate=rebuild,
         office_exporter=fail_export,
@@ -395,7 +445,7 @@ def test_render_assurance_revalidates_the_exact_candidate_after_font_substitutio
             "study.xml",
         ),
         renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
-        page_renderer_identities=[{"kind": "pymupdf", "path": "python:pymupdf"}],
+        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
         font_probe=lambda font, **_kwargs: (False, "missing") if font == "Missing Sans" else (True, "available"),
         rebuild_candidate=rebuild,
     )

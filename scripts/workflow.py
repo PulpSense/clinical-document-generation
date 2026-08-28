@@ -441,7 +441,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     ]
     fallback_pages = [
         item for item in page_renderers(skill_root=skill_root)
-        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+        if item.get("kind") == "pypdfium2" and item.get("source") == "release-owned runtime"
     ]
     with tempfile.TemporaryDirectory(prefix="clinical-installation-assurance-") as directory:
         revision_dir = Path(directory)
@@ -478,7 +478,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     if not fallback_renderers:
         findings.append({"category": "installation", "field": "fallback_renderer", "issue": "The versioned local LibreOffice fallback was not discovered."})
     if not fallback_pages:
-        findings.append({"category": "installation", "field": "fallback_page_renderer", "issue": "The versioned local PyMuPDF page renderer was not discovered."})
+        findings.append({"category": "installation", "field": "pdf_page_renderer", "issue": "The release-owned pypdfium2 page renderer was not discovered."})
     return {
         "status": "passed" if not findings else "blocked",
         "renderer": render_evidence.get("renderer"),
