@@ -210,6 +210,41 @@
         "owned_processes_reaped": true,
         "late_responses_ignored": true
       }
+    },
+    {
+      "id": "task-aware-handoff-termination",
+      "classification": "rejected_candidate",
+      "outcome": "failed_first_real_case_invalid_hermes_response",
+      "candidate_git_commit": "adfa18ab0a9b19c27c90c459f027e0d96b5f2650",
+      "candidate_package_fingerprint": "86cd9bc8e0bda07ccc83355333b127b598e3aab1ed45153b2fe66e6be10fc2ef",
+      "candidate_archive_sha256": "52d99486958408bc96ab14ebc80632b40e5b6868161b8402806cdf9e6704ed3c",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "2e92951b63c2a0910214139957c15d51829e51f20f939087d9941ab38d577218",
+      "repository_regression_test_count": 330,
+      "failed_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "invalid-Hermes-response",
+        "desktop_operation_elapsed_seconds": 722.523,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 722.627,
+        "under_15_minutes": true,
+        "all_quality_gates_passed": true,
+        "delivery_confirmed": true,
+        "case_report_sha256": "66940e6fe8c692cdcd2f58d0399aacbb51094c2204630ad93ae284a188db9066",
+        "desktop_operation_state_sha256": "e592ed2ac5499dd0fea7bacab5d4a4f69b4654958ace2614f902a7e4c35d65a5",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 5,
+          "protocol_pages": 11,
+          "checks_per_page": 14
+        }
+      },
+      "finding": "Drafting handoffs were incorrectly polled with the visual-verification completion validator. Bound drafting responses therefore did not terminate their owned Hermes workers; those workers remained alive long enough to observe later retry requests and write schema-mismatched responses outside their assigned handoff. The same run also exposed non-canonical model identifiers and a visual status alias that required the governed Desktop-parent fallback.",
+      "measured_fix": "Authenticate drafting completion with task-specific request/response bindings, terminate and reap each owned drafting worker immediately after its bound response exists, preserve both targets of an exact-prose collision while accepting unaffected sections, explicitly forbid copied list items, and bind every agent response to the configured canonical model identifier and literal verification status values.",
+      "corpus_report_sha256": "a82b307e00cb49bd0be35cc4c1e32ac5e5d892624a3889ed9c733a74958a4bb8",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
     }
   ]
 }

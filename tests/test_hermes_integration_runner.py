@@ -86,7 +86,7 @@ def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path,
         "task": request["task"],
         "status": "passed",
         "findings": [],
-        "producer": {"model_id": "hermes/test"},
+        "producer": {"model_id": "gpt-5.6-sol"},
         "page_assessments": [{
             "artifact": "protocol",
             "page": 1,
@@ -113,6 +113,7 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
         "failed_second_real_case",
         "failed_third_real_case",
         "failed_second_real_case_slow",
+        "failed_first_real_case_invalid_hermes_response",
     ]
     assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
     retrospective_attempt = next(
@@ -279,7 +280,13 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
     return path
 
 
-def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_seconds: float = 600.0) -> Path:
+def _write_passing_case_report(
+    tmp_path: Path,
+    fixture_id: str,
+    *,
+    elapsed_seconds: float = 600.0,
+    producer_model_id: str = "gpt-5.6-sol",
+) -> Path:
     fixture = certification_fixture(fixture_id)
     run_dir = tmp_path / fixture_id
     logs = run_dir / "logs"
@@ -331,7 +338,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
         "section_id": "protocol.synopsis",
         "request_id": "draft-1",
         "request_sha256": "3" * 64,
-        "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+        "producer": {"model_id": producer_model_id},
     }), encoding="utf-8")
     drafting_evidence = [{
         "path": accepted_draft.relative_to(revision).as_posix(),
@@ -340,7 +347,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
         "request_sha256": "3" * 64,
         "accepted_request_path": drafting_request.relative_to(revision).as_posix(),
         "accepted_request_file_sha256": hashlib.sha256(drafting_request.read_bytes()).hexdigest(),
-        "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+        "producer": {"model_id": producer_model_id},
     }]
     manifest_outputs = []
     for name in fixture["expected_outputs"]:
@@ -367,7 +374,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
         "request_sha256": "1" * 64,
         "task": "clinical_content_verification",
         "status": "passed",
-        "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+        "producer": {"model_id": producer_model_id},
         "section_assessments": [{"artifact": "protocol", "section_id": "protocol.title-page", "status": "passed"}],
         "cross_document_assessments": [{"check": "study_title", "status": "passed"}],
     }), encoding="utf-8")
@@ -424,7 +431,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
             "request_sha256": "2" * 64,
             "task": "rendered_page_visual_verification",
             "status": "passed",
-            "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+            "producer": {"model_id": producer_model_id},
             "page_assessments": [{
                 "artifact": artifact,
                 "page": 1,
@@ -438,14 +445,14 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
             "request_sha256": hashlib.sha256(visual_request.read_bytes()).hexdigest(),
             "response": visual_response.relative_to(revision).as_posix(),
             "response_sha256": hashlib.sha256(visual_response.read_bytes()).hexdigest(),
-            "producer": {"model_id": "openai-codex/gpt-5.6-sol"},
+            "producer": {"model_id": producer_model_id},
             "artifacts": [render_artifact],
         }
         docx_artifacts[artifact] = {
             "status": "passed",
             "request_sha256": hashlib.sha256(visual_request.read_bytes()).hexdigest(),
             "response_sha256": hashlib.sha256(visual_response.read_bytes()).hexdigest(),
-            "producer_model_id": "openai-codex/gpt-5.6-sol",
+            "producer_model_id": producer_model_id,
             "docx_sha256": render_artifact["docx_sha256"],
             "pdf_sha256": render_artifact["pdf_sha256"],
             "page_count": 1,
@@ -530,7 +537,7 @@ def _write_passing_case_report(tmp_path: Path, fixture_id: str, *, elapsed_secon
                 (fixture["artifact_paths"]["source_input"].parent / "fixture.json").read_bytes()
             ).hexdigest(),
         },
-        "model_identifiers": ["openai-codex/gpt-5.6-sol"],
+        "model_identifiers": [producer_model_id],
         "missing_response_paths": [],
         "invalid_response_paths": [],
         "recorded_response_paths": [],
@@ -831,12 +838,30 @@ def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path
     assert result["status"] == "failed"
     assert any("model identifiers do not match" in finding for finding in result["findings"])
     assert any("Visual QA summary does not match" in finding for finding in result["findings"])
-    assert result["cases"][0]["model_identifiers"] == ["openai-codex/gpt-5.6-sol"]
+    assert result["cases"][0]["model_identifiers"] == ["gpt-5.6-sol"]
     assert all(
         digest != "0" * 64
         for item in result["cases"][0]["visual_qa"].values()
         for digest in item["page_sha256"]
     )
+
+
+def test_corpus_reducer_rejects_bound_producers_outside_governed_model(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(
+            tmp_path,
+            fixture_id,
+            producer_model_id=("other-model" if fixture_id == CERTIFICATION_CORPUS[0] else "gpt-5.6-sol"),
+        )
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+
+    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+
+    assert result["status"] == "failed"
+    assert any("governed model identifier" in finding for finding in result["findings"])
 
 
 def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tmp_path: Path, monkeypatch) -> None:
@@ -954,6 +979,7 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
             "task": "rendered_page_visual_verification",
         },
         hermes_configuration={
+            "model_identifier": "gpt-5.6-sol",
             "layout_preservation_notes": [
                 "The two-line Table 13.3.-1 contact caption is authority-preserved."
             ],
@@ -963,6 +989,8 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
     assert "The two-line Table 13.3.-1 contact caption is authority-preserved." in prompt
     assert "Do not normalize" in prompt
     assert "Do not inspect production code or tests" in prompt
+    assert 'producer.model_id must be exactly "gpt-5.6-sol"' in prompt
+    assert 'top-level status and every page status must be exactly "passed"' in prompt
 
 
 def test_content_verifier_prompt_goes_directly_to_bound_evidence(tmp_path: Path) -> None:
@@ -1068,6 +1096,22 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
     }
     manifest_path = run_dir / "revisions" / revision_id / "delivery-manifest.json"
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    request_dir = run_dir / "revisions" / revision_id / "hermes/requests"
+    response_dir = run_dir / "revisions" / revision_id / "hermes/responses"
+    request_dir.mkdir(parents=True)
+    response_dir.mkdir(parents=True)
+    request = {
+        "request_id": "draft-1",
+        "request_sha256": "a" * 64,
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "response_path": "hermes/responses/draft-1.json",
+    }
+    (request_dir / "draft-1.json").write_text(json.dumps(request), encoding="utf-8")
+    (response_dir / "draft-1.json").write_text(json.dumps({
+        **request,
+        "producer": {"model_id": "gpt-5.6-sol"},
+    }), encoding="utf-8")
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
         "status": "passed",
         "stage": "delivery",
@@ -1084,6 +1128,7 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
             "max_turns": 80,
             "skill": "clinical-document-drafting",
             "safe_mode": True,
+            "model_identifier": "gpt-5.6-sol",
             "reasoning_configuration": "Hermes Desktop governed default",
         },
     )
@@ -1179,6 +1224,7 @@ def test_parent_visual_review_waits_for_bound_desktop_responses(tmp_path: Path) 
     marker = json.loads((tmp_path / "logs/desktop-parent-visual-review.json").read_text())
     assert marker["status"] == "completed"
     assert marker["response_paths"] == ["hermes/verification-responses/visual.json"]
+    assert marker["required_producer_model_id"] == "gpt-5.6-sol"
 
 
 def test_parent_visual_review_reports_progress_while_waiting(tmp_path: Path, monkeypatch) -> None:
@@ -1323,6 +1369,60 @@ def test_bound_but_incomplete_visual_pass_is_not_terminal(tmp_path: Path) -> Non
         revision_dir,
         handoff,
         quality.verification_response_is_complete,
+    ) is False
+
+
+def test_bound_drafting_response_is_terminal_without_visual_validation(tmp_path: Path) -> None:
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/requests/draft.json"
+    response_path = revision_dir / "hermes/responses/draft.json"
+    request = {
+        "schema_version": "hermes-request/v2",
+        "request_id": "draft",
+        "request_sha256": "request-hash",
+        "revision_id": "r-test",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+    }
+    response = {
+        "schema_version": "hermes-response/v2",
+        "request_id": "draft",
+        "request_sha256": "request-hash",
+        "revision_id": "r-test",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {"model_id": "gpt-5.6-sol"},
+        "section_results": [],
+    }
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+    handoff = {
+        "request_path": request_path.relative_to(revision_dir).as_posix(),
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+        "task": "section_drafting",
+    }
+
+    assert _response_is_bound(
+        revision_dir,
+        handoff,
+        lambda *_args: (_ for _ in ()).throw(AssertionError("visual validator used for drafting")),
+    ) is True
+
+    response["request_sha256"] = "wrong"
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+    assert _response_is_bound(revision_dir, handoff, lambda *_args: True) is False
+
+    response["request_sha256"] = "request-hash"
+    response["producer"]["model_id"] = "openai-codex/gpt-5.6-sol"
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+    assert _response_is_bound(
+        revision_dir,
+        handoff,
+        lambda *_args: True,
+        expected_model_identifier="gpt-5.6-sol",
     ) is False
 
 
@@ -1514,6 +1614,22 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
         encoding="utf-8",
     )
     (run_dir / "output/protocol.docx").write_bytes(b"published")
+    request_dir = run_dir / "revisions" / revision_id / "hermes/requests"
+    response_dir = run_dir / "revisions" / revision_id / "hermes/responses"
+    request_dir.mkdir(parents=True)
+    response_dir.mkdir(parents=True)
+    request = {
+        "request_id": "draft-1",
+        "request_sha256": "a" * 64,
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "response_path": "hermes/responses/draft-1.json",
+    }
+    (request_dir / "draft-1.json").write_text(json.dumps(request), encoding="utf-8")
+    (response_dir / "draft-1.json").write_text(json.dumps({
+        **request,
+        "producer": {"model_id": "other-model"},
+    }), encoding="utf-8")
 
     without_delivery = inspect_run(
         run_dir,
@@ -1544,12 +1660,26 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
         timed_out=False,
         child_returncode=0,
     )
+    wrong_model_delivery = inspect_run(
+        run_dir,
+        final_result={
+            "status": "passed",
+            "stage": "desktop_delivery",
+            "delivery": {"confirmed": True},
+        },
+        elapsed_seconds=1.0,
+        timed_out=False,
+        child_returncode=0,
+        expected_model_identifier="gpt-5.6-sol",
+    )
 
     assert without_delivery["outcome"] != DiagnosticOutcome.PASSED.value
     assert with_delivery["outcome"] == DiagnosticOutcome.PASSED.value
     assert slow_delivery["outcome"] == DiagnosticOutcome.NON_CERTIFYING_RUNTIME.value
     assert slow_delivery["output_published"] is True
     assert with_delivery["required_outputs"] == ["protocol.docx"]
+    assert wrong_model_delivery["outcome"] == DiagnosticOutcome.INVALID_HERMES_RESPONSE.value
+    assert wrong_model_delivery["noncanonical_model_identifiers"] == ["other-model"]
 
 
 def test_diagnostic_preserves_a_classified_layout_blocker_after_response_invalidation(tmp_path: Path) -> None:

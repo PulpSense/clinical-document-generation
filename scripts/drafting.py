@@ -96,7 +96,7 @@ def _request_constraints() -> list[str]:
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections must use their listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
-        "Write separately contracted sections independently; do not repeat an exact sentence or paragraph across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it.",
+        "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
         "Use participant-facing language for ICF sections.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
@@ -782,13 +782,16 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 "issue": "The section contract does not authorize the fixed_boilerplate outcome or the returned content is not its exact authorized boilerplate.",
                 "next_action": "Use the exact listed Fixed Clinical Boilerplate with its matching boilerplate reference, or return an authorized agent draft.",
             })
+    has_blocking_contract_findings = bool(findings)
     duplicate_records = (
         (section_id, item, expected_contracts[section_id])
         for item in results
         if isinstance(item, Mapping)
         and (section_id := str(item.get("section_id") or "")) in expected_contracts
     )
+    duplicate_target_ids: set[str] = set()
     for prior_section, section_id in _cross_section_duplicate_pairs(duplicate_records):
+        duplicate_target_ids.update((prior_section, section_id))
         findings.append({
             "category": "drafting",
             "field": section_id,
@@ -796,7 +799,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
             "next_action": "Rewrite each target with independent source-grounded prose.",
         })
-    if findings:
+    if has_blocking_contract_findings:
         return None, findings
     accepted: list[dict[str, Any]] = []
     for item in results:
@@ -842,7 +845,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         ))
         if not clean_paragraphs and not lists:
             findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
-        if len(findings) == section_finding_count:
+        if len(findings) == section_finding_count and section_id not in duplicate_target_ids:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
     return {"kind": "sections", "drafts": accepted}, findings
 
@@ -893,7 +896,11 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             }]
         for finding in response_findings:
             field = str(finding.get("field") or "")
-            finding["target_ids"] = [field] if field in target_ids else target_ids
+            explicit_targets = [
+                str(target) for target in finding.get("target_ids", [])
+                if str(target) in target_ids
+            ] if isinstance(finding.get("target_ids"), list) else []
+            finding["target_ids"] = explicit_targets or ([field] if field in target_ids else target_ids)
         if accepted:
             if accepted["kind"] == "prs":
                 accepted_path = revision_dir / "hermes/accepted/prs-narrative.json"

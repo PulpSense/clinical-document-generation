@@ -91,7 +91,10 @@ def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp
         wave="initial",
     )
     request = json.loads(path.read_text(encoding="utf-8"))
-    assert any("exact sentence or paragraph" in item for item in request["constraints"])
+    assert any(
+        "exact sentence or paragraph" in item and "exact list item" in item
+        for item in request["constraints"]
+    )
     response = recorded_acceptance_response(request)
     visits = next(item for item in response["section_results"] if item["section_id"] == "study-procedure.visits")
     evaluation = next(item for item in response["section_results"] if item["section_id"] == "evaluation-procedures")
@@ -100,10 +103,69 @@ def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp
 
     accepted, findings = validate_response(request, response)
 
-    assert accepted is None
+    assert accepted is not None
+    assert {
+        item["section_id"] for item in accepted["drafts"]
+    }.isdisjoint({"evaluation-procedures", "study-procedure.visits"})
+    assert {
+        item["section_id"] for item in accepted["drafts"]
+    } == set(batch.section_ids) - {"evaluation-procedures", "study-procedure.visits"}
     duplicate_findings = [item for item in findings if "duplicated across separately contracted" in item["issue"]]
     assert duplicate_findings
     assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures", "study-procedure.visits"]
+
+
+def test_duplicate_ingestion_preserves_both_retry_targets_and_accepts_the_rest(tmp_path):
+    reference = fixture()
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-duplicate-local-retry",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    visits = next(item for item in response["section_results"] if item["section_id"] == "study-procedure.visits")
+    evaluation = next(item for item in response["section_results"] if item["section_id"] == "evaluation-procedures")
+    evaluation["paragraphs"] = json.loads(json.dumps(visits["paragraphs"]))
+    evaluation["lists"] = json.loads(json.dumps(visits["lists"]))
+    response_path = tmp_path / request["response_path"]
+    response_path.parent.mkdir(parents=True, exist_ok=True)
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    governing = governing_resources(ROOT, reference)
+    findings = ingest_responses(tmp_path, governing)
+
+    assert findings[0]["target_ids"] == ["evaluation-procedures", "study-procedure.visits"]
+    accepted_ids = {
+        section_id for section_id in batch.section_ids
+        if accepted_draft(tmp_path, section_id, governing) is not None
+    }
+    assert accepted_ids == set(batch.section_ids) - {"evaluation-procedures", "study-procedure.visits"}
+    attempts, exhausted = retry_attempts(findings, {})
+    assert exhausted == []
+    created = schedule_requests(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-duplicate-local-retry",
+        reference=reference,
+        attempts=attempts,
+        wave="retry",
+        findings=findings,
+    )
+    retry = next(
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in created
+        if json.loads(path.read_text(encoding="utf-8"))["batch_id"] == batch.batch_id
+    )
+    assert [item["section_id"] for item in retry["section_contracts"]] == [
+        "study-procedure.visits",
+        "evaluation-procedures",
+    ]
 
 
 def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp_path):
@@ -274,7 +336,10 @@ def test_authorized_boilerplate_does_not_hide_an_unauthorized_cross_section_copy
 
     accepted, findings = validate_response(request, response)
 
-    assert accepted is None
+    assert accepted is not None
+    assert {
+        item["section_id"] for item in accepted["drafts"]
+    }.isdisjoint({"introduction", "study-design.bias"})
     duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
     assert duplicate["target_ids"] == ["introduction", "study-design.bias"]
 

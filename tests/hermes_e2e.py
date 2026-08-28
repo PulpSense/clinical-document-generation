@@ -61,6 +61,7 @@ GOVERNED_HERMES_CONFIGURATION_FIELDS = (
     "max_turns",
     "skill",
     "safe_mode",
+    "model_identifier",
     "reasoning_configuration",
 )
 CERTIFICATION_VISUAL_CHECKS = frozenset({
@@ -79,6 +80,7 @@ DEFAULT_HERMES_CONFIGURATION = {
     "max_turns": 80,
     "skill": "clinical-document-drafting",
     "safe_mode": True,
+    "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
 }
 FIRST_WAVE_BATCHES = frozenset(
@@ -375,6 +377,7 @@ def inspect_run(
     elapsed_seconds: float,
     timed_out: bool,
     child_returncode: int | None,
+    expected_model_identifier: str | None = None,
 ) -> dict[str, Any]:
     reference = _read_json(run_dir / "reference/study.reference.json") or {}
     required_outputs = expected_outputs(reference)
@@ -505,6 +508,15 @@ def inspect_run(
     for stage, intervals in agent_intervals.items():
         stage_elapsed_seconds[stage] = round(stage_elapsed_seconds.get(stage, 0.0) + _interval_seconds(intervals), 3)
     repair_report_path = run_dir / "reference/repair-report.md"
+    expected_model_identifier = str(expected_model_identifier or "").strip()
+    noncanonical_model_identifiers = sorted(
+        model_id for model_id in model_identifiers
+        if expected_model_identifier and model_id != expected_model_identifier
+    )
+    model_identity_complete = bool(
+        not expected_model_identifier
+        or model_identifiers == {expected_model_identifier}
+    )
     valid_delivery = (
         final_result.get("status") == "passed"
         and output_files == required_outputs
@@ -513,6 +525,7 @@ def inspect_run(
         and not invalid_response_paths
         and not recorded_response_paths
         and not invalid_rejection_paths
+        and model_identity_complete
     )
     if timed_out:
         outcome = DiagnosticOutcome.TIMEOUT
@@ -558,6 +571,8 @@ def inspect_run(
         "delivery": final_result.get("delivery"),
         "retry_limit_violations": retry_limit_violations,
         "model_identifiers": sorted(model_identifiers),
+        "expected_model_identifier": expected_model_identifier or None,
+        "noncanonical_model_identifiers": noncanonical_model_identifiers,
         "input_provenance": _read_json(run_dir / "reference/input-provenance.json"),
         "repair_report": repair_report_path.read_text(encoding="utf-8") if repair_report_path.is_file() else None,
     }
@@ -727,9 +742,11 @@ def _agent_prompt(
     response_path = revision_dir / str(handoff["response_path"])
     task = str(handoff.get("task") or "")
     visual_verification = task == "rendered_page_visual_verification"
+    model_identifier = str(hermes_configuration.get("model_identifier") or "gpt-5.6-sol")
     if task == "rendered_page_visual_verification":
         verification_rule = (
             "Act as an independent verifier. Load and inspect every supplied page PNG with the vision tool, assess every listed check for every page, then write the bound response promptly. "
+            "The response top-level status and every page status must be exactly \"passed\"; do not use verdict, accepted, or pass aliases. "
             "Do not inspect production code or tests; the request contains the complete governed evidence and response contract."
         )
     elif task == "clinical_content_verification":
@@ -786,7 +803,7 @@ Task: {task}
 
 Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
 {preservation_rule}
-Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. Use a truthful nonempty producer.model_id. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
+Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must be exactly "{model_identifier}", the canonical identifier for the configured model serving this handoff. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
 def _wait_for_processes(
@@ -859,9 +876,37 @@ def _response_is_bound(
     revision_dir: Path,
     handoff: Mapping[str, Any],
     response_is_complete: Callable[[Path, Path], bool],
+    expected_model_identifier: str | None = None,
 ) -> bool:
     """Delegate terminal-pass authentication to the immutable candidate validator."""
     request_path = revision_dir / str(handoff.get("request_path") or "")
+    task = str(handoff.get("task") or "")
+    response_path = revision_dir / str(handoff.get("response_path") or "")
+    response: dict[str, Any] | None = None
+    if expected_model_identifier:
+        try:
+            response = _read_json(response_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return False
+        if str(((response or {}).get("producer") or {}).get("model_id") or "").strip() != expected_model_identifier:
+            return False
+    if task in {"section_drafting", "prs_narrative_drafting"}:
+        try:
+            request = _read_json(request_path)
+            response = response or _read_json(response_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            return False
+        if request is None or response is None:
+            return False
+        return bool(
+            response.get("schema_version") == "hermes-response/v2"
+            and response.get("request_id") == request.get("request_id")
+            and response.get("request_sha256") == request.get("request_sha256")
+            and response.get("revision_id") == request.get("revision_id")
+            and response.get("task") == request.get("task")
+            and response.get("batch_id") == request.get("batch_id")
+            and str((response.get("producer") or {}).get("model_id") or "").strip()
+        )
     return response_is_complete(revision_dir, request_path)
 
 
@@ -871,6 +916,7 @@ def wait_for_parent_visual_review(
     remaining_seconds: float,
     *,
     response_is_complete: Callable[[Path, Path], bool],
+    model_identifier: str = "gpt-5.6-sol",
     progress: Callable[[str, float], None] | None = None,
 ) -> None:
     """Wait inside the original operation for Desktop-parent page review evidence."""
@@ -888,6 +934,7 @@ def wait_for_parent_visual_review(
             "request_paths": [str(item.get("request_path") or "") for item in handoffs],
             "response_paths": response_paths,
             "completion_requirement": "Desktop parent must inspect every bound page image.",
+            "required_producer_model_id": model_identifier,
         }, indent=2) + "\n", encoding="utf-8")
 
     record("awaiting_desktop_parent")
@@ -895,7 +942,12 @@ def wait_for_parent_visual_review(
     deadline = started + max(0.0, remaining_seconds)
     last_progress = started
     while time.monotonic() < deadline:
-        if all(_response_is_bound(revision_dir, handoff, response_is_complete) for handoff in handoffs):
+        if all(_response_is_bound(
+            revision_dir,
+            handoff,
+            response_is_complete,
+            expected_model_identifier=model_identifier,
+        ) for handoff in handoffs):
             record("completed")
             return
         observed = time.monotonic()
@@ -980,6 +1032,7 @@ def _run_handoff_wave(
                 revision_dir,
                 handoff_by_process[id(process)],
                 response_is_complete,
+                expected_model_identifier=str(hermes_configuration["model_identifier"]),
             ),
         )
     finally:
@@ -1105,6 +1158,7 @@ def run_release_certification_operation(
         elapsed_seconds=round(operation_elapsed, 3),
         timed_out=timed_out,
         child_returncode=None,
+        expected_model_identifier=str(hermes_configuration["model_identifier"]),
     )
     if state_path_resolver is None:
         operation_module = sys.modules.get(str(getattr(desktop_operation, "__module__", "")))
@@ -1917,6 +1971,13 @@ def _case_artifact_findings(
     ):
         findings.append("Recorded or synthetic producers cannot satisfy live drafting or verification gates.")
     derived_evidence["model_identifiers"] = sorted(model_identifiers)
+    expected_model_identifier = str(
+        ((fixture or {}).get("hermes_configuration") or {}).get("model_identifier") or ""
+    ).strip()
+    if not expected_model_identifier or model_identifiers != {expected_model_identifier}:
+        findings.append(
+            "Hermes drafting, verifier, and Desktop-parent producers do not all match the governed model identifier."
+        )
     derived_evidence["visual_qa"] = derived_visual_qa
     approval = (actual_reference or {}).get("approval") or {}
     working_reference = _read_json(run_dir / "reference/study.reference.json") or {}
@@ -2238,6 +2299,7 @@ def run_release_certification_corpus(
                 handoffs,
                 remaining,
                 response_is_complete=validator,
+                model_identifier=str(fixture["hermes_configuration"]["model_identifier"]),
                 progress=lambda stage, available: _append_json_line(
                     current / "logs/hermes-integration-events.jsonl",
                     {
@@ -2324,6 +2386,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             handoffs,
             remaining,
             response_is_complete=validator,
+            model_identifier=str(fixture["hermes_configuration"]["model_identifier"]),
             progress=lambda stage, available: _append_json_line(
                 run_dir / "logs/hermes-integration-events.jsonl",
                 {
