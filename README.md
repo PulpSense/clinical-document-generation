@@ -1,236 +1,219 @@
-# Clinical Document Generation Skill
+# Clinical Document Generation
 
-This repository is the Hermes skill source for clinical document generation.
+Hermes skill for generating reviewed clinical Protocol DOCX, ICF DOCX, and ClinicalTrials.gov PRS XML packages.
 
-Setup target:
+The repository root is the skill root. Install the whole repository—not only `SKILL.md`—because the skill requires its templates, contracts, boilerplate, and Python modules.
 
-- GitHub repo: `https://github.com/PulpSense/clinical-document-generation`
-- Branch: `main`
-- Skill name: `clinical-document-generation`
-- Skill root: the repository root, the directory that contains `SKILL.md`
-- Required Hermes model: `gpt-5.5`
+## Architecture
 
-Do not install only `SKILL.md`. The skill requires the bundled `assets/`, `references/`, and `scripts/` directories.
-
-## What Is Included
-
-- `SKILL.md`: the Hermes skill instructions and routing description.
-- `assets/client-templates/`: bundled DOCX and PRS XML templates.
-- `references/`: branch, schema, approval, source-of-truth, and template-contract instructions.
-- `scripts/`: deterministic Python scripts used by the skill.
-
-The scripts do not call OpenAI directly. Hermes should use `gpt-5.5` for the agent reasoning and narrative-generation steps, then run the local scripts for validation, mapping, rendering, and QA.
-
-## Access Check
-
-The repository is private. Before cloning, confirm the GitHub account used by Hermes or by the setup agent has access to `PulpSense/clinical-document-generation`.
-
-With GitHub CLI:
-
-```bash
-gh auth status
-gh repo view PulpSense/clinical-document-generation --json nameWithOwner,visibility,defaultBranchRef
-```
-
-Expected result:
+`scripts/workflow.py` is the only public entrypoint. Production code is limited to six Python files:
 
 ```text
-nameWithOwner: PulpSense/clinical-document-generation
-visibility: PRIVATE
-defaultBranchRef.name: main
+scripts/
+├── workflow.py
+├── contracts.py
+├── drafting.py
+├── rendering.py
+├── quality.py
+└── prs_xml.py
 ```
 
-If GitHub returns `Repository not found`, the account is not authenticated correctly or has not been invited to the private repo.
+There is no hidden runtime package and no alternative lifecycle.
 
-## Clone Into Hermes
-
-Set the Hermes skill directory to the actual skill directory used by that Hermes installation:
-
-```bash
-export HERMES_SKILLS_DIR="/absolute/path/to/hermes/skills"
-test -d "$HERMES_SKILLS_DIR"
-```
-
-Clone the repository as a direct child of that directory:
-
-```bash
-git clone https://github.com/PulpSense/clinical-document-generation.git \
-  "$HERMES_SKILLS_DIR/clinical-document-generation"
-
-cd "$HERMES_SKILLS_DIR/clinical-document-generation"
-git checkout main
-```
-
-Verify the clone:
-
-```bash
-test -f SKILL.md
-test -d assets/client-templates/docx
-test -d references
-test -d scripts
-```
-
-If the repo is already cloned, update it with:
-
-```bash
-cd "$HERMES_SKILLS_DIR/clinical-document-generation"
-git pull --ff-only origin main
-```
-
-## Runtime Requirements
-
-The core workflow has one runtime requirement in the environment where Hermes runs skill commands:
-
-- Python 3.9 or newer.
-
-All Python scripts use the standard library. Do not run `pip install`, `npm install`, or any package bootstrap command for this skill. Node.js is not used.
-
-DOCX generation does not require Microsoft Word, Apple Pages, or LibreOffice. Optional PDF-based visual/TOC QA automatically uses Pages on macOS, Word on Windows, or LibreOffice on Linux when available. If none is installed, the DOCX is still generated and the exporter records that visual QA was skipped.
-
-Check versions:
-
-```bash
-python3 --version
-```
-
-The Python version check must report 3.9 or newer. No additional runtime installation is needed.
-
-## Verify Local Setup
-
-Run these commands from the skill root:
-
-```bash
-cd "$HERMES_SKILLS_DIR/clinical-document-generation"
-
-python3 - <<'PY'
-import sys
-assert sys.version_info >= (3, 9), sys.version
-print("Python version OK")
-PY
-
-python3 -m py_compile scripts/*.py
-python3 -m unittest discover -s tests -v
-```
-
-Run a smoke test that creates and then removes a temporary run outside the repo:
-
-```bash
-printf '%s\n' "Hermes setup smoke test only." > /tmp/hermes-clinical-source.md
-
-python3 scripts/create_run.py \
-  --root /tmp/hermes-clinical-runs \
-  --slug setup-smoke \
-  --study-type retrospective \
-  --raw-context /tmp/hermes-clinical-source.md
-
-test -f /tmp/hermes-clinical-runs/setup-smoke/reference/study.reference.json
-test -f /tmp/hermes-clinical-runs/setup-smoke/templates/protocol.template.docx
-
-rm -rf /tmp/hermes-clinical-runs /tmp/hermes-clinical-source.md
-```
-
-## Register In Hermes
-
-Register the cloned repository root as a Hermes skill source.
-
-Use these values in the Hermes UI or config fields that correspond to skill registration:
-
-```yaml
-skill_id: clinical-document-generation
-name: clinical-document-generation
-source_type: local_directory
-path: /absolute/path/to/hermes/skills/clinical-document-generation
-entrypoint: SKILL.md
-model: gpt-5.5
-enabled: true
-```
-
-If Hermes imports skills directly from Git instead of a local directory, use:
-
-```yaml
-skill_id: clinical-document-generation
-name: clinical-document-generation
-source_type: git
-repository: https://github.com/PulpSense/clinical-document-generation.git
-branch: main
-subdirectory: .
-entrypoint: SKILL.md
-model: gpt-5.5
-enabled: true
-```
-
-Important registration details:
-
-- Point Hermes at the repo root, not `scripts/`, `references/`, or the parent skills directory.
-- Keep the skill name as `clinical-document-generation`; it matches the `name` field in `SKILL.md`.
-- Route this skill to `gpt-5.5`. Do not route the generation workflow to a smaller or summarization-only model.
-- Allow the skill runtime to execute `python3`.
-- Allow the skill runtime to read and write local run directories.
-- No office-application permission is required for DOCX generation. Optional renderer-based QA may invoke Pages/`osascript` on macOS, Word/PowerShell on Windows, or LibreOffice where installed.
-
-## Hermes Smoke Prompt
-
-After registration, ask Hermes:
+The workflow is:
 
 ```text
-Use the clinical-document-generation skill to start a retrospective clinical document generation run from these setup-test notes: This is only a setup test. Principal investigator, sponsor, site, study title, endpoints, and IRB details are intentionally omitted.
+study inputs
+  → mandatory-input check
+  → editable Source-of-Truth Markdown
+  → explicit client approval
+  → parallel section-level Hermes drafting batches
+  → deterministic DOCX/XML assembly
+  → independent content and every-page visual verification
+  → atomic publication of the complete branch package
 ```
 
-Expected behavior:
+See [SKILL.md](SKILL.md) for the exact Hermes orchestration and retry loop.
 
-- Hermes selects the `clinical-document-generation` skill.
-- Hermes does not produce final DOCX/XML outputs from incomplete information.
-- Hermes preserves the setup-test source input in a run directory or reports the missing required inputs.
-- Hermes stops before final generation until a reviewer-facing source-of-truth Markdown file is complete and explicitly approved.
+## Runtime
 
-## Normal Generation Contract
+- Python 3.10+
+- Dependencies in `requirements.txt`
+- Preferred host renderers: Microsoft Word, LibreOffice, then Apple Pages
+- A version-local LibreOffice fallback provisioned during activation
+- Page-image fallbacks ending in required PyMuPDF
+- No Node.js or TypeScript
 
-For real studies, the Hermes agent must follow this sequence:
+Activation provisions and smoke-tests a release-owned LibreOffice renderer, a release-owned PyMuPDF page renderer, and packaged compatible fonts. Preferred host tools remain first in the runtime ladder, but their absence cannot make the active release incapable of Visual QA. Normal generation never installs packages, fonts, or changes machine configuration. It builds the complete candidate before resolving Render Assurance, treats unknown font inventory as a render test rather than a missing font, maps proven-missing fonts only to explicit packaged Liberation substitutes, and records every fallback in the manifest.
 
-1. Preserve raw source material under the run's `input/` directory.
-2. Classify the study as `Prospective`, `Ambispective`, or `Retrospective`.
-3. Draft `reference/study.reference.json`.
-4. For prospective or ambispective studies, resolve Advarra vs Sterling before source-of-truth generation. Auto-select an explicitly named supported template; otherwise ask. Apply a later answer with `python3 scripts/select_icf_template.py --run-dir <run-dir> --choice <advarra|sterling>`. Retrospective studies skip this step.
-5. Run `python3 scripts/check_required_inputs.py --run-dir <run-dir>`.
-6. If blocking inputs remain, ask for them together and stop. Clinical input blockers are limited to missing or conflicting starred Fillout fields; prospective and ambispective runs also require the separate ICF template choice.
-7. Create the reviewer-facing source Markdown with `python3 scripts/create_source_truth_md.py --run-dir <run-dir> --require-complete`.
-8. Send or attach only the generated source Markdown for review.
-9. Wait for explicit reviewer approval or an edited source Markdown upload.
-10. Parse the approved Markdown back into `study.reference.json`.
-11. Generate branch-specific narrative fields with `gpt-5.5` and save them under `generated`.
-12. Run the branch mapper and validation scripts.
-13. Render final DOCX/XML outputs only with `python3 scripts/render_templates.py --run-dir <run-dir> --require-approval`.
-14. Run PRS XML validation for prospective and ambispective XML outputs.
-15. Run `python3 scripts/export_docx_to_pdf.py <input.docx> <output.pdf> --report <report.json>` for optional platform-aware visual QA. If a renderer is available and the DOCX has a static TOC/index, refresh, re-render, and audit it. If no renderer is available, keep the DOCX and disclose that visual/TOC QA was skipped.
+The client outputs are standard `.docx` and `.xml` files. Microsoft Word is not required on the authoring computer; the workflow uses the best installed renderer for local QA and keeps the output Word-compatible.
 
-Read `SKILL.md` and the referenced files in `references/` for the full workflow before generating real client documents.
+Protocol and ICF rendering begins from the bundled client Word families. The renderer preserves their visual design, replaces study-specific Protocol bodies with accepted drafts, keeps applicable ICF regulatory language, removes example-study leakage, and blocks empty or near-empty rendered pages.
 
-## Do Not Ship If
+Install Python dependencies in the Hermes environment:
 
-Do not mark a run complete if any of these are true:
+```bash
+"$CLINICAL_PYTHON" -m pip install -r requirements.txt
+```
 
-- Branch-required inputs are still missing or conflicting.
-- `approval.status` is not `approved`.
-- The approved source Markdown was not parsed after approval.
-- `needs_review` contains unresolved branch-blocking starred-field conflicts; optional and generic review notes do not block.
-- Template placeholders remain unresolved.
-- Prospective or ambispective PRS XML validation has not passed.
-- An available DOCX renderer reports static TOC/index page mismatches, missing headings, or alignment mismatches.
+`CLINICAL_PYTHON` must be the absolute Python 3.10+ path returned by
+`workflow.resolve_python_runtime`; do not rely on the host's unqualified
+`python3`. The Desktop operation records that identity and every later runtime
+used to resume it.
 
-## Troubleshooting
+## Public commands
 
-`Repository not found`
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+```
 
-The GitHub account used by Hermes does not have access to the private repo. Authenticate as an invited GitHub user or request repo access.
+`generate` may return `awaiting_hermes`. It is the deterministic inner lifecycle
+step. Normal post-approval Desktop delivery uses
+`workflow.run_desktop_operation`, which owns one cross-process UTC deadline, routes
+those handoffs, and confirms every final attachment through the Desktop opener.
+The standalone CLI loop is for development and controlled diagnostics; it is
+not sufficient evidence of Desktop delivery.
 
-`Unsupported or encrypted PDF`
+The same operation interface is used by the controlled real-Hermes certification
+adapter in `tests/hermes_e2e.py`. That adapter supplies only environment-specific
+Hermes process, read-only sandbox, file-opening, progress, and cleanup behavior;
+it does not own another generation loop or deadline. The persisted operation
+state binds the release fingerprint and compatible runtimes to the original UTC
+deadline, exact pending handoffs, attempt counters, stage timing and soft-budget
+diagnostics, cleanup evidence, and immutable terminal result.
 
-The built-in PDF text extractor accepts the unencrypted PDFs generated by Apple Pages and ordinary office renderers. Re-export the DOCX as an unencrypted PDF with the same renderer the reviewer will use, then rerun TOC refresh/audit.
+One real certification tracer requires an extracted, hash-valid candidate rather than the
+editable checkout:
 
-`status: unavailable` from `export_docx_to_pdf.py`
+```bash
+candidate_dir="$(mktemp -d /tmp/clinical-release-candidate.XXXXXX)"
+"$CLINICAL_PYTHON" scripts/workflow.py --package-release "$candidate_dir/release.zip"
+unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
+"$CLINICAL_PYTHON" tests/hermes_e2e.py \
+  --fixture ambispective-sterling \
+  --release-root "$candidate_dir/extracted/clinical-document-generation"
+```
 
-The host has no supported PDF renderer. This does not block DOCX generation or delivery. The report must remain with the run logs and the delivery note must state that PDF-based visual/TOC QA was skipped. Install or provide Pages, Word, or LibreOffice only when the client requires strict visual verification.
+The adapter loads `run_desktop_operation` from that candidate, launches Hermes
+with the candidate read-only, and binds the operation to its release-manifest
+fingerprint. Its cleanup reserve remains inside the one 30-minute operation;
+there is no shorter certification timeout. A successful single fixture is
+case evidence only; it does not certify a release until the complete three-study
+corpus has passed.
 
-Final output was not generated
+The complete live gate runs the declared cases sequentially against one package
+fingerprint and stops at the first failed, blocked, or slow case while retaining
+that attempt. It requires hash-bound evidence that static checks, the deterministic
+six-case Branch Acceptance Corpus, and the repository regression suite passed
+before any real model call:
 
-This is usually correct when source inputs are incomplete or approval is missing. Complete the source-of-truth Markdown review and approval loop before rendering final outputs.
+```bash
+"$CLINICAL_PYTHON" tests/hermes_e2e.py \
+  --run-preflight \
+  --preflight-evidence /absolute/path/release-certification-preflight.json \
+  --release-root /absolute/path/to/extracted/clinical-document-generation
+
+"$CLINICAL_PYTHON" tests/hermes_e2e.py \
+  --corpus \
+  --preflight-evidence /absolute/path/release-certification-preflight.json \
+  --run-root /absolute/path/to/isolated-certification-runs \
+  --release-root /absolute/path/to/extracted/clinical-document-generation
+```
+
+The harness creates the preflight evidence by checking a clean candidate commit,
+compiling exactly the six production modules, running the identical-content
+five-family Layout Preservation corpus, running the deterministic six-case Branch
+Acceptance Corpus, and then running the complete repository suite. The resulting
+`release-certification-corpus.json` is the only full-corpus pass signal. It binds
+those governed command results and logs, the clean commit and package fingerprint, each
+approved synthetic fixture, governed Hermes settings and observed model IDs,
+Contracted Template Bundle and Layout Preservation identities, exact delivered
+bytes, all quality gates, every rendered page and check, delivery confirmation,
+and sub-15-minute case timing. Recorded drafting or synthetic verification remains
+labelled structural-only in preflight evidence and cannot satisfy the live gate.
+
+Certification fixtures live under `tests/fixtures/release-certification/`.
+Each fixture manifest explicitly declares synthetic/non-private provenance,
+hashes its source input, reviewed Source-of-Truth, and approved reference, fixes
+the exact branch output set and governed Hermes configuration, and may declare
+authority-derived Layout Preservation notes. A run is always prepared from
+those repository bytes into a fresh directory; ignored runs, Downloads, and
+prior Hermes sessions are not inputs. The durable report is written to
+`<run>/logs/hermes-integration-report.json`. If the visual-review soft budget
+expires, `<run>/logs/desktop-parent-visual-review.json` identifies the exact
+page requests the Desktop parent must inspect and bind inside the unchanged
+operation deadline.
+
+The normal approval-to-accessible-files target is 10–12 minutes. The target is
+not a cutoff. The complete operation, including retries, verification,
+attachment retrieval, and owned-process cleanup, has a 30-minute ceiling.
+Normal generation runs with the installed skill read-only and may write only to
+the run workspace and isolated runtime caches. It never patches code or
+templates, installs packages, runs the development suite, or starts a recovery
+operation to obtain a new deadline.
+
+## Verification
+
+```bash
+"$CLINICAL_PYTHON" -m py_compile scripts/*.py
+"$CLINICAL_PYTHON" -m pytest -q
+"$CLINICAL_PYTHON" scripts/workflow.py --release-gate
+# Build a clean release archive outside the checkout
+"$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
+"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
+"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
+```
+
+The first release-gate command may return `awaiting_hermes` with independent
+content and rendered-page verification requests. Complete those requests using
+real content/image inspection, then resume without rebuilding the corpus:
+
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --release-gate --release-gate-root <evidence_root>
+```
+
+The gate never creates synthetic visual approvals.
+
+The release gate exercises six distinct public lifecycle cases:
+
+- Prospective sparse/rich
+- Ambispective sparse/rich
+- Retrospective sparse/rich
+
+Prospective and Ambispective publish Protocol + ICF + PRS XML. Retrospective publishes Protocol only.
+
+## Hermes installation
+
+For a release, build the archive with `--package-release` and activate it with
+`--install-release`. The installer stages the candidate, provisions its local
+fallback runtime, verifies package hashes, renders a DOCX, rasterizes a page,
+checks the packaged fonts, and atomically swaps it into the Hermes skills
+directory. A failed update retains the previous verified release. The archive
+includes the templates, contracts,
+boilerplate, and requirements, plus `RELEASE-MANIFEST.json` with hashes and
+packaging-time provenance. Packaging materializes the exact `HEAD` commit into
+an isolated tree, records that commit, and never copies mutable checkout bytes.
+It excludes development environments, credentials,
+source/patient data, old runs, and tests. Register the extracted root as
+`clinical-document-generation` with `SKILL.md` as the entrypoint.
+
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py \
+  --install-release /absolute/path/clinical-document-generation-release.zip \
+  --skills-dir /absolute/path/to/hermes/skills
+```
+
+The installed `INSTALLATION-ASSURANCE.json` records the verified renderer,
+page renderer, fonts, and smoke result. Installation is setup; the post-approval
+Desktop operation remains governed by the single 30-minute budget. A passing
+Generation Manifest is not delivery: the Desktop parent must expose exactly its
+client outputs as attachments, retrieve each file through the actual opener,
+and confirm byte length and SHA-256 before reporting success.
+Release Certification additionally requires completion within 15 minutes; a
+slower valid operation may still deliver before the 30-minute correctness
+ceiling, but receives a non-certifying runtime outcome.
+
+The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.

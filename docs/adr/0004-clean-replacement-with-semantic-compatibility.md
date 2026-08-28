@@ -1,0 +1,3 @@
+# Build a clean replacement with semantic input compatibility
+
+The generation implementation will be rebuilt beside the current implementation and replace it only after representative branch acceptance passes. Compatibility preserves the reviewer-facing Source-of-Truth Markdown, the semantic obligations of the prospective/ambispective and retrospective Branch Input Contracts, and the required client outputs; undocumented internal run state, legacy `template_fields`, n8n names, and old template mechanics need not survive. After acceptance, the old internal scripts are removed so the skill has one production path.

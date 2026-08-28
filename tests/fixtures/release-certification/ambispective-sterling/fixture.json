@@ -1,0 +1,44 @@
+{
+  "schema_version": "release-certification-fixture/v1",
+  "fixture_id": "ambispective-sterling",
+  "synthetic": true,
+  "contains_private_data": false,
+  "privacy_statement": "Repository-owned synthetic study. Names, organizations, contacts, identifiers, and clinical facts are fictional and contain no client or patient data.",
+  "review_status": "approved for release certification",
+  "study_type": "Ambispective",
+  "icf_family": "Sterling",
+  "expected_outputs": [
+    "icf.docx",
+    "protocol.docx",
+    "study.xml"
+  ],
+  "artifacts": {
+    "source_input": {
+      "path": "source-input.md",
+      "sha256": "b54328aa5f7f26b53109e4eccb5efc4665a2ed23a90e169da4c7a9aa6c6c768b"
+    },
+    "approved_source": {
+      "path": "approved-source.md",
+      "sha256": "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f"
+    },
+    "approved_reference": {
+      "path": "approved-reference.json",
+      "sha256": "fbc6184614dad6073a38e71b63bb9b07200ade8ffa135df2ae9173e30f840788"
+    }
+  },
+  "approved_normalization": {
+    "source_input_sha256": "b54328aa5f7f26b53109e4eccb5efc4665a2ed23a90e169da4c7a9aa6c6c768b",
+    "approved_source_sha256": "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f"
+  },
+  "hermes_configuration": {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": true,
+    "model_identifier": "gpt-5.6-sol",
+    "reasoning_configuration": "Hermes Desktop governed default",
+    "layout_preservation_notes": [
+      "The Protocol contact caption is intentionally authority-preserved as a centered two-line 'Table 13.3.-1:' followed by 'Contact Information for Study'; its numbering and stacking are not a style defect."
+    ]
+  }
+}

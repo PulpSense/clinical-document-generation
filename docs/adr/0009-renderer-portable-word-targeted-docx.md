@@ -1,0 +1,9 @@
+---
+status: superseded by ADR-0018
+---
+
+# Validate with the available renderer and target Microsoft Word
+
+The workflow produces standards-compliant, Microsoft Word-targeted DOCX files and performs Visual QA with the best supported renderer installed on the generation host, preferring Word, then LibreOffice, then Pages. PDF pages are rasterized by the first working backend in this order: Poppler `pdftoppm`, Poppler `pdftocairo`, MuPDF `mutool`, Ghostscript, ImageMagick, then optional PyMuPDF. Discovery covers PATH, Hermes and workspace bundles, the active Python environment, and common macOS, Windows, and Linux installation locations. Evidence records both renderer identities and exact artifact hashes, and the workflow never claims Microsoft Word validation unless Word produced that evidence. If no supported DOCX renderer or page renderer exists, generation blocks before drafting and emits a Repair Report without client outputs.
+
+An approved generation first runs a bounded disposable smoke export and page-image probe. Preflight verifies each visible template font and, when a client font is unavailable, deterministically selects the first installed same-class fallback from an ordered cross-platform chain. The substitution is recorded, written explicitly into generated DOCX declarations, exercised by the smoke export, and included in the candidate fingerprint. Generation blocks only when neither the requested font nor any compatible fallback can be verified, or when every compatible rendering backend fails. Renderer setup remains a one-time administrator operation, and the generation lifecycle never installs packages, fonts, or changes machine configuration. The DOCX renderer identity, PDF page-renderer identity, and font substitutions selected by preflight remain fixed for that governed attempt.

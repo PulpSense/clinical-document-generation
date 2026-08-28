@@ -101,4 +101,4 @@ During extraction, preserve prospective and ambispective starred-field candidate
 
 For a list, table, document section, spreadsheet range, email, or other uploaded source supplied as one candidate, wrap the entire value in a `value` object. Do not flatten its entries into separate conflicting candidates.
 
-If candidate values conflict, keep the canonical field unresolved, add a field-specific `needs_review` item with `"kind": "conflict"`, and run `scripts/check_required_inputs.py`. After the reviewer resolves the conflict, retain only the selected value or identical agreeing candidates. Generic review notes on populated starred fields are nonblocking.
+If candidate values conflict, keep the canonical field unresolved, add a field-specific `needs_review` item with `"kind": "conflict"`, and run the public workflow's `prepare` or `validate` stage. After the reviewer resolves the conflict, retain only the selected value or identical agreeing candidates. Generic review notes on populated starred fields are nonblocking.

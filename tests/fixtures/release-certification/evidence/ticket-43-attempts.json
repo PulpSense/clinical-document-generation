@@ -1,0 +1,391 @@
+{
+  "schema_version": "release-certification-attempt-ledger/v1",
+  "ticket": 43,
+  "certification_scope": "complete_three_case_corpus",
+  "attempts": [
+    {
+      "id": "clean-preflight-hidden-run-dependency",
+      "classification": "rejected_candidate",
+      "outcome": "failed_preflight",
+      "candidate_git_commit": "9af1a73c4bf216bbee39d0a64cc95a3ac2ce2acf",
+      "candidate_package_fingerprint": "64cd30b31ea6593866059c78d7dfada8161d3d9354e3c88ab4d13172a63566e3",
+      "candidate_archive_sha256": "9acde8d5b066a072dae905e436624ccc55edf547fe189d204b956268be85ca39",
+      "preflight_status": "failed",
+      "preflight_evidence_sha256": "6f976559b7235030b58de4b1ba6b98dd02ddfe14c603c12761a1a715488081e9",
+      "regression_log_sha256": "b0f3cbb126241e45cc9f9286ced16bddf9022fb7d0430df03f8f1673ac7acb2d",
+      "finding": "The clean checkout exposed 16 runtime regression tests that depended on ignored runs/ps-mm-001 source data; real corpus execution did not begin.",
+      "remediation": "The runtime regression fixture was rebound to the tracked approved Prospective release-certification fixture in commit dd20dddb2f393a44da8fe718e4c7a64868e71b4c."
+    },
+    {
+      "id": "ambispective-content-and-verifier-command",
+      "classification": "rejected_candidate",
+      "outcome": "failed_first_real_case",
+      "candidate_git_commit": "dd20dddb2f393a44da8fe718e4c7a64868e71b4c",
+      "candidate_package_fingerprint": "e7c4d19a9362bc90203efc32506c7502aad56495ccc9f7f51e12c8d27eda4a84",
+      "candidate_archive_sha256": "d25a037858f893f6e14621ee1881d163d15f5630c3ca3406670592dc91028d35",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "803fd07d040ec22534a565946e221891cd9702d7c8e683cce6890747bcd1c3b6",
+      "fixture_id": "ambispective-sterling",
+      "desktop_operation_elapsed_seconds": 1381.084,
+      "under_15_minutes": false,
+      "within_30_minute_correctness_ceiling": true,
+      "operation_outcome": "invalid-Hermes-response",
+      "finding": "Independent content verification rejected Protocol Section 14 because it contained no substantive ethical-conduct content before subsection 14.1.",
+      "measured_bottleneck": "The content verifier lost 352.9 seconds waiting for safe-mode approval of an unnecessary shell heredoc while searching production code for a validator.",
+      "remediation": "Bind approved ethics boilerplate to the Section 14 container and give verifier handoffs one exact resolved-runtime, shell-quoted, read-only validation command.",
+      "corpus_report_sha256": "dc69d4f083d8ecf365010d099a963d71f327cf4d6547b72dc0100498c2b9e404",
+      "case_report_sha256": "44062a0aca478f561da7efdef01a151380746b67783b286f57f7b4fb336991a9",
+      "desktop_operation_state_sha256": "1fa8f00411990c4aaac96835d0f492ab067da449cf4c0bdf95021e4bf5ebca82",
+      "content_verifier_log_sha256": "1effead35f9e07c839d63cca4cb0be4180430e1653b2bf7f84ff260d490002dc",
+      "repair_report_sha256": "2d899f7bf440ef7a70ff7058c4f941186289e31b584849800ff86630d95e037c",
+      "visual_review": {
+        "status": "passed",
+        "icf_pages": 5,
+        "protocol_pages": 12,
+        "checks_per_page": 14,
+        "producer_model_id": "desktop-parent/gpt-5.6-sol"
+      },
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "prospective-completion-coverage-and-premature-review-completion",
+      "classification": "rejected_candidate",
+      "outcome": "failed_second_real_case",
+      "candidate_git_commit": "a41b0441f9bb5d553d06bd2a676a82f367cd5e89",
+      "candidate_package_fingerprint": "14e3818ad5ffb5ad53e481a3bf104015802a79e2d2bafbf0607a7eec8e68e4d3",
+      "candidate_archive_sha256": "7a141b0e1b0b5529efbc04792a4ff0c89a50e5915bee3e669eae470aa8dc710e",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "4840d1a64058590be0b80a8254b786086fc13363328badc0520fafd9e1d22e82",
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "outcome": "passed",
+        "desktop_operation_elapsed_seconds": 594.797,
+        "under_15_minutes": true,
+        "case_report_sha256": "29c6abdc0d8ac49116739e0d49bb212577cde7fea24a6c3bb7ca0cee2f92fdad",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 5,
+          "protocol_pages": 12,
+          "checks_per_page": 14,
+          "producer_model_id": "openai-codex/gpt-5.6-sol"
+        }
+      },
+      "failed_case": {
+        "fixture_id": "prospective-advarra",
+        "desktop_operation_elapsed_seconds": 998.546,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "operation_outcome": "invalid-Hermes-response",
+        "case_report_sha256": "7c7041e1c4694db6f8a4f5efe5cdaa3563d6cb146582e164c306cd03ef643545",
+        "desktop_operation_state_sha256": "1eed41f5bdf7e96594ffdc8d4057fe8a370ab76e1984b63485cffa38faf93ebb",
+        "repair_report_sha256": "c1423fda3d7a5957e958c9ccaa030a1399ae67165c1b9d28228f9816e4ff0f95",
+        "first_content_response_sha256": "c28a142bbaa47d27ec33db600a74f2d5149ecc01d9b1232b2509c016469258b5",
+        "second_content_response_sha256": "e3399f8f48ab31e5892228cd7d59e5bd68833363c04f3a02383d4e0a27e15529",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 6,
+          "protocol_pages": 9,
+          "checks_per_page": 14,
+          "producer_model_id": "desktop-parent/gpt-5.6-sol"
+        }
+      },
+      "finding": "Protocol Sections 18.1 and 18.5 repeatedly omitted the approved Month 1 and Month 3 visits, and the handoff watcher terminated visual reviewers as soon as a response was bound even when its pass schema was incomplete.",
+      "remediation": "Require terminal, structurally complete verification responses before reaping Hermes reviewers and make every approved visit and time point an item-complete obligation for both completion sections.",
+      "corpus_report_sha256": "dbdf684b5e7175342b86c5888ab7f3be26b2c1bc954418ee1986bbfcc95a0d81",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "retrospective-objectives-and-canonical-reference-identity",
+      "classification": "rejected_candidate",
+      "outcome": "failed_third_real_case",
+      "candidate_git_commit": "47ba11b465f7f3d4b6a7c2ac05e78ce55ddb0819",
+      "candidate_package_fingerprint": "2fd1f097526f55f527294aa7a5680e097376abee79b199a0fbc8c4a4fd83d6ac",
+      "candidate_archive_sha256": "92df4399889c144283334816cfbacaec7ce20369d0ca631e8d3c6206dbf89cdb",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "a3fde46cd3c6e9e8c2b01f34e579cf88d2e9943b580a78f36f4ae3400e5b6dc8",
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 657.672,
+        "under_15_minutes": true,
+        "case_report_sha256": "6e4b830043b9fbdc3f5a1a6b6c01ae390eb82d4bbbc73192a43415224e462de7",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 5,
+          "protocol_pages": 12,
+          "checks_per_page": 14
+        }
+      },
+      "second_case": {
+        "fixture_id": "prospective-advarra",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 701.244,
+        "approval_confirmed_elapsed_seconds": 701.383,
+        "under_15_minutes": true,
+        "case_report_sha256": "8ef9bb386637fc0d1fba01fd79f5d8a943700cc41ca163513bb2c1333e7f2ba3",
+        "desktop_operation_state_sha256": "476808592ddf4b3eab19a5c3a1414f7b8d89221bbf994f007b8813b0d9b54a0b",
+        "corpus_validation_outcome": "failed",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 6,
+          "protocol_pages": 9,
+          "checks_per_page": 14
+        }
+      },
+      "failed_case": {
+        "fixture_id": "retrospective",
+        "desktop_operation_elapsed_seconds": 1139.156,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "operation_outcome": "invalid-Hermes-response",
+        "case_report_sha256": "25eccbd3bb489f2925d58743bd51f5c26af908148882540a6a67a0d923fa9161",
+        "desktop_operation_state_sha256": "7423a86765fd60cdfd0de6028c9d809c16986f5c3e834611c85a1acddab041ca",
+        "final_content_response_sha256": "f1a3207d7a7cd770e3689ce12152d8d5c96de4d491c14399dcb38bcfe3dafe28",
+        "visual_review": {
+          "status": "passed",
+          "protocol_pages": 4,
+          "checks_per_page": 14,
+          "producer_model_id": "desktop-parent/gpt-5.6-sol"
+        }
+      },
+      "findings": [
+        "The corpus compared the raw reviewed structured fixture to the production-normalized approved reference even though governed Markdown parsing intentionally normalizes scalar types and strips template-only fields.",
+        "Retrospective Protocol Section 5 omitted the approved secondary objective and distinct hypothesis because its minimum evidence authorized only the primary objective and primary endpoint.",
+        "The content verifier compared a canonical DOCX content hash to the raw file hash, triggering an unnecessary drafting retry and extending the operation beyond the 15-minute target."
+      ],
+      "remediation": "Compare the governed revision to the canonical reference re-derived from the hash-bound approved source, deepen retrospective objective evidence to every approved construct, and explicitly prohibit raw-file comparison for canonical DOCX content hashes.",
+      "corpus_report_sha256": "2a5994cd5a8c61e2c357d9153b5c9b86f8f7d08f55a906c6da7ab3332ee2cacd",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "pre-render-cross-batch-prose-collision",
+      "classification": "rejected_candidate",
+      "outcome": "failed_second_real_case_slow",
+      "candidate_git_commit": "c6339e82f94d5c023ca438b829bd940ac19523f1",
+      "candidate_package_fingerprint": "3f0c9c2a3b613018b9f9e54f117a1bcf9e60096b84b4ea9cbd4ba34b52b8d482",
+      "candidate_archive_sha256": "db6567dfd3fc7c79021c29c6a74763997220f41eca5d9a7ddc177d55b662de8b",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "b9d3447431ad208667229f7ca420c35465dd486cf6ceeebabc504978a1d70806",
+      "repository_regression_test_count": 328,
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 598.511,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 598.605,
+        "under_15_minutes": true,
+        "case_report_sha256": "e9fc9472537802ab0cfb87cb3156e6dacdbe5172426709ed306cccbdd3067105"
+      },
+      "failed_case": {
+        "fixture_id": "prospective-advarra",
+        "operation_outcome": "non-certifying-runtime",
+        "desktop_operation_elapsed_seconds": 931.621,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 931.766,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "all_quality_gates_passed": true,
+        "delivery_confirmed": true,
+        "case_report_sha256": "26a27293062aed0c00859997f43a19c01caa93b213815408c2915ee334cf7101",
+        "desktop_operation_state_sha256": "84042c6085e58a62845299279114763d3e24e5c1fe046dbc3efa2e5637ab8094",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 6,
+          "protocol_pages": 9,
+          "checks_per_page": 14,
+          "producer_model_id": "desktop-parent/gpt-5.6-sol"
+        }
+      },
+      "finding": "Two exact source-grounded paragraphs were independently repeated across the Objectives and Study Methods and Measurements batches. The deterministic collision was discovered only after the first candidate render and independent verification wave, forcing a 116.636-second localized drafting retry and a second complete quality wave.",
+      "measured_fix": "Detect exact prose collisions across all authenticated accepted Protocol drafts before candidate rendering and route only the colliding section targets through the existing governed drafting-retry policy.",
+      "corpus_report_sha256": "1d0fd64609ea4020dcfe1d4bcf7d4a04bed15db8183d864466f4c915fc893d31",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "task-aware-handoff-termination",
+      "classification": "rejected_candidate",
+      "outcome": "failed_first_real_case_invalid_hermes_response",
+      "candidate_git_commit": "adfa18ab0a9b19c27c90c459f027e0d96b5f2650",
+      "candidate_package_fingerprint": "86cd9bc8e0bda07ccc83355333b127b598e3aab1ed45153b2fe66e6be10fc2ef",
+      "candidate_archive_sha256": "52d99486958408bc96ab14ebc80632b40e5b6868161b8402806cdf9e6704ed3c",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "2e92951b63c2a0910214139957c15d51829e51f20f939087d9941ab38d577218",
+      "repository_regression_test_count": 330,
+      "failed_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "invalid-Hermes-response",
+        "desktop_operation_elapsed_seconds": 722.523,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 722.627,
+        "under_15_minutes": true,
+        "all_quality_gates_passed": true,
+        "delivery_confirmed": true,
+        "case_report_sha256": "66940e6fe8c692cdcd2f58d0399aacbb51094c2204630ad93ae284a188db9066",
+        "desktop_operation_state_sha256": "e592ed2ac5499dd0fea7bacab5d4a4f69b4654958ace2614f902a7e4c35d65a5",
+        "visual_review": {
+          "status": "passed",
+          "icf_pages": 5,
+          "protocol_pages": 11,
+          "checks_per_page": 14
+        }
+      },
+      "finding": "Drafting handoffs were incorrectly polled with the visual-verification completion validator. Bound drafting responses therefore did not terminate their owned Hermes workers; those workers remained alive long enough to observe later retry requests and write schema-mismatched responses outside their assigned handoff. The same run also exposed non-canonical model identifiers and a visual status alias that required the governed Desktop-parent fallback.",
+      "measured_fix": "Authenticate drafting completion with task-specific request/response bindings, terminate and reap each owned drafting worker immediately after its bound response exists, preserve both targets of an exact-prose collision while accepting unaffected sections, explicitly forbid copied list items, and bind every agent response to the configured canonical model identifier and literal verification status values.",
+      "corpus_report_sha256": "a82b307e00cb49bd0be35cc4c1e32ac5e5d892624a3889ed9c733a74958a4bb8",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "retrospective-safety-role-and-reverification-delay",
+      "classification": "rejected_candidate",
+      "outcome": "failed_third_real_case_slow",
+      "candidate_git_commit": "976b22ca535d54b490dfa9427e25a2438eef2c4f",
+      "candidate_package_fingerprint": "a6b9ec6e70bc80c897aac1a3c5ed346cb8e8091c870b94c05a7e17fbe55b05d4",
+      "candidate_archive_sha256": "b7bcbc3b350af6b8533f76fca89e0631f6fffe65a6428bb26125b4914c199c98",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "ece8b595daa40bd4462c77959f00838a441d7ec790eed0a57de089ad9d0f55aa",
+      "repository_regression_test_count": 333,
+      "first_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 369.284,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 369.385,
+        "under_15_minutes": true,
+        "case_report_sha256": "3c10a994c9e517ced37cfdea771ecf61a8d4969b7a8f96974c143efe8396584e",
+        "desktop_operation_state_sha256": "9e9e2b48ec29cb4ff5d8bd343d485bf5cfe2ead1b50a4e3e3a500ed737498133"
+      },
+      "second_case": {
+        "fixture_id": "prospective-advarra",
+        "operation_outcome": "passed",
+        "desktop_operation_elapsed_seconds": 342.22,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 342.364,
+        "under_15_minutes": true,
+        "case_report_sha256": "05d07041b810bbe27466999805558b1a64ba4339c213a070f5138ad09f981ce9",
+        "desktop_operation_state_sha256": "f39f23f3f823f2451a4b4fd276d0051717a9d5ccee54ee9cd027e428ae5a2688"
+      },
+      "failed_case": {
+        "fixture_id": "retrospective",
+        "operation_outcome": "non-certifying-runtime",
+        "desktop_operation_elapsed_seconds": 1071.559,
+        "approval_to_confirmed_retrieval_elapsed_seconds": 1071.64,
+        "under_15_minutes": false,
+        "within_30_minute_correctness_ceiling": true,
+        "all_quality_gates_passed": true,
+        "delivery_confirmed": true,
+        "case_report_sha256": "5d4e842df69b7a43cd674703a466a9bcd5b5faf7ed88931d5b990e096cf9ce58",
+        "desktop_operation_state_sha256": "bd09a467da21ecd7be35d549b392c2260c55584fbe9e683f38c3024c33bcc776",
+        "visual_review": {
+          "status": "passed",
+          "protocol_pages": 4,
+          "checks_per_page": 14,
+          "producer_model_id": "gpt-5.6-sol"
+        }
+      },
+      "finding": "The initial Retrospective Section 12 handoff did not authorize the approved investigator safety-event role, so independent content verification correctly forced a localized retry. The first retry then cited that source field outside the section contract and required a second drafting attempt; the repeated verification wave and governed Desktop-parent visual fallback pushed an otherwise fully passing delivery to 1071.640 seconds.",
+      "measured_fix": "Bind safety.roles into the Retrospective quality-safety minimum-evidence contract so the first parallel drafting wave must include the approved investigator role and avoids the measured localized drafting and complete reverification cycle.",
+      "corpus_report_sha256": "ea06b06905aea6de9604850aad4a81d8a5ae4f240dd804d9e9d3a14a0676b105",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "analysis-provenance-and-unattended-parent-review",
+      "classification": "rejected_candidate_attempt",
+      "outcome": "failed_first_real_case_at_correctness_ceiling",
+      "candidate_git_commit": "10231c52bc25edae27e498bd180cc7309f33dfa8",
+      "candidate_package_fingerprint": "f5792fb8c5761d2119e43505fba14e613e61ef573c55350586271527eed78420",
+      "candidate_archive_sha256": "9bab831b85e33684ea4c595b5b60b9ed5366d0c49805e883ea4583c24c20584b",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "a12fa6d74ce44ee0f38a3fccf280b844e1b0045e4b956dd75a0fe49b139544fd",
+      "repository_regression_test_count": 336,
+      "failed_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "invalid-Hermes-response",
+        "desktop_operation_elapsed_seconds": 1800.108,
+        "under_15_minutes": false,
+        "correctness_ceiling_enforced": true,
+        "case_report_sha256": "c0ac6c121bd741c5d87f82e89cbe0c1fc5163542c8cdc035cd09e64e8eedcf66",
+        "desktop_operation_state_sha256": "ef87fb7562feee504b234fcd8c92c7e39240319b0a254cc80685adf71bef9c68"
+      },
+      "findings": [
+        "The initial content verifier correctly rejected internal source-provenance phrases in three Analysis Plan sections and triggered a localized redraft.",
+        "The second verification wave requested the governed Desktop-parent visual fallback, but the parent response was not supplied before the original 30-minute deadline; no outputs were certified or delivered."
+      ],
+      "governed_follow_up": "One rerun of the identical immutable candidate was explicitly authorized with active Desktop-parent Visual QA monitoring; the failed attempt remains retained and was not used as passing evidence.",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "certified-three-case-corpus",
+      "classification": "certified_candidate",
+      "outcome": "passed_complete_three_case_corpus",
+      "candidate_git_commit": "10231c52bc25edae27e498bd180cc7309f33dfa8",
+      "candidate_package_fingerprint": "f5792fb8c5761d2119e43505fba14e613e61ef573c55350586271527eed78420",
+      "candidate_archive_sha256": "9bab831b85e33684ea4c595b5b60b9ed5366d0c49805e883ea4583c24c20584b",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "a12fa6d74ce44ee0f38a3fccf280b844e1b0045e4b956dd75a0fe49b139544fd",
+      "repository_regression_test_count": 336,
+      "corpus_status": "passed",
+      "corpus_report_sha256": "40e3c94915bea3700c168c7e3db706341af0d25cac982784eef7bce5d25cdc63",
+      "cases": [
+        {
+          "fixture_id": "ambispective-sterling",
+          "operation_outcome": "passed",
+          "desktop_operation_elapsed_seconds": 743.249,
+          "approval_to_confirmed_retrieval_elapsed_seconds": 743.347,
+          "under_15_minutes": true,
+          "case_report_sha256": "aa5c16e064585c4e3581bb38ab5c5a7d828eea2bcd72b49694e5185bad7ab844",
+          "desktop_operation_state_sha256": "4843e14ff1ad99a000d6662a2d64f9d438d48a6819ac15bc1786030178e90bb1",
+          "visual_page_counts": {"icf": 5, "protocol": 12}
+        },
+        {
+          "fixture_id": "prospective-advarra",
+          "operation_outcome": "passed",
+          "desktop_operation_elapsed_seconds": 372.608,
+          "approval_to_confirmed_retrieval_elapsed_seconds": 372.741,
+          "under_15_minutes": true,
+          "case_report_sha256": "63bbb5ce60ca5169f6dc63f983bf38760c768db0d628d15f32d1549055f253f3",
+          "desktop_operation_state_sha256": "ac7e34c46353c81282c548e31589959bf9d976a692e86795f3bdb557801ebc88",
+          "visual_page_counts": {"icf": 6, "protocol": 10}
+        },
+        {
+          "fixture_id": "retrospective",
+          "operation_outcome": "passed",
+          "desktop_operation_elapsed_seconds": 344.194,
+          "approval_to_confirmed_retrieval_elapsed_seconds": 344.312,
+          "under_15_minutes": true,
+          "case_report_sha256": "a49cd857332e235ad1262af51f4ab1256d8f4bda32c7bb2c83192a34d094b57e",
+          "desktop_operation_state_sha256": "f8e1df3234d77d9bbf75732b712ffabadb778e48bf4567f14353f246389efbb7",
+          "visual_page_counts": {"protocol": 4}
+        }
+      ],
+      "all_required_gates": "passed",
+      "layout_preservation": {
+        "identical_content_baseline": "passed",
+        "natural_section_3_flow": "passed",
+        "no_orphan_headings": "passed",
+        "every_page_visual_qa": "passed"
+      },
+      "delivery_confirmation": "passed",
+      "model_identifier": "gpt-5.6-sol",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    }
+  ]
+}

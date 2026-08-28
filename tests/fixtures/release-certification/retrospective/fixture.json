@@ -1,0 +1,42 @@
+{
+  "schema_version": "release-certification-fixture/v1",
+  "fixture_id": "retrospective",
+  "synthetic": true,
+  "contains_private_data": false,
+  "privacy_statement": "Repository-owned synthetic study. Names, organizations, contacts, identifiers, and clinical facts are fictional and contain no client or patient data.",
+  "review_status": "approved for release certification",
+  "study_type": "Retrospective",
+  "icf_family": null,
+  "expected_outputs": [
+    "protocol.docx"
+  ],
+  "artifacts": {
+    "source_input": {
+      "path": "source-input.md",
+      "sha256": "c4fae8835a097cb2d3aaf6ae03723588f9c4d7cc2d704752aac9d80f5fa3c61d"
+    },
+    "approved_source": {
+      "path": "approved-source.md",
+      "sha256": "1264725b55da3af2e4ff08f79bed6e46dca22da2fe9672c1d47de92385b2860d"
+    },
+    "approved_reference": {
+      "path": "approved-reference.json",
+      "sha256": "4bb0cd18d1ebc43396f07aff05eb8e6ebc3d784e5e63936e3a3a76bcef0651ca"
+    }
+  },
+  "approved_normalization": {
+    "source_input_sha256": "c4fae8835a097cb2d3aaf6ae03723588f9c4d7cc2d704752aac9d80f5fa3c61d",
+    "approved_source_sha256": "1264725b55da3af2e4ff08f79bed6e46dca22da2fe9672c1d47de92385b2860d"
+  },
+  "hermes_configuration": {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": true,
+    "model_identifier": "gpt-5.6-sol",
+    "reasoning_configuration": "Hermes Desktop governed default",
+    "layout_preservation_notes": [
+      "The Retrospective Protocol retains the authority-derived front matter, table of contents, heading hierarchy, tables, headers, and footers; only natural body-section flow and orphan prevention are expected."
+    ]
+  }
+}

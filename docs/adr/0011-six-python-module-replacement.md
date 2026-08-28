@@ -1,0 +1,3 @@
+# Replace the script collection with six deep Python modules
+
+The replacement targets six production scripts: `workflow.py` for the only public `prepare`, `approve`, `validate`, and `generate` operations; `contracts.py` for branch and section contracts; `drafting.py` for concurrent subagent work, deterministic merging, and retries; `rendering.py` for Protocol and ICF DOCX construction; `quality.py` for all gates and renderer evidence; and `prs_xml.py` for the preserved XML path. Boilerplate, prompts, schemas, and templates remain data resources; the target expresses ownership and depth rather than an inflexible file-count quota.
