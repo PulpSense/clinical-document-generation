@@ -2380,6 +2380,8 @@ def run_release_certification_corpus(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+    sys.dont_write_bytecode = True
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", default="ambispective-sterling")
     parser.add_argument("--run-root", type=Path, default=Path("/tmp/clinical-hermes-real-e2e"))
