@@ -3319,7 +3319,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release")
     args = parser.parse_args(argv)
     if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
-    elif args.provision_candidate: result = provision_fallback_stack(SCRIPT_DIR.parent)
+    elif args.provision_candidate:
+        result = provision_fallback_stack(SCRIPT_DIR.parent)
+        shutil.rmtree(SCRIPT_DIR / "__pycache__", ignore_errors=True)
     elif args.bind_certification:
         if not args.release_archive: parser.error("--release-archive is required with --bind-certification")
         result = bind_release_certification(Path(args.release_archive), Path(args.bind_certification))
