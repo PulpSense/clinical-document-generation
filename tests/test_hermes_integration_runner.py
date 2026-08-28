@@ -115,6 +115,8 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
         "failed_second_real_case_slow",
         "failed_first_real_case_invalid_hermes_response",
         "failed_third_real_case_slow",
+        "failed_first_real_case_at_correctness_ceiling",
+        "passed_complete_three_case_corpus",
     ]
     assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
     retrospective_attempt = next(
@@ -124,6 +126,37 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
     assert retrospective_attempt["failed_case"]["final_content_response_sha256"] == (
         "f1a3207d7a7cd770e3689ce12152d8d5c96de4d491c14399dcb38bcfe3dafe28"
     )
+    certified_attempt = ledger["attempts"][-1]
+    assert certified_attempt["classification"] == "certified_candidate"
+    assert certified_attempt["corpus_status"] == "passed"
+    assert certified_attempt["candidate_git_commit"] == (
+        "10231c52bc25edae27e498bd180cc7309f33dfa8"
+    )
+    assert certified_attempt["candidate_package_fingerprint"] == (
+        "f5792fb8c5761d2119e43505fba14e613e61ef573c55350586271527eed78420"
+    )
+    assert certified_attempt["preflight_evidence_sha256"] == (
+        "a12fa6d74ce44ee0f38a3fccf280b844e1b0045e4b956dd75a0fe49b139544fd"
+    )
+    assert certified_attempt["corpus_report_sha256"] == (
+        "40e3c94915bea3700c168c7e3db706341af0d25cac982784eef7bce5d25cdc63"
+    )
+    cases = certified_attempt["cases"]
+    assert tuple(case["fixture_id"] for case in cases) == CERTIFICATION_CORPUS
+    assert all(case["operation_outcome"] == "passed" for case in cases)
+    assert all(case["under_15_minutes"] is True for case in cases)
+    assert all(
+        0 < case["approval_to_confirmed_retrieval_elapsed_seconds"] < 900
+        for case in cases
+    )
+    assert all(
+        len(case[hash_key]) == 64
+        for case in cases
+        for hash_key in ("case_report_sha256", "desktop_operation_state_sha256")
+    )
+    assert certified_attempt["all_required_gates"] == "passed"
+    assert set(certified_attempt["layout_preservation"].values()) == {"passed"}
+    assert certified_attempt["delivery_confirmation"] == "passed"
     assert "/tmp/" not in path.read_text(encoding="utf-8")
 
 

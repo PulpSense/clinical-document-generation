@@ -299,6 +299,93 @@
         "owned_processes_reaped": true,
         "late_responses_ignored": true
       }
+    },
+    {
+      "id": "analysis-provenance-and-unattended-parent-review",
+      "classification": "rejected_candidate_attempt",
+      "outcome": "failed_first_real_case_at_correctness_ceiling",
+      "candidate_git_commit": "10231c52bc25edae27e498bd180cc7309f33dfa8",
+      "candidate_package_fingerprint": "f5792fb8c5761d2119e43505fba14e613e61ef573c55350586271527eed78420",
+      "candidate_archive_sha256": "9bab831b85e33684ea4c595b5b60b9ed5366d0c49805e883ea4583c24c20584b",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "a12fa6d74ce44ee0f38a3fccf280b844e1b0045e4b956dd75a0fe49b139544fd",
+      "repository_regression_test_count": 336,
+      "failed_case": {
+        "fixture_id": "ambispective-sterling",
+        "operation_outcome": "invalid-Hermes-response",
+        "desktop_operation_elapsed_seconds": 1800.108,
+        "under_15_minutes": false,
+        "correctness_ceiling_enforced": true,
+        "case_report_sha256": "c0ac6c121bd741c5d87f82e89cbe0c1fc5163542c8cdc035cd09e64e8eedcf66",
+        "desktop_operation_state_sha256": "ef87fb7562feee504b234fcd8c92c7e39240319b0a254cc80685adf71bef9c68"
+      },
+      "findings": [
+        "The initial content verifier correctly rejected internal source-provenance phrases in three Analysis Plan sections and triggered a localized redraft.",
+        "The second verification wave requested the governed Desktop-parent visual fallback, but the parent response was not supplied before the original 30-minute deadline; no outputs were certified or delivered."
+      ],
+      "governed_follow_up": "One rerun of the identical immutable candidate was explicitly authorized with active Desktop-parent Visual QA monitoring; the failed attempt remains retained and was not used as passing evidence.",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    },
+    {
+      "id": "certified-three-case-corpus",
+      "classification": "certified_candidate",
+      "outcome": "passed_complete_three_case_corpus",
+      "candidate_git_commit": "10231c52bc25edae27e498bd180cc7309f33dfa8",
+      "candidate_package_fingerprint": "f5792fb8c5761d2119e43505fba14e613e61ef573c55350586271527eed78420",
+      "candidate_archive_sha256": "9bab831b85e33684ea4c595b5b60b9ed5366d0c49805e883ea4583c24c20584b",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "a12fa6d74ce44ee0f38a3fccf280b844e1b0045e4b956dd75a0fe49b139544fd",
+      "repository_regression_test_count": 336,
+      "corpus_status": "passed",
+      "corpus_report_sha256": "40e3c94915bea3700c168c7e3db706341af0d25cac982784eef7bce5d25cdc63",
+      "cases": [
+        {
+          "fixture_id": "ambispective-sterling",
+          "operation_outcome": "passed",
+          "desktop_operation_elapsed_seconds": 743.249,
+          "approval_to_confirmed_retrieval_elapsed_seconds": 743.347,
+          "under_15_minutes": true,
+          "case_report_sha256": "aa5c16e064585c4e3581bb38ab5c5a7d828eea2bcd72b49694e5185bad7ab844",
+          "desktop_operation_state_sha256": "4843e14ff1ad99a000d6662a2d64f9d438d48a6819ac15bc1786030178e90bb1",
+          "visual_page_counts": {"icf": 5, "protocol": 12}
+        },
+        {
+          "fixture_id": "prospective-advarra",
+          "operation_outcome": "passed",
+          "desktop_operation_elapsed_seconds": 372.608,
+          "approval_to_confirmed_retrieval_elapsed_seconds": 372.741,
+          "under_15_minutes": true,
+          "case_report_sha256": "63bbb5ce60ca5169f6dc63f983bf38760c768db0d628d15f32d1549055f253f3",
+          "desktop_operation_state_sha256": "ac7e34c46353c81282c548e31589959bf9d976a692e86795f3bdb557801ebc88",
+          "visual_page_counts": {"icf": 6, "protocol": 10}
+        },
+        {
+          "fixture_id": "retrospective",
+          "operation_outcome": "passed",
+          "desktop_operation_elapsed_seconds": 344.194,
+          "approval_to_confirmed_retrieval_elapsed_seconds": 344.312,
+          "under_15_minutes": true,
+          "case_report_sha256": "a49cd857332e235ad1262af51f4ab1256d8f4bda32c7bb2c83192a34d094b57e",
+          "desktop_operation_state_sha256": "f8e1df3234d77d9bbf75732b712ffabadb778e48bf4567f14353f246389efbb7",
+          "visual_page_counts": {"protocol": 4}
+        }
+      ],
+      "all_required_gates": "passed",
+      "layout_preservation": {
+        "identical_content_baseline": "passed",
+        "natural_section_3_flow": "passed",
+        "no_orphan_headings": "passed",
+        "every_page_visual_qa": "passed"
+      },
+      "delivery_confirmation": "passed",
+      "model_identifier": "gpt-5.6-sol",
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
     }
   ]
 }
