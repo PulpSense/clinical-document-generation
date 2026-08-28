@@ -3,12 +3,13 @@
   "ticket": 42,
   "fixture_id": "ambispective-sterling",
   "source_input_sha256": "b54328aa5f7f26b53109e4eccb5efc4665a2ed23a90e169da4c7a9aa6c6c768b",
-  "candidate_package_fingerprint": "4956157b1fe23b413d3c734f244babd6b2bcdd2aa30e110b44324e1079c45cd1",
-  "candidate_git_commit": "8d880a48f87f8403e35979efb75c68549aeb9066",
+  "candidate_package_fingerprint": "358b2f7f69eb802d44727b1cb14e164d88ccf862618136240a8dc01c696f4594",
+  "candidate_git_commit": "6b760658e933a1f8100ec448385a38bb71b21997",
   "like_for_like_comparison": {
     "baseline_attempt": "parent-fallback-missing",
-    "candidate_attempt": "single-case-pass",
-    "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108"
+    "candidate_attempt": "final-immutable-candidate-pass",
+    "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
+    "hermes_configuration_hash_canonicalization": "SHA-256 of UTF-8 JSON with sorted keys, compact separators, and ensure_ascii=false"
   },
   "attempts": [
     {
@@ -39,7 +40,7 @@
       "outcome": "invalid-Hermes-response",
       "elapsed_seconds": 647.898,
       "finding": "The Desktop Operation correctly requested parent visual fallback, but the real adapter did not yet provide its governed callback.",
-      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
       "retained_local_evidence": "/tmp/clinical-issue42-final/ambispective-sterling-20260827T232958Z/logs/hermes-integration-report.json",
       "retained_evidence_sha256": "e3db46ffbb459c9a5da6b78ac68fd70163c50491d51f44e83a9b26739138c555"
     },
@@ -49,7 +50,7 @@
       "outcome": "passed",
       "elapsed_seconds": 813.914,
       "under_15_minutes": true,
-      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
       "retained_local_evidence": "/tmp/clinical-issue42-certified/ambispective-sterling-20260827T234202Z/logs/hermes-integration-report.json",
       "retained_evidence_sha256": "63d58a1dfcab0ba35b32f92a9d1d35b6a5d78e7d486bb145165fee7a2c4e1ad2"
     },
@@ -60,7 +61,7 @@
       "elapsed_seconds": 1800.564,
       "candidate_package_fingerprint": "81e28358bf72b07cc31e701d48191c32bb721d396b59bc81265d72c90b30c538",
       "candidate_git_commit": "c9b4b109f1e32e806f08c1b92fed61edd3b2b4fb",
-      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
       "diagnosis": "Independent verification consumed 1045.039 seconds because verifier agents explored production code before response serialization; the final content call stalled until the correctness ceiling. Separately contracted Protocol sections repeatedly contained identical visit prose, consuming 212.419 seconds of targeted drafting retry. The adapter then exposed a /tmp versus /private/tmp report-path alias defect after governed cleanup.",
       "measured_stage_seconds": {
         "generate": 54.278,
@@ -99,7 +100,7 @@
       "under_15_minutes": false,
       "candidate_package_fingerprint": "ce602b2e5b0a2a652f04f9069c583028e133814e72c18c4cb9421a2a5aa7c41c",
       "candidate_git_commit": "b86294d8d50ac7dccaae183a1afcf142936dc665",
-      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
       "diagnosis": "The clean immutable candidate completed every content, rendering, every-page visual, delivery, and cleanup gate, but independent verification consumed 449.757 seconds. A delegated ICF verifier did not serialize within the 360-second soft budget; the exact-page Desktop-parent fallback and repaired-candidate re-verification were correct but pushed confirmed delivery 177.288 seconds beyond the certification limit.",
       "measured_stage_seconds": {
         "generate": 38.42,
@@ -131,7 +132,7 @@
       "under_15_minutes": false,
       "candidate_package_fingerprint": "9b66a0f134edc5e004b4d088dfec34cee896ea8c6eab79ed22f67af0bc0f6fcb",
       "candidate_git_commit": "b1160cd88231ad5ba48bdf6e413e98e6df33a3c2",
-      "hermes_configuration_sha256": "38f1c1d6ed9cc60fb1c9c5f983ab174fdca784e059c187631bb77d9069266108",
+      "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
       "diagnosis": "The immutable candidate passed every content, rendering, every-page visual, delivery, and cleanup gate, but the Desktop fallback initially requested both visual reviews after Hermes had already completed ICF. Real handoffs carry signed request and response paths rather than request identity fields inline, so the mixed-wave helper could not recognize the bound ICF response. The unnecessary repeat review plus the polling delay consumed enough time to miss the certification target.",
       "measured_stage_seconds": {
         "generate": 38.091,
@@ -154,6 +155,73 @@
       },
       "retained_local_evidence": "/tmp/clinical-issue42-b1160cd.0TMh4L/runs/ambispective-sterling-20260828T020101Z/logs/hermes-integration-report.json",
       "retained_evidence_sha256": "57d558cdfc6b2b1fa76efa5b7e4dfe11237b820cf85d74916ef6f8dfe3acaf6d"
+    },
+    {
+      "id": "final-immutable-candidate-pass",
+      "classification": "like_for_like_candidate",
+      "outcome": "passed",
+      "elapsed_seconds": 788.385,
+      "under_15_minutes": true,
+      "within_normal_target": false,
+      "candidate_package_fingerprint": "358b2f7f69eb802d44727b1cb14e164d88ccf862618136240a8dc01c696f4594",
+      "candidate_archive_sha256": "b798c4b6bef98e6478dd649ce5baac7e48e7fefa5b442a32644166083b76b032",
+      "candidate_git_commit": "6b760658e933a1f8100ec448385a38bb71b21997",
+      "hermes_configuration_sha256": "1f82829ba2ebbdd46c2f53df716a4fb43bcdb24e4230265e6d75ea3e5be5298c",
+      "hermes_configuration": {
+        "source": "clinical-release-certification",
+        "max_turns": 80,
+        "skill": "clinical-document-drafting",
+        "safe_mode": true,
+        "reasoning_configuration": "Hermes Desktop governed default",
+        "layout_preservation_notes": [
+          "The Protocol contact caption is intentionally authority-preserved as a centered two-line 'Table 13.3.-1:' followed by 'Contact Information for Study'; its numbering and stacking are not a style defect."
+        ]
+      },
+      "measured_stage_seconds": {
+        "generate": 38.24,
+        "drafting": 207.065,
+        "drafting_retry": 64.231,
+        "candidate": 3.984,
+        "render_assurance": 29.703,
+        "independent_verification": 323.445,
+        "delivery": 0.011
+      },
+      "concurrency": {
+        "initial_drafting_handoffs": 4,
+        "initial_verification_handoffs": 3,
+        "quality_retry_handoffs": 1
+      },
+      "adapter_attempts": {
+        "renderer": "LibreOfficeDev 26.8.0.0.alpha0",
+        "page_renderer": "pdftoppm",
+        "renderer_status": "passed",
+        "page_renderer_status": "passed"
+      },
+      "retries": {
+        "verification:content": 1,
+        "ethics": 2,
+        "confidentiality-publication": 2
+      },
+      "visual_qa": {
+        "icf_pages": 5,
+        "protocol_pages": 12,
+        "checks_per_page": 14,
+        "second_wave_unchanged_hashes_reused": 16,
+        "second_wave_changed_pages_reinspected": 1,
+        "status": "passed"
+      },
+      "output_evidence": {
+        "icf.docx": "16278f7a721c156bea1983a0f69bf0f64070b21758c945f215e8fba67acaa84d",
+        "protocol.docx": "6ea52e4fe63f1f28a48cca5e1f0eacb36867a07838617c6cda76a6ea920c1c65",
+        "study.xml": "7dedcc3072dc069c855f36d10548ed63d8aaae00431650f1b14de007da1c63b9"
+      },
+      "delivery_confirmed": true,
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      },
+      "retained_local_evidence": "/tmp/clinical-issue42-6b76065.t7Pnjn/runs/ambispective-sterling-20260828T024837Z/logs/hermes-integration-report.json",
+      "retained_evidence_sha256": "0b3ce5096526b3b7f1c0d846fec40282368822739b219a5e32fd3b40e354bb43"
     }
   ]
 }
