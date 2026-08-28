@@ -426,7 +426,11 @@ def _set_paragraph_text(paragraph: Paragraph, text: str) -> None:
         paragraph.add_run(text)
 
 
-def _clear_protocol_container_introductions(document: Document, branch: str) -> None:
+def _normalize_protocol_container_introductions(
+    document: Document,
+    branch: str,
+    boilerplate: Mapping[str, str],
+) -> None:
     sections = list(protocol_contract(branch))
     for index, section in enumerate(sections[:-1]):
         if section.role != "container":
@@ -442,12 +446,21 @@ def _clear_protocol_container_introductions(document: Document, branch: str) -> 
         if heading is None:
             continue
         element = heading._p.getnext()
+        exemplar = None
         while element is not None:
             following = element.getnext()
             if element.tag == qn("w:p") and _heading_level(Paragraph(element, document)) is not None:
                 break
+            if exemplar is None and element.tag == qn("w:p"):
+                exemplar = Paragraph(element, document)
             element.getparent().remove(element)
             element = following
+        if section.boilerplate_key:
+            paragraph = document.add_paragraph()
+            _copy_paragraph_design(paragraph, exemplar)
+            run = paragraph.add_run(boilerplate[section.boilerplate_key])
+            _copy_run_design(run, _first_visible_run(exemplar))
+            heading._p.addnext(paragraph._p)
 
 
 def _study_descriptor(reference: Mapping[str, Any]) -> str:
@@ -2226,7 +2239,7 @@ def _template_document(
         _normalize_protocol_running_header(document)
         _apply_protocol_visit_table_layout(document, authority)
         _ensure_contract_headings(document, branch)
-        _clear_protocol_container_introductions(document, branch)
+        _normalize_protocol_container_introductions(document, branch, boilerplate)
         _replace_protocol_leaf_bodies(document, model, branch, authority)
         _normalize_protocol_title_controls(document, reference)
         _normalize_protocol_summary_table(document)

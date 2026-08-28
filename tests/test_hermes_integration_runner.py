@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shlex
 from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
@@ -37,6 +38,19 @@ import hermes_e2e
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_paths() -> None:
+    path = ROOT / "tests/fixtures/release-certification/evidence/ticket-43-attempts.json"
+    ledger = json.loads(path.read_text(encoding="utf-8"))
+
+    assert ledger["ticket"] == 43
+    assert [attempt["outcome"] for attempt in ledger["attempts"]] == [
+        "failed_preflight",
+        "failed_first_real_case",
+    ]
+    assert all(attempt["candidate_package_fingerprint"] for attempt in ledger["attempts"])
+    assert "/tmp/" not in path.read_text(encoding="utf-8")
 
 
 def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_path: Path) -> None:
@@ -865,9 +879,11 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
 
 
 def test_content_verifier_prompt_goes_directly_to_bound_evidence(tmp_path: Path) -> None:
+    skill_root = tmp_path / "release $HOME 'quoted'"
+    revision_dir = tmp_path / "revision $(touch nope)"
     prompt = _agent_prompt(
-        tmp_path / "release",
-        tmp_path / "revision",
+        skill_root,
+        revision_dir,
         {
             "request_path": "hermes/verification-requests/content.json",
             "response_path": "hermes/verification-responses/content.json",
@@ -880,8 +896,17 @@ def test_content_verifier_prompt_goes_directly_to_bound_evidence(tmp_path: Path)
 
     assert "Use the request's bound extracts and assessment matrices directly" in prompt
     assert "Do not inspect production code or tests" in prompt
-    assert "Run the repository's real validator" in prompt
+    assert "verification_response_is_complete" in prompt
+    assert "Do not use a shell heredoc" in prompt
     assert "Visual-only authority note." not in prompt
+    validator_command = next(line for line in prompt.splitlines() if "verification_response_is_complete" in line)
+    command = shlex.split(validator_command)
+    assert command[0] == str(Path(sys.executable).resolve())
+    assert command[-3:] == [
+        str(skill_root / "scripts"),
+        str(revision_dir),
+        str(revision_dir / "hermes/verification-requests/content.json"),
+    ]
 
 
 def test_drafting_constraints_require_independent_section_prose() -> None:

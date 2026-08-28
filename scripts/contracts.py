@@ -18,7 +18,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.9"
+CONTRACT_VERSION = "clinical-documents-v2.10"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -368,7 +368,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("quality-safety.reporting", "13.3.", "Procedures for Recording and Reporting AEs and SAEs", "protocol-analysis-and-oversight", ("safety.adverse_events",), "safety-reporting"),
     _section_spec("quality-safety.follow-up", "13.4.", "Follow-Up of Adverse Events and Quality Complaints", "protocol-analysis-and-oversight", ("safety.follow_up",), "safety-followup"),
     _section_spec("quality-safety.analysis", "13.5.", "Safety Analyses", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "safety.adverse_events"), "safety-analysis"),
-    _section_spec("ethics", "14.", "GCP, ICH AND ETHICAL CONSIDERATIONS", role="container"),
+    _section_spec("ethics", "14.", "GCP, ICH AND ETHICAL CONSIDERATIONS", boilerplate="ethics", role="container"),
     _section_spec("ethics.confidentiality", "14.1.", "Confidentiality", "protocol-analysis-and-oversight", ("ethics.confidentiality", "confidentiality.data_handling"), "confidentiality-cross-reference"),
     _section_spec("evaluation-procedures", "15.", "STANDARD EVALUATION PROCEDURES", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule")),
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),

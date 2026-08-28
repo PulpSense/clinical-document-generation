@@ -265,6 +265,7 @@ def test_protocol_removes_unsupported_template_governance_claims(tmp_path):
 
     assert "will be registered with clinicaltrials.gov" not in visible
     assert "will be conducted in compliance with the protocol, gcp" not in visible
+    assert "the study will be conducted under the approved protocol" in visible
 
 
 def test_sterling_icf_does_not_duplicate_flat_site_address(tmp_path):

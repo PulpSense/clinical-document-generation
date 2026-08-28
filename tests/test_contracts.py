@@ -233,9 +233,12 @@ def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     assert {"study.hypothesis", "endpoints.primary"} <= set(icf["icf.study-purpose"].evidence)
 
 
-def test_protocol_confidentiality_uses_substantive_confidentiality_boilerplate():
+def test_protocol_ethics_and_confidentiality_use_substantive_boilerplate():
     protocol = {section.section_id: section for section in protocol_contract("Ambispective")}
 
+    assert protocol["ethics"].role == "container"
+    assert protocol["ethics"].batch_id == ""
+    assert protocol["ethics"].boilerplate_key == "ethics"
     assert protocol["ethics.confidentiality"].boilerplate_key == "confidentiality-cross-reference"
 
 

@@ -9,6 +9,7 @@ import json
 import math
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
@@ -730,6 +731,31 @@ def _agent_prompt(
         if visual_verification and preservation_notes
         else ""
     )
+    if task in {"clinical_content_verification", "rendered_page_visual_verification"}:
+        validator_code = (
+            "import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); "
+            "from quality import verification_response_is_complete; "
+            "print(verification_response_is_complete(Path(sys.argv[2]), Path(sys.argv[3])))"
+        )
+        validator_command = shlex.join([
+            str(Path(sys.executable).resolve()),
+            "-c",
+            validator_code,
+            str(skill_root / "scripts"),
+            str(revision_dir),
+            str(request_path),
+        ])
+        validation_rule = (
+            "Use your file-writing tool directly to write the JSON response. Do not use a shell heredoc. "
+            "Then run exactly this read-only validator command without inspecting its source or searching for another validator:\n"
+            f"{validator_command}\n"
+            "The command must print True before you finish."
+        )
+    else:
+        validation_rule = (
+            "Write the response directly with your file-writing tool. The next generate invocation is the authoritative response validator; "
+            "do not inspect production code or tests and do not search for another validator."
+        )
     return f"""Complete one isolated clinical-document Hermes handoff.
 
 Certified skill: {skill_root}
@@ -740,7 +766,7 @@ Task: {task}
 
 Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
 {preservation_rule}
-Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. Use a truthful nonempty producer.model_id. Run the repository's real validator before finishing. Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
+Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. Use a truthful nonempty producer.model_id. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
 def _wait_for_processes(

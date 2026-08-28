@@ -1,0 +1,54 @@
+{
+  "schema_version": "release-certification-attempt-ledger/v1",
+  "ticket": 43,
+  "certification_scope": "complete_three_case_corpus",
+  "attempts": [
+    {
+      "id": "clean-preflight-hidden-run-dependency",
+      "classification": "rejected_candidate",
+      "outcome": "failed_preflight",
+      "candidate_git_commit": "9af1a73c4bf216bbee39d0a64cc95a3ac2ce2acf",
+      "candidate_package_fingerprint": "64cd30b31ea6593866059c78d7dfada8161d3d9354e3c88ab4d13172a63566e3",
+      "candidate_archive_sha256": "9acde8d5b066a072dae905e436624ccc55edf547fe189d204b956268be85ca39",
+      "preflight_status": "failed",
+      "preflight_evidence_sha256": "6f976559b7235030b58de4b1ba6b98dd02ddfe14c603c12761a1a715488081e9",
+      "regression_log_sha256": "b0f3cbb126241e45cc9f9286ced16bddf9022fb7d0430df03f8f1673ac7acb2d",
+      "finding": "The clean checkout exposed 16 runtime regression tests that depended on ignored runs/ps-mm-001 source data; real corpus execution did not begin.",
+      "remediation": "The runtime regression fixture was rebound to the tracked approved Prospective release-certification fixture in commit dd20dddb2f393a44da8fe718e4c7a64868e71b4c."
+    },
+    {
+      "id": "ambispective-content-and-verifier-command",
+      "classification": "rejected_candidate",
+      "outcome": "failed_first_real_case",
+      "candidate_git_commit": "dd20dddb2f393a44da8fe718e4c7a64868e71b4c",
+      "candidate_package_fingerprint": "e7c4d19a9362bc90203efc32506c7502aad56495ccc9f7f51e12c8d27eda4a84",
+      "candidate_archive_sha256": "d25a037858f893f6e14621ee1881d163d15f5630c3ca3406670592dc91028d35",
+      "preflight_status": "passed",
+      "preflight_evidence_sha256": "803fd07d040ec22534a565946e221891cd9702d7c8e683cce6890747bcd1c3b6",
+      "fixture_id": "ambispective-sterling",
+      "desktop_operation_elapsed_seconds": 1381.084,
+      "under_15_minutes": false,
+      "within_30_minute_correctness_ceiling": true,
+      "operation_outcome": "invalid-Hermes-response",
+      "finding": "Independent content verification rejected Protocol Section 14 because it contained no substantive ethical-conduct content before subsection 14.1.",
+      "measured_bottleneck": "The content verifier lost 352.9 seconds waiting for safe-mode approval of an unnecessary shell heredoc while searching production code for a validator.",
+      "remediation": "Bind approved ethics boilerplate to the Section 14 container and give verifier handoffs one exact resolved-runtime, shell-quoted, read-only validation command.",
+      "corpus_report_sha256": "dc69d4f083d8ecf365010d099a963d71f327cf4d6547b72dc0100498c2b9e404",
+      "case_report_sha256": "44062a0aca478f561da7efdef01a151380746b67783b286f57f7b4fb336991a9",
+      "desktop_operation_state_sha256": "1fa8f00411990c4aaac96835d0f492ab067da449cf4c0bdf95021e4bf5ebca82",
+      "content_verifier_log_sha256": "1effead35f9e07c839d63cca4cb0be4180430e1653b2bf7f84ff260d490002dc",
+      "repair_report_sha256": "2d899f7bf440ef7a70ff7058c4f941186289e31b584849800ff86630d95e037c",
+      "visual_review": {
+        "status": "passed",
+        "icf_pages": 5,
+        "protocol_pages": 12,
+        "checks_per_page": 14,
+        "producer_model_id": "desktop-parent/gpt-5.6-sol"
+      },
+      "cleanup": {
+        "owned_processes_reaped": true,
+        "late_responses_ignored": true
+      }
+    }
+  ]
+}
