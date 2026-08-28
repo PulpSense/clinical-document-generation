@@ -464,6 +464,15 @@ def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
             "clinical-document-generation/./RELEASE-CERTIFICATION.json",
             b"{}",
         )
+    skills_dir = tmp_path / "skills"
+    with pytest.raises(ValueError, match="duplicate normalized target"):
+        install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=_hermes_config(skills_dir),
+            verifier=lambda _candidate: {"status": "passed"},
+            provisioner=lambda _candidate: {"status": "passed"},
+        )
 
 
 def test_certification_binding_rejects_nested_identity_mutations(tmp_path):
@@ -493,16 +502,6 @@ def test_certification_binding_rejects_nested_identity_mutations(tmp_path):
 
         with pytest.raises(ValueError, match="does not pass and bind"):
             bind_release_certification(candidate, mutated_report)
-    skills_dir = tmp_path / "skills"
-    with pytest.raises(ValueError, match="duplicate normalized target"):
-        install_release(
-            archive_path,
-            skills_dir,
-            hermes_config_path=_hermes_config(skills_dir),
-            verifier=lambda _candidate: {"status": "passed"},
-            provisioner=lambda _candidate: {"status": "passed"},
-        )
-
 def test_incompatible_hermes_discovery_stops_before_activation(tmp_path):
     archive_path = tmp_path / "release.zip"
     package_release(ROOT, archive_path)
