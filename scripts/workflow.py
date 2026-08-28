@@ -376,6 +376,44 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         raise ValueError("A release must be built from a committed Git tree.") from exc
     if git_root != repo_root:
         raise ValueError("Release packaging must target the Git repository root.")
+    try:
+        status_output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError("The release-owned worktree state could not be verified.") from exc
+    dirty_paths: list[Path] = []
+    records = status_output.split("\0")
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if not record:
+            continue
+        status = record[:2]
+        candidates = [record[3:]]
+        if "R" in status or "C" in status:
+            if index < len(records) and records[index]:
+                candidates.append(records[index])
+                index += 1
+        for candidate in candidates:
+            relative = Path(candidate)
+            if not _release_excluded(relative):
+                dirty_paths.append(relative)
+    if dirty_paths:
+        names = ", ".join(path.as_posix() for path in sorted(set(dirty_paths)))
+        raise ValueError(f"Release-owned resources must be clean and committed: {names}")
     with tempfile.TemporaryDirectory(prefix="clinical-release-commit-") as temporary_dir:
         snapshot_root = Path(temporary_dir) / "snapshot"
         snapshot_root.mkdir()
@@ -435,9 +473,9 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     if not any(fallback_fonts.glob("*.ttf")):
         findings.append({"category": "installation", "field": "fallback_fonts", "issue": "No packaged compatible fonts are present."})
     reference = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}
-    fallback_renderers = [
+    office_renderers = [
         item for item in renderers(skill_root=skill_root)
-        if item.get("source") == "verified fallback stack"
+        if item.get("kind") in {"Microsoft Word", "LibreOffice"}
     ]
     fallback_pages = [
         item for item in page_renderers(skill_root=skill_root)
@@ -467,7 +505,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
                 }],
             },
             deadline_seconds=deadline_seconds,
-            renderer_identities=fallback_renderers,
+            renderer_identities=office_renderers,
             page_renderer_identities=fallback_pages,
             rebuild_candidate=lambda _substitutions: {"status": "passed"},
         )
@@ -475,8 +513,8 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
         findings.extend(assurance.get("findings", []))
     render_evidence = assurance.get("render", {})
     candidates = [attempt.get("adapter") for attempt in render_evidence.get("renderer_attempts", []) if attempt.get("adapter")]
-    if not fallback_renderers:
-        findings.append({"category": "installation", "field": "fallback_renderer", "issue": "The versioned local LibreOffice fallback was not discovered."})
+    if not office_renderers:
+        findings.append({"category": "installation", "field": "office_renderer", "issue": "Microsoft Word or LibreOffice is required on the host."})
     if not fallback_pages:
         findings.append({"category": "installation", "field": "pdf_page_renderer", "issue": "The release-owned pypdfium2 page renderer was not discovered."})
     return {
@@ -492,27 +530,6 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
         "render_assurance": assurance,
         "findings": findings,
     }
-
-
-def _provisionable_libreoffice() -> tuple[Path, Path] | None:
-    """Return (tree root, relative executable) for a locally reusable runtime."""
-    system = platform.system()
-    if system == "Darwin":
-        roots = [Path("/Applications/LibreOffice.app")]
-        cache = Path.home() / ".cache/codex-runtimes"
-        roots.extend(sorted(cache.glob("*/dependencies/native/libreoffice-headless/libreoffice/*.app")))
-        for root in roots:
-            executable = root / "Contents/MacOS/soffice"
-            if executable.is_file() and os.access(executable, os.X_OK):
-                return root, executable.relative_to(root)
-    for identity in renderers():
-        if identity.get("kind") != "LibreOffice":
-            continue
-        executable = Path(str(identity["path"])).resolve()
-        if executable.is_file() and os.access(executable, os.X_OK):
-            root = executable.parent.parent if executable.parent.name == "program" else executable.parent
-            return root, executable.relative_to(root)
-    return None
 
 
 def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
@@ -605,38 +622,27 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
 
 
 def provision_fallback_stack(skill_root: Path) -> dict[str, Any]:
-    """Provision version-local DOCX and page renderers without changing the host."""
+    """Provision PDFium offline and verify the required host office renderer."""
     skill_root = skill_root.resolve()
-    runtime_root = skill_root / "runtime"
-    existing = renderers(skill_root=skill_root)
+    office_renderers = [
+        item for item in renderers(skill_root=skill_root)
+        if item.get("kind") in {"Microsoft Word", "LibreOffice"}
+    ]
     page_provision = _provision_page_renderer(skill_root)
     if page_provision.get("status") != "passed":
         return page_provision
-    if any(item.get("source") == "verified fallback stack" for item in existing):
+    if office_renderers:
         return {
             "status": "passed",
-            "renderer": next(item for item in existing if item.get("source") == "verified fallback stack"),
+            "renderer": office_renderers[0],
             "page_renderer": page_provision["page_renderer"],
             "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
         }
-    source = _provisionable_libreoffice()
-    if source is None:
-        return {"status": "blocked", "findings": [{"category": "installation", "field": "fallback_renderer", "issue": "No local LibreOffice runtime is available to provision."}]}
-    source_root, relative_executable = source
-    destination = runtime_root / source_root.name
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    try:
-        shutil.copytree(source_root, destination, copy_function=os.link)
-    except OSError:
-        shutil.rmtree(destination, ignore_errors=True)
-        shutil.copytree(source_root, destination)
-    executable = destination / relative_executable
-    return {
-        "status": "passed",
-        "renderer": {"kind": "LibreOffice", "path": str(executable), "source": "verified fallback stack", "platform": platform.system()},
-        "page_renderer": page_provision["page_renderer"],
-        "provisioned": {"renderer": True, "page_renderer": page_provision["provisioned"]},
-    }
+    return {"status": "blocked", "findings": [{
+        "category": "installation",
+        "field": "office_renderer",
+        "issue": "Microsoft Word or LibreOffice is required on the host.",
+    }]}
 
 
 def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> Any:

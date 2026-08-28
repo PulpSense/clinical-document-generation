@@ -9,6 +9,7 @@ import workflow
 from hermes_e2e import _certified_release
 from pypdf import PdfWriter
 from quality import rasterize_pdf
+import pytest
 from workflow import (
     install_release,
     package_release,
@@ -20,6 +21,19 @@ from workflow import (
 ROOT = Path(__file__).resolve().parents[1]
 PDFIUM_WHEEL = "pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
 PDFIUM_SHA256 = "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4"
+
+
+def test_release_packaging_refuses_an_uncommitted_release_owned_resource(tmp_path):
+    dirty_resource = ROOT / "ticket-44-uncommitted-resource.txt"
+    dirty_resource.write_text("not committed", encoding="utf-8")
+    try:
+        with pytest.raises(
+            ValueError,
+            match="Release-owned resources must be clean and committed: ticket-44-uncommitted-resource.txt",
+        ):
+            package_release(ROOT, tmp_path / "release.zip")
+    finally:
+        dirty_resource.unlink(missing_ok=True)
 
 
 def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
@@ -43,8 +57,8 @@ def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
     )
     office = {
         "kind": "LibreOffice",
-        "path": str(skill_root / "runtime/LibreOffice.app/Contents/MacOS/soffice"),
-        "source": "verified fallback stack",
+        "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        "source": "host prerequisite",
     }
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [office])
 
@@ -67,6 +81,7 @@ def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
     }
     assert (skill_root / "runtime/python/pypdfium2/__init__.py").is_file()
     assert (skill_root / "runtime/python/pypdfium2_raw/libpdfium.dylib").is_file()
+    assert not (skill_root / "runtime/LibreOffice.app").exists()
     assert json.loads((skill_root / "runtime/PDF-RENDERER.json").read_text()) == {
         "kind": "pypdfium2",
         "version": "5.13.0",
