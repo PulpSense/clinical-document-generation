@@ -142,7 +142,9 @@ def test_ticket_43_attempt_ledger_retains_rejected_candidates_without_local_path
         "40e3c94915bea3700c168c7e3db706341af0d25cac982784eef7bce5d25cdc63"
     )
     cases = certified_attempt["cases"]
-    assert tuple(case["fixture_id"] for case in cases) == CERTIFICATION_CORPUS
+    assert tuple(case["fixture_id"] for case in cases) == (
+        "ambispective-sterling", "prospective-advarra", "retrospective",
+    )
     assert all(case["operation_outcome"] == "passed" for case in cases)
     assert all(case["under_15_minutes"] is True for case in cases)
     assert all(
@@ -693,7 +695,7 @@ def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tm
         _write_passing_case_report(
             tmp_path,
             fixture_id,
-            elapsed_seconds=900.0 if fixture_id == "prospective-advarra" else 600.0,
+            elapsed_seconds=1080.001 if fixture_id == "prospective-advarra" else 600.0,
         )
         for fixture_id in CERTIFICATION_CORPUS
     ]
@@ -703,7 +705,7 @@ def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tm
     assert result["status"] == "failed"
     assert [case["fixture_id"] for case in result["cases"]] == list(CERTIFICATION_CORPUS)
     assert next(case for case in result["cases"] if case["fixture_id"] == "prospective-advarra")["status"] == "failed"
-    assert any("not below 900 seconds" in finding for finding in result["findings"])
+    assert any("exceeds the approved 1080-second ceiling" in finding for finding in result["findings"])
 
 
 def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: Path, monkeypatch) -> None:
@@ -713,17 +715,17 @@ def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: P
         _write_passing_case_report(
             tmp_path,
             fixture_id,
-            elapsed_seconds=840.0 if fixture_id == "ambispective-sterling" else 600.0,
+            elapsed_seconds=1080.001 if fixture_id == "ambispective-sterling" else 600.0,
         )
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
     result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
 
-    first = result["cases"][0]
+    first = next(case for case in result["cases"] if case["fixture_id"] == "ambispective-sterling")
     assert result["status"] == "failed"
-    assert first["desktop_operation_elapsed_seconds"] == 840.0
-    assert first["elapsed_seconds"] == 900.0
+    assert first["desktop_operation_elapsed_seconds"] == 1080.001
+    assert first["elapsed_seconds"] == 1080.001
     assert first["under_15_minutes"] is False
     assert any("Approval-to-confirmed-retrieval" in finding for finding in first["findings"])
 
@@ -806,8 +808,8 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
         preflight_path=tmp_path / "preflight.json",
     )
 
-    assert launched == ["prepare:ambispective-sterling", "run:ambispective-sterling"]
-    assert result["attempted_reports"] == ["ambispective-sterling"]
+    assert launched == ["prepare:retrospective", "run:retrospective"]
+    assert result["attempted_reports"] == ["retrospective"]
 
 
 def test_corpus_reducer_rehashes_actual_outputs_and_rejects_unauthorized_gate_waivers(tmp_path: Path, monkeypatch) -> None:

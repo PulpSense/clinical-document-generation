@@ -102,6 +102,11 @@ def _certification_runtime_ceiling(fixture_id: str) -> float:
     )
 
 
+def _certification_runtime_exceeded(fixture_id: str, elapsed: float) -> bool:
+    ceiling = _certification_runtime_ceiling(fixture_id)
+    return elapsed > ceiling if ceiling == EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS else elapsed >= ceiling
+
+
 def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
     study_type = str((reference.get("meta") or {}).get("study_type") or "").casefold()
     return frozenset({"protocol.docx"}) if study_type == "retrospective" else EXPECTED_OUTPUTS
@@ -557,7 +562,11 @@ def inspect_run(
         outcome = DiagnosticOutcome.TIMEOUT
     elif retry_limit_violations:
         outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
-    elif valid_delivery and elapsed_seconds > certification_runtime_ceiling:
+    elif valid_delivery and (
+        elapsed_seconds > certification_runtime_ceiling
+        if certification_runtime_ceiling == EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
+        else elapsed_seconds >= certification_runtime_ceiling
+    ):
         outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
     elif valid_delivery:
         outcome = DiagnosticOutcome.PASSED
@@ -2163,7 +2172,7 @@ def certify_release_corpus(
         except (TypeError, ValueError):
             elapsed = float("nan")
         runtime_ceiling = _certification_runtime_ceiling(str(fixture_id or ""))
-        if not math.isfinite(elapsed) or elapsed <= 0.0 or elapsed > runtime_ceiling:
+        if not math.isfinite(elapsed) or elapsed <= 0.0 or _certification_runtime_exceeded(str(fixture_id or ""), elapsed):
             case_findings.append(f"Approval-to-confirmed-retrieval elapsed time {elapsed:.3f}s exceeds the approved {runtime_ceiling:.0f}-second ceiling.")
         if report.get("missing_response_paths") or report.get("invalid_response_paths") or report.get("recorded_response_paths") or report.get("invalid_rejection_paths"):
             case_findings.append("Case contains missing, invalid, recorded, or rejected response evidence.")
@@ -2221,7 +2230,7 @@ def certify_release_corpus(
             "elapsed_seconds": elapsed,
             "desktop_operation_elapsed_seconds": operation_elapsed,
             "under_15_minutes": math.isfinite(elapsed) and 0.0 < elapsed < CERTIFICATION_RUNTIME_CEILING_SECONDS,
-            "within_approved_runtime": math.isfinite(elapsed) and 0.0 < elapsed <= runtime_ceiling,
+            "within_approved_runtime": math.isfinite(elapsed) and 0.0 < elapsed and not _certification_runtime_exceeded(str(fixture_id or ""), elapsed),
             "report_sha256": _sha256(path),
             "release_identity": identities[-1],
             "hermes_configuration_sha256": _canonical_sha256(report.get("hermes_configuration") or {}),
@@ -2351,7 +2360,7 @@ def run_release_certification_corpus(
             report.get("outcome") != DiagnosticOutcome.PASSED.value
             or not math.isfinite(elapsed)
             or elapsed <= 0.0
-            or elapsed > _certification_runtime_ceiling(fixture_id)
+            or _certification_runtime_exceeded(fixture_id, elapsed)
         ):
             break
     return certify_release_corpus(
