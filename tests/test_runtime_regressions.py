@@ -23,7 +23,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _source():
     return json.loads(
-        (ROOT / "runs/ps-mm-001/reference/study.reference.json").read_text(encoding="utf-8")
+        (
+            ROOT
+            / "tests/fixtures/release-certification/prospective-advarra/approved-reference.json"
+        ).read_text(encoding="utf-8")
     )
 
 
@@ -985,10 +988,9 @@ def test_approved_investigator_and_facility_values_populate_protocol_agreement(t
         if any("Signature of Investigator" in cell.text for row in table.rows for cell in row.cells)
     )
     values = [cell.text for row in agreement.rows for cell in row.cells]
-    assert "Dana Roberts" in values
+    assert "Alex Investigator" in values
     assert "MD" in values
-    assert "North Neurology Research Center" in values
-    assert "Boston" in "\n".join(values)
+    assert "Site One" in values
 
 
 def test_protocol_visit_schedule_has_rows_when_approved_source_has_assessments_only(tmp_path):
@@ -1026,7 +1028,7 @@ def test_advarra_icf_contact_and_withdrawal_are_source_bound(tmp_path):
     assert "toll-free" not in visible
     assert "study subject adviser" not in visible
     assert "schedule study exit procedures" not in visible
-    assert "555-310-2000" in visible
+    assert "555-0101" in visible
     assert "no new routine research procedures" in visible
 
 
@@ -1061,7 +1063,7 @@ def test_protocol_test_article_falls_back_to_approved_intervention_name():
 
     fields = rendering.render_fields(reference, {"protocol": [], "icf": {}, "prs": {}})
 
-    assert fields["testArticle(s)"] == "Meridian Monitor"
+    assert fields["testArticle(s)"] == "Sentinel Patch"
 
 
 def test_transient_verifier_failure_is_classified_for_retry_without_accepting_qa(tmp_path):
