@@ -10,6 +10,7 @@ import json
 import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -549,12 +550,12 @@ def _is_sha256(value: Any) -> bool:
     return len(text) == 64 and all(character in "0123456789abcdef" for character in text.casefold())
 
 
-def _valid_utc_timestamp(value: Any) -> bool:
+def _utc_timestamp(value: Any) -> datetime | None:
     try:
         parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
-        return False
-    return parsed.tzinfo is not None
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
 
 
 def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
@@ -571,6 +572,9 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
     configurations = report.get("hermes_configurations") or {}
     expected_configuration_hashes = (manifest.get("inventory") or {}).get("certification_configuration_sha256") or {}
     layout_evidence = report.get("layout_preservation_evidence") or {}
+    layout_started = _utc_timestamp(layout_evidence.get("started_at"))
+    layout_completed = _utc_timestamp(layout_evidence.get("completed_at"))
+    report_completed = _utc_timestamp(report.get("completed_at"))
     valid = (
         report.get("schema_version") == "release-certification-corpus/v1"
         and report.get("status") == "passed"
@@ -586,9 +590,10 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
             "Prospective/Advarra", "Prospective/Sterling", "Ambispective/Advarra",
             "Ambispective/Sterling", "Retrospective/Protocol",
         }
-        and _valid_utc_timestamp(layout_evidence.get("started_at"))
-        and _valid_utc_timestamp(layout_evidence.get("completed_at"))
-        and _valid_utc_timestamp(report.get("completed_at"))
+        and layout_started is not None
+        and layout_completed is not None
+        and report_completed is not None
+        and layout_started <= layout_completed <= report_completed
         and set(configurations) == set(CERTIFICATION_CASE_ORDER)
         and expected_configuration_hashes == {
             fixture_id: sha256_value(configurations.get(fixture_id) or {})
@@ -652,6 +657,18 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
         render_assurance_evidence = case.get("render_assurance") or {}
         page_renderer_evidence = render_assurance_evidence.get("active_page_renderer") or {}
         expected_page_renderer = (manifest.get("inventory") or {}).get("pdf_page_renderer") or {}
+        expected_selection = {
+            "retrospective": ("Retrospective", None),
+            "ambispective-sterling": ("Ambispective", "Sterling"),
+            "prospective-advarra": ("Prospective", "Advarra"),
+        }.get(fixture_id)
+        expected_bundle = next((
+            bundle for bundle in (manifest.get("inventory") or {}).get("contracted_template_bundles", [])
+            if (
+                (bundle.get("selection") or {}).get("study_type"),
+                (bundle.get("selection") or {}).get("icf_family"),
+            ) == expected_selection
+        ), {})
         expected_gate_statuses = {gate: "passed" for gate in CERTIFICATION_GATES}
         if fixture_id == "retrospective":
             expected_gate_statuses["prs_xml"] = "not_applicable"
@@ -672,8 +689,8 @@ def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None,
             (render_assurance_evidence.get("active_renderer") or {}).get("kind") in {"Microsoft Word", "LibreOffice"},
             all(page_renderer_evidence.get(key) == expected_page_renderer.get(key) for key in ("kind", "version", "wheel", "wheel_sha256")),
             page_renderer_evidence.get("source") == "release-owned runtime",
-            _is_sha256(case.get("contracted_template_bundle_identity")),
-            _is_sha256(case.get("layout_preservation_baseline_identity")),
+            case.get("contracted_template_bundle_identity") == expected_bundle.get("identity_sha256"),
+            case.get("layout_preservation_baseline_identity") == (expected_bundle.get("layout_preservation_baseline") or {}).get("sha256"),
         ))
     if not valid:
         return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, model, and configuration."}]
@@ -751,7 +768,7 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     except OSError as exc:
         return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes configuration cannot be read: {exc}"}]
     entries: list[str] = []
-    scalars: dict[tuple[str, ...], str] = {}
+    scalars: dict[tuple[str, ...], Any] = {}
     stack: list[tuple[int, str]] = []
     in_external = False
     base_indent = 0
@@ -763,8 +780,16 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
             while stack and stack[-1][0] >= indent:
                 stack.pop()
             path = tuple(item[1] for item in stack) + (key.strip(),)
-            value = raw_value.strip().strip("'\"")
-            if value:
+            raw_scalar = raw_value.strip()
+            if raw_scalar:
+                if raw_scalar[:1] in {"'", '"'} and raw_scalar[-1:] == raw_scalar[:1]:
+                    value: Any = raw_scalar[1:-1]
+                elif raw_scalar.casefold() in {"true", "false"}:
+                    value = raw_scalar.casefold() == "true"
+                elif re.fullmatch(r"-?\d+", raw_scalar):
+                    value = int(raw_scalar)
+                else:
+                    value = raw_scalar
                 scalars[path] = value
             else:
                 stack.append((indent, key.strip()))
@@ -780,10 +805,7 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
         key: scalars.get(("skills", "clinical_document_generation", key))
         for key in CERTIFIED_HERMES_CONFIGURATION
     }
-    governed_matches = all(
-        str(governed[key]).casefold() == str(expected).casefold()
-        for key, expected in CERTIFIED_HERMES_CONFIGURATION.items()
-    )
+    governed_matches = governed == CERTIFIED_HERMES_CONFIGURATION
     try:
         host_turns_sufficient = int(scalars.get(("agent", "max_turns"), "0")) >= int(CERTIFIED_HERMES_CONFIGURATION["max_turns"])
     except ValueError:

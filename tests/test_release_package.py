@@ -36,6 +36,19 @@ def _certify_archive(archive_path: Path) -> None:
         fixture: json.loads((ROOT / f"tests/fixtures/release-certification/{fixture}/fixture.json").read_text())["hermes_configuration"]
         for fixture in workflow.CERTIFICATION_CASE_ORDER
     }
+    bundle_by_fixture = {}
+    fixture_selections = {
+        "retrospective": ("Retrospective", None),
+        "ambispective-sterling": ("Ambispective", "Sterling"),
+        "prospective-advarra": ("Prospective", "Advarra"),
+    }
+    for fixture, selection in fixture_selections.items():
+        bundle_by_fixture[fixture] = next(
+            bundle for bundle in manifest["inventory"]["contracted_template_bundles"]
+            if (
+                bundle["selection"]["study_type"], bundle["selection"]["icf_family"],
+            ) == selection
+        )
 
     def passing_case(fixture: str) -> dict:
         output_paths = (
@@ -87,8 +100,8 @@ def _certify_archive(archive_path: Path) -> None:
                     "source": "release-owned runtime",
                 },
             },
-            "contracted_template_bundle_identity": "3" * 64,
-            "layout_preservation_baseline_identity": "4" * 64,
+            "contracted_template_bundle_identity": bundle_by_fixture[fixture]["identity_sha256"],
+            "layout_preservation_baseline_identity": bundle_by_fixture[fixture]["layout_preservation_baseline"]["sha256"],
         }
 
     report = {
@@ -491,6 +504,9 @@ def test_certification_binding_rejects_nested_identity_mutations(tmp_path):
         lambda report: report.update(completed_at="not-a-timestamp"),
         lambda report: report["cases"][0].update(report_sha256="z" * 64),
         lambda report: report["hermes_configurations"]["retrospective"].update(layout_preservation_notes=["mutated"]),
+        lambda report: report["cases"][0].update(contracted_template_bundle_identity="5" * 64),
+        lambda report: report["cases"][0].update(layout_preservation_baseline_identity="6" * 64),
+        lambda report: report["layout_preservation_evidence"].update(completed_at="2026-08-27T23:59:00+00:00"),
     )
     for index, mutate in enumerate(mutations):
         candidate = tmp_path / f"candidate-{index}.zip"
@@ -525,6 +541,34 @@ def test_incompatible_hermes_discovery_stops_before_activation(tmp_path):
     assert result["stage"] == "promotion_eligibility"
     assert result["findings"][-1]["field"] == "hermes_configuration"
     assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
+
+
+def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    for index, replacement in enumerate((
+        ("safe_mode: true", 'safe_mode: "true"'),
+        ("model_identifier: gpt-5.6-sol", "model_identifier: GPT-5.6-SOL"),
+        ("skill: clinical-document-drafting", "skill: Clinical-Document-Drafting"),
+    )):
+        skills_dir = tmp_path / f"skills-{index}"
+        config = _hermes_config(skills_dir)
+        config.write_text(
+            config.read_text(encoding="utf-8").replace(*replacement),
+            encoding="utf-8",
+        )
+
+        result = install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=config,
+            verifier=lambda _candidate: {"status": "passed"},
+            provisioner=lambda _candidate: {"status": "passed"},
+        )
+
+        assert result["status"] == "blocked"
+        assert result["findings"][-1]["field"] == "hermes_configuration"
 
 
 def test_one_rollback_operation_verifies_previous_and_quarantines_active(tmp_path):
