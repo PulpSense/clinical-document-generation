@@ -770,6 +770,8 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     entries: list[str] = []
     scalars: dict[tuple[str, ...], Any] = {}
     stack: list[tuple[int, str]] = []
+    defined_paths: set[tuple[str, ...]] = set()
+    duplicate_paths: set[tuple[str, ...]] = set()
     in_external = False
     base_indent = 0
     external_definitions = 0
@@ -781,6 +783,9 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
             while stack and stack[-1][0] >= indent:
                 stack.pop()
             path = tuple(item[1] for item in stack) + (key.strip(),)
+            if path in defined_paths:
+                duplicate_paths.add(path)
+            defined_paths.add(path)
             raw_scalar = raw_value.strip()
             if raw_scalar:
                 if raw_scalar[:1] in {"'", '"'} and raw_scalar[-1:] == raw_scalar[:1]:
@@ -820,7 +825,7 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
         host_turns_sufficient,
     ))
     normalized_entries = [str(Path(entry).expanduser().resolve()) for entry in entries]
-    if external_definitions != 1 or normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
+    if duplicate_paths or external_definitions != 1 or normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
         return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
     return []
 

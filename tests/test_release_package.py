@@ -589,6 +589,22 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
     assert decoy["status"] == "blocked"
     assert decoy["findings"][-1]["field"] == "hermes_configuration"
 
+    skills_dir = tmp_path / "skills-split"
+    config = _hermes_config(skills_dir)
+    text = config.read_text(encoding="utf-8")
+    text = text.replace("  clinical_document_generation:\n", "skills:\n  clinical_document_generation:\n")
+    config.write_text(text, encoding="utf-8")
+    split = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=config,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {"status": "passed"},
+    )
+
+    assert split["status"] == "blocked"
+    assert split["findings"][-1]["field"] == "hermes_configuration"
+
 
 def test_one_rollback_operation_verifies_previous_and_quarantines_active(tmp_path):
     skills_dir = tmp_path / "skills"
