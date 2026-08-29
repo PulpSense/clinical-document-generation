@@ -6,11 +6,11 @@ from __future__ import annotations
 import argparse
 import copy
 import hashlib
-import importlib.util
 import json
 import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -20,7 +20,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Mapping
 
 from docx import Document
@@ -31,7 +31,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import PAGE_RENDERER_BACKENDS, _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderer, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256, verification_response_is_complete
+from quality import _approved_packaged_font_fallback, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, create_verification_requests, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -50,8 +50,42 @@ DESKTOP_STAGE_SOFT_BUDGETS = {
     "desktop_delivery": 60.0,
 }
 RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
+RELEASE_CERTIFICATION = "RELEASE-CERTIFICATION.json"
 INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
+PROMOTION_RECORD = "PROMOTION-RECORD.json"
 MINIMUM_PYTHON_VERSION = (3, 10)
+PDF_PAGE_RENDERER = {
+    "kind": "pypdfium2",
+    "version": "5.13.0",
+    "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
+    "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
+    "platform": "macosx_13_0_arm64",
+}
+PRODUCTION_MODULES = {
+    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
+}
+CERTIFIED_HERMES_CONFIGURATION = {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-drafting",
+    "safe_mode": True,
+    "model_identifier": "gpt-5.6-sol",
+    "reasoning_configuration": "Hermes Desktop governed default",
+}
+CERTIFICATION_CASE_ORDER = (
+    "retrospective", "ambispective-sterling", "prospective-advarra",
+)
+CERTIFICATION_GATES = {
+    "source", "content", "document_structure", "prs_xml", "package",
+    "cross_document_consistency", "render_assurance", "every_page_visual_qa",
+    "delivery_confirmation",
+}
+CERTIFICATION_VISUAL_CHECKS = {
+    "artificial_pagination", "bad_table_split", "blank_page", "clipping",
+    "duplicate_section", "excessive_whitespace", "footer_collision",
+    "inconsistent_style", "missing_header_footer", "orphan_heading",
+    "overflow", "overlap", "toc_mismatch", "unreadable_text",
+}
 
 
 class OperationDeadlineExpired(RuntimeError):
@@ -235,6 +269,48 @@ def _release_excluded(path: Path) -> bool:
     return False
 
 
+def _pdfium_wheel_inventory(wheel: Path) -> list[dict[str, Any]]:
+    """Derive the deterministic extraction inventory trusted by the release."""
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    with zipfile.ZipFile(wheel) as archive:
+        for member in archive.infolist():
+            raw = (
+                member.filename[:-1]
+                if member.is_dir() and member.filename.endswith("/")
+                else member.filename
+            )
+            relative = PurePosixPath(raw)
+            normalized = relative.as_posix()
+            if (
+                not normalized
+                or raw != normalized
+                or relative.is_absolute()
+                or "\\" in raw
+                or any(part in {"", ".", ".."} for part in raw.split("/"))
+                or normalized.casefold() in seen
+            ):
+                raise ValueError(
+                    "The pinned pypdfium2 wheel has an unsafe or duplicate extraction path."
+                )
+            seen.add(normalized.casefold())
+            if member.is_dir():
+                continue
+            if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                raise ValueError("The pinned pypdfium2 wheel contains an unsupported symbolic link.")
+            payload = archive.read(member)
+            if len(payload) != member.file_size:
+                raise ValueError("The pinned pypdfium2 wheel contains an inconsistent file size.")
+            entries.append({
+                "path": normalized,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            })
+    if not entries:
+        raise ValueError("The pinned pypdfium2 wheel has no extractable runtime files.")
+    return sorted(entries, key=lambda item: item["path"])
+
+
 def _package_release_tree(
     repo_root: Path,
     output_path: Path,
@@ -251,9 +327,24 @@ def _package_release_tree(
     output_path = output_path.expanduser().resolve()
     if output_path == repo_root or repo_root in output_path.parents:
         raise ValueError("Release archive must be outside the skill repository.")
+    actual_modules = {path.name for path in (repo_root / "scripts").glob("*.py")}
+    if actual_modules != PRODUCTION_MODULES:
+        raise ValueError(
+            "Release packaging requires exactly the six production Python modules: "
+            + ", ".join(sorted(PRODUCTION_MODULES))
+        )
+    exact_files = {"SKILL.md", "README.md", "CONTEXT.md", "requirements.txt", "agents/openai.yaml"}
     files = [
         path for path in sorted(repo_root.rglob("*"))
-        if path.is_file() and not _release_excluded(path.relative_to(repo_root))
+        if path.is_file()
+        and (
+            path.relative_to(repo_root).as_posix() in exact_files
+            or path.relative_to(repo_root).parts[0] in {"assets", "references"}
+            or (
+                path.relative_to(repo_root).parts[0] == "scripts"
+                and path.name in PRODUCTION_MODULES
+            )
+        )
     ]
     if not files:
         raise ValueError("No release files were found.")
@@ -281,7 +372,25 @@ def _package_release_tree(
             font_inventory[path.relative_to(repo_root).as_posix()] = sorted(_template_fonts(path))
     required_font_names = sorted({font for fonts in font_inventory.values() for font in fonts})
     approved_font_plan = bundles[0]["approved_font_plan"]
-    implementation_files = [item["path"] for item in entries if item["path"].startswith("scripts/")]
+    certification_configuration_sha256 = {}
+    for fixture_id in CERTIFICATION_CASE_ORDER:
+        fixture_path = repo_root / "tests/fixtures/release-certification" / fixture_id / "fixture.json"
+        try:
+            fixture = _read(fixture_path)
+            certification_configuration_sha256[fixture_id] = sha256_value(fixture["hermes_configuration"])
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Release packaging requires the governed certification fixture: {fixture_id}") from exc
+    pdf_renderer: dict[str, Any] = dict(PDF_PAGE_RENDERER)
+    pdf_renderer_wheel = repo_root / pdf_renderer["wheel"]
+    if (
+        not pdf_renderer_wheel.is_file()
+        or sha256_file(pdf_renderer_wheel) != pdf_renderer["wheel_sha256"]
+    ):
+        raise ValueError(
+            "The pinned pypdfium2 wheel is missing or does not match its governed hash."
+        )
+    pdf_renderer["runtime_inventory"] = _pdfium_wheel_inventory(pdf_renderer_wheel)
+    implementation_files = sorted(f"scripts/{name}" for name in PRODUCTION_MODULES)
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
         "git_commit": git_commit,
@@ -293,7 +402,7 @@ def _package_release_tree(
             "dependencies": "requirements.txt",
             "install_as_direct_child_of": "Hermes skills directory",
             "activation": "atomic after end-to-end Render Assurance smoke; previous verified release retained",
-            "required_external_tools": [],
+            "required_external_tools": ["Microsoft Word or LibreOffice"],
         },
         "inventory": {
             "implementation": implementation_files,
@@ -302,16 +411,15 @@ def _package_release_tree(
             "font_identities": font_inventory,
             "font_fallbacks": {font: [_approved_packaged_font_fallback(font, approved_font_plan)] for font in required_font_names},
             "renderer_at_packaging": renderer(environment=os.environ),
-            "page_renderer_fallbacks": list(PAGE_RENDERER_BACKENDS),
-            "page_renderer_at_packaging": page_renderer(environment=os.environ),
+            "pdf_page_renderer": pdf_renderer,
             "harness": {"python": platform.python_version(), "platform": platform.platform()},
             "model": "Hermes Desktop runtime; model identity is recorded per generation evidence.",
+            "certification_configuration_sha256": certification_configuration_sha256,
         },
         "excluded_classes": ["git metadata", "development virtual environments", "credentials", "patient/source data", "old run outputs", "development tests", "installed runtime and assurance evidence"],
         "files": entries,
     }
-    manifest_payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    manifest["package_fingerprint"] = hashlib.sha256(manifest_payload).hexdigest()
+    manifest["package_fingerprint"] = _manifest_package_fingerprint(manifest)[1]
     manifest_text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_name(f".{output_path.name}.tmp")
@@ -362,6 +470,44 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         raise ValueError("A release must be built from a committed Git tree.") from exc
     if git_root != repo_root:
         raise ValueError("Release packaging must target the Git repository root.")
+    try:
+        status_output = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repo_root),
+                "status",
+                "--porcelain=v1",
+                "-z",
+                "--untracked-files=all",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ValueError("The release-owned worktree state could not be verified.") from exc
+    dirty_paths: list[Path] = []
+    records = status_output.split("\0")
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if not record:
+            continue
+        status = record[:2]
+        candidates = [record[3:]]
+        if "R" in status or "C" in status:
+            if index < len(records) and records[index]:
+                candidates.append(records[index])
+                index += 1
+        for candidate in candidates:
+            relative = Path(candidate)
+            if not _release_excluded(relative):
+                dirty_paths.append(relative)
+    if dirty_paths:
+        names = ", ".join(path.as_posix() for path in sorted(set(dirty_paths)))
+        raise ValueError(f"Release-owned resources must be clean and committed: {names}")
     with tempfile.TemporaryDirectory(prefix="clinical-release-commit-") as temporary_dir:
         snapshot_root = Path(temporary_dir) / "snapshot"
         snapshot_root.mkdir()
@@ -390,7 +536,7 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
         return _package_release_tree(snapshot_root, output_path, git_commit=commit)
 
 
-def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
+def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -> list[dict[str, Any]]:
     manifest_path = skill_root / RELEASE_MANIFEST
     if not manifest_path.is_file():
         return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": "Release manifest is missing."}]
@@ -399,8 +545,14 @@ def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": str(exc)}]
     findings = []
+    recorded_fingerprint, computed_fingerprint = _manifest_package_fingerprint(manifest)
+    if not recorded_fingerprint or computed_fingerprint != recorded_fingerprint:
+        findings.append({"category": "installation", "field": "package_fingerprint", "issue": "Package fingerprint does not match the release manifest."})
+    declared: set[str] = set()
     for item in manifest.get("files", []):
-        path = skill_root / str(item.get("path") or "")
+        relative = str(item.get("path") or "")
+        declared.add(relative)
+        path = skill_root / relative
         try:
             path.resolve().relative_to(skill_root.resolve())
         except ValueError:
@@ -408,9 +560,322 @@ def _manifest_integrity(skill_root: Path) -> list[dict[str, Any]]:
             continue
         if not path.is_file():
             findings.append({"category": "installation", "field": str(item.get("path")), "issue": "Packaged file is missing."})
-        elif sha256_file(path) != item.get("sha256"):
+        elif sha256_file(path) != item.get("sha256") or path.stat().st_size != int(item.get("bytes", -1)):
             findings.append({"category": "installation", "field": str(item.get("path")), "issue": "Packaged file hash does not match the release manifest."})
+    permitted_state = {RELEASE_CERTIFICATION, RELEASE_MANIFEST}
+    if allow_runtime_state:
+        permitted_state.update({INSTALLATION_ASSURANCE, PROMOTION_RECORD})
+    actual = {
+        path.relative_to(skill_root).as_posix()
+        for path in skill_root.rglob("*")
+        if path.is_file() and not (
+            allow_runtime_state
+            and (
+                "runtime" in path.relative_to(skill_root).parts
+                or "__pycache__" in path.relative_to(skill_root).parts
+                or path.suffix == ".pyc"
+            )
+        )
+    }
+    extras = sorted(actual - declared - permitted_state)
+    if extras:
+        findings.append({"category": "installation", "field": "inventory", "issue": f"Unlisted packaged files are present: {', '.join(extras)}"})
     return findings
+
+
+def _is_sha256(value: Any) -> bool:
+    text = str(value or "")
+    return len(text) == 64 and all(character in "0123456789abcdef" for character in text.casefold())
+
+
+def _utc_timestamp(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
+
+
+def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    """Verify that the embedded full-corpus report certifies this exact candidate."""
+    report_path = skill_root / RELEASE_CERTIFICATION
+    try:
+        report = _read(report_path)
+        manifest = _read(skill_root / RELEASE_MANIFEST)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": f"A valid embedded Release Certification report is required: {exc}"}]
+    identity = report.get("release_identity") or {}
+    cases = report.get("cases") or []
+    case_order = report.get("case_order") or []
+    configurations = report.get("hermes_configurations") or {}
+    expected_configuration_hashes = (manifest.get("inventory") or {}).get("certification_configuration_sha256") or {}
+    layout_evidence = report.get("layout_preservation_evidence") or {}
+    layout_started = _utc_timestamp(layout_evidence.get("started_at"))
+    layout_completed = _utc_timestamp(layout_evidence.get("completed_at"))
+    report_completed = _utc_timestamp(report.get("completed_at"))
+    valid = (
+        report.get("schema_version") == "release-certification-corpus/v1"
+        and report.get("status") == "passed"
+        and report.get("certification_scope") == "complete_three_case_corpus"
+        and not report.get("findings")
+        and identity.get("package_fingerprint") == manifest.get("package_fingerprint")
+        and identity.get("git_commit") == manifest.get("git_commit")
+        and _is_sha256(report.get("preflight_evidence_sha256"))
+        and layout_evidence.get("status") == "passed"
+        and layout_evidence.get("returncode") == 0
+        and _is_sha256(layout_evidence.get("sha256"))
+        and set(layout_evidence.get("coverage") or []) == {
+            "Prospective/Advarra", "Prospective/Sterling", "Ambispective/Advarra",
+            "Ambispective/Sterling", "Retrospective/Protocol",
+        }
+        and layout_started is not None
+        and layout_completed is not None
+        and report_completed is not None
+        and layout_started <= layout_completed <= report_completed
+        and set(configurations) == set(CERTIFICATION_CASE_ORDER)
+        and expected_configuration_hashes == {
+            fixture_id: sha256_value(configurations.get(fixture_id) or {})
+            for fixture_id in CERTIFICATION_CASE_ORDER
+        }
+        and all(
+            all(configuration.get(key) == expected for key, expected in CERTIFIED_HERMES_CONFIGURATION.items())
+            and bool(configuration.get("layout_preservation_notes"))
+            for configuration in configurations.values()
+        )
+        and tuple(case_order) == CERTIFICATION_CASE_ORDER
+        and tuple(case.get("fixture_id") for case in cases) == CERTIFICATION_CASE_ORDER
+    )
+    for case in cases:
+        fixture_id = str(case.get("fixture_id") or "")
+        outputs = case.get("output_evidence") or []
+        expected_outputs = (
+            {"output/protocol.docx"}
+            if fixture_id == "retrospective"
+            else {"output/protocol.docx", "output/icf.docx", "output/study.xml"}
+        )
+        output_by_path = {str(item.get("path") or ""): item for item in outputs}
+        visual = case.get("visual_qa") or {}
+        expected_visual = {Path(path).stem for path in expected_outputs if path.endswith(".docx")}
+        try:
+            elapsed = float(case.get("elapsed_seconds"))
+            desktop_elapsed = float(case.get("desktop_operation_elapsed_seconds"))
+        except (TypeError, ValueError):
+            elapsed = desktop_elapsed = -1.0
+        runtime_valid = (
+            0.0 < elapsed < 900.0
+            if fixture_id == "retrospective"
+            else 0.0 < elapsed <= 1080.0
+        )
+        output_valid = (
+            set(output_by_path) == expected_outputs
+            and all(
+                item.get("confirmed") is True
+                and int(item.get("bytes") or 0) > 0
+                and _is_sha256(item.get("sha256"))
+                for item in output_by_path.values()
+            )
+        )
+        visual_valid = (
+            set(visual) == expected_visual
+            and all(
+                item.get("status") == "passed"
+                and int(item.get("page_count") or 0) > 0
+                and int(item.get("page_count") or 0) == len(item.get("page_sha256") or [])
+                and all(_is_sha256(digest) for digest in item.get("page_sha256") or [])
+                and set(item.get("checks") or []) == CERTIFICATION_VISUAL_CHECKS
+                and _is_sha256(item.get("request_sha256"))
+                and _is_sha256(item.get("response_sha256"))
+                and _is_sha256(item.get("pdf_sha256"))
+                and _is_sha256(item.get("docx_sha256"))
+                and item.get("producer_model_id") == CERTIFIED_HERMES_CONFIGURATION["model_identifier"]
+                and item.get("docx_sha256") == output_by_path.get(f"output/{artifact}.docx", {}).get("sha256")
+                for artifact, item in visual.items()
+            )
+        )
+        render_assurance_evidence = case.get("render_assurance") or {}
+        page_renderer_evidence = render_assurance_evidence.get("active_page_renderer") or {}
+        expected_page_renderer = (manifest.get("inventory") or {}).get("pdf_page_renderer") or {}
+        expected_selection = {
+            "retrospective": ("Retrospective", None),
+            "ambispective-sterling": ("Ambispective", "Sterling"),
+            "prospective-advarra": ("Prospective", "Advarra"),
+        }.get(fixture_id)
+        expected_bundle = next((
+            bundle for bundle in (manifest.get("inventory") or {}).get("contracted_template_bundles", [])
+            if (
+                (bundle.get("selection") or {}).get("study_type"),
+                (bundle.get("selection") or {}).get("icf_family"),
+            ) == expected_selection
+        ), {})
+        expected_gate_statuses = {gate: "passed" for gate in CERTIFICATION_GATES}
+        if fixture_id == "retrospective":
+            expected_gate_statuses["prs_xml"] = "not_applicable"
+        valid = valid and all((
+            case.get("status") == "passed",
+            not case.get("findings"),
+            case.get("release_identity") == identity,
+            case.get("hermes_configuration_sha256") == expected_configuration_hashes.get(fixture_id),
+            set(case.get("model_identifiers") or []) == {CERTIFIED_HERMES_CONFIGURATION["model_identifier"]},
+            _is_sha256(case.get("report_sha256")),
+            runtime_valid,
+            desktop_elapsed > 0.0,
+            case.get("within_approved_runtime") is True,
+            output_valid,
+            case.get("gate_statuses") == expected_gate_statuses,
+            case.get("layout_checks") == {"natural_section_3_flow": "passed", "no_orphan_headings": "passed"},
+            visual_valid,
+            (render_assurance_evidence.get("active_renderer") or {}).get("kind") in {"Microsoft Word", "LibreOffice"},
+            all(page_renderer_evidence.get(key) == expected_page_renderer.get(key) for key in ("kind", "version", "wheel", "wheel_sha256")),
+            page_renderer_evidence.get("source") == "release-owned runtime",
+            case.get("contracted_template_bundle_identity") == expected_bundle.get("identity_sha256"),
+            case.get("layout_preservation_baseline_identity") == (expected_bundle.get("layout_preservation_baseline") or {}).get("sha256"),
+        ))
+    if not valid:
+        return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, model, and configuration."}]
+    return report, []
+
+
+def _validated_archive_members(archive: zipfile.ZipFile, extraction_root: Path) -> list[zipfile.ZipInfo]:
+    """Reject every ambiguous archive member before extraction."""
+    root = extraction_root.resolve()
+    targets: set[str] = set()
+    members = archive.infolist()
+    for info in members:
+        raw = info.filename[:-1] if info.is_dir() and info.filename.endswith("/") else info.filename
+        relative_path = PurePosixPath(raw)
+        if (
+            not raw
+            or "\\" in raw
+            or any(part in {"", ".", ".."} for part in raw.split("/"))
+            or relative_path.is_absolute()
+            or relative_path.as_posix() != raw
+        ):
+            raise ValueError(f"Release archive contains a noncanonical member path: {info.filename}")
+        target = (root / Path(*relative_path.parts)).resolve()
+        try:
+            relative = target.relative_to(root)
+        except ValueError as exc:
+            raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
+        if not relative.parts or relative.parts[0] != "clinical-document-generation":
+            raise ValueError(f"Release archive member is outside its one package root: {info.filename}")
+        key = str(target).casefold()
+        if key in targets:
+            raise ValueError(f"Release archive contains duplicate normalized target: {info.filename}")
+        targets.add(key)
+        if (info.external_attr >> 16) & 0o170000 == 0o120000:
+            raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
+    return members
+
+
+def bind_release_certification(archive_path: Path, report_path: Path) -> dict[str, Any]:
+    """Attach the passing report to its already-certified immutable package."""
+    archive_path = archive_path.expanduser().resolve()
+    report_path = report_path.expanduser().resolve()
+    report_bytes = report_path.read_bytes()
+    try:
+        report = json.loads(report_bytes)
+    except json.JSONDecodeError as exc:
+        raise ValueError("Release Certification report is not valid JSON.") from exc
+    with tempfile.TemporaryDirectory(prefix="clinical-certification-bind-") as directory:
+        extracted = Path(directory) / "extracted"
+        with zipfile.ZipFile(archive_path) as source:
+            _validated_archive_members(source, extracted)
+            source.extractall(extracted)
+        candidate = extracted / "clinical-document-generation"
+        (candidate / RELEASE_CERTIFICATION).write_bytes(report_bytes)
+        integrity = _manifest_integrity(candidate, allow_runtime_state=False)
+        _, certification_findings = _certification_attestation(candidate)
+        if integrity or certification_findings:
+            issues = integrity + certification_findings
+            raise ValueError("Release Certification cannot be bound: " + "; ".join(str(item["issue"]) for item in issues))
+        temporary = archive_path.with_name(f".{archive_path.name}.certified")
+        try:
+            with zipfile.ZipFile(archive_path) as source, zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as target:
+                for info in source.infolist():
+                    if info.filename.endswith("/" + RELEASE_CERTIFICATION):
+                        continue
+                    target.writestr(info, source.read(info.filename))
+                info = zipfile.ZipInfo(f"clinical-document-generation/{RELEASE_CERTIFICATION}", date_time=(1980, 1, 1, 0, 0, 0))
+                info.compress_type = zipfile.ZIP_DEFLATED
+                target.writestr(info, report_bytes)
+            os.replace(temporary, archive_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+    return {
+        "status": "passed",
+        "package": archive_path.as_posix(),
+        "package_fingerprint": report["release_identity"]["package_fingerprint"],
+        "certification_sha256": hashlib.sha256(report_bytes).hexdigest(),
+    }
+
+
+def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str, Any]]:
+    """Require Hermes discovery to select this promoted path and no editable copy."""
+    try:
+        lines = config_path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes configuration cannot be read: {exc}"}]
+    entries: list[str] = []
+    scalars: dict[tuple[str, ...], Any] = {}
+    stack: list[tuple[int, str]] = []
+    defined_paths: set[tuple[str, ...]] = set()
+    duplicate_paths: set[tuple[str, ...]] = set()
+    in_external = False
+    base_indent = 0
+    external_definitions = 0
+    for line in lines:
+        stripped = line.strip()
+        indent = len(line) - len(line.lstrip())
+        if stripped and not stripped.startswith(("#", "- ")) and ":" in stripped:
+            key, raw_value = stripped.split(":", 1)
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            path = tuple(item[1] for item in stack) + (key.strip(),)
+            if path in defined_paths:
+                duplicate_paths.add(path)
+            defined_paths.add(path)
+            raw_scalar = raw_value.strip()
+            if raw_scalar:
+                if raw_scalar[:1] in {"'", '"'} and raw_scalar[-1:] == raw_scalar[:1]:
+                    value: Any = raw_scalar[1:-1]
+                elif raw_scalar.casefold() in {"true", "false"}:
+                    value = raw_scalar.casefold() == "true"
+                elif re.fullmatch(r"-?\d+", raw_scalar):
+                    value = int(raw_scalar)
+                else:
+                    value = raw_scalar
+                scalars[path] = value
+            else:
+                stack.append((indent, key.strip()))
+        if stripped == "external_dirs:":
+            exact_external = tuple(item[1] for item in stack) == ("skills", "external_dirs")
+            in_external = exact_external
+            if exact_external:
+                external_definitions += 1
+                base_indent = indent
+            continue
+        if in_external and stripped and indent <= base_indent:
+            in_external = False
+        if in_external and stripped.startswith("- "):
+            entries.append(stripped[2:].strip().strip("'\""))
+    governed = {
+        key: scalars.get(("skills", "clinical_document_generation", key))
+        for key in CERTIFIED_HERMES_CONFIGURATION
+    }
+    governed_matches = governed == CERTIFIED_HERMES_CONFIGURATION
+    try:
+        host_turns_sufficient = int(scalars.get(("agent", "max_turns"), "0")) >= int(CERTIFIED_HERMES_CONFIGURATION["max_turns"])
+    except ValueError:
+        host_turns_sufficient = False
+    host_matches = all((
+        scalars.get(("model", "default")) == CERTIFIED_HERMES_CONFIGURATION["model_identifier"],
+        scalars.get(("agent", "reasoning_effort")) == "medium",
+        host_turns_sufficient,
+    ))
+    normalized_entries = [str(Path(entry).expanduser().resolve()) for entry in entries]
+    if duplicate_paths or external_definitions != 1 or normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
+        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
+    return []
 
 
 def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) -> dict[str, Any]:
@@ -421,13 +886,15 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     if not any(fallback_fonts.glob("*.ttf")):
         findings.append({"category": "installation", "field": "fallback_fonts", "issue": "No packaged compatible fonts are present."})
     reference = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}
-    fallback_renderers = [
+    office_renderers = [
         item for item in renderers(skill_root=skill_root)
-        if item.get("source") == "verified fallback stack"
+        if item.get("kind") in {"Microsoft Word", "LibreOffice"}
     ]
-    fallback_pages = [
-        item for item in page_renderers(skill_root=skill_root)
-        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+    page_renderer_identities = [
+        item for item in page_renderers(
+            skill_root=skill_root, require_promoted_runtime=False
+        )
+        if item.get("kind") == "pypdfium2" and item.get("source") == "release-owned runtime"
     ]
     with tempfile.TemporaryDirectory(prefix="clinical-installation-assurance-") as directory:
         revision_dir = Path(directory)
@@ -453,18 +920,19 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
                 }],
             },
             deadline_seconds=deadline_seconds,
-            renderer_identities=fallback_renderers,
-            page_renderer_identities=fallback_pages,
+            renderer_identities=office_renderers,
+            page_renderer_identities=page_renderer_identities,
             rebuild_candidate=lambda _substitutions: {"status": "passed"},
+            require_promoted_runtime=False,
         )
     if assurance.get("status") != "passed":
         findings.extend(assurance.get("findings", []))
     render_evidence = assurance.get("render", {})
     candidates = [attempt.get("adapter") for attempt in render_evidence.get("renderer_attempts", []) if attempt.get("adapter")]
-    if not fallback_renderers:
-        findings.append({"category": "installation", "field": "fallback_renderer", "issue": "The versioned local LibreOffice fallback was not discovered."})
-    if not fallback_pages:
-        findings.append({"category": "installation", "field": "fallback_page_renderer", "issue": "The versioned local PyMuPDF page renderer was not discovered."})
+    if not office_renderers:
+        findings.append({"category": "installation", "field": "office_renderer", "issue": "Microsoft Word or LibreOffice is required on the host."})
+    if not page_renderer_identities:
+        findings.append({"category": "installation", "field": "pdf_page_renderer", "issue": "The release-owned pypdfium2 page renderer was not discovered."})
     return {
         "status": "passed" if not findings else "blocked",
         "renderer": render_evidence.get("renderer"),
@@ -480,83 +948,148 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     }
 
 
-def _provisionable_libreoffice() -> tuple[Path, Path] | None:
-    """Return (tree root, relative executable) for a locally reusable runtime."""
-    system = platform.system()
-    if system == "Darwin":
-        roots = [Path("/Applications/LibreOffice.app")]
-        cache = Path.home() / ".cache/codex-runtimes"
-        roots.extend(sorted(cache.glob("*/dependencies/native/libreoffice-headless/libreoffice/*.app")))
-        for root in roots:
-            executable = root / "Contents/MacOS/soffice"
-            if executable.is_file() and os.access(executable, os.X_OK):
-                return root, executable.relative_to(root)
-    for identity in renderers():
-        if identity.get("kind") != "LibreOffice":
-            continue
-        executable = Path(str(identity["path"])).resolve()
-        if executable.is_file() and os.access(executable, os.X_OK):
-            root = executable.parent.parent if executable.parent.name == "program" else executable.parent
-            return root, executable.relative_to(root)
-    return None
-
-
 def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
-    """Copy the installed PyMuPDF package into the versioned fallback stack."""
-    runtime_python = skill_root / "runtime/python"
-    existing = [
-        item for item in page_renderers(skill_root=skill_root)
-        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
-    ]
+    """Install the manifest-bound pypdfium2 wheel without host discovery."""
+    skill_root = skill_root.resolve()
+    runtime_root = skill_root / "runtime"
+    runtime_python = runtime_root / "python"
+    try:
+        manifest = _read(skill_root / RELEASE_MANIFEST)
+        identity = dict(manifest["inventory"]["pdf_page_renderer"])
+    except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The release manifest does not identify its one packaged pypdfium2 renderer.",
+        }]}
+    if identity.get("kind") != "pypdfium2":
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The release manifest must identify pypdfium2 as its only PDF page renderer.",
+        }]}
+    existing = page_renderers(
+        skill_root=skill_root, require_promoted_runtime=False
+    )
     if existing:
         return {"status": "passed", "page_renderer": existing[0], "provisioned": False}
-    spec = importlib.util.find_spec("pymupdf")
-    if spec is None or spec.origin is None:
-        return {"status": "blocked", "findings": [{"category": "installation", "field": "fallback_page_renderer", "issue": "PyMuPDF is not installed locally and cannot be provisioned."}]}
-    source = Path(spec.origin).resolve().parent
-    destination = runtime_python / "pymupdf"
-    runtime_python.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, destination)
-    identity = next(
-        item for item in page_renderers(skill_root=skill_root)
-        if item.get("kind") == "pymupdf" and item.get("source") == "verified fallback stack"
+    if (
+        runtime_root.is_symlink()
+        or runtime_python.exists()
+        or runtime_python.is_symlink()
+        or (runtime_root / "PDF-RENDERER.json").exists()
+    ):
+        finding = dict(_pdfium_runtime_integrity(
+            skill_root, require_promoted_runtime=False
+        )["finding"])
+        finding["category"] = "installation"
+        finding["field"] = "pdf_page_renderer"
+        return {"status": "blocked", "findings": [finding]}
+    wheel_relative = Path(str(identity.get("wheel") or ""))
+    wheel = (skill_root / wheel_relative).resolve()
+    try:
+        wheel.relative_to(skill_root)
+    except ValueError:
+        wheel = Path()
+    expected_hash = str(identity.get("wheel_sha256") or "")
+    if not wheel.is_file() or not expected_hash or sha256_file(wheel) != expected_hash:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The packaged pypdfium2 wheel is missing or does not match its release-manifest hash.",
+        }]}
+    try:
+        expected_inventory = _pdfium_wheel_inventory(wheel)
+    except (OSError, ValueError, zipfile.BadZipFile):
+        expected_inventory = []
+    if identity.get("runtime_inventory") != expected_inventory:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "code": "installation.pdfium_manifest_inventory_invalid",
+            "issue": "The PDFium extraction inventory does not match the immutable packaged wheel.",
+        }]}
+    platform_tag = str(identity.get("platform") or "")
+    host = f"{platform.system()} {platform.machine()}"
+    compatible = (
+        platform.system() == "Darwin"
+        and "macosx" in platform_tag
+        and platform.machine().casefold() in platform_tag.casefold()
     )
+    if not compatible:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": f"Packaged pypdfium2 targets {platform_tag}; this host is {host}.",
+        }]}
+    staged_python = runtime_root / ".pypdfium2-install"
+    shutil.rmtree(staged_python, ignore_errors=True)
+    staged_python.mkdir(parents=True)
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            for member in archive.infolist():
+                target = (staged_python / member.filename).resolve()
+                try:
+                    target.relative_to(staged_python.resolve())
+                except ValueError as exc:
+                    raise ValueError("The packaged pypdfium2 wheel contains an escaping path.") from exc
+                if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                    raise ValueError("The packaged pypdfium2 wheel contains an unsupported symbolic link.")
+            archive.extractall(staged_python)
+        shutil.rmtree(runtime_python, ignore_errors=True)
+        os.replace(staged_python, runtime_python)
+        _write(runtime_root / "PDF-RENDERER.json", {
+            "kind": "pypdfium2",
+            "version": str(identity.get("version") or ""),
+            "wheel": wheel_relative.as_posix(),
+            "wheel_sha256": expected_hash,
+            "platform": platform_tag,
+            "status": "provisioned",
+            "inventory_source": RELEASE_MANIFEST,
+        })
+    except (OSError, ValueError, zipfile.BadZipFile) as exc:
+        shutil.rmtree(staged_python, ignore_errors=True)
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": f"The packaged pypdfium2 wheel could not be installed: {exc}",
+        }]}
+    installed = page_renderers(
+        skill_root=skill_root, require_promoted_runtime=False
+    )
+    if len(installed) != 1:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "issue": "The release-owned pypdfium2 runtime could not be discovered after installation.",
+        }]}
+    identity = installed[0]
     return {"status": "passed", "page_renderer": identity, "provisioned": True}
 
 
-def provision_fallback_stack(skill_root: Path) -> dict[str, Any]:
-    """Provision version-local DOCX and page renderers without changing the host."""
+def provision_render_assurance(skill_root: Path) -> dict[str, Any]:
+    """Provision PDFium offline and verify the required host office renderer."""
     skill_root = skill_root.resolve()
-    runtime_root = skill_root / "runtime"
-    existing = renderers(skill_root=skill_root)
+    office_renderers = [
+        item for item in renderers(skill_root=skill_root)
+        if item.get("kind") in {"Microsoft Word", "LibreOffice"}
+    ]
     page_provision = _provision_page_renderer(skill_root)
     if page_provision.get("status") != "passed":
         return page_provision
-    if any(item.get("source") == "verified fallback stack" for item in existing):
+    if office_renderers:
         return {
             "status": "passed",
-            "renderer": next(item for item in existing if item.get("source") == "verified fallback stack"),
+            "renderer": office_renderers[0],
             "page_renderer": page_provision["page_renderer"],
             "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
         }
-    source = _provisionable_libreoffice()
-    if source is None:
-        return {"status": "blocked", "findings": [{"category": "installation", "field": "fallback_renderer", "issue": "No local LibreOffice runtime is available to provision."}]}
-    source_root, relative_executable = source
-    destination = runtime_root / source_root.name
-    runtime_root.mkdir(parents=True, exist_ok=True)
-    try:
-        shutil.copytree(source_root, destination, copy_function=os.link)
-    except OSError:
-        shutil.rmtree(destination, ignore_errors=True)
-        shutil.copytree(source_root, destination)
-    executable = destination / relative_executable
-    return {
-        "status": "passed",
-        "renderer": {"kind": "LibreOffice", "path": str(executable), "source": "verified fallback stack", "platform": platform.system()},
-        "page_renderer": page_provision["page_renderer"],
-        "provisioned": {"renderer": True, "page_renderer": page_provision["provisioned"]},
-    }
+    return {"status": "blocked", "findings": [{
+        "category": "installation",
+        "field": "office_renderer",
+        "code": "installation.office_renderer_required",
+        "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
+    }]}
 
 
 def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> Any:
@@ -572,12 +1105,96 @@ def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> An
     return value
 
 
+def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
+    timeout_seconds = 180
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
+            cwd=candidate,
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "blocked",
+            "findings": [{
+                "category": "installation",
+                "field": "smoke",
+                "code": "installation.smoke_timeout",
+                "timeout_seconds": timeout_seconds,
+                "issue": f"Installation smoke exceeded {timeout_seconds} seconds.",
+            }],
+        }
+    try:
+        assurance = json.loads(completed.stdout)
+    except json.JSONDecodeError:
+        assurance = {
+            "status": "blocked",
+            "findings": [{
+                "category": "installation",
+                "field": "smoke",
+                "issue": completed.stderr or completed.stdout or "Installation smoke returned no JSON.",
+            }],
+        }
+    if completed.returncode and assurance.get("status") == "passed":
+        return {
+            "status": "blocked",
+            "findings": [{
+                "category": "installation",
+                "field": "smoke",
+                "issue": completed.stderr or "Installation smoke process failed.",
+            }],
+        }
+    return dict(assurance)
+
+
+def _installation_pdfium_findings(candidate: Path) -> list[dict[str, Any]]:
+    integrity = _pdfium_runtime_integrity(
+        candidate, require_promoted_runtime=False
+    )
+    if integrity.get("status") == "passed":
+        return []
+    finding = dict(integrity.get("finding") or {})
+    finding["category"] = "installation"
+    finding["field"] = "pdf_page_renderer"
+    return [finding]
+
+
+def _retain_lightweight_release_history(
+    release: Path,
+    skills_dir: Path,
+) -> Path:
+    identity = _active_release_identity(release)
+    certification: dict[str, Any] = {}
+    promotion_path = release / "PROMOTION-RECORD.json"
+    if promotion_path.is_file():
+        try:
+            certification = dict(_read(promotion_path).get("certification") or {})
+        except (OSError, TypeError, ValueError, json.JSONDecodeError):
+            certification = {}
+    fingerprint = str(identity["package_fingerprint"])
+    history_key = "".join(
+        character for character in fingerprint
+        if character.isalnum() or character in "-_"
+    )
+    history_path = skills_dir / "release-history" / f"{history_key}.json"
+    _write(history_path, {
+        "schema_version": "release-history/v1",
+        "git_commit": identity.get("git_commit"),
+        "package_fingerprint": fingerprint,
+        "certification": certification,
+    })
+    return history_path
+
+
 def install_release(
     archive_path: Path,
     skills_dir: Path,
     *,
+    hermes_config_path: Path,
     verifier: Callable[[Path], Mapping[str, Any]] | None = None,
-    provisioner: Callable[[Path], Mapping[str, Any]] = provision_fallback_stack,
+    provisioner: Callable[[Path], Mapping[str, Any]] = provision_render_assurance,
 ) -> dict[str, Any]:
     """Smoke, then atomically activate an installable skill archive."""
     archive_path = archive_path.expanduser().resolve()
@@ -589,37 +1206,44 @@ def install_release(
     candidate = staging_root / "clinical-document-generation"
     try:
         with zipfile.ZipFile(archive_path) as archive:
-            for info in archive.infolist():
-                target = (staging_root / info.filename).resolve()
-                try:
-                    target.relative_to(staging_root)
-                except ValueError as exc:
-                    raise ValueError(f"Release archive path escapes the staging root: {info.filename}") from exc
+            _validated_archive_members(archive, staging_root)
             archive.extractall(staging_root)
+        integrity = _manifest_integrity(candidate, allow_runtime_state=False)
+        certification, certification_findings = _certification_attestation(candidate)
+        discovery_findings = _validate_hermes_discovery(hermes_config_path.expanduser().resolve(), active)
+        if integrity or certification_findings or discovery_findings:
+            return {
+                "status": "blocked",
+                "stage": "promotion_eligibility",
+                "findings": integrity + certification_findings + discovery_findings,
+                "active_release_retained": active.is_dir(),
+            }
         provision = dict(provisioner(candidate))
         if provision.get("status") != "passed":
             return {"status": "blocked", "stage": "provision", "findings": list(provision.get("findings", [])), "active_release_retained": active.is_dir()}
-        if verifier is None:
-            completed = subprocess.run(
-                [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
-                cwd=candidate,
-                text=True,
-                capture_output=True,
-                timeout=180,
-            )
-            try:
-                assurance = json.loads(completed.stdout)
-            except json.JSONDecodeError:
-                assurance = {
-                    "status": "blocked",
-                    "findings": [{"category": "installation", "field": "smoke", "issue": completed.stderr or completed.stdout or "Installation smoke returned no JSON."}],
-                }
-            if completed.returncode and assurance.get("status") == "passed":
-                assurance = {"status": "blocked", "findings": [{"category": "installation", "field": "smoke", "issue": completed.stderr or "Installation smoke process failed."}]}
-        else:
-            assurance = dict(verifier(candidate))
+        runtime_findings = _installation_pdfium_findings(candidate)
+        if runtime_findings:
+            return {
+                "status": "blocked",
+                "stage": "provision_integrity",
+                "findings": runtime_findings,
+                "active_release_retained": active.is_dir(),
+            }
+        assurance = (
+            _installation_smoke_result(candidate)
+            if verifier is None
+            else dict(verifier(candidate))
+        )
         if assurance.get("status") != "passed":
             return {"status": "blocked", "stage": "installation_smoke", "findings": list(assurance.get("findings", [])), "active_release_retained": active.is_dir()}
+        runtime_findings = _installation_pdfium_findings(candidate)
+        if runtime_findings:
+            return {
+                "status": "blocked",
+                "stage": "installation_integrity",
+                "findings": runtime_findings,
+                "active_release_retained": active.is_dir(),
+            }
         recorded_provision = _relocate_paths(provision, candidate, active)
         recorded_assurance = _relocate_paths(assurance, candidate, active)
         _write(candidate / INSTALLATION_ASSURANCE, {
@@ -628,8 +1252,39 @@ def install_release(
             "provision": recorded_provision,
             "assurance": recorded_assurance,
         })
+        assurance_sha256 = sha256_file(candidate / INSTALLATION_ASSURANCE)
+        report_path = candidate / RELEASE_CERTIFICATION
+        manifest = _read(candidate / RELEASE_MANIFEST)
+        model_identifiers = sorted({
+            str(model)
+            for case in certification.get("cases", [])
+            for model in case.get("model_identifiers", [])
+        })
+        configuration_hashes = sorted({
+            str(case.get("hermes_configuration_sha256"))
+            for case in certification.get("cases", [])
+        })
+        activated_at = datetime.now(timezone.utc).isoformat()
+        _write(candidate / PROMOTION_RECORD, {
+            "schema_version": "promoted-release/v1",
+            "status": "active",
+            "git_commit": manifest.get("git_commit"),
+            "package_fingerprint": manifest.get("package_fingerprint"),
+            "certification": {
+                "status": "passed",
+                "report_sha256": sha256_file(report_path),
+                "preflight_evidence_sha256": certification.get("preflight_evidence_sha256"),
+                "model_identifiers": model_identifiers,
+                "hermes_configuration_sha256": configuration_hashes,
+            },
+            "runtime_assurance_sha256": assurance_sha256,
+            "activated_at": activated_at,
+            "hermes_discovery": str(active),
+        })
         displaced_previous = None
+        retained_history = None
         if previous.exists():
+            retained_history = _retain_lightweight_release_history(previous, skills_dir)
             displaced_previous = skills_dir / f".clinical-document-generation.previous-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
             os.replace(previous, displaced_previous)
         if active.exists():
@@ -639,17 +1294,106 @@ def install_release(
         except Exception:
             if previous.exists() and not active.exists():
                 os.replace(previous, active)
+            if displaced_previous is not None and displaced_previous.exists() and not previous.exists():
+                os.replace(displaced_previous, previous)
+            if retained_history is not None:
+                retained_history.unlink(missing_ok=True)
             raise
+        if displaced_previous is not None:
+            shutil.rmtree(displaced_previous)
         return {
             "status": "passed",
             "stage": "activated",
             "active": str(active),
             "previous": str(previous) if previous.exists() else None,
-            "displaced_previous": str(displaced_previous) if displaced_previous else None,
+            "retained_history": str(retained_history) if retained_history else None,
             "assurance": recorded_assurance,
+            "promotion_record": str(active / PROMOTION_RECORD),
         }
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
+
+
+def rollback_release(
+    skills_dir: Path,
+    *,
+    verifier: Callable[[Path], Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Verify and atomically restore the previous release, quarantining active."""
+    skills_dir = skills_dir.expanduser().resolve()
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    if not active.is_dir() or not previous.is_dir():
+        return {
+            "status": "blocked",
+            "stage": "rollback_precondition",
+            "findings": [{
+                "category": "installation",
+                "field": "rollback",
+                "issue": "Rollback requires complete active and immediately previous releases.",
+            }],
+            "active_release_retained": active.is_dir(),
+            "previous_release_retained": previous.is_dir(),
+        }
+    assurance = (
+        _installation_smoke_result(previous)
+        if verifier is None
+        else dict(verifier(previous))
+    )
+    if assurance.get("status") != "passed":
+        return {
+            "status": "blocked",
+            "stage": "rollback_smoke",
+            "findings": list(assurance.get("findings", [])),
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    try:
+        manifest = _read(active / RELEASE_MANIFEST)
+        fingerprint = str(manifest.get("package_fingerprint") or "")
+    except (OSError, ValueError, json.JSONDecodeError):
+        fingerprint = ""
+    if not fingerprint:
+        return {
+            "status": "blocked",
+            "stage": "rollback_identity",
+            "findings": [{
+                "category": "installation",
+                "field": "package_fingerprint",
+                "issue": "The active release has no package fingerprint and cannot be quarantined safely.",
+            }],
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    quarantine_key = "".join(character for character in fingerprint if character.isalnum() or character in "-_")
+    quarantine = skills_dir / f".clinical-document-generation.quarantine-{quarantine_key}"
+    if quarantine.exists():
+        return {
+            "status": "blocked",
+            "stage": "rollback_quarantine",
+            "findings": [{
+                "category": "installation",
+                "field": "quarantine",
+                "issue": f"Rollback quarantine already exists: {quarantine}",
+            }],
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    os.replace(active, quarantine)
+    try:
+        os.replace(previous, active)
+    except Exception:
+        if quarantine.exists() and not active.exists():
+            os.replace(quarantine, active)
+        raise
+    return {
+        "status": "passed",
+        "stage": "rolled_back",
+        "active": str(active),
+        "quarantined": str(quarantine),
+        "assurance": assurance,
+        "historical_run_revisions_rewritten": False,
+    }
 
 
 @dataclass(frozen=True)
@@ -2473,7 +3217,11 @@ def generate(
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
 
         observe_stage("candidate")
-        remaining = 180.0 if operation_deadline is None else operation_deadline - clock()
+        remaining = (
+            DESKTOP_OPERATION_BUDGET_SECONDS
+            if operation_deadline is None
+            else operation_deadline - clock()
+        )
         if remaining <= 0:
             return {
                 "status": "timeout",
@@ -2508,7 +3256,7 @@ def generate(
             candidate_font_substitutions=font_substitutions,
             rebuild_candidate=rebuild_with_substitutions,
             artifact_names=partial_repair or None,
-            deadline_seconds=min(180.0, remaining),
+            deadline_seconds=remaining,
             deadline_monotonic=operation_deadline,
             clock=clock,
         )
@@ -2693,13 +3441,23 @@ def run_release_gate(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an installable release archive"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a release archive"); parser.add_argument("--skills-dir", help="Hermes skills directory for --install-release")
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
+    if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
+    elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
+    elif args.provision_candidate:
+        result = provision_render_assurance(SCRIPT_DIR.parent)
+        shutil.rmtree(SCRIPT_DIR / "__pycache__", ignore_errors=True)
+    elif args.bind_certification:
+        if not args.release_archive: parser.error("--release-archive is required with --bind-certification")
+        result = bind_release_certification(Path(args.release_archive), Path(args.bind_certification))
     elif args.verify_installation: result = verify_installation(SCRIPT_DIR.parent)
     elif args.install_release:
-        if not args.skills_dir: parser.error("--skills-dir is required with --install-release")
-        result = install_release(Path(args.install_release), Path(args.skills_dir))
+        if not args.skills_dir or not args.hermes_config: parser.error("--skills-dir and --hermes-config are required with --install-release")
+        result = install_release(Path(args.install_release), Path(args.skills_dir), hermes_config_path=Path(args.hermes_config))
+    elif args.rollback_release:
+        if not args.skills_dir: parser.error("--skills-dir is required with --rollback-release")
+        result = rollback_release(Path(args.skills_dir))
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     else:
         if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless --release-gate is used")
@@ -2708,7 +3466,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

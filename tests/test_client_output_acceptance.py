@@ -2044,7 +2044,7 @@ def test_ambispective_body_sections_follow_template_pagination_and_spacing(tmp_p
     assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in body_headings)
 
 
-def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path):
+def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, governed_pdfium):
     cases = (
         ("prospective-acceptance-source.json", "Advarra"),
         ("prospective-acceptance-source.json", "Sterling"),
@@ -2059,7 +2059,7 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path):
         output = tmp_path / f"{reference['meta']['study_type']}-{icf_family or 'none'}"
 
         document_report = render_documents(ROOT, output, reference, {"protocol": [], "icf": {}, "prs": {}})
-        render_report = render_pages(output)
+        render_report = render_pages(output, page_renderer_identities=[governed_pdfium])
 
         assert document_report["status"] == "passed"
         assert render_report["status"] == "passed"
@@ -2231,11 +2231,11 @@ def test_protocol_headings_keep_their_first_content_and_front_matter_boundaries(
     assert all(paragraph.paragraph_format.keep_with_next is True for paragraph in protected_chain)
 
 
-def test_rendered_ambispective_section_three_flows_after_investigator_agreement(tmp_path):
+def test_rendered_ambispective_section_three_flows_after_investigator_agreement(tmp_path, governed_pdfium):
     reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
     render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
 
-    report = render_pages(tmp_path)
+    report = render_pages(tmp_path, page_renderer_identities=[governed_pdfium])
 
     assert report["status"] == "passed"
     protocol = next(item for item in report["artifacts"] if item["artifact"] == "protocol")

@@ -39,14 +39,13 @@ See [SKILL.md](SKILL.md) for the exact Hermes orchestration and retry loop.
 
 - Python 3.10+
 - Dependencies in `requirements.txt`
-- Preferred host renderers: Microsoft Word, LibreOffice, then Apple Pages
-- A version-local LibreOffice fallback provisioned during activation
-- Page-image fallbacks ending in required PyMuPDF
+- Required host renderer: Microsoft Word or LibreOffice
+- One release-owned page renderer: pinned `pypdfium2` 5.13.0
 - No Node.js or TypeScript
 
-Activation provisions and smoke-tests a release-owned LibreOffice renderer, a release-owned PyMuPDF page renderer, and packaged compatible fonts. Preferred host tools remain first in the runtime ladder, but their absence cannot make the active release incapable of Visual QA. Normal generation never installs packages, fonts, or changes machine configuration. It builds the complete candidate before resolving Render Assurance, treats unknown font inventory as a render test rather than a missing font, maps proven-missing fonts only to explicit packaged Liberation substitutes, and records every fallback in the manifest.
+Activation verifies host Word or LibreOffice, installs the manifest-bound `pypdfium2` wheel offline into the release runtime, and smoke-tests that exact DOCX-to-PDF-to-PNG path with the packaged compatible fonts. No alternate PDF renderer is discovered or used. Normal generation never installs packages, fonts, or changes machine configuration. It builds the complete candidate before resolving Render Assurance, treats unknown font inventory as a render test rather than a missing font, and maps proven-missing fonts only to explicit packaged Liberation substitutes.
 
-The client outputs are standard `.docx` and `.xml` files. Microsoft Word is not required on the authoring computer; the workflow uses the best installed renderer for local QA and keeps the output Word-compatible.
+The client outputs are standard `.docx` and `.xml` files. The authoring host must provide Microsoft Word or LibreOffice for DOCX rendering; the workflow records which application produced the local QA evidence.
 
 Protocol and ICF rendering begins from the bundled client Word families. The renderer preserves their visual design, replaces study-specific Protocol bodies with accepted drafts, keeps applicable ICF regulatory language, removes example-study leakage, and blocks empty or near-empty rendered pages.
 
@@ -92,6 +91,8 @@ editable checkout:
 candidate_dir="$(mktemp -d /tmp/clinical-release-candidate.XXXXXX)"
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release "$candidate_dir/release.zip"
 unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
+"$CLINICAL_PYTHON" "$candidate_dir/extracted/clinical-document-generation/scripts/workflow.py" \
+  --provision-candidate
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --fixture ambispective-sterling \
   --release-root "$candidate_dir/extracted/clinical-document-generation"
@@ -132,7 +133,8 @@ those governed command results and logs, the clean commit and package fingerprin
 approved synthetic fixture, governed Hermes settings and observed model IDs,
 Contracted Template Bundle and Layout Preservation identities, exact delivered
 bytes, all quality gates, every rendered page and check, delivery confirmation,
-and sub-15-minute case timing. Recorded drafting or synthetic verification remains
+Retrospective timing below 15 minutes, and the explicitly approved Ambispective
+and Prospective ceiling of 18 minutes. Recorded drafting or synthetic verification remains
 labelled structural-only in preflight evidence and cannot satisfy the live gate.
 
 Certification fixtures live under `tests/fixtures/release-certification/`.
@@ -163,8 +165,10 @@ operation to obtain a new deadline.
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 # Build a clean release archive outside the checkout
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
-"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills
+"$CLINICAL_PYTHON" scripts/workflow.py --bind-certification /absolute/path/release-certification-corpus.json --release-archive /absolute/path/clinical-document-generation-release.zip
+"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills --hermes-config /absolute/path/to/hermes/config.yaml
 "$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
+"$CLINICAL_PYTHON" scripts/workflow.py --rollback-release --skills-dir /absolute/path/to/hermes/skills
 ```
 
 The first release-gate command may return `awaiting_hermes` with independent
@@ -187,9 +191,10 @@ Prospective and Ambispective publish Protocol + ICF + PRS XML. Retrospective pub
 
 ## Hermes installation
 
-For a release, build the archive with `--package-release` and activate it with
-`--install-release`. The installer stages the candidate, provisions its local
-fallback runtime, verifies package hashes, renders a DOCX, rasterizes a page,
+For a release, build the immutable candidate with `--package-release`, certify
+its extracted and provisioned bytes, embed the passing full-corpus report with
+`--bind-certification`, and activate it with `--install-release`. The installer stages the candidate, verifies host Word or
+LibreOffice, installs its packaged PDFium runtime offline, verifies package hashes, renders a DOCX, rasterizes a page,
 checks the packaged fonts, and atomically swaps it into the Hermes skills
 directory. A failed update retains the previous verified release. The archive
 includes the templates, contracts,
@@ -203,17 +208,41 @@ source/patient data, old runs, and tests. Register the extracted root as
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py \
   --install-release /absolute/path/clinical-document-generation-release.zip \
-  --skills-dir /absolute/path/to/hermes/skills
+  --skills-dir /absolute/path/to/hermes/skills \
+  --hermes-config /absolute/path/to/hermes/config.yaml
 ```
 
-The installed `INSTALLATION-ASSURANCE.json` records the verified renderer,
+The installer refuses an unsigned archive, a mismatched fingerprint, unlisted
+files, stale model/configuration evidence, or a Hermes configuration that points
+at an editable copy. The installed `PROMOTION-RECORD.json` binds the commit,
+fingerprint, embedded certification report, model/configuration hashes, runtime
+assurance, activation time, and sole promoted discovery path.
+`INSTALLATION-ASSURANCE.json` records the verified renderer,
 page renderer, fonts, and smoke result. Installation is setup; the post-approval
 Desktop operation remains governed by the single 30-minute budget. A passing
 Generation Manifest is not delivery: the Desktop parent must expose exactly its
 client outputs as attachments, retrieve each file through the actual opener,
 and confirm byte length and SHA-256 before reporting success.
-Release Certification additionally requires completion within 15 minutes; a
-slower valid operation may still deliver before the 30-minute correctness
-ceiling, but receives a non-certifying runtime outcome.
+Release Certification requires Retrospective completion below 15 minutes and
+permits Ambispective and Prospective through 18 minutes under the approved
+exception when every other gate passes. A slower valid operation may still
+deliver before the 30-minute correctness ceiling, but receives a non-certifying
+runtime outcome.
+
+Before installation, the same `config.yaml` must select only the active path and
+declare the certified launch settings under `skills.clinical_document_generation`:
+`source: clinical-release-certification`, `max_turns: 80`,
+`skill: clinical-document-drafting`, `safe_mode: true`,
+`model_identifier: gpt-5.6-sol`, and
+`reasoning_configuration: Hermes Desktop governed default`. The host also needs
+`model.default: gpt-5.6-sol`, `agent.reasoning_effort: medium`, and at least 80
+agent turns. A mismatch stops before activation with one configuration finding.
+
+`--rollback-release` verifies the immediately previous release before one
+atomic swap, restores it as active, and quarantines the suspect release without
+rewriting historical Run Revisions. Activation retains complete runtime
+material only for active and immediately previous releases; displaced older
+releases become lightweight identity and certification records under
+`release-history/`.
 
 The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.

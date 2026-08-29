@@ -115,20 +115,28 @@ A bundled template with an explicit Document Section Contract and acceptance cov
 _Avoid_: arbitrary DOCX, drop-in template, compatible file
 
 **Renderer**:
-An available document application or converter used to open a DOCX and produce a visual PDF or page image for quality review.
+An identified office application used to open a DOCX and produce the PDF used for quality review.
 _Avoid_: exporter, converter, editor
 
 **Client Rendering Authority**:
 The office application used by the client to open the delivered DOCX; Microsoft Word desktop is the current client’s renderer. It is the compatibility target, even when a different Active Renderer performs local Visual QA.
 _Avoid_: active renderer, local renderer, whatever opens it
 
+**Host Office Renderer**:
+Microsoft Word or LibreOffice on the generation host, verified during installation and used only for DOCX-to-PDF conversion. It is a declared host prerequisite and is never copied into or discovered from the release runtime.
+_Avoid_: packaged office fallback, release-owned renderer, Pages
+
 **Active Renderer**:
-The best supported document renderer available on the generation host—preferred in the order Microsoft Word, LibreOffice, then Pages—and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
+The Host Office Renderer selected for one render attempt and recorded with its Visual QA evidence. Passing evidence proves the artifact under that renderer only and must not be described as Microsoft Word validation unless Word produced it.
 _Avoid_: Client Rendering Authority, generic renderer, invisible converter
 
-**Verified Fallback Stack**:
-The release-owned assurance capability that keeps mandatory Visual QA available when preferred host capabilities fail. Its verified identity belongs to the active skill release.
-_Avoid_: optional dependency, best-effort tooling, host assumption
+**Release-Owned Page Renderer**:
+The single manifest-bound `pypdfium2` runtime that converts the Host Office Renderer’s exact PDF bytes into every page image used by Visual QA. Packaging derives its normalized extraction inventory from the pinned wheel; installation and every later use rehash that inventory from the immutable manifest rather than trusting writable runtime metadata. Installation smoke explicitly verifies a pre-promotion candidate only inside the lifecycle-owned installation staging root; every ordinary or active-root assurance requires and verifies the independent promotion record, including its hash binding to the exact installation-assurance bytes, so deleting or mutating writable assurance metadata cannot downgrade or alter active-release trust. Native rendering runs only in a killable worker with time, page, pixel, dimension, output, and supported process-resource limits; its complete process group is terminated and reaped after timeout, crash, malformed protocol, or successful exit. It never falls through to another PDF backend.
+_Avoid_: host page renderer, PDF fallback ladder, mutable runtime marker
+
+**Release-Owned Render Assurance Assets**:
+The Release-Owned Page Renderer and approved compatible fonts whose immutable identities belong to the active skill release. These assets supplement but do not replace the Host Office Renderer prerequisite.
+_Avoid_: packaged office suite, optional dependency, best-effort tooling
 
 **Render Assurance**:
 The mandatory evidence-backed result showing that the exact Generated Protocol and Generated ICF bytes were rendered and visually reviewed under an identified Active Renderer. An environment or tooling fault leaves assurance unresolved rather than failed; a genuine visual defect must be repaired and reassessed.

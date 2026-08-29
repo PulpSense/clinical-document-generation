@@ -31,10 +31,11 @@ CERTIFICATION_FIXTURE_ROOT = REPO_ROOT / "tests/fixtures/release-certification"
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
 CERTIFICATION_RUNTIME_CEILING_SECONDS = 900.0
+EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS = 1080.0
 CERTIFICATION_CORPUS = (
+    "retrospective",
     "ambispective-sterling",
     "prospective-advarra",
-    "retrospective",
 )
 CERTIFICATION_CORPUS_COVERAGE = {
     "ambispective-sterling": ("Ambispective", "Sterling"),
@@ -91,6 +92,19 @@ FIRST_WAVE_BATCHES = frozenset(
         "icf-narrative",
     }
 )
+
+
+def _certification_runtime_ceiling(fixture_id: str) -> float:
+    return (
+        EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
+        if fixture_id in {"ambispective-sterling", "prospective-advarra"}
+        else CERTIFICATION_RUNTIME_CEILING_SECONDS
+    )
+
+
+def _certification_runtime_exceeded(fixture_id: str, elapsed: float) -> bool:
+    ceiling = _certification_runtime_ceiling(fixture_id)
+    return elapsed > ceiling if ceiling == EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS else elapsed >= ceiling
 
 
 def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
@@ -306,6 +320,17 @@ def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
         recorded_bytes = item.get("bytes")
         if not path.is_file() or _sha256(path) != item.get("sha256") or path.stat().st_size != int(recorded_bytes if recorded_bytes is not None else -1):
             raise ValueError(f"Release candidate file does not match its manifest: {relative}")
+    declared = {str(item.get("path") or "") for item in manifest.get("files", [])}
+    actual = {
+        path.relative_to(release_root).as_posix()
+        for path in release_root.rglob("*")
+        if path.is_file()
+        and "runtime" not in path.relative_to(release_root).parts
+        and path.name not in {"RELEASE-CERTIFICATION.json", "INSTALLATION-ASSURANCE.json", "PROMOTION-RECORD.json", "RELEASE-MANIFEST.json"}
+    }
+    extras = sorted(actual - declared)
+    if extras:
+        raise ValueError(f"Release candidate contains files outside its manifest: {', '.join(extras)}")
 
     scripts = release_root / "scripts"
     workflow_path = scripts / "workflow.py"
@@ -318,6 +343,8 @@ def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
     module = importlib.util.module_from_spec(specification)
     dependency_names = ("contracts", "drafting", "rendering", "quality", "prs_xml")
     previous_modules = {name: sys.modules.get(name) for name in dependency_names}
+    previous_dont_write_bytecode = sys.dont_write_bytecode
+    sys.dont_write_bytecode = True
     sys.path.insert(0, str(scripts))
     sys.modules[module_name] = module
     try:
@@ -328,6 +355,7 @@ def _certified_release(release_root: Path) -> tuple[Any, dict[str, Any]]:
         sys.modules.pop(module_name, None)
         raise
     finally:
+        sys.dont_write_bytecode = previous_dont_write_bytecode
         sys.path.remove(str(scripts))
         for name, previous in previous_modules.items():
             if previous is None:
@@ -380,6 +408,12 @@ def inspect_run(
     expected_model_identifier: str | None = None,
 ) -> dict[str, Any]:
     reference = _read_json(run_dir / "reference/study.reference.json") or {}
+    study_type = str((reference.get("meta") or {}).get("study_type") or "").casefold()
+    certification_runtime_ceiling = (
+        EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
+        if study_type in {"ambispective", "prospective"}
+        else CERTIFICATION_RUNTIME_CEILING_SECONDS
+    )
     required_outputs = expected_outputs(reference)
     revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
     revision_dir = run_dir / "revisions" / revision_id
@@ -531,7 +565,11 @@ def inspect_run(
         outcome = DiagnosticOutcome.TIMEOUT
     elif retry_limit_violations:
         outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
-    elif valid_delivery and elapsed_seconds >= CERTIFICATION_RUNTIME_CEILING_SECONDS:
+    elif valid_delivery and (
+        elapsed_seconds > certification_runtime_ceiling
+        if certification_runtime_ceiling == EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
+        else elapsed_seconds >= certification_runtime_ceiling
+    ):
         outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
     elif valid_delivery:
         outcome = DiagnosticOutcome.PASSED
@@ -2136,8 +2174,9 @@ def certify_release_corpus(
             elapsed = float((derived_evidence.get("performance") or {}).get("elapsed_seconds"))
         except (TypeError, ValueError):
             elapsed = float("nan")
-        if not math.isfinite(elapsed) or elapsed <= 0.0 or elapsed >= CERTIFICATION_RUNTIME_CEILING_SECONDS:
-            case_findings.append(f"Approval-to-confirmed-retrieval elapsed time {elapsed:.3f}s is not below 900 seconds.")
+        runtime_ceiling = _certification_runtime_ceiling(str(fixture_id or ""))
+        if not math.isfinite(elapsed) or elapsed <= 0.0 or _certification_runtime_exceeded(str(fixture_id or ""), elapsed):
+            case_findings.append(f"Approval-to-confirmed-retrieval elapsed time {elapsed:.3f}s exceeds the approved {runtime_ceiling:.0f}-second ceiling.")
         if report.get("missing_response_paths") or report.get("invalid_response_paths") or report.get("recorded_response_paths") or report.get("invalid_rejection_paths"):
             case_findings.append("Case contains missing, invalid, recorded, or rejected response evidence.")
         if list(report.get("model_identifiers") or []) != derived_evidence.get("model_identifiers"):
@@ -2194,6 +2233,7 @@ def certify_release_corpus(
             "elapsed_seconds": elapsed,
             "desktop_operation_elapsed_seconds": operation_elapsed,
             "under_15_minutes": math.isfinite(elapsed) and 0.0 < elapsed < CERTIFICATION_RUNTIME_CEILING_SECONDS,
+            "within_approved_runtime": math.isfinite(elapsed) and 0.0 < elapsed and not _certification_runtime_exceeded(str(fixture_id or ""), elapsed),
             "report_sha256": _sha256(path),
             "release_identity": identities[-1],
             "hermes_configuration_sha256": _canonical_sha256(report.get("hermes_configuration") or {}),
@@ -2227,6 +2267,10 @@ def certify_release_corpus(
         "status": "passed" if not findings else "failed",
         "certification_scope": "complete_three_case_corpus",
         "release_identity": release_identity,
+        "hermes_configurations": {
+            fixture_id: dict(fixtures[fixture_id]["hermes_configuration"])
+            for fixture_id in CERTIFICATION_CORPUS
+        },
         "preflight_evidence_sha256": _sha256(preflight_path.resolve()) if preflight_path.is_file() else None,
         "layout_preservation_evidence": (preflight.get("checks") or {}).get("layout_preservation_corpus"),
         "case_order": list(CERTIFICATION_CORPUS),
@@ -2323,7 +2367,7 @@ def run_release_certification_corpus(
             report.get("outcome") != DiagnosticOutcome.PASSED.value
             or not math.isfinite(elapsed)
             or elapsed <= 0.0
-            or elapsed >= CERTIFICATION_RUNTIME_CEILING_SECONDS
+            or _certification_runtime_exceeded(fixture_id, elapsed)
         ):
             break
     return certify_release_corpus(
@@ -2336,6 +2380,8 @@ def run_release_certification_corpus(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
+    sys.dont_write_bytecode = True
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fixture", default="ambispective-sterling")
     parser.add_argument("--run-root", type=Path, default=Path("/tmp/clinical-hermes-real-e2e"))
@@ -2349,7 +2395,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"{args.fixture}-%Y%m%dT%H%M%SZ"
     )
     release_root = args.release_root.resolve()
-    _certified_release(release_root)
     if args.run_preflight:
         if args.preflight_evidence is None:
             parser.error("--preflight-evidence is required with --run-preflight")

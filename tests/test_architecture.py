@@ -81,3 +81,54 @@ def test_skill_documents_natural_pagination_exact_visual_bytes_and_runtime_safe_
     ):
         assert phrase in instructions
         assert phrase in architecture
+
+
+def test_governed_renderer_authorities_require_host_office_and_only_pdfium():
+    authority_paths = (
+        ROOT / "CONTEXT.md",
+        ROOT / "README.md",
+        ROOT / "SKILL.md",
+        ROOT / "docs/adr/0009-renderer-portable-word-targeted-docx.md",
+        ROOT / "docs/adr/0018-own-render-assurance-capabilities.md",
+        ROOT / "docs/renderer-preflight.md",
+        ROOT / "docs/specs/clinical-document-generation-quality.md",
+        ROOT / "docs/specs/clinical-document-generation-v2-rebuild.md",
+        ROOT / "docs/specs/render-assurance-fallbacks.md",
+    )
+    authority = "\n".join(path.read_text(encoding="utf-8") for path in authority_paths)
+    for stale_contract in (
+        "Pages, then",
+        "release-local verified LibreOffice",
+        "release-local LibreOffice fallback",
+        "without making the host a prerequisite",
+        "Poppler `pdftoppm`",
+        "MuPDF `mutool`",
+        "optional PyMuPDF",
+        "only renderer fallback location",
+        "verified local fallbacks",
+        "smoke-test its fallback stack",
+    ):
+        assert stale_contract not in authority
+
+    context = (ROOT / "CONTEXT.md").read_text(encoding="utf-8")
+    assert "**Host Office Renderer**:" in context
+    assert "**Release-Owned Page Renderer**:" in context
+    assert "Microsoft Word or LibreOffice" in context
+    assert "single manifest-bound `pypdfium2`" in context
+
+    quality = (ROOT / "scripts/quality.py").read_text(encoding="utf-8")
+    workflow = (ROOT / "scripts/workflow.py").read_text(encoding="utf-8")
+    assert 'PAGE_RENDERER_BACKENDS = ("pypdfium2",)' in quality
+    assert '"kind": "pypdfium2"' in workflow
+    assert "runtime/**/soffice" not in quality
+    assert "runtime/**/program/soffice" not in quality
+    assert "provision_fallback_stack" not in workflow
+    assert "fallback_pages" not in workflow
+    rasterize_contract = quality[
+        quality.index("def rasterize_pdf("):quality.index("\ndef renderers(")
+    ]
+    for stale_interface in ("every backend", "environment"):
+        assert stale_interface not in rasterize_contract
+    assert "timeout_seconds" in rasterize_contract
+    assert "subprocess.Popen" in rasterize_contract
+    assert "--internal-pdfium-worker" in workflow
