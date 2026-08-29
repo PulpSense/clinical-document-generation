@@ -65,13 +65,36 @@ supported update path. Installation verifies host Word or LibreOffice, installs
 the one manifest-bound `pypdfium2` wheel offline, verifies every extracted file
 against the immutable wheel-derived inventory, and runs page rendering in a
 killable worker with governed time, page, pixel, dimension, output, and process
-resource limits. It runs an end-to-end render/page-image smoke, reruns manifest,
+resource limits. Before staging or archive access, installation requires the
+current resolved Python 3.10+ interpreter and records its implementation,
+version, resolved executable path, and executable SHA-256 in installation
+assurance. It runs an end-to-end render/page-image smoke, reruns manifest,
 certification, and runtime-integrity verification immediately after each
 provisioner/verifier hook and before invoking the next hook, rejecting a symbolic
 link at the skill root or any manifest-owned path
-component, and only then writes installation records and atomically replaces the
-active `clinical-document-generation` directory. A failed smoke
-leaves the previous verified release active. The archive contains
+component, and only then writes installation records. Before the first namespace
+mutation, installation durably commits an inode-bound activation journal with an
+atomic JSON replacement and parent-directory sync. The atomic candidate-to-active
+rename is the activation commit point. Every ordinary failure before it restores
+the exact prior active and previous releases and removes only transient history
+created by that attempt; an interrupted process is reconciled from the journal
+before any later staging. Inode identity distinguishes a committed candidate from
+the prior active release even when their package fingerprints match. Failures
+cleaning deterministic fingerprint-named displaced state or the transaction
+journal after that commit point are reported as successful activation with
+deferred-cleanup findings; they never become false installation failures. The
+newly activated release remains selected. A failed smoke leaves the previous
+verified release active. One rollback operation completely revalidates the
+immutable previous release's manifest, certification/evidence, and PDFium runtime,
+copies it to an isolated system-temporary directory outside the live release
+namespace, completely verifies that copy, runs executable
+integration smoke only against the copy, and completely revalidates the copy after
+smoke. The retained previous release is also completely revalidated after the
+callback and immediately before the swap. Rollback then
+commits an atomic previous-to-active swap. A durable inode-bound rollback journal restores a failed
+pre-commit swap on retry or recognizes an already committed rollback. The suspect
+release is quarantined under its fingerprint without rewriting retained run
+revisions. The archive contains
 `RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
 also requires Hermes `skills.external_dirs` to name only the promoted active
 path, validates the certified model/reasoning/safe-mode/turn settings declared

@@ -1157,6 +1157,40 @@ def test_installer_hooks_cannot_bypass_unconditional_runtime_rehash(tmp_path):
     assert result["findings"][0]["code"] == "renderer.pdfium_runtime_missing"
 
 
+def test_unsupported_python_blocks_before_staging_or_archive_access(tmp_path, monkeypatch):
+    archive_path = tmp_path / "not-a-release.zip"
+    archive_path.write_bytes(b"archive tripwire")
+    skills_dir = tmp_path / "skills"
+    monkeypatch.setattr(workflow, "_current_python_runtime", lambda: {
+        "executable": "/unsupported/python3.9",
+        "implementation": "CPython",
+        "version": "3.9.19",
+        "version_info": [3, 9, 19],
+    })
+
+    result = None
+    try:
+        result = install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=tmp_path / "config.yaml",
+        )
+    except zipfile.BadZipFile:
+        pytest.fail("unsupported Python reached release archive access")
+
+    assert result == {
+        "status": "blocked",
+        "stage": "python_runtime",
+        "findings": [{
+            "category": "installation",
+            "field": "python_runtime",
+            "code": "installation.python_runtime_unsupported",
+            "issue": "Installation requires Python 3.10 or newer before staging.",
+        }],
+    }
+    assert not skills_dir.exists()
+
+
 def test_installer_rehashes_runtime_after_verifier_hook(tmp_path):
     archive_path = tmp_path / "release.zip"
     package_release(ROOT, archive_path)
@@ -1312,6 +1346,7 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
     assert (active / "SKILL.md").is_file()
     assert (skills_dir / ".clinical-document-generation.previous/marker.txt").read_text(encoding="utf-8") == "previous verified release"
     assurance = json.loads((active / "INSTALLATION-ASSURANCE.json").read_text(encoding="utf-8"))
+    assert assurance["python_runtime"] == workflow._accepted_installation_python_runtime()
     assert assurance["assurance"]["renderer"]["path"] == str(active / "runtime/soffice")
     promotion = json.loads((active / "PROMOTION-RECORD.json").read_text(encoding="utf-8"))
     assert promotion["status"] == "active"
@@ -1894,7 +1929,9 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
     assert split["findings"][-1]["field"] == "hermes_configuration"
 
 
-def test_one_rollback_operation_verifies_previous_and_quarantines_active(tmp_path):
+def test_one_rollback_operation_verifies_previous_and_quarantines_active(
+    tmp_path, monkeypatch
+):
     skills_dir = tmp_path / "skills"
     active = skills_dir / "clinical-document-generation"
     previous = skills_dir / ".clinical-document-generation.previous"
@@ -1912,15 +1949,26 @@ def test_one_rollback_operation_verifies_previous_and_quarantines_active(tmp_pat
     historical_revision.parent.mkdir()
     historical_revision.write_text('{"package_fingerprint":"suspect-fingerprint"}', encoding="utf-8")
     verified = []
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda _release, **_kwargs: ({}, []),
+    )
 
     result = workflow.rollback_release(
         skills_dir,
-        verifier=lambda release: verified.append(release) or {"status": "passed"},
+        verifier=lambda release: verified.append((
+            release,
+            (release / "marker.txt").read_text(encoding="utf-8"),
+        )) or {"status": "passed"},
     )
 
     assert result["status"] == "passed"
     assert result["stage"] == "rolled_back"
-    assert verified == [previous]
+    assert result["rollback_commit_point"] == "previous_to_active_atomic_swap"
+    assert len(verified) == 1
+    assert verified[0][0] != previous
+    assert verified[0][1] == "verified previous"
     assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
     quarantine = Path(result["quarantined"])
     assert quarantine.parent == skills_dir
@@ -1932,7 +1980,9 @@ def test_one_rollback_operation_verifies_previous_and_quarantines_active(tmp_pat
     )
 
 
-def test_failed_rollback_verification_leaves_active_and_previous_unchanged(tmp_path):
+def test_failed_rollback_verification_leaves_active_and_previous_unchanged(
+    tmp_path, monkeypatch
+):
     skills_dir = tmp_path / "skills"
     active = skills_dir / "clinical-document-generation"
     previous = skills_dir / ".clinical-document-generation.previous"
@@ -1940,6 +1990,11 @@ def test_failed_rollback_verification_leaves_active_and_previous_unchanged(tmp_p
     previous.mkdir()
     (active / "marker.txt").write_text("active", encoding="utf-8")
     (previous / "marker.txt").write_text("previous", encoding="utf-8")
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda _release, **_kwargs: ({}, []),
+    )
 
     result = workflow.rollback_release(
         skills_dir,
@@ -1958,6 +2013,528 @@ def test_failed_rollback_verification_leaves_active_and_previous_unchanged(tmp_p
     }
     assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
     assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous"
+
+
+def test_rollback_integrity_blocks_before_smoke_or_swap(tmp_path, monkeypatch):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("active", encoding="utf-8")
+    (previous / "marker.txt").write_text("previous", encoding="utf-8")
+    finding = {
+        "category": "installation",
+        "field": "release_manifest",
+        "code": "release.manifest_integrity",
+        "issue": "controlled previous-release integrity failure",
+    }
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda release, **_kwargs: ({}, [finding]) if release == previous else ({}, []),
+    )
+    smoke_reached = []
+
+    result = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda release: smoke_reached.append(release) or {"status": "passed"},
+    )
+
+    assert result == {
+        "status": "blocked",
+        "stage": "rollback_integrity",
+        "findings": [finding],
+        "active_release_retained": True,
+        "previous_release_retained": True,
+    }
+    assert smoke_reached == []
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous"
+
+
+def test_rollback_revalidates_integrity_after_executable_verifier(tmp_path, monkeypatch):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("active", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("previous", encoding="utf-8")
+    integrity_calls = []
+    mutation_finding = {
+        "category": "installation",
+        "field": "release_manifest",
+        "code": "release.manifest_integrity",
+        "issue": "verifier-mutated previous release",
+    }
+
+    def integrity(release, **_kwargs):
+        integrity_calls.append(release)
+        marker = release / "marker.txt"
+        findings = (
+            [mutation_finding]
+            if marker.is_file()
+            and marker.read_text(encoding="utf-8") == "mutated by verifier"
+            else []
+        )
+        return {}, findings
+
+    def mutating_verifier(release):
+        (release / "marker.txt").write_text("mutated by verifier", encoding="utf-8")
+        return {"status": "passed"}
+
+    monkeypatch.setattr(workflow, "_installation_candidate_integrity", integrity)
+
+    result = workflow.rollback_release(skills_dir, verifier=mutating_verifier)
+
+    assert result == {
+        "status": "blocked",
+        "stage": "rollback_integrity_after_smoke",
+        "findings": [mutation_finding],
+        "active_release_retained": True,
+        "previous_release_retained": True,
+    }
+    assert integrity_calls[0] == previous
+    assert len(integrity_calls) == 4
+    assert integrity_calls[1] == integrity_calls[2]
+    assert integrity_calls[1] != previous
+    assert integrity_calls[3] == previous
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous"
+
+    retry = workflow.rollback_release(
+        skills_dir, verifier=lambda _release: {"status": "passed"}
+    )
+
+    assert retry["status"] == "passed"
+    assert retry["stage"] == "rolled_back"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "previous"
+
+
+def test_rollback_verifier_cannot_reach_live_previous_as_probe_sibling(
+    tmp_path, monkeypatch
+):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("suspect", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("verified previous", encoding="utf-8")
+
+    def integrity(release, **_kwargs):
+        marker = release / "marker.txt"
+        findings = []
+        if marker.is_file() and marker.read_text(encoding="utf-8") == "escaped mutation":
+            findings.append({"issue": "live rollback target mutated"})
+        return {}, findings
+
+    def sibling_escape_verifier(probe):
+        live_sibling = (
+            probe.parent.parent / ".clinical-document-generation.previous"
+        )
+        if live_sibling.is_dir():
+            (live_sibling / "marker.txt").write_text(
+                "escaped mutation", encoding="utf-8"
+            )
+        return {"status": "passed"}
+
+    monkeypatch.setattr(workflow, "_installation_candidate_integrity", integrity)
+    result = workflow.rollback_release(skills_dir, verifier=sibling_escape_verifier)
+
+    assert result["status"] == "passed"
+    assert result["stage"] == "rolled_back"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
+
+
+def test_rollback_revalidates_live_previous_after_out_of_scope_callback_mutation(
+    tmp_path, monkeypatch
+):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("suspect", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("verified previous", encoding="utf-8")
+    finding = {"issue": "live rollback target mutated"}
+
+    def integrity(release, **_kwargs):
+        marker = release / "marker.txt"
+        return {}, (
+            [finding]
+            if marker.is_file() and marker.read_text(encoding="utf-8") == "direct mutation"
+            else []
+        )
+
+    def direct_mutation_verifier(_probe):
+        (previous / "marker.txt").write_text("direct mutation", encoding="utf-8")
+        return {"status": "passed"}
+
+    monkeypatch.setattr(workflow, "_installation_candidate_integrity", integrity)
+    result = workflow.rollback_release(skills_dir, verifier=direct_mutation_verifier)
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "rollback_integrity_after_smoke"
+    assert result["findings"] == [finding]
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "suspect"
+    assert previous.is_dir()
+
+
+@pytest.mark.parametrize("failure_boundary", ("active_to_quarantine", "previous_to_active"))
+def test_rollback_swap_failure_restores_active_without_rewriting_history(
+    tmp_path, monkeypatch, failure_boundary
+):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("active", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("previous", encoding="utf-8")
+    revision = skills_dir / "runs/revision-1.json"
+    revision.parent.mkdir()
+    revision.write_bytes(b'{"immutable":"revision"}')
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda _release, **_kwargs: ({}, []),
+    )
+    real_replace = workflow.os.replace
+
+    def fail_rollback_swap(source, destination):
+        source = Path(source)
+        destination = Path(destination)
+        if (
+            failure_boundary == "active_to_quarantine"
+            and source == active
+            and destination.name.startswith(".clinical-document-generation.quarantine-")
+        ) or (
+            failure_boundary == "previous_to_active"
+            and source == previous
+            and destination == active
+        ):
+            raise OSError("injected rollback swap failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(workflow.os, "replace", fail_rollback_swap)
+
+    result = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {"status": "passed"},
+    )
+
+    assert result == {
+        "status": "blocked",
+        "stage": "rollback_swap",
+        "findings": [{
+            "category": "installation",
+            "field": "rollback_swap",
+            "code": "installation.rollback_swap_failed",
+            "issue": "Rollback swap failed; the prior active release was restored.",
+        }],
+        "active_release_retained": True,
+        "previous_release_retained": True,
+    }
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous"
+    assert not (skills_dir / ".clinical-document-generation.quarantine-suspect-fingerprint").exists()
+    assert revision.read_bytes() == b'{"immutable":"revision"}'
+
+
+def test_rollback_swap_that_commits_then_reports_error_returns_success(
+    tmp_path, monkeypatch
+):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("suspect", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("verified previous", encoding="utf-8")
+    real_replace = workflow.os.replace
+    committed = []
+
+    def commit_then_report_error(source, destination):
+        result = real_replace(source, destination)
+        if Path(source) == previous and Path(destination) == active and not committed:
+            committed.append(True)
+            raise OSError("injected error after committed rollback swap")
+        return result
+
+    monkeypatch.setattr(
+        workflow, "_installation_candidate_integrity", lambda *_args, **_kwargs: ({}, [])
+    )
+    monkeypatch.setattr(workflow.os, "replace", commit_then_report_error)
+
+    result = workflow.rollback_release(
+        skills_dir, verifier=lambda _candidate: {"status": "passed"}
+    )
+
+    assert result["status"] == "passed"
+    assert result["stage"] == "rolled_back"
+    assert result["rollback_commit_point"] == "previous_to_active_atomic_swap"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
+    assert not previous.exists()
+    quarantine = Path(result["quarantined"])
+    assert (quarantine / "marker.txt").read_text(encoding="utf-8") == "suspect"
+
+
+def test_rollback_restoration_failure_is_recovered_on_retry(tmp_path, monkeypatch):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    quarantine = skills_dir / ".clinical-document-generation.quarantine-suspect-fingerprint"
+    journal = skills_dir / ".clinical-document-generation.rollback.json"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("suspect active", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("verified previous", encoding="utf-8")
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda _release, **_kwargs: ({}, []),
+    )
+    real_replace = workflow.os.replace
+
+    def fail_swap_and_restoration(source, destination):
+        source = Path(source)
+        destination = Path(destination)
+        if (
+            source == previous and destination == active
+        ) or (
+            source == quarantine and destination == active
+        ):
+            raise OSError("injected rollback swap/restoration failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(workflow.os, "replace", fail_swap_and_restoration)
+
+    failed = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {"status": "passed"},
+    )
+
+    assert failed["status"] == "blocked"
+    assert failed["stage"] == "rollback_recovery"
+    assert failed["active_release_retained"] is False
+    assert failed["previous_release_retained"] is True
+    assert not active.exists()
+    assert quarantine.is_dir()
+    assert journal.is_file()
+
+    monkeypatch.setattr(workflow.os, "replace", real_replace)
+    recovered = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {"status": "passed"},
+    )
+
+    assert recovered["status"] == "passed"
+    assert recovered["stage"] == "rolled_back"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
+    assert (quarantine / "marker.txt").read_text(encoding="utf-8") == "suspect active"
+    assert not previous.exists()
+    assert not journal.exists()
+
+
+def test_interrupted_rollback_restores_then_retries_from_journal(tmp_path, monkeypatch):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    quarantine = skills_dir / ".clinical-document-generation.quarantine-suspect-fingerprint"
+    journal = skills_dir / ".clinical-document-generation.rollback.json"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("suspect active", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("verified previous", encoding="utf-8")
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda _release, **_kwargs: ({}, []),
+    )
+    real_replace = workflow.os.replace
+    interrupted = []
+
+    def interrupt_after_quarantine(source, destination):
+        result = real_replace(source, destination)
+        if Path(source) == active and Path(destination) == quarantine and not interrupted:
+            interrupted.append(True)
+            raise KeyboardInterrupt("injected rollback interruption")
+        return result
+
+    monkeypatch.setattr(workflow.os, "replace", interrupt_after_quarantine)
+
+    with pytest.raises(KeyboardInterrupt, match="injected rollback interruption"):
+        workflow.rollback_release(
+            skills_dir,
+            verifier=lambda _release: {"status": "passed"},
+        )
+
+    assert not active.exists()
+    assert previous.is_dir()
+    assert quarantine.is_dir()
+    assert journal.is_file()
+
+    monkeypatch.setattr(workflow.os, "replace", real_replace)
+    recovered = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {"status": "passed"},
+    )
+
+    assert recovered["status"] == "passed"
+    assert recovered["stage"] == "rolled_back"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
+    assert (quarantine / "marker.txt").read_text(encoding="utf-8") == "suspect active"
+    assert not previous.exists()
+    assert not journal.exists()
+
+
+def test_dangling_rollback_journal_symlink_blocks_before_smoke(tmp_path):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    journal = skills_dir / ".clinical-document-generation.rollback.json"
+    journal.symlink_to(skills_dir / "missing-rollback-journal.json")
+    verified = []
+
+    result = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda candidate: verified.append(candidate) or {"status": "passed"},
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "rollback_recovery"
+    assert verified == []
+    assert journal.is_symlink()
+
+
+def test_committed_rollback_recovery_reports_journal_cleanup_as_deferred(
+    tmp_path, monkeypatch
+):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    quarantine = skills_dir / ".clinical-document-generation.quarantine-suspect-fingerprint"
+    journal = skills_dir / ".clinical-document-generation.rollback.json"
+    active.mkdir(parents=True)
+    previous.mkdir()
+    (active / "marker.txt").write_text("suspect active", encoding="utf-8")
+    (active / "RELEASE-MANIFEST.json").write_text(
+        json.dumps({"package_fingerprint": "suspect-fingerprint"}), encoding="utf-8"
+    )
+    (previous / "marker.txt").write_text("verified previous", encoding="utf-8")
+    monkeypatch.setattr(
+        workflow,
+        "_installation_candidate_integrity",
+        lambda _release, **_kwargs: ({}, []),
+    )
+    real_replace = workflow.os.replace
+    interrupted = []
+
+    def interrupt_after_rollback_commit(source, destination):
+        result = real_replace(source, destination)
+        if Path(source) == previous and Path(destination) == active and not interrupted:
+            interrupted.append(True)
+            raise KeyboardInterrupt("injected interruption after rollback commit")
+        return result
+
+    monkeypatch.setattr(workflow.os, "replace", interrupt_after_rollback_commit)
+    with pytest.raises(KeyboardInterrupt, match="after rollback commit"):
+        workflow.rollback_release(
+            skills_dir, verifier=lambda _release: {"status": "passed"}
+        )
+
+    monkeypatch.setattr(workflow.os, "replace", real_replace)
+    real_unlink = Path.unlink
+
+    def fail_journal_unlink(path, *args, **kwargs):
+        if path == journal:
+            raise OSError("injected committed rollback journal cleanup failure")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fail_journal_unlink)
+    recovered = workflow.rollback_release(
+        skills_dir, verifier=lambda _release: {"status": "passed"}
+    )
+
+    assert recovered["status"] == "passed"
+    assert recovered["stage"] == "rolled_back"
+    assert recovered["cleanup"]["status"] == "deferred"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "verified previous"
+    assert (quarantine / "marker.txt").read_text(encoding="utf-8") == "suspect active"
+    assert journal.is_file()
+
+
+def test_immutable_package_install_rollback_and_reactivation(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    config = _hermes_config(skills_dir)
+    install_kwargs = {
+        "hermes_config_path": config,
+        "trusted_certification_key_id": TEST_CERTIFICATION_KEY_ID,
+        "verifier": lambda _candidate: {"status": "passed"},
+        "provisioner": _passing_provisioner,
+    }
+
+    first = install_release(archive_path, skills_dir, **install_kwargs)
+    second = install_release(archive_path, skills_dir, **install_kwargs)
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    revision = skills_dir / "runs/revision-immutable.json"
+    revision.parent.mkdir()
+    revision.write_bytes(b'{"immutable":"historical-run-revision"}')
+
+    rollback = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {"status": "passed"},
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+    )
+    fingerprint = json.loads(
+        (active / "RELEASE-MANIFEST.json").read_text(encoding="utf-8")
+    )["package_fingerprint"]
+    quarantine = skills_dir / f".clinical-document-generation.quarantine-{fingerprint}"
+
+    assert first["status"] == second["status"] == "passed"
+    assert rollback["status"] == "passed"
+    assert rollback["rollback_commit_point"] == "previous_to_active_atomic_swap"
+    assert quarantine.is_dir()
+    assert not previous.exists()
+    assert revision.read_bytes() == b'{"immutable":"historical-run-revision"}'
+
+    reactivated = install_release(archive_path, skills_dir, **install_kwargs)
+
+    assert reactivated["status"] == "passed"
+    assert reactivated["activation_commit_point"] == "candidate_to_active_atomic_swap"
+    assert active.is_dir()
+    assert previous.is_dir()
+    assert quarantine.is_dir()
+    assert revision.read_bytes() == b'{"immutable":"historical-run-revision"}'
 
 
 def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):
@@ -2009,6 +2586,617 @@ def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):
         path.name.startswith(".clinical-document-generation.previous-")
         for path in skills_dir.iterdir()
     )
+
+
+@pytest.mark.parametrize("record_failure", (False, True))
+def test_post_commit_cleanup_failure_reports_activation_and_defers_cleanup(
+    tmp_path, monkeypatch, record_failure
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    for release, fingerprint, marker in (
+        (active, "immediate-previous", "selected before activation"),
+        (previous, "historical-release", "displaced history"),
+    ):
+        (release / "runtime").mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+            "git_commit": f"commit-{fingerprint}",
+            "package_fingerprint": fingerprint,
+        }), encoding="utf-8")
+    (previous / "PROMOTION-RECORD.json").write_text(
+        json.dumps({"certification": {"status": "passed"}}), encoding="utf-8"
+    )
+    real_rmtree = workflow.shutil.rmtree
+
+    def cleanup_tripwire(path, *args, **kwargs):
+        name = Path(path).name
+        if (
+            name == ".clinical-document-generation.displaced-historical-release"
+            or name.startswith(".clinical-document-generation.previous-")
+        ):
+            raise OSError("injected displaced cleanup failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(workflow.shutil, "rmtree", cleanup_tripwire)
+    real_write = workflow._write_atomic_installation_state
+
+    def record_tripwire(path, value):
+        if record_failure and Path(path).name == "deferred-cleanup-historical-release.json":
+            raise OSError("injected deferred-cleanup record failure")
+        return real_write(path, value)
+
+    monkeypatch.setattr(workflow, "_write_atomic_installation_state", record_tripwire)
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    displaced = skills_dir / ".clinical-document-generation.displaced-historical-release"
+    deferred_record = skills_dir / "release-history/deferred-cleanup-historical-release.json"
+    assert result["status"] == "passed"
+    assert result["stage"] == "activated"
+    assert result["activation_commit_point"] == "candidate_to_active_atomic_swap"
+    assert result["cleanup"]["status"] == "deferred"
+    cleanup_finding = {
+        "category": "installation",
+        "field": "post_commit_cleanup",
+        "code": "installation.cleanup_deferred",
+        "issue": "Activation succeeded; displaced release cleanup is deferred.",
+        "path": str(displaced),
+    }
+    assert result["cleanup"]["record"] == (
+        None if record_failure else str(deferred_record)
+    )
+    assert result["cleanup"]["findings"][0] == cleanup_finding
+    if record_failure:
+        assert result["cleanup"]["findings"][1] == {
+            "category": "installation",
+            "field": "post_commit_cleanup_record",
+            "code": "installation.cleanup_record_failed",
+            "issue": "Activation succeeded; deferred-cleanup evidence could not be persisted.",
+            "path": str(deferred_record),
+        }
+    else:
+        assert result["cleanup"]["findings"] == [cleanup_finding]
+    assert "name: clinical-document-generation" in (active / "SKILL.md").read_text(encoding="utf-8")
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "selected before activation"
+    assert (displaced / "marker.txt").read_text(encoding="utf-8") == "displaced history"
+    if record_failure:
+        assert not deferred_record.exists()
+        assert (
+            skills_dir / ".clinical-document-generation.activation.json"
+        ).is_file()
+    else:
+        assert json.loads(deferred_record.read_text(encoding="utf-8"))["finding"] == cleanup_finding
+        assert not (
+            skills_dir / ".clinical-document-generation.activation.json"
+        ).exists()
+
+
+def test_post_commit_journal_cleanup_failure_reports_activation_and_recovers(
+    tmp_path, monkeypatch
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text("active before attempt", encoding="utf-8")
+    journal = skills_dir / ".clinical-document-generation.activation.json"
+    real_unlink = Path.unlink
+
+    def journal_unlink_failure(path, *args, **kwargs):
+        if Path(path) == journal:
+            raise OSError("injected post-commit journal cleanup failure")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", journal_unlink_failure)
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "passed"
+    assert result["stage"] == "activated"
+    assert result["cleanup"]["status"] == "deferred"
+    assert result["cleanup"]["findings"] == [{
+        "category": "installation",
+        "field": "activation_journal_cleanup",
+        "code": "installation.activation_journal_cleanup_deferred",
+        "issue": "Activation succeeded; transaction-journal cleanup is deferred.",
+        "path": str(journal),
+    }]
+    assert journal.is_file()
+    assert not (active / "marker.txt").exists()
+
+    monkeypatch.setattr(Path, "unlink", real_unlink)
+    rerun = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {
+            "status": "blocked",
+            "findings": [{"issue": "stop after reconciliation"}],
+        },
+    )
+
+    assert rerun["status"] == "blocked"
+    assert rerun["stage"] == "provision"
+    assert active.is_dir()
+    assert not journal.exists()
+
+
+def test_committed_activation_recovery_reports_displaced_cleanup_as_deferred(
+    tmp_path, monkeypatch
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    displaced = skills_dir / ".clinical-document-generation.displaced-historical-release"
+    for release, fingerprint, marker in (
+        (active, "immediate-previous", "active before commit"),
+        (previous, "historical-release", "previous before commit"),
+    ):
+        release.mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+            "git_commit": f"commit-{fingerprint}",
+            "package_fingerprint": fingerprint,
+        }), encoding="utf-8")
+    real_replace = workflow.os.replace
+    interrupted = []
+
+    def interrupt_after_candidate_commit(source, destination):
+        result = real_replace(source, destination)
+        if Path(destination) == active and Path(source) != previous and not interrupted:
+            interrupted.append(True)
+            raise KeyboardInterrupt("injected interruption after activation commit")
+        return result
+
+    monkeypatch.setattr(workflow.os, "replace", interrupt_after_candidate_commit)
+    with pytest.raises(KeyboardInterrupt, match="after activation commit"):
+        install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=_hermes_config(skills_dir),
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+            verifier=lambda _candidate: {"status": "passed"},
+            provisioner=_passing_provisioner,
+        )
+
+    monkeypatch.setattr(workflow.os, "replace", real_replace)
+    real_rmtree = workflow.shutil.rmtree
+
+    def fail_displaced_cleanup(path, *args, **kwargs):
+        if Path(path) == displaced:
+            raise OSError("injected committed displaced cleanup failure")
+        return real_rmtree(path, *args, **kwargs)
+
+    monkeypatch.setattr(workflow.shutil, "rmtree", fail_displaced_cleanup)
+    recovered = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    assert recovered["status"] == "passed"
+    assert recovered["stage"] == "activated"
+    assert recovered["cleanup"]["status"] == "deferred"
+    assert displaced.is_dir()
+    assert (skills_dir / ".clinical-document-generation.activation.json").is_file()
+
+
+def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
+    tmp_path, monkeypatch
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text("active before attempt", encoding="utf-8")
+    real_replace = workflow.os.replace
+    injected = []
+
+    def report_error_after_candidate_commit(source, destination):
+        source = Path(source)
+        destination = Path(destination)
+        result = real_replace(source, destination)
+        if destination == active and source != active and not injected:
+            injected.append(True)
+            raise OSError("injected error after committed candidate swap")
+        return result
+
+    monkeypatch.setattr(workflow.os, "replace", report_error_after_candidate_commit)
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    assert injected
+    assert result["status"] == "passed"
+    assert result["stage"] == "activated"
+    assert result["activation_commit_point"] == "candidate_to_active_atomic_swap"
+    assert result["cleanup"]["status"] == "deferred"
+    assert not (active / "marker.txt").exists()
+    assert (skills_dir / ".clinical-document-generation.activation.json").is_file()
+
+
+@pytest.mark.parametrize("failure_boundary", ("active_to_previous", "candidate_to_active"))
+def test_pre_commit_rename_failures_restore_release_state(
+    tmp_path, monkeypatch, failure_boundary
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    for release, fingerprint, marker in (
+        (active, "immediate-previous", "active before attempt"),
+        (previous, "historical-release", "previous before attempt"),
+    ):
+        release.mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+            "git_commit": f"commit-{fingerprint}",
+            "package_fingerprint": fingerprint,
+        }), encoding="utf-8")
+    (previous / "PROMOTION-RECORD.json").write_text(
+        json.dumps({"certification": {"status": "passed"}}), encoding="utf-8"
+    )
+    preexisting_history = skills_dir / "release-history/historical-release.json"
+    preexisting_history_value = {
+        "schema_version": "release-history/v1",
+        "git_commit": "commit-historical-release",
+        "package_fingerprint": "historical-release",
+        "certification": {"status": "passed"},
+    }
+    preexisting_history_bytes = json.dumps(
+        preexisting_history_value, separators=(",", ":")
+    ).encode()
+    preexisting_history.parent.mkdir()
+    preexisting_history.write_bytes(preexisting_history_bytes)
+    real_write = workflow._write
+    assurance_created = []
+
+    def observe_write(path, value):
+        if Path(path).name == "INSTALLATION-ASSURANCE.json":
+            assurance_created.append(Path(path))
+        return real_write(path, value)
+
+    monkeypatch.setattr(workflow, "_write", observe_write)
+    real_replace = workflow.os.replace
+    injected = []
+
+    def rename_tripwire(source, destination):
+        source = Path(source)
+        destination = Path(destination)
+        should_fail = (
+            failure_boundary == "active_to_previous"
+            and source == active
+            and destination == previous
+        ) or (
+            failure_boundary == "candidate_to_active"
+            and destination == active
+            and source.name == "clinical-document-generation"
+            and source != active
+        )
+        if should_fail and not injected:
+            injected.append((source, destination))
+            raise OSError(f"injected {failure_boundary} failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(workflow.os, "replace", rename_tripwire)
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    assert assurance_created
+    assert injected
+    assert result == {
+        "status": "blocked",
+        "stage": "activation_swap",
+        "findings": [{
+            "category": "installation",
+            "field": "activation_swap",
+            "code": "installation.activation_swap_failed",
+            "issue": "Activation swap failed before commit; the prior release state was restored.",
+        }],
+        "active_release_retained": True,
+        "previous_release_retained": True,
+    }
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active before attempt"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous before attempt"
+    assert not (skills_dir / ".clinical-document-generation.displaced-historical-release").exists()
+    assert preexisting_history.read_bytes() == preexisting_history_bytes
+
+
+def test_conflicting_release_history_record_is_rejected_without_rewrite(tmp_path):
+    skills_dir = tmp_path / "skills"
+    release = tmp_path / "previous"
+    release.mkdir()
+    (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+        "git_commit": "expected-commit",
+        "package_fingerprint": "expected-fingerprint",
+    }), encoding="utf-8")
+    history = skills_dir / "release-history/expected-fingerprint.json"
+    history.parent.mkdir(parents=True)
+    conflicting_bytes = b'{"unrelated":"record"}'
+    history.write_bytes(conflicting_bytes)
+
+    with pytest.raises(ValueError, match="history record collision"):
+        workflow._retain_lightweight_release_history(release, skills_dir)
+
+    assert history.read_bytes() == conflicting_bytes
+
+
+def test_interrupted_activation_is_reconciled_before_rerun(tmp_path, monkeypatch):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    displaced = skills_dir / ".clinical-document-generation.displaced-historical-release"
+    journal = skills_dir / ".clinical-document-generation.activation.json"
+    for release, fingerprint, marker in (
+        (active, "immediate-previous", "active before interruption"),
+        (previous, "historical-release", "previous before interruption"),
+    ):
+        release.mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+            "git_commit": f"commit-{fingerprint}",
+            "package_fingerprint": fingerprint,
+        }), encoding="utf-8")
+    real_replace = workflow.os.replace
+    interrupted = []
+
+    def interrupt_after_active_rename(source, destination):
+        result = real_replace(source, destination)
+        if Path(source) == active and Path(destination) == previous and not interrupted:
+            interrupted.append(True)
+            raise KeyboardInterrupt("injected process interruption")
+        return result
+
+    monkeypatch.setattr(workflow.os, "replace", interrupt_after_active_rename)
+
+    with pytest.raises(KeyboardInterrupt, match="injected process interruption"):
+        install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=_hermes_config(skills_dir),
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+            verifier=lambda _candidate: {"status": "passed"},
+            provisioner=_passing_provisioner,
+        )
+
+    assert not active.exists()
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "active before interruption"
+    assert (displaced / "marker.txt").read_text(encoding="utf-8") == "previous before interruption"
+    assert journal.is_file()
+
+    monkeypatch.setattr(workflow.os, "replace", real_replace)
+    rerun = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {
+            "status": "blocked",
+            "findings": [{"issue": "stop after reconciliation"}],
+        },
+    )
+
+    assert rerun["status"] == "blocked"
+    assert rerun["stage"] == "provision"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active before interruption"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous before interruption"
+    assert not displaced.exists()
+    assert not journal.exists()
+    assert not (skills_dir / "release-history/historical-release.json").exists()
+
+
+def test_dangling_activation_journal_symlink_blocks_before_staging(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    skills_dir.mkdir()
+    journal = skills_dir / ".clinical-document-generation.activation.json"
+    journal.symlink_to(skills_dir / "missing-activation-journal.json")
+    provisioned = []
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda candidate: provisioned.append(candidate)
+        or {"status": "passed"},
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "activation_recovery"
+    assert provisioned == []
+    assert journal.is_symlink()
+
+
+def test_interruption_after_history_write_removes_attempt_history_on_retry(
+    tmp_path, monkeypatch
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    displaced = skills_dir / ".clinical-document-generation.displaced-historical-release"
+    history = skills_dir / "release-history/historical-release.json"
+    for release, fingerprint, marker in (
+        (active, "immediate-previous", "active before interruption"),
+        (previous, "historical-release", "previous before interruption"),
+    ):
+        release.mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+            "git_commit": f"commit-{fingerprint}",
+            "package_fingerprint": fingerprint,
+        }), encoding="utf-8")
+    real_write = workflow._write_atomic_installation_state
+    interrupted = []
+
+    def interrupt_after_history_write(path, value):
+        result = real_write(path, value)
+        if Path(path) == history and not interrupted:
+            interrupted.append(True)
+            raise KeyboardInterrupt("injected interruption after history write")
+        return result
+
+    monkeypatch.setattr(
+        workflow, "_write_atomic_installation_state", interrupt_after_history_write
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="after history write"):
+        install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=_hermes_config(skills_dir),
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+            verifier=lambda _candidate: {"status": "passed"},
+            provisioner=_passing_provisioner,
+        )
+
+    assert history.is_file()
+    assert active.is_dir()
+    assert not previous.exists()
+    assert displaced.is_dir()
+
+    monkeypatch.setattr(workflow, "_write_atomic_installation_state", real_write)
+    rerun = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {
+            "status": "blocked",
+            "findings": [{"issue": "stop after reconciliation"}],
+        },
+    )
+
+    assert rerun["status"] == "blocked"
+    assert rerun["stage"] == "provision"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active before interruption"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous before interruption"
+    assert not displaced.exists()
+    assert not history.exists()
+
+
+@pytest.mark.parametrize("failure_boundary", ("previous_to_displaced", "history_record"))
+def test_pre_commit_displacement_failures_restore_release_state(
+    tmp_path, monkeypatch, failure_boundary
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    displaced = skills_dir / ".clinical-document-generation.displaced-historical-release"
+    for release, fingerprint, marker in (
+        (active, "immediate-previous", "active before attempt"),
+        (previous, "historical-release", "previous before attempt"),
+    ):
+        release.mkdir(parents=True)
+        (release / "marker.txt").write_text(marker, encoding="utf-8")
+        (release / "RELEASE-MANIFEST.json").write_text(json.dumps({
+            "git_commit": f"commit-{fingerprint}",
+            "package_fingerprint": fingerprint,
+        }), encoding="utf-8")
+    real_replace = workflow.os.replace
+    history_path = skills_dir / "release-history/historical-release.json"
+
+    def replace_tripwire(source, destination):
+        displacement_failure = (
+            failure_boundary == "previous_to_displaced"
+            and Path(source) == previous
+            and Path(destination) == displaced
+        )
+        history_failure = (
+            failure_boundary == "history_record"
+            and Path(destination) == history_path
+        )
+        if displacement_failure or history_failure:
+            raise OSError(f"injected {failure_boundary} failure")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(workflow.os, "replace", replace_tripwire)
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    assert result == {
+        "status": "blocked",
+        "stage": "activation_precondition",
+        "findings": [{
+            "category": "installation",
+            "field": "displaced_release",
+            "code": "installation.displacement_failed",
+            "issue": "Prior release displacement failed before commit; release state was restored.",
+        }],
+        "active_release_retained": True,
+        "previous_release_retained": True,
+    }
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "active before attempt"
+    assert (previous / "marker.txt").read_text(encoding="utf-8") == "previous before attempt"
+    assert not displaced.exists()
+    assert not (skills_dir / "release-history/historical-release.json").exists()
 
 
 def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_renderer(tmp_path, monkeypatch):
