@@ -71,6 +71,15 @@ DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "ambispective-sparse-complete", "ambispective-rich-complete",
     "retrospective-sparse-complete", "retrospective-rich-complete",
 )
+GOVERNED_GATE_SEQUENCE = (
+    "clinical_fidelity",
+    "content_completeness_consistency",
+    "docx_prs_structure",
+    "exact_artifact_rendering",
+    "every_page_visual_qa",
+    "exact_byte_atomic_delivery",
+)
+FORMAT_CONFORMANCE_MATRIX = "references/format-conformance-matrix.json"
 CERTIFICATION_VISUAL_CHECKS = {
     "artificial_pagination", "bad_table_split", "blank_page", "clipping",
     "duplicate_section", "excessive_whitespace", "footer_collision",
@@ -151,6 +160,159 @@ def sha256_file(path: Path) -> str:
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""): digest.update(chunk)
     return digest.hexdigest()
+
+
+def canonical_evidence_sha256(value: Any) -> str:
+    """Hash a machine-readable evidence value using one canonical encoding."""
+    return hashlib.sha256(json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+
+
+def load_format_conformance_matrix(repo_root: Path) -> dict[str, Any]:
+    """Load and independently rehash the deterministic format matrix."""
+    root = repo_root.resolve()
+    matrix = _json(root / FORMAT_CONFORMANCE_MATRIX)
+    if matrix.get("schema_version") != "clinical-format-conformance/v1":
+        raise ValueError("Format conformance matrix schema is invalid.")
+    unsigned = dict(matrix)
+    declared_sha256 = str(unsigned.pop("matrix_sha256", ""))
+    if not declared_sha256 or declared_sha256 != canonical_evidence_sha256(unsigned):
+        raise ValueError("Format conformance matrix identity is invalid.")
+    gates = matrix.get("gate_sequence")
+    if not isinstance(gates, list) or tuple(
+        item.get("gate_id") for item in gates if isinstance(item, Mapping)
+    ) != GOVERNED_GATE_SEQUENCE:
+        raise ValueError("Format conformance gate order is invalid.")
+    cases = matrix.get("cases")
+    expected_cases = (
+        "retrospective-protocol", "prospective-advarra", "prospective-sterling",
+        "ambispective-advarra", "ambispective-sterling",
+    )
+    if not isinstance(cases, list) or tuple(
+        item.get("case_id") for item in cases if isinstance(item, Mapping)
+    ) != expected_cases:
+        raise ValueError("Format conformance case inventory is invalid.")
+    for case in cases:
+        resources = [case.get("fixture"), *list(case.get("baselines") or [])]
+        for resource in resources:
+            if not isinstance(resource, Mapping):
+                raise ValueError("Format conformance resource declaration is invalid.")
+            path_text = str(resource.get("path") or "")
+            relative = PurePosixPath(path_text)
+            if relative.is_absolute() or ".." in relative.parts or relative.as_posix() != path_text:
+                raise ValueError("Format conformance resource path is invalid.")
+            target = root / relative
+            if not target.is_file() or sha256_file(target) != resource.get("sha256"):
+                raise ValueError(f"Format conformance resource identity is invalid: {relative}")
+    return matrix
+
+
+def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str, Any]:
+    """Reject reordered, stale, incomplete, or non-monotonic delivery gates."""
+    matrix = load_format_conformance_matrix(repo_root)
+    value = dict(ledger)
+    if value.get("schema_version") != "clinical-gate-ledger/v1":
+        raise ValueError("Gate ledger schema is invalid.")
+    if value.get("matrix_sha256") != matrix.get("matrix_sha256"):
+        raise ValueError("Gate ledger is not bound to the current conformance matrix.")
+    unsigned = dict(value)
+    declared_sha256 = str(unsigned.pop("ledger_sha256", ""))
+    if not declared_sha256 or declared_sha256 != canonical_evidence_sha256(unsigned):
+        raise ValueError("Gate ledger identity is invalid.")
+    records = value.get("records")
+    if not isinstance(records, list) or tuple(
+        record.get("gate_id") for record in records if isinstance(record, Mapping)
+    ) != GOVERNED_GATE_SEQUENCE:
+        raise ValueError("Gate ledger sequence is invalid.")
+    unresolved = False
+    finding_fields = set(matrix["finding_contract"]["required"])
+    for order, record in enumerate(records, start=1):
+        if not isinstance(record, Mapping) or record.get("order") != order:
+            raise ValueError("Gate ledger order is invalid.")
+        status = str(record.get("terminal_status") or "")
+        if status not in {"passed", "pending", "blocked"}:
+            raise ValueError("Gate ledger terminal status is invalid.")
+        if unresolved and status == "passed":
+            raise ValueError(f"Gate {record.get('gate_id')} cannot pass after an unresolved earlier gate.")
+        unresolved = unresolved or status != "passed"
+        evidence_sha256 = str(record.get("evidence_sha256") or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
+            raise ValueError("Gate evidence identity is invalid.")
+        if not str(record.get("retry_owner") or ""):
+            raise ValueError("Gate retry ownership is missing.")
+        findings = record.get("findings")
+        if not isinstance(findings, list) or any(
+            not isinstance(finding, Mapping) or not finding_fields <= set(finding)
+            for finding in findings
+        ):
+            raise ValueError("Gate finding contract is invalid.")
+    return value
+
+
+def build_gate_ledger(
+    repo_root: Path,
+    evidence_by_gate: Mapping[str, Any],
+    *,
+    statuses: Mapping[str, str] | None = None,
+    findings_by_gate: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Build a canonical monotonic ledger from exact evidence values."""
+    matrix = load_format_conformance_matrix(repo_root)
+    gates = {str(item["gate_id"]): item for item in matrix["gate_sequence"]}
+    if set(evidence_by_gate) != set(GOVERNED_GATE_SEQUENCE):
+        raise ValueError("Evidence must cover the complete governed gate sequence.")
+    records = []
+    for order, gate_id in enumerate(GOVERNED_GATE_SEQUENCE, start=1):
+        status = str((statuses or {}).get(gate_id, "passed"))
+        records.append({
+            "order": order,
+            "gate_id": gate_id,
+            "terminal_status": status,
+            "evidence_sha256": canonical_evidence_sha256(evidence_by_gate[gate_id]),
+            "retry_owner": str(gates[gate_id]["retry_owner"]),
+            "findings": [dict(item) for item in (findings_by_gate or {}).get(gate_id, [])],
+        })
+    ledger = {
+        "schema_version": "clinical-gate-ledger/v1",
+        "matrix_sha256": matrix["matrix_sha256"],
+        "records": records,
+    }
+    ledger["ledger_sha256"] = canonical_evidence_sha256(ledger)
+    return validate_gate_ledger(repo_root, ledger)
+
+
+def advance_gate_ledger(
+    repo_root: Path,
+    ledger: Mapping[str, Any],
+    *,
+    gate_id: str,
+    terminal_status: str,
+    evidence: Any,
+    findings: Iterable[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    """Advance only the first unresolved gate and bind its replacement evidence."""
+    current = validate_gate_ledger(repo_root, ledger)
+    records = [dict(record) for record in current["records"]]
+    unresolved = next(
+        (record for record in records if record["terminal_status"] != "passed"),
+        None,
+    )
+    if unresolved is None or unresolved["gate_id"] != gate_id:
+        raise ValueError(f"Only the first unresolved gate may advance; requested {gate_id}.")
+    unresolved["terminal_status"] = terminal_status
+    unresolved["evidence_sha256"] = canonical_evidence_sha256(evidence)
+    unresolved["findings"] = [dict(item) for item in findings]
+    advanced = {
+        "schema_version": current["schema_version"],
+        "matrix_sha256": current["matrix_sha256"],
+        "records": records,
+    }
+    advanced["ledger_sha256"] = canonical_evidence_sha256(advanced)
+    return validate_gate_ledger(repo_root, advanced)
 
 
 def release_certification_payload(report: Mapping[str, Any]) -> bytes:
@@ -3025,4 +3187,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_gate_ledger", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]

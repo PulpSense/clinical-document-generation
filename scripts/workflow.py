@@ -33,7 +33,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, create_verification_requests, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -43,6 +43,7 @@ DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 720.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 1800.0
+FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
     "drafting": 480.0,
     "candidate": 120.0,
@@ -3546,6 +3547,31 @@ def run_desktop_operation(
             "delivery": delivery,
             "deadline_at_epoch": deadline_at_epoch,
         }
+        prepared_ledger = manifest.get("gate_ledger")
+        if isinstance(prepared_ledger, Mapping):
+            gate_findings = [
+                {
+                    "code": "DELIVERY_CONFIRMATION_FAILED",
+                    "target": str(finding.get("field") or "desktop_delivery"),
+                    "evidence_sha256": canonical_evidence_sha256(dict(finding)),
+                    "retry_owner": "desktop_transport",
+                    "terminal_status": "blocked",
+                }
+                for finding in delivery.get("findings", [])
+                if isinstance(finding, Mapping)
+            ]
+            final["gate_ledger"] = advance_gate_ledger(
+                SCRIPT_DIR.parent,
+                prepared_ledger,
+                gate_id="exact_byte_atomic_delivery",
+                terminal_status="passed" if delivery["confirmed"] else "blocked",
+                evidence={
+                    "opened": delivery.get("opened", []),
+                    "attempts": delivery.get("attempts"),
+                    "manifest_outputs": manifest.get("client_outputs", []),
+                },
+                findings=gate_findings,
+            )
         if not delivery["confirmed"]:
             final["client_outputs"] = []
         return finish(final)
@@ -3569,6 +3595,105 @@ def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
     return evidence
 
 
+def _publication_evidence_findings(
+    revision_dir: Path,
+    build: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Rehash every candidate, PDF, and page bound by the accepted build."""
+    expected: dict[str, str] = {}
+    for item in build.get("candidate_files", []):
+        if isinstance(item, Mapping):
+            expected[str(item.get("path") or "")] = str(item.get("sha256") or "")
+    for artifact in dict(build.get("render_report") or {}).get("artifacts", []):
+        if not isinstance(artifact, Mapping):
+            continue
+        for kind in ("docx", "pdf"):
+            expected[str(artifact.get(kind) or "")] = str(artifact.get(f"{kind}_sha256") or "")
+        for page in artifact.get("pages", []):
+            if isinstance(page, Mapping):
+                expected[str(page.get("path") or "")] = str(page.get("sha256") or "")
+    findings = []
+    for relative_text, expected_sha256 in sorted(expected.items()):
+        relative = PurePosixPath(relative_text)
+        valid_path = (
+            bool(relative_text)
+            and not relative.is_absolute()
+            and ".." not in relative.parts
+            and relative.as_posix() == relative_text
+        )
+        target = revision_dir / relative if valid_path else revision_dir
+        actual_sha256 = quality_sha256(target) if valid_path and target.is_file() else None
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256) or actual_sha256 != expected_sha256:
+            findings.append({
+                "code": "STALE_PUBLICATION_EVIDENCE",
+                "target": relative_text or "candidate-build.json",
+                "evidence_sha256": expected_sha256,
+                "actual_sha256": actual_sha256,
+                "retry_owner": "render_assurance",
+                "terminal_status": "blocked",
+            })
+    if not expected:
+        findings.append({
+            "code": "MISSING_PUBLICATION_EVIDENCE",
+            "target": "candidate-build.json",
+            "evidence_sha256": quality_sha256(revision_dir / "candidate-build.json") if (revision_dir / "candidate-build.json").is_file() else "",
+            "actual_sha256": None,
+            "retry_owner": "render_assurance",
+            "terminal_status": "blocked",
+        })
+    return findings
+
+
+def _prepared_gate_ledger(
+    build: Mapping[str, Any],
+    quality: Mapping[str, Any],
+    published: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    verification = dict(quality.get("verification_evidence") or {})
+    content_evidence = {
+        key: value for key, value in verification.items()
+        if "content" in str(key) or "clinical" in str(key)
+    }
+    visual_evidence = {
+        key: value for key, value in verification.items()
+        if "visual" in str(key) or "page" in str(key)
+    }
+    candidate_files = list(build.get("candidate_files") or [])
+    evidence = {
+        "clinical_fidelity": {"gate": "clinical_fidelity", "verification": content_evidence or verification},
+        "content_completeness_consistency": {
+            "gate": "content_completeness_consistency",
+            "verification": content_evidence or verification,
+            "candidate_files": candidate_files,
+        },
+        "docx_prs_structure": {
+            "gate": "docx_prs_structure",
+            "document_report": build.get("document_report"),
+            "xml_report": build.get("xml_report"),
+            "candidate_files": candidate_files,
+        },
+        "exact_artifact_rendering": {
+            "gate": "exact_artifact_rendering",
+            "render_report": build.get("render_report"),
+            "render_assurance": quality.get("render_assurance"),
+        },
+        "every_page_visual_qa": {
+            "gate": "every_page_visual_qa",
+            "verification": visual_evidence or verification,
+            "render_report": build.get("render_report"),
+        },
+        "exact_byte_atomic_delivery": {
+            "gate": "exact_byte_atomic_delivery",
+            "prepared_outputs": [dict(item) for item in published],
+        },
+    }
+    return build_gate_ledger(
+        SCRIPT_DIR.parent,
+        evidence,
+        statuses={"exact_byte_atomic_delivery": "pending"},
+    )
+
+
 def _publish(
     run_dir: Path,
     revision_dir: Path,
@@ -3578,6 +3703,13 @@ def _publish(
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
+    build_path = revision_dir / "candidate-build.json"
+    try:
+        build = _read(build_path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"stale publication evidence: {exc}") from exc
+    if evidence_findings := _publication_evidence_findings(revision_dir, build):
+        raise RuntimeError(f"stale publication evidence: {evidence_findings}")
     sources = sorted((revision_dir / "candidate").glob("*.docx")) + sorted((revision_dir / "candidate").glob("*.xml"))
     expected = set(document_set(get_path(reference, "meta.study_type")))
     actual = {source.name for source in sources}
@@ -3591,6 +3723,14 @@ def _publish(
             raise OperationDeadlineExpired("The Desktop operation expired before publication.")
         for source in sources:
             shutil.copy2(source, staging / source.name)
+            expected = next(
+                (item for item in build.get("candidate_files", []) if item.get("path") == source.relative_to(revision_dir).as_posix()),
+                None,
+            )
+            if not isinstance(expected, Mapping) or quality_sha256(staging / source.name) != expected.get("sha256"):
+                raise RuntimeError(f"stale publication evidence: staged bytes changed for {source.name}")
+        if evidence_findings := _publication_evidence_findings(revision_dir, build):
+            raise RuntimeError(f"stale publication evidence: {evidence_findings}")
         # The only client-visible mutation is the atomic swap below. Recheck
         # after staging so slow copies cannot publish after the hard ceiling.
         if operation_deadline is not None and clock() >= operation_deadline:
@@ -3615,9 +3755,7 @@ def _publish(
         {"path": (output / source.name).relative_to(run_dir).as_posix(), "sha256": quality_sha256(output / source.name), "bytes": (output / source.name).stat().st_size}
         for source in sources
     ]
-    build_path = revision_dir / "candidate-build.json"
-    build = _read(build_path) if build_path.is_file() else {}
-    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published}
+    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(build, quality, published)}
     manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
     return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
@@ -3748,6 +3886,7 @@ def _quality_retry(
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
     stage_observer: Callable[[str, float], Any] | None = None,
+    require_promoted_runtime: bool = True,
 ) -> dict[str, Any]:
     """Retry draftable targets; deterministic layout defects require an actual repair."""
     invalid_recovery = [
@@ -3952,6 +4091,8 @@ def _quality_retry(
         "operation_deadline": operation_deadline,
         "clock": clock,
     }
+    if not require_promoted_runtime:
+        retry_options["require_promoted_runtime"] = False
     if stage_observer is not None:
         retry_options["stage_observer"] = stage_observer
     return generate(run_dir, **retry_options)
@@ -3963,6 +4104,7 @@ def generate(
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
     stage_observer: Callable[[str, float], Any] | None = None,
+    require_promoted_runtime: bool = True,
     **_: Any,
 ) -> dict[str, Any]:
     """Advance one approved revision until it needs Hermes work or passes."""
@@ -4056,6 +4198,7 @@ def generate(
             operation_deadline=operation_deadline,
             clock=clock,
             stage_observer=stage_observer,
+            require_promoted_runtime=require_promoted_runtime,
         )
 
     observe_stage("drafting")
@@ -4116,7 +4259,7 @@ def generate(
                 findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
                 if classification_block is not None:
                     return classification_block
-                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer)
+                return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
             xml_report = prior_build.get("xml_report") if partial_repair else None
             if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
                 if xml_report is None or not (revision_dir / "candidate/study.xml").is_file():
@@ -4180,6 +4323,7 @@ def generate(
             deadline_seconds=remaining,
             deadline_monotonic=operation_deadline,
             clock=clock,
+            require_promoted_runtime=require_promoted_runtime,
         )
         resolved_substitutions = {
             str(source): str(target)
@@ -4220,7 +4364,7 @@ def generate(
                     "candidate_outputs": _candidate_outputs(revision_dir),
                     "client_outputs": [],
                 }
-            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer)
+            return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendered_document_qa", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
         build = _record_build(revision_dir, fingerprint, governing, bundle, document_report, xml_report, render_report)
     else:
         observe_stage("candidate")
@@ -4244,7 +4388,7 @@ def generate(
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
     final_quality["render_assurance"] = assurance_report
     if final_quality["status"] != "passed":
-        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer)
+        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
     observe_stage("independent_verification")
     try:
         published = _publish(
@@ -4283,6 +4427,7 @@ def run_release_gate(
     *,
     verification_responder: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
     evidence_root: Path | None = None,
+    require_promoted_runtime: bool = True,
 ) -> dict[str, Any]:
     """Exercise all six lifecycle cases; genuine verifier responses remain external."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -4297,7 +4442,7 @@ def run_release_gate(
             suffix += 1
     root.mkdir(parents=True, exist_ok=True)
     results = []
-    corpus = _read_corpus(repo_root / "tests/fixtures/branch-acceptance-corpus.json")
+    corpus = _read_corpus(repo_root / "references/conformance-fixtures/branch-acceptance-corpus.json")
     for case in [item for item in corpus if str(item.get("profile", "")).endswith("complete")]:
             branch = str(case["study_type"]); richness = str(case["profile"]).split("-", 1)[0]
             run_dir = root / str(case["fixture_id"])
@@ -4333,7 +4478,7 @@ def run_release_gate(
             case_bundle = contracted_template_bundle(repo_root, reference)
             result: dict[str, Any] = {}
             for _attempt in range(12):
-                result = generate(run_dir)
+                result = generate(run_dir, require_promoted_runtime=require_promoted_runtime)
                 if result.get("status") != "awaiting_hermes": break
                 revision_dir = run_dir / "revisions" / str(result["revision_id"])
                 for relative in result.get("requests", []):
@@ -4361,8 +4506,200 @@ def run_release_gate(
     _write(root / "release-gate-report.json", report); return report
 
 
+def _synthetic_format_verification(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Produce explicit non-certifying structural responses for the matrix runner."""
+    response: dict[str, Any] = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "DeterministicFormatConformance/v1"},
+        "status": "passed",
+        "findings": [],
+    }
+    if request["task"] == "rendered_page_visual_verification":
+        response["page_assessments"] = [
+            {
+                "artifact": artifact["artifact"],
+                "page": page["page"],
+                "sha256": page["sha256"],
+                "status": "passed",
+                "checks": list(VISUAL_CHECKS),
+            }
+            for artifact in request.get("artifacts", [])
+            for page in artifact.get("pages", [])
+        ]
+    else:
+        response["section_assessments"] = [
+            {
+                "artifact": item["artifact"],
+                "section_id": item["section_id"],
+                "status": "passed",
+                "checks": list(CONTENT_CHECKS),
+            }
+            for item in request.get("sections", [])
+        ]
+        response["cross_document_assessments"] = [
+            {"check": check, "status": "passed"}
+            for check in request.get("cross_document_checks", [])
+        ]
+    return response
+
+
+setattr(_synthetic_format_verification, "synthetic", True)
+
+
+def _run_format_conformance_in_disposable_candidate(
+    repo_root: Path,
+    evidence_root: Path,
+) -> dict[str, Any]:
+    """Run source conformance inside a governed disposable install candidate."""
+    with tempfile.TemporaryDirectory(
+        prefix=".clinical-document-generation.install-",
+    ) as directory:
+        staging_root = Path(directory).resolve()
+        archive_path = staging_root / "candidate.zip"
+        try:
+            git_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=True,
+            ).stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            git_commit = "working-tree"
+        _package_release_tree(
+            repo_root,
+            archive_path,
+            git_commit=git_commit or "working-tree",
+        )
+        with zipfile.ZipFile(archive_path) as archive:
+            _validated_archive_members(archive, staging_root)
+            archive.extractall(staging_root)
+        candidate = staging_root / "clinical-document-generation"
+        integrity = _manifest_integrity(candidate, allow_runtime_state=False)
+        if integrity:
+            return {
+                "status": "blocked",
+                "assurance": "deterministic-structural-only",
+                "live_certification_required": True,
+                "findings": integrity,
+            }
+        provision = provision_render_assurance(candidate)
+        if provision.get("status") != "passed":
+            return {
+                "status": "blocked",
+                "assurance": "deterministic-structural-only",
+                "live_certification_required": True,
+                "findings": provision.get("findings", []),
+            }
+        command = [
+            sys.executable,
+            str(candidate / "scripts/workflow.py"),
+            "--format-conformance",
+            "--format-conformance-root",
+            str(evidence_root),
+        ]
+        completed = subprocess.run(
+            command,
+            cwd=candidate,
+            capture_output=True,
+            text=True,
+            timeout=FORMAT_CONFORMANCE_TIMEOUT_SECONDS,
+            check=False,
+        )
+        try:
+            result = json.loads(completed.stdout)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            result = {
+                "status": "blocked",
+                "assurance": "deterministic-structural-only",
+                "live_certification_required": True,
+                "findings": [{
+                    "category": "conformance",
+                    "field": "disposable_candidate",
+                    "issue": "The disposable format-conformance candidate did not return valid JSON.",
+                    "exit_code": completed.returncode,
+                }],
+            }
+        return dict(result)
+
+
+def run_format_conformance(
+    repo_root: Path,
+    *,
+    evidence_root: Path | None = None,
+) -> dict[str, Any]:
+    """Run all deterministic format cases without claiming live certification."""
+    repo_root = repo_root.resolve()
+    resolved_evidence_root = (
+        evidence_root.resolve()
+        if evidence_root is not None
+        else (repo_root / ".scratch/format-conformance").resolve()
+    )
+    if not page_renderers(
+        skill_root=repo_root,
+        require_promoted_runtime=False,
+    ):
+        return _run_format_conformance_in_disposable_candidate(
+            repo_root,
+            resolved_evidence_root,
+        )
+    matrix = load_format_conformance_matrix(repo_root)
+    report = run_release_gate(
+        repo_root,
+        verification_responder=_synthetic_format_verification,
+        evidence_root=resolved_evidence_root,
+        require_promoted_runtime=False,
+    )
+    covered = set()
+    all_cases_passed = True
+    for item in report.get("cases", []):
+        if not isinstance(item, Mapping):
+            all_cases_passed = False
+            continue
+        corpus: Mapping[str, Any] = item.get("corpus") if isinstance(item.get("corpus"), Mapping) else {}
+        case_result: Mapping[str, Any] = item.get("result") if isinstance(item.get("result"), Mapping) else {}
+        study_type = str(canonical_study_type(
+            corpus.get("study_type") or case_result.get("study_type") or str(item.get("case") or "").split("-", 1)[0]
+        ) or "")
+        if study_type == "Retrospective":
+            covered.add("retrospective-protocol")
+        else:
+            icf_template = str(item.get("icf_template") or "").strip().casefold()
+            if icf_template:
+                covered.add(f"{study_type.casefold()}-{icf_template}")
+        all_cases_passed = all_cases_passed and item.get("status") == "passed"
+    expected = {str(case["case_id"]) for case in matrix["cases"]}
+    structural_passed = (
+        report.get("status") == "structural_passed"
+        and report.get("assurance") == "synthetic-structural-only"
+        and all_cases_passed
+        and covered == expected
+    )
+    result = {
+        "schema_version": "clinical-format-conformance-report/v1",
+        "status": "structural_passed" if structural_passed else "blocked",
+        "assurance": "deterministic-structural-only",
+        "live_certification_required": True,
+        "matrix_sha256": matrix["matrix_sha256"],
+        "covered_cases": sorted(covered),
+        "expected_cases": sorted(expected),
+        "release_gate_status": report.get("status"),
+        "release_gate_assurance": report.get("assurance"),
+        "release_gate_report_sha256": canonical_evidence_sha256(report),
+        "evidence_root": report.get("evidence_root"),
+    }
+    root = Path(str(report.get("evidence_root") or resolved_evidence_root))
+    root.mkdir(parents=True, exist_ok=True)
+    _write(root / "format-conformance-report.json", result)
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix"); parser.add_argument("--format-conformance-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
@@ -4380,14 +4717,15 @@ def main(argv: list[str] | None = None) -> int:
         if not args.skills_dir: parser.error("--skills-dir is required with --rollback-release")
         result = rollback_release(Path(args.skills_dir))
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
+    elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)
     else:
-        if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless --release-gate is used")
+        if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless a release or conformance operation is used")
         run_dir = Path(args.run_dir).expanduser().resolve()
         result = {"prepare": prepare, "approve": approve, "validate": validate, "generate": generate}[args.stage](run_dir, approved_by=args.approved_by, source_md=Path(args.source_md).expanduser() if args.source_md else None)
-    print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
+    print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

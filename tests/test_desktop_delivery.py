@@ -651,6 +651,14 @@ def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_de
     candidate.mkdir(parents=True)
     (candidate / "protocol.docx").write_bytes(b"new candidate")
     (revision_dir / "approved-reference.json").write_text("{}", encoding="utf-8")
+    (revision_dir / "candidate-build.json").write_text(json.dumps({
+        "candidate_files": [{
+            "path": "candidate/protocol.docx",
+            "sha256": workflow.quality_sha256(candidate / "protocol.docx"),
+            "bytes": (candidate / "protocol.docx").stat().st_size,
+        }],
+        "render_report": {"artifacts": []},
+    }), encoding="utf-8")
     output = tmp_path / "output"
     output.mkdir()
     (output / "protocol.docx").write_bytes(b"previous release")

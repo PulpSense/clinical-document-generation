@@ -45,6 +45,7 @@ Python 3.10+ path.
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --format-conformance --format-conformance-root <evidence-root>
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
 "$CLINICAL_PYTHON" scripts/workflow.py --bind-certification /absolute/path/release-certification-corpus.json --release-archive /absolute/path/clinical-document-generation-release.zip
@@ -143,6 +144,14 @@ requests, save their exact responses, then resume the same corpus with:
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate --release-gate-root <evidence_root>
 ```
+
+Before live certification, `--format-conformance` runs the immutable matrix in
+`references/format-conformance-matrix.json`. It covers Retrospective Protocol,
+Prospective–Advarra, Prospective–Sterling, Ambispective–Advarra, and
+Ambispective–Sterling using exact hash-addressed fixtures, templates, and client
+authorities. Its `structural_passed` result is deterministic structural evidence
+only: it cannot substitute for clinical verification, genuine every-page image
+inspection, production certification, or exact-byte Desktop confirmation.
 
 The six production modules are:
 
@@ -306,6 +315,16 @@ concurrently so every-page image inspection stays off the serial critical path:
 - `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
 
 The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery.
+
+The Generation Manifest contains one hash-bound monotonic gate ledger in this
+fixed order: clinical fidelity; content completeness and consistency; DOCX/PRS
+structure; exact-artifact rendering; every-page Visual QA; exact-byte atomic
+delivery. Each gate records its evidence hash, retry owner, terminal status, and
+stable machine-readable findings. A later gate cannot pass while an earlier gate
+is pending or blocked. Publication rehashes every candidate DOCX/XML, PDF, and
+page image against the accepted build immediately before staging, then rehashes
+the staged client bytes before the atomic swap. Desktop confirmation advances
+only the final pending gate and is persisted in the Desktop operation result.
 
 The deterministic render gate also rejects pages with no meaningful body content, even when a running header or page number is present. A signature or continuation sentence may not be stranded on an otherwise empty page.
 
