@@ -1,4 +1,5 @@
 import hashlib
+import base64
 import json
 import os
 import shutil
@@ -25,6 +26,10 @@ from workflow import (
 ROOT = Path(__file__).resolve().parents[1]
 PDFIUM_WHEEL = "pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
 PDFIUM_SHA256 = "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4"
+TEST_CERTIFICATION_KEY = ROOT / "tests/fixtures/test-certification-signing-key.json"
+TEST_CERTIFICATION_KEY_ID = json.loads(
+    TEST_CERTIFICATION_KEY.read_text(encoding="utf-8")
+)["key_id"]
 
 
 def _installation_staging(tmp_path: Path) -> Path:
@@ -65,9 +70,27 @@ def _passing_provisioner(candidate: Path) -> dict:
     }
 
 
-def _certify_archive(archive_path: Path) -> None:
+def _certify_archive(
+    archive_path: Path,
+    *,
+    include_evidence: bool = True,
+    include_preflight_logs: bool = True,
+    sign: bool = True,
+    bind_report: bool = True,
+) -> None:
+    test_key = json.loads(TEST_CERTIFICATION_KEY.read_text(encoding="utf-8"))
+    test_public_key = {
+        key: value for key, value in test_key.items()
+        if key not in {"private_exponent", "test_only"}
+    }
+    package_release(
+        ROOT,
+        archive_path,
+        certification_public_key=test_public_key,
+    )
     with zipfile.ZipFile(archive_path) as archive:
-        manifest = json.loads(archive.read("clinical-document-generation/RELEASE-MANIFEST.json"))
+        manifest_bytes = archive.read("clinical-document-generation/RELEASE-MANIFEST.json")
+        manifest = json.loads(manifest_bytes)
     identity = {
         "package_fingerprint": manifest["package_fingerprint"],
         "git_commit": manifest["git_commit"],
@@ -168,9 +191,343 @@ def _certify_archive(archive_path: Path) -> None:
         "findings": [],
         "completed_at": "2026-08-28T00:02:00+00:00",
     }
+    if include_evidence:
+        entries = []
+
+        def add(
+            identity_name: str,
+            kind: str,
+            content: bytes,
+            *,
+            case_id: str | None = None,
+            path: str | None = None,
+        ) -> dict:
+            entry = _embedded_evidence_entry(
+                identity_name,
+                content,
+                kind=kind,
+                case_id=case_id,
+                path=path,
+            )
+            entries.append(entry)
+            return entry
+
+        add("release-manifest", "release_manifest", manifest_bytes)
+        synthetic_python_runtime = {
+            "version": "3.11.15",
+            "implementation": "cpython",
+            "executable_sha256": "9" * 64,
+        }
+        preflight_log_entries = {}
+        if include_preflight_logs:
+            for check_name in ("static_release_checks", "repository_regression_suite"):
+                preflight_log_entries[check_name] = add(
+                    check_name,
+                    "preflight_log",
+                    f"passing synthetic preflight log:{check_name}\n".encode(),
+                    path=f"global/preflight-logs/{check_name}.log",
+                )
+        preflight = add(
+            "preflight",
+            "preflight",
+            json.dumps({
+                "schema_version": "release-certification-preflight/v1",
+                "status": "passed",
+                "candidate": identity,
+                "python_runtime": synthetic_python_runtime,
+                "checks": {
+                    "layout_preservation_corpus": {"status": "passed", "returncode": 0},
+                    "deterministic_branch_acceptance_corpus": {"status": "passed", "returncode": 0},
+                    **{
+                        name: {
+                            "status": "passed",
+                            "returncode": 0,
+                            "sha256": (preflight_log_entries.get(name) or {}).get(
+                                "sha256", "0" * 64
+                            ),
+                        }
+                        for name in ("static_release_checks", "repository_regression_suite")
+                    },
+                },
+            }, sort_keys=True).encode(),
+        )
+        report["preflight_evidence_sha256"] = preflight["sha256"]
+        layout = add(
+            "layout-preservation",
+            "layout_preservation",
+            json.dumps(report["layout_preservation_evidence"], sort_keys=True).encode(),
+        )
+        report["layout_preservation_evidence"]["sha256"] = layout["sha256"]
+        add(
+            "deterministic-corpus",
+            "deterministic_corpus",
+            json.dumps({
+                "status": "passed",
+                "case_ids": list(workflow.DETERMINISTIC_BRANCH_ACCEPTANCE_CASES),
+            }, sort_keys=True).encode(),
+        )
+        add(
+            "runtime-identity",
+            "runtime_identity",
+            json.dumps({
+                "release_identity": identity,
+                "python": synthetic_python_runtime,
+                "page_renderer": manifest["inventory"]["pdf_page_renderer"],
+                "hermes_configuration_sha256": {
+                    fixture: workflow.sha256_value(configuration)
+                    for fixture, configuration in configurations.items()
+                },
+                "production_modules": {
+                    item["path"]: item["sha256"]
+                    for item in manifest["files"]
+                    if item["path"].startswith("scripts/") and item["path"].endswith(".py")
+                },
+            }, sort_keys=True).encode(),
+        )
+        for case in report["cases"]:
+            fixture = case["fixture_id"]
+            output_entries = []
+            for output in case["output_evidence"]:
+                content = f"synthetic certification output:{fixture}:{output['path']}".encode()
+                entry = add(
+                    f"{fixture}-output-{Path(output['path']).name}",
+                    "output",
+                    content,
+                    case_id=fixture,
+                    path=f"cases/{fixture}/{output['path']}",
+                )
+                output.update(
+                    sha256=entry["sha256"], bytes=entry["bytes"], confirmed=True
+                )
+                output_entries.append(dict(output))
+            delivery_manifest = {
+                "status": "passed",
+                "release_identity": identity,
+                "client_outputs": output_entries,
+                "quality": {"status": "passed"},
+            }
+            add(
+                f"{fixture}-delivery-manifest",
+                "delivery_manifest",
+                json.dumps(delivery_manifest, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/delivery-manifest.json",
+            )
+            add(
+                f"{fixture}-desktop-state",
+                "desktop_operation_state",
+                json.dumps({
+                    "status": "passed",
+                    "release_identity": {**identity, "hermes_configuration": configurations[fixture]},
+                    "result": {"status": "passed", "delivery": {"confirmed": True}},
+                    "cleanup": {"owned_processes_reaped": True},
+                }, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/desktop-operation.json",
+            )
+            add(
+                f"{fixture}-delivery-confirmation",
+                "delivery_confirmation",
+                json.dumps({"confirmed": True, "opened": output_entries}, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/delivery-confirmation.json",
+            )
+            fixture_artifacts = {}
+            for identity_suffix, kind in (
+                ("fixture-source", "fixture_source"),
+                ("approved-source", "approved_source"),
+                ("approved-reference", "approved_reference"),
+            ):
+                retained = add(
+                    f"{fixture}-{identity_suffix}",
+                    kind,
+                    f"synthetic non-private {kind}:{fixture}".encode(),
+                    case_id=fixture,
+                    path=f"cases/{fixture}/fixture/{identity_suffix}.dat",
+                )
+                artifact_name = {
+                    "fixture_source": "source_input",
+                    "approved_source": "approved_source",
+                    "approved_reference": "approved_reference",
+                }[kind]
+                fixture_artifacts[artifact_name] = {"sha256": retained["sha256"]}
+            add(
+                f"{fixture}-fixture-manifest",
+                "fixture_manifest",
+                json.dumps({
+                    "fixture_id": fixture,
+                    "synthetic": True,
+                    "contains_private_data": False,
+                    "artifacts": fixture_artifacts,
+                    "approved_normalization": {
+                        "source_input_sha256": fixture_artifacts["source_input"]["sha256"],
+                        "approved_source_sha256": fixture_artifacts["approved_source"]["sha256"],
+                    },
+                }, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/fixture/fixture.json",
+            )
+            drafting_request = {
+                "request_id": f"{fixture}-draft",
+                "request_sha256": hashlib.sha256(f"{fixture}-draft".encode()).hexdigest(),
+                "task": "section_drafting",
+            }
+            add(
+                f"{fixture}-drafting-request",
+                "drafting_request",
+                json.dumps(drafting_request, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/drafting-request.json",
+            )
+            add(
+                f"{fixture}-drafting-response",
+                "drafting_response",
+                json.dumps({
+                    **drafting_request,
+                    "status": "passed",
+                    "producer": {"model_id": "gpt-5.6-sol"},
+                }, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/drafting-response.json",
+            )
+            content_request = {
+                "request_id": f"{fixture}-content",
+                "request_sha256": hashlib.sha256(f"{fixture}-content".encode()).hexdigest(),
+                "task": "clinical_content_verification",
+            }
+            add(
+                f"{fixture}-content-request",
+                "verification_request",
+                json.dumps(content_request, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/content-request.json",
+            )
+            add(
+                f"{fixture}-content-response",
+                "verification_response",
+                json.dumps({
+                    **content_request,
+                    "status": "passed",
+                    "producer": {"model_id": "gpt-5.6-sol"},
+                    "section_assessments": [{"status": "passed"}],
+                    "cross_document_assessments": [{"status": "passed"}],
+                }, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/content-response.json",
+            )
+            for artifact, visual in case["visual_qa"].items():
+                pdf = add(
+                    f"{fixture}-{artifact}-pdf",
+                    "pdf",
+                    f"synthetic-pdf:{fixture}:{artifact}".encode(),
+                    case_id=fixture,
+                    path=f"cases/{fixture}/rendered/{artifact}.pdf",
+                )
+                page = add(
+                    f"{fixture}-{artifact}-page-1",
+                    "page_image",
+                    f"synthetic-page:{fixture}:{artifact}:1".encode(),
+                    case_id=fixture,
+                    path=f"cases/{fixture}/pages/{artifact}/page-1.png",
+                )
+                output = next(
+                    item for item in case["output_evidence"]
+                    if item["path"] == f"output/{artifact}.docx"
+                )
+                request = {
+                    "request_id": f"{fixture}-{artifact}-visual",
+                    "request_sha256": hashlib.sha256(
+                        f"{fixture}-{artifact}-visual".encode()
+                    ).hexdigest(),
+                    "task": "rendered_page_visual_verification",
+                    "artifacts": [{
+                        "artifact": artifact,
+                        "docx_sha256": output["sha256"],
+                        "pdf_sha256": pdf["sha256"],
+                        "pages": [{"page": 1, "sha256": page["sha256"]}],
+                    }],
+                }
+                request_entry = add(
+                    f"{fixture}-{artifact}-visual-request",
+                    "verification_request",
+                    json.dumps(request, sort_keys=True).encode(),
+                    case_id=fixture,
+                    path=f"cases/{fixture}/{artifact}-visual-request.json",
+                )
+                response_entry = add(
+                    f"{fixture}-{artifact}-parent-review",
+                    "parent_page_review",
+                    json.dumps({
+                        **request,
+                        "status": "passed",
+                        "producer": {"model_id": "gpt-5.6-sol", "source": "desktop_parent"},
+                        "page_assessments": [{
+                            "artifact": artifact,
+                            "page": 1,
+                            "sha256": page["sha256"],
+                            "status": "passed",
+                            "checks": sorted(workflow.CERTIFICATION_VISUAL_CHECKS),
+                        }],
+                    }, sort_keys=True).encode(),
+                    case_id=fixture,
+                    path=f"cases/{fixture}/{artifact}-parent-review.json",
+                )
+                visual.update(
+                    request_sha256=request_entry["sha256"],
+                    response_sha256=response_entry["sha256"],
+                    docx_sha256=output["sha256"],
+                    pdf_sha256=pdf["sha256"],
+                    page_sha256=[page["sha256"]],
+                )
+            add(
+                f"{fixture}-parent-process-marker",
+                "parent_process_marker",
+                json.dumps({
+                    "status": "completed",
+                    "completion_requirement": "Desktop parent must inspect every bound page image.",
+                    "required_producer_model_id": "gpt-5.6-sol",
+                }, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/parent-process-review.json",
+            )
+            case_report = {
+                "schema_version": "release-certification-case/v1",
+                "fixture_id": fixture,
+                "status": "passed",
+                "release_identity": identity,
+                "hermes_configuration": configurations[fixture],
+                "model_identifiers": ["gpt-5.6-sol"],
+                "output_evidence": case["output_evidence"],
+                "visual_qa": case["visual_qa"],
+            }
+            case_entry = add(
+                f"{fixture}-case-report",
+                "case_report",
+                json.dumps(case_report, sort_keys=True).encode(),
+                case_id=fixture,
+                path=f"cases/{fixture}/case-report.json",
+            )
+            case["report_sha256"] = case_entry["sha256"]
+        metadata = [
+            {key: value for key, value in entry.items() if key != "content_base64"}
+            for entry in entries
+        ]
+        report["evidence_bundle"] = {
+            "schema_version": "release-certification-evidence/v1",
+            "inventory_sha256": workflow.sha256_value(metadata),
+            "total_bytes": sum(entry["bytes"] for entry in entries),
+            "entries": entries,
+        }
+    if sign:
+        report = workflow._sign_release_certification(report, TEST_CERTIFICATION_KEY)
     report_path = archive_path.with_suffix(".certification.json")
     report_path.write_text(json.dumps(report), encoding="utf-8")
-    bind_release_certification(archive_path, report_path)
+    if bind_report:
+        bind_release_certification(
+            archive_path,
+            report_path,
+            trusted_certification_key_id=test_key["key_id"],
+        )
 
 
 def _hermes_config(skills_dir: Path) -> Path:
@@ -202,6 +559,25 @@ def test_release_packaging_refuses_an_uncommitted_release_owned_resource(tmp_pat
             package_release(ROOT, tmp_path / "release.zip")
     finally:
         dirty_resource.unlink(missing_ok=True)
+
+
+def test_production_certification_public_key_identity_is_canonical_and_pinned():
+    public_key = json.loads(
+        (ROOT / workflow.RELEASE_CERTIFICATION_PUBLIC_KEY).read_text(encoding="utf-8")
+    )
+    identity = {
+        "algorithm": public_key["algorithm"],
+        "exponent": public_key["exponent"],
+        "modulus": public_key["modulus"],
+    }
+
+    assert "private_exponent" not in public_key
+    assert workflow.sha256_value(identity) == public_key["key_id"]
+    assert quality.release_certification_key_id(public_key) == public_key["key_id"]
+    assert public_key["key_id"] == workflow.RELEASE_CERTIFICATION_TRUSTED_KEY_ID
+
+    test_key = json.loads(TEST_CERTIFICATION_KEY.read_text(encoding="utf-8"))
+    assert quality.release_certification_key_id(test_key) == test_key["key_id"]
 
 
 def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
@@ -731,6 +1107,7 @@ def test_failed_installation_smoke_keeps_the_active_skill_unchanged(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "blocked", "findings": [{"issue": "smoke failed"}]},
         provisioner=_passing_provisioner,
     )
@@ -770,6 +1147,7 @@ def test_installer_hooks_cannot_bypass_unconditional_runtime_rehash(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=lambda _candidate: {"status": "passed"},
     )
@@ -794,6 +1172,7 @@ def test_installer_rehashes_runtime_after_verifier_hook(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=mutating_verifier,
         provisioner=_passing_provisioner,
     )
@@ -802,6 +1181,110 @@ def test_installer_rehashes_runtime_after_verifier_hook(tmp_path):
     assert result["stage"] == "installation_integrity"
     assert result["findings"][0]["code"] == "renderer.pdfium_runtime_file_changed"
     assert result["findings"][0]["path"] == "pypdfium2/__init__.py"
+
+
+def test_installer_rehashes_manifest_and_certification_after_verifier_hook(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+
+    def mutating_verifier(candidate):
+        production_module = candidate / "scripts/quality.py"
+        production_module.write_bytes(production_module.read_bytes() + b"\n# tampered\n")
+        return {"status": "passed"}
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=mutating_verifier,
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "installation_integrity"
+    assert any(
+        item.get("field") == "scripts/quality.py"
+        and "hash does not match" in item.get("issue", "")
+        for item in result["findings"]
+    )
+    assert not (skills_dir / "clinical-document-generation").exists()
+
+
+def test_complete_integrity_revalidation_precedes_verifier_hook(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text("previous verified release", encoding="utf-8")
+    verifier_called = False
+
+    def symlink_substituting_provisioner(candidate):
+        provision = _passing_provisioner(candidate)
+        production_module = candidate / "scripts/quality.py"
+        alias = candidate / "runtime/manifest-owned-alias.py"
+        alias.write_bytes(production_module.read_bytes())
+        production_module.unlink()
+        production_module.symlink_to("../runtime/manifest-owned-alias.py")
+        return provision
+
+    def verifier_tripwire(_candidate):
+        nonlocal verifier_called
+        verifier_called = True
+        return {"status": "passed"}
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=verifier_tripwire,
+        provisioner=symlink_substituting_provisioner,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "provision_integrity"
+    assert verifier_called is False
+    assert any("symbolic link" in finding.get("issue", "") for finding in result["findings"])
+    assert (active / "marker.txt").read_text(encoding="utf-8") == "previous verified release"
+
+
+def test_installer_rejects_post_verifier_manifest_symlink_substitution(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+
+    def symlink_substituting_verifier(candidate):
+        production_module = candidate / "scripts/quality.py"
+        alias = candidate / "runtime/manifest-owned-alias.py"
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        alias.write_bytes(production_module.read_bytes())
+        production_module.unlink()
+        production_module.symlink_to("../runtime/manifest-owned-alias.py")
+        return {"status": "passed"}
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=symlink_substituting_verifier,
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "installation_integrity"
+    assert any(
+        item.get("field") == "scripts/quality.py"
+        and "symbolic link" in item.get("issue", "")
+        for item in result["findings"]
+    )
+    assert not (skills_dir / "clinical-document-generation").exists()
 
 
 def test_verified_installation_atomically_retains_the_previous_release(tmp_path):
@@ -820,6 +1303,7 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=verified,
         provisioner=_passing_provisioner,
     )
@@ -897,6 +1381,7 @@ def test_unsigned_or_unlisted_release_cannot_displace_active(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=lambda _candidate: {"status": "passed"},
     )
@@ -912,6 +1397,7 @@ def test_unsigned_or_unlisted_release_cannot_displace_active(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=lambda _candidate: {"status": "passed"},
     )
@@ -935,6 +1421,36 @@ def test_release_archive_rejects_unique_noncanonical_member_paths(
 
     with zipfile.ZipFile(archive_path) as archive:
         with pytest.raises(ValueError, match="noncanonical member path"):
+            workflow._validated_archive_members(archive, tmp_path / "extract")
+
+
+@pytest.mark.parametrize(("mutation", "message"), [
+    ("count", "too many members"),
+    ("member_size", "member exceeds"),
+    ("total_size", "total uncompressed"),
+    ("ratio", "compression ratio"),
+])
+def test_release_archive_is_bounded_before_extraction(tmp_path, mutation, message):
+    archive_path = tmp_path / "bounded.zip"
+    member_count = workflow.RELEASE_ARCHIVE_MAX_MEMBERS + 1 if mutation == "count" else 6
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        for index in range(member_count):
+            archive.writestr(f"clinical-document-generation/member-{index}.bin", b"x")
+
+    with zipfile.ZipFile(archive_path) as archive:
+        members = archive.infolist()
+        if mutation == "member_size":
+            members[0].file_size = workflow.RELEASE_ARCHIVE_MAX_MEMBER_BYTES + 1
+            members[0].compress_size = members[0].file_size
+        elif mutation == "total_size":
+            per_member = workflow.RELEASE_ARCHIVE_MAX_TOTAL_BYTES // len(members) + 1
+            for member in members:
+                member.file_size = per_member
+                member.compress_size = per_member
+        elif mutation == "ratio":
+            members[0].compress_size = 1
+            members[0].file_size = workflow.RELEASE_ARCHIVE_MAX_COMPRESSION_RATIO + 1
+        with pytest.raises(ValueError, match=message):
             workflow._validated_archive_members(archive, tmp_path / "extract")
 
 
@@ -964,7 +1480,7 @@ def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
         "findings": [],
     }), encoding="utf-8")
 
-    with pytest.raises(ValueError, match="does not pass and bind"):
+    with pytest.raises(ValueError, match="evidence bundle|does not pass and bind"):
         bind_release_certification(archive_path, skeletal)
 
     _certify_archive(archive_path)
@@ -979,9 +1495,281 @@ def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
             archive_path,
             skills_dir,
             hermes_config_path=_hermes_config(skills_dir),
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
             verifier=lambda _candidate: {"status": "passed"},
             provisioner=lambda _candidate: {"status": "passed"},
         )
+
+
+def test_digest_shaped_certification_summary_cannot_bind_without_evidence_bundle(
+    tmp_path,
+):
+    archive_path = tmp_path / "forged-summary.zip"
+    package_release(ROOT, archive_path)
+
+    with pytest.raises(ValueError, match="evidence bundle"):
+        _certify_archive(archive_path, include_evidence=False)
+
+
+def _embedded_evidence_entry(
+    identity: str,
+    content: bytes,
+    *,
+    kind: str = "preflight",
+    case_id: str | None = None,
+    path: str | None = None,
+) -> dict:
+    return {
+        "identity": identity,
+        "kind": kind,
+        "case_id": case_id,
+        "path": path or f"global/{identity}.json",
+        "bytes": len(content),
+        "sha256": hashlib.sha256(content).hexdigest(),
+        "content_base64": base64.b64encode(content).decode("ascii"),
+    }
+
+
+@pytest.mark.parametrize(("mutation", "message"), [
+    ("traversal", "noncanonical evidence path"),
+    ("duplicate", "duplicate evidence identity"),
+    ("changed", "evidence bytes do not match"),
+    ("oversized", "evidence item exceeds"),
+])
+def test_certification_evidence_inventory_fails_closed(mutation, message):
+    first = _embedded_evidence_entry("preflight", b"{}")
+    entries = [first]
+    if mutation == "traversal":
+        first["path"] = "global/../private.json"
+    elif mutation == "duplicate":
+        entries.append(_embedded_evidence_entry("PREFLIGHT", b"{}"))
+    elif mutation == "changed":
+        first["content_base64"] = base64.b64encode(b"changed").decode("ascii")
+    else:
+        first["bytes"] = workflow.CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES + 1
+
+    with pytest.raises(ValueError, match=message):
+        workflow._validated_certification_evidence({
+            "schema_version": "release-certification-evidence/v1",
+            "entries": entries,
+        })
+
+
+def test_oversized_certification_report_is_rejected_before_json_parsing(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    oversized = tmp_path / "oversized-certification.json"
+    with oversized.open("wb") as stream:
+        stream.truncate(workflow.CERTIFICATION_REPORT_MAX_BYTES + 1)
+
+    with pytest.raises(ValueError, match="governed encoded byte limit"):
+        bind_release_certification(archive_path, oversized)
+
+
+def test_coherently_fabricated_unsigned_evidence_cannot_bind(tmp_path):
+    unsigned = tmp_path / "unsigned.zip"
+    package_release(ROOT, unsigned)
+    candidate = tmp_path / "candidate.zip"
+    shutil.copy2(unsigned, candidate)
+    _certify_archive(unsigned, sign=False, bind_report=False)
+
+    with pytest.raises(ValueError, match="attestation|signature"):
+        bind_release_certification(candidate, unsigned.with_suffix(".certification.json"))
+
+
+def test_coherently_signed_attacker_key_cannot_replace_the_production_trust_root(tmp_path):
+    archive_path = tmp_path / "attacker-key.zip"
+    _certify_archive(archive_path)
+    report_path = archive_path.with_suffix(".certification.json")
+
+    with pytest.raises(ValueError, match="public key"):
+        bind_release_certification(archive_path, report_path)
+
+
+def test_certification_requires_both_preflight_logs(tmp_path):
+    unsigned = tmp_path / "unsigned.zip"
+    package_release(ROOT, unsigned)
+    candidate = tmp_path / "candidate.zip"
+    shutil.copy2(unsigned, candidate)
+    _certify_archive(unsigned, include_preflight_logs=False, bind_report=False)
+
+    with pytest.raises(ValueError, match="preflight logs"):
+        bind_release_certification(candidate, unsigned.with_suffix(".certification.json"))
+
+
+def test_rehashed_visual_request_artifact_substitution_cannot_bind(tmp_path):
+    unsigned = tmp_path / "unsigned.zip"
+    package_release(ROOT, unsigned)
+    candidate = tmp_path / "candidate.zip"
+    shutil.copy2(unsigned, candidate)
+    _certify_archive(unsigned)
+    report = json.loads(
+        unsigned.with_suffix(".certification.json").read_text(encoding="utf-8")
+    )
+    entry = next(
+        item for item in report["evidence_bundle"]["entries"]
+        if item["kind"] == "verification_request"
+        and json.loads(base64.b64decode(item["content_base64"]))
+        .get("task") == "rendered_page_visual_verification"
+    )
+    request = json.loads(base64.b64decode(entry["content_base64"]))
+    previous_request_sha256 = entry["sha256"]
+    request["artifacts"][0].update(
+        docx_sha256="3" * 64,
+        pdf_sha256="4" * 64,
+    )
+    request["artifacts"][0]["pages"][0]["sha256"] = "5" * 64
+    _replace_embedded_content(entry, json.dumps(request, sort_keys=True).encode())
+    case = next(item for item in report["cases"] if item["fixture_id"] == entry["case_id"])
+    visual = next(
+        item for item in case["visual_qa"].values()
+        if item["request_sha256"] == previous_request_sha256
+    )
+    visual["request_sha256"] = entry["sha256"]
+    _rehash_embedded_evidence(report)
+    report = workflow._sign_release_certification(report, TEST_CERTIFICATION_KEY)
+    forged = tmp_path / "visual-substitution.json"
+    forged.write_text(json.dumps(report), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="independent verification"):
+        bind_release_certification(candidate, forged)
+
+
+def test_rehashed_fixture_source_substitution_cannot_bind(tmp_path):
+    unsigned = tmp_path / "unsigned.zip"
+    package_release(ROOT, unsigned)
+    candidate = tmp_path / "candidate.zip"
+    shutil.copy2(unsigned, candidate)
+    _certify_archive(unsigned)
+    report_path = unsigned.with_suffix(".certification.json")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    entry = next(
+        item for item in report["evidence_bundle"]["entries"]
+        if item["kind"] == "fixture_source"
+    )
+    substituted = b"different synthetic source with recomputed identities"
+    entry.update(
+        bytes=len(substituted),
+        sha256=hashlib.sha256(substituted).hexdigest(),
+        content_base64=base64.b64encode(substituted).decode("ascii"),
+    )
+    metadata = [
+        {key: value for key, value in item.items() if key != "content_base64"}
+        for item in report["evidence_bundle"]["entries"]
+    ]
+    report["evidence_bundle"].update(
+        inventory_sha256=workflow.sha256_value(metadata),
+        total_bytes=sum(item["bytes"] for item in report["evidence_bundle"]["entries"]),
+    )
+    forged = tmp_path / "rehashed-substitution.json"
+    forged.write_text(json.dumps(report), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="independent verification"):
+        bind_release_certification(candidate, forged)
+
+
+def _rehash_embedded_evidence(report: dict) -> None:
+    entries = report["evidence_bundle"]["entries"]
+    metadata = [
+        {key: value for key, value in item.items() if key != "content_base64"}
+        for item in entries
+    ]
+    report["evidence_bundle"].update(
+        inventory_sha256=workflow.sha256_value(metadata),
+        total_bytes=sum(item["bytes"] for item in entries),
+    )
+
+
+def _replace_embedded_content(entry: dict, content: bytes) -> None:
+    entry.update(
+        bytes=len(content),
+        sha256=hashlib.sha256(content).hexdigest(),
+        content_base64=base64.b64encode(content).decode("ascii"),
+    )
+
+
+def test_signed_unrelated_binary_evidence_cannot_be_smuggled_into_certification(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    _certify_archive(archive_path)
+    report = json.loads(archive_path.with_suffix(".certification.json").read_text())
+    report["evidence_bundle"]["entries"].append(_embedded_evidence_entry(
+        "retrospective-private-session-export",
+        b"Patient: Private Person\nAPI_KEY=secret\nprivate session log\n",
+        kind="pdf",
+        case_id="retrospective",
+        path="cases/retrospective/private-session-export.pdf",
+    ))
+    _rehash_embedded_evidence(report)
+    report.pop("evidence_attestation", None)
+    report = workflow._sign_release_certification(report, TEST_CERTIFICATION_KEY)
+    forged = tmp_path / "forged-certification.json"
+    forged.write_text(json.dumps(report), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="independent verification"):
+        bind_release_certification(
+            archive_path,
+            forged,
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        )
+
+
+def test_rehashed_certification_evidence_attacks_cannot_bind(tmp_path):
+    unsigned = tmp_path / "unsigned.zip"
+    package_release(ROOT, unsigned)
+    _certify_archive(unsigned)
+    baseline = json.loads(
+        unsigned.with_suffix(".certification.json").read_text(encoding="utf-8")
+    )
+
+    def mutate_bytes(report, kind):
+        entry = next(item for item in report["evidence_bundle"]["entries"] if item["kind"] == kind)
+        _replace_embedded_content(entry, b"substituted evidence bytes")
+
+    def mutate_json(report, kind, mutation):
+        entry = next(item for item in report["evidence_bundle"]["entries"] if item["kind"] == kind)
+        payload = json.loads(base64.b64decode(entry["content_base64"]))
+        mutation(payload)
+        _replace_embedded_content(entry, json.dumps(payload, sort_keys=True).encode())
+
+    attacks = (
+        lambda report: mutate_bytes(report, "output"),
+        lambda report: mutate_bytes(report, "page_image"),
+        lambda report: mutate_json(
+            report, "runtime_identity", lambda payload: payload["python"].update(version="0.0")
+        ),
+        lambda report: mutate_json(
+            report, "parent_process_marker", lambda payload: payload.update(status="failed")
+        ),
+        lambda report: mutate_json(
+            report, "verification_response", lambda payload: payload.update(status="failed")
+        ),
+        lambda report: report["evidence_bundle"]["entries"].remove(next(
+            item for item in report["evidence_bundle"]["entries"] if item["kind"] == "pdf"
+        )),
+        lambda report: report["evidence_bundle"]["entries"].append(
+            _embedded_evidence_entry(
+                "private-session-log",
+                b"private session transcript",
+                kind="private_session_log",
+                path="global/private-session.log",
+            )
+        ),
+        lambda report: mutate_bytes(report, "release_manifest"),
+    )
+    for index, attack in enumerate(attacks):
+        report = json.loads(json.dumps(baseline))
+        attack(report)
+        _rehash_embedded_evidence(report)
+        forged = tmp_path / f"attack-{index}.json"
+        forged.write_text(json.dumps(report), encoding="utf-8")
+        candidate = tmp_path / f"candidate-{index}.zip"
+        shutil.copy2(unsigned, candidate)
+        try:
+            bind_release_certification(candidate, forged)
+        except ValueError as exc:
+            assert "independent verification" in str(exc)
+        else:
+            pytest.fail(f"Rehashed certification evidence attack {index} bound successfully.")
 
 
 def test_certification_binding_rejects_nested_identity_mutations(tmp_path):
@@ -1012,7 +1800,7 @@ def test_certification_binding_rejects_nested_identity_mutations(tmp_path):
         mutated_report = tmp_path / f"mutated-{index}.json"
         mutated_report.write_text(json.dumps(report), encoding="utf-8")
 
-        with pytest.raises(ValueError, match="does not pass and bind"):
+        with pytest.raises(ValueError, match="independent verification|does not pass and bind"):
             bind_release_certification(candidate, mutated_report)
 def test_incompatible_hermes_discovery_stops_before_activation(tmp_path):
     archive_path = tmp_path / "release.zip"
@@ -1029,6 +1817,7 @@ def test_incompatible_hermes_discovery_stops_before_activation(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=config,
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=lambda _candidate: {"status": "passed"},
     )
@@ -1059,6 +1848,7 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
             archive_path,
             skills_dir,
             hermes_config_path=config,
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
             verifier=lambda _candidate: {"status": "passed"},
             provisioner=lambda _candidate: {"status": "passed"},
         )
@@ -1078,6 +1868,7 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=config,
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=lambda _candidate: {"status": "passed"},
     )
@@ -1094,6 +1885,7 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=config,
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=lambda _candidate: {"status": "passed"},
     )
@@ -1197,6 +1989,7 @@ def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
         verifier=lambda _candidate: {"status": "passed"},
         provisioner=_passing_provisioner,
     )

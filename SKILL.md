@@ -55,21 +55,54 @@ Python 3.10+ path.
 
 `--package-release` creates the immutable candidate from the current clean
 commit. Provision the extracted certification candidate with
-`--provision-candidate`, run the full real corpus, and embed its passing report
-with `--bind-certification`. Only that one certified archive may be activated
+`--provision-candidate`, run the full real corpus, and set
+`CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY` to the authorized external RSA
+private-key JSON before embedding its passing report with `--bind-certification`.
+The private key must never be copied into the repository, archive, evidence
+bundle, logs, or installation. Only that one certified archive may be activated
 with `--install-release`; direct extraction is not a
 supported update path. Installation verifies host Word or LibreOffice, installs
 the one manifest-bound `pypdfium2` wheel offline, verifies every extracted file
 against the immutable wheel-derived inventory, and runs page rendering in a
 killable worker with governed time, page, pixel, dimension, output, and process
-resource limits. It runs an end-to-end render/page-image smoke and only then atomically
-replaces the active `clinical-document-generation` directory. A failed smoke
+resource limits. It runs an end-to-end render/page-image smoke, reruns manifest,
+certification, and runtime-integrity verification immediately after each
+provisioner/verifier hook and before invoking the next hook, rejecting a symbolic
+link at the skill root or any manifest-owned path
+component, and only then writes installation records and atomically replaces the
+active `clinical-document-generation` directory. A failed smoke
 leaves the previous verified release active. The archive contains
 `RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
 also requires Hermes `skills.external_dirs` to name only the promoted active
 path, validates the certified model/reasoning/safe-mode/turn settings declared
 under `skills.clinical_document_generation`, and records the activation in
-`PROMOTION-RECORD.json`. The manifest
+`PROMOTION-RECORD.json`.
+
+The bound certification report contains a deterministic
+`release-certification-evidence/v1` bundle. Its canonical inventory retains the
+exact release manifest, preflight report and logs, deterministic/layout evidence,
+Python/renderer/six-module/configuration identities, synthetic fixture sources
+and approvals, all three raw case/state/manifest records, output bytes, drafting
+and verification exchanges, parent-process completion records, PDFs, and every
+reviewed page image. The complete canonical report is signed with the external
+private key; binding and installation verify that detached signature against
+`references/release-certification-public-key.json`, whose exact bytes are bound
+by the immutable release manifest. Signer and verifier derive its key identity
+through one shared canonical hash of algorithm, exponent, and modulus. They then
+independently decode and rehash every item, cross-check all semantic links, and
+reject unsigned, missing, substituted,
+ambiguous, stale, or unrelated evidence. The bundle is limited to 512 files,
+32 MiB per file, and 128 MiB total. It rejects symlinks and path aliases and
+must not retain credentials, private session logs, editable-checkout debris, or
+client/patient data; fixture provenance must explicitly be synthetic and
+non-private.
+
+Before either binding or installation extracts an archive, the archive is limited
+to 1,024 members, 64 MiB per ordinary member, 195,734,187 bytes for the encoded
+certification report, 329,951,915 uncompressed bytes in total, and a 100:1 maximum
+compression ratio. Any excess fails before extraction.
+
+The manifest
 hashes every packaged file and records implementation, template, contract,
 font, renderer, harness, and model provenance. It excludes development
 environments, credentials, source/patient data, old runs, and tests.

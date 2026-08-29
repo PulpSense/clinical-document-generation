@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -1582,6 +1583,11 @@ def run_release_certification_preflight(
         "status": overall_status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
         "candidate": release_identity,
+        "python_runtime": {
+            "version": sys.version,
+            "implementation": sys.implementation.name,
+            "executable_sha256": _sha256(Path(sys.executable).resolve()),
+        },
         "repository_clean": True,
         "producer": {
             "path": "tests/hermes_e2e.py",
@@ -2095,6 +2101,235 @@ def _utc_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
+def _release_certification_evidence_bundle(
+    result: Mapping[str, Any],
+    *,
+    release_root: Path,
+    preflight_path: Path,
+    reports: Sequence[tuple[str, Path, Mapping[str, Any]]],
+    fixtures: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Retain only bounded synthetic evidence already verified by the corpus reducer."""
+    entries: list[dict[str, Any]] = []
+    seen_paths: set[str] = set()
+    authorized_roots = {
+        release_root.resolve(),
+        preflight_path.parent.resolve(),
+        *(path.parent.parent.resolve() for _, path, _ in reports),
+        *(
+            Path(path).parent.resolve()
+            for fixture in fixtures.values()
+            for path in (fixture.get("artifact_paths") or {}).values()
+        ),
+    }
+
+    def add(
+        identity: str,
+        kind: str,
+        *,
+        source: Path | None = None,
+        content: bytes | None = None,
+        case_id: str | None = None,
+        path: str,
+    ) -> dict[str, Any]:
+        if source is not None:
+            source = source.absolute()
+            resolved = source.resolve()
+            containing_root = next((
+                root for root in authorized_roots
+                if resolved == root or root in resolved.parents
+            ), None)
+            cursor = source
+            has_symlink = False
+            while containing_root is not None and cursor != containing_root:
+                if cursor.is_symlink():
+                    has_symlink = True
+                    break
+                cursor = cursor.parent
+            if containing_root is None or has_symlink or not resolved.is_file():
+                raise ValueError(f"Certification evidence source is missing or unsafe: {source}")
+            content = resolved.read_bytes()
+        if content is None:
+            raise ValueError("Certification evidence requires source bytes.")
+        if path.casefold() in seen_paths:
+            raise ValueError(f"Certification evidence path is duplicated: {path}")
+        if len(entries) >= 512 or len(content) > 32 * 1024 * 1024:
+            raise ValueError("Certification evidence exceeds the governed item limit.")
+        seen_paths.add(path.casefold())
+        entry = {
+            "identity": identity,
+            "kind": kind,
+            "case_id": case_id,
+            "path": path,
+            "bytes": len(content),
+            "sha256": hashlib.sha256(content).hexdigest(),
+            "content_base64": base64.b64encode(content).decode("ascii"),
+        }
+        entries.append(entry)
+        return entry
+
+    manifest_path = release_root / "RELEASE-MANIFEST.json"
+    manifest = _read_json(manifest_path) or {}
+    add("release-manifest", "release_manifest", source=manifest_path, path="global/release-manifest.json")
+    add("preflight", "preflight", source=preflight_path, path="global/preflight.json")
+    preflight = _read_json(preflight_path) or {}
+    for name, kind in (
+        ("static_release_checks", "preflight_log"),
+        ("layout_preservation_corpus", "layout_preservation"),
+        ("deterministic_branch_acceptance_corpus", "deterministic_corpus"),
+        ("repository_regression_suite", "preflight_log"),
+    ):
+        check = (preflight.get("checks") or {}).get(name) or {}
+        log_path = _contained_run_path(preflight_path.parent, check.get("log_path"))
+        if log_path is None:
+            raise ValueError(f"Certification preflight log escapes its evidence root: {name}")
+        add(name, kind, source=log_path, path=f"global/preflight-logs/{name}.log")
+    python_path = Path(sys.executable).resolve()
+    runtime_identity = {
+        "release_identity": result.get("release_identity") or {},
+        "python": {
+            "version": sys.version,
+            "implementation": sys.implementation.name,
+            "executable_sha256": _sha256(python_path),
+        },
+        "page_renderer": (manifest.get("inventory") or {}).get("pdf_page_renderer"),
+        "hermes_configuration_sha256": {
+            fixture: _canonical_sha256(configuration)
+            for fixture, configuration in (result.get("hermes_configurations") or {}).items()
+        },
+        "production_modules": {
+            item["path"]: item["sha256"]
+            for item in manifest.get("files") or []
+            if str(item.get("path") or "").startswith("scripts/")
+            and str(item.get("path") or "").endswith(".py")
+        },
+    }
+    add(
+        "runtime-identity", "runtime_identity",
+        content=json.dumps(runtime_identity, sort_keys=True).encode(),
+        path="global/runtime-identity.json",
+    )
+    case_summaries = {
+        str(case.get("fixture_id") or ""): case for case in result.get("cases") or []
+    }
+    for fixture_id, report_path, report in reports:
+        run_dir = report_path.parent.parent
+        fixture = fixtures[fixture_id]
+        prefix = f"cases/{fixture_id}"
+        add(
+            f"{fixture_id}-case-report", "case_report", source=report_path,
+            case_id=fixture_id, path=f"{prefix}/case-report.json",
+        )
+        bound = report.get("bound_evidence") or {}
+        state_path = _contained_run_path(run_dir, (bound.get("desktop_operation_state") or {}).get("path"))
+        manifest_run_path = _contained_run_path(run_dir, (bound.get("delivery_manifest") or {}).get("path"))
+        if state_path is None or manifest_run_path is None:
+            raise ValueError(f"Certification case bound evidence escapes its run: {fixture_id}")
+        add(
+            f"{fixture_id}-desktop-state", "desktop_operation_state", source=state_path,
+            case_id=fixture_id, path=f"{prefix}/desktop-operation.json",
+        )
+        add(
+            f"{fixture_id}-delivery-manifest", "delivery_manifest", source=manifest_run_path,
+            case_id=fixture_id, path=f"{prefix}/delivery-manifest.json",
+        )
+        delivery_manifest = _read_json(manifest_run_path) or {}
+        desktop_state = _read_json(state_path) or {}
+        summary = case_summaries[fixture_id]
+        add(
+            f"{fixture_id}-delivery-confirmation", "delivery_confirmation",
+            content=json.dumps({
+                "confirmed": bool((((desktop_state.get("result") or {}).get("delivery") or {}).get("confirmed"))),
+                "opened": list(summary.get("output_evidence") or []),
+            }, sort_keys=True).encode(),
+            case_id=fixture_id, path=f"{prefix}/delivery-confirmation.json",
+        )
+        fixture_paths = fixture["artifact_paths"]
+        for name, kind in (
+            ("source_input", "fixture_source"),
+            ("approved_source", "approved_source"),
+            ("approved_reference", "approved_reference"),
+        ):
+            add(
+                f"{fixture_id}-{name.replace('_', '-')}", kind, source=fixture_paths[name],
+                case_id=fixture_id, path=f"{prefix}/fixture/{Path(fixture_paths[name]).name}",
+            )
+        add(
+            f"{fixture_id}-fixture-manifest", "fixture_manifest",
+            source=fixture_paths["source_input"].parent / "fixture.json",
+            case_id=fixture_id, path=f"{prefix}/fixture/fixture.json",
+        )
+        for output in summary.get("output_evidence") or []:
+            source = _contained_run_path(run_dir, output.get("path"))
+            if source is None:
+                raise ValueError(f"Certification output escapes its run: {fixture_id}")
+            add(
+                f"{fixture_id}-output-{Path(str(output.get('path'))).name}", "output", source=source,
+                case_id=fixture_id, path=f"{prefix}/{output.get('path')}",
+            )
+        for index, drafting in enumerate(delivery_manifest.get("drafting_evidence") or []):
+            for field, kind in (("accepted_request_path", "drafting_request"), ("path", "drafting_response")):
+                source = _contained_run_path(manifest_run_path.parent, drafting.get(field))
+                if source is None:
+                    raise ValueError(f"Certification drafting evidence escapes its run: {fixture_id}")
+                add(
+                    f"{fixture_id}-{kind}-{index}", kind, source=source,
+                    case_id=fixture_id, path=f"{prefix}/drafting/{index}-{kind}.json",
+                )
+        verification = ((delivery_manifest.get("quality") or {}).get("verification_evidence") or {})
+        for evidence_id, evidence in verification.items():
+            request = _contained_run_path(manifest_run_path.parent, evidence.get("request"))
+            response = _contained_run_path(manifest_run_path.parent, evidence.get("response"))
+            if request is None or response is None:
+                raise ValueError(f"Certification verification evidence escapes its run: {fixture_id}")
+            add(
+                f"{fixture_id}-{evidence_id}-request", "verification_request", source=request,
+                case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-request.json",
+            )
+            response_kind = "verification_response" if evidence_id == "clinical_content_verification" else "parent_page_review"
+            add(
+                f"{fixture_id}-{evidence_id}-response", response_kind, source=response,
+                case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-response.json",
+            )
+            for artifact in evidence.get("artifacts") or []:
+                artifact_name = str(artifact.get("artifact") or "")
+                pdf_path = next((
+                    _contained_run_path(manifest_run_path.parent, item.get("pdf"))
+                    for item in (((delivery_manifest.get("quality") or {}).get("render_assurance") or {}).get("render") or {}).get("artifacts") or []
+                    if item.get("artifact") == artifact_name
+                ), None)
+                if pdf_path is None:
+                    raise ValueError(f"Certification PDF evidence is missing: {fixture_id}:{artifact_name}")
+                add(
+                    f"{fixture_id}-{artifact_name}-pdf", "pdf", source=pdf_path,
+                    case_id=fixture_id, path=f"{prefix}/rendered/{artifact_name}.pdf",
+                )
+                for page in artifact.get("pages") or []:
+                    page_path = _contained_run_path(manifest_run_path.parent, page.get("path"))
+                    if page_path is None:
+                        raise ValueError(f"Certification page evidence escapes its run: {fixture_id}")
+                    page_number = int(page.get("page") or 0)
+                    add(
+                        f"{fixture_id}-{artifact_name}-page-{page_number}", "page_image", source=page_path,
+                        case_id=fixture_id, path=f"{prefix}/pages/{artifact_name}/page-{page_number}.png",
+                    )
+        parent_marker = run_dir / "logs/desktop-parent-visual-review.json"
+        add(
+            f"{fixture_id}-parent-process-marker", "parent_process_marker", source=parent_marker,
+            case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
+        )
+    total_bytes = sum(item["bytes"] for item in entries)
+    if total_bytes > 128 * 1024 * 1024:
+        raise ValueError("Certification evidence exceeds the governed bundle limit.")
+    metadata = [{key: value for key, value in item.items() if key != "content_base64"} for item in entries]
+    return {
+        "schema_version": "release-certification-evidence/v1",
+        "inventory_sha256": _canonical_sha256(metadata),
+        "total_bytes": total_bytes,
+        "entries": entries,
+    }
+
+
 def certify_release_corpus(
     case_report_paths: Sequence[Path],
     *,
@@ -2278,6 +2513,14 @@ def certify_release_corpus(
         "findings": findings,
         "completed_at": datetime.now(timezone.utc).isoformat(),
     }
+    if not findings:
+        result["evidence_bundle"] = _release_certification_evidence_bundle(
+            result,
+            release_root=release_root.resolve(),
+            preflight_path=preflight_path,
+            reports=reports,
+            fixtures=fixtures,
+        )
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

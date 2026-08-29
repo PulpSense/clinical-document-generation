@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
+import hmac
 import importlib
 import importlib.util
 import json
@@ -19,7 +22,7 @@ import tempfile
 import time
 import zipfile
 import zlib
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
 
 from docx import Document
@@ -53,6 +56,27 @@ PDFIUM_MAX_TOTAL_PIXELS = 1_000_000_000
 PDFIUM_MAX_OUTPUT_BYTES = 1_000_000_000
 PDFIUM_WORKER_MEMORY_BYTES = 2 * 1024 * 1024 * 1024
 PDFIUM_WORKER_FILE_BYTES = PDFIUM_MAX_OUTPUT_BYTES + 64 * 1024 * 1024
+RELEASE_CERTIFICATION_PUBLIC_KEY = "references/release-certification-public-key.json"
+RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM = "rsa-pkcs1-v1_5-sha256"
+RELEASE_CERTIFICATION_TRUSTED_KEY_ID = "50aa8bde2e3f31c7c24984078dbe1d236f118e0744c43a84d0e4c77ffcc1107c"
+_SHA256_DIGEST_INFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
+CERTIFICATION_EVIDENCE_MAX_FILES = 512
+CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES = 32 * 1024 * 1024
+CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES = 128 * 1024 * 1024
+CERTIFICATION_CASE_ORDER = (
+    "retrospective", "ambispective-sterling", "prospective-advarra",
+)
+DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
+    "prospective-sparse-complete", "prospective-rich-complete",
+    "ambispective-sparse-complete", "ambispective-rich-complete",
+    "retrospective-sparse-complete", "retrospective-rich-complete",
+)
+CERTIFICATION_VISUAL_CHECKS = {
+    "artificial_pagination", "bad_table_split", "blank_page", "clipping",
+    "duplicate_section", "excessive_whitespace", "footer_collision",
+    "inconsistent_style", "missing_header_footer", "orphan_heading",
+    "overflow", "overlap", "toc_mismatch", "unreadable_text",
+}
 
 SYMBOL_FONT_FALLBACKS = (
     "Apple Symbols",
@@ -127,6 +151,530 @@ def sha256_file(path: Path) -> str:
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""): digest.update(chunk)
     return digest.hexdigest()
+
+
+def release_certification_payload(report: Mapping[str, Any]) -> bytes:
+    """Canonical bytes covered by the detached release-certification signature."""
+    unsigned = dict(report)
+    unsigned.pop("evidence_attestation", None)
+    return json.dumps(
+        unsigned,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+
+
+def _canonical_sha256_value(value: Any) -> str:
+    return hashlib.sha256(json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+
+
+def release_certification_key_id(key: Mapping[str, Any]) -> str:
+    """Return the canonical identity shared by certification signers and verifiers."""
+    identity = {
+        "algorithm": str(key.get("algorithm") or ""),
+        "exponent": int(str(key.get("exponent") or "")),
+        "modulus": format(int(str(key.get("modulus") or ""), 16), "x"),
+    }
+    return _canonical_sha256_value(identity)
+
+
+def _validated_certification_evidence(bundle: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Decode one bounded canonical evidence inventory and rehash every byte."""
+    if bundle.get("schema_version") != "release-certification-evidence/v1":
+        raise ValueError("Certification evidence bundle schema is invalid.")
+    entries = bundle.get("entries")
+    if not isinstance(entries, list) or not entries or len(entries) > CERTIFICATION_EVIDENCE_MAX_FILES:
+        raise ValueError("Certification evidence bundle has an invalid file count.")
+    identities: set[str] = set()
+    paths: set[str] = set()
+    total_bytes = 0
+    decoded: list[dict[str, Any]] = []
+    for raw_item in entries:
+        if not isinstance(raw_item, Mapping):
+            raise ValueError("Certification evidence inventory item is invalid.")
+        item = dict(raw_item)
+        identity = str(item.get("identity") or "")
+        identity_key = identity.casefold()
+        if not identity or identity_key in identities:
+            raise ValueError("Certification evidence contains a duplicate evidence identity.")
+        identities.add(identity_key)
+        if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,127}", identity):
+            raise ValueError("Certification evidence identity is noncanonical.")
+        path_text = str(item.get("path") or "")
+        relative = PurePosixPath(path_text)
+        if (
+            not path_text
+            or "\\" in path_text
+            or any(part in {"", ".", ".."} for part in path_text.split("/"))
+            or relative.is_absolute()
+            or relative.as_posix() != path_text
+            or relative.parts[0] not in {"global", "cases"}
+        ):
+            raise ValueError(f"Certification evidence has a noncanonical evidence path: {path_text}")
+        path_key = path_text.casefold()
+        if path_key in paths:
+            raise ValueError("Certification evidence contains a duplicate evidence path.")
+        paths.add(path_key)
+        declared_bytes = item.get("bytes")
+        if isinstance(declared_bytes, bool) or not isinstance(declared_bytes, int):
+            raise ValueError("Certification evidence byte length is invalid.")
+        if declared_bytes < 0 or declared_bytes > CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES:
+            raise ValueError("Certification evidence item exceeds the governed byte limit.")
+        try:
+            content = base64.b64decode(
+                str(item.get("content_base64") or ""), validate=True
+            )
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError("Certification evidence content is not strict base64.") from exc
+        if (
+            len(content) != declared_bytes
+            or hashlib.sha256(content).hexdigest() != item.get("sha256")
+        ):
+            raise ValueError("Certification evidence bytes do not match the inventory.")
+        total_bytes += declared_bytes
+        if total_bytes > CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES:
+            raise ValueError("Certification evidence bundle exceeds the governed byte limit.")
+        decoded.append({**item, "content": content})
+    return decoded
+
+
+def _certification_evidence_findings(
+    report: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    manifest_bytes: bytes,
+) -> list[str]:
+    """Independently derive certification claims from retained evidence bytes."""
+    bundle = report.get("evidence_bundle") or {}
+    try:
+        entries = _validated_certification_evidence(bundle)
+    except ValueError as exc:
+        return [str(exc)]
+    metadata = [
+        {key: value for key, value in item.items() if key not in {"content", "content_base64"}}
+        for item in entries
+    ]
+    if (
+        bundle.get("inventory_sha256") != _canonical_sha256_value(metadata)
+        or bundle.get("total_bytes") != sum(item["bytes"] for item in entries)
+    ):
+        return ["Certification evidence inventory identity or total byte count is invalid."]
+    allowed_kinds = {
+        "release_manifest", "preflight", "preflight_log", "layout_preservation", "deterministic_corpus",
+        "runtime_identity", "case_report", "desktop_operation_state", "delivery_manifest",
+        "output", "delivery_confirmation", "drafting_request", "drafting_response",
+        "verification_request", "verification_response", "parent_page_review", "parent_process_marker",
+        "fixture_manifest", "fixture_source", "approved_source", "approved_reference", "pdf", "page_image",
+    }
+    findings: list[str] = []
+    indexed: dict[tuple[str | None, str], list[dict[str, Any]]] = {}
+    parsed: dict[str, dict[str, Any] | None] = {}
+    consumed_identities: set[str] = set()
+    for item in entries:
+        identity_key = str(item["identity"])
+        kind = str(item.get("kind") or "")
+        case_id = item.get("case_id")
+        path = str(item.get("path") or "")
+        if kind not in allowed_kinds:
+            findings.append(f"Evidence kind is not release-authorized: {kind!r}.")
+            continue
+        if case_id is None:
+            if not path.startswith("global/"):
+                findings.append(f"Global evidence has a case path: {path}.")
+        elif case_id not in CERTIFICATION_CASE_ORDER or not path.startswith(f"cases/{case_id}/"):
+            findings.append(f"Case evidence is mis-scoped: {path}.")
+        indexed.setdefault((case_id, kind), []).append(item)
+        if kind not in {"output", "pdf", "page_image", "release_manifest"}:
+            try:
+                value = json.loads(item["content"])
+                parsed[identity_key] = value if isinstance(value, dict) else None
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                parsed[identity_key] = None
+
+    def items(case_id: str | None, kind: str) -> list[dict[str, Any]]:
+        return indexed.get((case_id, kind), [])
+
+    def consume(evidence: Iterable[Mapping[str, Any]]) -> None:
+        consumed_identities.update(str(item.get("identity") or "") for item in evidence)
+
+    def one(case_id: str | None, kind: str) -> dict[str, Any] | None:
+        matches = items(case_id, kind)
+        if len(matches) != 1:
+            findings.append(f"Exactly one {kind!r} item is required for {case_id or 'global'}.")
+            return None
+        consume(matches)
+        return matches[0]
+
+    def payload(item: Mapping[str, Any] | None) -> dict[str, Any]:
+        return parsed.get(str((item or {}).get("identity") or "")) or {}
+
+    manifest_item = one(None, "release_manifest")
+    if manifest_item is not None and manifest_item["content"] != manifest_bytes:
+        findings.append("Retained release-manifest bytes do not match the installed manifest.")
+    identity = report.get("release_identity") or {}
+    preflight_item = one(None, "preflight")
+    preflight = payload(preflight_item)
+    required_checks = {
+        "layout_preservation_corpus", "deterministic_branch_acceptance_corpus",
+        "repository_regression_suite", "static_release_checks",
+    }
+    check_values = preflight.get("checks") or {}
+    if (
+        preflight_item is None
+        or preflight_item.get("sha256") != report.get("preflight_evidence_sha256")
+        or preflight.get("status") != "passed"
+        or preflight.get("candidate") != identity
+        or set(check_values) != required_checks
+        or any(
+            not isinstance(value, Mapping)
+            or value.get("status") != "passed"
+            or value.get("returncode") != 0
+            for value in check_values.values()
+        )
+    ):
+        findings.append("Preflight evidence does not independently pass every required check.")
+    layout_item = one(None, "layout_preservation")
+    layout = payload(layout_item)
+    layout_summary = report.get("layout_preservation_evidence") or {}
+    layout_check = check_values.get("layout_preservation_corpus") or {}
+    if (
+        layout_item is None
+        or layout_item.get("sha256") != layout_summary.get("sha256")
+        or not (
+            layout.get("status") == "passed" and layout.get("returncode") == 0
+            or isinstance(layout_check, Mapping)
+            and layout_check.get("status") == "passed"
+            and layout_check.get("returncode") == 0
+            and layout_check.get("sha256") == layout_item.get("sha256")
+        )
+        or set((layout or layout_check).get("coverage") or []) != set(layout_summary.get("coverage") or [])
+    ):
+        findings.append("Layout-preservation evidence is incomplete or stale.")
+    deterministic_item = one(None, "deterministic_corpus")
+    deterministic = payload(deterministic_item)
+    deterministic_check = check_values.get("deterministic_branch_acceptance_corpus") or {}
+    if (
+        not (
+            deterministic.get("status") == "passed"
+            and set(deterministic.get("case_ids") or []) == set(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
+            or isinstance(deterministic_check, Mapping)
+            and deterministic_check.get("status") == "passed"
+            and deterministic_check.get("returncode") == 0
+            and deterministic_item is not None
+            and deterministic_check.get("sha256") == deterministic_item.get("sha256")
+            and set(deterministic_check.get("case_ids") or []) == set(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
+        )
+    ):
+        findings.append("Deterministic branch-acceptance evidence is incomplete.")
+    preflight_logs = {
+        str(item.get("identity") or ""): item
+        for item in items(None, "preflight_log")
+    }
+    consume(preflight_logs.values())
+    required_preflight_logs = {
+        "static_release_checks", "repository_regression_suite",
+    }
+    if (
+        set(preflight_logs) != required_preflight_logs
+        or any(
+            not isinstance(check_values.get(name), Mapping)
+            or check_values[name].get("sha256") != preflight_logs[name].get("sha256")
+            for name in required_preflight_logs
+        )
+    ):
+        findings.append("Static and repository-regression preflight logs are incomplete.")
+    runtime = payload(one(None, "runtime_identity"))
+    configurations = report.get("hermes_configurations") or {}
+    expected_modules = {
+        item["path"]: item["sha256"]
+        for item in manifest.get("files") or []
+        if str(item.get("path") or "").startswith("scripts/")
+        and str(item.get("path") or "").endswith(".py")
+    }
+    if (
+        runtime.get("release_identity") != identity
+        or runtime.get("python") != preflight.get("python_runtime")
+        or runtime.get("page_renderer") != (manifest.get("inventory") or {}).get("pdf_page_renderer")
+        or runtime.get("production_modules") != expected_modules
+        or not str((runtime.get("python") or {}).get("version") or "")
+        or not re.fullmatch(r"[0-9a-f]{64}", str((runtime.get("python") or {}).get("executable_sha256") or ""))
+        or runtime.get("hermes_configuration_sha256") != {
+            fixture: _canonical_sha256_value(configuration) for fixture, configuration in configurations.items()
+        }
+    ):
+        findings.append("Python, worker, skill, renderer, or Hermes configuration identity is invalid.")
+
+    cases = {str(item.get("fixture_id") or ""): item for item in report.get("cases") or []}
+    for fixture in CERTIFICATION_CASE_ORDER:
+        case = cases.get(fixture) or {}
+        models = set(case.get("model_identifiers") or [])
+        case_item = one(fixture, "case_report")
+        case_payload = payload(case_item)
+        state = payload(one(fixture, "desktop_operation_state"))
+        delivery_manifest = payload(one(fixture, "delivery_manifest"))
+        delivery = payload(one(fixture, "delivery_confirmation"))
+        raw_case_identity = case_payload.get("release_identity") or {}
+        if (
+            case_item is None or case_item.get("sha256") != case.get("report_sha256")
+            or case_payload.get("status", case_payload.get("outcome")) != "passed"
+            or {key: raw_case_identity.get(key) for key in identity} != identity
+            or case_payload.get("hermes_configuration") != configurations.get(fixture)
+            or set(case_payload.get("model_identifiers") or []) != models
+        ):
+            findings.append(f"Case report is incomplete or stale for {fixture}.")
+        state_identity = state.get("release_identity") or {}
+        if (
+            state.get("status") != "passed"
+            or (state.get("result") or {}).get("status") != "passed"
+            or not ((state.get("result") or {}).get("delivery") or {}).get("confirmed")
+            or not (state.get("cleanup") or {}).get("owned_processes_reaped")
+            or {key: state_identity.get(key) for key in identity} != identity
+            or state_identity.get("hermes_configuration") != configurations.get(fixture)
+        ):
+            findings.append(f"Desktop operation evidence does not pass for {fixture}.")
+        expected_outputs = {str(item.get("path") or ""): item for item in case.get("output_evidence") or []}
+        actual_outputs = {
+            str(item["path"])[len(f"cases/{fixture}/"):]: item for item in items(fixture, "output")
+        }
+        consume(actual_outputs.values())
+        if set(actual_outputs) != set(expected_outputs):
+            findings.append(f"Output evidence does not cover the delivered set for {fixture}.")
+        for path, expected in expected_outputs.items():
+            actual = actual_outputs.get(path) or {}
+            if actual.get("sha256") != expected.get("sha256") or actual.get("bytes") != expected.get("bytes") or expected.get("confirmed") is not True:
+                findings.append(f"Output bytes do not match {fixture}:{path}.")
+        manifest_outputs = {
+            str(item.get("path") or ""): {
+                key: item.get(key) for key in ("path", "sha256", "bytes")
+            }
+            for item in delivery_manifest.get("client_outputs") or []
+        }
+        expected_manifest_outputs = {
+            path: {key: item.get(key) for key in ("path", "sha256", "bytes")}
+            for path, item in expected_outputs.items()
+        }
+        opened_outputs = {str(item.get("path") or ""): item for item in delivery.get("opened") or []}
+        if (
+            delivery_manifest.get("status") != "passed"
+            or (delivery_manifest.get("quality") or {}).get("status") != "passed"
+            or manifest_outputs != expected_manifest_outputs
+            or delivery.get("confirmed") is not True
+            or opened_outputs != expected_outputs
+        ):
+            findings.append(f"Delivery evidence is invalid for {fixture}.")
+        draft_request_items = items(fixture, "drafting_request")
+        draft_response_items = items(fixture, "drafting_response")
+        consume(draft_request_items)
+        consume(draft_response_items)
+        draft_requests = {payload(item).get("request_id"): payload(item) for item in draft_request_items}
+        draft_responses = [payload(item) for item in draft_response_items]
+        if (
+            not draft_requests
+            or len(draft_requests) != len(draft_responses)
+            or any(
+                not (request := draft_requests.get(response.get("request_id")))
+                or response.get("request_sha256") != request.get("request_sha256")
+                or response.get("status") not in {None, "passed"}
+                or (response.get("producer") or {}).get("model_id") not in models
+                for response in draft_responses
+            )
+        ):
+            findings.append(f"Drafting worker evidence is incomplete for {fixture}.")
+        fixture_manifest = payload(one(fixture, "fixture_manifest"))
+        fixture_source = one(fixture, "fixture_source")
+        approved_source = one(fixture, "approved_source")
+        approved_reference = one(fixture, "approved_reference")
+        provenance = fixture_manifest.get("provenance") or fixture_manifest
+        if provenance.get("synthetic") is not True or provenance.get("contains_private_data") is not False:
+            findings.append(f"Fixture evidence is not explicitly synthetic and non-private for {fixture}.")
+        artifact_entries = {
+            "source_input": fixture_source,
+            "approved_source": approved_source,
+            "approved_reference": approved_reference,
+        }
+        manifest_artifacts = fixture_manifest.get("artifacts") or {}
+        if any(
+            entry is None
+            or (manifest_artifacts.get(name) or {}).get("sha256") != entry.get("sha256")
+            for name, entry in artifact_entries.items()
+        ):
+            findings.append(f"Retained fixture source bytes do not match the governed fixture manifest for {fixture}.")
+        normalization = fixture_manifest.get("approved_normalization") or {}
+        if (
+            normalization.get("source_input_sha256") != (fixture_source or {}).get("sha256")
+            or normalization.get("approved_source_sha256") != (approved_source or {}).get("sha256")
+        ):
+            findings.append(f"Retained approved source normalization is invalid for {fixture}.")
+        request_items = items(fixture, "verification_request")
+        response_items = items(fixture, "verification_response")
+        consume(request_items)
+        consume(response_items)
+        requests = [(item, payload(item)) for item in request_items]
+        content_requests = [(item, value) for item, value in requests if value.get("task") == "clinical_content_verification"]
+        content_responses = [(item, payload(item)) for item in response_items]
+        if len(content_requests) != 1 or len(content_responses) != 1:
+            findings.append(f"Content verification evidence is incomplete for {fixture}.")
+        else:
+            request = content_requests[0][1]
+            response = content_responses[0][1]
+            if (
+                response.get("request_id") != request.get("request_id")
+                or response.get("request_sha256") != request.get("request_sha256")
+                or response.get("task") != request.get("task")
+                or response.get("status") != "passed"
+                or (response.get("producer") or {}).get("model_id") not in models
+                or not response.get("section_assessments")
+                or any(item.get("status") != "passed" for item in response.get("section_assessments") or [])
+                or not response.get("cross_document_assessments")
+                or any(item.get("status") != "passed" for item in response.get("cross_document_assessments") or [])
+            ):
+                findings.append(f"Content verification does not pass for {fixture}.")
+        visual_requests = [(item, value) for item, value in requests if value.get("task") == "rendered_page_visual_verification"]
+        parent_review_items = items(fixture, "parent_page_review")
+        consume(parent_review_items)
+        parent_reviews = [(item, payload(item)) for item in parent_review_items]
+        parent_marker = payload(one(fixture, "parent_process_marker"))
+        visual_summary = case.get("visual_qa") or {}
+        if len(visual_requests) != len(visual_summary) or len(parent_reviews) != len(visual_summary):
+            findings.append(f"Every-page review set is incomplete for {fixture}.")
+        if (
+            parent_marker.get("status") != "completed"
+            or parent_marker.get("completion_requirement")
+            != "Desktop parent must inspect every bound page image."
+            or parent_marker.get("required_producer_model_id") not in models
+        ):
+            findings.append(f"Desktop-parent review completion evidence is invalid for {fixture}.")
+        for artifact, visual in visual_summary.items():
+            request_pair = next((pair for pair in visual_requests if pair[0].get("sha256") == visual.get("request_sha256")), None)
+            review_pair = next((
+                pair for pair in parent_reviews
+                if any(part.get("artifact") == artifact for part in pair[1].get("page_assessments") or [])
+            ), None)
+            pdf = next((item for item in items(fixture, "pdf") if str(item["path"]).endswith(f"/{artifact}.pdf")), None)
+            page_items = [item for item in items(fixture, "page_image") if f"/pages/{artifact}/" in str(item["path"])]
+            consume([pdf] if pdf is not None else [])
+            consume(page_items)
+            expected_pages = list(visual.get("page_sha256") or [])
+            request_item, request = request_pair or ({}, {})
+            review_item, review = review_pair or ({}, {})
+            assessments = review.get("page_assessments") or []
+            docx = actual_outputs.get(f"output/{artifact}.docx") or {}
+            retained_page_sha256 = [item.get("sha256") for item in page_items]
+            request_artifacts = [
+                item for item in request.get("artifacts") or []
+                if item.get("artifact") == artifact
+            ]
+            request_artifact = request_artifacts[0] if len(request_artifacts) == 1 else {}
+            if (
+                request_item.get("sha256") != visual.get("request_sha256")
+                or review_item.get("sha256") != visual.get("response_sha256")
+                or review.get("request_id") != request.get("request_id")
+                or review.get("request_sha256") != request.get("request_sha256")
+                or request_artifact.get("docx_sha256") != docx.get("sha256")
+                or request_artifact.get("pdf_sha256") != (pdf or {}).get("sha256")
+                or [item.get("sha256") for item in request_artifact.get("pages") or []]
+                != retained_page_sha256
+                or review.get("status") != "passed"
+                or (review.get("producer") or {}).get("model_id") not in models
+                or (pdf or {}).get("sha256") != visual.get("pdf_sha256")
+                or retained_page_sha256 != expected_pages
+                or [item.get("sha256") for item in assessments] != expected_pages
+                or any(item.get("status") != "passed" or set(item.get("checks") or []) != CERTIFICATION_VISUAL_CHECKS for item in assessments)
+            ):
+                findings.append(f"PDF or parent every-page review is invalid for {fixture}:{artifact}.")
+    unconsumed = sorted(
+        str(item.get("path") or item.get("identity") or "")
+        for item in entries
+        if str(item.get("identity") or "") not in consumed_identities
+    )
+    if unconsumed:
+        findings.append(
+            "Certification evidence contains unrelated or semantically unbound items: "
+            + ", ".join(unconsumed)
+            + "."
+        )
+    return findings
+
+
+def release_certification_attestation_findings(
+    report: Mapping[str, Any],
+    manifest: Mapping[str, Any],
+    skill_root: Path,
+    *,
+    trusted_key_id: str = RELEASE_CERTIFICATION_TRUSTED_KEY_ID,
+) -> list[str]:
+    """Verify report provenance against the manifest-bound release public key."""
+    findings: list[str] = []
+    key_path = skill_root / RELEASE_CERTIFICATION_PUBLIC_KEY
+    try:
+        key_bytes = key_path.read_bytes()
+        key = json.loads(key_bytes)
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"Release certification public key is unavailable or invalid: {exc}"]
+    manifest_entry = next(
+        (
+            item for item in manifest.get("files") or []
+            if item.get("path") == RELEASE_CERTIFICATION_PUBLIC_KEY
+        ),
+        None,
+    )
+    if (
+        manifest_entry is None
+        or manifest_entry.get("bytes") != len(key_bytes)
+        or manifest_entry.get("sha256") != hashlib.sha256(key_bytes).hexdigest()
+    ):
+        findings.append("Release certification public key is not bound to the immutable manifest.")
+    try:
+        modulus = int(str(key.get("modulus") or ""), 16)
+        exponent = int(key.get("exponent"))
+    except (TypeError, ValueError):
+        return findings + ["Release certification public key parameters are invalid."]
+    try:
+        key_identity = release_certification_key_id(key)
+    except (TypeError, ValueError):
+        return findings + ["Release certification public key identity is invalid."]
+    if (
+        key.get("schema_version") != "release-certification-public-key/v1"
+        or key.get("algorithm") != RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM
+        or key.get("key_id") != key_identity
+        or key_identity != trusted_key_id
+        or exponent < 3
+        or exponent % 2 == 0
+        or modulus.bit_length() < 2048
+    ):
+        findings.append("Release certification public key identity or strength is invalid.")
+    attestation = report.get("evidence_attestation") or {}
+    payload_digest = hashlib.sha256(release_certification_payload(report)).digest()
+    if (
+        attestation.get("schema_version") != "release-certification-attestation/v1"
+        or attestation.get("algorithm") != RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM
+        or attestation.get("key_id") != key_identity
+        or attestation.get("payload_sha256") != payload_digest.hex()
+    ):
+        findings.append("Release certification evidence attestation metadata is missing or invalid.")
+        return findings
+    try:
+        signature = base64.b64decode(
+            str(attestation.get("signature_base64") or ""),
+            validate=True,
+        )
+    except (binascii.Error, ValueError):
+        return findings + ["Release certification evidence signature is not strict base64."]
+    encoded_bytes = (modulus.bit_length() + 7) // 8
+    digest_info = _SHA256_DIGEST_INFO_PREFIX + payload_digest
+    expected = b"\x00\x01" + b"\xff" * (encoded_bytes - len(digest_info) - 3) + b"\x00" + digest_info
+    if len(signature) != encoded_bytes:
+        findings.append("Release certification evidence signature has an invalid length.")
+    else:
+        recovered = pow(int.from_bytes(signature, "big"), exponent, modulus).to_bytes(encoded_bytes, "big")
+        if not hmac.compare_digest(recovered, expected):
+            findings.append("Release certification evidence signature does not verify.")
+    return findings
 
 
 def _manifest_package_fingerprint(manifest: Mapping[str, Any]) -> tuple[str, str]:

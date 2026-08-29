@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+
+import pytest
 
 from hermes_e2e import (
     CERTIFICATION_CORPUS,
@@ -305,6 +308,11 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
             "package_fingerprint": "candidate-fingerprint",
             "git_commit": "a" * 40,
         },
+        "python_runtime": {
+            "version": sys.version,
+            "implementation": sys.implementation.name,
+            "executable_sha256": hashlib.sha256(Path(sys.executable).resolve().read_bytes()).hexdigest(),
+        },
         "repository_clean": True,
         "producer": {
             "path": "tests/hermes_e2e.py",
@@ -327,6 +335,14 @@ def _write_passing_case_report(
     run_dir = tmp_path / fixture_id
     logs = run_dir / "logs"
     logs.mkdir(parents=True)
+    (logs / "desktop-parent-visual-review.json").write_text(json.dumps({
+        "status": "completed",
+        "revision_id": "r-test",
+        "request_paths": [],
+        "response_paths": [],
+        "completion_requirement": "Desktop parent must inspect every bound page image.",
+        "required_producer_model_id": producer_model_id,
+    }), encoding="utf-8")
     revision = run_dir / "revisions/r-test"
     manifest_path = revision / "delivery-manifest.json"
     output_dir = run_dir / "output"
@@ -461,6 +477,11 @@ def _write_passing_case_report(
             "request_id": f"visual-{artifact}",
             "request_sha256": "2" * 64,
             "task": "rendered_page_visual_verification",
+            "artifacts": [{
+                key: value
+                for key, value in render_artifact.items()
+                if key not in {"renderer", "page_renderer"}
+            }],
         }), encoding="utf-8")
         visual_response.write_text(json.dumps({
             "request_id": f"visual-{artifact}",
@@ -638,8 +659,24 @@ def _write_passing_case_report(
 
 
 def _use_controlled_certified_release(monkeypatch) -> Path:
+    release_root = Path(tempfile.mkdtemp(prefix="controlled-certified-release-"))
+    (release_root / "scripts").mkdir()
+    manifest = {
+        "package_fingerprint": "candidate-fingerprint",
+        "git_commit": "a" * 40,
+        "files": [
+            {
+                "path": f"scripts/{name}.py",
+                "sha256": hashlib.sha256((ROOT / f"scripts/{name}.py").read_bytes()).hexdigest(),
+            }
+            for name in ("workflow", "contracts", "drafting", "rendering", "quality", "prs_xml")
+        ],
+        "inventory": {"pdf_page_renderer": workflow.PDF_PAGE_RENDERER},
+    }
+    (release_root / "RELEASE-MANIFEST.json").write_text(json.dumps(manifest), encoding="utf-8")
+
     class ControlledWorkflow:
-        SCRIPT_DIR = Path("/controlled/immutable/release/scripts")
+        SCRIPT_DIR = release_root / "scripts"
         parse_source_truth = staticmethod(workflow.parse_source_truth)
 
         @staticmethod
@@ -664,7 +701,7 @@ def _use_controlled_certified_release(monkeypatch) -> Path:
             {"package_fingerprint": "candidate-fingerprint", "git_commit": "a" * 40},
         ),
     )
-    return Path("/controlled/immutable/release")
+    return release_root
 
 
 def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(tmp_path: Path, monkeypatch) -> None:
@@ -686,6 +723,31 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
         "package_fingerprint": "candidate-fingerprint",
         "git_commit": "a" * 40,
     }
+    manifest_bytes = (release_root / "RELEASE-MANIFEST.json").read_bytes()
+    evidence_findings = workflow._certification_evidence_findings(
+        result,
+        json.loads(manifest_bytes),
+        manifest_bytes,
+    )
+    assert evidence_findings == [], json.dumps(evidence_findings, indent=2)
+
+
+def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Path, monkeypatch) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    preflight_alias = tmp_path / "preflight-alias.json"
+    preflight_alias.symlink_to(preflight)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+
+    with pytest.raises(ValueError, match="missing or unsafe"):
+        certify_release_corpus(
+            reports,
+            release_root=release_root,
+            preflight_path=preflight_alias,
+        )
 
 
 def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tmp_path: Path, monkeypatch) -> None:
