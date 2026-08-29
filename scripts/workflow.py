@@ -1315,10 +1315,179 @@ def _installation_pdfium_findings(candidate: Path) -> list[dict[str, Any]]:
     return [finding]
 
 
+def _write_atomic_installation_state(path: Path, value: Mapping[str, Any]) -> None:
+    """Commit external installation state without exposing partial JSON."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+        _sync_directory(path.parent)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _sync_directory(path: Path) -> None:
+    descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    except OSError as exc:
+        if exc.errno not in {22, 45}:
+            raise
+    finally:
+        os.close(descriptor)
+
+
+def _filesystem_identity(path: Path) -> tuple[int, int] | None:
+    try:
+        details = path.stat(follow_symlinks=False)
+    except FileNotFoundError:
+        return None
+    return details.st_dev, details.st_ino
+
+
+def _activation_journal_path(skills_dir: Path) -> Path:
+    return skills_dir / ".clinical-document-generation.activation.json"
+
+
+def _remove_activation_journal(skills_dir: Path) -> None:
+    _activation_journal_path(skills_dir).unlink(missing_ok=True)
+    _sync_directory(skills_dir)
+
+
+def _recover_interrupted_activation(
+    skills_dir: Path,
+    *,
+    trusted_certification_key_id: str,
+) -> dict[str, Any] | None:
+    journal_path = _activation_journal_path(skills_dir)
+    if not journal_path.exists() and not journal_path.is_symlink():
+        return None
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    try:
+        if journal_path.is_symlink() or not journal_path.is_file():
+            raise ValueError("activation journal is not a regular file")
+        journal = _read(journal_path)
+        if journal.get("schema_version") != "activation-transaction/v1":
+            raise ValueError("unsupported activation journal schema")
+        displaced_key = journal.get("displaced_key")
+        if displaced_key is not None and (
+            not isinstance(displaced_key, str)
+            or _safe_release_identity_key(displaced_key) != displaced_key
+        ):
+            raise ValueError("invalid displaced release identity")
+        displaced = (
+            skills_dir / f".clinical-document-generation.displaced-{displaced_key}"
+            if isinstance(displaced_key, str) and displaced_key
+            else None
+        )
+        history_name = journal.get("history_name")
+        expected_history_name = f"{displaced_key}.json" if displaced_key else None
+        if history_name != expected_history_name:
+            raise ValueError("activation journal history identity does not match")
+        history = (
+            skills_dir / "release-history" / history_name
+            if isinstance(history_name, str)
+            and history_name == Path(history_name).name
+            and history_name.endswith(".json")
+            else None
+        )
+        candidate_identity = journal.get("candidate_identity")
+        if not (
+            isinstance(candidate_identity, list)
+            and len(candidate_identity) == 2
+            and all(isinstance(part, int) for part in candidate_identity)
+        ):
+            raise ValueError("invalid candidate identity")
+        candidate_committed = _filesystem_identity(active) == tuple(candidate_identity)
+        if candidate_committed:
+            _, active_findings = _installation_candidate_integrity(
+                active,
+                trusted_certification_key_id=trusted_certification_key_id,
+            )
+            if active_findings:
+                return {
+                    "status": "blocked",
+                    "stage": "activation_recovery_integrity",
+                    "findings": active_findings,
+                    "active_release_retained": True,
+                    "previous_release_retained": previous.is_dir(),
+                }
+            try:
+                if displaced is not None and displaced.exists():
+                    shutil.rmtree(displaced)
+                    _sync_directory(skills_dir)
+                _remove_activation_journal(skills_dir)
+            except OSError:
+                return {
+                    "status": "passed",
+                    "stage": "activated",
+                    "activation_commit_point": "candidate_to_active_atomic_swap",
+                    "active": str(active),
+                    "previous": str(previous) if previous.exists() else None,
+                    "cleanup": {
+                        "status": "deferred",
+                        "findings": [{
+                            "category": "installation",
+                            "field": "activation_recovery_cleanup",
+                            "code": "installation.activation_recovery_cleanup_deferred",
+                            "issue": "Activation was already committed; interrupted cleanup remains journaled for retry.",
+                        }],
+                    },
+                }
+            return None
+        else:
+            if bool(journal.get("active_had_release")) and not active.exists():
+                if not previous.exists():
+                    raise OSError("interrupted activation has no restorable active release")
+                os.replace(previous, active)
+                _sync_directory(skills_dir)
+            if bool(journal.get("previous_had_release")) and not previous.exists():
+                if displaced is None or not displaced.exists():
+                    raise OSError("interrupted activation has no restorable previous release")
+                os.replace(displaced, previous)
+                _sync_directory(skills_dir)
+            if bool(journal.get("history_created")) and history is not None:
+                history.unlink(missing_ok=True)
+                _sync_directory(history.parent)
+        _remove_activation_journal(skills_dir)
+        return None
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {
+            "status": "blocked",
+            "stage": "activation_recovery",
+            "findings": [{
+                "category": "installation",
+                "field": "activation_recovery",
+                "code": "installation.activation_recovery_required",
+                "issue": "An interrupted activation could not be reconciled; no new candidate was staged.",
+            }],
+            "active_release_retained": active.exists(),
+            "previous_release_retained": previous.exists(),
+        }
+
+
+def _safe_release_identity_key(fingerprint: object) -> str:
+    key = "".join(
+        character for character in str(fingerprint)
+        if character.isalnum() or character in "-_"
+    )
+    if not key:
+        raise ValueError("Release package fingerprint has no safe filesystem identity.")
+    return key
+
+
 def _retain_lightweight_release_history(
     release: Path,
     skills_dir: Path,
-) -> Path:
+) -> tuple[Path, bool]:
     identity = _active_release_identity(release)
     certification: dict[str, Any] = {}
     promotion_path = release / "PROMOTION-RECORD.json"
@@ -1328,18 +1497,26 @@ def _retain_lightweight_release_history(
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             certification = {}
     fingerprint = str(identity["package_fingerprint"])
-    history_key = "".join(
-        character for character in fingerprint
-        if character.isalnum() or character in "-_"
-    )
+    history_key = _safe_release_identity_key(fingerprint)
     history_path = skills_dir / "release-history" / f"{history_key}.json"
-    _write(history_path, {
+    history_value = {
         "schema_version": "release-history/v1",
         "git_commit": identity.get("git_commit"),
         "package_fingerprint": fingerprint,
         "certification": certification,
-    })
-    return history_path
+    }
+    created = not history_path.exists()
+    if created:
+        _write_atomic_installation_state(history_path, history_value)
+    elif _read(history_path) != history_value:
+        raise ValueError("Release history record collision has conflicting content.")
+    return history_path, created
+
+
+def _release_identity_key(release: Path) -> str:
+    return _safe_release_identity_key(
+        _active_release_identity(release)["package_fingerprint"]
+    )
 
 
 def _installation_candidate_integrity(
@@ -1356,6 +1533,31 @@ def _installation_candidate_integrity(
     return certification or {}, integrity + certification_findings + runtime_findings
 
 
+def _accepted_installation_python_runtime() -> dict[str, Any]:
+    """Return the exact supported interpreter identity before installation staging."""
+    runtime = _current_python_runtime()
+    if _runtime_version(runtime) < (*MINIMUM_PYTHON_VERSION, 0):
+        raise RuntimeError("unsupported Python runtime")
+    implementation = str(runtime.get("implementation") or "")
+    executable_value = str(runtime.get("executable") or "")
+    if not implementation or not executable_value:
+        raise RuntimeError("incomplete Python runtime identity")
+    executable = Path(executable_value).expanduser().resolve(strict=True)
+    if not executable.is_file():
+        raise RuntimeError("Python executable identity is not a file")
+    return {
+        "implementation": implementation,
+        "version": str(runtime.get("version") or ".".join(
+            str(part) for part in _runtime_version(runtime)
+        )),
+        "version_info": list(_runtime_version(runtime)),
+        "executable": {
+            "path": str(executable),
+            "sha256": sha256_file(executable),
+        },
+    }
+
+
 def install_release(
     archive_path: Path,
     skills_dir: Path,
@@ -1366,9 +1568,28 @@ def install_release(
     trusted_certification_key_id: str = RELEASE_CERTIFICATION_TRUSTED_KEY_ID,
 ) -> dict[str, Any]:
     """Smoke, then atomically activate an installable skill archive."""
+    try:
+        python_runtime = _accepted_installation_python_runtime()
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return {
+            "status": "blocked",
+            "stage": "python_runtime",
+            "findings": [{
+                "category": "installation",
+                "field": "python_runtime",
+                "code": "installation.python_runtime_unsupported",
+                "issue": "Installation requires Python 3.10 or newer before staging.",
+            }],
+        }
     archive_path = archive_path.expanduser().resolve()
     skills_dir = skills_dir.expanduser().resolve()
     skills_dir.mkdir(parents=True, exist_ok=True)
+    recovery = _recover_interrupted_activation(
+        skills_dir,
+        trusted_certification_key_id=trusted_certification_key_id,
+    )
+    if recovery is not None:
+        return recovery
     staging_root = Path(tempfile.mkdtemp(prefix=".clinical-document-generation.install-", dir=skills_dir))
     active = skills_dir / "clinical-document-generation"
     previous = skills_dir / ".clinical-document-generation.previous"
@@ -1426,6 +1647,7 @@ def install_release(
         _write(candidate / INSTALLATION_ASSURANCE, {
             "status": "passed",
             "verified_at": datetime.now(timezone.utc).isoformat(),
+            "python_runtime": python_runtime,
             "provision": recorded_provision,
             "assurance": recorded_assurance,
         })
@@ -1459,47 +1681,435 @@ def install_release(
             "hermes_discovery": str(active),
         })
         displaced_previous = None
+        displaced_key = None
         retained_history = None
-        if previous.exists():
-            retained_history = _retain_lightweight_release_history(previous, skills_dir)
-            displaced_previous = skills_dir / f".clinical-document-generation.previous-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-            os.replace(previous, displaced_previous)
-        if active.exists():
-            os.replace(active, previous)
+        retained_history_created = False
         try:
+            if previous.exists():
+                displaced_key = _release_identity_key(previous)
+                displaced_previous = (
+                    skills_dir
+                    / f".clinical-document-generation.displaced-{displaced_key}"
+                )
+                if displaced_previous.exists():
+                    return {
+                        "status": "blocked",
+                        "stage": "activation_precondition",
+                        "findings": [{
+                            "category": "installation",
+                            "field": "displaced_release",
+                            "code": "installation.displaced_release_exists",
+                            "issue": "Deterministic displaced-release path already exists.",
+                            "path": str(displaced_previous),
+                        }],
+                    }
+            candidate_identity = _filesystem_identity(candidate)
+            if candidate_identity is None:
+                raise ValueError("candidate identity disappeared")
+            history_name = f"{displaced_key}.json" if displaced_key else None
+            journal = {
+                "schema_version": "activation-transaction/v1",
+                "phase": "prepared",
+                "candidate_identity": list(candidate_identity),
+                "active_had_release": active.exists(),
+                "previous_had_release": previous.exists(),
+                "displaced_key": displaced_key,
+                "history_name": history_name,
+                "history_created": bool(
+                    history_name
+                    and not (skills_dir / "release-history" / history_name).exists()
+                ),
+            }
+            _write_atomic_installation_state(
+                _activation_journal_path(skills_dir), journal
+            )
+        except (OSError, ValueError):
+            return {
+                "status": "blocked",
+                "stage": "activation_journal",
+                "findings": [{
+                    "category": "installation",
+                    "field": "activation_journal",
+                    "code": "installation.activation_journal_failed",
+                    "issue": "Activation journal could not be committed before namespace mutation.",
+                }],
+                "active_release_retained": active.is_dir(),
+                "previous_release_retained": previous.is_dir(),
+            }
+        if previous.exists():
+            try:
+                assert displaced_previous is not None
+                os.replace(previous, displaced_previous)
+                _sync_directory(skills_dir)
+                retained_history, retained_history_created = (
+                    _retain_lightweight_release_history(displaced_previous, skills_dir)
+                )
+
+            except (OSError, ValueError):
+                try:
+                    if (
+                        displaced_previous is not None
+                        and displaced_previous.exists()
+                        and not previous.exists()
+                    ):
+                        os.replace(displaced_previous, previous)
+                        _sync_directory(skills_dir)
+                    _remove_activation_journal(skills_dir)
+                except OSError:
+                    return {
+                        "status": "blocked",
+                        "stage": "activation_recovery",
+                        "findings": [{
+                            "category": "installation",
+                            "field": "activation_recovery",
+                            "code": "installation.activation_recovery_required",
+                            "issue": "Prior release displacement failed and restoration must be retried.",
+                        }],
+                        "active_release_retained": active.is_dir(),
+                        "previous_release_retained": previous.is_dir(),
+                    }
+                return {
+                    "status": "blocked",
+                    "stage": "activation_precondition",
+                    "findings": [{
+                        "category": "installation",
+                        "field": "displaced_release",
+                        "code": "installation.displacement_failed",
+                        "issue": "Prior release displacement failed before commit; release state was restored.",
+                    }],
+                    "active_release_retained": active.is_dir(),
+                    "previous_release_retained": previous.is_dir(),
+                }
+        try:
+            if active.exists():
+                os.replace(active, previous)
+                _sync_directory(skills_dir)
             os.replace(candidate, active)
-        except Exception:
-            if previous.exists() and not active.exists():
-                os.replace(previous, active)
-            if displaced_previous is not None and displaced_previous.exists() and not previous.exists():
-                os.replace(displaced_previous, previous)
-            if retained_history is not None:
-                retained_history.unlink(missing_ok=True)
-            raise
+            _sync_directory(skills_dir)
+        except OSError:
+            if _filesystem_identity(active) == candidate_identity:
+                return {
+                    "status": "passed",
+                    "stage": "activated",
+                    "activation_commit_point": "candidate_to_active_atomic_swap",
+                    "active": str(active),
+                    "previous": str(previous) if previous.exists() else None,
+                    "retained_history": (
+                        str(retained_history) if retained_history is not None else None
+                    ),
+                    "cleanup": {
+                        "status": "deferred",
+                        "record": str(_activation_journal_path(skills_dir)),
+                        "findings": [{
+                            "category": "installation",
+                            "field": "activation_commit_confirmation",
+                            "code": "installation.activation_reconciliation_deferred",
+                            "issue": "The candidate swap committed; transaction reconciliation is deferred.",
+                        }],
+                    },
+                }
+            try:
+                if previous.exists() and not active.exists():
+                    os.replace(previous, active)
+                    _sync_directory(skills_dir)
+                if (
+                    displaced_previous is not None
+                    and displaced_previous.exists()
+                    and not previous.exists()
+                ):
+                    os.replace(displaced_previous, previous)
+                    _sync_directory(skills_dir)
+                if retained_history is not None and retained_history_created:
+                    retained_history.unlink(missing_ok=True)
+                    _sync_directory(retained_history.parent)
+                _remove_activation_journal(skills_dir)
+            except OSError:
+                return {
+                    "status": "blocked",
+                    "stage": "activation_recovery",
+                    "findings": [{
+                        "category": "installation",
+                        "field": "activation_recovery",
+                        "code": "installation.activation_recovery_required",
+                        "issue": "Activation failed before commit and restoration must be retried.",
+                    }],
+                    "active_release_retained": active.is_dir(),
+                    "previous_release_retained": previous.is_dir(),
+                }
+            return {
+                "status": "blocked",
+                "stage": "activation_swap",
+                "findings": [{
+                    "category": "installation",
+                    "field": "activation_swap",
+                    "code": "installation.activation_swap_failed",
+                    "issue": "Activation swap failed before commit; the prior release state was restored.",
+                }],
+                "active_release_retained": active.is_dir(),
+                "previous_release_retained": previous.is_dir(),
+            }
+        cleanup: dict[str, Any] = {"status": "passed", "findings": []}
+        retain_activation_journal = False
         if displaced_previous is not None:
-            shutil.rmtree(displaced_previous)
+            try:
+                shutil.rmtree(displaced_previous)
+                _sync_directory(skills_dir)
+            except OSError:
+                finding = {
+                    "category": "installation",
+                    "field": "post_commit_cleanup",
+                    "code": "installation.cleanup_deferred",
+                    "issue": "Activation succeeded; displaced release cleanup is deferred.",
+                    "path": str(displaced_previous),
+                }
+                deferred_record = (
+                    skills_dir / "release-history"
+                    / f"deferred-cleanup-{displaced_key}.json"
+                )
+                cleanup_findings = [finding]
+                recorded_path: str | None = str(deferred_record)
+                try:
+                    _write_atomic_installation_state(deferred_record, {
+                        "schema_version": "deferred-installation-cleanup/v1",
+                        "status": "deferred",
+                        "finding": finding,
+                    })
+                except OSError:
+                    recorded_path = None
+                    retain_activation_journal = True
+                    cleanup_findings.append({
+                        "category": "installation",
+                        "field": "post_commit_cleanup_record",
+                        "code": "installation.cleanup_record_failed",
+                        "issue": "Activation succeeded; deferred-cleanup evidence could not be persisted.",
+                        "path": str(deferred_record),
+                    })
+                    cleanup_findings.append({
+                        "category": "installation",
+                        "field": "activation_journal",
+                        "code": "installation.activation_journal_retained",
+                        "issue": "The activation journal remains as durable deferred-cleanup evidence.",
+                        "path": str(_activation_journal_path(skills_dir)),
+                    })
+                cleanup = {
+                    "status": "deferred",
+                    "record": recorded_path,
+                    "findings": cleanup_findings,
+                }
+        try:
+            if not retain_activation_journal:
+                _remove_activation_journal(skills_dir)
+        except OSError:
+            journal_finding = {
+                "category": "installation",
+                "field": "activation_journal_cleanup",
+                "code": "installation.activation_journal_cleanup_deferred",
+                "issue": "Activation succeeded; transaction-journal cleanup is deferred.",
+                "path": str(_activation_journal_path(skills_dir)),
+            }
+            cleanup = {
+                "status": "deferred",
+                "record": cleanup.get("record"),
+                "findings": [*cleanup.get("findings", []), journal_finding],
+            }
         return {
             "status": "passed",
             "stage": "activated",
+            "activation_commit_point": "candidate_to_active_atomic_swap",
             "active": str(active),
             "previous": str(previous) if previous.exists() else None,
             "retained_history": str(retained_history) if retained_history else None,
             "assurance": recorded_assurance,
             "promotion_record": str(active / PROMOTION_RECORD),
+            "cleanup": cleanup,
         }
     finally:
         shutil.rmtree(staging_root, ignore_errors=True)
+
+
+def _rollback_journal_path(skills_dir: Path) -> Path:
+    return skills_dir / ".clinical-document-generation.rollback.json"
+
+
+def _remove_rollback_journal(skills_dir: Path) -> None:
+    _rollback_journal_path(skills_dir).unlink(missing_ok=True)
+    _sync_directory(skills_dir)
+
+
+def _disposable_rollback_smoke(
+    release: Path,
+    *,
+    verifier: Callable[[Path], Mapping[str, Any]] | None,
+    trusted_certification_key_id: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
+    probe_root = Path(tempfile.mkdtemp(prefix="clinical-document-rollback-smoke-"))
+    probe = probe_root / "release"
+    try:
+        shutil.copytree(release, probe, symlinks=True)
+        _, before_findings = _installation_candidate_integrity(
+            probe,
+            trusted_certification_key_id=trusted_certification_key_id,
+        )
+        if before_findings:
+            return {}, before_findings, []
+        assurance = (
+            _installation_smoke_result(probe)
+            if verifier is None
+            else dict(verifier(probe))
+        )
+        _, after_findings = _installation_candidate_integrity(
+            probe,
+            trusted_certification_key_id=trusted_certification_key_id,
+        )
+        _, retained_release_findings = _installation_candidate_integrity(
+            release,
+            trusted_certification_key_id=trusted_certification_key_id,
+        )
+        return assurance, [], [*after_findings, *retained_release_findings]
+    except OSError:
+        return {}, [{
+            "category": "installation",
+            "field": "rollback_smoke_copy",
+            "code": "installation.rollback_smoke_copy_failed",
+            "issue": "A disposable rollback smoke copy could not be created.",
+        }], []
+    finally:
+        shutil.rmtree(probe_root, ignore_errors=True)
+
+
+def _recover_interrupted_rollback(
+    skills_dir: Path,
+    *,
+    verifier: Callable[[Path], Mapping[str, Any]] | None,
+    trusted_certification_key_id: str,
+) -> dict[str, Any] | None:
+    journal_path = _rollback_journal_path(skills_dir)
+    if not journal_path.exists() and not journal_path.is_symlink():
+        return None
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    try:
+        if journal_path.is_symlink() or not journal_path.is_file():
+            raise ValueError("rollback journal is not a regular file")
+        journal = _read(journal_path)
+        if journal.get("schema_version") != "rollback-transaction/v1":
+            raise ValueError("unsupported rollback journal schema")
+        quarantine_key = journal.get("quarantine_key")
+        if (
+            not isinstance(quarantine_key, str)
+            or not quarantine_key
+            or _safe_release_identity_key(quarantine_key) != quarantine_key
+        ):
+            raise ValueError("invalid rollback quarantine identity")
+        quarantine = (
+            skills_dir / f".clinical-document-generation.quarantine-{quarantine_key}"
+        )
+        previous_identity = journal.get("previous_identity")
+        if not (
+            isinstance(previous_identity, list)
+            and len(previous_identity) == 2
+            and all(isinstance(part, int) for part in previous_identity)
+        ):
+            raise ValueError("invalid rollback previous identity")
+        if _filesystem_identity(active) == tuple(previous_identity):
+            _, recovery_findings = _installation_candidate_integrity(
+                active,
+                trusted_certification_key_id=trusted_certification_key_id,
+            )
+            (
+                recovery_assurance,
+                smoke_copy_findings,
+                post_recovery_findings,
+            ) = _disposable_rollback_smoke(
+                active,
+                verifier=verifier,
+                trusted_certification_key_id=trusted_certification_key_id,
+            )
+            if (
+                recovery_findings
+                or smoke_copy_findings
+                or recovery_assurance.get("status") != "passed"
+                or post_recovery_findings
+            ):
+                return {
+                    "status": "blocked",
+                    "stage": "rollback_recovery_integrity",
+                    "findings": [
+                        *recovery_findings,
+                        *smoke_copy_findings,
+                        *list(recovery_assurance.get("findings", [])),
+                        *post_recovery_findings,
+                    ],
+                    "active_release_retained": True,
+                    "previous_release_retained": previous.is_dir(),
+                }
+            cleanup_findings = []
+            try:
+                _remove_rollback_journal(skills_dir)
+            except OSError:
+                cleanup_findings.append({
+                    "category": "installation",
+                    "field": "rollback_recovery_cleanup",
+                    "code": "installation.rollback_recovery_cleanup_deferred",
+                    "issue": "Rollback was already committed; interrupted journal cleanup remains deferred.",
+                })
+            result = {
+                "status": "passed",
+                "stage": "rolled_back",
+                "rollback_commit_point": "previous_to_active_atomic_swap",
+                "active": str(active),
+                "quarantined": str(quarantine),
+                "assurance": {
+                    **recovery_assurance,
+                    "recovered_after_interruption": True,
+                },
+                "historical_run_revisions_rewritten": False,
+            }
+            if cleanup_findings:
+                result["cleanup"] = {
+                    "status": "deferred",
+                    "findings": cleanup_findings,
+                }
+            return result
+        if not active.exists() and quarantine.exists():
+            os.replace(quarantine, active)
+            _sync_directory(skills_dir)
+        if not active.is_dir() or not previous.is_dir():
+            raise OSError("interrupted rollback state is not restorable")
+        _remove_rollback_journal(skills_dir)
+        return None
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {
+            "status": "blocked",
+            "stage": "rollback_recovery",
+            "findings": [{
+                "category": "installation",
+                "field": "rollback_recovery",
+                "code": "installation.rollback_recovery_required",
+                "issue": "An interrupted rollback could not be reconciled; retry recovery before another swap.",
+            }],
+            "active_release_retained": active.is_dir(),
+            "previous_release_retained": previous.is_dir(),
+        }
 
 
 def rollback_release(
     skills_dir: Path,
     *,
     verifier: Callable[[Path], Mapping[str, Any]] | None = None,
+    trusted_certification_key_id: str = RELEASE_CERTIFICATION_TRUSTED_KEY_ID,
 ) -> dict[str, Any]:
     """Verify and atomically restore the previous release, quarantining active."""
     skills_dir = skills_dir.expanduser().resolve()
     active = skills_dir / "clinical-document-generation"
     previous = skills_dir / ".clinical-document-generation.previous"
+    recovery = _recover_interrupted_rollback(
+        skills_dir,
+        verifier=verifier,
+        trusted_certification_key_id=trusted_certification_key_id,
+    )
+    if recovery is not None:
+        return recovery
     if not active.is_dir() or not previous.is_dir():
         return {
             "status": "blocked",
@@ -1512,16 +2122,44 @@ def rollback_release(
             "active_release_retained": active.is_dir(),
             "previous_release_retained": previous.is_dir(),
         }
-    assurance = (
-        _installation_smoke_result(previous)
-        if verifier is None
-        else dict(verifier(previous))
+    _, integrity_findings = _installation_candidate_integrity(
+        previous,
+        trusted_certification_key_id=trusted_certification_key_id,
     )
+    if integrity_findings:
+        return {
+            "status": "blocked",
+            "stage": "rollback_integrity",
+            "findings": integrity_findings,
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    assurance, smoke_copy_findings, post_smoke_findings = _disposable_rollback_smoke(
+        previous,
+        verifier=verifier,
+        trusted_certification_key_id=trusted_certification_key_id,
+    )
+    if smoke_copy_findings:
+        return {
+            "status": "blocked",
+            "stage": "rollback_smoke_copy_integrity",
+            "findings": smoke_copy_findings,
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
     if assurance.get("status") != "passed":
         return {
             "status": "blocked",
             "stage": "rollback_smoke",
             "findings": list(assurance.get("findings", [])),
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
+    if post_smoke_findings:
+        return {
+            "status": "blocked",
+            "stage": "rollback_integrity_after_smoke",
+            "findings": post_smoke_findings,
             "active_release_retained": True,
             "previous_release_retained": True,
         }
@@ -1542,7 +2180,20 @@ def rollback_release(
             "active_release_retained": True,
             "previous_release_retained": True,
         }
-    quarantine_key = "".join(character for character in fingerprint if character.isalnum() or character in "-_")
+    try:
+        quarantine_key = _safe_release_identity_key(fingerprint)
+    except ValueError:
+        return {
+            "status": "blocked",
+            "stage": "rollback_identity",
+            "findings": [{
+                "category": "installation",
+                "field": "package_fingerprint",
+                "issue": "The active release fingerprint has no safe quarantine identity.",
+            }],
+            "active_release_retained": True,
+            "previous_release_retained": True,
+        }
     quarantine = skills_dir / f".clinical-document-generation.quarantine-{quarantine_key}"
     if quarantine.exists():
         return {
@@ -1556,21 +2207,114 @@ def rollback_release(
             "active_release_retained": True,
             "previous_release_retained": True,
         }
-    os.replace(active, quarantine)
     try:
+        active_identity = _filesystem_identity(active)
+        previous_identity = _filesystem_identity(previous)
+        if active_identity is None or previous_identity is None:
+            raise OSError("rollback release identity disappeared")
+        _write_atomic_installation_state(_rollback_journal_path(skills_dir), {
+            "schema_version": "rollback-transaction/v1",
+            "active_identity": list(active_identity),
+            "previous_identity": list(previous_identity),
+            "quarantine_key": quarantine_key,
+        })
+    except OSError:
+        return {
+            "status": "blocked",
+            "stage": "rollback_journal",
+            "findings": [{
+                "category": "installation",
+                "field": "rollback_journal",
+                "code": "installation.rollback_journal_failed",
+                "issue": "Rollback journal could not be committed before namespace mutation.",
+            }],
+            "active_release_retained": active.is_dir(),
+            "previous_release_retained": previous.is_dir(),
+        }
+    try:
+        os.replace(active, quarantine)
+        _sync_directory(skills_dir)
         os.replace(previous, active)
-    except Exception:
-        if quarantine.exists() and not active.exists():
-            os.replace(quarantine, active)
-        raise
-    return {
+        _sync_directory(skills_dir)
+    except OSError:
+        if _filesystem_identity(active) == previous_identity:
+            cleanup_findings = []
+            try:
+                _remove_rollback_journal(skills_dir)
+            except OSError:
+                cleanup_findings.append({
+                    "category": "installation",
+                    "field": "rollback_journal",
+                    "code": "installation.rollback_journal_cleanup_failed",
+                    "issue": "Rollback committed; journal cleanup is deferred.",
+                })
+            result = {
+                "status": "passed",
+                "stage": "rolled_back",
+                "rollback_commit_point": "previous_to_active_atomic_swap",
+                "active": str(active),
+                "quarantined": str(quarantine),
+                "assurance": assurance,
+                "historical_run_revisions_rewritten": False,
+            }
+            if cleanup_findings:
+                result["cleanup"] = {
+                    "status": "deferred",
+                    "findings": cleanup_findings,
+                }
+            return result
+        try:
+            if quarantine.exists() and not active.exists():
+                os.replace(quarantine, active)
+                _sync_directory(skills_dir)
+            _remove_rollback_journal(skills_dir)
+        except OSError:
+            return {
+                "status": "blocked",
+                "stage": "rollback_recovery",
+                "findings": [{
+                    "category": "installation",
+                    "field": "rollback_recovery",
+                    "code": "installation.rollback_recovery_required",
+                    "issue": "Rollback swap failed and restoration must be retried.",
+                }],
+                "active_release_retained": active.is_dir(),
+                "previous_release_retained": previous.is_dir(),
+            }
+        return {
+            "status": "blocked",
+            "stage": "rollback_swap",
+            "findings": [{
+                "category": "installation",
+                "field": "rollback_swap",
+                "code": "installation.rollback_swap_failed",
+                "issue": "Rollback swap failed; the prior active release was restored.",
+            }],
+            "active_release_retained": active.is_dir(),
+            "previous_release_retained": previous.is_dir(),
+        }
+    cleanup_findings = []
+    try:
+        _remove_rollback_journal(skills_dir)
+    except OSError:
+        cleanup_findings.append({
+            "category": "installation",
+            "field": "rollback_journal",
+            "code": "installation.rollback_journal_cleanup_failed",
+            "issue": "Rollback committed; journal cleanup is deferred.",
+        })
+    result = {
         "status": "passed",
         "stage": "rolled_back",
+        "rollback_commit_point": "previous_to_active_atomic_swap",
         "active": str(active),
         "quarantined": str(quarantine),
         "assurance": assurance,
         "historical_run_revisions_rewritten": False,
     }
+    if cleanup_findings:
+        result["cleanup"] = {"status": "deferred", "findings": cleanup_findings}
+    return result
 
 
 @dataclass(frozen=True)
