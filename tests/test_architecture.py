@@ -127,5 +127,8 @@ def test_governed_renderer_authorities_require_host_office_and_only_pdfium():
     rasterize_contract = quality[
         quality.index("def rasterize_pdf("):quality.index("\ndef renderers(")
     ]
-    for stale_interface in ("every backend", "timeout_seconds", "environment"):
+    for stale_interface in ("every backend", "environment"):
         assert stale_interface not in rasterize_contract
+    assert "timeout_seconds" in rasterize_contract
+    assert "subprocess.Popen" in rasterize_contract
+    assert "--internal-pdfium-worker" in workflow

@@ -131,11 +131,11 @@ def test_rasterize_pdf_verifies_against_the_current_release_root(
 ):
     observed_roots = []
 
-    def observe_release_root(**kwargs):
-        observed_roots.append(Path(kwargs["skill_root"]).resolve())
+    def observe_release_root(_identities, *, skill_root, **_kwargs):
+        observed_roots.append(Path(skill_root).resolve())
         return []
 
-    monkeypatch.setattr(quality, "page_renderers", observe_release_root)
+    monkeypatch.setattr(quality, "_one_pdfium_renderer", observe_release_root)
 
     with pytest.raises(RuntimeError, match="manifest-verified release-owned runtime"):
         quality.rasterize_pdf(

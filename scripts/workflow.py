@@ -20,7 +20,7 @@ import time
 import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Mapping
 
 from docx import Document
@@ -31,7 +31,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import _approved_packaged_font_fallback, _template_fonts, create_verification_requests, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, sha256_file as quality_sha256, verification_response_is_complete
+from quality import _approved_packaged_font_fallback, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, create_verification_requests, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -269,6 +269,48 @@ def _release_excluded(path: Path) -> bool:
     return False
 
 
+def _pdfium_wheel_inventory(wheel: Path) -> list[dict[str, Any]]:
+    """Derive the deterministic extraction inventory trusted by the release."""
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    with zipfile.ZipFile(wheel) as archive:
+        for member in archive.infolist():
+            raw = (
+                member.filename[:-1]
+                if member.is_dir() and member.filename.endswith("/")
+                else member.filename
+            )
+            relative = PurePosixPath(raw)
+            normalized = relative.as_posix()
+            if (
+                not normalized
+                or raw != normalized
+                or relative.is_absolute()
+                or "\\" in raw
+                or any(part in {"", ".", ".."} for part in raw.split("/"))
+                or normalized.casefold() in seen
+            ):
+                raise ValueError(
+                    "The pinned pypdfium2 wheel has an unsafe or duplicate extraction path."
+                )
+            seen.add(normalized.casefold())
+            if member.is_dir():
+                continue
+            if (member.external_attr >> 16) & 0o170000 == 0o120000:
+                raise ValueError("The pinned pypdfium2 wheel contains an unsupported symbolic link.")
+            payload = archive.read(member)
+            if len(payload) != member.file_size:
+                raise ValueError("The pinned pypdfium2 wheel contains an inconsistent file size.")
+            entries.append({
+                "path": normalized,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            })
+    if not entries:
+        raise ValueError("The pinned pypdfium2 wheel has no extractable runtime files.")
+    return sorted(entries, key=lambda item: item["path"])
+
+
 def _package_release_tree(
     repo_root: Path,
     output_path: Path,
@@ -338,7 +380,7 @@ def _package_release_tree(
             certification_configuration_sha256[fixture_id] = sha256_value(fixture["hermes_configuration"])
         except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError(f"Release packaging requires the governed certification fixture: {fixture_id}") from exc
-    pdf_renderer = dict(PDF_PAGE_RENDERER)
+    pdf_renderer: dict[str, Any] = dict(PDF_PAGE_RENDERER)
     pdf_renderer_wheel = repo_root / pdf_renderer["wheel"]
     if (
         not pdf_renderer_wheel.is_file()
@@ -347,6 +389,7 @@ def _package_release_tree(
         raise ValueError(
             "The pinned pypdfium2 wheel is missing or does not match its governed hash."
         )
+    pdf_renderer["runtime_inventory"] = _pdfium_wheel_inventory(pdf_renderer_wheel)
     implementation_files = sorted(f"scripts/{name}" for name in PRODUCTION_MODULES)
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
@@ -376,8 +419,7 @@ def _package_release_tree(
         "excluded_classes": ["git metadata", "development virtual environments", "credentials", "patient/source data", "old run outputs", "development tests", "installed runtime and assurance evidence"],
         "files": entries,
     }
-    manifest_payload = json.dumps(manifest, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    manifest["package_fingerprint"] = hashlib.sha256(manifest_payload).hexdigest()
+    manifest["package_fingerprint"] = _manifest_package_fingerprint(manifest)[1]
     manifest_text = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     temporary = output_path.with_name(f".{output_path.name}.tmp")
@@ -503,11 +545,7 @@ def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": str(exc)}]
     findings = []
-    fingerprint_payload = dict(manifest)
-    recorded_fingerprint = str(fingerprint_payload.pop("package_fingerprint", ""))
-    computed_fingerprint = hashlib.sha256(
-        json.dumps(fingerprint_payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-    ).hexdigest()
+    recorded_fingerprint, computed_fingerprint = _manifest_package_fingerprint(manifest)
     if not recorded_fingerprint or computed_fingerprint != recorded_fingerprint:
         findings.append({"category": "installation", "field": "package_fingerprint", "issue": "Package fingerprint does not match the release manifest."})
     declared: set[str] = set()
@@ -703,7 +741,17 @@ def _validated_archive_members(archive: zipfile.ZipFile, extraction_root: Path) 
     targets: set[str] = set()
     members = archive.infolist()
     for info in members:
-        target = (root / info.filename).resolve()
+        raw = info.filename[:-1] if info.is_dir() and info.filename.endswith("/") else info.filename
+        relative_path = PurePosixPath(raw)
+        if (
+            not raw
+            or "\\" in raw
+            or any(part in {"", ".", ".."} for part in raw.split("/"))
+            or relative_path.is_absolute()
+            or relative_path.as_posix() != raw
+        ):
+            raise ValueError(f"Release archive contains a noncanonical member path: {info.filename}")
+        target = (root / Path(*relative_path.parts)).resolve()
         try:
             relative = target.relative_to(root)
         except ValueError as exc:
@@ -843,7 +891,9 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
         if item.get("kind") in {"Microsoft Word", "LibreOffice"}
     ]
     page_renderer_identities = [
-        item for item in page_renderers(skill_root=skill_root)
+        item for item in page_renderers(
+            skill_root=skill_root, require_promoted_runtime=False
+        )
         if item.get("kind") == "pypdfium2" and item.get("source") == "release-owned runtime"
     ]
     with tempfile.TemporaryDirectory(prefix="clinical-installation-assurance-") as directory:
@@ -873,6 +923,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
             renderer_identities=office_renderers,
             page_renderer_identities=page_renderer_identities,
             rebuild_candidate=lambda _substitutions: {"status": "passed"},
+            require_promoted_runtime=False,
         )
     if assurance.get("status") != "passed":
         findings.extend(assurance.get("findings", []))
@@ -917,9 +968,23 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
             "field": "pdf_page_renderer",
             "issue": "The release manifest must identify pypdfium2 as its only PDF page renderer.",
         }]}
-    existing = page_renderers(skill_root=skill_root)
+    existing = page_renderers(
+        skill_root=skill_root, require_promoted_runtime=False
+    )
     if existing:
         return {"status": "passed", "page_renderer": existing[0], "provisioned": False}
+    if (
+        runtime_root.is_symlink()
+        or runtime_python.exists()
+        or runtime_python.is_symlink()
+        or (runtime_root / "PDF-RENDERER.json").exists()
+    ):
+        finding = dict(_pdfium_runtime_integrity(
+            skill_root, require_promoted_runtime=False
+        )["finding"])
+        finding["category"] = "installation"
+        finding["field"] = "pdf_page_renderer"
+        return {"status": "blocked", "findings": [finding]}
     wheel_relative = Path(str(identity.get("wheel") or ""))
     wheel = (skill_root / wheel_relative).resolve()
     try:
@@ -932,6 +997,17 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
             "category": "installation",
             "field": "pdf_page_renderer",
             "issue": "The packaged pypdfium2 wheel is missing or does not match its release-manifest hash.",
+        }]}
+    try:
+        expected_inventory = _pdfium_wheel_inventory(wheel)
+    except (OSError, ValueError, zipfile.BadZipFile):
+        expected_inventory = []
+    if identity.get("runtime_inventory") != expected_inventory:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "pdf_page_renderer",
+            "code": "installation.pdfium_manifest_inventory_invalid",
+            "issue": "The PDFium extraction inventory does not match the immutable packaged wheel.",
         }]}
     platform_tag = str(identity.get("platform") or "")
     host = f"{platform.system()} {platform.machine()}"
@@ -962,18 +1038,14 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
             archive.extractall(staged_python)
         shutil.rmtree(runtime_python, ignore_errors=True)
         os.replace(staged_python, runtime_python)
-        installed_files = {
-            path.relative_to(runtime_python).as_posix(): sha256_file(path)
-            for path in runtime_python.rglob("*")
-            if path.is_file()
-        }
         _write(runtime_root / "PDF-RENDERER.json", {
             "kind": "pypdfium2",
             "version": str(identity.get("version") or ""),
             "wheel": wheel_relative.as_posix(),
             "wheel_sha256": expected_hash,
             "platform": platform_tag,
-            "installed_files": installed_files,
+            "status": "provisioned",
+            "inventory_source": RELEASE_MANIFEST,
         })
     except (OSError, ValueError, zipfile.BadZipFile) as exc:
         shutil.rmtree(staged_python, ignore_errors=True)
@@ -982,7 +1054,9 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
             "field": "pdf_page_renderer",
             "issue": f"The packaged pypdfium2 wheel could not be installed: {exc}",
         }]}
-    installed = page_renderers(skill_root=skill_root)
+    installed = page_renderers(
+        skill_root=skill_root, require_promoted_runtime=False
+    )
     if len(installed) != 1:
         return {"status": "blocked", "findings": [{
             "category": "installation",
@@ -1032,13 +1106,26 @@ def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> An
 
 
 def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
-    completed = subprocess.run(
-        [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
-        cwd=candidate,
-        text=True,
-        capture_output=True,
-        timeout=180,
-    )
+    timeout_seconds = 180
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
+            cwd=candidate,
+            text=True,
+            capture_output=True,
+            timeout=timeout_seconds,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "blocked",
+            "findings": [{
+                "category": "installation",
+                "field": "smoke",
+                "code": "installation.smoke_timeout",
+                "timeout_seconds": timeout_seconds,
+                "issue": f"Installation smoke exceeded {timeout_seconds} seconds.",
+            }],
+        }
     try:
         assurance = json.loads(completed.stdout)
     except json.JSONDecodeError:
@@ -1060,6 +1147,18 @@ def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
             }],
         }
     return dict(assurance)
+
+
+def _installation_pdfium_findings(candidate: Path) -> list[dict[str, Any]]:
+    integrity = _pdfium_runtime_integrity(
+        candidate, require_promoted_runtime=False
+    )
+    if integrity.get("status") == "passed":
+        return []
+    finding = dict(integrity.get("finding") or {})
+    finding["category"] = "installation"
+    finding["field"] = "pdf_page_renderer"
+    return [finding]
 
 
 def _retain_lightweight_release_history(
@@ -1122,6 +1221,14 @@ def install_release(
         provision = dict(provisioner(candidate))
         if provision.get("status") != "passed":
             return {"status": "blocked", "stage": "provision", "findings": list(provision.get("findings", [])), "active_release_retained": active.is_dir()}
+        runtime_findings = _installation_pdfium_findings(candidate)
+        if runtime_findings:
+            return {
+                "status": "blocked",
+                "stage": "provision_integrity",
+                "findings": runtime_findings,
+                "active_release_retained": active.is_dir(),
+            }
         assurance = (
             _installation_smoke_result(candidate)
             if verifier is None
@@ -1129,6 +1236,14 @@ def install_release(
         )
         if assurance.get("status") != "passed":
             return {"status": "blocked", "stage": "installation_smoke", "findings": list(assurance.get("findings", [])), "active_release_retained": active.is_dir()}
+        runtime_findings = _installation_pdfium_findings(candidate)
+        if runtime_findings:
+            return {
+                "status": "blocked",
+                "stage": "installation_integrity",
+                "findings": runtime_findings,
+                "active_release_retained": active.is_dir(),
+            }
         recorded_provision = _relocate_paths(provision, candidate, active)
         recorded_assurance = _relocate_paths(assurance, candidate, active)
         _write(candidate / INSTALLATION_ASSURANCE, {
@@ -3326,9 +3441,10 @@ def run_release_gate(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release")
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
-    if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
+    if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
+    elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.provision_candidate:
         result = provision_render_assurance(SCRIPT_DIR.parent)
         shutil.rmtree(SCRIPT_DIR / "__pycache__", ignore_errors=True)

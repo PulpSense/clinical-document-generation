@@ -59,8 +59,10 @@ commit. Provision the extracted certification candidate with
 with `--bind-certification`. Only that one certified archive may be activated
 with `--install-release`; direct extraction is not a
 supported update path. Installation verifies host Word or LibreOffice, installs
-the one manifest-bound `pypdfium2` wheel offline, runs an end-to-end
-render/page-image smoke, and only then atomically
+the one manifest-bound `pypdfium2` wheel offline, verifies every extracted file
+against the immutable wheel-derived inventory, and runs page rendering in a
+killable worker with governed time, page, pixel, dimension, output, and process
+resource limits. It runs an end-to-end render/page-image smoke and only then atomically
 replaces the active `clinical-document-generation` directory. A failed smoke
 leaves the previous verified release active. The archive contains
 `RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation

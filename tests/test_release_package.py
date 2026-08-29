@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import shutil
@@ -24,6 +25,44 @@ from workflow import (
 ROOT = Path(__file__).resolve().parents[1]
 PDFIUM_WHEEL = "pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
 PDFIUM_SHA256 = "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4"
+
+
+def _installation_staging(tmp_path: Path) -> Path:
+    staging = tmp_path / ".clinical-document-generation.install-test"
+    staging.mkdir(parents=True, exist_ok=True)
+    return staging
+
+
+def _pdfium_manifest_identity():
+    return {
+        "kind": "pypdfium2",
+        "version": "5.13.0",
+        "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+        "wheel_sha256": PDFIUM_SHA256,
+        "platform": "macosx_13_0_arm64",
+        "runtime_inventory": workflow._pdfium_wheel_inventory(
+            ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL
+        ),
+    }
+
+
+def _write_release_manifest(skill_root: Path, payload: dict) -> None:
+    manifest = json.loads(json.dumps(payload))
+    manifest.pop("package_fingerprint", None)
+    manifest["package_fingerprint"] = workflow.sha256_value(manifest)
+    (skill_root / "RELEASE-MANIFEST.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+
+def _passing_provisioner(candidate: Path) -> dict:
+    result = workflow._provision_page_renderer(candidate)
+    if result.get("status") != "passed":
+        return result
+    return {
+        **result,
+        "renderer": {"kind": "LibreOffice", "path": "/controlled/soffice"},
+    }
 
 
 def _certify_archive(archive_path: Path) -> None:
@@ -166,24 +205,12 @@ def test_release_packaging_refuses_an_uncommitted_release_owned_resource(tmp_pat
 
 
 def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
-    skill_root = tmp_path / "clinical-document-generation"
-    wheel_dir = skill_root / "assets/runtime-wheels"
-    wheel_dir.mkdir(parents=True)
-    shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
-    (skill_root / "RELEASE-MANIFEST.json").write_text(
-        json.dumps({
-            "inventory": {
-                "pdf_page_renderer": {
-                    "kind": "pypdfium2",
-                    "version": "5.13.0",
-                    "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
-                    "wheel_sha256": PDFIUM_SHA256,
-                    "platform": "macosx_13_0_arm64",
-                }
-            }
-        }),
-        encoding="utf-8",
-    )
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    staging = _installation_staging(tmp_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(staging)
+    skill_root = staging / "clinical-document-generation"
     office = {
         "kind": "LibreOffice",
         "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice",
@@ -212,16 +239,15 @@ def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
     assert (skill_root / "runtime/python/pypdfium2_raw/libpdfium.dylib").is_file()
     assert not (skill_root / "runtime/LibreOffice.app").exists()
     marker = json.loads((skill_root / "runtime/PDF-RENDERER.json").read_text())
-    installed_files = marker.pop("installed_files")
     assert marker == {
         "kind": "pypdfium2",
         "version": "5.13.0",
         "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
         "wheel_sha256": PDFIUM_SHA256,
         "platform": "macosx_13_0_arm64",
+        "status": "provisioned",
+        "inventory_source": "RELEASE-MANIFEST.json",
     }
-    assert installed_files["pypdfium2/__init__.py"]
-    assert installed_files["pypdfium2_raw/libpdfium.dylib"]
     pdf = tmp_path / "one-page.pdf"
     writer = PdfWriter()
     writer.add_blank_page(width=612, height=792)
@@ -229,26 +255,42 @@ def test_release_provisions_its_one_pdf_renderer_offline(tmp_path, monkeypatch):
         writer.write(handle)
 
     monkeypatch.setattr(quality, "__file__", str(skill_root / "scripts/quality.py"))
-    pages = rasterize_pdf(pdf, tmp_path / "pages", result["page_renderer"])
+    native_modules_before = {
+        name: module for name, module in sys.modules.items()
+        if name == "pypdfium2" or name.startswith("pypdfium2.")
+        or name == "pypdfium2_raw" or name.startswith("pypdfium2_raw.")
+    }
+    pages = rasterize_pdf(
+        pdf,
+        tmp_path / "pages",
+        result["page_renderer"],
+        require_promoted_runtime=False,
+    )
+    repeated_pages = rasterize_pdf(
+        pdf,
+        tmp_path / "repeated-pages",
+        result["page_renderer"],
+        require_promoted_runtime=False,
+    )
 
     assert [page.name for page in pages] == ["page-1.png"]
     assert pages[0].read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    assert repeated_pages[0].read_bytes() == pages[0].read_bytes()
+    assert {
+        name: module for name, module in sys.modules.items()
+        if name == "pypdfium2" or name.startswith("pypdfium2.")
+        or name == "pypdfium2_raw" or name.startswith("pypdfium2_raw.")
+    } == native_modules_before
 
 
 def test_release_installation_fails_closed_without_a_host_office_renderer(tmp_path, monkeypatch):
-    skill_root = tmp_path / "clinical-document-generation"
+    skill_root = _installation_staging(tmp_path) / "clinical-document-generation"
     wheel_dir = skill_root / "assets/runtime-wheels"
     wheel_dir.mkdir(parents=True)
     shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
-    (skill_root / "RELEASE-MANIFEST.json").write_text(json.dumps({
-        "inventory": {"pdf_page_renderer": {
-            "kind": "pypdfium2",
-            "version": "5.13.0",
-            "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
-            "wheel_sha256": PDFIUM_SHA256,
-            "platform": "macosx_13_0_arm64",
-        }}
-    }), encoding="utf-8")
+    _write_release_manifest(skill_root, {
+        "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()}
+    })
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [])
 
     assert provision_render_assurance(skill_root) == {
@@ -262,35 +304,245 @@ def test_release_installation_fails_closed_without_a_host_office_renderer(tmp_pa
     }
 
 
-def test_release_renderer_rejects_and_repairs_tampered_runtime(tmp_path, monkeypatch):
-    skill_root = tmp_path / "clinical-document-generation"
+def test_release_renderer_rejects_tampered_runtime_without_silent_repair(tmp_path, monkeypatch):
+    skill_root = _installation_staging(tmp_path) / "clinical-document-generation"
     wheel_dir = skill_root / "assets/runtime-wheels"
     wheel_dir.mkdir(parents=True)
     shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
-    (skill_root / "RELEASE-MANIFEST.json").write_text(json.dumps({
-        "inventory": {"pdf_page_renderer": {
-            "kind": "pypdfium2",
-            "version": "5.13.0",
-            "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
-            "wheel_sha256": PDFIUM_SHA256,
-            "platform": "macosx_13_0_arm64",
-        }}
-    }), encoding="utf-8")
+    _write_release_manifest(skill_root, {
+        "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()}
+    })
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
         "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
     }])
 
     assert provision_render_assurance(skill_root)["status"] == "passed"
     target = skill_root / "runtime/python/pypdfium2/__init__.py"
-    expected = target.read_bytes()
     target.write_text("tampered", encoding="utf-8")
 
     assert workflow.page_renderers(skill_root=skill_root) == []
-    repaired = provision_render_assurance(skill_root)
+    result = provision_render_assurance(skill_root)
 
-    assert repaired["status"] == "passed"
-    assert repaired["provisioned"]["page_renderer"] is True
-    assert target.read_bytes() == expected
+    assert result["status"] == "blocked"
+    assert result["findings"][0]["code"] == "renderer.pdfium_runtime_file_changed"
+    assert result["findings"][0]["path"] == "pypdfium2/__init__.py"
+    assert target.read_text(encoding="utf-8") == "tampered"
+
+
+def test_runtime_marker_cannot_attest_to_a_tampered_pdfium_runtime(tmp_path, monkeypatch):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    staging = _installation_staging(tmp_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(staging)
+    skill_root = staging / "clinical-document-generation"
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    }])
+    assert provision_render_assurance(skill_root)["status"] == "passed"
+
+    target = skill_root / "runtime/python/pypdfium2/__init__.py"
+    target.write_text("tampered", encoding="utf-8")
+    marker_path = skill_root / "runtime/PDF-RENDERER.json"
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    marker["installed_files"] = {
+        path.relative_to(skill_root / "runtime/python").as_posix(): workflow.sha256_file(path)
+        for path in (skill_root / "runtime/python").rglob("*")
+        if path.is_file()
+    }
+    marker_path.write_text(json.dumps(marker), encoding="utf-8")
+
+    assert workflow.page_renderers(skill_root=skill_root) == []
+
+
+def test_runtime_inventory_requires_a_valid_manifest_fingerprint(tmp_path, monkeypatch):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    staging = _installation_staging(tmp_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(staging)
+    skill_root = staging / "clinical-document-generation"
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    }])
+    assert provision_render_assurance(skill_root)["status"] == "passed"
+
+    target = skill_root / "runtime/python/pypdfium2/__init__.py"
+    original = target.read_bytes()
+    target.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+    manifest_path = skill_root / "RELEASE-MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    inventory = manifest["inventory"]["pdf_page_renderer"]["runtime_inventory"]
+    entry = next(item for item in inventory if item["path"] == "pypdfium2/__init__.py")
+    entry["sha256"] = workflow.sha256_file(target)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    verification = quality._pdfium_runtime_integrity(skill_root)
+
+    assert verification["status"] == "blocked"
+    assert verification["finding"]["code"] == "renderer.pdfium_manifest_fingerprint_invalid"
+    assert verification["finding"]["path"] == "RELEASE-MANIFEST.json"
+
+
+def test_promoted_runtime_inventory_cannot_rebind_its_package_fingerprint(
+    tmp_path,
+    governed_pdfium,
+):
+    package = tmp_path / "release.zip"
+    workflow.package_release(ROOT, package)
+    extraction_root = _installation_staging(tmp_path)
+    with zipfile.ZipFile(package) as archive:
+        archive.extractall(extraction_root)
+    skill_root = extraction_root / "clinical-document-generation"
+    assert workflow._provision_page_renderer(skill_root)["status"] == "passed"
+    assert quality._pdfium_runtime_integrity(
+        skill_root, require_promoted_runtime=False
+    )["status"] == "passed"
+    assert quality._pdfium_runtime_integrity(skill_root)["status"] == "blocked"
+
+    manifest_path = skill_root / "RELEASE-MANIFEST.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    promoted_fingerprint = manifest["package_fingerprint"]
+    assurance_path = skill_root / "INSTALLATION-ASSURANCE.json"
+    assurance_path.write_text(json.dumps({"status": "passed"}), encoding="utf-8")
+    (skill_root / "PROMOTION-RECORD.json").write_text(
+        json.dumps({
+            "schema_version": "promoted-release/v1",
+            "status": "active",
+            "package_fingerprint": promoted_fingerprint,
+            "runtime_assurance_sha256": workflow.sha256_file(assurance_path),
+        }),
+        encoding="utf-8",
+    )
+
+    entry = manifest["inventory"]["pdf_page_renderer"]["runtime_inventory"][0]
+    target = skill_root / "runtime/python" / entry["path"]
+    original = target.read_bytes()
+    target.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+    entry["sha256"] = workflow.sha256_file(target)
+    _write_release_manifest(skill_root, manifest)
+
+    verification = quality._pdfium_runtime_integrity(skill_root)
+
+    assert verification["status"] == "blocked"
+    assert verification["finding"]["code"] == (
+        "renderer.pdfium_promotion_fingerprint_mismatch"
+    )
+    assert verification["finding"]["path"] == "PROMOTION-RECORD.json"
+
+
+@pytest.mark.parametrize(("mutation", "code", "path"), [
+    ("missing", "renderer.pdfium_runtime_file_missing", "pypdfium2/__init__.py"),
+    ("extra", "renderer.pdfium_runtime_file_extra", "unexpected.py"),
+    ("symlink", "renderer.pdfium_runtime_symlink", "pypdfium2/__init__.py"),
+    ("changed", "renderer.pdfium_runtime_file_changed", "pypdfium2/__init__.py"),
+    ("same-length", "renderer.pdfium_runtime_file_changed", "pypdfium2/__init__.py"),
+])
+def test_runtime_inventory_mutations_fail_closed_with_stable_diagnostic(
+    tmp_path, monkeypatch, mutation, code, path
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    staging = _installation_staging(tmp_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(staging)
+    skill_root = staging / "clinical-document-generation"
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    }])
+    assert provision_render_assurance(skill_root)["status"] == "passed"
+    runtime = skill_root / "runtime/python"
+    target = runtime / "pypdfium2/__init__.py"
+    if mutation == "missing":
+        target.unlink()
+    elif mutation == "extra":
+        (runtime / "unexpected.py").write_text("unexpected", encoding="utf-8")
+    elif mutation == "symlink":
+        target.unlink()
+        target.symlink_to(runtime / "pypdfium2/version.py")
+    elif mutation == "changed":
+        target.write_text("changed", encoding="utf-8")
+    else:
+        original = target.read_bytes()
+        target.write_bytes(bytes([original[0] ^ 1]) + original[1:])
+
+    result = provision_render_assurance(skill_root)
+
+    assert result["status"] == "blocked"
+    assert result["findings"][0]["category"] == "installation"
+    assert result["findings"][0]["field"] == "pdf_page_renderer"
+    assert result["findings"][0]["code"] == code
+    assert result["findings"][0]["path"] == path
+
+
+def test_later_render_assurance_reports_exact_runtime_integrity_failure(
+    tmp_path, monkeypatch
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    staging = _installation_staging(tmp_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(staging)
+    skill_root = staging / "clinical-document-generation"
+    office = {
+        "kind": "LibreOffice",
+        "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        "source": "host prerequisite",
+    }
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [office])
+    assert provision_render_assurance(skill_root)["status"] == "passed"
+    manifest = json.loads(
+        (skill_root / "RELEASE-MANIFEST.json").read_text(encoding="utf-8")
+    )
+    assurance_path = skill_root / "INSTALLATION-ASSURANCE.json"
+    assurance_path.write_text(json.dumps({"status": "passed"}), encoding="utf-8")
+    (skill_root / "PROMOTION-RECORD.json").write_text(json.dumps({
+        "schema_version": "promoted-release/v1",
+        "status": "active",
+        "package_fingerprint": manifest["package_fingerprint"],
+        "runtime_assurance_sha256": workflow.sha256_file(assurance_path),
+    }), encoding="utf-8")
+    (skill_root / "runtime/python/pypdfium2/__init__.py").unlink()
+    monkeypatch.setattr(quality, "__file__", str(skill_root / "scripts/quality.py"))
+    monkeypatch.setattr(quality, "renderers", lambda **_kwargs: [office])
+
+    result = quality.render_pages(tmp_path / "revision")
+
+    assert result["status"] == "blocked"
+    assert result["findings"][0]["code"] == "renderer.pdfium_runtime_file_missing"
+    assert result["findings"][0]["path"] == "pypdfium2/__init__.py"
+
+
+@pytest.mark.parametrize(("symlink_level", "code", "path"), [
+    ("runtime", "renderer.pdfium_runtime_directory_symlink", "runtime"),
+    ("python", "renderer.pdfium_runtime_root_symlink", "runtime/python"),
+])
+def test_runtime_root_symlink_escape_fails_closed_with_exact_path(
+    tmp_path, monkeypatch, symlink_level, code, path
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    staging = _installation_staging(tmp_path)
+    with zipfile.ZipFile(archive_path) as archive:
+        archive.extractall(staging)
+    skill_root = staging / "clinical-document-generation"
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    }])
+    assert provision_render_assurance(skill_root)["status"] == "passed"
+    symlink = skill_root / ("runtime" if symlink_level == "runtime" else "runtime/python")
+    external_runtime = tmp_path / f"external-{symlink_level}"
+    shutil.copytree(symlink, external_runtime)
+    shutil.rmtree(symlink)
+    symlink.symlink_to(external_runtime, target_is_directory=True)
+
+    assert workflow.page_renderers(skill_root=skill_root) == []
+    finding = workflow._pdfium_runtime_integrity(skill_root)["finding"]
+    assert finding["code"] == code
+    assert finding["path"] == path
+    result = provision_render_assurance(skill_root)
+    assert result["status"] == "blocked"
+    assert result["findings"][0]["code"] == code
 
 
 def test_release_package_contains_hashed_runtime_and_excludes_development_data(tmp_path):
@@ -351,13 +603,7 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         for bundle in bundles:
             assert all(packaged_hashes[path] == digest for path, digest in bundle["resource_hashes"].items())
         assert manifest["inventory"]["font_fallbacks"]["Noto Sans Symbols"] == ["Liberation Sans"]
-        assert manifest["inventory"]["pdf_page_renderer"] == {
-            "kind": "pypdfium2",
-            "version": "5.13.0",
-            "wheel": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
-            "wheel_sha256": PDFIUM_SHA256,
-            "platform": "macosx_13_0_arm64",
-        }
+        assert manifest["inventory"]["pdf_page_renderer"] == _pdfium_manifest_identity()
         assert "page_renderer_fallbacks" not in manifest["inventory"]
         assert "page_renderer_at_packaging" not in manifest["inventory"]
         assert manifest["installation"]["required_external_tools"] == [
@@ -365,6 +611,88 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         ]
         assert "atomic" in manifest["installation"]["activation"]
         assert manifest["excluded_classes"]
+
+
+def test_release_manifest_binds_expected_pdfium_extraction_inventory(tmp_path):
+    archive_path = tmp_path / "release.zip"
+
+    package_release(ROOT, archive_path)
+
+    with zipfile.ZipFile(archive_path) as archive:
+        manifest = json.loads(archive.read("clinical-document-generation/RELEASE-MANIFEST.json"))
+    inventory = manifest["inventory"]["pdf_page_renderer"]["runtime_inventory"]
+    assert inventory
+    assert inventory == sorted(inventory, key=lambda item: item["path"])
+    assert all(set(item) == {"path", "bytes", "sha256"} for item in inventory)
+    assert all(item["path"] and not item["path"].startswith(("/", "../")) for item in inventory)
+    assert all(item["bytes"] >= 0 and len(item["sha256"]) == 64 for item in inventory)
+    assert any(item["path"] == "pypdfium2/__init__.py" for item in inventory)
+    assert any(item["path"] == "pypdfium2_raw/libpdfium.dylib" for item in inventory)
+
+
+@pytest.mark.parametrize("member_name", [
+    "../escape.py",
+    "/absolute.py",
+    "package/./alias.py",
+    "package//alias.py",
+    "package\\alias.py",
+    "package/./",
+    "package/../",
+    "package//",
+    "package\\/",
+    "/absolute/",
+])
+def test_pdfium_wheel_inventory_rejects_noncanonical_paths(tmp_path, member_name):
+    wheel = tmp_path / "unsafe.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr(member_name, b"unsafe")
+
+    with pytest.raises(ValueError, match="unsafe or duplicate extraction path"):
+        workflow._pdfium_wheel_inventory(wheel)
+
+
+def test_pdfium_wheel_inventory_accepts_canonical_directory_members(tmp_path):
+    wheel = tmp_path / "safe.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        archive.writestr("package/", b"")
+        archive.writestr("package/module.py", b"safe")
+
+    assert workflow._pdfium_wheel_inventory(wheel) == [{
+        "path": "package/module.py",
+        "bytes": 4,
+        "sha256": hashlib.sha256(b"safe").hexdigest(),
+    }]
+
+
+@pytest.mark.parametrize("members", [
+    (("Foo.py", b"one"), ("foo.py", b"two")),
+    (("Package/", b""), ("package/", b"")),
+])
+def test_pdfium_wheel_inventory_rejects_case_colliding_members(tmp_path, members):
+    wheel = tmp_path / "case-collision.whl"
+    with zipfile.ZipFile(wheel, "w") as archive:
+        for name, payload in members:
+            archive.writestr(name, payload)
+
+    with pytest.raises(ValueError, match="unsafe or duplicate extraction path"):
+        workflow._pdfium_wheel_inventory(wheel)
+
+
+def test_pdfium_manifest_rejects_escaping_runtime_inventory(tmp_path):
+    skill_root = tmp_path / "clinical-document-generation"
+    wheel_dir = skill_root / "assets/runtime-wheels"
+    wheel_dir.mkdir(parents=True)
+    shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
+    identity = _pdfium_manifest_identity()
+    identity["runtime_inventory"][0]["path"] = "../escape"
+    _write_release_manifest(skill_root, {
+        "inventory": {"pdf_page_renderer": identity}
+    })
+
+    result = workflow._provision_page_renderer(skill_root)
+
+    assert result["status"] == "blocked"
+    assert result["findings"][0]["code"] == "installation.pdfium_manifest_inventory_invalid"
 
 
 def test_release_package_can_be_installed_and_imported_without_checkout(tmp_path):
@@ -404,11 +732,76 @@ def test_failed_installation_smoke_keeps_the_active_skill_unchanged(tmp_path):
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
         verifier=lambda _candidate: {"status": "blocked", "findings": [{"issue": "smoke failed"}]},
-        provisioner=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
     )
 
     assert result["status"] == "blocked"
     assert (active / "marker.txt").read_text(encoding="utf-8") == "previous verified release"
+
+
+def test_installation_smoke_timeout_returns_terminal_finding(tmp_path, monkeypatch):
+    candidate = tmp_path / "clinical-document-generation"
+    candidate.mkdir()
+
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], kwargs["timeout"])
+
+    monkeypatch.setattr(workflow.subprocess, "run", timeout)
+
+    assert workflow._installation_smoke_result(candidate) == {
+        "status": "blocked",
+        "findings": [{
+            "category": "installation",
+            "field": "smoke",
+            "code": "installation.smoke_timeout",
+            "timeout_seconds": 180,
+            "issue": "Installation smoke exceeded 180 seconds.",
+        }],
+    }
+
+
+def test_installer_hooks_cannot_bypass_unconditional_runtime_rehash(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {"status": "passed"},
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "provision_integrity"
+    assert result["findings"][0]["code"] == "renderer.pdfium_runtime_missing"
+
+
+def test_installer_rehashes_runtime_after_verifier_hook(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+
+    def mutating_verifier(candidate):
+        runtime_file = candidate / "runtime/python/pypdfium2/__init__.py"
+        runtime_file.write_bytes(runtime_file.read_bytes() + b"tampered")
+        return {"status": "passed"}
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        verifier=mutating_verifier,
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "installation_integrity"
+    assert result["findings"][0]["code"] == "renderer.pdfium_runtime_file_changed"
+    assert result["findings"][0]["path"] == "pypdfium2/__init__.py"
 
 
 def test_verified_installation_atomically_retains_the_previous_release(tmp_path):
@@ -428,7 +821,7 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
         verifier=verified,
-        provisioner=lambda _candidate: {"status": "passed", "renderer": {"kind": "LibreOffice"}},
+        provisioner=_passing_provisioner,
     )
 
     assert result["status"] == "passed"
@@ -442,6 +835,54 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
     assert promotion["certification"]["status"] == "passed"
     assert promotion["certification"]["model_identifiers"] == ["gpt-5.6-sol"]
     assert promotion["hermes_discovery"] == str(active)
+    assert quality._pdfium_runtime_integrity(active)["status"] == "passed"
+    assurance_path = active / "INSTALLATION-ASSURANCE.json"
+    assurance_bytes = assurance_path.read_bytes()
+    assurance_path.write_bytes(assurance_bytes + b"\n")
+    changed_assurance = quality._pdfium_runtime_integrity(active)
+    assert changed_assurance["status"] == "blocked"
+    assert changed_assurance["finding"] == {
+        "category": "renderer",
+        "field": "page_renderer",
+        "code": "renderer.pdfium_installation_assurance_mismatch",
+        "path": "INSTALLATION-ASSURANCE.json",
+        "issue": "The promoted release does not match its bound installation assurance.",
+    }
+    assurance_path.unlink()
+    missing_assurance = quality._pdfium_runtime_integrity(active)
+    assert missing_assurance["status"] == "blocked"
+    assert missing_assurance["finding"]["code"] == (
+        "renderer.pdfium_installation_assurance_mismatch"
+    )
+    assurance_path.symlink_to(tmp_path / "external-assurance.json")
+    symlinked_assurance = quality._pdfium_runtime_integrity(active)
+    assert symlinked_assurance["status"] == "blocked"
+    assert symlinked_assurance["finding"]["code"] == (
+        "renderer.pdfium_installation_assurance_mismatch"
+    )
+    assurance_path.unlink()
+    assurance_path.write_bytes(assurance_bytes)
+    assert quality._pdfium_runtime_integrity(active)["status"] == "passed"
+    (active / "PROMOTION-RECORD.json").unlink()
+    missing_promotion = quality._pdfium_runtime_integrity(active)
+    assert missing_promotion["status"] == "blocked"
+    assert missing_promotion["finding"]["code"] == (
+        "renderer.pdfium_promotion_record_invalid"
+    )
+    assert missing_promotion["finding"]["path"] == "PROMOTION-RECORD.json"
+    (active / "INSTALLATION-ASSURANCE.json").unlink()
+    both_records_missing = quality._pdfium_runtime_integrity(active)
+    assert both_records_missing["status"] == "blocked"
+    assert both_records_missing["finding"]["code"] == (
+        "renderer.pdfium_promotion_record_invalid"
+    )
+    explicit_candidate_mode = quality._pdfium_runtime_integrity(
+        active, require_promoted_runtime=False
+    )
+    assert explicit_candidate_mode["status"] == "blocked"
+    assert explicit_candidate_mode["finding"]["code"] == (
+        "renderer.pdfium_promotion_record_invalid"
+    )
 
 
 def test_unsigned_or_unlisted_release_cannot_displace_active(tmp_path):
@@ -480,6 +921,32 @@ def test_unsigned_or_unlisted_release_cannot_displace_active(tmp_path):
     assert (active / "marker.txt").read_text(encoding="utf-8") == "active"
 
 
+@pytest.mark.parametrize("member_name", [
+    "clinical-document-generation/./rogue.txt",
+    "clinical-document-generation//rogue.txt",
+    "clinical-document-generation/sub/../rogue.txt",
+])
+def test_release_archive_rejects_unique_noncanonical_member_paths(
+    tmp_path, member_name
+):
+    archive_path = tmp_path / "noncanonical.zip"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        archive.writestr(member_name, b"rogue")
+
+    with zipfile.ZipFile(archive_path) as archive:
+        with pytest.raises(ValueError, match="noncanonical member path"):
+            workflow._validated_archive_members(archive, tmp_path / "extract")
+
+
+def test_installation_and_runtime_share_manifest_fingerprint_verifier():
+    assert workflow._manifest_package_fingerprint is quality._manifest_package_fingerprint
+    manifest = {"schema_version": "release-manifest/v1", "inventory": {}}
+    recorded, computed = quality._manifest_package_fingerprint(manifest)
+    assert recorded == ""
+    manifest["package_fingerprint"] = computed
+    assert quality._manifest_package_fingerprint(manifest) == (computed, computed)
+
+
 def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
     archive_path = tmp_path / "release.zip"
     package_release(ROOT, archive_path)
@@ -507,7 +974,7 @@ def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
             b"{}",
         )
     skills_dir = tmp_path / "skills"
-    with pytest.raises(ValueError, match="duplicate normalized target"):
+    with pytest.raises(ValueError, match="noncanonical member path"):
         install_release(
             archive_path,
             skills_dir,
@@ -731,7 +1198,7 @@ def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
         verifier=lambda _candidate: {"status": "passed"},
-        provisioner=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
     )
 
     assert result["status"] == "passed"
