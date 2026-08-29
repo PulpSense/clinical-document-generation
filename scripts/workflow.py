@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import copy
 import hashlib
 import json
@@ -31,7 +33,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import _approved_packaged_font_fallback, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, create_verification_requests, page_renderers, pending_verifications, quality_report, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, create_verification_requests, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -51,6 +53,14 @@ DESKTOP_STAGE_SOFT_BUDGETS = {
 }
 RELEASE_MANIFEST = "RELEASE-MANIFEST.json"
 RELEASE_CERTIFICATION = "RELEASE-CERTIFICATION.json"
+CERTIFICATION_REPORT_MAX_BYTES = (
+    (CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES * 4 + 2) // 3
+    + 16 * 1024 * 1024
+)
+RELEASE_ARCHIVE_MAX_MEMBERS = 1024
+RELEASE_ARCHIVE_MAX_MEMBER_BYTES = 64 * 1024 * 1024
+RELEASE_ARCHIVE_MAX_TOTAL_BYTES = CERTIFICATION_REPORT_MAX_BYTES + 128 * 1024 * 1024
+RELEASE_ARCHIVE_MAX_COMPRESSION_RATIO = 100
 INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
 PROMOTION_RECORD = "PROMOTION-RECORD.json"
 MINIMUM_PYTHON_VERSION = (3, 10)
@@ -72,22 +82,11 @@ CERTIFIED_HERMES_CONFIGURATION = {
     "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
 }
-CERTIFICATION_CASE_ORDER = (
-    "retrospective", "ambispective-sterling", "prospective-advarra",
-)
 CERTIFICATION_GATES = {
     "source", "content", "document_structure", "prs_xml", "package",
     "cross_document_consistency", "render_assurance", "every_page_visual_qa",
     "delivery_confirmation",
 }
-CERTIFICATION_VISUAL_CHECKS = {
-    "artificial_pagination", "bad_table_split", "blank_page", "clipping",
-    "duplicate_section", "excessive_whitespace", "footer_collision",
-    "inconsistent_style", "missing_header_footer", "orphan_heading",
-    "overflow", "overlap", "toc_mismatch", "unreadable_text",
-}
-
-
 class OperationDeadlineExpired(RuntimeError):
     """Raised before an atomic publication would cross the operation deadline."""
 
@@ -316,6 +315,7 @@ def _package_release_tree(
     output_path: Path,
     *,
     git_commit: str,
+    certification_public_key: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a deterministic, installable Hermes skill archive.
 
@@ -348,10 +348,21 @@ def _package_release_tree(
     ]
     if not files:
         raise ValueError("No release files were found.")
+    file_bytes = {path: path.read_bytes() for path in files}
+    if certification_public_key is not None:
+        if "private_exponent" in certification_public_key:
+            raise ValueError("Release packaging cannot receive certification private-key material.")
+        key_path = repo_root / RELEASE_CERTIFICATION_PUBLIC_KEY
+        if key_path not in file_bytes:
+            raise ValueError("The release certification public-key resource is missing.")
+        file_bytes[key_path] = (
+            json.dumps(certification_public_key, indent=2, ensure_ascii=False) + "\n"
+        ).encode("utf-8")
     entries = []
     for path in files:
         relative = path.relative_to(repo_root).as_posix()
-        entries.append({"path": relative, "sha256": sha256_file(path), "bytes": path.stat().st_size})
+        content = file_bytes[path]
+        entries.append({"path": relative, "sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)})
     bundle_references = (
         {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}},
         {"meta": {"study_type": "Prospective", "icf_template": "Sterling"}},
@@ -429,7 +440,7 @@ def _package_release_tree(
                 relative = path.relative_to(repo_root).as_posix()
                 info = zipfile.ZipInfo(f"clinical-document-generation/{relative}", date_time=(1980, 1, 1, 0, 0, 0))
                 info.compress_type = zipfile.ZIP_DEFLATED
-                archive.writestr(info, path.read_bytes())
+                archive.writestr(info, file_bytes[path])
             info = zipfile.ZipInfo(f"clinical-document-generation/{RELEASE_MANIFEST}", date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             archive.writestr(info, manifest_text.encode("utf-8"))
@@ -447,7 +458,12 @@ def _package_release_tree(
     }
 
 
-def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
+def package_release(
+    repo_root: Path,
+    output_path: Path,
+    *,
+    certification_public_key: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Package the exact committed tree, never mutable checkout bytes."""
     repo_root = repo_root.resolve()
     output_path = output_path.expanduser().resolve()
@@ -533,11 +549,37 @@ def package_release(repo_root: Path, output_path: Path) -> dict[str, Any]:
                 archive.extractall(snapshot_root)
         except (OSError, subprocess.CalledProcessError, tarfile.TarError, ValueError) as exc:
             raise ValueError("The committed release tree could not be materialized.") from exc
-        return _package_release_tree(snapshot_root, output_path, git_commit=commit)
+        return _package_release_tree(
+            snapshot_root,
+            output_path,
+            git_commit=commit,
+            certification_public_key=certification_public_key,
+        )
 
 
 def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -> list[dict[str, Any]]:
+    if skill_root.is_symlink():
+        return [{
+            "category": "installation",
+            "field": ".",
+            "issue": "The installed skill root must not be a symbolic link.",
+        }]
+
+    def symlink_component(relative: Path) -> Path | None:
+        current = skill_root
+        for part in relative.parts:
+            current = current / part
+            if current.is_symlink():
+                return current
+        return None
+
     manifest_path = skill_root / RELEASE_MANIFEST
+    if symlink_component(Path(RELEASE_MANIFEST)) is not None:
+        return [{
+            "category": "installation",
+            "field": RELEASE_MANIFEST,
+            "issue": "A manifest-owned path or ancestor is an unsupported symbolic link.",
+        }]
     if not manifest_path.is_file():
         return [{"category": "installation", "field": RELEASE_MANIFEST, "issue": "Release manifest is missing."}]
     try:
@@ -553,6 +595,13 @@ def _manifest_integrity(skill_root: Path, *, allow_runtime_state: bool = True) -
         relative = str(item.get("path") or "")
         declared.add(relative)
         path = skill_root / relative
+        if symlink_component(Path(relative)) is not None:
+            findings.append({
+                "category": "installation",
+                "field": relative,
+                "issue": "A manifest-owned path or ancestor is an unsupported symbolic link.",
+            })
+            continue
         try:
             path.resolve().relative_to(skill_root.resolve())
         except ValueError:
@@ -596,15 +645,47 @@ def _utc_timestamp(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
 
 
-def _certification_attestation(skill_root: Path) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+
+def _certification_attestation(
+    skill_root: Path,
+    *,
+    trusted_key_id: str = RELEASE_CERTIFICATION_TRUSTED_KEY_ID,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     """Verify that the embedded full-corpus report certifies this exact candidate."""
     report_path = skill_root / RELEASE_CERTIFICATION
     try:
+        if report_path.stat().st_size > CERTIFICATION_REPORT_MAX_BYTES:
+            raise ValueError("Release Certification report exceeds the governed encoded byte limit")
         report = _read(report_path)
-        manifest = _read(skill_root / RELEASE_MANIFEST)
+        manifest_path = skill_root / RELEASE_MANIFEST
+        manifest_bytes = manifest_path.read_bytes()
+        manifest = json.loads(manifest_bytes)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": f"A valid embedded Release Certification report is required: {exc}"}]
     identity = report.get("release_identity") or {}
+    evidence_bundle = report.get("evidence_bundle") or {}
+    if evidence_bundle.get("schema_version") != "release-certification-evidence/v1":
+        return None, [{
+            "category": "installation",
+            "field": RELEASE_CERTIFICATION,
+            "issue": (
+                "The embedded Release Certification evidence bundle is missing or invalid; "
+                "digest-shaped summary fields cannot authorize this release."
+            ),
+        }]
+    evidence_findings = release_certification_attestation_findings(
+        report, manifest, skill_root, trusted_key_id=trusted_key_id,
+    )
+    evidence_findings.extend(_certification_evidence_findings(report, manifest, manifest_bytes))
+    if evidence_findings:
+        return None, [{
+            "category": "installation",
+            "field": RELEASE_CERTIFICATION,
+            "issue": (
+                "Certification evidence bundle failed independent verification: "
+                + "; ".join(evidence_findings)
+            ),
+        }]
     cases = report.get("cases") or []
     case_order = report.get("case_order") or []
     configurations = report.get("hermes_configurations") or {}
@@ -740,6 +821,9 @@ def _validated_archive_members(archive: zipfile.ZipFile, extraction_root: Path) 
     root = extraction_root.resolve()
     targets: set[str] = set()
     members = archive.infolist()
+    if len(members) > RELEASE_ARCHIVE_MAX_MEMBERS:
+        raise ValueError("Release archive contains too many members.")
+    total_uncompressed = 0
     for info in members:
         raw = info.filename[:-1] if info.is_dir() and info.filename.endswith("/") else info.filename
         relative_path = PurePosixPath(raw)
@@ -764,18 +848,86 @@ def _validated_archive_members(archive: zipfile.ZipFile, extraction_root: Path) 
         targets.add(key)
         if (info.external_attr >> 16) & 0o170000 == 0o120000:
             raise ValueError(f"Release archive contains an unsupported symbolic link: {info.filename}")
+        member_limit = (
+            CERTIFICATION_REPORT_MAX_BYTES
+            if relative.name == RELEASE_CERTIFICATION
+            else RELEASE_ARCHIVE_MAX_MEMBER_BYTES
+        )
+        if info.file_size < 0 or info.file_size > member_limit:
+            raise ValueError(f"Release archive member exceeds the governed byte limit: {info.filename}")
+        total_uncompressed += info.file_size
+        if total_uncompressed > RELEASE_ARCHIVE_MAX_TOTAL_BYTES:
+            raise ValueError("Release archive total uncompressed size exceeds the governed byte limit.")
+        if info.file_size and (
+            info.compress_size <= 0
+            or info.file_size / info.compress_size > RELEASE_ARCHIVE_MAX_COMPRESSION_RATIO
+        ):
+            raise ValueError(f"Release archive member exceeds the governed compression ratio: {info.filename}")
     return members
 
 
-def bind_release_certification(archive_path: Path, report_path: Path) -> dict[str, Any]:
+def _sign_release_certification(
+    report: Mapping[str, Any],
+    private_key_path: Path,
+) -> dict[str, Any]:
+    """Sign one canonical certification report with an external RSA private key."""
+    try:
+        private_key = json.loads(private_key_path.expanduser().read_text(encoding="utf-8"))
+        modulus = int(str(private_key.get("modulus") or ""), 16)
+        private_exponent = int(str(private_key.get("private_exponent") or ""), 16)
+        exponent = int(private_key.get("exponent"))
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Release Certification signing key is unavailable or invalid: {exc}") from exc
+    key_identity = release_certification_key_id(private_key)
+    if (
+        private_key.get("schema_version") != "release-certification-public-key/v1"
+        or private_key.get("algorithm") != RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM
+        or private_key.get("key_id") != key_identity
+        or modulus.bit_length() < 2048
+    ):
+        raise ValueError("Release Certification signing key identity or strength is invalid.")
+    signed = copy.deepcopy(dict(report))
+    signed.pop("evidence_attestation", None)
+    payload_digest = hashlib.sha256(release_certification_payload(signed)).digest()
+    encoded_bytes = (modulus.bit_length() + 7) // 8
+    digest_info = bytes.fromhex("3031300d060960864801650304020105000420") + payload_digest
+    encoded = b"\x00\x01" + b"\xff" * (encoded_bytes - len(digest_info) - 3) + b"\x00" + digest_info
+    signature = pow(int.from_bytes(encoded, "big"), private_exponent, modulus).to_bytes(encoded_bytes, "big")
+    signed["evidence_attestation"] = {
+        "schema_version": "release-certification-attestation/v1",
+        "algorithm": RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM,
+        "key_id": key_identity,
+        "payload_sha256": payload_digest.hex(),
+        "signature_base64": base64.b64encode(signature).decode("ascii"),
+    }
+    return signed
+
+
+def bind_release_certification(
+    archive_path: Path,
+    report_path: Path,
+    *,
+    private_key_path: Path | None = None,
+    trusted_certification_key_id: str = RELEASE_CERTIFICATION_TRUSTED_KEY_ID,
+) -> dict[str, Any]:
     """Attach the passing report to its already-certified immutable package."""
     archive_path = archive_path.expanduser().resolve()
     report_path = report_path.expanduser().resolve()
+    if report_path.stat().st_size > CERTIFICATION_REPORT_MAX_BYTES:
+        raise ValueError("Release Certification report exceeds the governed encoded byte limit.")
     report_bytes = report_path.read_bytes()
     try:
         report = json.loads(report_bytes)
     except json.JSONDecodeError as exc:
         raise ValueError("Release Certification report is not valid JSON.") from exc
+    configured_key = private_key_path
+    if configured_key is None and os.environ.get("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY"):
+        configured_key = Path(os.environ["CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY"])
+    if not report.get("evidence_attestation") and configured_key is not None:
+        report = _sign_release_certification(report, configured_key)
+        report_bytes = (json.dumps(report, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+        if len(report_bytes) > CERTIFICATION_REPORT_MAX_BYTES:
+            raise ValueError("Release Certification report exceeds the governed encoded byte limit.")
     with tempfile.TemporaryDirectory(prefix="clinical-certification-bind-") as directory:
         extracted = Path(directory) / "extracted"
         with zipfile.ZipFile(archive_path) as source:
@@ -784,7 +936,9 @@ def bind_release_certification(archive_path: Path, report_path: Path) -> dict[st
         candidate = extracted / "clinical-document-generation"
         (candidate / RELEASE_CERTIFICATION).write_bytes(report_bytes)
         integrity = _manifest_integrity(candidate, allow_runtime_state=False)
-        _, certification_findings = _certification_attestation(candidate)
+        _, certification_findings = _certification_attestation(
+            candidate, trusted_key_id=trusted_certification_key_id,
+        )
         if integrity or certification_findings:
             issues = integrity + certification_findings
             raise ValueError("Release Certification cannot be bound: " + "; ".join(str(item["issue"]) for item in issues))
@@ -1188,6 +1342,20 @@ def _retain_lightweight_release_history(
     return history_path
 
 
+def _installation_candidate_integrity(
+    candidate: Path,
+    *,
+    trusted_certification_key_id: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Revalidate the complete candidate after one executable installer hook."""
+    integrity = _manifest_integrity(candidate, allow_runtime_state=True)
+    certification, certification_findings = _certification_attestation(
+        candidate, trusted_key_id=trusted_certification_key_id,
+    )
+    runtime_findings = _installation_pdfium_findings(candidate)
+    return certification or {}, integrity + certification_findings + runtime_findings
+
+
 def install_release(
     archive_path: Path,
     skills_dir: Path,
@@ -1195,6 +1363,7 @@ def install_release(
     hermes_config_path: Path,
     verifier: Callable[[Path], Mapping[str, Any]] | None = None,
     provisioner: Callable[[Path], Mapping[str, Any]] = provision_render_assurance,
+    trusted_certification_key_id: str = RELEASE_CERTIFICATION_TRUSTED_KEY_ID,
 ) -> dict[str, Any]:
     """Smoke, then atomically activate an installable skill archive."""
     archive_path = archive_path.expanduser().resolve()
@@ -1209,7 +1378,9 @@ def install_release(
             _validated_archive_members(archive, staging_root)
             archive.extractall(staging_root)
         integrity = _manifest_integrity(candidate, allow_runtime_state=False)
-        certification, certification_findings = _certification_attestation(candidate)
+        certification, certification_findings = _certification_attestation(
+            candidate, trusted_key_id=trusted_certification_key_id,
+        )
         discovery_findings = _validate_hermes_discovery(hermes_config_path.expanduser().resolve(), active)
         if integrity or certification_findings or discovery_findings:
             return {
@@ -1221,12 +1392,15 @@ def install_release(
         provision = dict(provisioner(candidate))
         if provision.get("status") != "passed":
             return {"status": "blocked", "stage": "provision", "findings": list(provision.get("findings", [])), "active_release_retained": active.is_dir()}
-        runtime_findings = _installation_pdfium_findings(candidate)
-        if runtime_findings:
+        certification, provision_findings = _installation_candidate_integrity(
+            candidate,
+            trusted_certification_key_id=trusted_certification_key_id,
+        )
+        if provision_findings:
             return {
                 "status": "blocked",
                 "stage": "provision_integrity",
-                "findings": runtime_findings,
+                "findings": provision_findings,
                 "active_release_retained": active.is_dir(),
             }
         assurance = (
@@ -1236,12 +1410,15 @@ def install_release(
         )
         if assurance.get("status") != "passed":
             return {"status": "blocked", "stage": "installation_smoke", "findings": list(assurance.get("findings", [])), "active_release_retained": active.is_dir()}
-        runtime_findings = _installation_pdfium_findings(candidate)
-        if runtime_findings:
+        certification, installation_findings = _installation_candidate_integrity(
+            candidate,
+            trusted_certification_key_id=trusted_certification_key_id,
+        )
+        if installation_findings:
             return {
                 "status": "blocked",
                 "stage": "installation_integrity",
-                "findings": runtime_findings,
+                "findings": installation_findings,
                 "active_release_retained": active.is_dir(),
             }
         recorded_provision = _relocate_paths(provision, candidate, active)
