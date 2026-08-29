@@ -842,7 +842,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
         item for item in renderers(skill_root=skill_root)
         if item.get("kind") in {"Microsoft Word", "LibreOffice"}
     ]
-    fallback_pages = [
+    page_renderer_identities = [
         item for item in page_renderers(skill_root=skill_root)
         if item.get("kind") == "pypdfium2" and item.get("source") == "release-owned runtime"
     ]
@@ -871,7 +871,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
             },
             deadline_seconds=deadline_seconds,
             renderer_identities=office_renderers,
-            page_renderer_identities=fallback_pages,
+            page_renderer_identities=page_renderer_identities,
             rebuild_candidate=lambda _substitutions: {"status": "passed"},
         )
     if assurance.get("status") != "passed":
@@ -880,7 +880,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     candidates = [attempt.get("adapter") for attempt in render_evidence.get("renderer_attempts", []) if attempt.get("adapter")]
     if not office_renderers:
         findings.append({"category": "installation", "field": "office_renderer", "issue": "Microsoft Word or LibreOffice is required on the host."})
-    if not fallback_pages:
+    if not page_renderer_identities:
         findings.append({"category": "installation", "field": "pdf_page_renderer", "issue": "The release-owned pypdfium2 page renderer was not discovered."})
     return {
         "status": "passed" if not findings else "blocked",
@@ -993,7 +993,7 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
     return {"status": "passed", "page_renderer": identity, "provisioned": True}
 
 
-def provision_fallback_stack(skill_root: Path) -> dict[str, Any]:
+def provision_render_assurance(skill_root: Path) -> dict[str, Any]:
     """Provision PDFium offline and verify the required host office renderer."""
     skill_root = skill_root.resolve()
     office_renderers = [
@@ -1013,7 +1013,8 @@ def provision_fallback_stack(skill_root: Path) -> dict[str, Any]:
     return {"status": "blocked", "findings": [{
         "category": "installation",
         "field": "office_renderer",
-        "issue": "Microsoft Word or LibreOffice is required on the host.",
+        "code": "installation.office_renderer_required",
+        "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
     }]}
 
 
@@ -1094,7 +1095,7 @@ def install_release(
     *,
     hermes_config_path: Path,
     verifier: Callable[[Path], Mapping[str, Any]] | None = None,
-    provisioner: Callable[[Path], Mapping[str, Any]] = provision_fallback_stack,
+    provisioner: Callable[[Path], Mapping[str, Any]] = provision_render_assurance,
 ) -> dict[str, Any]:
     """Smoke, then atomically activate an installable skill archive."""
     archive_path = archive_path.expanduser().resolve()
@@ -3329,7 +3330,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.provision_candidate:
-        result = provision_fallback_stack(SCRIPT_DIR.parent)
+        result = provision_render_assurance(SCRIPT_DIR.parent)
         shutil.rmtree(SCRIPT_DIR / "__pycache__", ignore_errors=True)
     elif args.bind_certification:
         if not args.release_archive: parser.error("--release-archive is required with --bind-certification")
@@ -3349,7 +3350,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_fallback_stack", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

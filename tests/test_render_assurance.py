@@ -1,5 +1,4 @@
 import hashlib
-import zipfile
 from pathlib import Path
 
 from docx import Document
@@ -61,21 +60,14 @@ def test_release_owned_pdfium_is_the_only_page_renderer(tmp_path):
     ]
 
 
-def test_pdfium_rasterization_does_not_require_optional_pillow(tmp_path, monkeypatch):
+def test_pdfium_rasterization_does_not_require_optional_pillow(tmp_path, monkeypatch, governed_pdfium):
     pdf = tmp_path / "one-page.pdf"
     writer = PdfWriter()
     writer.add_blank_page(width=72, height=72)
     with pdf.open("wb") as handle:
         writer.write(handle)
     monkeypatch.setitem(__import__("sys").modules, "PIL", None)
-    runtime_python = tmp_path / "runtime-python"
-    with zipfile.ZipFile(ROOT / "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl") as wheel:
-        wheel.extractall(runtime_python)
-
-    pages = rasterize_pdf(pdf, tmp_path / "pages", {
-        "kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2",
-        "python_path": str(runtime_python),
-    })
+    pages = rasterize_pdf(pdf, tmp_path / "pages", governed_pdfium)
 
     assert pages[0].read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
 
@@ -139,7 +131,7 @@ def _structural_validation(revision_dir: Path, *expected_files: str) -> dict:
     }
 
 
-def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exact_artifacts(tmp_path):
+def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exact_artifacts(tmp_path, governed_pdfium):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     document = Document()
@@ -175,7 +167,7 @@ def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exa
         return [page]
 
     office = {"kind": "LibreOffice", "path": "/controlled/soffice"}
-    pages = {"kind": "pypdfium2", "path": "python:pypdfium2"}
+    pages = governed_pdfium
     report = render_assurance(
         ROOT,
         tmp_path,
@@ -213,7 +205,7 @@ def test_render_assurance_records_tri_state_fonts_and_binds_substitutions_to_exa
     assert hashlib.sha256((tmp_path / artifact["pages"][0]["path"]).read_bytes()).hexdigest() == artifact["pages"][0]["sha256"]
 
 
-def test_render_assurance_advances_ordered_adapters_with_governed_recovery_records(tmp_path):
+def test_render_assurance_advances_ordered_adapters_with_governed_recovery_records(tmp_path, governed_pdfium):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     document = Document()
@@ -222,7 +214,7 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
     original = (candidate / "protocol.docx").read_bytes()
     word = {"kind": "Microsoft Word", "path": "/controlled/word"}
     libreoffice = {"kind": "LibreOffice", "path": "/controlled/soffice"}
-    pdfium = {"kind": "pypdfium2", "path": "python:pypdfium2"}
+    pdfium = governed_pdfium
 
     def export(docx, output_dir, identity, **_kwargs):
         if identity == word:
@@ -268,13 +260,13 @@ def test_render_assurance_advances_ordered_adapters_with_governed_recovery_recor
     ]
 
 
-def test_render_assurance_stops_when_the_one_pdfium_renderer_fails(tmp_path):
+def test_render_assurance_stops_when_the_one_pdfium_renderer_fails(tmp_path, governed_pdfium):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     document = Document()
     document.add_paragraph("Complete candidate")
     document.save(candidate / "protocol.docx")
-    pdfium = {"kind": "pypdfium2", "path": "python:pypdfium2"}
+    pdfium = governed_pdfium
     unapproved_host_renderer = {
         "kind": "pdftoppm",
         "path": "/controlled/pdftoppm",
@@ -328,7 +320,7 @@ def test_render_assurance_stops_when_the_one_pdfium_renderer_fails(tmp_path):
     }]
 
 
-def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnostic(tmp_path):
+def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnostic(tmp_path, governed_pdfium):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     document = Document()
@@ -350,7 +342,7 @@ def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnosti
         contracted_bundle=_bundle(),
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[word, libreoffice],
-        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
+        page_renderer_identities=[governed_pdfium],
         font_probe=lambda _font, **_kwargs: (True, "available"),
         office_exporter=lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("controlled failure")),
         page_exporter=lambda *_args, **_kwargs: [],
@@ -373,7 +365,7 @@ def test_render_assurance_exhaustion_preserves_candidate_and_emits_one_diagnosti
     assert not stale_page.exists()
 
 
-def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp_path):
+def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp_path, governed_pdfium):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     document = Document()
@@ -405,7 +397,7 @@ def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp
         contracted_bundle=_bundle(),
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
-        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
+        page_renderer_identities=[governed_pdfium],
         font_probe=probe,
         rebuild_candidate=rebuild,
         office_exporter=fail_export,
@@ -419,7 +411,7 @@ def test_render_assurance_reuses_a_substituted_candidate_without_oscillating(tmp
         structural_validation=_structural_validation(tmp_path, "protocol.docx"),
         candidate_font_substitutions=first["font_substitutions"],
         renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
-        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
+        page_renderer_identities=[governed_pdfium],
         font_probe=probe,
         rebuild_candidate=rebuild,
         office_exporter=fail_export,
@@ -456,7 +448,7 @@ def test_render_assurance_rejects_an_incomplete_branch_candidate(tmp_path):
     assert "complete structurally validated" in report["findings"][0]["issue"]
 
 
-def test_render_assurance_revalidates_the_exact_candidate_after_font_substitution(tmp_path):
+def test_render_assurance_revalidates_the_exact_candidate_after_font_substitution(tmp_path, governed_pdfium):
     candidate = tmp_path / "candidate"
     candidate.mkdir()
     document = Document()
@@ -480,7 +472,7 @@ def test_render_assurance_revalidates_the_exact_candidate_after_font_substitutio
             "study.xml",
         ),
         renderer_identities=[{"kind": "LibreOffice", "path": "/controlled/soffice"}],
-        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
+        page_renderer_identities=[governed_pdfium],
         font_probe=lambda font, **_kwargs: (False, "missing") if font == "Missing Sans" else (True, "available"),
         rebuild_candidate=rebuild,
     )

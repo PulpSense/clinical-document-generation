@@ -36,7 +36,17 @@ def _visible(document):
     return "\n".join(paragraphs + cells)
 
 
-def test_renderer_preflight_reports_exhausted_fallback_stack_when_no_renderer_exists(tmp_path, monkeypatch):
+def _page_identity():
+    return {
+        "kind": "pypdfium2",
+        "path": "python:pypdfium2",
+        "module": "pypdfium2",
+        "python_path": "/release/runtime/python",
+        "source": "release-owned runtime",
+    }
+
+
+def test_renderer_preflight_reports_missing_host_office_when_no_renderer_exists(tmp_path, monkeypatch):
     reference = _source()
     monkeypatch.setattr(quality, "renderers", lambda **_: [])
     report = quality.preflight(ROOT, reference, deadline_seconds=2)
@@ -49,7 +59,7 @@ def test_renderer_preflight_reports_exhausted_fallback_stack_when_no_renderer_ex
 def test_renderer_preflight_records_renderer_font_and_smoke_evidence(tmp_path, monkeypatch):
     reference = _source()
     identity = {"kind": "LibreOffice", "path": "/usr/bin/soffice", "version": "test", "platform": "Linux"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2"}
+    page_identity = _page_identity()
     monkeypatch.setattr(quality, "renderers", lambda **_: [identity])
     monkeypatch.setattr(quality, "page_renderers", lambda **_: [page_identity])
     monkeypatch.setattr(quality, "_font_probe", lambda *_args, **_kwargs: (True, "test-font"))
@@ -89,10 +99,69 @@ def test_page_renderer_has_one_governed_backend_and_ignores_host_tools(tmp_path)
     ) is None
 
 
+def test_pdfium_identity_filter_rejects_ambient_interpreter_identity(tmp_path):
+    runtime_python = tmp_path / "runtime/python"
+    governed = {
+        "kind": "pypdfium2",
+        "path": "python:pypdfium2",
+        "module": "pypdfium2",
+        "python_path": str(runtime_python),
+        "source": "release-owned runtime",
+    }
+
+    assert quality._one_pdfium_renderer([
+        {"kind": "pypdfium2", "path": "python:pypdfium2"},
+        governed,
+    ]) == [governed]
+
+
+def test_rasterize_pdf_rejects_ambient_pdfium_before_import(tmp_path):
+    with pytest.raises(RuntimeError, match="manifest-verified release-owned runtime"):
+        quality.rasterize_pdf(
+            tmp_path / "unused.pdf",
+            tmp_path / "pages",
+            {"kind": "pypdfium2", "path": "python:pypdfium2"},
+        )
+
+
+def test_rasterize_pdf_verifies_against_the_current_release_root(
+    tmp_path,
+    monkeypatch,
+    governed_pdfium,
+):
+    observed_roots = []
+
+    def observe_release_root(**kwargs):
+        observed_roots.append(Path(kwargs["skill_root"]).resolve())
+        return []
+
+    monkeypatch.setattr(quality, "page_renderers", observe_release_root)
+
+    with pytest.raises(RuntimeError, match="manifest-verified release-owned runtime"):
+        quality.rasterize_pdf(
+            tmp_path / "unused.pdf",
+            tmp_path / "pages",
+            governed_pdfium,
+        )
+
+    assert observed_roots == [ROOT.resolve()]
+
+
+def test_renderer_discovery_ignores_a_release_local_office_suite(tmp_path, monkeypatch):
+    bundled = tmp_path / "runtime/LibreOffice/program/soffice"
+    bundled.parent.mkdir(parents=True)
+    bundled.write_text("#!/bin/sh\nprintf 'LibreOffice test\\n'\n", encoding="utf-8")
+    bundled.chmod(0o755)
+    monkeypatch.setattr(quality.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(quality, "_executable_candidates", lambda *_args, **_kwargs: iter(()))
+
+    assert quality.renderers(skill_root=tmp_path) == []
+
+
 def test_renderer_preflight_uses_the_selected_page_renderer(tmp_path, monkeypatch):
     reference = _source()
     renderer_identity = {"kind": "LibreOffice", "path": "/usr/bin/soffice", "version": "test", "platform": "Linux"}
-    page_renderer_identity = {"kind": "pypdfium2", "path": "python:pypdfium2", "source": "release-owned runtime"}
+    page_renderer_identity = _page_identity()
     monkeypatch.setattr(quality, "renderers", lambda **_: [renderer_identity])
     monkeypatch.setattr(quality, "page_renderers", lambda **_: [page_renderer_identity])
     monkeypatch.setattr(quality, "_font_probe", lambda *_args, **_kwargs: (True, "test-font"))
@@ -126,7 +195,7 @@ def test_renderer_preflight_uses_the_selected_page_renderer(tmp_path, monkeypatc
 def test_renderer_preflight_stops_when_the_release_owned_pdfium_fails(monkeypatch):
     renderer_identity = {"kind": "LibreOffice", "path": "/usr/bin/soffice", "version": "test", "platform": "Linux"}
     word_identity = {"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "platform": "Darwin"}
-    broken = {"kind": "pypdfium2", "path": "python:pypdfium2", "source": "release-owned runtime"}
+    broken = _page_identity()
     unapproved = {"kind": "pdftoppm", "path": "/usr/bin/pdftoppm", "source": "PATH"}
     attempts = []
     monkeypatch.setattr(quality, "renderers", lambda **_: [renderer_identity, word_identity])
@@ -162,7 +231,7 @@ def test_renderer_preflight_stops_when_the_release_owned_pdfium_fails(monkeypatc
 
 def test_renderer_preflight_uses_a_packaged_font_when_host_fonts_are_missing(monkeypatch):
     identity = {"kind": "LibreOffice", "path": "/usr/bin/soffice", "version": "test", "platform": "Linux"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2", "source": "release-owned runtime"}
+    page_identity = _page_identity()
     monkeypatch.setattr(quality, "renderers", lambda **_: [identity])
     monkeypatch.setattr(quality, "page_renderers", lambda **_: [page_identity])
     monkeypatch.setattr(quality, "_template_fonts", lambda _path: {"Missing Client Font"})
@@ -208,9 +277,9 @@ def test_every_current_template_font_has_an_explicit_packaged_fallback():
     }
 
 
-def test_renderer_preflight_uses_only_the_approved_packaged_fallback_for_a_missing_client_font(monkeypatch):
-    identity = {"kind": "LibreOffice", "path": "/verified/soffice", "version": "test", "platform": "Darwin", "source": "verified fallback stack"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2"}
+def test_renderer_preflight_uses_only_the_approved_packaged_font_for_a_missing_client_font(monkeypatch):
+    identity = {"kind": "LibreOffice", "path": "/verified/soffice", "version": "test", "platform": "Darwin", "source": "host prerequisite"}
+    page_identity = _page_identity()
     probes = {
         "Noto Sans Symbols": (False, "not installed"),
         "Apple Symbols": (True, "macOS system font inventory"),
@@ -636,7 +705,7 @@ def test_partial_render_merge_keeps_each_artifacts_bound_renderer(tmp_path):
 
 def test_renderer_preflight_render_verifies_an_uninspectable_font_instead_of_failing(monkeypatch):
     identity = {"kind": "LibreOffice", "path": "/test/soffice", "version": "test", "platform": "Linux"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2", "source": "release-owned runtime"}
+    page_identity = _page_identity()
     monkeypatch.setattr(quality, "renderers", lambda **_: [identity])
     monkeypatch.setattr(quality, "page_renderers", lambda **_: [page_identity])
     monkeypatch.setattr(quality, "_template_fonts", lambda _path: {"Client Sans"})
@@ -673,8 +742,8 @@ def test_renderer_preflight_render_verifies_an_uninspectable_font_instead_of_fai
 
 def test_renderer_preflight_falls_through_a_broken_preferred_renderer(monkeypatch):
     word = {"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "version": "test", "platform": "Darwin"}
-    fallback = {"kind": "LibreOffice", "path": "/bundled/soffice", "version": "test", "platform": "Darwin", "source": "verified fallback stack"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2", "source": "release-owned runtime"}
+    fallback = {"kind": "LibreOffice", "path": "/host/soffice", "version": "test", "platform": "Darwin", "source": "host prerequisite"}
+    page_identity = _page_identity()
     monkeypatch.setattr(quality, "renderers", lambda **_: [word, fallback])
     monkeypatch.setattr(quality, "page_renderers", lambda **_: [page_identity])
     monkeypatch.setattr(quality, "_template_fonts", lambda _path: set())
@@ -714,8 +783,8 @@ def test_document_rendering_falls_through_tool_failure_to_the_next_renderer(tmp_
     candidate.mkdir()
     Document().save(candidate / "protocol.docx")
     word = {"kind": "Microsoft Word", "path": "/test/word", "platform": "Darwin"}
-    fallback = {"kind": "LibreOffice", "path": "/test/soffice", "platform": "Darwin", "source": "verified fallback stack"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2"}
+    fallback = {"kind": "LibreOffice", "path": "/test/soffice", "platform": "Darwin", "source": "host prerequisite"}
+    page_identity = _page_identity()
 
     def fake_export(docx, output_dir, identity, **_kwargs):
         if identity == word:
@@ -736,6 +805,7 @@ def test_document_rendering_falls_through_tool_failure_to_the_next_renderer(tmp_
 
     monkeypatch.setattr(quality, "_render_pdf", fake_export)
     monkeypatch.setattr(quality, "rasterize_pdf", fake_rasterize)
+    monkeypatch.setattr(quality, "page_renderers", lambda **_: [_page_identity()])
     monkeypatch.setattr(quality, "refresh_toc_from_pdf", lambda *_args: False)
     monkeypatch.setattr(quality, "_blank_pdf_pages", lambda _pdf: [])
 
@@ -758,8 +828,8 @@ def test_real_visual_defect_does_not_switch_away_from_the_client_renderer(tmp_pa
     candidate.mkdir()
     Document().save(candidate / "protocol.docx")
     word = {"kind": "Microsoft Word", "path": "/test/word", "platform": "Darwin"}
-    fallback = {"kind": "LibreOffice", "path": "/test/soffice", "platform": "Darwin", "source": "verified fallback stack"}
-    page_identity = {"kind": "pypdfium2", "path": "python:pypdfium2", "module": "pypdfium2"}
+    fallback = {"kind": "LibreOffice", "path": "/test/soffice", "platform": "Darwin", "source": "host prerequisite"}
+    page_identity = _page_identity()
     rendered_by = []
 
     def fake_export(docx, output_dir, identity, **_kwargs):
@@ -780,6 +850,7 @@ def test_real_visual_defect_does_not_switch_away_from_the_client_renderer(tmp_pa
 
     monkeypatch.setattr(quality, "_render_pdf", fake_export)
     monkeypatch.setattr(quality, "rasterize_pdf", fake_rasterize)
+    monkeypatch.setattr(quality, "page_renderers", lambda **_: [_page_identity()])
     monkeypatch.setattr(quality, "refresh_toc_from_pdf", lambda *_args: False)
     monkeypatch.setattr(quality, "_blank_pdf_pages", lambda _pdf: [1])
 
@@ -825,6 +896,7 @@ def test_render_pages_regenerates_only_the_selected_artifact(tmp_path, monkeypat
 
     monkeypatch.setattr(quality, "_render_pdf", fake_export)
     monkeypatch.setattr(quality, "rasterize_pdf", fake_rasterize)
+    monkeypatch.setattr(quality, "page_renderers", lambda **_: [_page_identity()])
     monkeypatch.setattr(quality, "refresh_toc_from_pdf", lambda *_args: False)
     monkeypatch.setattr(quality, "_blank_pdf_pages", lambda _pdf: [])
 
@@ -832,7 +904,7 @@ def test_render_pages_regenerates_only_the_selected_artifact(tmp_path, monkeypat
         tmp_path,
         artifact_names={"protocol"},
         renderer_identities=[{"kind": "test", "path": "/test/renderer"}],
-        page_renderer_identities=[{"kind": "pypdfium2", "path": "python:pypdfium2"}],
+        page_renderer_identities=[_page_identity()],
     )
 
     assert report["status"] == "passed"

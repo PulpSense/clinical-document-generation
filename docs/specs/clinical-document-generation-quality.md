@@ -95,9 +95,9 @@ The Reference Protocol is the visual and structural authority. The generated doc
 54. As a maintainer, I want new templates to prefer structured table loops and explicit fields, so that future documents do not regress to newline-separated table blobs.
 55. As a maintainer, I want the end-to-end approved-run path to be the primary test seam, so that tests verify externally meaningful output behavior rather than implementation details.
 56. As a reviewer, I want document construction to complete before Render Assurance capability failures are reported, so that an environment fault never destroys the complete internal candidate.
-57. As a reviewer, I want unavailable renderer, page-renderer, font-inventory, and delegated-reviewer capabilities to use verified local fallbacks, so that mandatory Visual QA remains mandatory and runnable.
+57. As a reviewer, I want unavailable capabilities to fail closed or use only their explicitly governed owner—host Word/LibreOffice, the release-owned PDFium runtime, packaged fonts, or Desktop-parent visual review—so that mandatory Visual QA remains mandatory without an alternate renderer backend.
 58. As a reviewer, I want unknown font inventory decided by actual render evidence rather than treated as a missing font, so that an inspection limitation cannot block valid documents.
-59. As an administrator, I want release activation to smoke-test its fallback stack and retain the previous verified release atomically, so that a broken update cannot break future runs.
+59. As an administrator, I want release activation to smoke-test the host office prerequisite and manifest-bound PDFium runtime and retain the previous verified release atomically, so that a broken update cannot break future runs.
 60. As a reviewer, I want a genuine defect to remain bound to the renderer that exposed it, so that switching renderers cannot manufacture a pass.
 
 ## Implementation Decisions

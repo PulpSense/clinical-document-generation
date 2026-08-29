@@ -8,7 +8,7 @@ The current test suite can pass while required document sections remain empty or
 
 Clinical content generation is also too coarse. Giving one agent an entire document makes targeted retries difficult, but assigning the same arbitrary number of agents to every document fragments tone and creates unnecessary contradiction boundaries. Protocol, ICF, and PRS XML have different narrative shapes and must not receive identical agent topologies.
 
-The client requires Microsoft Word-compatible DOCX output, while the development or Hermes host may have Word, LibreOffice, Pages, or no document renderer. The skill must generate standards-compliant DOCX without requiring Word, but it must state honestly which Active Renderer produced Visual QA evidence and must not claim Word validation when Word was not used.
+The client requires Microsoft Word-compatible DOCX output. Candidate construction remains independent of office software, while installation requires a verified host Microsoft Word or LibreOffice capability for DOCX-to-PDF Render Assurance. The skill must state honestly which Active Renderer produced Visual QA evidence and must not claim Word validation when Word was not used.
 
 The PRS XML path requires special protection. The client-confirmed manual XML is the PRS XML Structural Reference. A separate generated example is defective: it omits much of the required XML shape, changes element ordering and repeated-block taxonomy, and collapses interventions, arms, and other outcomes. The replacement must preserve the existing client-approved XML structure and mapping rather than redesigning a path that already has a correct reference.
 
@@ -118,7 +118,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 84. As a reviewer, I want Repair Report findings classified as source evidence, drafting, contradiction, structure, renderer, or visual failures, so that remediation is routed correctly.
 85. As a client, I want standards-compliant DOCX output, so that files can be opened and edited in Microsoft Word.
 86. As a client, I want Microsoft Word treated as the compatibility target, so that local fallback rendering is not mistaken for the client's environment.
-87. As a QA reviewer, I want the Active Renderer selected in the order Word, installed LibreOffice, Pages, then the verified release-local LibreOffice fallback, so that the strongest available local evidence is used without making the host a prerequisite.
+87. As a QA reviewer, I want the Active Renderer selected from verified host Microsoft Word and LibreOffice, so that DOCX-to-PDF evidence uses an explicit supported prerequisite.
 88. As a QA reviewer, I want the Active Renderer identity recorded, so that every visual claim names the environment that produced it.
 89. As a QA reviewer, I want the workflow forbidden from claiming Word validation unless Word produced the evidence, so that validation statements remain truthful.
 90. As a QA reviewer, I want a missing renderer to prevent a visual-pass claim, so that structural validation is not confused with rendered validation.
@@ -132,7 +132,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 98. As a maintainer, I want a Generation Manifest recording source, contracts, boilerplate, templates, model, renderer, evidence, and artifact hashes, so that every result is reproducible.
 99. As a maintainer, I want six focused production modules behind one public workflow, so that the codebase remains manageable.
 100. As a maintainer, I want the old script collection removed only after the Branch Acceptance Corpus passes, so that simplification does not sacrifice proven behavior.
-101. As a QA reviewer, I want environment and reviewer transport failures to exhaust verified local fallbacks while genuine visual defects still trigger repair, so that mandatory Visual QA is neither skipped nor falsely failed.
+101. As a QA reviewer, I want office tool failure to advance only between verified host Word and LibreOffice while PDFium failure stops exactly, so that mandatory Visual QA is neither skipped nor falsely passed through an alternate backend.
 102. As an administrator, I want installation activation to be conditional on an end-to-end Render Assurance smoke and to retain the previous verified release, so that updates are atomic.
 
 ## Implementation Decisions
@@ -246,10 +246,10 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 
 - DOCX generation does not require an office application and targets standards-compliant Microsoft Word output.
 - Microsoft Word desktop is the Client Rendering Authority for the current client.
-- The Active Renderer is selected in the order Microsoft Word, installed LibreOffice, Pages, then the release-local verified LibreOffice fallback.
+- The Active Renderer is selected from verified host Microsoft Word and LibreOffice; no release-local office suite or unsupported host application is discovered.
 - The Generation Manifest records the Active Renderer and binds render evidence to artifact hashes.
 - Passing evidence proves the artifact only under the renderer that produced it. The workflow never reports Word validation unless Word produced the evidence.
-- Candidate construction precedes Render Assurance capability resolution. Installation guarantees a local fallback path; an unexpected total capability loss retains the complete candidate internally but cannot publish the Branch Document Set.
+- Candidate construction precedes Render Assurance capability resolution. Installation verifies the host office prerequisite and manifest-bound PDFium runtime; unexpected capability loss retains the complete candidate internally but cannot publish the Branch Document Set.
 - Unknown font inventory is decided through render evidence. Proven missing fonts use a recorded approved compatible mapping, including release-packaged fonts.
 - A delegated visual-review failure routes the same exact page-image request to the parent reviewer; deterministic checks alone cannot pass Visual QA.
 - Visual QA inspects every page of every generated Protocol and ICF.
@@ -361,9 +361,9 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 
 ### Renderer and visual behavior
 
-- Renderer discovery tests Word, installed LibreOffice, Pages, then the verified release-local LibreOffice fallback.
+- Renderer discovery tests only host Microsoft Word and LibreOffice and ignores release-local office executables.
 - Evidence records the renderer identity and never labels fallback evidence as Word evidence.
-- Environment and tooling faults exercise renderer, page-renderer, font, and parent-review fallbacks without being mislabeled as document defects.
+- Environment and tooling faults exercise the host Word-to-LibreOffice transition, the single terminal PDFium path, approved font substitution, and parent-review routing without being mislabeled as document defects.
 - Installation tests prove failed smoke leaves the active release unchanged and successful activation retains the previous verified release.
 - Every page of representative Protocol and ICF outputs is rendered and inspected.
 - Visual assertions cover title pages, document control, TOC, dense sections, long lists, signatures, tables, page boundaries, headers, footers, and final pages.
@@ -404,7 +404,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 - Automatically changing Drafting Batch topology during a run.
 - Delivering partial Branch Document Sets, known-defective artifacts, or Internal QA Artifacts as successful client output.
 - Preserving obsolete production scripts indefinitely after replacement acceptance.
-- Treating a fixed six-file count as more important than clear module ownership if a small future adjustment is justified by the same architectural principles.
+- Adding, deleting, or replacing one of the six existing production Python modules, or introducing another production entrypoint or workflow.
 
 ## Further Notes
 
