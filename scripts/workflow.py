@@ -3573,7 +3573,7 @@ def run_desktop_operation(
         if isinstance(prepared_ledger, Mapping):
             gate_findings = [
                 {
-                    "code": "DELIVERY_CONFIRMATION_FAILED",
+                    "code": "EXACT_BYTE_ATOMIC_DELIVERY_FAILED",
                     "target": str(finding.get("field") or "desktop_delivery"),
                     "evidence_sha256": canonical_evidence_sha256(dict(finding)),
                     "retry_owner": "desktop_transport",
