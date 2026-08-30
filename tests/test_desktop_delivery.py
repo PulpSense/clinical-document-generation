@@ -247,6 +247,27 @@ def test_shipped_production_adapter_drives_actual_desktop_operation(tmp_path, mo
     assert dispatched == ["section_drafting"]
 
 
+def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp_path, monkeypatch):
+    hermes_home = tmp_path / "isolated-home"
+    skill_root = hermes_home / "skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    monkeypatch.setenv("HOME", "/ambient/home")
+    monkeypatch.setenv("HERMES_HOME", "/ambient/hermes")
+    monkeypatch.setenv("PYTHONPATH", "/ambient/python")
+
+    environment = workflow._production_subprocess_environment(skill_root)
+
+    assert environment["HOME"] == str(hermes_home.resolve())
+    assert environment["HERMES_HOME"] == str(hermes_home.resolve())
+    assert "PYTHONPATH" not in environment
+    assert environment["XDG_CACHE_HOME"] == str(hermes_home.resolve() / ".cache")
+
+    linked_root = hermes_home / "skills/linked-clinical-document-generation"
+    linked_root.symlink_to(skill_root, target_is_directory=True)
+    with pytest.raises(ValueError, match="non-symlinked"):
+        workflow._production_subprocess_environment(linked_root)
+
+
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
         "package_fingerprint": "installed",

@@ -3700,6 +3700,33 @@ def _production_agent_prompt(
     )
 
 
+def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
+    """Bind Hermes process state to the profile containing the installed skill."""
+    untrusted_root = skill_root.expanduser().absolute()
+    if untrusted_root.is_symlink() or untrusted_root.parent.name != "skills":
+        raise ValueError(
+            "Production Desktop execution requires a non-symlinked skill under an isolated Hermes skills directory."
+        )
+    hermes_home = untrusted_root.parent.parent.resolve()
+    environment = dict(os.environ)
+    for name in (
+        "HERMES_HOME", "HERMES_PROFILE", "HOME", "PYTHONHOME", "PYTHONPATH",
+        "XDG_CACHE_HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
+    ):
+        environment.pop(name, None)
+    environment.update({
+        "HERMES_HOME": str(hermes_home),
+        "HOME": str(hermes_home),
+        "XDG_CACHE_HOME": str(hermes_home / ".cache"),
+        "XDG_CONFIG_HOME": str(hermes_home / ".config"),
+        "XDG_DATA_HOME": str(hermes_home / ".local/share"),
+        "XDG_STATE_HOME": str(hermes_home / ".local/state"),
+    })
+    for name in (".cache", ".config", ".local/share", ".local/state"):
+        (hermes_home / name).mkdir(parents=True, exist_ok=True)
+    return environment
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -3717,6 +3744,7 @@ def _production_dispatch_handoffs(
     sandbox = shutil.which("sandbox-exec")
     if sandbox is None:
         raise RuntimeError("No supported OS sandbox enforcement mechanism is available.")
+    environment = _production_subprocess_environment(skill_root)
     for handoff in handoffs:
         started = time.monotonic()
         request_id = Path(str(handoff["request_path"])).stem
@@ -3749,7 +3777,7 @@ def _production_dispatch_handoffs(
         process = subprocess.Popen(
             [sandbox, "-f", profile.name, *command],
             cwd=skill_root,
-            env=dict(os.environ),
+            env=environment,
             stdout=stdout_handle,
             stderr=stderr_handle,
             text=True,
@@ -3825,6 +3853,10 @@ def _production_dispatch_handoffs(
 
 
 def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
+    untrusted_root = skill_root.expanduser().absolute()
+    if untrusted_root.is_symlink():
+        raise ValueError("The installed release root must not be a symlink.")
+    skill_root = untrusted_root.resolve()
     findings = _manifest_integrity(skill_root, allow_runtime_state=True)
     if findings:
         raise ValueError(
@@ -3852,7 +3884,10 @@ def run_production_desktop_operation(
 ) -> dict[str, Any]:
     """Shipped host adapter for normal and certification Desktop execution."""
     run_dir = run_dir.expanduser().resolve()
-    root = (skill_root or SCRIPT_DIR.parent).expanduser().resolve()
+    untrusted_root = (skill_root or SCRIPT_DIR.parent).expanduser().absolute()
+    if untrusted_root.is_symlink():
+        raise ValueError("The installed release root must not be a symlink.")
+    root = untrusted_root.resolve()
     installed_identity = _installed_release_identity(root)
     if release_identity is not None and any(
         release_identity.get(field) != installed_identity.get(field)
