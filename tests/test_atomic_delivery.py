@@ -191,3 +191,6 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     assert prepared["predecessors"][-1]["blocked_findings"] == second_ledger["records"][4]["findings"]
     assert first_candidate.read_bytes() == b"failed candidate one"
     assert (second / "candidate/protocol.docx").read_bytes() == b"failed candidate two"
+    (second / "gate-ledger.json").unlink()
+    with pytest.raises(ValueError, match="attempt ledger"):
+        workflow._prepared_gate_ledger(revision_dir, {}, {}, [])

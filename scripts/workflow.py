@@ -3894,11 +3894,32 @@ def _invalidate_layout_artifact(revision_dir: Path, artifact: str) -> None:
 
 
 def _retained_gate_predecessors(revision_dir: Path) -> list[dict[str, Any]]:
-    ledgers = sorted((revision_dir / "attempts").glob("*/gate-ledger.json"))
-    if not ledgers:
+    attempt_root = revision_dir / "attempts"
+    attempt_dirs = sorted(path for path in attempt_root.glob("*") if path.is_dir())
+    if not attempt_dirs:
         return []
-    validated = [validate_gate_ledger(SCRIPT_DIR.parent, _read(path)) for path in ledgers]
+    validated = []
+    for attempt_dir in attempt_dirs:
+        manifest_path = attempt_dir / "attempt-manifest.json"
+        ledger_path = attempt_dir / "gate-ledger.json"
+        if not manifest_path.is_file() or not ledger_path.is_file():
+            raise ValueError(f"Retained attempt ledger or manifest is missing: {attempt_dir.name}")
+        manifest = _read(manifest_path)
+        ledger_file_sha256 = sha256_file(ledger_path)
+        if (
+            manifest.get("gate_ledger_sha256") != _read(ledger_path).get("ledger_sha256")
+            or dict(manifest.get("files") or {}).get("gate-ledger.json") != ledger_file_sha256
+        ):
+            raise ValueError(f"Retained attempt ledger identity is invalid: {attempt_dir.name}")
+        validated.append(validate_gate_ledger(SCRIPT_DIR.parent, _read(ledger_path)))
     latest = max(validated, key=lambda ledger: len(ledger["predecessors"]))
+    retained_hashes = {ledger["ledger_sha256"] for ledger in validated}
+    chained_hashes = {
+        *[item["ledger_sha256"] for item in latest["predecessors"]],
+        latest["ledger_sha256"],
+    }
+    if len(retained_hashes) != len(validated) or retained_hashes != chained_hashes:
+        raise ValueError("Retained attempt ledger chain is incomplete or forked.")
     blocked = next(
         record for record in latest["records"]
         if record["terminal_status"] == "blocked"
@@ -3958,6 +3979,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
     while (archive_root / f"{safe_stage}-a{sequence:02d}").exists():
         sequence += 1
     destination = archive_root / f"{safe_stage}-a{sequence:02d}"
+    predecessors = _retained_gate_predecessors(revision_dir)
     destination.mkdir()
     retained = (
         Path("candidate"),
@@ -3996,7 +4018,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         SCRIPT_DIR.parent,
         attempt_evidence,
         attempt_id=revision_dir.name,
-        predecessors=_retained_gate_predecessors(revision_dir),
+        predecessors=predecessors,
         statuses=statuses,
         findings_by_gate={failed_gate: ledger_findings},
     )
