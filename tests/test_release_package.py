@@ -683,6 +683,8 @@ def test_release_installation_fails_closed_without_a_host_office_renderer(tmp_pa
             "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
         }],
     }
+    assert not (skill_root / "runtime/CERTIFICATION-CANDIDATE.json").exists()
+    assert not (skill_root / "runtime/PDF-RENDERER.json").exists()
 
 
 def test_direct_extracted_candidate_provisions_without_forging_promotion(tmp_path, monkeypatch):

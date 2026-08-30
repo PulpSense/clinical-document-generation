@@ -1252,22 +1252,22 @@ def provision_render_assurance(skill_root: Path) -> dict[str, Any]:
         item for item in renderers(skill_root=skill_root)
         if item.get("kind") in {"Microsoft Word", "LibreOffice"}
     ]
+    if not office_renderers:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "office_renderer",
+            "code": "installation.office_renderer_required",
+            "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
+        }]}
     page_provision = _provision_page_renderer(skill_root)
     if page_provision.get("status") != "passed":
         return page_provision
-    if office_renderers:
-        return {
-            "status": "passed",
-            "renderer": office_renderers[0],
-            "page_renderer": page_provision["page_renderer"],
-            "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
-        }
-    return {"status": "blocked", "findings": [{
-        "category": "installation",
-        "field": "office_renderer",
-        "code": "installation.office_renderer_required",
-        "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
-    }]}
+    return {
+        "status": "passed",
+        "renderer": office_renderers[0],
+        "page_renderer": page_provision["page_renderer"],
+        "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
+    }
 
 
 def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> Any:
