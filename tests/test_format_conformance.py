@@ -220,7 +220,7 @@ def test_only_next_pending_gate_advances_with_new_exact_evidence():
         )
 
     finding = {
-        "code": "EVERY_PAGE_VISUAL_QA_ORPHAN_HEADING",
+        "code": "EVERY_PAGE_VISUAL_QA_FAILED",
         "target": "protocol.docx#page=4#section=3",
         "evidence_sha256": "c" * 64,
         "retry_owner": _gate_owner("every_page_visual_qa"),

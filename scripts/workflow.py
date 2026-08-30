@@ -4061,12 +4061,8 @@ def _ledger_findings(
 ) -> list[dict[str, Any]]:
     result = []
     for item in findings:
-        code_source = "_".join(filter(None, (
-            str(item.get("category") or ""),
-            str(item.get("field") or item.get("check") or "failure"),
-        )))
         result.append({
-            "code": f"{gate_id.upper()}_" + re.sub(r"[^A-Z0-9]+", "_", code_source.upper()).strip("_") + "_FAILED",
+            "code": f"{gate_id.upper()}_FAILED",
             "target": str(item.get("artifact") or item.get("field") or item.get("check") or "attempt"),
             "evidence_sha256": canonical_evidence_sha256(item),
             "retry_owner": retry_owner,
