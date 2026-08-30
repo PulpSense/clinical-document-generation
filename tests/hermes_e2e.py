@@ -80,7 +80,7 @@ CERTIFICATION_GATE_NAMES = frozenset({
 DEFAULT_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
     "max_turns": 80,
-    "skill": "clinical-document-drafting",
+    "skill": "clinical-document-generation",
     "safe_mode": True,
     "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
@@ -840,7 +840,7 @@ Request: {request_path}
 Response: {response_path}
 Task: {task}
 
-Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
+Read {skill_root / 'SKILL.md'} and load the clinical-document-generation skill. Read the request completely. {verification_rule}
 {preservation_rule}
 Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must be exactly "{model_identifier}", the canonical identifier for the configured model serving this handoff. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 

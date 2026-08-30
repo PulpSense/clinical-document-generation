@@ -59,6 +59,16 @@ def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
     ]
 
 
+def test_certification_uses_the_shipped_skill_identity() -> None:
+    skill_name = next(
+        line.split(":", 1)[1].strip()
+        for line in (ROOT / "SKILL.md").read_text(encoding="utf-8").splitlines()
+        if line.startswith("name:")
+    )
+    for path in (ROOT / "scripts/workflow.py", ROOT / "tests/hermes_e2e.py"):
+        assert f'"skill": "{skill_name}"' in path.read_text(encoding="utf-8")
+
+
 def test_skill_requires_source_truth_as_file_not_inline_chat():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     assert "review_delivery" in instructions

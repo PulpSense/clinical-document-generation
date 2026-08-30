@@ -80,7 +80,7 @@ PRODUCTION_MODULES = {
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
     "max_turns": 80,
-    "skill": "clinical-document-drafting",
+    "skill": "clinical-document-generation",
     "safe_mode": True,
     "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
@@ -3684,7 +3684,7 @@ def _production_agent_prompt(
         "Complete one isolated clinical-document Hermes handoff.\n"
         f"Certified skill: {skill_root}\nRun revision: {revision_dir}\n"
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
-        f"Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. "
+        f"Read {skill_root / 'SKILL.md'} and load the clinical-document-generation skill. "
         f"Read the request completely. {task_rule} Write exact JSON directly to the response "
         f"path and bind every schema, request ID, request hash, task, target, and evidence "
         f"reference exactly. producer.model_id must be exactly {model_identifier!r}."
