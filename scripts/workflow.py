@@ -3717,12 +3717,13 @@ def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
     environment.update({
         "HERMES_HOME": str(hermes_home),
         "HOME": str(hermes_home),
+        "TMPDIR": str(hermes_home / ".tmp"),
         "XDG_CACHE_HOME": str(hermes_home / ".cache"),
         "XDG_CONFIG_HOME": str(hermes_home / ".config"),
         "XDG_DATA_HOME": str(hermes_home / ".local/share"),
         "XDG_STATE_HOME": str(hermes_home / ".local/state"),
     })
-    for name in (".cache", ".config", ".local/share", ".local/state"):
+    for name in (".tmp", ".cache", ".config", ".local/share", ".local/state"):
         (hermes_home / name).mkdir(parents=True, exist_ok=True)
     return environment
 
@@ -3745,6 +3746,7 @@ def _production_dispatch_handoffs(
     if sandbox is None:
         raise RuntimeError("No supported OS sandbox enforcement mechanism is available.")
     environment = _production_subprocess_environment(skill_root)
+    hermes_home = Path(environment["HERMES_HOME"])
     for handoff in handoffs:
         started = time.monotonic()
         request_id = Path(str(handoff["request_path"])).stem
@@ -3754,9 +3756,10 @@ def _production_dispatch_handoffs(
             "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
         )
         profile.write("(version 1)\n(allow default)\n")
+        profile.write(
+            f"(deny file-write* (require-not (subpath {json.dumps(str(hermes_home.resolve()))})))\n"
+        )
         profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
-        profile.write(f"(allow file-write* (subpath {json.dumps(str(run_dir.resolve()))}))\n")
-        profile.write(f"(allow file-write* (subpath {json.dumps(str(cache_dir.resolve()))}))\n")
         for executable in ("pytest", "py.test", "pip", "pip3"):
             profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
             resolved = shutil.which(executable)

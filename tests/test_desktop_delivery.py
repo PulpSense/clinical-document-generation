@@ -260,6 +260,7 @@ def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp
     assert environment["HOME"] == str(hermes_home.resolve())
     assert environment["HERMES_HOME"] == str(hermes_home.resolve())
     assert "PYTHONPATH" not in environment
+    assert environment["TMPDIR"] == str(hermes_home.resolve() / ".tmp")
     assert environment["XDG_CACHE_HOME"] == str(hermes_home.resolve() / ".cache")
 
     linked_root = hermes_home / "skills/linked-clinical-document-generation"
