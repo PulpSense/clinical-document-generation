@@ -4009,6 +4009,10 @@ def _validate_expected_gate_attempts(
     actual_dirs = sorted(path for path in (revision_dir / "attempts").glob("*") if path.is_dir())
     if len(actual_dirs) != len(expected):
         raise ValueError("Retained gate attempt inventory count is invalid.")
+    expected_paths = [str(entry.get("path") or "") for entry in expected]
+    actual_paths = {path.relative_to(revision_dir).as_posix() for path in actual_dirs}
+    if len(expected_paths) != len(set(expected_paths)) or set(expected_paths) != actual_paths:
+        raise ValueError("Retained gate attempt inventory paths are duplicated or incomplete.")
     for entry in expected:
         relative_text = str(entry.get("path") or "")
         relative = PurePosixPath(relative_text)
