@@ -3703,9 +3703,10 @@ def _production_agent_prompt(
 def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
     """Bind Hermes process state to the profile containing the installed skill."""
     untrusted_root = skill_root.expanduser().absolute()
-    if untrusted_root.is_symlink() or untrusted_root.parent.name != "skills":
+    profile_paths = (untrusted_root, untrusted_root.parent, untrusted_root.parent.parent)
+    if any(path.is_symlink() for path in profile_paths) or untrusted_root.parent.name != "skills":
         raise ValueError(
-            "Production Desktop execution requires a non-symlinked skill under an isolated Hermes skills directory."
+            "Production Desktop execution requires a non-symlinked skill and profile under an isolated Hermes skills directory."
         )
     hermes_home = untrusted_root.parent.parent.resolve()
     environment = dict(os.environ)
@@ -3757,7 +3758,9 @@ def _production_dispatch_handoffs(
         )
         profile.write("(version 1)\n(allow default)\n")
         profile.write(
-            f"(deny file-write* (require-not (subpath {json.dumps(str(hermes_home.resolve()))})))\n"
+            "(deny file-write* (require-not (require-any "
+            f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
+            f"(subpath {json.dumps(str(run_dir.resolve()))}))))\n"
         )
         profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
         for executable in ("pytest", "py.test", "pip", "pip3"):
@@ -3857,8 +3860,10 @@ def _production_dispatch_handoffs(
 
 def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
     untrusted_root = skill_root.expanduser().absolute()
-    if untrusted_root.is_symlink():
-        raise ValueError("The installed release root must not be a symlink.")
+    if any(path.is_symlink() for path in (
+        untrusted_root, untrusted_root.parent, untrusted_root.parent.parent,
+    )):
+        raise ValueError("The installed release root and profile must not contain symlinks.")
     skill_root = untrusted_root.resolve()
     findings = _manifest_integrity(skill_root, allow_runtime_state=True)
     if findings:
@@ -3888,8 +3893,10 @@ def run_production_desktop_operation(
     """Shipped host adapter for normal and certification Desktop execution."""
     run_dir = run_dir.expanduser().resolve()
     untrusted_root = (skill_root or SCRIPT_DIR.parent).expanduser().absolute()
-    if untrusted_root.is_symlink():
-        raise ValueError("The installed release root must not be a symlink.")
+    if any(path.is_symlink() for path in (
+        untrusted_root, untrusted_root.parent, untrusted_root.parent.parent,
+    )):
+        raise ValueError("The installed release root and profile must not contain symlinks.")
     root = untrusted_root.resolve()
     installed_identity = _installed_release_identity(root)
     if release_identity is not None and any(

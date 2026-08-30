@@ -268,6 +268,15 @@ def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp
     with pytest.raises(ValueError, match="non-symlinked"):
         workflow._production_subprocess_environment(linked_root)
 
+    real_home = tmp_path / "real-home"
+    (real_home / "skills/clinical-document-generation").mkdir(parents=True)
+    linked_home = tmp_path / "linked-home"
+    linked_home.symlink_to(real_home, target_is_directory=True)
+    with pytest.raises(ValueError, match="non-symlinked"):
+        workflow._production_subprocess_environment(
+            linked_home / "skills/clinical-document-generation"
+        )
+
 
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
