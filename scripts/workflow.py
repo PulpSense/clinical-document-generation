@@ -1211,6 +1211,19 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
             "field": "pdf_page_renderer",
             "issue": f"The packaged pypdfium2 wheel could not be installed: {exc}",
         }]}
+    installation_candidate = (
+        skill_root.name == "clinical-document-generation"
+        and skill_root.parent.name.startswith(".clinical-document-generation.install-")
+    )
+    certification_candidate_path = skill_root / "runtime/CERTIFICATION-CANDIDATE.json"
+    if not installation_candidate:
+        manifest = _read(skill_root / RELEASE_MANIFEST)
+        _write(certification_candidate_path, {
+            "schema_version": "certification-candidate/v1",
+            "status": "provisioned",
+            "package_fingerprint": manifest["package_fingerprint"],
+            "git_commit": manifest["git_commit"],
+        })
     installed = page_renderers(
         skill_root=skill_root, require_promoted_runtime=False
     )

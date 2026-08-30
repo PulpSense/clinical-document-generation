@@ -1348,8 +1348,30 @@ def _pdfium_runtime_integrity(
             ".clinical-document-generation.install-"
         )
     )
+    certification_candidate_path = resolved_root / "runtime/CERTIFICATION-CANDIDATE.json"
+    certification_candidate = False
+    if not require_promoted_runtime and not installation_candidate:
+        try:
+            candidate_record = _json(certification_candidate_path)
+            candidate_manifest = _json(resolved_root / "RELEASE-MANIFEST.json")
+            recorded_candidate_fingerprint, computed_candidate_fingerprint = (
+                _manifest_package_fingerprint(candidate_manifest)
+            )
+            certification_candidate = (
+                not certification_candidate_path.is_symlink()
+                and candidate_record.get("schema_version") == "certification-candidate/v1"
+                and candidate_record.get("status") == "provisioned"
+                and candidate_record.get("package_fingerprint") == recorded_candidate_fingerprint
+                and candidate_record.get("git_commit") == candidate_manifest.get("git_commit")
+                and bool(recorded_candidate_fingerprint)
+                and recorded_candidate_fingerprint == computed_candidate_fingerprint
+            )
+        except (OSError, ValueError, json.JSONDecodeError, KeyError, TypeError):
+            certification_candidate = False
     require_promoted_runtime = (
-        require_promoted_runtime or not installation_candidate
+        require_promoted_runtime or not (
+            installation_candidate or certification_candidate
+        )
     )
     runtime_root = resolved_root / "runtime"
     runtime_python = runtime_root / "python"

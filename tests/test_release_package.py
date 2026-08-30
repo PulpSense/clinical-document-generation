@@ -680,6 +680,40 @@ def test_release_installation_fails_closed_without_a_host_office_renderer(tmp_pa
     }
 
 
+def test_direct_extracted_candidate_provisions_without_forging_promotion(tmp_path, monkeypatch):
+    skill_root = tmp_path / "isolated-hermes-home/skills/clinical-document-generation"
+    wheel_dir = skill_root / "assets/runtime-wheels"
+    wheel_dir.mkdir(parents=True)
+    shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
+    _write_release_manifest(skill_root, {
+        "git_commit": "candidate-commit",
+        "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()},
+    })
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    }])
+
+    result = provision_render_assurance(skill_root)
+
+    assert result["status"] == "passed"
+    marker = json.loads(
+        (skill_root / "runtime/CERTIFICATION-CANDIDATE.json").read_text(encoding="utf-8")
+    )
+    manifest = json.loads((skill_root / "RELEASE-MANIFEST.json").read_text(encoding="utf-8"))
+    assert marker == {
+        "schema_version": "certification-candidate/v1",
+        "status": "provisioned",
+        "package_fingerprint": manifest["package_fingerprint"],
+        "git_commit": "candidate-commit",
+    }
+    assert quality._pdfium_runtime_integrity(
+        skill_root, require_promoted_runtime=False,
+    )["status"] == "passed"
+    promoted = quality._pdfium_runtime_integrity(skill_root)
+    assert promoted["status"] == "blocked"
+    assert promoted["finding"]["code"] == "renderer.pdfium_promotion_record_invalid"
+
+
 def test_release_renderer_rejects_tampered_runtime_without_silent_repair(tmp_path, monkeypatch):
     skill_root = _installation_staging(tmp_path) / "clinical-document-generation"
     wheel_dir = skill_root / "assets/runtime-wheels"
