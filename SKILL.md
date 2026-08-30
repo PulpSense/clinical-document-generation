@@ -153,7 +153,9 @@ authorities. It also compares every generated DOCX with an approved normalized
 OOXML baseline under `references/format-baselines/`, covering section geometry,
 styles, numbering, headers/footers, fields/TOC, page furniture, table geometry,
 signature/legal placement, paragraph rhythm, and relational pagination controls
-without relying on whole-DOCX equality. Its `structural_passed` result is
+without relying on whole-DOCX equality. Every governed heading is bound to its
+actual first substantive paragraph, table, or child heading on the same rendered
+page; missing successors and unrelated page text fail. Its `structural_passed` result is
 deterministic structural evidence only: it cannot substitute for clinical
 verification, genuine every-page image inspection, production certification, or
 exact-byte Desktop confirmation.
