@@ -687,6 +687,11 @@ def test_direct_extracted_candidate_provisions_without_forging_promotion(tmp_pat
     shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
     _write_release_manifest(skill_root, {
         "git_commit": "candidate-commit",
+        "files": [{
+            "path": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "sha256": PDFIUM_SHA256,
+            "bytes": (wheel_dir / PDFIUM_WHEEL).stat().st_size,
+        }],
         "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()},
     })
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
@@ -712,6 +717,45 @@ def test_direct_extracted_candidate_provisions_without_forging_promotion(tmp_pat
     promoted = quality._pdfium_runtime_integrity(skill_root)
     assert promoted["status"] == "blocked"
     assert promoted["finding"]["code"] == "renderer.pdfium_promotion_record_invalid"
+
+
+def test_direct_extracted_candidate_refuses_mutated_manifest_owned_bytes(tmp_path, monkeypatch):
+    skill_root = tmp_path / "isolated-hermes-home/skills/clinical-document-generation"
+    wheel_dir = skill_root / "assets/runtime-wheels"
+    script_path = skill_root / "scripts/workflow.py"
+    wheel_dir.mkdir(parents=True)
+    script_path.parent.mkdir(parents=True)
+    script_path.write_text("original\n", encoding="utf-8")
+    shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
+    _write_release_manifest(
+        skill_root,
+        {
+            "git_commit": "candidate-commit",
+            "files": [
+                {
+                    "path": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+                    "sha256": PDFIUM_SHA256,
+                    "bytes": (wheel_dir / PDFIUM_WHEEL).stat().st_size,
+                },
+                {
+                    "path": "scripts/workflow.py",
+                    "sha256": hashlib.sha256(script_path.read_bytes()).hexdigest(),
+                    "bytes": script_path.stat().st_size,
+                },
+            ],
+            "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()},
+        },
+    )
+    script_path.write_text("mutated\n", encoding="utf-8")
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    }])
+
+    result = provision_render_assurance(skill_root)
+
+    assert result["status"] == "blocked"
+    assert any(finding["field"] == "scripts/workflow.py" for finding in result["findings"])
+    assert not (skill_root / "runtime/CERTIFICATION-CANDIDATE.json").exists()
 
 
 def test_release_renderer_rejects_tampered_runtime_without_silent_repair(tmp_path, monkeypatch):

@@ -1240,6 +1240,14 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
 def provision_render_assurance(skill_root: Path) -> dict[str, Any]:
     """Provision PDFium offline and verify the required host office renderer."""
     skill_root = skill_root.resolve()
+    manifest_findings = _manifest_integrity(skill_root, allow_runtime_state=True)
+    if manifest_findings:
+        return {
+            "status": "blocked",
+            "findings": manifest_findings,
+            "renderer": None,
+            "page_renderer": None,
+        }
     office_renderers = [
         item for item in renderers(skill_root=skill_root)
         if item.get("kind") in {"Microsoft Word", "LibreOffice"}
