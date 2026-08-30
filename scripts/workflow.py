@@ -3931,9 +3931,16 @@ def _retained_gate_predecessors(revision_dir: Path) -> list[dict[str, Any]]:
             raise ValueError(f"Retained attempt ledger or manifest is missing: {attempt_dir.name}")
         manifest = _read(manifest_path)
         ledger_file_sha256 = sha256_file(ledger_path)
+        declared_files = dict(manifest.get("files") or {})
+        actual_files = {
+            path.relative_to(attempt_dir).as_posix(): sha256_file(path)
+            for path in sorted(attempt_dir.rglob("*"))
+            if path.is_file() and path.name != "attempt-manifest.json"
+        }
         if (
             manifest.get("gate_ledger_sha256") != _read(ledger_path).get("ledger_sha256")
             or dict(manifest.get("files") or {}).get("gate-ledger.json") != ledger_file_sha256
+            or declared_files != actual_files
         ):
             raise ValueError(f"Retained attempt ledger identity is invalid: {attempt_dir.name}")
         validated.append(validate_gate_ledger(SCRIPT_DIR.parent, _read(ledger_path)))
@@ -4887,23 +4894,24 @@ def run_format_conformance(
         if evidence_root is not None
         else (repo_root / ".scratch/format-conformance").resolve()
     )
+    try:
+        git_root = Path(subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()).resolve()
+    except (OSError, subprocess.CalledProcessError):
+        git_root = None
+    if git_root == repo_root:
+        return _run_format_conformance_in_disposable_candidate(
+            repo_root,
+            resolved_evidence_root,
+        )
     available_page_renderers = page_renderers(
         skill_root=repo_root,
         require_promoted_runtime=False,
     )
-    if available_page_renderers:
-        try:
-            git_root = Path(subprocess.run(
-                ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()).resolve()
-        except (OSError, subprocess.CalledProcessError):
-            git_root = None
-        if git_root == repo_root:
-            with tempfile.TemporaryDirectory(prefix="format-conformance-clean-") as directory:
-                package_release(repo_root, Path(directory) / "candidate.zip")
     if not available_page_renderers:
         return _run_format_conformance_in_disposable_candidate(
             repo_root,

@@ -538,6 +538,10 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
     if not isinstance(predecessors, list):
         raise ValueError("Gate ledger predecessor history is invalid.")
     predecessor_hashes = []
+    gate_retry_owners = {
+        str(item["gate_id"]): str(item["retry_owner"])
+        for item in matrix["gate_sequence"]
+    }
     for predecessor in predecessors:
         if not isinstance(predecessor, Mapping):
             raise ValueError("Gate ledger predecessor entry is invalid.")
@@ -550,7 +554,13 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
             or not isinstance(blocked_findings, list)
             or not blocked_findings
             or any(
-                not isinstance(finding, Mapping) or not finding_fields <= set(finding)
+                not isinstance(finding, Mapping)
+                or not finding_fields <= set(finding)
+                or not re.fullmatch(r"[A-Z][A-Z0-9_]+", str(finding.get("code") or ""))
+                or not str(finding.get("target") or "").strip()
+                or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
+                or finding.get("retry_owner") != gate_retry_owners.get(str(predecessor.get("terminal_gate")))
+                or finding.get("terminal_status") != "blocked"
                 for finding in blocked_findings
             )
         ):

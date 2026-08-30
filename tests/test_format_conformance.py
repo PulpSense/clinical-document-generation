@@ -258,8 +258,12 @@ def test_independent_runner_binds_exact_matrix_combinations(tmp_path, monkeypatc
         {"status": "passed", "case": "ambispective-advarra", "result": {"study_type": "Ambispective"}, "icf_template": "Advarra"},
         {"status": "passed", "case": "ambispective-sterling", "result": {"study_type": "Ambispective"}, "icf_template": "Sterling"},
     ]
+    monkeypatch.setattr(
+        workflow.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(workflow.subprocess.CalledProcessError(1, "git")),
+    )
     monkeypatch.setattr(workflow, "page_renderers", lambda **kwargs: [{"kind": "pypdfium2"}])
-    monkeypatch.setattr(workflow, "package_release", lambda *_args, **_kwargs: {"status": "passed"})
     monkeypatch.setattr(workflow, "run_release_gate", lambda *args, **kwargs: {
         "status": "structural_passed",
         "assurance": "synthetic-structural-only",
