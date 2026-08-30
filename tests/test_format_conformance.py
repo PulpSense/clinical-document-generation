@@ -74,7 +74,19 @@ def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
         gate_id: {"gate": gate_id, "artifact_sha256": str(index) * 64}
         for index, gate_id in enumerate(quality.GOVERNED_GATE_SEQUENCE, start=1)
     }
-    ledger = quality.build_gate_ledger(ROOT, evidence)
+    pending = quality.build_gate_ledger(
+        ROOT,
+        evidence,
+        attempt_id="test-root",
+        statuses={"exact_byte_atomic_delivery": "pending"},
+    )
+    ledger = quality.advance_gate_ledger(
+        ROOT,
+        pending,
+        gate_id="exact_byte_atomic_delivery",
+        terminal_status="passed",
+        evidence={"delivery": "confirmed"},
+    )
 
     assert [record["gate_id"] for record in ledger["records"]] == list(quality.GOVERNED_GATE_SEQUENCE)
     assert all(record["terminal_status"] == "passed" for record in ledger["records"])
@@ -92,6 +104,8 @@ def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
     bypass["ledger_sha256"] = quality.canonical_evidence_sha256(unsigned)
     with pytest.raises(ValueError, match="cannot pass after"):
         quality.validate_gate_ledger(ROOT, bypass)
+    with pytest.raises(ValueError, match="must advance"):
+        quality.build_gate_ledger(ROOT, evidence, attempt_id="forbidden-direct-pass")
 
 
 @pytest.mark.parametrize("failed_gate", quality.GOVERNED_GATE_SEQUENCE)
@@ -112,6 +126,7 @@ def test_every_failed_gate_is_terminal_and_retained(failed_gate):
     ledger = quality.build_gate_ledger(
         ROOT,
         evidence,
+        attempt_id=f"failed-{failed_gate}",
         statuses=statuses,
         findings_by_gate={failed_gate: [finding]},
     )
@@ -126,11 +141,47 @@ def test_every_failed_gate_is_terminal_and_retained(failed_gate):
     assert ledger["records"][failed_index]["findings"] == [finding]
 
 
+def test_retry_ledger_retains_blocked_predecessor_and_findings():
+    evidence = {gate_id: {"gate": gate_id} for gate_id in quality.GOVERNED_GATE_SEQUENCE}
+    finding = {
+        "code": "DOCX_STRUCTURE_FAILED",
+        "target": "protocol.docx#section=3",
+        "evidence_sha256": "f" * 64,
+        "retry_owner": "document-repair",
+        "terminal_status": "blocked",
+    }
+    blocked = quality.build_gate_ledger(
+        ROOT,
+        evidence,
+        attempt_id="revision-r1",
+        statuses={
+            "docx_prs_structure": "blocked",
+            "exact_artifact_rendering": "pending",
+            "every_page_visual_qa": "pending",
+            "exact_byte_atomic_delivery": "pending",
+        },
+        findings_by_gate={"docx_prs_structure": [finding]},
+    )
+
+    retried = quality.retry_gate_ledger(
+        ROOT,
+        blocked,
+        evidence,
+        statuses={"exact_byte_atomic_delivery": "pending"},
+    )
+
+    assert retried["attempt_id"] == "revision-r1"
+    assert retried["predecessors"][-1]["ledger_sha256"] == blocked["ledger_sha256"]
+    assert retried["predecessors"][-1]["blocked_findings"] == [finding]
+    assert quality.validate_gate_ledger(ROOT, retried) == retried
+
+
 def test_only_next_pending_gate_advances_with_new_exact_evidence():
     evidence = {gate_id: {"gate": gate_id} for gate_id in quality.GOVERNED_GATE_SEQUENCE}
     pending = quality.build_gate_ledger(
         ROOT,
         evidence,
+        attempt_id="delivery-attempt",
         statuses={"exact_byte_atomic_delivery": "pending"},
     )
     prior_hash = pending["records"][-1]["evidence_sha256"]
@@ -167,6 +218,7 @@ def test_only_next_pending_gate_advances_with_new_exact_evidence():
         quality.build_gate_ledger(
             ROOT,
             evidence,
+            attempt_id="visual-attempt",
             statuses={"every_page_visual_qa": "pending", "exact_byte_atomic_delivery": "pending"},
         ),
         gate_id="every_page_visual_qa",

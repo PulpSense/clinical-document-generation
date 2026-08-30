@@ -24,10 +24,32 @@ def _publish_fixture(tmp_path: Path):
         }
         for path in sorted(candidate.iterdir())
     ]
+    rendered = revision_dir / "rendered"
+    render_artifacts = []
+    for artifact in ("icf", "protocol"):
+        pdf = rendered / f"{artifact}.pdf"
+        page = rendered / artifact / "page-01.png"
+        page.parent.mkdir(parents=True, exist_ok=True)
+        pdf.write_bytes(f"approved {artifact} pdf".encode())
+        page.write_bytes(f"approved {artifact} page".encode())
+        render_artifacts.append({
+            "artifact": artifact,
+            "status": "passed",
+            "docx": f"candidate/{artifact}.docx",
+            "docx_sha256": hashlib.sha256((candidate / f"{artifact}.docx").read_bytes()).hexdigest(),
+            "pdf": f"rendered/{artifact}.pdf",
+            "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+            "page_count": 1,
+            "pages": [{
+                "page": 1,
+                "path": f"rendered/{artifact}/page-01.png",
+                "sha256": hashlib.sha256(page.read_bytes()).hexdigest(),
+            }],
+        })
     (revision_dir / "candidate-build.json").write_text(json.dumps({
         "governing_resources": {},
         "candidate_files": candidate_files,
-        "render_report": {"artifacts": []},
+        "render_report": {"status": "passed", "artifacts": render_artifacts},
     }), encoding="utf-8")
     output = run_dir / "output"
     output.mkdir()
@@ -45,25 +67,7 @@ def test_publish_rejects_changed_bytes_after_evidence_and_preserves_prior_output
     run_dir, revision_dir, reference = _publish_fixture(tmp_path)
     rendered = revision_dir / "rendered"
     page = rendered / "protocol/page-01.png"
-    page.parent.mkdir(parents=True)
     pdf = rendered / "protocol.pdf"
-    pdf.write_bytes(b"approved pdf")
-    page.write_bytes(b"approved page")
-    build_path = revision_dir / "candidate-build.json"
-    build = json.loads(build_path.read_text(encoding="utf-8"))
-    build["render_report"] = {"artifacts": [{
-        "artifact": "protocol",
-        "docx": "candidate/protocol.docx",
-        "docx_sha256": hashlib.sha256((revision_dir / "candidate/protocol.docx").read_bytes()).hexdigest(),
-        "pdf": "rendered/protocol.pdf",
-        "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
-        "pages": [{
-            "page": 1,
-            "path": "rendered/protocol/page-01.png",
-            "sha256": hashlib.sha256(page.read_bytes()).hexdigest(),
-        }],
-    }]}
-    build_path.write_text(json.dumps(build), encoding="utf-8")
 
     changed = {
         "docx": revision_dir / "candidate/protocol.docx",
@@ -82,25 +86,7 @@ def test_publish_rejects_changed_bytes_after_evidence_and_preserves_prior_output
 def test_publish_rechecks_reviewed_evidence_after_staging(tmp_path, monkeypatch):
     run_dir, revision_dir, reference = _publish_fixture(tmp_path)
     page = revision_dir / "rendered/protocol/page-01.png"
-    page.parent.mkdir(parents=True)
-    page.write_bytes(b"approved page")
     pdf = revision_dir / "rendered/protocol.pdf"
-    pdf.write_bytes(b"approved pdf")
-    build_path = revision_dir / "candidate-build.json"
-    build = json.loads(build_path.read_text(encoding="utf-8"))
-    build["render_report"] = {"artifacts": [{
-        "artifact": "protocol",
-        "docx": "candidate/protocol.docx",
-        "docx_sha256": hashlib.sha256((revision_dir / "candidate/protocol.docx").read_bytes()).hexdigest(),
-        "pdf": "rendered/protocol.pdf",
-        "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
-        "pages": [{
-            "page": 1,
-            "path": "rendered/protocol/page-01.png",
-            "sha256": hashlib.sha256(page.read_bytes()).hexdigest(),
-        }],
-    }]}
-    build_path.write_text(json.dumps(build), encoding="utf-8")
     original_copy = workflow.shutil.copy2
 
     def mutate_reviewed_page_after_copy(source, target):
@@ -138,6 +124,19 @@ def test_publish_failure_keeps_the_previous_package_intact(tmp_path, monkeypatch
     assert sorted(path.name for path in (run_dir / "output").iterdir()) == ["obsolete.txt", "protocol.docx"]
 
 
+def test_publish_rejects_truncated_render_inventory(tmp_path):
+    run_dir, revision_dir, reference = _publish_fixture(tmp_path)
+    build_path = revision_dir / "candidate-build.json"
+    build = json.loads(build_path.read_text(encoding="utf-8"))
+    build["render_report"]["artifacts"] = []
+    build_path.write_text(json.dumps(build), encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="stale publication evidence"):
+        workflow._publish(run_dir, revision_dir, reference, {})
+
+    assert (run_dir / "output/protocol.docx").read_bytes() == b"old protocol"
+
+
 def test_publish_swaps_the_complete_package_and_removes_obsolete_outputs(tmp_path):
     run_dir, revision_dir, reference = _publish_fixture(tmp_path)
 
@@ -166,8 +165,12 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     first_candidate = first / "candidate/protocol.docx"
     assert first_candidate.read_bytes() == b"failed candidate one"
     first_manifest = json.loads((first / "attempt-manifest.json").read_text(encoding="utf-8"))
+    first_ledger = json.loads((first / "gate-ledger.json").read_text(encoding="utf-8"))
     assert first_manifest["revision_id"] == "r-traceable"
     assert first_manifest["findings"][0]["issue"] == "First failed page"
+    assert first_manifest["gate_ledger_sha256"] == first_ledger["ledger_sha256"]
+    assert first_ledger["attempt_id"] == "r-traceable"
+    assert first_ledger["records"][4]["terminal_status"] == "blocked"
 
     (revision_dir / "candidate/protocol.docx").write_bytes(b"failed candidate two")
     second = workflow._archive_failed_attempt(
@@ -177,5 +180,14 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     )
 
     assert second != first
+    second_ledger = json.loads((second / "gate-ledger.json").read_text(encoding="utf-8"))
+    assert second_ledger["predecessors"][-1]["ledger_sha256"] == first_ledger["ledger_sha256"]
+    assert second_ledger["predecessors"][-1]["blocked_findings"] == first_ledger["records"][4]["findings"]
+    prepared = workflow._prepared_gate_ledger(revision_dir, {}, {}, [])
+    assert [item["ledger_sha256"] for item in prepared["predecessors"]] == [
+        first_ledger["ledger_sha256"],
+        second_ledger["ledger_sha256"],
+    ]
+    assert prepared["predecessors"][-1]["blocked_findings"] == second_ledger["records"][4]["findings"]
     assert first_candidate.read_bytes() == b"failed candidate one"
     assert (second / "candidate/protocol.docx").read_bytes() == b"failed candidate two"

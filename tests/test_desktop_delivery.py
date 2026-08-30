@@ -651,13 +651,31 @@ def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_de
     candidate.mkdir(parents=True)
     (candidate / "protocol.docx").write_bytes(b"new candidate")
     (revision_dir / "approved-reference.json").write_text("{}", encoding="utf-8")
+    pdf = revision_dir / "rendered/protocol.pdf"
+    page = revision_dir / "rendered/protocol/page-01.png"
+    page.parent.mkdir(parents=True)
+    pdf.write_bytes(b"approved pdf")
+    page.write_bytes(b"approved page")
     (revision_dir / "candidate-build.json").write_text(json.dumps({
         "candidate_files": [{
             "path": "candidate/protocol.docx",
             "sha256": workflow.quality_sha256(candidate / "protocol.docx"),
             "bytes": (candidate / "protocol.docx").stat().st_size,
         }],
-        "render_report": {"artifacts": []},
+        "render_report": {"status": "passed", "artifacts": [{
+            "artifact": "protocol",
+            "status": "passed",
+            "docx": "candidate/protocol.docx",
+            "docx_sha256": workflow.quality_sha256(candidate / "protocol.docx"),
+            "pdf": "rendered/protocol.pdf",
+            "pdf_sha256": workflow.quality_sha256(pdf),
+            "page_count": 1,
+            "pages": [{
+                "page": 1,
+                "path": "rendered/protocol/page-01.png",
+                "sha256": workflow.quality_sha256(page),
+            }],
+        }]},
     }), encoding="utf-8")
     output = tmp_path / "output"
     output.mkdir()

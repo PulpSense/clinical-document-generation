@@ -33,7 +33,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -3601,18 +3601,79 @@ def _publication_evidence_findings(
 ) -> list[dict[str, Any]]:
     """Rehash every candidate, PDF, and page bound by the accepted build."""
     expected: dict[str, str] = {}
-    for item in build.get("candidate_files", []):
+    candidate_rows = list(build.get("candidate_files") or [])
+    for item in candidate_rows:
         if isinstance(item, Mapping):
             expected[str(item.get("path") or "")] = str(item.get("sha256") or "")
-    for artifact in dict(build.get("render_report") or {}).get("artifacts", []):
+    actual_candidate_paths = {
+        path.relative_to(revision_dir).as_posix()
+        for path in (revision_dir / "candidate").glob("*") if path.is_file()
+    }
+    declared_candidate_paths = {
+        str(item.get("path") or "") for item in candidate_rows if isinstance(item, Mapping)
+    }
+    render_report = dict(build.get("render_report") or {})
+    render_rows = list(render_report.get("artifacts") or [])
+    expected_render_artifacts = {
+        PurePosixPath(path).stem
+        for path in actual_candidate_paths
+        if PurePosixPath(path).suffix.casefold() == ".docx"
+    }
+    declared_render_artifacts = [
+        str(artifact.get("artifact") or "")
+        for artifact in render_rows if isinstance(artifact, Mapping)
+    ]
+    inventory_valid = (
+        declared_candidate_paths == actual_candidate_paths
+        and len(declared_render_artifacts) == len(set(declared_render_artifacts))
+        and set(declared_render_artifacts) == expected_render_artifacts
+        and render_report.get("status") == "passed"
+    )
+    for artifact in render_rows:
         if not isinstance(artifact, Mapping):
+            inventory_valid = False
             continue
+        pages = list(artifact.get("pages") or [])
+        page_count = artifact.get("page_count")
+        declared_page_paths = {
+            str(page.get("path") or "") for page in pages if isinstance(page, Mapping)
+        }
+        artifact_name = str(artifact.get("artifact") or "")
+        actual_page_paths = {
+            path.relative_to(revision_dir).as_posix()
+            for path in (revision_dir / "rendered" / artifact_name).glob("*.png")
+            if path.is_file()
+        }
+        if (
+            artifact.get("status") != "passed"
+            or not isinstance(page_count, int)
+            or page_count <= 0
+            or [page.get("page") for page in pages if isinstance(page, Mapping)] != list(range(1, page_count + 1))
+            or len(pages) != page_count
+            or declared_page_paths != actual_page_paths
+        ):
+            inventory_valid = False
         for kind in ("docx", "pdf"):
             expected[str(artifact.get(kind) or "")] = str(artifact.get(f"{kind}_sha256") or "")
         for page in artifact.get("pages", []):
             if isinstance(page, Mapping):
                 expected[str(page.get("path") or "")] = str(page.get("sha256") or "")
     findings = []
+    if not inventory_valid:
+        findings.append({
+            "code": "INCOMPLETE_PUBLICATION_EVIDENCE_INVENTORY",
+            "target": "candidate-build.json",
+            "evidence_sha256": canonical_evidence_sha256({
+                "candidate_files": candidate_rows,
+                "render_report": render_report,
+            }),
+            "actual_candidate_paths": sorted(actual_candidate_paths),
+            "declared_candidate_paths": sorted(declared_candidate_paths),
+            "expected_render_artifacts": sorted(expected_render_artifacts),
+            "declared_render_artifacts": declared_render_artifacts,
+            "retry_owner": "render_assurance",
+            "terminal_status": "blocked",
+        })
     for relative_text, expected_sha256 in sorted(expected.items()):
         relative = PurePosixPath(relative_text)
         valid_path = (
@@ -3645,6 +3706,7 @@ def _publication_evidence_findings(
 
 
 def _prepared_gate_ledger(
+    revision_dir: Path,
     build: Mapping[str, Any],
     quality: Mapping[str, Any],
     published: Iterable[Mapping[str, Any]],
@@ -3690,6 +3752,8 @@ def _prepared_gate_ledger(
     return build_gate_ledger(
         SCRIPT_DIR.parent,
         evidence,
+        attempt_id=revision_dir.name,
+        predecessors=_retained_gate_predecessors(revision_dir),
         statuses={"exact_byte_atomic_delivery": "pending"},
     )
 
@@ -3755,7 +3819,7 @@ def _publish(
         {"path": (output / source.name).relative_to(run_dir).as_posix(), "sha256": quality_sha256(output / source.name), "bytes": (output / source.name).stat().st_size}
         for source in sources
     ]
-    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(build, quality, published)}
+    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(revision_dir, build, quality, published)}
     manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
     return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
@@ -3829,6 +3893,62 @@ def _invalidate_layout_artifact(revision_dir: Path, artifact: str) -> None:
         request_path.unlink(missing_ok=True)
 
 
+def _retained_gate_predecessors(revision_dir: Path) -> list[dict[str, Any]]:
+    ledgers = sorted((revision_dir / "attempts").glob("*/gate-ledger.json"))
+    if not ledgers:
+        return []
+    validated = [validate_gate_ledger(SCRIPT_DIR.parent, _read(path)) for path in ledgers]
+    latest = max(validated, key=lambda ledger: len(ledger["predecessors"]))
+    blocked = next(
+        record for record in latest["records"]
+        if record["terminal_status"] == "blocked"
+    )
+    return [
+        *[dict(item) for item in latest["predecessors"]],
+        {
+            "attempt_id": latest["attempt_id"],
+            "ledger_sha256": latest["ledger_sha256"],
+            "terminal_gate": blocked["gate_id"],
+            "blocked_findings": [dict(item) for item in blocked["findings"]],
+        },
+    ]
+
+
+def _failed_gate_for_stage(stage: str, findings: Iterable[Mapping[str, Any]]) -> str:
+    if stage == "pre_render_content":
+        return "content_completeness_consistency"
+    if stage == "rendering":
+        return "docx_prs_structure"
+    if stage == "rendered_document_qa" or any(
+        str(item.get("category") or "").casefold() == "visual" for item in findings
+    ):
+        return "every_page_visual_qa"
+    return "clinical_fidelity"
+
+
+def _ledger_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    result = []
+    for item in findings:
+        code_source = "_".join(filter(None, (
+            str(item.get("category") or ""),
+            str(item.get("field") or item.get("check") or "failure"),
+        )))
+        result.append({
+            "code": re.sub(r"[^A-Z0-9]+", "_", code_source.upper()).strip("_") + "_FAILED",
+            "target": str(item.get("artifact") or item.get("field") or item.get("check") or "attempt"),
+            "evidence_sha256": canonical_evidence_sha256(item),
+            "retry_owner": str(item.get("action") or item.get("recovery_class") or "governed-retry"),
+            "terminal_status": "blocked",
+        })
+    return result or [{
+        "code": "GOVERNED_GATE_FAILED",
+        "target": "attempt",
+        "evidence_sha256": canonical_evidence_sha256([]),
+        "retry_owner": "governed-retry",
+        "terminal_status": "blocked",
+    }]
+
+
 def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mapping[str, Any]]) -> Path:
     """Preserve the complete failed candidate and QA evidence before any retry mutation."""
     archive_root = revision_dir / "attempts"
@@ -3856,6 +3976,31 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         elif source.is_file():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+    failed_gate = _failed_gate_for_stage(stage, findings)
+    failed_index = GOVERNED_GATE_SEQUENCE.index(failed_gate)
+    statuses = {
+        gate_id: "passed" if index < failed_index else "blocked" if index == failed_index else "pending"
+        for index, gate_id in enumerate(GOVERNED_GATE_SEQUENCE)
+    }
+    ledger_findings = _ledger_findings(findings)
+    attempt_evidence = {
+        gate_id: {
+            "revision_id": revision_dir.name,
+            "stage": stage,
+            "gate_id": gate_id,
+            "findings_sha256": canonical_evidence_sha256(findings),
+        }
+        for gate_id in GOVERNED_GATE_SEQUENCE
+    }
+    failed_ledger = build_gate_ledger(
+        SCRIPT_DIR.parent,
+        attempt_evidence,
+        attempt_id=revision_dir.name,
+        predecessors=_retained_gate_predecessors(revision_dir),
+        statuses=statuses,
+        findings_by_gate={failed_gate: ledger_findings},
+    )
+    _write(destination / "gate-ledger.json", failed_ledger)
     files = {
         path.relative_to(destination).as_posix(): sha256_file(path)
         for path in sorted(destination.rglob("*"))
@@ -3867,6 +4012,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         "attempt": sequence,
         "archived_at": datetime.now(timezone.utc).isoformat(),
         "findings": [dict(item) for item in findings],
+        "gate_ledger_sha256": failed_ledger["ledger_sha256"],
         "files": files,
     })
     return destination

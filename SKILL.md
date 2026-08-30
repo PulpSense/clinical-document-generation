@@ -328,7 +328,11 @@ delivery. Each gate records its evidence hash, retry owner, terminal status, and
 stable machine-readable findings. A later gate cannot pass while an earlier gate
 is pending or blocked. A blocked record is terminal and immutable; a governed
 retry starts a new retained attempt rather than replacing or erasing that failed
-evidence. Publication rehashes every candidate DOCX/XML, PDF, and
+evidence. Each archived attempt stores its blocked ledger, and every later ledger
+binds the ordered predecessor ledger hashes and blocked findings under the same
+Run Revision attempt identity. Publication reconciles the complete candidate
+inventory with exactly one passed render row and nonempty page evidence for each
+DOCX, then rehashes every candidate DOCX/XML, PDF, and
 page image against the accepted build immediately before staging, then rehashes
 the staged client bytes before the atomic swap. Desktop confirmation advances
 only the final pending gate and is persisted in the Desktop operation result.

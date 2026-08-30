@@ -503,6 +503,9 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
         raise ValueError("Gate ledger schema is invalid.")
     if value.get("matrix_sha256") != matrix.get("matrix_sha256"):
         raise ValueError("Gate ledger is not bound to the current conformance matrix.")
+    attempt_id = str(value.get("attempt_id") or "")
+    if not attempt_id:
+        raise ValueError("Gate ledger attempt identity is missing.")
     unsigned = dict(value)
     declared_sha256 = str(unsigned.pop("ledger_sha256", ""))
     if not declared_sha256 or declared_sha256 != canonical_evidence_sha256(unsigned):
@@ -514,6 +517,30 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
         raise ValueError("Gate ledger sequence is invalid.")
     unresolved = False
     finding_fields = set(matrix["finding_contract"]["required"])
+    predecessors = value.get("predecessors")
+    if not isinstance(predecessors, list):
+        raise ValueError("Gate ledger predecessor history is invalid.")
+    predecessor_hashes = []
+    for predecessor in predecessors:
+        if not isinstance(predecessor, Mapping):
+            raise ValueError("Gate ledger predecessor entry is invalid.")
+        ledger_sha256 = str(predecessor.get("ledger_sha256") or "")
+        blocked_findings = predecessor.get("blocked_findings")
+        if (
+            predecessor.get("attempt_id") != attempt_id
+            or not re.fullmatch(r"[0-9a-f]{64}", ledger_sha256)
+            or predecessor.get("terminal_gate") not in GOVERNED_GATE_SEQUENCE
+            or not isinstance(blocked_findings, list)
+            or not blocked_findings
+            or any(
+                not isinstance(finding, Mapping) or not finding_fields <= set(finding)
+                for finding in blocked_findings
+            )
+        ):
+            raise ValueError("Gate ledger predecessor evidence is invalid.")
+        predecessor_hashes.append(ledger_sha256)
+    if len(predecessor_hashes) != len(set(predecessor_hashes)):
+        raise ValueError("Gate ledger predecessor history contains duplicates.")
     for order, record in enumerate(records, start=1):
         if not isinstance(record, Mapping) or record.get("order") != order:
             raise ValueError("Gate ledger order is invalid.")
@@ -541,11 +568,15 @@ def build_gate_ledger(
     repo_root: Path,
     evidence_by_gate: Mapping[str, Any],
     *,
+    attempt_id: str,
+    predecessors: Iterable[Mapping[str, Any]] = (),
     statuses: Mapping[str, str] | None = None,
     findings_by_gate: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Build a canonical monotonic ledger from exact evidence values."""
     matrix = load_format_conformance_matrix(repo_root)
+    if not str(attempt_id).strip():
+        raise ValueError("Gate ledger attempt identity is required.")
     gates = {str(item["gate_id"]): item for item in matrix["gate_sequence"]}
     if set(evidence_by_gate) != set(GOVERNED_GATE_SEQUENCE):
         raise ValueError("Evidence must cover the complete governed gate sequence.")
@@ -560,13 +591,50 @@ def build_gate_ledger(
             "retry_owner": str(gates[gate_id]["retry_owner"]),
             "findings": [dict(item) for item in (findings_by_gate or {}).get(gate_id, [])],
         })
+    if all(record["terminal_status"] == "passed" for record in records):
+        raise ValueError("A complete passed ledger must advance from its final pending delivery gate.")
     ledger = {
         "schema_version": "clinical-gate-ledger/v1",
         "matrix_sha256": matrix["matrix_sha256"],
+        "attempt_id": str(attempt_id),
+        "predecessors": [dict(item) for item in predecessors],
         "records": records,
     }
     ledger["ledger_sha256"] = canonical_evidence_sha256(ledger)
     return validate_gate_ledger(repo_root, ledger)
+
+
+def retry_gate_ledger(
+    repo_root: Path,
+    blocked_ledger: Mapping[str, Any],
+    evidence_by_gate: Mapping[str, Any],
+    *,
+    statuses: Mapping[str, str],
+    findings_by_gate: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Create one linked retry while retaining the exact terminal blocked ledger."""
+    prior = validate_gate_ledger(repo_root, blocked_ledger)
+    blocked_records = [
+        record for record in prior["records"]
+        if record["terminal_status"] == "blocked"
+    ]
+    if len(blocked_records) != 1:
+        raise ValueError("A retry requires exactly one terminal blocked predecessor gate.")
+    blocked = blocked_records[0]
+    predecessor = {
+        "attempt_id": prior["attempt_id"],
+        "ledger_sha256": prior["ledger_sha256"],
+        "terminal_gate": blocked["gate_id"],
+        "blocked_findings": [dict(item) for item in blocked["findings"]],
+    }
+    return build_gate_ledger(
+        repo_root,
+        evidence_by_gate,
+        attempt_id=str(prior["attempt_id"]),
+        predecessors=[*list(prior["predecessors"]), predecessor],
+        statuses=statuses,
+        findings_by_gate=findings_by_gate,
+    )
 
 
 def advance_gate_ledger(
@@ -595,6 +663,8 @@ def advance_gate_ledger(
     advanced = {
         "schema_version": current["schema_version"],
         "matrix_sha256": current["matrix_sha256"],
+        "attempt_id": current["attempt_id"],
+        "predecessors": list(current["predecessors"]),
         "records": records,
     }
     advanced["ledger_sha256"] = canonical_evidence_sha256(advanced)
@@ -2682,6 +2752,7 @@ def render_pages(
                 })
             artifacts.append({
                 "artifact": docx.stem,
+                "status": "passed",
                 "renderer": identity,
                 "page_renderer": selected_page_renderer,
                 "font_evidence": dict(font_evidence or {}),
@@ -2690,6 +2761,7 @@ def render_pages(
                 "docx_sha256": sha256_file(docx),
                 "pdf": pdf.relative_to(revision_dir).as_posix(),
                 "pdf_sha256": sha256_file(pdf),
+                "page_count": len(pages),
                 "pages": [{"page": i, "path": page.relative_to(revision_dir).as_posix(), "sha256": sha256_file(page)} for i, page in enumerate(pages, 1)],
             })
         renderer_attempts.append({"renderer": identity, "status": "passed"})
@@ -3473,4 +3545,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_gate_ledger", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]
