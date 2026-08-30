@@ -3,6 +3,7 @@ import re
 import zipfile
 from pathlib import Path
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
@@ -14,7 +15,7 @@ from pypdf import PdfReader, PdfWriter
 from contracts import batch_plan
 from drafting import create_drafting_request, recorded_acceptance_response, validate_response
 from quality import deterministic_content_check, render_pages, sha256_file
-from rendering import refresh_toc_from_pdf, render_documents, render_fields
+from rendering import _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -76,6 +77,30 @@ def _doc_default_font(docx_path: Path):
     if fonts is None:
         return None, None
     return fonts.get(qn("w:ascii")), fonts.get(qn("w:hAnsi"))
+
+
+def _explicit_page_break_count(document: Document) -> int:
+    return len(document.element.body.xpath('.//w:pageBreakBefore | .//w:br[@w:type="page"]'))
+
+
+def _add_page_break(paragraph) -> None:
+    run = paragraph.add_run()
+    page_break = run._r.makeelement(qn("w:br"), {qn("w:type"): "page"})
+    run._r.append(page_break)
+
+
+def _page_boundary_before(paragraph) -> bool:
+    if paragraph.paragraph_format.page_break_before is True:
+        return True
+    previous = paragraph._p.getprevious()
+    while previous is not None and previous.tag == qn("w:p"):
+        prior = Paragraph(previous, paragraph._parent)
+        if previous.xpath('.//w:br[@w:type="page"]'):
+            return True
+        if prior.text.strip():
+            break
+        previous = previous.getprevious()
+    return False
 
 
 def _numbering_level_signature(document: Document, paragraph):
@@ -2041,7 +2066,94 @@ def test_ambispective_body_sections_follow_template_pagination_and_spacing(tmp_p
         paragraph for paragraph in protocol.paragraphs[toc_index + 1:]
         if paragraph.style.name.casefold().startswith("heading")
     ]
-    assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in body_headings)
+    first_body = next(paragraph for paragraph in body_headings if "INTRODUCTION" in paragraph.text)
+    assert _page_boundary_before(first_body)
+    assert all(
+        paragraph.paragraph_format.page_break_before is not True
+        for paragraph in body_headings
+        if paragraph is not first_body
+    )
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "expected_template"),
+    (
+        ("retrospective-acceptance-source.json", "retrospective-protocol.template.docx"),
+        ("ambispective-acceptance-source.json", "ambispective-protocol.template.docx"),
+        ("prospective-acceptance-source.json", "prospective-protocol.template.docx"),
+    ),
+)
+def test_protocol_toc_boundaries_preserve_selected_client_template_without_package_growth(
+    tmp_path, fixture_name, expected_template,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+
+    report = render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    protocol_report = next(item for item in report["artifacts"] if item["artifact"] == "protocol")
+    output_path = tmp_path / protocol_report["path"]
+    template_path = ROOT / protocol_report["template"]
+    protocol = Document(output_path)
+    headings = [paragraph for paragraph in protocol.paragraphs if paragraph.style.name.casefold().startswith("heading")]
+    toc = next(paragraph for paragraph in headings if "TABLE OF CONTENTS" in paragraph.text)
+    first_body = next(paragraph for paragraph in headings if "INTRODUCTION" in paragraph.text)
+
+    assert protocol_report["template"].endswith(expected_template)
+    assert protocol_report["template_sha256"] == sha256_file(template_path)
+    assert _page_boundary_before(toc)
+    assert _page_boundary_before(first_body)
+    assert all(
+        paragraph.paragraph_format.page_break_before is not True
+        for paragraph in headings[headings.index(first_body) + 1:]
+    )
+    with zipfile.ZipFile(template_path) as template_package, zipfile.ZipFile(output_path) as output_package:
+        template_media = {name for name in template_package.namelist() if name.startswith("word/media/")}
+        output_media = {name for name in output_package.namelist() if name.startswith("word/media/")}
+    assert output_media == template_media
+    assert output_path.stat().st_size <= template_path.stat().st_size + 256 * 1024
+
+
+def test_protocol_toc_boundaries_are_added_once_when_template_has_none_and_toc_spans_pages():
+    document = Document()
+    document.add_paragraph("3. GENERAL INFORMATION", style="Heading 1")
+    toc = document.add_paragraph("4. TABLE OF CONTENTS", style="Heading 1")
+    for index in range(80):
+        entry = document.add_paragraph(f"{index + 1}. Generated TOC entry")
+        if index == 39:
+            _add_page_break(entry)
+    first_body = document.add_paragraph("5. INTRODUCTION", style="Heading 1")
+    later_body = document.add_paragraph("6. OBJECTIVES", style="Heading 1")
+
+    _normalize_protocol_section_pagination(document)
+    first_count = _explicit_page_break_count(document)
+    _normalize_protocol_section_pagination(document)
+
+    assert _page_boundary_before(toc)
+    assert _page_boundary_before(first_body)
+    assert later_body.paragraph_format.page_break_before is not True
+    assert first_count == 3  # TOC start, simulated continuation page, first body start.
+    assert _explicit_page_break_count(document) == first_count
+
+
+def test_protocol_toc_boundaries_preserve_existing_template_breaks_without_duplicates():
+    document = Document()
+    document.add_paragraph("3. GENERAL INFORMATION", style="Heading 1")
+    before_toc = document.add_paragraph()
+    _add_page_break(before_toc)
+    toc = document.add_paragraph("4. TABLE OF CONTENTS", style="Heading 1")
+    document.add_paragraph("Cached TOC entry")
+    before_body = document.add_paragraph()
+    _add_page_break(before_body)
+    first_body = document.add_paragraph("5. INTRODUCTION", style="Heading 1")
+
+    _normalize_protocol_section_pagination(document)
+    _normalize_protocol_section_pagination(document)
+
+    assert _page_boundary_before(toc)
+    assert _page_boundary_before(first_body)
+    assert toc.paragraph_format.page_break_before is not True
+    assert first_body.paragraph_format.page_break_before is not True
+    assert _explicit_page_break_count(document) == 2
 
 
 def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, governed_pdfium):
@@ -2158,7 +2270,13 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
                 and content_marker in page[page.index(heading_marker) + len(heading_marker):]
                 for page in normalized_pages
             ), f"Rendered heading is orphaned from first content: {heading.text}"
-        assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in numbered_body_headings)
+        first_body_heading = next(paragraph for paragraph in numbered_body_headings if "INTRODUCTION" in paragraph.text)
+        assert _page_boundary_before(first_body_heading)
+        assert all(
+            paragraph.paragraph_format.page_break_before is not True
+            for paragraph in numbered_body_headings
+            if paragraph is not first_body_heading
+        )
         assert all(
             paragraph.paragraph_format.keep_with_next is True
             or paragraph.style.paragraph_format.keep_with_next is True

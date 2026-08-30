@@ -1935,20 +1935,47 @@ def _normalize_protocol_table_pagination(document: Document) -> None:
                     caption_head.paragraph_format.page_break_before = None
 
 
+def _has_page_boundary_before(paragraph: Paragraph) -> bool:
+    if (
+        paragraph.paragraph_format.page_break_before is True
+        or paragraph.style.paragraph_format.page_break_before is True
+    ):
+        return True
+    previous = paragraph._p.getprevious()
+    while previous is not None and previous.tag == qn("w:p"):
+        if previous.xpath('.//w:br[@w:type="page"]'):
+            return True
+        properties = previous.find(qn("w:pPr"))
+        section = None if properties is None else properties.find(qn("w:sectPr"))
+        if section is not None:
+            section_type = section.find(qn("w:type"))
+            if section_type is None or section_type.get(qn("w:val")) != "continuous":
+                return True
+        if Paragraph(previous, paragraph._parent).text.strip():
+            break
+        previous = previous.getprevious()
+    return False
+
+
 def _normalize_protocol_section_pagination(document: Document) -> None:
-    """Remove forced numbered-body starts and retain front-matter boundaries."""
-    front_matter = {
-        _protocol_heading_key("1. TITLE PAGE"),
-        _protocol_heading_key("TABLE OF CONTENTS"),
-    }
-    for heading in document.paragraphs:
-        if _heading_level(heading) is None:
-            continue
-        key = _protocol_heading_key(heading.text)
-        if key in front_matter or not re.match(r"^\d+(?:\.\d+)*\.?\s+", heading.text.strip()):
-            continue
-        if heading.paragraph_format.page_break_before is True:
-            heading.paragraph_format.page_break_before = None
+    """Preserve template breaks and guarantee only the two TOC boundaries."""
+    headings = [
+        paragraph for paragraph in document.paragraphs
+        if _heading_level(paragraph) is not None
+    ]
+    toc_index = next((
+        index for index, paragraph in enumerate(headings)
+        if "table of contents" in _protocol_heading_key(paragraph.text)
+    ), None)
+    if toc_index is None:
+        return
+    first_body = next((
+        paragraph for paragraph in headings[toc_index + 1:]
+        if re.match(r"^\d+(?:\.\d+)*\.?\s+", paragraph.text.strip())
+    ), None)
+    for boundary in (headings[toc_index], first_body):
+        if boundary is not None and not _has_page_boundary_before(boundary):
+            boundary.paragraph_format.page_break_before = True
 
 
 def _protect_protocol_heading_content(document: Document) -> None:

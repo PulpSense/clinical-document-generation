@@ -359,7 +359,7 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 ## Word template authorities
 
 - Every Protocol branch uses the bundled Protocol client authority for page geometry, typography, headers/footers, heading hierarchy, document-control surfaces, and table design.
-- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Never insert unconditional body-section breaks merely to copy or stabilize a prior pagination result. Keep every heading with its first substantive paragraph, list, or table while preserving intentional title-page and table-of-contents boundaries.
+- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Preserve the template's page breaks; ensure the Table of Contents and its first following body section each begin at a page boundary without adding breaks before later body sections. Keep every heading with its first substantive paragraph, list, or table.
 - Advarra ICF output uses the bundled Advarra authority; Sterling output uses the bundled Sterling authority.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
