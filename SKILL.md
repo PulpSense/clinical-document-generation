@@ -330,12 +330,17 @@ is pending or blocked. A blocked record is terminal and immutable; a governed
 retry starts a new retained attempt rather than replacing or erasing that failed
 evidence. Each archived attempt stores its blocked ledger, and every later ledger
 binds the ordered predecessor ledger hashes and blocked findings under the same
-Run Revision attempt identity. Publication reconciles the complete candidate
+Run Revision attempt identity. The working reference also binds every retained
+attempt directory to its manifest and ledger identities; missing, mutated,
+duplicated, or forked attempt history blocks retry, resume, and publication.
+Publication reconciles the complete candidate
 inventory with exactly one passed render row and nonempty page evidence for each
 DOCX, then rehashes every candidate DOCX/XML, PDF, and
 page image against the accepted build immediately before staging, then rehashes
 the staged client bytes before the atomic swap. Desktop confirmation advances
 only the final pending gate and is persisted in the Desktop operation result.
+Terminal replay revalidates both prepared and final ledgers and permits only that
+one delivery-gate transition.
 
 The deterministic render gate also rejects pages with no meaningful body content, even when a running header or page number is present. A signature or continuation sentence may not be stranded on an otherwise empty page.
 

@@ -325,20 +325,6 @@ def _rendered_pagination_relations(docx_path: Path, pdf_path: Path) -> dict[str,
     ]
     cohesion = []
     for heading in headings:
-        if not protocol:
-            heading_tokens = re.findall(r"[a-z0-9]+", heading.text.casefold())[:2]
-            rendered_page = next((
-                page for page in pages
-                if heading_tokens
-                and heading_tokens[0] in page
-                and (len(heading_tokens) == 1 or heading_tokens[1] in page[page.index(heading_tokens[0]) + len(heading_tokens[0]):])
-            ), "")
-            cohesion.append({
-                "heading": heading.text.strip(),
-                "first_content_sha256": None,
-                "same_page": bool(rendered_page) and len(rendered_page.split()) >= 50,
-            })
-            continue
         heading_index = body.index(heading._p)
         first_content = ""
         for element in body[heading_index + 1:]:
@@ -350,22 +336,53 @@ def _rendered_pagination_relations(docx_path: Path, pdf_path: Path) -> dict[str,
                 continue
             paragraph = Paragraph(element, document)
             if paragraph.style.name.casefold().startswith("heading"):
+                first_content = paragraph.text
                 break
             if paragraph.text.strip():
                 first_content = paragraph.text
                 break
-        if not first_content:
-            continue
-        heading_marker = " ".join(re.findall(r"[a-z0-9]+", heading.text.casefold()))
+        heading_tokens = re.findall(r"[a-z0-9]+", heading.text.casefold())
         content_marker = " ".join(re.findall(r"[a-z0-9]+", first_content.casefold())[:4])
-        together = any(
-            heading_marker in page
-            and content_marker in page[page.index(heading_marker) + len(heading_marker):]
-            for page in pages
-        )
+        together = False
+        if first_content and heading_tokens and content_marker:
+            for page in pages:
+                if protocol:
+                    heading_marker = " ".join(heading_tokens)
+                    if heading_marker not in page:
+                        continue
+                    heading_end = page.index(heading_marker) + len(heading_marker)
+                else:
+                    first = page.find(heading_tokens[0])
+                    if first < 0:
+                        continue
+                    heading_end = first + len(heading_tokens[0])
+                    if len(heading_tokens) > 1:
+                        second = page.find(heading_tokens[1], heading_end)
+                        if second < 0:
+                            continue
+                        heading_end = second + len(heading_tokens[1])
+                remainder = page[heading_end:]
+                if protocol and content_marker in remainder:
+                    together = True
+                    break
+                if not protocol:
+                    content_tokens = [
+                        token for token in re.findall(r"[a-z0-9]+", first_content.casefold())
+                        if token not in {"a", "an", "the", "this"}
+                    ][:3]
+                    cursor = 0
+                    for token in content_tokens:
+                        position = remainder.find(token, cursor)
+                        if position < 0:
+                            break
+                        cursor = position + len(token)
+                    else:
+                        if content_tokens:
+                            together = True
+                            break
         cohesion.append({
             "heading": heading.text.strip(),
-            "first_content_sha256": hashlib.sha256(first_content.encode("utf-8")).hexdigest(),
+            "first_content_sha256": hashlib.sha256(first_content.encode("utf-8")).hexdigest() if first_content else None,
             "same_page": together,
         })
     section_three = next((paragraph.text.strip() for paragraph in headings if "GENERAL INFORMATION" in paragraph.text.upper()), None)
@@ -557,10 +574,18 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
             raise ValueError("Gate retry ownership is missing.")
         findings = record.get("findings")
         if not isinstance(findings, list) or any(
-            not isinstance(finding, Mapping) or not finding_fields <= set(finding)
+            not isinstance(finding, Mapping)
+            or not finding_fields <= set(finding)
+            or not re.fullmatch(r"[A-Z][A-Z0-9_]+", str(finding.get("code") or ""))
+            or not str(finding.get("target") or "").strip()
+            or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
+            or not str(finding.get("retry_owner") or "").strip()
+            or finding.get("terminal_status") != "blocked"
             for finding in findings
         ):
             raise ValueError("Gate finding contract is invalid.")
+        if (status == "blocked") != bool(findings):
+            raise ValueError("Only blocked gates may carry findings, and blocked gates require them.")
     return value
 
 

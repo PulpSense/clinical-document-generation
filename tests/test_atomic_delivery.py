@@ -183,7 +183,15 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     second_ledger = json.loads((second / "gate-ledger.json").read_text(encoding="utf-8"))
     assert second_ledger["predecessors"][-1]["ledger_sha256"] == first_ledger["ledger_sha256"]
     assert second_ledger["predecessors"][-1]["blocked_findings"] == first_ledger["records"][4]["findings"]
-    prepared = workflow._prepared_gate_ledger(revision_dir, {}, {}, [])
+    expected_attempts = [
+        {
+            "path": path.relative_to(revision_dir).as_posix(),
+            "attempt_manifest_sha256": workflow.sha256_file(path / "attempt-manifest.json"),
+            "gate_ledger_sha256": json.loads((path / "gate-ledger.json").read_text(encoding="utf-8"))["ledger_sha256"],
+        }
+        for path in (first, second)
+    ]
+    prepared = workflow._prepared_gate_ledger(revision_dir, {}, {}, [], expected_attempts)
     assert [item["ledger_sha256"] for item in prepared["predecessors"]] == [
         first_ledger["ledger_sha256"],
         second_ledger["ledger_sha256"],
@@ -191,6 +199,6 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     assert prepared["predecessors"][-1]["blocked_findings"] == second_ledger["records"][4]["findings"]
     assert first_candidate.read_bytes() == b"failed candidate one"
     assert (second / "candidate/protocol.docx").read_bytes() == b"failed candidate two"
-    (second / "gate-ledger.json").unlink()
-    with pytest.raises(ValueError, match="attempt ledger"):
-        workflow._prepared_gate_ledger(revision_dir, {}, {}, [])
+    workflow.shutil.rmtree(second)
+    with pytest.raises(ValueError, match="inventory count"):
+        workflow._prepared_gate_ledger(revision_dir, {}, {}, [], expected_attempts)

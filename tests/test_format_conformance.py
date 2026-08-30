@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 from docx import Document
+from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Inches, Pt
 
 import quality
@@ -98,6 +99,13 @@ def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
 
     bypass = json.loads(json.dumps(ledger))
     bypass["records"][2]["terminal_status"] = "blocked"
+    bypass["records"][2]["findings"] = [{
+        "code": "STRUCTURE_FAILED",
+        "target": "protocol.docx#section=3",
+        "evidence_sha256": "f" * 64,
+        "retry_owner": "document-repair",
+        "terminal_status": "blocked",
+    }]
     bypass["records"][3]["terminal_status"] = "passed"
     unsigned = dict(bypass)
     unsigned.pop("ledger_sha256")
@@ -327,3 +335,43 @@ def test_normalized_signature_detects_semantic_format_mutation(tmp_path):
     assert actual["table_geometry"] != expected["table_geometry"]
     assert actual["paragraph_rhythm"] != expected["paragraph_rhythm"]
     assert actual["pagination_relations"] != expected["pagination_relations"]
+
+
+def test_rendered_cohesion_rejects_trailing_protocol_heading(tmp_path, monkeypatch):
+    docx_path = tmp_path / "protocol.docx"
+    document = Document()
+    document.add_heading("1. BODY", level=1)
+    document.save(docx_path)
+    pdf_path = tmp_path / "protocol.pdf"
+    pdf_path.write_bytes(b"pdf")
+
+    class Page:
+        def extract_text(self):
+            return "1. BODY"
+
+    monkeypatch.setattr(quality, "PdfReader", lambda _path: type("Reader", (), {"pages": [Page()]})())
+    result = quality._rendered_pagination_relations(docx_path, pdf_path)
+
+    assert result["heading_cohesion"][0]["first_content_sha256"] is None
+    assert result["all_headings_with_first_content"] is False
+
+
+def test_icf_cohesion_requires_actual_first_content_not_unrelated_word_count(tmp_path, monkeypatch):
+    docx_path = tmp_path / "icf.docx"
+    document = Document()
+    style = document.styles.add_style("Heading ICF Section", WD_STYLE_TYPE.PARAGRAPH)
+    document.add_paragraph("AGREEMENT TO PARTICIPATE", style=style)
+    document.add_paragraph("Actual first consent content must follow this heading.")
+    document.save(docx_path)
+    pdf_path = tmp_path / "icf.pdf"
+    pdf_path.write_bytes(b"pdf")
+
+    class Page:
+        def extract_text(self):
+            return "AGREEMENT TO PARTICIPATE " + "unrelated " * 100
+
+    monkeypatch.setattr(quality, "PdfReader", lambda _path: type("Reader", (), {"pages": [Page()]})())
+    result = quality._rendered_pagination_relations(docx_path, pdf_path)
+
+    assert result["heading_cohesion"][0]["first_content_sha256"] is not None
+    assert result["all_headings_with_first_content"] is False

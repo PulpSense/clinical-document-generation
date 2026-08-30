@@ -3154,6 +3154,22 @@ def run_desktop_operation(
             try:
                 manifest_path.relative_to(run_dir)
                 manifest = _read(manifest_path)
+                prepared_ledger = validate_gate_ledger(
+                    SCRIPT_DIR.parent,
+                    dict(manifest.get("gate_ledger") or {}) if isinstance(manifest.get("gate_ledger"), Mapping) else {},
+                )
+                final_ledger = validate_gate_ledger(
+                    SCRIPT_DIR.parent,
+                    dict(prior_result.get("gate_ledger") or {}) if isinstance(prior_result.get("gate_ledger"), Mapping) else {},
+                )
+                if (
+                    prepared_ledger["attempt_id"] != final_ledger["attempt_id"]
+                    or prepared_ledger["predecessors"] != final_ledger["predecessors"]
+                    or prepared_ledger["records"][:-1] != final_ledger["records"][:-1]
+                    or prepared_ledger["records"][-1]["terminal_status"] != "pending"
+                    or final_ledger["records"][-1]["terminal_status"] != "passed"
+                ):
+                    raise ValueError("Persisted Desktop gate-ledger lineage or terminal transition is invalid.")
                 set_finding = _desktop_delivery_set_finding(run_dir, manifest)
                 if set_finding is not None:
                     raise ValueError(set_finding["issue"])
@@ -3710,7 +3726,9 @@ def _prepared_gate_ledger(
     build: Mapping[str, Any],
     quality: Mapping[str, Any],
     published: Iterable[Mapping[str, Any]],
+    expected_attempts: Iterable[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
+    _validate_expected_gate_attempts(revision_dir, expected_attempts)
     verification = dict(quality.get("verification_evidence") or {})
     content_evidence = {
         key: value for key, value in verification.items()
@@ -3764,6 +3782,7 @@ def _publish(
     reference: Mapping[str, Any],
     quality: Mapping[str, Any],
     *,
+    expected_attempts: Iterable[Mapping[str, Any]] = (),
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
@@ -3819,7 +3838,7 @@ def _publish(
         {"path": (output / source.name).relative_to(run_dir).as_posix(), "sha256": quality_sha256(output / source.name), "bytes": (output / source.name).stat().st_size}
         for source in sources
     ]
-    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(revision_dir, build, quality, published)}
+    manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(revision_dir, build, quality, published, expected_attempts)}
     manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
     return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
@@ -3933,6 +3952,32 @@ def _retained_gate_predecessors(revision_dir: Path) -> list[dict[str, Any]]:
             "blocked_findings": [dict(item) for item in blocked["findings"]],
         },
     ]
+
+
+def _validate_expected_gate_attempts(
+    revision_dir: Path,
+    expected_attempts: Iterable[Mapping[str, Any]],
+) -> None:
+    expected = [dict(item) for item in expected_attempts]
+    actual_dirs = sorted(path for path in (revision_dir / "attempts").glob("*") if path.is_dir())
+    if len(actual_dirs) != len(expected):
+        raise ValueError("Retained gate attempt inventory count is invalid.")
+    for entry in expected:
+        relative_text = str(entry.get("path") or "")
+        relative = PurePosixPath(relative_text)
+        if relative.is_absolute() or ".." in relative.parts or relative.as_posix() != relative_text:
+            raise ValueError("Retained gate attempt path is invalid.")
+        attempt_dir = revision_dir / relative
+        manifest_path = attempt_dir / "attempt-manifest.json"
+        ledger_path = attempt_dir / "gate-ledger.json"
+        if (
+            not attempt_dir.is_dir()
+            or not manifest_path.is_file()
+            or not ledger_path.is_file()
+            or sha256_file(manifest_path) != entry.get("attempt_manifest_sha256")
+            or _read(ledger_path).get("ledger_sha256") != entry.get("gate_ledger_sha256")
+        ):
+            raise ValueError(f"Retained gate attempt evidence is missing or stale: {relative_text}")
 
 
 def _failed_gate_for_stage(stage: str, findings: Iterable[Mapping[str, Any]]) -> str:
@@ -4108,7 +4153,21 @@ def _quality_retry(
             explicit_route_errors,
             candidate_outputs=_candidate_outputs(revision_dir),
         )
-    _archive_failed_attempt(revision_dir, stage, findings)
+    generation_state = working_reference.setdefault("generation", {})
+    expected_gate_attempts = list(generation_state.get("gate_attempts") or [])
+    _validate_expected_gate_attempts(revision_dir, expected_gate_attempts)
+    archived_attempt = _archive_failed_attempt(revision_dir, stage, findings)
+    attempt_manifest = archived_attempt / "attempt-manifest.json"
+    attempt_ledger = archived_attempt / "gate-ledger.json"
+    generation_state["gate_attempts"] = [
+        *expected_gate_attempts,
+        {
+            "path": archived_attempt.relative_to(revision_dir).as_posix(),
+            "attempt_manifest_sha256": sha256_file(attempt_manifest),
+            "gate_ledger_sha256": _read(attempt_ledger)["ledger_sha256"],
+        },
+    ]
+    _write(reference_path, working_reference)
     transient = [item for item in findings if item.get("recovery_class") == "verifier_transient"]
     if transient:
         verification_attempts = working_reference.setdefault("generation", {}).setdefault("verification_attempts", {})
@@ -4564,6 +4623,7 @@ def generate(
             revision_dir,
             reference,
             final_quality,
+            expected_attempts=list(state.get("gate_attempts") or []),
             operation_deadline=operation_deadline,
             clock=clock,
         )
