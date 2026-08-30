@@ -33,7 +33,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, verification_response_is_complete
 from rendering import render_documents
 
 
@@ -4559,22 +4559,7 @@ def _run_format_conformance_in_disposable_candidate(
     ) as directory:
         staging_root = Path(directory).resolve()
         archive_path = staging_root / "candidate.zip"
-        try:
-            git_commit = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=True,
-            ).stdout.strip()
-        except (OSError, subprocess.SubprocessError):
-            git_commit = "working-tree"
-        _package_release_tree(
-            repo_root,
-            archive_path,
-            git_commit=git_commit or "working-tree",
-        )
+        package_release(repo_root, archive_path)
         with zipfile.ZipFile(archive_path) as archive:
             _validated_archive_members(archive, staging_root)
             archive.extractall(staging_root)
@@ -4654,6 +4639,12 @@ def run_format_conformance(
         evidence_root=resolved_evidence_root,
         require_promoted_runtime=False,
     )
+    output_audit = audit_format_conformance_outputs(
+        repo_root,
+        matrix,
+        report,
+        resolved_evidence_root,
+    )
     covered = set()
     all_cases_passed = True
     for item in report.get("cases", []):
@@ -4678,6 +4669,7 @@ def run_format_conformance(
         and report.get("assurance") == "synthetic-structural-only"
         and all_cases_passed
         and covered == expected
+        and output_audit.get("status") == "passed"
     )
     result = {
         "schema_version": "clinical-format-conformance-report/v1",
@@ -4690,6 +4682,9 @@ def run_format_conformance(
         "release_gate_status": report.get("status"),
         "release_gate_assurance": report.get("assurance"),
         "release_gate_report_sha256": canonical_evidence_sha256(report),
+        "output_baseline_status": output_audit.get("status"),
+        "output_baseline_evidence_sha256": output_audit.get("evidence_sha256"),
+        "output_baseline_cases": output_audit.get("cases", []),
         "evidence_root": report.get("evidence_root"),
     }
     root = Path(str(report.get("evidence_root") or resolved_evidence_root))

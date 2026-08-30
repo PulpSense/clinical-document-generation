@@ -149,9 +149,14 @@ Before live certification, `--format-conformance` runs the immutable matrix in
 `references/format-conformance-matrix.json`. It covers Retrospective Protocol,
 Prospective–Advarra, Prospective–Sterling, Ambispective–Advarra, and
 Ambispective–Sterling using exact hash-addressed fixtures, templates, and client
-authorities. Its `structural_passed` result is deterministic structural evidence
-only: it cannot substitute for clinical verification, genuine every-page image
-inspection, production certification, or exact-byte Desktop confirmation.
+authorities. It also compares every generated DOCX with an approved normalized
+OOXML baseline under `references/format-baselines/`, covering section geometry,
+styles, numbering, headers/footers, fields/TOC, page furniture, table geometry,
+signature/legal placement, paragraph rhythm, and relational pagination controls
+without relying on whole-DOCX equality. Its `structural_passed` result is
+deterministic structural evidence only: it cannot substitute for clinical
+verification, genuine every-page image inspection, production certification, or
+exact-byte Desktop confirmation.
 
 The six production modules are:
 
@@ -321,7 +326,9 @@ fixed order: clinical fidelity; content completeness and consistency; DOCX/PRS
 structure; exact-artifact rendering; every-page Visual QA; exact-byte atomic
 delivery. Each gate records its evidence hash, retry owner, terminal status, and
 stable machine-readable findings. A later gate cannot pass while an earlier gate
-is pending or blocked. Publication rehashes every candidate DOCX/XML, PDF, and
+is pending or blocked. A blocked record is terminal and immutable; a governed
+retry starts a new retained attempt rather than replacing or erasing that failed
+evidence. Publication rehashes every candidate DOCX/XML, PDF, and
 page image against the accepted build immediately before staging, then rehashes
 the staged client bytes before the atomic swap. Desktop confirmation advances
 only the final pending gate and is persisted in the Desktop operation result.

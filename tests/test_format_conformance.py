@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 
 import pytest
+from docx import Document
+from docx.shared import Inches, Pt
 
 import quality
 import workflow
@@ -41,6 +43,26 @@ def test_format_conformance_matrix_is_complete_hash_addressed_and_ordered():
             path = ROOT / item["path"]
             assert path.is_file()
             assert quality.sha256_file(path) == item["sha256"]
+        approved = case["approved_output_baseline"]
+        assert approved["path"].startswith("references/format-baselines/")
+        approved_path = ROOT / approved["path"]
+        assert quality.sha256_file(approved_path) == approved["sha256"]
+        signature = json.loads(approved_path.read_text(encoding="utf-8"))
+        required_signature_fields = {
+            "section_geometry", "styles", "numbering", "headers_footers",
+            "fields_toc", "page_furniture", "table_geometry", "signature_blocks",
+            "consent_legal_placement", "paragraph_rhythm", "pagination_relations",
+        }
+        assert signature["artifacts"]
+        assert all(set(value) == required_signature_fields for value in signature["artifacts"].values())
+        for artifact in signature["artifacts"].values():
+            assert artifact["section_geometry"]
+            assert artifact["styles"]["count"] > 0
+            assert artifact["headers_footers"]
+            assert artifact["signature_blocks"]
+            assert artifact["consent_legal_placement"]
+            assert artifact["pagination_relations"]["numbered_body_has_no_artificial_starts"] is True
+            assert artifact["pagination_relations"]["all_headings_keep_with_next"] is True
 
     canonical = dict(matrix)
     declared_sha256 = canonical.pop("matrix_sha256")
@@ -72,6 +94,38 @@ def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
         quality.validate_gate_ledger(ROOT, bypass)
 
 
+@pytest.mark.parametrize("failed_gate", quality.GOVERNED_GATE_SEQUENCE)
+def test_every_failed_gate_is_terminal_and_retained(failed_gate):
+    evidence = {gate_id: {"gate": gate_id} for gate_id in quality.GOVERNED_GATE_SEQUENCE}
+    failed_index = quality.GOVERNED_GATE_SEQUENCE.index(failed_gate)
+    statuses = {
+        gate_id: "passed" if index < failed_index else "blocked" if index == failed_index else "pending"
+        for index, gate_id in enumerate(quality.GOVERNED_GATE_SEQUENCE)
+    }
+    finding = {
+        "code": f"{failed_gate.upper()}_FAILED",
+        "target": f"{failed_gate}:artifact#section=target",
+        "evidence_sha256": "e" * 64,
+        "retry_owner": "governed-retry",
+        "terminal_status": "blocked",
+    }
+    ledger = quality.build_gate_ledger(
+        ROOT,
+        evidence,
+        statuses=statuses,
+        findings_by_gate={failed_gate: [finding]},
+    )
+    with pytest.raises(ValueError, match="terminal blocked gate"):
+        quality.advance_gate_ledger(
+            ROOT,
+            ledger,
+            gate_id=failed_gate,
+            terminal_status="passed",
+            evidence={"replacement": True},
+        )
+    assert ledger["records"][failed_index]["findings"] == [finding]
+
+
 def test_only_next_pending_gate_advances_with_new_exact_evidence():
     evidence = {gate_id: {"gate": gate_id} for gate_id in quality.GOVERNED_GATE_SEQUENCE}
     pending = quality.build_gate_ledger(
@@ -101,6 +155,35 @@ def test_only_next_pending_gate_advances_with_new_exact_evidence():
             evidence={"invalid": True},
         )
 
+    finding = {
+        "code": "VISUAL_ORPHAN_HEADING",
+        "target": "protocol.docx#page=4#section=3",
+        "evidence_sha256": "c" * 64,
+        "retry_owner": "layout-repair",
+        "terminal_status": "blocked",
+    }
+    blocked = quality.advance_gate_ledger(
+        ROOT,
+        quality.build_gate_ledger(
+            ROOT,
+            evidence,
+            statuses={"every_page_visual_qa": "pending", "exact_byte_atomic_delivery": "pending"},
+        ),
+        gate_id="every_page_visual_qa",
+        terminal_status="blocked",
+        evidence={"page_sha256": "c" * 64},
+        findings=[finding],
+    )
+    with pytest.raises(ValueError, match="terminal blocked gate"):
+        quality.advance_gate_ledger(
+            ROOT,
+            blocked,
+            gate_id="every_page_visual_qa",
+            terminal_status="passed",
+            evidence={"page_sha256": "d" * 64},
+        )
+    assert blocked["records"][4]["findings"] == [finding]
+
 
 def test_independent_runner_binds_exact_matrix_combinations(tmp_path, monkeypatch):
     cases = [
@@ -117,12 +200,18 @@ def test_independent_runner_binds_exact_matrix_combinations(tmp_path, monkeypatc
         "cases": cases,
         "evidence_root": tmp_path.as_posix(),
     })
+    monkeypatch.setattr(
+        workflow,
+        "audit_format_conformance_outputs",
+        lambda *args, **kwargs: {"status": "passed", "cases": []},
+    )
 
     report = workflow.run_format_conformance(ROOT, evidence_root=tmp_path)
 
     assert report["status"] == "structural_passed"
     assert report["assurance"] == "deterministic-structural-only"
     assert report["live_certification_required"] is True
+    assert report["output_baseline_status"] == "passed"
     assert report["matrix_sha256"] == quality.load_format_conformance_matrix(ROOT)["matrix_sha256"]
     assert report["covered_cases"] == [
         "ambispective-advarra", "ambispective-sterling", "prospective-advarra",
@@ -147,3 +236,42 @@ def test_source_runner_bootstraps_disposable_release_candidate(monkeypatch, tmp_
 
     assert result == expected
     assert calls == [(ROOT.resolve(), evidence_root)]
+
+
+def test_disposable_bootstrap_uses_public_clean_tree_packager(tmp_path, monkeypatch):
+    calls = []
+
+    def fake_package(repo_root, output_path):
+        calls.append((repo_root, output_path))
+        raise RuntimeError("stop after public packager")
+
+    monkeypatch.setattr(workflow, "package_release", fake_package)
+    with pytest.raises(RuntimeError, match="stop after public packager"):
+        workflow._run_format_conformance_in_disposable_candidate(
+            ROOT,
+            (tmp_path / "evidence").resolve(),
+        )
+    assert calls and calls[0][0] == ROOT
+
+
+def test_normalized_signature_detects_semantic_format_mutation(tmp_path):
+    source = ROOT / "assets/client-templates/docx/prospective-protocol.template.docx"
+    candidate = tmp_path / "mutated.docx"
+    document = Document(source)
+    document.sections[0].left_margin = Inches(1.37)
+    next(iter(document.styles)).font.size = Pt(13)
+    document.sections[0].header.add_paragraph("Changed furniture")
+    document.tables[0].columns[0].width = Inches(2.75)
+    heading = next(paragraph for paragraph in document.paragraphs if paragraph.style.name.startswith("Heading"))
+    heading.paragraph_format.page_break_before = True
+    document.save(candidate)
+
+    expected = quality.normalized_docx_format_signature(source)
+    actual = quality.normalized_docx_format_signature(candidate)
+
+    assert actual["section_geometry"] != expected["section_geometry"]
+    assert actual["styles"] != expected["styles"]
+    assert actual["headers_footers"] != expected["headers_footers"]
+    assert actual["table_geometry"] != expected["table_geometry"]
+    assert actual["paragraph_rhythm"] != expected["paragraph_rhythm"]
+    assert actual["pagination_relations"] != expected["pagination_relations"]

@@ -1,6 +1,6 @@
 {
   "schema_version": "clinical-format-conformance/v1",
-  "matrix_sha256": "e22d4b6ed82738e0da6e3e110389f4396c80a032b5f80b7b219208fdd360dd08",
+  "matrix_sha256": "4d515f6f762949438e9503a0d517e28943a1c9b0c0bf8b7ded178decb7a92136",
   "assurance": "deterministic-structural-only",
   "live_certification_required": true,
   "finding_contract": {
@@ -65,6 +65,10 @@
         "path": "references/conformance-fixtures/retrospective-acceptance-source.json",
         "sha256": "b4c2bd73334c6e6f54d3efa68d0fb533a4e7853ce51092ef2f7197caec8dbebb"
       },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/retrospective-protocol.json",
+        "sha256": "5de290f5c37a3af2ce583f0d871f86ade86b34cac0aabdaa1762bb9c29d37a55"
+      },
       "baselines": [
         {
           "role": "contracted_protocol_template",
@@ -87,6 +91,10 @@
       "fixture": {
         "path": "references/conformance-fixtures/prospective-acceptance-source.json",
         "sha256": "60b6058af707892495c8d1630a07588301450724d3893e4e8988d05307ef882c"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/prospective-advarra.json",
+        "sha256": "6e916ddac1bdff74692f02ad6ea5a9f62a25dcfb0634443ebcde0489eae1b852"
       },
       "baselines": [
         {
@@ -121,6 +129,10 @@
         "path": "references/conformance-fixtures/prospective-acceptance-source.json",
         "sha256": "60b6058af707892495c8d1630a07588301450724d3893e4e8988d05307ef882c"
       },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/prospective-sterling.json",
+        "sha256": "831e8c4322064bdeb2742bbb0cb7b9b65a7004a7bd5998a7f9bce1810e6449b4"
+      },
       "baselines": [
         {
           "role": "contracted_protocol_template",
@@ -154,6 +166,10 @@
         "path": "references/conformance-fixtures/ambispective-acceptance-source.json",
         "sha256": "cc830be47efd5286de7d24b508ba6223b48455d19a6898dbd70360836cf24907"
       },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/ambispective-advarra.json",
+        "sha256": "4b482342a9110a7864f7d98fb76bc38ec747d9496bc43c1cace9d758e68bfa06"
+      },
       "baselines": [
         {
           "role": "contracted_protocol_template",
@@ -186,6 +202,10 @@
       "fixture": {
         "path": "references/conformance-fixtures/ambispective-acceptance-source.json",
         "sha256": "cc830be47efd5286de7d24b508ba6223b48455d19a6898dbd70360836cf24907"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/ambispective-sterling.json",
+        "sha256": "47db8ece4485046da21ab613d8da57f8b2a6d679c75cb45043fb771ceef9b27d"
       },
       "baselines": [
         {
