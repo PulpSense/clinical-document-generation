@@ -1,0 +1,236 @@
+{
+  "schema_version": "clinical-format-conformance/v1",
+  "matrix_sha256": "4d515f6f762949438e9503a0d517e28943a1c9b0c0bf8b7ded178decb7a92136",
+  "assurance": "deterministic-structural-only",
+  "live_certification_required": true,
+  "finding_contract": {
+    "required": [
+      "code",
+      "target",
+      "evidence_sha256",
+      "retry_owner",
+      "terminal_status"
+    ]
+  },
+  "gate_sequence": [
+    {
+      "order": 1,
+      "gate_id": "clinical_fidelity",
+      "retry_owner": "drafting",
+      "terminal_status": "blocked"
+    },
+    {
+      "order": 2,
+      "gate_id": "content_completeness_consistency",
+      "retry_owner": "drafting_or_source_evidence",
+      "terminal_status": "blocked"
+    },
+    {
+      "order": 3,
+      "gate_id": "docx_prs_structure",
+      "retry_owner": "deterministic_renderer",
+      "terminal_status": "blocked"
+    },
+    {
+      "order": 4,
+      "gate_id": "exact_artifact_rendering",
+      "retry_owner": "render_assurance",
+      "terminal_status": "blocked"
+    },
+    {
+      "order": 5,
+      "gate_id": "every_page_visual_qa",
+      "retry_owner": "layout_repair",
+      "terminal_status": "blocked"
+    },
+    {
+      "order": 6,
+      "gate_id": "exact_byte_atomic_delivery",
+      "retry_owner": "desktop_transport",
+      "terminal_status": "blocked"
+    }
+  ],
+  "invalidation": {
+    "docx_changed": ["exact_artifact_rendering", "every_page_visual_qa", "exact_byte_atomic_delivery"],
+    "pdf_changed": ["every_page_visual_qa", "exact_byte_atomic_delivery"],
+    "page_changed": ["every_page_visual_qa", "exact_byte_atomic_delivery"],
+    "failed_gate_is_monotonic": true
+  },
+  "cases": [
+    {
+      "case_id": "retrospective-protocol",
+      "study_type": "Retrospective",
+      "icf_template": null,
+      "fixture": {
+        "path": "references/conformance-fixtures/retrospective-acceptance-source.json",
+        "sha256": "b4c2bd73334c6e6f54d3efa68d0fb533a4e7853ce51092ef2f7197caec8dbebb"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/retrospective-protocol.json",
+        "sha256": "5de290f5c37a3af2ce583f0d871f86ade86b34cac0aabdaa1762bb9c29d37a55"
+      },
+      "baselines": [
+        {
+          "role": "contracted_protocol_template",
+          "path": "assets/client-templates/docx/retrospective-protocol.template.docx",
+          "sha256": "f54236f45023c098d72b40371188a98b3a95643b62d40cebd89621ada6ccc60e"
+        },
+        {
+          "role": "protocol_client_authority",
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        }
+      ],
+      "expected_outputs": ["protocol.docx"],
+      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+    },
+    {
+      "case_id": "prospective-advarra",
+      "study_type": "Prospective",
+      "icf_template": "Advarra",
+      "fixture": {
+        "path": "references/conformance-fixtures/prospective-acceptance-source.json",
+        "sha256": "60b6058af707892495c8d1630a07588301450724d3893e4e8988d05307ef882c"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/prospective-advarra.json",
+        "sha256": "6e916ddac1bdff74692f02ad6ea5a9f62a25dcfb0634443ebcde0489eae1b852"
+      },
+      "baselines": [
+        {
+          "role": "contracted_protocol_template",
+          "path": "assets/client-templates/docx/prospective-protocol.template.docx",
+          "sha256": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0"
+        },
+        {
+          "role": "contracted_icf_template",
+          "path": "assets/client-templates/docx/prospective-icf.template.docx",
+          "sha256": "dd3742192ed7fc2d32b7a2e6ed0b891c25063b8fee6a83c61e68b0bd4514fa88"
+        },
+        {
+          "role": "protocol_client_authority",
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        },
+        {
+          "role": "icf_client_authority",
+          "path": "assets/client-templates/reference/advarra-icf-reference.docx",
+          "sha256": "2cb95691434958421997a4da8baee57ae8eca1626364aa6d11121cc9ce6b4534"
+        }
+      ],
+      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
+      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+    },
+    {
+      "case_id": "prospective-sterling",
+      "study_type": "Prospective",
+      "icf_template": "Sterling",
+      "fixture": {
+        "path": "references/conformance-fixtures/prospective-acceptance-source.json",
+        "sha256": "60b6058af707892495c8d1630a07588301450724d3893e4e8988d05307ef882c"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/prospective-sterling.json",
+        "sha256": "831e8c4322064bdeb2742bbb0cb7b9b65a7004a7bd5998a7f9bce1810e6449b4"
+      },
+      "baselines": [
+        {
+          "role": "contracted_protocol_template",
+          "path": "assets/client-templates/docx/prospective-protocol.template.docx",
+          "sha256": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0"
+        },
+        {
+          "role": "contracted_icf_template",
+          "path": "assets/client-templates/docx/sterling-icf.template.docx",
+          "sha256": "6801dd7bb5467505f65f0e413148e4d0f705c928f9291d303987c7b3db4f2260"
+        },
+        {
+          "role": "protocol_client_authority",
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        },
+        {
+          "role": "icf_client_authority",
+          "path": "assets/client-templates/reference/sterling-icf-reference.docx",
+          "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
+        }
+      ],
+      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
+      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+    },
+    {
+      "case_id": "ambispective-advarra",
+      "study_type": "Ambispective",
+      "icf_template": "Advarra",
+      "fixture": {
+        "path": "references/conformance-fixtures/ambispective-acceptance-source.json",
+        "sha256": "cc830be47efd5286de7d24b508ba6223b48455d19a6898dbd70360836cf24907"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/ambispective-advarra.json",
+        "sha256": "4b482342a9110a7864f7d98fb76bc38ec747d9496bc43c1cace9d758e68bfa06"
+      },
+      "baselines": [
+        {
+          "role": "contracted_protocol_template",
+          "path": "assets/client-templates/docx/ambispective-protocol.template.docx",
+          "sha256": "d26b745c61cf479ffdc02ce2540821349bb3ebad5030a3c3cf41fa2403f5a678"
+        },
+        {
+          "role": "contracted_icf_template",
+          "path": "assets/client-templates/docx/ambispective-icf.template.docx",
+          "sha256": "44b7d61a838c9bf082da0b3db2d6140778a25d49a5910e221a496f541e58aeb6"
+        },
+        {
+          "role": "protocol_client_authority",
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        },
+        {
+          "role": "icf_client_authority",
+          "path": "assets/client-templates/reference/advarra-icf-reference.docx",
+          "sha256": "2cb95691434958421997a4da8baee57ae8eca1626364aa6d11121cc9ce6b4534"
+        }
+      ],
+      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
+      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+    },
+    {
+      "case_id": "ambispective-sterling",
+      "study_type": "Ambispective",
+      "icf_template": "Sterling",
+      "fixture": {
+        "path": "references/conformance-fixtures/ambispective-acceptance-source.json",
+        "sha256": "cc830be47efd5286de7d24b508ba6223b48455d19a6898dbd70360836cf24907"
+      },
+      "approved_output_baseline": {
+        "path": "references/format-baselines/ambispective-sterling.json",
+        "sha256": "47db8ece4485046da21ab613d8da57f8b2a6d679c75cb45043fb771ceef9b27d"
+      },
+      "baselines": [
+        {
+          "role": "contracted_protocol_template",
+          "path": "assets/client-templates/docx/ambispective-protocol.template.docx",
+          "sha256": "d26b745c61cf479ffdc02ce2540821349bb3ebad5030a3c3cf41fa2403f5a678"
+        },
+        {
+          "role": "contracted_icf_template",
+          "path": "assets/client-templates/docx/sterling-icf.template.docx",
+          "sha256": "6801dd7bb5467505f65f0e413148e4d0f705c928f9291d303987c7b3db4f2260"
+        },
+        {
+          "role": "protocol_client_authority",
+          "path": "assets/client-templates/reference/protocol-reference.docx",
+          "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+        },
+        {
+          "role": "icf_client_authority",
+          "path": "assets/client-templates/reference/sterling-icf-reference.docx",
+          "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
+        }
+      ],
+      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
+      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+    }
+  ]
+}

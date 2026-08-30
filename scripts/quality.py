@@ -71,6 +71,15 @@ DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "ambispective-sparse-complete", "ambispective-rich-complete",
     "retrospective-sparse-complete", "retrospective-rich-complete",
 )
+GOVERNED_GATE_SEQUENCE = (
+    "clinical_fidelity",
+    "content_completeness_consistency",
+    "docx_prs_structure",
+    "exact_artifact_rendering",
+    "every_page_visual_qa",
+    "exact_byte_atomic_delivery",
+)
+FORMAT_CONFORMANCE_MATRIX = "references/format-conformance-matrix.json"
 CERTIFICATION_VISUAL_CHECKS = {
     "artificial_pagination", "bad_table_split", "blank_page", "clipping",
     "duplicate_section", "excessive_whitespace", "footer_collision",
@@ -151,6 +160,556 @@ def sha256_file(path: Path) -> str:
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""): digest.update(chunk)
     return digest.hexdigest()
+
+
+def canonical_evidence_sha256(value: Any) -> str:
+    """Hash a machine-readable evidence value using one canonical encoding."""
+    return hashlib.sha256(json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+
+
+def _normalized_ooxml_hash(element: ET._Element, *, redact_text: bool = True) -> str:
+    clone = ET.fromstring(ET.tostring(element))
+    for node in clone.iter():
+        for attribute in list(node.attrib):
+            if ET.QName(attribute).localname.startswith("rsid"):
+                del node.attrib[attribute]
+        if redact_text and ET.QName(node).localname in {"t", "delText"}:
+            node.text = "#TEXT" if node.text else ""
+    return hashlib.sha256(ET.tostring(clone, method="c14n")).hexdigest()
+
+
+def normalized_docx_format_signature(path: Path) -> dict[str, Any]:
+    """Return semantic, text-normalized OOXML format evidence for one DOCX."""
+    with zipfile.ZipFile(path) as archive:
+        document_xml = ET.fromstring(archive.read("word/document.xml"))
+        styles_xml = ET.fromstring(archive.read("word/styles.xml"))
+        numbering_xml = ET.fromstring(archive.read("word/numbering.xml"))
+        settings_xml = ET.fromstring(archive.read("word/settings.xml"))
+        headers_footers = []
+        for name in sorted(
+            item for item in archive.namelist()
+            if re.fullmatch(r"word/(?:header|footer)\d+\.xml", item)
+        ):
+            root = ET.fromstring(archive.read(name))
+            fields = [" ".join(str(node.text or "").split()) for node in root.xpath(".//*[local-name()='instrText']")]
+            headers_footers.append({
+                "part": name,
+                "semantic_sha256": _normalized_ooxml_hash(root),
+                "fields": fields,
+                "table_count": len(root.xpath(".//*[local-name()='tbl']")),
+            })
+
+    section_geometry = []
+    for section in document_xml.xpath(".//*[local-name()='sectPr']"):
+        item: dict[str, Any] = {}
+        for child_name in ("pgSz", "pgMar", "cols", "type"):
+            matches = section.xpath(f"./*[local-name()='{child_name}']")
+            child = matches[0] if matches else None
+            item[child_name] = (
+                {ET.QName(key).localname: value for key, value in sorted(child.attrib.items())}
+                if child is not None else None
+            )
+        section_geometry.append(item)
+
+    table_geometry = []
+    for table in document_xml.xpath(".//*[local-name()='tbl']"):
+        rows = table.xpath("./*[local-name()='tr']")
+        table_geometry.append({
+            "grid_widths": [node.get(qn("w:w"), "") for node in table.xpath("./*[local-name()='tblGrid']/*[local-name()='gridCol']")],
+            "row_count": len(rows),
+            "repeating_header_rows": sum(bool(row.xpath("./*[local-name()='trPr']/*[local-name()='tblHeader']")) for row in rows),
+            "non_splitting_rows": sum(bool(row.xpath("./*[local-name()='trPr']/*[local-name()='cantSplit']")) for row in rows),
+            "semantic_sha256": _normalized_ooxml_hash(table),
+        })
+
+    paragraphs = document_xml.xpath(".//*[local-name()='body']//*[local-name()='p']")
+    paragraph_records = []
+    visible_paragraphs = []
+    for index, paragraph in enumerate(paragraphs):
+        text = " ".join("".join(str(node.text or "") for node in paragraph.xpath(".//*[local-name()='t']")).split())
+        style_nodes = paragraph.xpath("./*[local-name()='pPr']/*[local-name()='pStyle']")
+        style = style_nodes[0].get(qn("w:val"), "") if style_nodes else ""
+        ppr = paragraph.xpath("./*[local-name()='pPr']")
+        paragraph_records.append({
+            "style": style,
+            "ppr_sha256": _normalized_ooxml_hash(ppr[0]) if ppr else None,
+            "run_property_sha256": [_normalized_ooxml_hash(node) for node in paragraph.xpath("./*[local-name()='r']/*[local-name()='rPr']")],
+        })
+        if text:
+            visible_paragraphs.append((index, text, style, paragraph))
+
+    signature_pattern = re.compile(r"\b(?:signature|signed|participant name|investigator name)\b", re.I)
+    legal_pattern = re.compile(r"\b(?:consent|authorization|privacy|confidential|injury|compensation|withdraw|voluntary)\b", re.I)
+    signature_blocks = [
+        {"paragraph": index, "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "style": style}
+        for index, text, style, _ in visible_paragraphs if signature_pattern.search(text)
+    ]
+    legal_terms = ("consent", "authorization", "privacy", "confidential", "injury", "compensation", "withdraw", "voluntary")
+    consent_legal_placement = [
+        {
+            "paragraph": index,
+            "text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+            "style": style,
+            "categories": [term for term in legal_terms if re.search(rf"\b{term}\w*\b", text, re.I)],
+        }
+        for index, text, style, _ in visible_paragraphs if legal_pattern.search(text)
+    ]
+    headings = []
+    for index, text, style, paragraph in visible_paragraphs:
+        if not style.casefold().startswith("heading"):
+            continue
+        ppr_matches = paragraph.xpath("./*[local-name()='pPr']")
+        ppr = ppr_matches[0] if ppr_matches else None
+        headings.append({
+            "paragraph": index,
+            "text": text,
+            "style": style,
+            "page_break_before": bool(ppr is not None and ppr.xpath("./*[local-name()='pageBreakBefore']")),
+            "keep_with_next": bool(ppr is not None and ppr.xpath("./*[local-name()='keepNext']")),
+        })
+    field_codes = [" ".join(str(node.text or "").split()) for node in document_xml.xpath(".//*[local-name()='instrText']")]
+    page_fields = sum("PAGE" in value.upper() for value in field_codes) + sum(
+        "PAGE" in value.upper() for part in headers_footers for value in part["fields"]
+    )
+    update_fields = bool(settings_xml.xpath(".//*[local-name()='updateFields' and (@*[local-name()='val']='true' or @*[local-name()='val']='1')]"))
+    first_numbered = next((item["paragraph"] for item in headings if re.match(r"^\d+(?:\.|\s)", item["text"])), None)
+    return {
+        "section_geometry": section_geometry,
+        "styles": {"count": len(styles_xml.xpath(".//*[local-name()='style']")), "semantic_sha256": _normalized_ooxml_hash(styles_xml, redact_text=False)},
+        "numbering": {
+            "abstract_count": len(numbering_xml.xpath(".//*[local-name()='abstractNum']")),
+            "number_count": len(numbering_xml.xpath(".//*[local-name()='num']")),
+            "semantic_sha256": _normalized_ooxml_hash(numbering_xml, redact_text=False),
+        },
+        "headers_footers": headers_footers,
+        "fields_toc": {"codes": field_codes, "update_fields": update_fields},
+        "page_furniture": {
+            "header_count": sum(item["part"].startswith("word/header") for item in headers_footers),
+            "footer_count": sum(item["part"].startswith("word/footer") for item in headers_footers),
+            "page_field_count": page_fields,
+        },
+        "table_geometry": table_geometry,
+        "signature_blocks": signature_blocks,
+        "consent_legal_placement": consent_legal_placement,
+        "paragraph_rhythm": {"paragraph_count": len(paragraph_records), "semantic_sha256": canonical_evidence_sha256(paragraph_records)},
+        "pagination_relations": {
+            "headings": headings,
+            "first_numbered_body_paragraph": first_numbered,
+            "numbered_body_has_no_artificial_starts": all(not item["page_break_before"] for item in headings if re.match(r"^\d+(?:\.|\s)", item["text"])),
+            "all_headings_keep_with_next": all(item["keep_with_next"] for item in headings),
+        },
+    }
+
+
+def _rendered_pagination_relations(docx_path: Path, pdf_path: Path) -> dict[str, Any]:
+    document = Document(docx_path)
+    pages = [
+        re.sub(r"[^a-z0-9]+", " ", (page.extract_text() or "").casefold()).strip()
+        for page in PdfReader(pdf_path).pages
+    ]
+    body = list(document.element.body)
+    protocol = docx_path.name == "protocol.docx"
+    headings = [
+        paragraph for paragraph in document.paragraphs
+        if paragraph.style.name.casefold().startswith("heading")
+        and (not protocol or re.match(r"^\d+(?:\.\d+)*\.?\s+", paragraph.text.strip()))
+        and (protocol or paragraph.style.name == "Heading ICF Section")
+        and paragraph.text.strip()
+        and "TITLE PAGE" not in paragraph.text.upper()
+        and "TABLE OF CONTENTS" not in paragraph.text.upper()
+    ]
+    cohesion = []
+    for heading in headings:
+        heading_index = body.index(heading._p)
+        first_content = ""
+        for element in body[heading_index + 1:]:
+            if element.tag == qn("w:tbl"):
+                table = Table(element, document)
+                first_content = " ".join(cell.text for cell in table.rows[0].cells) if table.rows else ""
+                break
+            if element.tag != qn("w:p"):
+                continue
+            paragraph = Paragraph(element, document)
+            if paragraph.style.name.casefold().startswith("heading"):
+                first_content = paragraph.text
+                break
+            if paragraph.text.strip():
+                first_content = paragraph.text
+                break
+        heading_tokens = re.findall(r"[a-z0-9]+", heading.text.casefold())
+        content_marker = " ".join(re.findall(r"[a-z0-9]+", first_content.casefold())[:4])
+        together = False
+        if first_content and heading_tokens and content_marker:
+            for page in pages:
+                if protocol:
+                    heading_marker = " ".join(heading_tokens)
+                    if heading_marker not in page:
+                        continue
+                    heading_end = page.index(heading_marker) + len(heading_marker)
+                else:
+                    first = page.find(heading_tokens[0])
+                    if first < 0:
+                        continue
+                    heading_end = first + len(heading_tokens[0])
+                    if len(heading_tokens) > 1:
+                        second = page.find(heading_tokens[1], heading_end)
+                        if second < 0:
+                            continue
+                        heading_end = second + len(heading_tokens[1])
+                remainder = page[heading_end:]
+                if protocol and content_marker in remainder:
+                    together = True
+                    break
+                if not protocol:
+                    content_tokens = [
+                        token for token in re.findall(r"[a-z0-9]+", first_content.casefold())
+                        if token not in {"a", "an", "the", "this"}
+                    ][:3]
+                    cursor = 0
+                    for token in content_tokens:
+                        position = remainder.find(token, cursor)
+                        if position < 0:
+                            break
+                        cursor = position + len(token)
+                    else:
+                        if content_tokens:
+                            together = True
+                            break
+        cohesion.append({
+            "heading": heading.text.strip(),
+            "first_content_sha256": hashlib.sha256(first_content.encode("utf-8")).hexdigest() if first_content else None,
+            "same_page": together,
+        })
+    section_three = next((paragraph.text.strip() for paragraph in headings if "GENERAL INFORMATION" in paragraph.text.upper()), None)
+    section_three_flow = True
+    if section_three:
+        marker = " ".join(re.findall(r"[a-z0-9]+", section_three.casefold()))
+        section_three_page = next((page for page in pages if marker in page and "table of contents" not in page), "")
+        section_three_flow = "2 investigator agreement" in section_three_page
+    return {
+        "pdf_sha256": sha256_file(pdf_path),
+        "heading_cohesion": cohesion,
+        "all_headings_with_first_content": bool(cohesion) and all(item["same_page"] for item in cohesion),
+        "natural_section_3_flow": section_three_flow,
+    }
+
+
+def audit_format_conformance_outputs(
+    repo_root: Path,
+    matrix: Mapping[str, Any],
+    release_gate_report: Mapping[str, Any],
+    evidence_root: Path,
+) -> dict[str, Any]:
+    """Compare generated deterministic DOCX semantics with approved baselines."""
+    selected_cases = {
+        "retrospective-protocol": "retrospective-sparse-complete",
+        "prospective-advarra": "prospective-sparse-complete",
+        "prospective-sterling": "prospective-rich-complete",
+        "ambispective-advarra": "ambispective-sparse-complete",
+        "ambispective-sterling": "ambispective-rich-complete",
+    }
+    reported = {str(item.get("case")): item for item in release_gate_report.get("cases", []) if isinstance(item, Mapping)}
+    results = []
+    for case in matrix.get("cases", []):
+        case_id = str(case.get("case_id") or "")
+        lifecycle_case = selected_cases.get(case_id, "")
+        gate_case = reported.get(lifecycle_case, {})
+        findings = []
+        baseline_record = case.get("approved_output_baseline", {})
+        baseline_path = repo_root / str(baseline_record.get("path") or "")
+        if not baseline_path.is_file() or sha256_file(baseline_path) != baseline_record.get("sha256"):
+            findings.append({"code": "FORMAT_BASELINE_IDENTITY_MISMATCH", "target": case_id})
+            baseline = {"artifacts": {}}
+        else:
+            baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        revision_id = str((gate_case.get("result") or {}).get("revision_id") or "")
+        revision_dir = evidence_root / lifecycle_case / "revisions" / revision_id
+        candidate_dir = revision_dir / "candidate"
+        actual_artifacts = {}
+        for artifact, expected_signature in baseline.get("artifacts", {}).items():
+            artifact_path = candidate_dir / artifact
+            if not artifact_path.is_file():
+                findings.append({"code": "FORMAT_CANDIDATE_MISSING", "target": f"{case_id}:{artifact}"})
+                continue
+            actual_signature = normalized_docx_format_signature(artifact_path)
+            actual_artifacts[artifact] = {"sha256": sha256_file(artifact_path), "signature_sha256": canonical_evidence_sha256(actual_signature)}
+            pdf_path = revision_dir / "rendered" / f"{artifact_path.stem}.pdf"
+            if not pdf_path.is_file():
+                findings.append({"code": "FORMAT_RENDERED_PDF_MISSING", "target": f"{case_id}:{artifact}"})
+            else:
+                relations = _rendered_pagination_relations(artifact_path, pdf_path)
+                actual_artifacts[artifact]["rendered_pagination"] = relations
+                if not relations["all_headings_with_first_content"]:
+                    findings.append({"code": "FORMAT_ORPHAN_HEADING", "target": f"{case_id}:{artifact}"})
+                if artifact == "protocol.docx" and not relations["natural_section_3_flow"]:
+                    findings.append({"code": "FORMAT_SECTION_3_FLOW_BROKEN", "target": f"{case_id}:{artifact}#section=3"})
+            if actual_signature != expected_signature:
+                findings.append({
+                    "code": "FORMAT_BASELINE_MISMATCH",
+                    "target": f"{case_id}:{artifact}",
+                    "expected_signature_sha256": canonical_evidence_sha256(expected_signature),
+                    "actual_signature_sha256": canonical_evidence_sha256(actual_signature),
+                })
+        results.append({
+            "case_id": case_id,
+            "status": "passed" if not findings else "blocked",
+            "baseline_sha256": baseline_record.get("sha256"),
+            "artifacts": actual_artifacts,
+            "findings": findings,
+        })
+    return {
+        "status": "passed" if results and all(item["status"] == "passed" for item in results) else "blocked",
+        "cases": results,
+        "evidence_sha256": canonical_evidence_sha256(results),
+    }
+
+
+def load_format_conformance_matrix(repo_root: Path) -> dict[str, Any]:
+    """Load and independently rehash the deterministic format matrix."""
+    root = repo_root.resolve()
+    matrix = _json(root / FORMAT_CONFORMANCE_MATRIX)
+    if matrix.get("schema_version") != "clinical-format-conformance/v1":
+        raise ValueError("Format conformance matrix schema is invalid.")
+    unsigned = dict(matrix)
+    declared_sha256 = str(unsigned.pop("matrix_sha256", ""))
+    if not declared_sha256 or declared_sha256 != canonical_evidence_sha256(unsigned):
+        raise ValueError("Format conformance matrix identity is invalid.")
+    gates = matrix.get("gate_sequence")
+    if not isinstance(gates, list) or tuple(
+        item.get("gate_id") for item in gates if isinstance(item, Mapping)
+    ) != GOVERNED_GATE_SEQUENCE:
+        raise ValueError("Format conformance gate order is invalid.")
+    cases = matrix.get("cases")
+    expected_cases = (
+        "retrospective-protocol", "prospective-advarra", "prospective-sterling",
+        "ambispective-advarra", "ambispective-sterling",
+    )
+    if not isinstance(cases, list) or tuple(
+        item.get("case_id") for item in cases if isinstance(item, Mapping)
+    ) != expected_cases:
+        raise ValueError("Format conformance case inventory is invalid.")
+    for case in cases:
+        resources = [
+            case.get("fixture"),
+            case.get("approved_output_baseline"),
+            *list(case.get("baselines") or []),
+        ]
+        for resource in resources:
+            if not isinstance(resource, Mapping):
+                raise ValueError("Format conformance resource declaration is invalid.")
+            path_text = str(resource.get("path") or "")
+            relative = PurePosixPath(path_text)
+            if relative.is_absolute() or ".." in relative.parts or relative.as_posix() != path_text:
+                raise ValueError("Format conformance resource path is invalid.")
+            target = root / relative
+            if not target.is_file() or sha256_file(target) != resource.get("sha256"):
+                raise ValueError(f"Format conformance resource identity is invalid: {relative}")
+    return matrix
+
+
+def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str, Any]:
+    """Reject reordered, stale, incomplete, or non-monotonic delivery gates."""
+    matrix = load_format_conformance_matrix(repo_root)
+    value = dict(ledger)
+    if value.get("schema_version") != "clinical-gate-ledger/v1":
+        raise ValueError("Gate ledger schema is invalid.")
+    if value.get("matrix_sha256") != matrix.get("matrix_sha256"):
+        raise ValueError("Gate ledger is not bound to the current conformance matrix.")
+    attempt_id = str(value.get("attempt_id") or "")
+    if not attempt_id:
+        raise ValueError("Gate ledger attempt identity is missing.")
+    unsigned = dict(value)
+    declared_sha256 = str(unsigned.pop("ledger_sha256", ""))
+    if not declared_sha256 or declared_sha256 != canonical_evidence_sha256(unsigned):
+        raise ValueError("Gate ledger identity is invalid.")
+    records = value.get("records")
+    if not isinstance(records, list) or tuple(
+        record.get("gate_id") for record in records if isinstance(record, Mapping)
+    ) != GOVERNED_GATE_SEQUENCE:
+        raise ValueError("Gate ledger sequence is invalid.")
+    unresolved = False
+    finding_fields = set(matrix["finding_contract"]["required"])
+    predecessors = value.get("predecessors")
+    if not isinstance(predecessors, list):
+        raise ValueError("Gate ledger predecessor history is invalid.")
+    predecessor_hashes = []
+    gate_retry_owners = {
+        str(item["gate_id"]): str(item["retry_owner"])
+        for item in matrix["gate_sequence"]
+    }
+    for predecessor in predecessors:
+        if not isinstance(predecessor, Mapping):
+            raise ValueError("Gate ledger predecessor entry is invalid.")
+        ledger_sha256 = str(predecessor.get("ledger_sha256") or "")
+        blocked_findings = predecessor.get("blocked_findings")
+        predecessor_code = f"{str(predecessor.get('terminal_gate')).upper()}_FAILED"
+        if (
+            predecessor.get("attempt_id") != attempt_id
+            or not re.fullmatch(r"[0-9a-f]{64}", ledger_sha256)
+            or predecessor.get("terminal_gate") not in GOVERNED_GATE_SEQUENCE
+            or not isinstance(blocked_findings, list)
+            or not blocked_findings
+            or any(
+                not isinstance(finding, Mapping)
+                or not finding_fields <= set(finding)
+                or not re.fullmatch(r"[A-Z][A-Z0-9_]+", str(finding.get("code") or ""))
+                or finding.get("code") != predecessor_code
+                or not str(finding.get("target") or "").strip()
+                or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
+                or finding.get("retry_owner") != gate_retry_owners.get(str(predecessor.get("terminal_gate")))
+                or finding.get("terminal_status") != "blocked"
+                for finding in blocked_findings
+            )
+        ):
+            raise ValueError("Gate ledger predecessor evidence is invalid.")
+        predecessor_hashes.append(ledger_sha256)
+    if len(predecessor_hashes) != len(set(predecessor_hashes)):
+        raise ValueError("Gate ledger predecessor history contains duplicates.")
+    for order, record in enumerate(records, start=1):
+        if not isinstance(record, Mapping) or record.get("order") != order:
+            raise ValueError("Gate ledger order is invalid.")
+        status = str(record.get("terminal_status") or "")
+        if status not in {"passed", "pending", "blocked"}:
+            raise ValueError("Gate ledger terminal status is invalid.")
+        if unresolved and status == "passed":
+            raise ValueError(f"Gate {record.get('gate_id')} cannot pass after an unresolved earlier gate.")
+        unresolved = unresolved or status != "passed"
+        evidence_sha256 = str(record.get("evidence_sha256") or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", evidence_sha256):
+            raise ValueError("Gate evidence identity is invalid.")
+        expected_retry_owner = gate_retry_owners.get(str(record.get("gate_id")))
+        if record.get("retry_owner") != expected_retry_owner:
+            raise ValueError("Gate retry ownership does not match the governed matrix.")
+        findings = record.get("findings")
+        governed_finding_code = f"{str(record.get('gate_id')).upper()}_FAILED"
+        if not isinstance(findings, list) or any(
+            not isinstance(finding, Mapping)
+            or not finding_fields <= set(finding)
+            or not re.fullmatch(r"[A-Z][A-Z0-9_]+", str(finding.get("code") or ""))
+            or finding.get("code") != governed_finding_code
+            or not str(finding.get("target") or "").strip()
+            or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
+            or not str(finding.get("retry_owner") or "").strip()
+            or finding.get("retry_owner") != record.get("retry_owner")
+            or finding.get("terminal_status") != "blocked"
+            for finding in findings
+        ):
+            raise ValueError("Gate finding contract is invalid.")
+        if (status == "blocked") != bool(findings):
+            raise ValueError("Only blocked gates may carry findings, and blocked gates require them.")
+    return value
+
+
+def build_gate_ledger(
+    repo_root: Path,
+    evidence_by_gate: Mapping[str, Any],
+    *,
+    attempt_id: str,
+    predecessors: Iterable[Mapping[str, Any]] = (),
+    statuses: Mapping[str, str] | None = None,
+    findings_by_gate: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Build a canonical monotonic ledger from exact evidence values."""
+    matrix = load_format_conformance_matrix(repo_root)
+    if not str(attempt_id).strip():
+        raise ValueError("Gate ledger attempt identity is required.")
+    gates = {str(item["gate_id"]): item for item in matrix["gate_sequence"]}
+    if set(evidence_by_gate) != set(GOVERNED_GATE_SEQUENCE):
+        raise ValueError("Evidence must cover the complete governed gate sequence.")
+    records = []
+    for order, gate_id in enumerate(GOVERNED_GATE_SEQUENCE, start=1):
+        status = str((statuses or {}).get(gate_id, "passed"))
+        records.append({
+            "order": order,
+            "gate_id": gate_id,
+            "terminal_status": status,
+            "evidence_sha256": canonical_evidence_sha256(evidence_by_gate[gate_id]),
+            "retry_owner": str(gates[gate_id]["retry_owner"]),
+            "findings": [dict(item) for item in (findings_by_gate or {}).get(gate_id, [])],
+        })
+    if all(record["terminal_status"] == "passed" for record in records):
+        raise ValueError("A complete passed ledger must advance from its final pending delivery gate.")
+    ledger = {
+        "schema_version": "clinical-gate-ledger/v1",
+        "matrix_sha256": matrix["matrix_sha256"],
+        "attempt_id": str(attempt_id),
+        "predecessors": [dict(item) for item in predecessors],
+        "records": records,
+    }
+    ledger["ledger_sha256"] = canonical_evidence_sha256(ledger)
+    return validate_gate_ledger(repo_root, ledger)
+
+
+def retry_gate_ledger(
+    repo_root: Path,
+    blocked_ledger: Mapping[str, Any],
+    evidence_by_gate: Mapping[str, Any],
+    *,
+    statuses: Mapping[str, str],
+    findings_by_gate: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    """Create one linked retry while retaining the exact terminal blocked ledger."""
+    prior = validate_gate_ledger(repo_root, blocked_ledger)
+    blocked_records = [
+        record for record in prior["records"]
+        if record["terminal_status"] == "blocked"
+    ]
+    if len(blocked_records) != 1:
+        raise ValueError("A retry requires exactly one terminal blocked predecessor gate.")
+    blocked = blocked_records[0]
+    predecessor = {
+        "attempt_id": prior["attempt_id"],
+        "ledger_sha256": prior["ledger_sha256"],
+        "terminal_gate": blocked["gate_id"],
+        "blocked_findings": [dict(item) for item in blocked["findings"]],
+    }
+    return build_gate_ledger(
+        repo_root,
+        evidence_by_gate,
+        attempt_id=str(prior["attempt_id"]),
+        predecessors=[*list(prior["predecessors"]), predecessor],
+        statuses=statuses,
+        findings_by_gate=findings_by_gate,
+    )
+
+
+def advance_gate_ledger(
+    repo_root: Path,
+    ledger: Mapping[str, Any],
+    *,
+    gate_id: str,
+    terminal_status: str,
+    evidence: Any,
+    findings: Iterable[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    """Advance only the first unresolved gate and bind its replacement evidence."""
+    current = validate_gate_ledger(repo_root, ledger)
+    records = [dict(record) for record in current["records"]]
+    unresolved = next(
+        (record for record in records if record["terminal_status"] != "passed"),
+        None,
+    )
+    if unresolved is None or unresolved["gate_id"] != gate_id:
+        raise ValueError(f"Only the first unresolved gate may advance; requested {gate_id}.")
+    if unresolved["terminal_status"] == "blocked":
+        raise ValueError(f"A terminal blocked gate cannot advance; start a new retained attempt for {gate_id}.")
+    unresolved["terminal_status"] = terminal_status
+    unresolved["evidence_sha256"] = canonical_evidence_sha256(evidence)
+    unresolved["findings"] = [dict(item) for item in findings]
+    advanced = {
+        "schema_version": current["schema_version"],
+        "matrix_sha256": current["matrix_sha256"],
+        "attempt_id": current["attempt_id"],
+        "predecessors": list(current["predecessors"]),
+        "records": records,
+    }
+    advanced["ledger_sha256"] = canonical_evidence_sha256(advanced)
+    return validate_gate_ledger(repo_root, advanced)
 
 
 def release_certification_payload(report: Mapping[str, Any]) -> bytes:
@@ -2234,6 +2793,7 @@ def render_pages(
                 })
             artifacts.append({
                 "artifact": docx.stem,
+                "status": "passed",
                 "renderer": identity,
                 "page_renderer": selected_page_renderer,
                 "font_evidence": dict(font_evidence or {}),
@@ -2242,6 +2802,7 @@ def render_pages(
                 "docx_sha256": sha256_file(docx),
                 "pdf": pdf.relative_to(revision_dir).as_posix(),
                 "pdf_sha256": sha256_file(pdf),
+                "page_count": len(pages),
                 "pages": [{"page": i, "path": page.relative_to(revision_dir).as_posix(), "sha256": sha256_file(page)} for i, page in enumerate(pages, 1)],
             })
         renderer_attempts.append({"renderer": identity, "status": "passed"})
@@ -3025,4 +3586,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "create_verification_requests", "deterministic_content_check", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "sha256_file", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]

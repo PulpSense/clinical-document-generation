@@ -4,6 +4,7 @@ from pathlib import Path
 from docx import Document
 
 from contracts import contracted_template_bundle
+import quality
 from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS
 from rendering import template_paths
 from workflow import run_release_gate
@@ -73,6 +74,10 @@ def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch,
         revision_dir = case_root / "revisions" / case["result"]["revision_id"]
         manifest = json.loads((case_root / case["result"]["manifest"]).read_text(encoding="utf-8"))
         build = json.loads((revision_dir / "candidate-build.json").read_text(encoding="utf-8"))
+        assert [record["terminal_status"] for record in manifest["gate_ledger"]["records"]] == [
+            "passed", "passed", "passed", "passed", "passed", "pending",
+        ]
+        assert quality.validate_gate_ledger(ROOT, manifest["gate_ledger"]) == manifest["gate_ledger"]
         verification_requests = [
             json.loads(path.read_text(encoding="utf-8"))
             for path in (revision_dir / "hermes/verification-requests").glob("*.json")
