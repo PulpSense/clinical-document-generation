@@ -194,6 +194,80 @@ def test_desktop_operation_persists_governed_identity_attempts_timings_and_clean
     assert cleanups == ["passed"]
 
 
+def test_shipped_production_adapter_drives_actual_desktop_operation(tmp_path, monkeypatch):
+    branch_manifest = {
+        "status": "passed",
+        "client_outputs": [{
+            **_manifest()["client_outputs"][0],
+            "path": "output/protocol.docx",
+        }],
+    }
+    handoff = {
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "passed", "stage": "delivery", "manifest": "revisions/r1/delivery-manifest.json"},
+    ])
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(branch_manifest), encoding="utf-8")
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({
+        "meta": {"study_type": "Retrospective"},
+        "approval": {"status": "approved", "revision_id": "r1"},
+    }), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "production-candidate",
+        "git_commit": None,
+        "source": "shipped_production_adapter",
+    })
+    dispatched = []
+
+    def dispatch(handoffs, remaining_seconds, revision_dir, configuration):
+        assert remaining_seconds > 0
+        assert revision_dir == tmp_path / "revisions/r1"
+        assert configuration["safe_mode"] is True
+        dispatched.extend(handoff["task"] for handoff in handoffs)
+
+    result = workflow.run_production_desktop_operation(
+        tmp_path,
+        dispatch_handoffs=dispatch,
+        opener=lambda _path: b"1234",
+        release_identity={"package_fingerprint": "production-candidate"},
+    )
+
+    assert result["status"] == "passed", result
+    assert result["stage"] == "desktop_delivery"
+    assert result["delivery"]["confirmed"] is True
+    assert dispatched == ["section_drafting"]
+
+
+def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "installed",
+        "git_commit": "abc123",
+        "source": "shipped_production_adapter",
+    })
+
+    with pytest.raises(ValueError, match="does not match the installed candidate"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "forged", "git_commit": "abc123"},
+        )
+
+    with pytest.raises(ValueError, match="exact governed Hermes configuration"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc123"},
+            hermes_configuration={**workflow.CERTIFIED_HERMES_CONFIGURATION, "safe_mode": False},
+        )
+
+
 def test_missing_worker_response_cannot_be_replaced_by_a_changed_request(tmp_path, monkeypatch):
     original = {
         "request_id": "r1.draft.introduction.initial.a1",

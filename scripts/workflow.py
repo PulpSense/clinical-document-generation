@@ -13,7 +13,9 @@ import math
 import os
 import platform
 import re
+import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tarfile
@@ -23,7 +25,7 @@ import zipfile
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from docx import Document
 
@@ -3599,6 +3601,290 @@ def run_desktop_operation(
         return finish(final)
 
 
+def _production_response_is_bound(
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+    *,
+    model_identifier: str,
+) -> bool:
+    """Authenticate one worker response before reaping its Hermes process."""
+    request_path = revision_dir / str(handoff.get("request_path") or "")
+    response_path = revision_dir / str(handoff.get("response_path") or "")
+    try:
+        request = _read(request_path)
+        response = _read(response_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    if str((response.get("producer") or {}).get("model_id") or "") != model_identifier:
+        return False
+    if str(handoff.get("task") or "") in {
+        "clinical_content_verification", "rendered_page_visual_verification",
+    }:
+        return verification_response_is_complete(revision_dir, request_path)
+    return all((
+        response.get("schema_version") == "hermes-response/v2",
+        response.get("request_id") == request.get("request_id"),
+        response.get("request_sha256") == request.get("request_sha256"),
+        response.get("revision_id") == request.get("revision_id"),
+        response.get("task") == request.get("task"),
+        response.get("batch_id") == request.get("batch_id"),
+    ))
+
+
+def _production_agent_prompt(
+    skill_root: Path,
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+    configuration: Mapping[str, Any],
+) -> str:
+    request_path = revision_dir / str(handoff["request_path"])
+    response_path = revision_dir / str(handoff["response_path"])
+    task = str(handoff.get("task") or "")
+    model_identifier = str(configuration["model_identifier"])
+    if task == "rendered_page_visual_verification":
+        task_rule = (
+            "Act as an independent visual verifier. Load and inspect every supplied page PNG "
+            "with the vision tool and assess every requested check for every page."
+        )
+    elif task == "clinical_content_verification":
+        task_rule = (
+            "Act as an independent clinical-content verifier. Assess every bound section and "
+            "cross-document check directly from the request evidence."
+        )
+    else:
+        task_rule = "Draft only the requested sections from the closed approved evidence package."
+    validator = shlex.join([
+        str(Path(sys.executable).resolve()), "-c",
+        (
+            "import sys; from pathlib import Path; sys.path.insert(0, sys.argv[1]); "
+            "from quality import verification_response_is_complete; "
+            "print(verification_response_is_complete(Path(sys.argv[2]), Path(sys.argv[3])))"
+        ),
+        str(skill_root / "scripts"), str(revision_dir), str(request_path),
+    ])
+    verification_rule = (
+        f" After writing the response, run this read-only validator and require True:\n{validator}"
+        if task in {"clinical_content_verification", "rendered_page_visual_verification"}
+        else " The next generate invocation is the authoritative response validator."
+    )
+    return (
+        "Complete one isolated clinical-document Hermes handoff.\n"
+        f"Certified skill: {skill_root}\nRun revision: {revision_dir}\n"
+        f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
+        f"Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. "
+        f"Read the request completely. {task_rule} Write exact JSON directly to the response "
+        f"path and bind every schema, request ID, request hash, task, target, and evidence "
+        f"reference exactly. producer.model_id must be exactly {model_identifier!r}."
+        f"{verification_rule} Do not modify production code or approved source material."
+    )
+
+
+def _production_dispatch_handoffs(
+    handoffs: Sequence[Mapping[str, Any]],
+    remaining_seconds: float,
+    revision_dir: Path,
+    configuration: Mapping[str, Any],
+    *,
+    skill_root: Path,
+    run_dir: Path,
+) -> None:
+    """Run one concurrent Hermes wave under a read-only candidate boundary."""
+    processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float]] = []
+    deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
+    logs = run_dir / "logs/hermes-agents"
+    logs.mkdir(parents=True, exist_ok=True)
+    sandbox = shutil.which("sandbox-exec")
+    if sandbox is None:
+        raise RuntimeError("No supported OS sandbox enforcement mechanism is available.")
+    for handoff in handoffs:
+        started = time.monotonic()
+        request_id = Path(str(handoff["request_path"])).stem
+        cache_dir = run_dir / ".hermes-cache"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        profile = tempfile.NamedTemporaryFile(
+            "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
+        )
+        profile.write("(version 1)\n(allow default)\n")
+        profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
+        profile.write(f"(allow file-write* (subpath {json.dumps(str(run_dir.resolve()))}))\n")
+        profile.write(f"(allow file-write* (subpath {json.dumps(str(cache_dir.resolve()))}))\n")
+        for executable in ("pytest", "py.test", "pip", "pip3"):
+            profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
+            resolved = shutil.which(executable)
+            if resolved:
+                profile.write(f"(deny process-exec (literal {json.dumps(resolved)}))\n")
+        profile.close()
+        command = [
+            "hermes", "chat", "-q",
+            _production_agent_prompt(skill_root, revision_dir, handoff, configuration),
+            "--source", str(configuration["source"]),
+            "--max-turns", str(configuration["max_turns"]),
+            "--skills", str(configuration["skill"]),
+        ]
+        if configuration.get("safe_mode") is True:
+            command.append("--safe-mode")
+        stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
+        stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
+        process = subprocess.Popen(
+            [sandbox, "-f", profile.name, *command],
+            cwd=skill_root,
+            env=dict(os.environ),
+            stdout=stdout_handle,
+            stderr=stderr_handle,
+            text=True,
+            start_new_session=True,
+        )
+        processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started))
+    try:
+        pending = list(processes)
+        while pending and time.monotonic() < deadline:
+            for row in list(pending):
+                process, handoff, _, _, _, _ = row
+                if _production_response_is_bound(
+                    revision_dir, handoff,
+                    model_identifier=str(configuration["model_identifier"]),
+                ):
+                    if process.poll() is None:
+                        try:
+                            os.killpg(process.pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                    process.wait(timeout=5)
+                    pending.remove(row)
+                elif process.poll() is not None:
+                    pending.remove(row)
+            if pending:
+                time.sleep(0.05)
+        missing = [
+            str(handoff.get("response_path") or "")
+            for process, handoff, _, _, _, _ in processes
+            if not _production_response_is_bound(
+                revision_dir, handoff,
+                model_identifier=str(configuration["model_identifier"]),
+            )
+        ]
+        if missing:
+            raise RuntimeError(
+                "Hermes workers did not produce complete bound responses: " + ", ".join(missing)
+            )
+    finally:
+        for process, handoff, stdout_handle, stderr_handle, profile, started in processes:
+            if process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                    process.wait(timeout=5)
+                except (ProcessLookupError, subprocess.TimeoutExpired):
+                    if process.poll() is None:
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                        process.wait()
+            ended = time.monotonic()
+            stdout_handle.close()
+            stderr_handle.close()
+            profile.unlink(missing_ok=True)
+            event_path = run_dir / "logs/hermes-agent-events.jsonl"
+            event_path.parent.mkdir(parents=True, exist_ok=True)
+            response_path = revision_dir / str(handoff.get("response_path") or "")
+            with event_path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps({
+                    "request_path": str(handoff.get("request_path") or ""),
+                    "response_path": str(handoff.get("response_path") or ""),
+                    "task": handoff.get("task"),
+                    "batch_id": handoff.get("batch_id"),
+                    "started_monotonic": started,
+                    "ended_monotonic": ended,
+                    "elapsed_seconds": round(ended - started, 3),
+                    "returncode": process.returncode,
+                    "response_exists": response_path.is_file(),
+                    "stdout_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stdout.log",
+                    "stderr_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stderr.log",
+                }, ensure_ascii=False) + "\n")
+
+
+def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
+    findings = _manifest_integrity(skill_root, allow_runtime_state=True)
+    if findings:
+        raise ValueError(
+            "Production Desktop adapter requires an intact packaged release: "
+            + "; ".join(str(item.get("issue") or "") for item in findings)
+        )
+    manifest = _read(skill_root / RELEASE_MANIFEST)
+    return {
+        "package_fingerprint": manifest["package_fingerprint"],
+        "git_commit": manifest["git_commit"],
+        "source": "shipped_production_adapter",
+    }
+
+
+def run_production_desktop_operation(
+    run_dir: Path,
+    *,
+    dispatch_handoffs: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None] | None = None,
+    opener: Callable[[str], Any] | None = None,
+    parent_visual_reviewer: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None] | None = None,
+    release_identity: Mapping[str, Any] | None = None,
+    hermes_configuration: Mapping[str, Any] = CERTIFIED_HERMES_CONFIGURATION,
+    operation_id: str = "default",
+    skill_root: Path | None = None,
+) -> dict[str, Any]:
+    """Shipped host adapter for normal and certification Desktop execution."""
+    run_dir = run_dir.expanduser().resolve()
+    root = (skill_root or SCRIPT_DIR.parent).expanduser().resolve()
+    installed_identity = _installed_release_identity(root)
+    if release_identity is not None and any(
+        release_identity.get(field) != installed_identity.get(field)
+        for field in ("package_fingerprint", "git_commit")
+    ):
+        raise ValueError("Supplied release identity does not match the installed candidate manifest.")
+    identity = installed_identity
+    configuration = dict(hermes_configuration)
+    governed_configuration = {
+        field: configuration.get(field)
+        for field in CERTIFIED_HERMES_CONFIGURATION
+    }
+    if governed_configuration != CERTIFIED_HERMES_CONFIGURATION:
+        raise ValueError("Production Desktop execution requires the exact governed Hermes configuration.")
+
+    def revision_dir() -> Path:
+        reference = _read(run_dir / REFERENCE)
+        revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
+        if not revision_id:
+            raise RuntimeError("The approved Run Revision identity is missing.")
+        return run_dir / "revisions" / revision_id
+
+    def route(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        selected = dispatch_handoffs
+        if selected is None:
+            _production_dispatch_handoffs(
+                handoffs, remaining_seconds, revision_dir(), configuration,
+                skill_root=root, run_dir=run_dir,
+            )
+        else:
+            selected(handoffs, remaining_seconds, revision_dir(), configuration)
+
+    def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        if parent_visual_reviewer is None:
+            raise RuntimeError(
+                "Delegated Visual QA failed; the Desktop parent must inspect every bound page."
+            )
+        parent_visual_reviewer(handoffs, remaining_seconds, revision_dir(), configuration)
+
+    return run_desktop_operation(
+        run_dir,
+        handoff_runner=route,
+        fallback_handoff_runner=fallback,
+        opener=opener or (lambda path: Path(path).read_bytes()),
+        operation_id=operation_id,
+        release_identity={**identity, "hermes_configuration": configuration},
+        cleanup=lambda _status, _remaining: {
+            "owned_processes_reaped": True,
+            "late_responses_ignored": True,
+        },
+    )
+
+
 def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
     evidence = []
     for path in sorted((revision_dir / "hermes/accepted").glob("*.json")):
@@ -5014,7 +5300,7 @@ def run_format_conformance(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix"); parser.add_argument("--format-conformance-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter"); parser.add_argument("--operation-id", default="default"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix"); parser.add_argument("--format-conformance-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
@@ -5031,6 +5317,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.rollback_release:
         if not args.skills_dir: parser.error("--skills-dir is required with --rollback-release")
         result = rollback_release(Path(args.skills_dir))
+    elif args.desktop_operation:
+        if not args.run_dir: parser.error("--run-dir is required with --desktop-operation")
+        result = run_production_desktop_operation(Path(args.run_dir), operation_id=args.operation_id)
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)
     else:
@@ -5040,7 +5329,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

@@ -219,9 +219,14 @@ After approval, do not ask the reviewer any additional clinical or document-cont
 
 ### 4. Run the bounded Desktop operation
 
-The Desktop parent must call `workflow.run_desktop_operation` for the entire
-post-approval lifecycle. Supply the host's Hermes handoff runner and actual
-Desktop file opener. The operation persists its start and cross-process UTC deadline
+The Desktop parent must use the shipped
+`scripts/workflow.py --desktop-operation --run-dir <run-dir>` adapter for the
+entire post-approval lifecycle. Its production API is
+`workflow.run_production_desktop_operation`; callers supply only the actual
+Desktop file opener and, when required, the Desktop-parent visual fallback.
+The adapter owns the safe-mode Hermes launcher, read-only candidate sandbox,
+response authentication, and process cleanup. The operation persists its start
+and cross-process UTC deadline
 under the run workspace, so retries and resume calls cannot reset either. It
 records every compatible runtime identity used to resume. Persisted monotonic
 timestamps are never treated as portable; monotonic time is used only inside
@@ -236,9 +241,10 @@ or the parent visual fallback, but only the original UTC deadline terminates
 the operation. A late worker or opener completion cannot change a terminal
 result or confirm delivery after that deadline.
 
-Release Certification supplies `run_desktop_operation` from an extracted,
-hash-verified candidate release built from the exact commit recorded in its
-manifest and binds its fingerprint. It must not
+Release Certification calls `run_production_desktop_operation` from an
+extracted, hash-verified candidate release built from the exact commit recorded
+in its manifest and binds its fingerprint. The corpus controller may prepare
+fixtures and reduce evidence but must not inject a test-only worker launcher. It must not
 import or launch the editable checkout, and it does not replace the operation's
 30-minute deadline with a harness timeout. The certification adapter must wire
 visual fallback to a Desktop-parent review callback; it must never redispatch

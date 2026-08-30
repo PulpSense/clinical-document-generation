@@ -71,15 +71,17 @@ used to resume it.
 
 `generate` may return `awaiting_hermes`. It is the deterministic inner lifecycle
 step. Normal post-approval Desktop delivery uses
-`workflow.run_desktop_operation`, which owns one cross-process UTC deadline, routes
-those handoffs, and confirms every final attachment through the Desktop opener.
-The standalone CLI loop is for development and controlled diagnostics; it is
-not sufficient evidence of Desktop delivery.
+the shipped `scripts/workflow.py --desktop-operation` adapter, which owns one
+cross-process UTC deadline, launches safe-mode Hermes workers behind a read-only
+candidate boundary, routes bound responses, and confirms every final attachment
+through the Desktop opener. The standalone `--stage generate` loop is for
+development and controlled diagnostics; it is not sufficient evidence of
+Desktop delivery.
 
-The same operation interface is used by the controlled real-Hermes certification
-adapter in `tests/hermes_e2e.py`. That adapter supplies only environment-specific
-Hermes process, read-only sandbox, file-opening, progress, and cleanup behavior;
-it does not own another generation loop or deadline. The persisted operation
+The same shipped adapter owns controlled real-Hermes certification execution.
+`tests/hermes_e2e.py` prepares and audits the governed corpus but cannot replace
+the candidate's launcher, sandbox, response authentication, generation loop, or
+deadline. The persisted operation
 state binds the release fingerprint and compatible runtimes to the original UTC
 deadline, exact pending handoffs, attempt counters, stage timing and soft-budget
 diagnostics, cleanup evidence, and immutable terminal result.
@@ -98,9 +100,10 @@ unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
   --release-root "$candidate_dir/extracted/clinical-document-generation"
 ```
 
-The adapter loads `run_desktop_operation` from that candidate, launches Hermes
-with the candidate read-only, and binds the operation to its release-manifest
-fingerprint. Its cleanup reserve remains inside the one 30-minute operation;
+The corpus controller loads `run_production_desktop_operation` from that
+candidate; the candidate launches Hermes with its own files read-only and binds
+the operation to its independently verified release-manifest fingerprint. Its
+cleanup reserve remains inside the one 30-minute operation;
 there is no shorter certification timeout. A successful single fixture is
 case evidence only; it does not certify a release until the complete three-study
 corpus has passed.

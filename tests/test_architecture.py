@@ -44,15 +44,19 @@ def test_workflow_is_only_cli_entrypoint():
         assert ("argparse" in text) == (path.name == "workflow.py")
 
 
-def test_real_hermes_adapter_uses_the_production_desktop_operation():
-    source = (ROOT / "tests/hermes_e2e.py").read_text(encoding="utf-8")
-    assert "def run_release_certification_operation(" in source
-    assert "desktop_operation(" in source
-    assert "_certified_release(release_root)" in source
-    assert 'parser.add_argument("--release-root", type=Path, required=True)' in source
-    assert 'parser.add_argument("--timeout"' not in source
-    assert "class OperationBudget" not in source
-    assert "hermes-operation.json" not in source
+def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
+    production = (ROOT / "scripts/workflow.py").read_text(encoding="utf-8")
+    certification = (ROOT / "tests/hermes_e2e.py").read_text(encoding="utf-8")
+
+    assert "def run_production_desktop_operation(" in production
+    assert '"hermes", "chat", "-q"' in production
+    assert '"--safe-mode"' in production
+    assert 'parser.add_argument("--desktop-operation"' in production
+    assert "certified_workflow.run_production_desktop_operation(" in certification
+    assert "final_result = desktop_operation(" not in certification[
+        certification.index("def run_release_certification_operation("):
+        certification.index("def _case_artifact_findings(")
+    ]
 
 
 def test_skill_requires_source_truth_as_file_not_inline_chat():

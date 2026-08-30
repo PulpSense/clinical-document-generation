@@ -1118,6 +1118,7 @@ def run_release_certification_operation(
 ) -> dict[str, Any]:
     run_dir = run_dir.resolve()
     release_root = release_root.resolve()
+    certified_workflow = None
     if desktop_operation is None:
         certified_workflow, certified_identity = _certified_release(release_root)
         desktop_operation = certified_workflow.run_desktop_operation
@@ -1176,19 +1177,37 @@ def run_release_certification_operation(
             raise RuntimeError("The controlled operation has no candidate verification validator.")
         parent_visual_reviewer(handoffs, remaining_seconds, verification_response_validator)
 
-    final_result = desktop_operation(
-        run_dir,
-        handoff_runner=handoff_runner,
-        fallback_handoff_runner=parent_visual_fallback,
-        opener=lambda path: Path(path).read_bytes(),
-        operation_id=operation_id,
-        release_identity=release_identity,
-        progress=progress,
-        cleanup=lambda _status, _remaining: {
-            "owned_processes_reaped": True,
-            "late_responses_ignored": True,
-        },
-    )
+    if certified_workflow is not None:
+        if desktop_operation is not certified_workflow.run_desktop_operation:
+            raise ValueError("Release Certification requires the candidate production Desktop operation.")
+        final_result = certified_workflow.run_production_desktop_operation(
+            run_dir,
+            parent_visual_reviewer=lambda handoffs, remaining, _revision, _configuration: parent_visual_fallback(
+                list(handoffs), remaining,
+            ),
+            opener=lambda path: Path(path).read_bytes(),
+            operation_id=operation_id,
+            release_identity=release_identity,
+            hermes_configuration=hermes_configuration,
+            skill_root=release_root,
+        )
+    else:
+        controlled_operation = desktop_operation
+        if controlled_operation is None:
+            raise ValueError("A controlled certification operation was not supplied.")
+        final_result = controlled_operation(
+            run_dir,
+            handoff_runner=handoff_runner,
+            fallback_handoff_runner=parent_visual_fallback,
+            opener=lambda path: Path(path).read_bytes(),
+            operation_id=operation_id,
+            release_identity=release_identity,
+            progress=progress,
+            cleanup=lambda _status, _remaining: {
+                "owned_processes_reaped": True,
+                "late_responses_ignored": True,
+            },
+        )
     timed_out = final_result.get("status") == "timeout"
     operation_elapsed = float(final_result.get("elapsed_seconds") or (time.monotonic() - progress_started))
     report = inspect_run(
