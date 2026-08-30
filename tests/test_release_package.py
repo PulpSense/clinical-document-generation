@@ -665,6 +665,11 @@ def test_release_installation_fails_closed_without_a_host_office_renderer(tmp_pa
     wheel_dir.mkdir(parents=True)
     shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
     _write_release_manifest(skill_root, {
+        "files": [{
+            "path": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "sha256": PDFIUM_SHA256,
+            "bytes": (wheel_dir / PDFIUM_WHEEL).stat().st_size,
+        }],
         "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()}
     })
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [])
@@ -764,6 +769,11 @@ def test_release_renderer_rejects_tampered_runtime_without_silent_repair(tmp_pat
     wheel_dir.mkdir(parents=True)
     shutil.copy2(ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL, wheel_dir / PDFIUM_WHEEL)
     _write_release_manifest(skill_root, {
+        "files": [{
+            "path": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "sha256": PDFIUM_SHA256,
+            "bytes": (wheel_dir / PDFIUM_WHEEL).stat().st_size,
+        }],
         "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()}
     })
     monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{

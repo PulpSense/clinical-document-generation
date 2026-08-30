@@ -31,7 +31,7 @@
   "hermes_configuration": {
     "source": "clinical-release-certification",
     "max_turns": 80,
-    "skill": "clinical-document-drafting",
+    "skill": "clinical-document-generation",
     "safe_mode": true,
     "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
