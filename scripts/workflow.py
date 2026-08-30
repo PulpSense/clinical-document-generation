@@ -1228,6 +1228,9 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
         skill_root=skill_root, require_promoted_runtime=False
     )
     if len(installed) != 1:
+        certification_candidate_path.unlink(missing_ok=True)
+        (skill_root / "runtime/PDF-RENDERER.json").unlink(missing_ok=True)
+        shutil.rmtree(runtime_python, ignore_errors=True)
         return {"status": "blocked", "findings": [{
             "category": "installation",
             "field": "pdf_page_renderer",
@@ -3907,12 +3910,29 @@ def run_production_desktop_operation(
         raise ValueError("Supplied release identity does not match the installed candidate manifest.")
     identity = installed_identity
     configuration = dict(hermes_configuration)
+    allowed_configuration_fields = set(CERTIFIED_HERMES_CONFIGURATION) | {
+        "layout_preservation_notes",
+    }
+    if set(configuration) not in (
+        set(CERTIFIED_HERMES_CONFIGURATION), allowed_configuration_fields,
+    ):
+        raise ValueError("Production Desktop execution requires the exact governed Hermes configuration.")
+    if "layout_preservation_notes" in configuration and (
+        not isinstance(configuration["layout_preservation_notes"], list)
+        or any(
+            not isinstance(note, str) or not note.strip()
+            for note in configuration["layout_preservation_notes"]
+        )
+    ):
+        raise ValueError("Production Desktop execution requires governed layout-preservation notes.")
     governed_configuration = {
         field: configuration.get(field)
         for field in CERTIFIED_HERMES_CONFIGURATION
     }
     if governed_configuration != CERTIFIED_HERMES_CONFIGURATION:
         raise ValueError("Production Desktop execution requires the exact governed Hermes configuration.")
+    if opener is None:
+        raise ValueError("Production Desktop execution requires the actual Desktop opener.")
 
     def revision_dir() -> Path:
         reference = _read(run_dir / REFERENCE)
@@ -3942,7 +3962,7 @@ def run_production_desktop_operation(
         run_dir,
         handoff_runner=route,
         fallback_handoff_runner=fallback,
-        opener=opener or (lambda path: Path(path).read_bytes()),
+        opener=opener,
         operation_id=operation_id,
         release_identity={**identity, "hermes_configuration": configuration},
         cleanup=lambda _status, _remaining: {
@@ -3950,6 +3970,32 @@ def run_production_desktop_operation(
             "late_responses_ignored": True,
         },
     )
+
+
+def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
+    """Build an external host opener that emits exact retrieved bytes."""
+    expanded = command_path.expanduser()
+    if not expanded.is_absolute():
+        raise ValueError(
+            "The Desktop opener command must be an absolute, non-symlinked executable file."
+        )
+    command = expanded.absolute()
+    if command.is_symlink() or not command.is_file():
+        raise ValueError(
+            "The Desktop opener command must be an absolute, non-symlinked executable file."
+        )
+    if not os.access(command, os.X_OK):
+        raise ValueError("The Desktop opener command is not executable.")
+
+    def open_attachment(path: str) -> bytes:
+        return subprocess.run(
+            [str(command), path],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout
+
+    return open_attachment
 
 
 def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
@@ -5367,7 +5413,28 @@ def run_format_conformance(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter"); parser.add_argument("--operation-id", default="default"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix"); parser.add_argument("--format-conformance-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-dir")
+    parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate"))
+    parser.add_argument("--approved-by", default="client")
+    parser.add_argument("--source-md")
+    parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter")
+    parser.add_argument("--desktop-opener-command")
+    parser.add_argument("--operation-id", default="default")
+    parser.add_argument("--release-gate", action="store_true")
+    parser.add_argument("--release-gate-root")
+    parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix")
+    parser.add_argument("--format-conformance-root")
+    parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive")
+    parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate")
+    parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive")
+    parser.add_argument("--release-archive", help="candidate archive used with --bind-certification")
+    parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release")
+    parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive")
+    parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release")
+    parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback")
+    parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release")
+    parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
@@ -5386,7 +5453,12 @@ def main(argv: list[str] | None = None) -> int:
         result = rollback_release(Path(args.skills_dir))
     elif args.desktop_operation:
         if not args.run_dir: parser.error("--run-dir is required with --desktop-operation")
-        result = run_production_desktop_operation(Path(args.run_dir), operation_id=args.operation_id)
+        if not args.desktop_opener_command: parser.error("--desktop-opener-command is required with --desktop-operation")
+        result = run_production_desktop_operation(
+            Path(args.run_dir),
+            operation_id=args.operation_id,
+            opener=command_desktop_opener(Path(args.desktop_opener_command)),
+        )
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)
     else:
@@ -5396,7 +5468,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "command_desktop_opener", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

@@ -298,6 +298,22 @@ def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_pat
             hermes_configuration={**workflow.CERTIFIED_HERMES_CONFIGURATION, "safe_mode": False},
         )
 
+    with pytest.raises(ValueError, match="exact governed Hermes configuration"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc123"},
+            hermes_configuration={
+                **workflow.CERTIFIED_HERMES_CONFIGURATION,
+                "unexpected": "not-governed",
+            },
+        )
+
+    with pytest.raises(ValueError, match="actual Desktop opener"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc123"},
+        )
+
 
 def test_missing_worker_response_cannot_be_replaced_by_a_changed_request(tmp_path, monkeypatch):
     original = {

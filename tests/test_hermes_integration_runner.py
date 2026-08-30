@@ -27,6 +27,7 @@ from hermes_e2e import (
     certification_fixture,
     certification_corpus,
     certify_release_corpus,
+
     _workflow,
     input_provenance,
     inspect_run,
@@ -44,6 +45,27 @@ import quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_command_desktop_opener_emits_exact_bytes_and_rejects_aliases(tmp_path: Path) -> None:
+    attachment = tmp_path / "attachment.docx"
+    attachment.write_bytes(b"exact desktop bytes")
+    command = tmp_path / "desktop-opener"
+    command.write_text("#!/bin/sh\nexec /bin/cat -- \"$1\"\n", encoding="utf-8")
+    command.chmod(0o700)
+
+    opener = workflow.command_desktop_opener(command)
+
+    assert opener(str(attachment)) == b"exact desktop bytes"
+    alias = tmp_path / "aliased-opener"
+    alias.symlink_to(command)
+    with pytest.raises(ValueError, match="non-symlinked"):
+        workflow.command_desktop_opener(alias)
+    with pytest.raises(ValueError, match="absolute"):
+        workflow.command_desktop_opener(Path("relative-opener"))
+    command.chmod(0o600)
+    with pytest.raises(ValueError, match="not executable"):
+        workflow.command_desktop_opener(command)
 
 
 def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path, Path, Path]:
@@ -868,6 +890,7 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
         release_root=tmp_path / "release",
         run_root=tmp_path / "runs",
         preflight_path=tmp_path / "preflight.json",
+        desktop_opener=lambda path: Path(path).read_bytes(),
     )
 
     assert launched == ["prepare:retrospective", "run:retrospective"]
@@ -1221,6 +1244,7 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
         release_root=Path(__file__).resolve().parents[1],
         desktop_operation=workflow.run_desktop_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        desktop_opener=lambda path: Path(path).read_bytes(),
         hermes_configuration={
             "source": "clinical-release-certification",
             "max_turns": 80,
@@ -1274,6 +1298,7 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
         release_root=tmp_path,
         desktop_operation=controlled_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        desktop_opener=lambda path: Path(path).read_bytes(),
         parent_visual_reviewer=lambda handoffs, remaining, _validator: parent_reviews.append((handoffs, remaining)),
         verification_response_validator=quality.verification_response_is_complete,
         state_path_resolver=workflow.desktop_operation_state_path,
@@ -1299,6 +1324,7 @@ def test_release_report_handles_a_resolved_state_path_behind_a_symlink(tmp_path:
         release_root=tmp_path,
         desktop_operation=controlled_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        desktop_opener=lambda path: Path(path).read_bytes(),
         state_path_resolver=workflow.desktop_operation_state_path,
     )
 

@@ -1111,6 +1111,7 @@ def run_release_certification_operation(
     operation_id: str = "default",
     desktop_operation: Any | None = None,
     release_identity: Mapping[str, Any] | None = None,
+    desktop_opener: Callable[[str], bytes] | None = None,
     parent_visual_reviewer: Callable[[list[Mapping[str, Any]], float, Callable[[Path, Path], bool] | None], None] | None = None,
     verification_response_validator: Callable[[Path, Path], bool] | None = None,
     hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
@@ -1131,6 +1132,8 @@ def run_release_certification_operation(
         **dict(release_identity or {}),
         "hermes_configuration": dict(hermes_configuration),
     }
+    if desktop_opener is None:
+        raise ValueError("Release Certification requires the actual Desktop opener.")
     progress_started = time.monotonic()
     last_progress = [progress_started]
 
@@ -1185,7 +1188,7 @@ def run_release_certification_operation(
             parent_visual_reviewer=lambda handoffs, remaining, _revision, _configuration: parent_visual_fallback(
                 list(handoffs), remaining,
             ),
-            opener=lambda path: Path(path).read_bytes(),
+            opener=desktop_opener,
             operation_id=operation_id,
             release_identity=release_identity,
             hermes_configuration=hermes_configuration,
@@ -1199,7 +1202,7 @@ def run_release_certification_operation(
             run_dir,
             handoff_runner=handoff_runner,
             fallback_handoff_runner=parent_visual_fallback,
-            opener=lambda path: Path(path).read_bytes(),
+            opener=desktop_opener,
             operation_id=operation_id,
             release_identity=release_identity,
             progress=progress,
@@ -2551,6 +2554,7 @@ def run_release_certification_corpus(
     release_root: Path,
     run_root: Path,
     preflight_path: Path,
+    desktop_opener: Callable[[str], bytes],
     operation_id: str = "release-corpus",
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
@@ -2600,6 +2604,7 @@ def run_release_certification_corpus(
             release_root=release_root,
             operation_id=f"{operation_id}-{fixture_id}",
             hermes_configuration=fixture["hermes_configuration"],
+            desktop_opener=desktop_opener,
             parent_visual_reviewer=lambda handoffs, remaining, validator, current=run_dir: wait_for_parent_visual_review(
                 current,
                 handoffs,
@@ -2652,6 +2657,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--corpus", action="store_true", help="run the complete three-case Release Certification Corpus sequentially")
     parser.add_argument("--run-preflight", action="store_true", help="execute and record the governed checks required before --corpus")
     parser.add_argument("--preflight-evidence", type=Path, help="bound passing deterministic/static/regression evidence required before --corpus")
+    parser.add_argument("--desktop-opener-command", type=Path, help="absolute external Desktop opener command; receives one attachment path and emits exact retrieved bytes")
     args = parser.parse_args(argv)
     run_dir = args.run_root / datetime.now(timezone.utc).strftime(
         f"{args.fixture}-%Y%m%dT%H%M%SZ"
@@ -2666,6 +2672,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if report["status"] == "passed" else 1
+    if args.desktop_opener_command is None:
+        parser.error("--desktop-opener-command is required for live certification")
+    candidate_workflow, _candidate_identity = _certified_release(release_root)
+    desktop_opener = candidate_workflow.command_desktop_opener(args.desktop_opener_command)
     if args.corpus:
         if args.preflight_evidence is None:
             parser.error("--preflight-evidence is required with --corpus")
@@ -2673,6 +2683,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             release_root=release_root,
             run_root=args.run_root,
             preflight_path=args.preflight_evidence,
+            desktop_opener=desktop_opener,
             operation_id=args.operation_id,
         )
         print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -2688,6 +2699,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         release_root=release_root,
         operation_id=args.operation_id,
         hermes_configuration=fixture["hermes_configuration"],
+        desktop_opener=desktop_opener,
         parent_visual_reviewer=lambda handoffs, remaining, validator: wait_for_parent_visual_review(
             run_dir,
             handoffs,

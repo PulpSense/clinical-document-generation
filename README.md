@@ -91,13 +91,15 @@ editable checkout:
 
 ```bash
 candidate_dir="$(mktemp -d /tmp/clinical-release-candidate.XXXXXX)"
+mkdir -p "$candidate_dir/hermes-home/skills"
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release "$candidate_dir/release.zip"
-unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
-"$CLINICAL_PYTHON" "$candidate_dir/extracted/clinical-document-generation/scripts/workflow.py" \
+unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/hermes-home/skills"
+"$CLINICAL_PYTHON" "$candidate_dir/hermes-home/skills/clinical-document-generation/scripts/workflow.py" \
   --provision-candidate
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --fixture ambispective-sterling \
-  --release-root "$candidate_dir/extracted/clinical-document-generation"
+  --release-root "$candidate_dir/hermes-home/skills/clinical-document-generation" \
+  --desktop-opener-command /absolute/path/to/desktop-opener
 ```
 
 The corpus controller loads `run_production_desktop_operation` from that
@@ -118,14 +120,21 @@ before any real model call:
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --run-preflight \
   --preflight-evidence /absolute/path/release-certification-preflight.json \
-  --release-root /absolute/path/to/extracted/clinical-document-generation
+  --release-root /absolute/path/to/hermes-home/skills/clinical-document-generation
 
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --corpus \
   --preflight-evidence /absolute/path/release-certification-preflight.json \
   --run-root /absolute/path/to/isolated-certification-runs \
-  --release-root /absolute/path/to/extracted/clinical-document-generation
+  --release-root /absolute/path/to/hermes-home/skills/clinical-document-generation \
+  --desktop-opener-command /absolute/path/to/desktop-opener
 ```
+
+The opener command is an external Desktop-host prerequisite, not a release
+resource. It receives one attachment path and must emit exactly the bytes
+retrieved through the actual Desktop opener on stdout; certification rejects a
+missing, relative, non-executable, or symlinked command and never substitutes a
+local filesystem read.
 
 The harness creates the preflight evidence by checking a clean candidate commit,
 compiling exactly the six production modules, running the identical-content
