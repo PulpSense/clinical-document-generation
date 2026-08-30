@@ -105,7 +105,7 @@ def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
     bypass = json.loads(json.dumps(ledger))
     bypass["records"][2]["terminal_status"] = "blocked"
     bypass["records"][2]["findings"] = [{
-        "code": "STRUCTURE_FAILED",
+        "code": "DOCX_PRS_STRUCTURE_FAILED",
         "target": "protocol.docx#section=3",
         "evidence_sha256": "f" * 64,
         "retry_owner": _gate_owner("docx_prs_structure"),
@@ -157,7 +157,7 @@ def test_every_failed_gate_is_terminal_and_retained(failed_gate):
 def test_retry_ledger_retains_blocked_predecessor_and_findings():
     evidence = {gate_id: {"gate": gate_id} for gate_id in quality.GOVERNED_GATE_SEQUENCE}
     finding = {
-        "code": "DOCX_STRUCTURE_FAILED",
+        "code": "DOCX_PRS_STRUCTURE_FAILED",
         "target": "protocol.docx#section=3",
         "evidence_sha256": "f" * 64,
         "retry_owner": _gate_owner("docx_prs_structure"),
@@ -220,7 +220,7 @@ def test_only_next_pending_gate_advances_with_new_exact_evidence():
         )
 
     finding = {
-        "code": "VISUAL_ORPHAN_HEADING",
+        "code": "EVERY_PAGE_VISUAL_QA_ORPHAN_HEADING",
         "target": "protocol.docx#page=4#section=3",
         "evidence_sha256": "c" * 64,
         "retry_owner": _gate_owner("every_page_visual_qa"),

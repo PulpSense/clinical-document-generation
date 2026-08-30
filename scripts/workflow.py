@@ -3647,10 +3647,13 @@ def _publication_evidence_findings(
     ]
     inventory_valid = (
         declared_candidate_paths == actual_candidate_paths
+        and len(candidate_rows) == len(declared_candidate_paths)
+        and all(isinstance(item, Mapping) for item in candidate_rows)
         and len(declared_render_artifacts) == len(set(declared_render_artifacts))
         and set(declared_render_artifacts) == expected_render_artifacts
         and render_report.get("status") == "passed"
     )
+    all_declared_page_paths: list[str] = []
     for artifact in render_rows:
         if not isinstance(artifact, Mapping):
             inventory_valid = False
@@ -3660,6 +3663,10 @@ def _publication_evidence_findings(
         declared_page_paths = {
             str(page.get("path") or "") for page in pages if isinstance(page, Mapping)
         }
+        declared_page_path_rows = [
+            str(page.get("path") or "") for page in pages if isinstance(page, Mapping)
+        ]
+        all_declared_page_paths.extend(declared_page_path_rows)
         artifact_name = str(artifact.get("artifact") or "")
         actual_page_paths = {
             path.relative_to(revision_dir).as_posix()
@@ -3672,6 +3679,7 @@ def _publication_evidence_findings(
             or page_count <= 0
             or [page.get("page") for page in pages if isinstance(page, Mapping)] != list(range(1, page_count + 1))
             or len(pages) != page_count
+            or len(declared_page_path_rows) != len(declared_page_paths)
             or declared_page_paths != actual_page_paths
         ):
             inventory_valid = False
@@ -3680,6 +3688,8 @@ def _publication_evidence_findings(
         for page in artifact.get("pages", []):
             if isinstance(page, Mapping):
                 expected[str(page.get("path") or "")] = str(page.get("sha256") or "")
+    if len(all_declared_page_paths) != len(set(all_declared_page_paths)):
+        inventory_valid = False
     findings = []
     if not inventory_valid:
         findings.append({
@@ -4046,6 +4056,7 @@ def _failed_gate_for_stage(stage: str, findings: Iterable[Mapping[str, Any]]) ->
 def _ledger_findings(
     findings: Iterable[Mapping[str, Any]],
     *,
+    gate_id: str,
     retry_owner: str,
 ) -> list[dict[str, Any]]:
     result = []
@@ -4055,14 +4066,14 @@ def _ledger_findings(
             str(item.get("field") or item.get("check") or "failure"),
         )))
         result.append({
-            "code": re.sub(r"[^A-Z0-9]+", "_", code_source.upper()).strip("_") + "_FAILED",
+            "code": f"{gate_id.upper()}_" + re.sub(r"[^A-Z0-9]+", "_", code_source.upper()).strip("_") + "_FAILED",
             "target": str(item.get("artifact") or item.get("field") or item.get("check") or "attempt"),
             "evidence_sha256": canonical_evidence_sha256(item),
             "retry_owner": retry_owner,
             "terminal_status": "blocked",
         })
     return result or [{
-        "code": "GOVERNED_GATE_FAILED",
+        "code": f"{gate_id.upper()}_FAILED",
         "target": "attempt",
         "evidence_sha256": canonical_evidence_sha256([]),
         "retry_owner": retry_owner,
@@ -4111,7 +4122,11 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         item for item in load_format_conformance_matrix(SCRIPT_DIR.parent)["gate_sequence"]
         if item["gate_id"] == failed_gate
     )
-    ledger_findings = _ledger_findings(findings, retry_owner=str(gate_contract["retry_owner"]))
+    ledger_findings = _ledger_findings(
+        findings,
+        gate_id=failed_gate,
+        retry_owner=str(gate_contract["retry_owner"]),
+    )
     attempt_evidence = {
         gate_id: {
             "revision_id": revision_dir.name,

@@ -547,6 +547,7 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
             raise ValueError("Gate ledger predecessor entry is invalid.")
         ledger_sha256 = str(predecessor.get("ledger_sha256") or "")
         blocked_findings = predecessor.get("blocked_findings")
+        predecessor_code_prefix = f"{str(predecessor.get('terminal_gate')).upper()}_"
         if (
             predecessor.get("attempt_id") != attempt_id
             or not re.fullmatch(r"[0-9a-f]{64}", ledger_sha256)
@@ -557,6 +558,7 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
                 not isinstance(finding, Mapping)
                 or not finding_fields <= set(finding)
                 or not re.fullmatch(r"[A-Z][A-Z0-9_]+", str(finding.get("code") or ""))
+                or not str(finding.get("code") or "").startswith(predecessor_code_prefix)
                 or not str(finding.get("target") or "").strip()
                 or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
                 or finding.get("retry_owner") != gate_retry_owners.get(str(predecessor.get("terminal_gate")))
@@ -583,10 +585,12 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
         if not str(record.get("retry_owner") or ""):
             raise ValueError("Gate retry ownership is missing.")
         findings = record.get("findings")
+        finding_code_prefix = f"{str(record.get('gate_id')).upper()}_"
         if not isinstance(findings, list) or any(
             not isinstance(finding, Mapping)
             or not finding_fields <= set(finding)
             or not re.fullmatch(r"[A-Z][A-Z0-9_]+", str(finding.get("code") or ""))
+            or not str(finding.get("code") or "").startswith(finding_code_prefix)
             or not str(finding.get("target") or "").strip()
             or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
             or not str(finding.get("retry_owner") or "").strip()
