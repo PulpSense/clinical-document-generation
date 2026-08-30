@@ -3792,6 +3792,8 @@ def _publish(
     operation_deadline: float | None = None,
     clock: Callable[[], float] = time.monotonic,
 ) -> dict[str, Any]:
+    _validate_expected_gate_attempts(revision_dir, expected_attempts)
+    _retained_gate_predecessors(revision_dir)
     build_path = revision_dir / "candidate-build.json"
     try:
         build = _read(build_path)
@@ -3945,6 +3947,24 @@ def _retained_gate_predecessors(revision_dir: Path) -> list[dict[str, Any]]:
             raise ValueError(f"Retained attempt ledger identity is invalid: {attempt_dir.name}")
         validated.append(validate_gate_ledger(SCRIPT_DIR.parent, _read(ledger_path)))
     latest = max(validated, key=lambda ledger: len(ledger["predecessors"]))
+    ledgers_by_hash = {ledger["ledger_sha256"]: ledger for ledger in validated}
+    for ledger in validated:
+        for predecessor in ledger["predecessors"]:
+            parent = ledgers_by_hash.get(predecessor["ledger_sha256"])
+            if parent is None:
+                raise ValueError("Retained attempt ledger predecessor is missing.")
+            blocked_parent = next(
+                record for record in parent["records"]
+                if record["terminal_status"] == "blocked"
+            )
+            expected_predecessor = {
+                "attempt_id": parent["attempt_id"],
+                "ledger_sha256": parent["ledger_sha256"],
+                "terminal_gate": blocked_parent["gate_id"],
+                "blocked_findings": [dict(item) for item in blocked_parent["findings"]],
+            }
+            if predecessor != expected_predecessor:
+                raise ValueError("Retained attempt ledger predecessor semantics are invalid.")
     retained_hashes = {ledger["ledger_sha256"] for ledger in validated}
     chained_hashes = {
         *[item["ledger_sha256"] for item in latest["predecessors"]],
