@@ -3760,7 +3760,8 @@ def _production_dispatch_handoffs(
         profile.write(
             "(deny file-write* (require-not (require-any "
             f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
-            f"(subpath {json.dumps(str(run_dir.resolve()))}))))\n"
+            f"(subpath {json.dumps(str(run_dir.resolve()))}) "
+            "(literal \"/dev/null\"))))\n"
         )
         profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
         for executable in ("pytest", "py.test", "pip", "pip3"):

@@ -52,6 +52,7 @@ def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
     assert '"hermes", "chat", "-q"' in production
     assert '"--safe-mode"' in production
     assert "(deny file-write* (require-not (require-any " in production
+    assert '(literal \\"/dev/null\\")' in production
     assert 'parser.add_argument("--desktop-operation"' in production
     assert "certified_workflow.run_production_desktop_operation(" in certification
     assert "final_result = desktop_operation(" not in certification[
