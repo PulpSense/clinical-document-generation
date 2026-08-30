@@ -357,14 +357,6 @@ def _write_passing_case_report(
     run_dir = tmp_path / fixture_id
     logs = run_dir / "logs"
     logs.mkdir(parents=True)
-    (logs / "desktop-parent-visual-review.json").write_text(json.dumps({
-        "status": "completed",
-        "revision_id": "r-test",
-        "request_paths": [],
-        "response_paths": [],
-        "completion_requirement": "Desktop parent must inspect every bound page image.",
-        "required_producer_model_id": producer_model_id,
-    }), encoding="utf-8")
     revision = run_dir / "revisions/r-test"
     manifest_path = revision / "delivery-manifest.json"
     output_dir = run_dir / "output"

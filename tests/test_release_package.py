@@ -708,22 +708,22 @@ def test_direct_extracted_candidate_provisions_without_forging_promotion(tmp_pat
     result = provision_render_assurance(skill_root)
 
     assert result["status"] == "passed"
-    marker = json.loads(
-        (skill_root / "runtime/CERTIFICATION-CANDIDATE.json").read_text(encoding="utf-8")
-    )
-    manifest = json.loads((skill_root / "RELEASE-MANIFEST.json").read_text(encoding="utf-8"))
-    assert marker == {
-        "schema_version": "certification-candidate/v1",
-        "status": "provisioned",
-        "package_fingerprint": manifest["package_fingerprint"],
-        "git_commit": "candidate-commit",
-    }
+    assert not (skill_root / "runtime/CERTIFICATION-CANDIDATE.json").exists()
     assert quality._pdfium_runtime_integrity(
         skill_root, require_promoted_runtime=False,
     )["status"] == "passed"
     promoted = quality._pdfium_runtime_integrity(skill_root)
     assert promoted["status"] == "blocked"
     assert promoted["finding"]["code"] == "renderer.pdfium_promotion_record_invalid"
+
+    copied_root = tmp_path / "copied-home/skills/clinical-document-generation"
+    shutil.copytree(skill_root, copied_root)
+    assert quality._pdfium_runtime_integrity(
+        copied_root, require_promoted_runtime=False,
+    )["status"] == "passed"
+    copied_promoted = quality._pdfium_runtime_integrity(copied_root)
+    assert copied_promoted["status"] == "blocked"
+    assert copied_promoted["finding"]["code"] == "renderer.pdfium_promotion_record_invalid"
 
 
 def test_direct_extracted_candidate_refuses_mutated_manifest_owned_bytes(tmp_path, monkeypatch):

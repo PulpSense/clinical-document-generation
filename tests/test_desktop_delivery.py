@@ -247,6 +247,136 @@ def test_shipped_production_adapter_drives_actual_desktop_operation(tmp_path, mo
     assert dispatched == ["section_drafting"]
 
 
+def test_production_verifier_relies_on_parent_validation_without_terminal_consent(tmp_path):
+    prompt = workflow._production_agent_prompt(
+        tmp_path / "skill",
+        tmp_path / "revision",
+        {
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "task": "rendered_page_visual_verification",
+        },
+        {"model_identifier": "test-model"},
+    )
+
+    assert "The Desktop parent validates it automatically" in prompt
+    assert "do not invoke terminal commands or wait for command approval" in prompt
+    assert "python -c" not in prompt
+
+
+def test_production_adapter_uses_unpromoted_runtime_only_for_verified_certification_candidate(
+    tmp_path, monkeypatch,
+):
+    skill_root = tmp_path / "isolated-home/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "certification-candidate",
+        "git_commit": "candidate-commit",
+        "source": "shipped_production_adapter",
+    })
+    integrity_calls = []
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda root, **options: integrity_calls.append((root, options)) or {"status": "passed"},
+    )
+    monkeypatch.setattr(
+        workflow,
+        "run_desktop_operation",
+        lambda _run_dir, **options: {"status": "passed", "options": options},
+    )
+    preflight = tmp_path / "evidence/preflight.json"
+    preflight.parent.mkdir()
+    unsigned_preflight = {
+        "schema_version": "release-certification-preflight/v1",
+        "status": "passed",
+        "repository_clean": True,
+        "candidate": {
+            "package_fingerprint": "certification-candidate",
+            "git_commit": "candidate-commit",
+            "release_root": str(skill_root.resolve()),
+        },
+        "producer": {
+            "path": "tests/hermes_e2e.py",
+            "git_commit": "candidate-commit",
+        },
+        "checks": {
+            name: {"status": "passed", "returncode": 0}
+            for name in (
+                "static_release_checks", "layout_preservation_corpus",
+                "deterministic_branch_acceptance_corpus", "repository_regression_suite",
+            )
+        },
+    }
+    signing_key_path = Path(__file__).parent / "fixtures/test-certification-signing-key.json"
+    signing_key = json.loads(signing_key_path.read_text(encoding="utf-8"))
+    public_key = {
+        key: value for key, value in signing_key.items()
+        if key != "private_exponent"
+    }
+    public_key_path = skill_root / workflow.RELEASE_CERTIFICATION_PUBLIC_KEY
+    public_key_path.parent.mkdir(parents=True)
+    public_key_path.write_text(json.dumps(public_key), encoding="utf-8")
+    monkeypatch.setattr(
+        workflow, "RELEASE_CERTIFICATION_TRUSTED_KEY_ID",
+        workflow.release_certification_key_id(public_key),
+    )
+    preflight.write_text(json.dumps(
+        workflow._sign_release_certification(unsigned_preflight, signing_key_path)
+    ), encoding="utf-8")
+
+    result = workflow.run_production_desktop_operation(
+        tmp_path / "run",
+        opener=lambda _path: b"unused",
+        release_identity={
+            "package_fingerprint": "certification-candidate",
+            "git_commit": "candidate-commit",
+        },
+        skill_root=skill_root,
+        certification_preflight=preflight,
+    )
+
+    assert integrity_calls == [(skill_root.resolve(), {"require_promoted_runtime": False})]
+    assert result["options"]["require_promoted_runtime"] is False
+
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda *_args, **_kwargs: {
+            "status": "blocked",
+            "finding": {"code": "renderer.pdfium_runtime_file_changed"},
+        },
+    )
+    with pytest.raises(ValueError, match="verified provisioned certification candidate"):
+        workflow.run_production_desktop_operation(
+            tmp_path / "run",
+            opener=lambda _path: b"unused",
+            release_identity={
+                "package_fingerprint": "certification-candidate",
+                "git_commit": "candidate-commit",
+            },
+            skill_root=skill_root,
+            certification_preflight=preflight,
+        )
+
+    rebound = json.loads(preflight.read_text())
+    rebound["candidate"]["release_root"] = str(
+        tmp_path / "copied-home/skills/clinical-document-generation"
+    )
+    preflight.write_text(json.dumps(rebound), encoding="utf-8")
+    with pytest.raises(ValueError, match="lifecycle-owned preflight"):
+        workflow.run_production_desktop_operation(
+            tmp_path / "run",
+            opener=lambda _path: b"unused",
+            release_identity={
+                "package_fingerprint": "certification-candidate",
+                "git_commit": "candidate-commit",
+            },
+            skill_root=skill_root,
+            certification_preflight=preflight,
+        )
+
+
 def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp_path, monkeypatch):
     hermes_home = tmp_path / "isolated-home"
     skill_root = hermes_home / "skills/clinical-document-generation"
@@ -254,12 +384,16 @@ def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp
     monkeypatch.setenv("HOME", "/ambient/home")
     monkeypatch.setenv("HERMES_HOME", "/ambient/hermes")
     monkeypatch.setenv("PYTHONPATH", "/ambient/python")
+    monkeypatch.setenv("PATH", "/ambient/editable/bin")
+    monkeypatch.setenv("DEVELOPMENT_CHECKOUT", "/ambient/editable/checkout")
 
     environment = workflow._production_subprocess_environment(skill_root)
 
     assert environment["HOME"] == str(hermes_home.resolve())
     assert environment["HERMES_HOME"] == str(hermes_home.resolve())
     assert "PYTHONPATH" not in environment
+    assert "DEVELOPMENT_CHECKOUT" not in environment
+    assert environment["PATH"] == "/usr/bin:/bin:/usr/sbin:/sbin"
     assert environment["TMPDIR"] == str(hermes_home.resolve() / ".tmp")
     assert environment["XDG_CACHE_HOME"] == str(hermes_home.resolve() / ".cache")
 
@@ -619,30 +753,30 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
         {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": handoffs},
         {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
     ])
-    primary_timeouts = []
+    primary_calls = []
     parent_reviews = []
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
 
     def primary(received_handoffs, timeout_seconds):
-        primary_timeouts.append(timeout_seconds)
+        primary_calls.append((received_handoffs, timeout_seconds))
         response_root = tmp_path / "revisions/r1/hermes/verification-responses"
         response_root.mkdir(parents=True, exist_ok=True)
-        content_response = {
-            "request_id": content_request["request_id"],
-            "request_sha256": content_request["request_sha256"],
-            "task": content_request["task"],
-        }
-        response_root.joinpath("content.json").write_text(json.dumps(content_response), encoding="utf-8")
-        response_root.joinpath("protocol.json").write_text(json.dumps(protocol_response), encoding="utf-8")
-        (tmp_path / "revisions/r1" / received_handoffs[2]["response_path"]).write_text(
-            json.dumps({
-                "request_id": icf_request["request_id"],
-                "request_sha256": icf_request["request_sha256"],
-                "task": icf_request["task"],
-            }),
-            encoding="utf-8",
-        )
-        now[0] += timeout_seconds
+        if received_handoffs == [protocol_handoff, icf_handoff]:
+            response_root.joinpath("protocol.json").write_text(
+                json.dumps(protocol_response), encoding="utf-8",
+            )
+            now[0] += timeout_seconds
+        elif received_handoffs == [content_handoff]:
+            content_response = {
+                "request_id": content_request["request_id"],
+                "request_sha256": content_request["request_sha256"],
+                "task": content_request["task"],
+            }
+            response_root.joinpath("content.json").write_text(
+                json.dumps(content_response), encoding="utf-8",
+            )
+        else:
+            raise AssertionError(f"unexpected mixed timeout domain: {received_handoffs!r}")
 
     result = workflow.run_desktop_operation(
         tmp_path,
@@ -656,8 +790,15 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
 
     state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
     assert result["status"] == "blocked"
-    assert primary_timeouts == [240.0]
-    assert parent_reviews == [handoffs[2]]
+    timeouts_by_tasks = {
+        tuple(item["task"] for item in received): timeout
+        for received, timeout in primary_calls
+    }
+    assert timeouts_by_tasks == {
+        ("rendered_page_visual_verification", "rendered_page_visual_verification"): 240.0,
+        ("clinical_content_verification",): 1_800.0,
+    }
+    assert parent_reviews == [icf_handoff]
     assert state["soft_budget_events"] == [{
         "stage": "independent_verification",
         "budget_seconds": 240.0,
@@ -665,6 +806,71 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
         "action": "early_parent_fallback",
     }]
     assert state["deadline_at_epoch"] == 2_800.0
+
+
+def test_new_visual_request_hash_gets_a_fresh_soft_budget(tmp_path, monkeypatch):
+    now = [0.0]
+    first_handoff, first_request, _ = _visual_handoff_fixture(tmp_path, "protocol")
+    second_request = json.loads(json.dumps(first_request))
+    second_handoff = dict(first_handoff)
+    second_request["request_id"] = f'{first_request["request_id"]}.retry'
+    second_request["response_path"] = "hermes/verification-responses/protocol-retry.json"
+    second_request.pop("request_sha256", None)
+    second_request["request_sha256"] = verification_request_sha256(second_request)
+    second_handoff["request_path"] = "hermes/verification-requests/protocol-retry.json"
+    second_handoff["response_path"] = second_request["response_path"]
+    second_handoff["request_id"] = second_request["request_id"]
+    second_handoff["request_sha256"] = second_request["request_sha256"]
+    second_request_path = tmp_path / "revisions/r1" / second_handoff["request_path"]
+    calls = [0]
+
+    def generate(_run_dir, **_kwargs):
+        calls[0] += 1
+        if calls[0] == 1:
+            return {
+                "status": "awaiting_hermes",
+                "stage": "independent_verification",
+                "revision_id": "r1",
+                "handoffs": [first_handoff],
+            }
+        if calls[0] == 2:
+            second_request_path.write_text(json.dumps(second_request), encoding="utf-8")
+            return {
+                "status": "awaiting_hermes",
+                "stage": "independent_verification",
+                "revision_id": "r1",
+                "handoffs": [second_handoff],
+            }
+        return {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []}
+
+    timeouts = []
+
+    def complete_visual(handoffs, timeout_seconds):
+        handoff = handoffs[0]
+        timeouts.append(timeout_seconds)
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps({
+            "request_id": handoff["request_id"],
+            "request_sha256": handoff["request_sha256"],
+            "task": handoff["task"],
+        }), encoding="utf-8")
+        now[0] += timeout_seconds
+
+    monkeypatch.setattr(workflow, "generate", generate)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=complete_visual,
+        fallback_handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+        stage_soft_budgets={"independent_verification": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert timeouts == [5.0, 5.0], (result, calls, timeouts)
 
 
 def test_verifier_exception_falls_back_only_for_incomplete_parent_work(tmp_path, monkeypatch):
@@ -724,6 +930,35 @@ def test_mutated_visual_request_cannot_suppress_parent_fallback(tmp_path, monkey
 
     assert result["status"] == "blocked"
     assert parent_reviews == [handoff]
+
+
+def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monkeypatch):
+    handoff, _, _ = _visual_handoff_fixture(tmp_path, "protocol")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "awaiting_hermes",
+        "stage": "independent_verification",
+        "revision_id": "r1",
+        "handoffs": [handoff],
+    })
+    fallback_calls = []
+
+    def failed_fallback(pending, _remaining):
+        fallback_calls.append(list(pending))
+        raise RuntimeError("parent fallback failed")
+
+    def failed_worker(*_args):
+        raise RuntimeError("worker failed")
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=failed_worker,
+        fallback_handoff_runner=failed_fallback,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert fallback_calls == [[handoff]]
 
 
 def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):

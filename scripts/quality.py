@@ -827,7 +827,8 @@ def _certification_evidence_findings(
         "release_manifest", "preflight", "preflight_log", "layout_preservation", "deterministic_corpus",
         "runtime_identity", "case_report", "desktop_operation_state", "delivery_manifest",
         "output", "delivery_confirmation", "drafting_request", "drafting_response",
-        "verification_request", "verification_response", "parent_page_review", "parent_process_marker",
+        "verification_request", "verification_response", "delegated_page_review",
+        "parent_page_review", "parent_process_marker",
         "fixture_manifest", "fixture_source", "approved_source", "approved_reference", "pdf", "page_image",
     }
     findings: list[str] = []
@@ -1095,23 +1096,33 @@ def _certification_evidence_findings(
                 findings.append(f"Content verification does not pass for {fixture}.")
         visual_requests = [(item, value) for item, value in requests if value.get("task") == "rendered_page_visual_verification"]
         parent_review_items = items(fixture, "parent_page_review")
+        delegated_review_items = items(fixture, "delegated_page_review")
         consume(parent_review_items)
-        parent_reviews = [(item, payload(item)) for item in parent_review_items]
-        parent_marker = payload(one(fixture, "parent_process_marker"))
+        consume(delegated_review_items)
+        visual_reviews = [
+            (item, payload(item))
+            for item in [*parent_review_items, *delegated_review_items]
+        ]
+        parent_marker_items = items(fixture, "parent_process_marker")
+        consume(parent_marker_items)
+        parent_marker = payload(parent_marker_items[0]) if len(parent_marker_items) == 1 else {}
         visual_summary = case.get("visual_qa") or {}
-        if len(visual_requests) != len(visual_summary) or len(parent_reviews) != len(visual_summary):
+        if len(visual_requests) != len(visual_summary) or len(visual_reviews) != len(visual_summary):
             findings.append(f"Every-page review set is incomplete for {fixture}.")
-        if (
-            parent_marker.get("status") != "completed"
+        if parent_review_items and (
+            len(parent_marker_items) != 1
+            or parent_marker.get("status") != "completed"
             or parent_marker.get("completion_requirement")
             != "Desktop parent must inspect every bound page image."
             or parent_marker.get("required_producer_model_id") not in models
         ):
             findings.append(f"Desktop-parent review completion evidence is invalid for {fixture}.")
+        if not parent_review_items and parent_marker_items:
+            findings.append(f"Unexpected Desktop-parent marker exists without fallback review evidence for {fixture}.")
         for artifact, visual in visual_summary.items():
             request_pair = next((pair for pair in visual_requests if pair[0].get("sha256") == visual.get("request_sha256")), None)
             review_pair = next((
-                pair for pair in parent_reviews
+                pair for pair in visual_reviews
                 if any(part.get("artifact") == artifact for part in pair[1].get("page_assessments") or [])
             ), None)
             pdf = next((item for item in items(fixture, "pdf") if str(item["path"]).endswith(f"/{artifact}.pdf")), None)
@@ -1145,7 +1156,7 @@ def _certification_evidence_findings(
                 or [item.get("sha256") for item in assessments] != expected_pages
                 or any(item.get("status") != "passed" or set(item.get("checks") or []) != CERTIFICATION_VISUAL_CHECKS for item in assessments)
             ):
-                findings.append(f"PDF or parent every-page review is invalid for {fixture}:{artifact}.")
+                findings.append(f"PDF or every-page review is invalid for {fixture}:{artifact}.")
     unconsumed = sorted(
         str(item.get("path") or item.get("identity") or "")
         for item in entries
@@ -1342,37 +1353,16 @@ def _pdfium_runtime_integrity(
 ) -> dict[str, Any]:
     """Verify one installed runtime and explain the first exact mismatch."""
     resolved_root = Path(skill_root).resolve()
-    installation_candidate = (
-        resolved_root.name == "clinical-document-generation"
-        and resolved_root.parent.name.startswith(
-            ".clinical-document-generation.install-"
+    active_lifecycle_evidence = any(
+        path.exists() or path.is_symlink()
+        for path in (
+            resolved_root / "PROMOTION-RECORD.json",
+            resolved_root / "INSTALLATION-ASSURANCE.json",
+            resolved_root.parent / ".clinical-document-generation.previous",
+            resolved_root.parent / ".clinical-document-generation.activation.json",
         )
     )
-    certification_candidate_path = resolved_root / "runtime/CERTIFICATION-CANDIDATE.json"
-    certification_candidate = False
-    if not require_promoted_runtime and not installation_candidate:
-        try:
-            candidate_record = _json(certification_candidate_path)
-            candidate_manifest = _json(resolved_root / "RELEASE-MANIFEST.json")
-            recorded_candidate_fingerprint, computed_candidate_fingerprint = (
-                _manifest_package_fingerprint(candidate_manifest)
-            )
-            certification_candidate = (
-                not certification_candidate_path.is_symlink()
-                and candidate_record.get("schema_version") == "certification-candidate/v1"
-                and candidate_record.get("status") == "provisioned"
-                and candidate_record.get("package_fingerprint") == recorded_candidate_fingerprint
-                and candidate_record.get("git_commit") == candidate_manifest.get("git_commit")
-                and bool(recorded_candidate_fingerprint)
-                and recorded_candidate_fingerprint == computed_candidate_fingerprint
-            )
-        except (OSError, ValueError, json.JSONDecodeError, KeyError, TypeError):
-            certification_candidate = False
-    require_promoted_runtime = (
-        require_promoted_runtime or not (
-            installation_candidate or certification_candidate
-        )
-    )
+    require_promoted_runtime = require_promoted_runtime or active_lifecycle_evidence
     runtime_root = resolved_root / "runtime"
     runtime_python = runtime_root / "python"
     identity_path = runtime_root / "PDF-RENDERER.json"

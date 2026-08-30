@@ -1108,6 +1108,7 @@ def run_release_certification_operation(
     run_dir: Path,
     *,
     release_root: Path,
+    preflight_evidence: Path | None = None,
     operation_id: str = "default",
     desktop_operation: Any | None = None,
     release_identity: Mapping[str, Any] | None = None,
@@ -1183,6 +1184,8 @@ def run_release_certification_operation(
     if certified_workflow is not None:
         if desktop_operation is not certified_workflow.run_desktop_operation:
             raise ValueError("Release Certification requires the candidate production Desktop operation.")
+        if preflight_evidence is None:
+            raise ValueError("Candidate production certification requires bound preflight evidence.")
         final_result = certified_workflow.run_production_desktop_operation(
             run_dir,
             parent_visual_reviewer=lambda handoffs, remaining, _revision, _configuration: parent_visual_fallback(
@@ -1193,6 +1196,7 @@ def run_release_certification_operation(
             release_identity=release_identity,
             hermes_configuration=hermes_configuration,
             skill_root=release_root,
+            certification_preflight=preflight_evidence,
         )
     else:
         controlled_operation = desktop_operation
@@ -1521,7 +1525,7 @@ def run_release_certification_preflight(
     """Execute and bind all cheap-to-expensive checks required before real Hermes."""
     repository_root = repository_root.resolve()
     release_root = release_root.resolve()
-    _, release_identity = _certified_release(release_root)
+    candidate_workflow, release_identity = _certified_release(release_root)
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=repository_root,
@@ -1566,12 +1570,14 @@ def run_release_certification_preflight(
     logs.mkdir(parents=True, exist_ok=True)
     checks: dict[str, Any] = {}
     overall_status = "passed"
+    check_environment = subprocess_environment()
+    check_environment.pop("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY", None)
     for name, command in command_specs:
         started_at = datetime.now(timezone.utc).isoformat()
         completed = subprocess.run(
             command,
             cwd=repository_root,
-            env=subprocess_environment(),
+            env=check_environment,
             text=True,
             capture_output=True,
             check=False,
@@ -1604,7 +1610,7 @@ def run_release_certification_preflight(
         "schema_version": "release-certification-preflight/v1",
         "status": overall_status,
         "completed_at": datetime.now(timezone.utc).isoformat(),
-        "candidate": release_identity,
+        "candidate": {**release_identity, "release_root": str(release_root.resolve())},
         "python_runtime": {
             "version": sys.version,
             "implementation": sys.implementation.name,
@@ -1618,6 +1624,11 @@ def run_release_certification_preflight(
         },
         "checks": checks,
     }
+    signing_key = os.environ.get("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY")
+    if signing_key:
+        result = candidate_workflow._sign_release_certification(
+            result, Path(signing_key),
+        )
     evidence_path.parent.mkdir(parents=True, exist_ok=True)
     evidence_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return result
@@ -2299,6 +2310,11 @@ def _release_certification_evidence_bundle(
                     case_id=fixture_id, path=f"{prefix}/drafting/{index}-{kind}.json",
                 )
         verification = ((delivery_manifest.get("quality") or {}).get("verification_evidence") or {})
+        parent_marker = run_dir / "logs/desktop-parent-visual-review.json"
+        parent_record = _read_json(parent_marker) or {}
+        parent_response_paths = {
+            str(path) for path in parent_record.get("response_paths") or []
+        }
         for evidence_id, evidence in verification.items():
             request = _contained_run_path(manifest_run_path.parent, evidence.get("request"))
             response = _contained_run_path(manifest_run_path.parent, evidence.get("response"))
@@ -2308,7 +2324,12 @@ def _release_certification_evidence_bundle(
                 f"{fixture_id}-{evidence_id}-request", "verification_request", source=request,
                 case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-request.json",
             )
-            response_kind = "verification_response" if evidence_id == "clinical_content_verification" else "parent_page_review"
+            if evidence_id == "clinical_content_verification":
+                response_kind = "verification_response"
+            elif str(evidence.get("response") or "") in parent_response_paths:
+                response_kind = "parent_page_review"
+            else:
+                response_kind = "delegated_page_review"
             add(
                 f"{fixture_id}-{evidence_id}-response", response_kind, source=response,
                 case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-response.json",
@@ -2335,11 +2356,11 @@ def _release_certification_evidence_bundle(
                         f"{fixture_id}-{artifact_name}-page-{page_number}", "page_image", source=page_path,
                         case_id=fixture_id, path=f"{prefix}/pages/{artifact_name}/page-{page_number}.png",
                     )
-        parent_marker = run_dir / "logs/desktop-parent-visual-review.json"
-        add(
-            f"{fixture_id}-parent-process-marker", "parent_process_marker", source=parent_marker,
-            case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
-        )
+        if parent_marker.is_file():
+            add(
+                f"{fixture_id}-parent-process-marker", "parent_process_marker", source=parent_marker,
+                case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
+            )
     total_bytes = sum(item["bytes"] for item in entries)
     if total_bytes > 128 * 1024 * 1024:
         raise ValueError("Certification evidence exceeds the governed bundle limit.")
@@ -2602,6 +2623,7 @@ def run_release_certification_corpus(
         report = run_release_certification_operation(
             run_dir,
             release_root=release_root,
+            preflight_evidence=preflight_path,
             operation_id=f"{operation_id}-{fixture_id}",
             hermes_configuration=fixture["hermes_configuration"],
             desktop_opener=desktop_opener,
@@ -2674,6 +2696,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0 if report["status"] == "passed" else 1
     if args.desktop_opener_command is None:
         parser.error("--desktop-opener-command is required for live certification")
+    if args.preflight_evidence is None:
+        parser.error("--preflight-evidence is required for live certification")
     candidate_workflow, _candidate_identity = _certified_release(release_root)
     desktop_opener = candidate_workflow.command_desktop_opener(args.desktop_opener_command)
     if args.corpus:
@@ -2697,6 +2721,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = run_release_certification_operation(
         run_dir,
         release_root=release_root,
+        preflight_evidence=args.preflight_evidence,
         operation_id=args.operation_id,
         hermes_configuration=fixture["hermes_configuration"],
         desktop_opener=desktop_opener,
