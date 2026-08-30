@@ -235,7 +235,7 @@ runtime outcome.
 Before installation, the same `config.yaml` must select only the active path and
 declare the certified launch settings under `skills.clinical_document_generation`:
 `source: clinical-release-certification`, `max_turns: 80`,
-`skill: clinical-document-drafting`, `safe_mode: true`,
+`skill: clinical-document-generation`, `safe_mode: true`,
 `model_identifier: gpt-5.6-sol`, and
 `reasoning_configuration: Hermes Desktop governed default`. The host also needs
 `model.default: gpt-5.6-sol`, `agent.reasoning_effort: medium`, and at least 80

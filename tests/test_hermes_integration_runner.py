@@ -197,7 +197,7 @@ def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_
         "hermes_configuration": {
             "source": "clinical-release-certification",
             "max_turns": 80,
-            "skill": "clinical-document-drafting",
+            "skill": "clinical-document-generation",
             "safe_mode": True,
         },
     }), encoding="utf-8")
@@ -1224,7 +1224,7 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
         hermes_configuration={
             "source": "clinical-release-certification",
             "max_turns": 80,
-            "skill": "clinical-document-drafting",
+            "skill": "clinical-document-generation",
             "safe_mode": True,
             "model_identifier": "gpt-5.6-sol",
             "reasoning_configuration": "Hermes Desktop governed default",

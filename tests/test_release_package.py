@@ -539,7 +539,7 @@ def _hermes_config(skills_dir: Path) -> Path:
         "  clinical_document_generation:\n"
         "    source: clinical-release-certification\n"
         "    max_turns: 80\n"
-        "    skill: clinical-document-drafting\n"
+        "    skill: clinical-document-generation\n"
         "    safe_mode: true\n"
         "    model_identifier: gpt-5.6-sol\n"
         "    reasoning_configuration: Hermes Desktop governed default\n",
@@ -1958,7 +1958,7 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
     for index, replacement in enumerate((
         ("safe_mode: true", 'safe_mode: "true"'),
         ("model_identifier: gpt-5.6-sol", "model_identifier: GPT-5.6-SOL"),
-        ("skill: clinical-document-drafting", "skill: Clinical-Document-Drafting"),
+        ("skill: clinical-document-generation", "skill: Clinical-Document-Generation"),
     )):
         skills_dir = tmp_path / f"skills-{index}"
         config = _hermes_config(skills_dir)
