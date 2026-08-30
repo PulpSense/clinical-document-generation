@@ -580,6 +580,7 @@ def validate_gate_ledger(repo_root: Path, ledger: Mapping[str, Any]) -> dict[str
             or not str(finding.get("target") or "").strip()
             or not re.fullmatch(r"[0-9a-f]{64}", str(finding.get("evidence_sha256") or ""))
             or not str(finding.get("retry_owner") or "").strip()
+            or finding.get("retry_owner") != record.get("retry_owner")
             or finding.get("terminal_status") != "blocked"
             for finding in findings
         ):

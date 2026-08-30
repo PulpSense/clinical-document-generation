@@ -3104,6 +3104,7 @@ def run_desktop_operation(
     terminal = persisted.get("status") in {"passed", "blocked", "timeout"}
     if terminal and isinstance(persisted.get("result"), Mapping):
         prior_result = dict(persisted["result"])
+        current_reference = operation_reference
         recorded_bundle = prior_result.get("contracted_template_bundle")
         requires_bundle_validation = prior_result.get("status") == "passed"
         if requires_bundle_validation and not (
@@ -3162,12 +3163,17 @@ def run_desktop_operation(
                     SCRIPT_DIR.parent,
                     dict(prior_result.get("gate_ledger") or {}) if isinstance(prior_result.get("gate_ledger"), Mapping) else {},
                 )
+                expected_attempts = list(
+                    dict(current_reference.get("generation") or {}).get("gate_attempts") or []
+                )
+                _validate_expected_gate_attempts(manifest_path.parent, expected_attempts)
                 if (
                     prepared_ledger["attempt_id"] != final_ledger["attempt_id"]
                     or prepared_ledger["predecessors"] != final_ledger["predecessors"]
                     or prepared_ledger["records"][:-1] != final_ledger["records"][:-1]
                     or prepared_ledger["records"][-1]["terminal_status"] != "pending"
                     or final_ledger["records"][-1]["terminal_status"] != "passed"
+                    or len(final_ledger["predecessors"]) != len(expected_attempts)
                 ):
                     raise ValueError("Persisted Desktop gate-ledger lineage or terminal transition is invalid.")
                 set_finding = _desktop_delivery_set_finding(run_dir, manifest)
@@ -3959,6 +3965,20 @@ def _validate_expected_gate_attempts(
     expected_attempts: Iterable[Mapping[str, Any]],
 ) -> None:
     expected = [dict(item) for item in expected_attempts]
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    if journal_path.is_file():
+        journal = _read(journal_path)
+        unsigned_journal = dict(journal)
+        declared_journal_sha256 = str(unsigned_journal.pop("journal_sha256", ""))
+        if (
+            journal.get("schema_version") != "clinical-gate-attempt-journal/v1"
+            or journal.get("attempt_id") != revision_dir.name
+            or declared_journal_sha256 != canonical_evidence_sha256(unsigned_journal)
+            or journal.get("entries") != expected
+        ):
+            raise ValueError("Retained gate attempt journal is invalid.")
+    elif expected:
+        raise ValueError("Retained gate attempt journal is missing.")
     actual_dirs = sorted(path for path in (revision_dir / "attempts").glob("*") if path.is_dir())
     if len(actual_dirs) != len(expected):
         raise ValueError("Retained gate attempt inventory count is invalid.")
@@ -3992,7 +4012,11 @@ def _failed_gate_for_stage(stage: str, findings: Iterable[Mapping[str, Any]]) ->
     return "clinical_fidelity"
 
 
-def _ledger_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def _ledger_findings(
+    findings: Iterable[Mapping[str, Any]],
+    *,
+    retry_owner: str,
+) -> list[dict[str, Any]]:
     result = []
     for item in findings:
         code_source = "_".join(filter(None, (
@@ -4003,14 +4027,14 @@ def _ledger_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, An
             "code": re.sub(r"[^A-Z0-9]+", "_", code_source.upper()).strip("_") + "_FAILED",
             "target": str(item.get("artifact") or item.get("field") or item.get("check") or "attempt"),
             "evidence_sha256": canonical_evidence_sha256(item),
-            "retry_owner": str(item.get("action") or item.get("recovery_class") or "governed-retry"),
+            "retry_owner": retry_owner,
             "terminal_status": "blocked",
         })
     return result or [{
         "code": "GOVERNED_GATE_FAILED",
         "target": "attempt",
         "evidence_sha256": canonical_evidence_sha256([]),
-        "retry_owner": "governed-retry",
+        "retry_owner": retry_owner,
         "terminal_status": "blocked",
     }]
 
@@ -4024,6 +4048,9 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
     while (archive_root / f"{safe_stage}-a{sequence:02d}").exists():
         sequence += 1
     destination = archive_root / f"{safe_stage}-a{sequence:02d}"
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    journal_entries = list(_read(journal_path).get("entries") or []) if journal_path.is_file() else []
+    _validate_expected_gate_attempts(revision_dir, journal_entries)
     predecessors = _retained_gate_predecessors(revision_dir)
     destination.mkdir()
     retained = (
@@ -4049,7 +4076,11 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         gate_id: "passed" if index < failed_index else "blocked" if index == failed_index else "pending"
         for index, gate_id in enumerate(GOVERNED_GATE_SEQUENCE)
     }
-    ledger_findings = _ledger_findings(findings)
+    gate_contract = next(
+        item for item in load_format_conformance_matrix(SCRIPT_DIR.parent)["gate_sequence"]
+        if item["gate_id"] == failed_gate
+    )
+    ledger_findings = _ledger_findings(findings, retry_owner=str(gate_contract["retry_owner"]))
     attempt_evidence = {
         gate_id: {
             "revision_id": revision_dir.name,
@@ -4082,6 +4113,18 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         "gate_ledger_sha256": failed_ledger["ledger_sha256"],
         "files": files,
     })
+    journal_entries.append({
+        "path": destination.relative_to(revision_dir).as_posix(),
+        "attempt_manifest_sha256": sha256_file(destination / "attempt-manifest.json"),
+        "gate_ledger_sha256": failed_ledger["ledger_sha256"],
+    })
+    gate_journal = {
+        "schema_version": "clinical-gate-attempt-journal/v1",
+        "attempt_id": revision_dir.name,
+        "entries": journal_entries,
+    }
+    gate_journal["journal_sha256"] = canonical_evidence_sha256(gate_journal)
+    _write(journal_path, gate_journal)
     return destination
 
 
@@ -4156,17 +4199,9 @@ def _quality_retry(
     generation_state = working_reference.setdefault("generation", {})
     expected_gate_attempts = list(generation_state.get("gate_attempts") or [])
     _validate_expected_gate_attempts(revision_dir, expected_gate_attempts)
-    archived_attempt = _archive_failed_attempt(revision_dir, stage, findings)
-    attempt_manifest = archived_attempt / "attempt-manifest.json"
-    attempt_ledger = archived_attempt / "gate-ledger.json"
-    generation_state["gate_attempts"] = [
-        *expected_gate_attempts,
-        {
-            "path": archived_attempt.relative_to(revision_dir).as_posix(),
-            "attempt_manifest_sha256": sha256_file(attempt_manifest),
-            "gate_ledger_sha256": _read(attempt_ledger)["ledger_sha256"],
-        },
-    ]
+    _archive_failed_attempt(revision_dir, stage, findings)
+    gate_journal = _read(revision_dir / "gate-attempt-journal.json")
+    generation_state["gate_attempts"] = list(gate_journal["entries"])
     _write(reference_path, working_reference)
     transient = [item for item in findings if item.get("recovery_class") == "verifier_transient"]
     if transient:
@@ -4852,10 +4887,24 @@ def run_format_conformance(
         if evidence_root is not None
         else (repo_root / ".scratch/format-conformance").resolve()
     )
-    if not page_renderers(
+    available_page_renderers = page_renderers(
         skill_root=repo_root,
         require_promoted_runtime=False,
-    ):
+    )
+    if available_page_renderers:
+        try:
+            git_root = Path(subprocess.run(
+                ["git", "-C", str(repo_root), "rev-parse", "--show-toplevel"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()).resolve()
+        except (OSError, subprocess.CalledProcessError):
+            git_root = None
+        if git_root == repo_root:
+            with tempfile.TemporaryDirectory(prefix="format-conformance-clean-") as directory:
+                package_release(repo_root, Path(directory) / "candidate.zip")
+    if not available_page_renderers:
         return _run_format_conformance_in_disposable_candidate(
             repo_root,
             resolved_evidence_root,

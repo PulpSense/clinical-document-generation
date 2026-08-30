@@ -13,6 +13,11 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _gate_owner(gate_id):
+    matrix = quality.load_format_conformance_matrix(ROOT)
+    return next(item["retry_owner"] for item in matrix["gate_sequence"] if item["gate_id"] == gate_id)
+
+
 def test_format_conformance_matrix_is_complete_hash_addressed_and_ordered():
     matrix = quality.load_format_conformance_matrix(ROOT)
 
@@ -103,7 +108,7 @@ def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
         "code": "STRUCTURE_FAILED",
         "target": "protocol.docx#section=3",
         "evidence_sha256": "f" * 64,
-        "retry_owner": "document-repair",
+        "retry_owner": _gate_owner("docx_prs_structure"),
         "terminal_status": "blocked",
     }]
     bypass["records"][3]["terminal_status"] = "passed"
@@ -128,7 +133,7 @@ def test_every_failed_gate_is_terminal_and_retained(failed_gate):
         "code": f"{failed_gate.upper()}_FAILED",
         "target": f"{failed_gate}:artifact#section=target",
         "evidence_sha256": "e" * 64,
-        "retry_owner": "governed-retry",
+        "retry_owner": _gate_owner(failed_gate),
         "terminal_status": "blocked",
     }
     ledger = quality.build_gate_ledger(
@@ -155,7 +160,7 @@ def test_retry_ledger_retains_blocked_predecessor_and_findings():
         "code": "DOCX_STRUCTURE_FAILED",
         "target": "protocol.docx#section=3",
         "evidence_sha256": "f" * 64,
-        "retry_owner": "document-repair",
+        "retry_owner": _gate_owner("docx_prs_structure"),
         "terminal_status": "blocked",
     }
     blocked = quality.build_gate_ledger(
@@ -218,7 +223,7 @@ def test_only_next_pending_gate_advances_with_new_exact_evidence():
         "code": "VISUAL_ORPHAN_HEADING",
         "target": "protocol.docx#page=4#section=3",
         "evidence_sha256": "c" * 64,
-        "retry_owner": "layout-repair",
+        "retry_owner": _gate_owner("every_page_visual_qa"),
         "terminal_status": "blocked",
     }
     blocked = quality.advance_gate_ledger(
@@ -254,6 +259,7 @@ def test_independent_runner_binds_exact_matrix_combinations(tmp_path, monkeypatc
         {"status": "passed", "case": "ambispective-sterling", "result": {"study_type": "Ambispective"}, "icf_template": "Sterling"},
     ]
     monkeypatch.setattr(workflow, "page_renderers", lambda **kwargs: [{"kind": "pypdfium2"}])
+    monkeypatch.setattr(workflow, "package_release", lambda *_args, **_kwargs: {"status": "passed"})
     monkeypatch.setattr(workflow, "run_release_gate", lambda *args, **kwargs: {
         "status": "structural_passed",
         "assurance": "synthetic-structural-only",
