@@ -1746,7 +1746,22 @@ def _replace_static_toc(document: Document) -> None:
     end = OxmlElement("w:fldChar"); end.set(qn("w:fldCharType"), "end")
     for node in (begin, instruction, separate, placeholder, end): run._r.append(node)
     anchor._p.addprevious(field_paragraph._p)
-    for paragraph in paragraphs[start:body]: paragraph._element.getparent().remove(paragraph._element)
+    preserve_from = body
+    for index in range(body - 1, start - 1, -1):
+        paragraph = paragraphs[index]
+        if paragraph.text.strip():
+            break
+        properties = paragraph._p.find(qn("w:pPr"))
+        section = None if properties is None else properties.find(qn("w:sectPr"))
+        section_type = None if section is None else section.find(qn("w:type"))
+        if (
+            paragraph._p.xpath('.//w:br[@w:type="page"]')
+            or section is not None
+            and (section_type is None or section_type.get(qn("w:val")) != "continuous")
+        ):
+            preserve_from = index
+    for paragraph in paragraphs[start:preserve_from]:
+        paragraph._element.getparent().remove(paragraph._element)
 
 
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
