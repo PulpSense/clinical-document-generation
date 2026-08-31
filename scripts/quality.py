@@ -906,7 +906,10 @@ def _certification_evidence_findings(
         preflight_item is None
         or preflight_item.get("sha256") != report.get("preflight_evidence_sha256")
         or preflight.get("status") != "passed"
-        or preflight.get("candidate") != identity
+        or any(
+            (preflight.get("candidate") or {}).get(key) != identity.get(key)
+            for key in ("package_fingerprint", "git_commit")
+        )
         or set(check_values) != required_checks
         or any(
             not isinstance(value, Mapping)

@@ -576,6 +576,13 @@ def _write_passing_case_report(
         "package_fingerprint": "candidate-fingerprint",
         "git_commit": "a" * 40,
         "hermes_configuration": fixture["hermes_configuration"],
+        "managed_hermes_identity": {
+            "launcher": "/managed/hermes/venv/bin/hermes",
+            "launcher_sha256": "1" * 64,
+            "interpreter": "/managed/hermes/venv/bin/python",
+            "interpreter_target": "/managed/python/bin/python3.11",
+            "interpreter_target_sha256": "2" * 64,
+        },
     }
     state = logs / "desktop-operation.json"
     state.write_text(json.dumps({
@@ -750,6 +757,13 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
     assert result["release_identity"] == {
         "package_fingerprint": "candidate-fingerprint",
         "git_commit": "a" * 40,
+        "managed_hermes_identity": {
+            "launcher": "/managed/hermes/venv/bin/hermes",
+            "launcher_sha256": "1" * 64,
+            "interpreter": "/managed/hermes/venv/bin/python",
+            "interpreter_target": "/managed/python/bin/python3.11",
+            "interpreter_target_sha256": "2" * 64,
+        },
     }
     manifest_bytes = (release_root / "RELEASE-MANIFEST.json").read_bytes()
     evidence_findings = workflow._certification_evidence_findings(
@@ -758,6 +772,43 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
         manifest_bytes,
     )
     assert evidence_findings == [], json.dumps(evidence_findings, indent=2)
+
+
+def test_complete_corpus_rejects_coherently_rehashed_incomplete_managed_identity(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        report = json.loads(path.read_text())
+        run_dir = path.parent.parent
+        state_path = run_dir / "logs/desktop-operation.json"
+        state = json.loads(state_path.read_text())
+        incomplete = {"launcher": "/managed/hermes/venv/bin/hermes"}
+        report["release_identity"]["managed_hermes_identity"] = incomplete
+        state["release_identity"]["managed_hermes_identity"] = incomplete
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        report["bound_evidence"]["desktop_operation_state"].update({
+            "sha256": hashlib.sha256(state_path.read_bytes()).hexdigest(),
+            "bytes": state_path.stat().st_size,
+        })
+        path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert all(case["status"] == "failed" for case in result["cases"])
+    assert all(
+        "Case managed Hermes launcher and interpreter identity is incomplete."
+        in case["findings"]
+        for case in result["cases"]
+    )
 
 
 def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Path, monkeypatch) -> None:

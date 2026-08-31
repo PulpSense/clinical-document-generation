@@ -1,6 +1,6 @@
 {
   "schema_version": "clinical-format-conformance/v1",
-  "matrix_sha256": "2dd501d300797d7b293adbbfd52f38d7bd9fddd7659253cc168418aafb89103d",
+  "matrix_sha256": "975975bec4956db79aa89dbe45af4ee8eac700dcfee6eb5418497f916909b851",
   "assurance": "deterministic-structural-only",
   "live_certification_required": true,
   "finding_contract": {
@@ -67,7 +67,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/retrospective-protocol.json",
-        "sha256": "235f7350626f2780426617794994ff3f4b5c07e5bfeae90d6ffb315a2271a0e0"
+        "sha256": "2edca571d538c6f60e4026fc88dfa1fdb47d73815baebf79026d7cad941bc068"
       },
       "baselines": [
         {
@@ -94,7 +94,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-advarra.json",
-        "sha256": "17612dc4051193460615d9d210b5adf177d079524097900b427d292893c1fb03"
+        "sha256": "127c82c31a36c41775bf3fb25e3bb2b73b6f2fd16b2d1393be9d22e56c7da65b"
       },
       "baselines": [
         {
@@ -131,7 +131,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-sterling.json",
-        "sha256": "f24d1ee920dbe2fa6154a9fae27dd4526c94a40dcb309fe758eb3abe53730683"
+        "sha256": "8aa780ae9d111725e0d105cfb4deec7c03480b39cb8d3e31707a17b6160ffa3a"
       },
       "baselines": [
         {
@@ -168,7 +168,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-advarra.json",
-        "sha256": "e309ba28c7e0660abfaedac2fd790073a7f9016ad55c652705d7b4335d8be011"
+        "sha256": "1fb1b26dd91e925137cabf99d5a0311fcafd03c28a9ff9b0c34b22f6c8a8c595"
       },
       "baselines": [
         {
@@ -205,7 +205,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-sterling.json",
-        "sha256": "8160db1beb5a0b2b102f0d52ad3d6c78679b422dff8a3442c1999daeb26856fa"
+        "sha256": "2b074d0394111caea69520724701b9db6b64bad44cbe75c8335c54fbb7936fce"
       },
       "baselines": [
         {

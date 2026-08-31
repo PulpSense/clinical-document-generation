@@ -2494,15 +2494,36 @@ def certify_release_corpus(
         fixture = fixtures.get(fixture_id)
         case_findings: list[str] = []
         identity = report.get("release_identity") or {}
+        managed_identity = identity.get("managed_hermes_identity")
         identities.append({
             "package_fingerprint": identity.get("package_fingerprint"),
             "git_commit": identity.get("git_commit"),
+            "managed_hermes_identity": (
+                dict(managed_identity) if isinstance(managed_identity, Mapping) else {}
+            ),
         })
         if any(
             identities[-1].get(key) != certified_identity.get(key)
             for key in ("package_fingerprint", "git_commit")
         ):
             case_findings.append("Case report identity does not match the immutable candidate.")
+        managed = identities[-1]["managed_hermes_identity"]
+        if (
+            set(managed) != {
+                "launcher", "launcher_sha256", "interpreter",
+                "interpreter_target", "interpreter_target_sha256",
+            }
+            or any(
+                not isinstance(managed.get(key), str)
+                or not Path(str(managed.get(key))).is_absolute()
+                for key in ("launcher", "interpreter", "interpreter_target")
+            )
+            or any(
+                re.fullmatch(r"[0-9a-f]{64}", str(managed.get(key) or "")) is None
+                for key in ("launcher_sha256", "interpreter_target_sha256")
+            )
+        ):
+            case_findings.append("Case managed Hermes launcher and interpreter identity is incomplete.")
         if fixture is None:
             case_findings.append("Case is not part of the declared Release Certification Corpus.")
         else:
@@ -2610,7 +2631,9 @@ def certify_release_corpus(
         for identity in identities
     }
     if len(distinct_identities) != 1 or not identities or not all(identities[0].values()):
-        findings.append("All real cases must bind the same complete candidate commit and package fingerprint.")
+        findings.append(
+            "All real cases must bind the same complete candidate, launcher, and interpreter identity."
+        )
     release_identity = identities[0] if len(distinct_identities) == 1 and identities else {}
     preflight, preflight_findings = _preflight_evidence(
         preflight_path.resolve(),
