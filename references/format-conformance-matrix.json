@@ -1,6 +1,6 @@
 {
   "schema_version": "clinical-format-conformance/v1",
-  "matrix_sha256": "a5a57cfe7c482949615b05ac9e5921db32ca11594d5324e88c194ade8d2191cf",
+  "matrix_sha256": "5f8371cb74b960a37ae86b2983b7dbd96bd73bf507062c7c3f1a61b76905775b",
   "assurance": "deterministic-structural-only",
   "live_certification_required": true,
   "finding_contract": {
@@ -67,7 +67,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/retrospective-protocol.json",
-        "sha256": "560b7e7e5fb6cff348ddc9519d8b265cbc751cc6c4e23f2a80a12e4a58a9049e"
+        "sha256": "cc76827821600431ad564f68b47b2094908d59f02065f6e9340878200f2aefef"
       },
       "baselines": [
         {
