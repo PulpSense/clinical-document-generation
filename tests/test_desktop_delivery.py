@@ -577,6 +577,39 @@ def test_production_connect_proxy_attempts_every_close_after_shutdown_failure():
     assert calls == ["shutdown", "server_close", ("join", 5.0)]
 
 
+def test_production_connect_proxy_closes_listener_when_thread_start_fails(monkeypatch):
+    calls = []
+
+    class FakeServer:
+        def __init__(self, host, port):
+            calls.append(("server", host, port))
+
+        def serve_forever(self):
+            raise AssertionError("must not run")
+
+        def server_close(self):
+            calls.append("server_close")
+
+    class FakeThread:
+        def __init__(self, **kwargs):
+            calls.append(("thread", kwargs["daemon"]))
+
+        def start(self):
+            raise RuntimeError("thread start failed")
+
+    monkeypatch.setattr(workflow, "_ProductionConnectProxyServer", FakeServer)
+    monkeypatch.setattr(workflow.threading, "Thread", FakeThread)
+
+    with pytest.raises(RuntimeError, match="thread start failed"):
+        workflow._start_production_connect_proxy()
+
+    assert calls == [
+        ("server", workflow.PRODUCTION_HERMES_NETWORK_HOST, workflow.PRODUCTION_HERMES_NETWORK_PORT),
+        ("thread", True),
+        "server_close",
+    ]
+
+
 def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_path, monkeypatch):
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     run_dir = tmp_path / "run"

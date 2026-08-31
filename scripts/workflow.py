@@ -3943,7 +3943,14 @@ def _start_production_connect_proxy(
 ) -> _ProductionConnectProxy:
     server = _ProductionConnectProxyServer(host, port)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
+    try:
+        thread.start()
+    except BaseException:
+        try:
+            server.server_close()
+        except BaseException:
+            pass
+        raise
     return _ProductionConnectProxy(server=server, thread=thread)
 
 
