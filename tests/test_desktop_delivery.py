@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -410,6 +411,115 @@ def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp
         workflow._production_subprocess_environment(
             linked_home / "skills/clinical-document-generation"
         )
+
+
+def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypatch):
+    account_home = tmp_path / "account"
+    launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    (launcher.parent / "python").symlink_to(Path(sys.executable))
+    attacker = tmp_path / "attacker/bin"
+    attacker.mkdir(parents=True)
+    monkeypatch.setenv("PATH", str(attacker))
+    monkeypatch.setattr(
+        workflow.pwd, "getpwuid", lambda _uid: type("Account", (), {"pw_dir": str(account_home)})(),
+    )
+
+    selected_launcher, selected_python = workflow._managed_hermes_pair()
+
+    assert selected_launcher == launcher
+    assert selected_python == launcher.parent / "python"
+    assert workflow._production_sandbox_executable() == Path("/usr/bin/sandbox-exec")
+
+
+def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    run_dir = tmp_path / "run"
+    skill_root.mkdir(parents=True)
+    captured = {}
+    monkeypatch.setattr(workflow, "_production_sandbox_executable", lambda: Path("/usr/bin/sandbox-exec"))
+    monkeypatch.setattr(
+        workflow, "_managed_hermes_pair",
+        lambda: (Path("/managed/hermes/venv/bin/hermes"), Path("/managed/hermes/venv/bin/python")),
+    )
+
+    def stop(command, **_kwargs):
+        captured["command"] = command
+        captured["profile"] = Path(command[2]).read_text(encoding="utf-8")
+        raise RuntimeError("probe complete")
+
+    monkeypatch.setattr(workflow.subprocess, "Popen", stop)
+    with pytest.raises(RuntimeError, match="probe complete"):
+        workflow._production_dispatch_handoffs(
+            [{"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"}],
+            30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
+            skill_root=skill_root, run_dir=run_dir,
+            runtime_identity={"executable": sys.executable},
+        )
+
+    assert captured["command"][0] == "/usr/bin/sandbox-exec"
+    assert "deny file-read* (require-not" in captured["profile"]
+    assert str(skill_root.resolve()) in captured["profile"]
+    assert str(run_dir.resolve()) in captured["profile"]
+    assert str(tmp_path / "unrelated-checkout") not in captured["profile"]
+
+
+def test_production_parent_fallback_never_redispatches_or_claims_parent_provenance(
+    tmp_path, monkeypatch,
+):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    reference = tmp_path / "run/reference/study.reference.json"
+    reference.parent.mkdir(parents=True)
+    reference.write_text(json.dumps({"approval": {"revision_id": "r1"}}), encoding="utf-8")
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "installed", "git_commit": "abc", "source": "test",
+    })
+    monkeypatch.setattr(
+        workflow, "resolve_python_runtime",
+        lambda **_kwargs: {"executable": sys.executable, "version_info": [3, 11, 0]},
+    )
+
+    def invoke_fallback(_run_dir, **options):
+        options["fallback_handoff_runner"]([{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+        }], 10.0)
+
+    monkeypatch.setattr(workflow, "run_desktop_operation", invoke_fallback)
+    monkeypatch.setattr(
+        workflow, "_production_dispatch_handoffs",
+        lambda *_args, **_kwargs: pytest.fail("parent fallback must not redispatch to a worker"),
+    )
+
+    with pytest.raises(RuntimeError, match="genuine Desktop-parent"):
+        workflow.run_production_desktop_operation(
+            tmp_path / "run", skill_root=skill_root,
+            opener=lambda _path: b"unused",
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc"},
+        )
+    assert not (tmp_path / "run/logs/desktop-parent-visual-review.json").exists()
+
+
+def test_external_parent_visual_reviewer_receives_one_bound_request_path(tmp_path):
+    command = tmp_path / "parent-reviewer"
+    command.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    command.chmod(0o700)
+    revision = tmp_path / "revisions/r1"
+    revision.mkdir(parents=True)
+    reviewer = workflow.command_parent_visual_reviewer(command)
+
+    reviewer([{
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+    }], 10.0, revision, {"model_identifier": "review-model"})
+
+    request = json.loads((revision / "hermes/desktop-parent-visual-review-request.json").read_text())
+    assert request["revision_id"] == "r1"
+    assert request["required_producer_model_id"] == "review-model"
+    assert len(request["handoffs"]) == 1
 
 
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):

@@ -1506,6 +1506,21 @@ def _preflight_evidence(
     regression = checks.get("repository_regression_suite") or {}
     if int(regression.get("test_count") or 0) <= 0:
         findings.append("Repository regression evidence has no passing test count.")
+    snapshot = evidence.get("snapshot") or {}
+    reconstructions = snapshot.get("package_reconstructions") or []
+    if (
+        snapshot.get("git_commit") != candidate.get("git_commit")
+        or snapshot.get("detached") is not True
+        or [item.get("phase") for item in reconstructions if isinstance(item, Mapping)] != ["before", "after"]
+        or any(
+            not isinstance(item, Mapping)
+            or item.get("package_fingerprint") != candidate.get("package_fingerprint")
+            or item.get("git_commit") != candidate.get("git_commit")
+            or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("archive_sha256") or ""))
+            for item in reconstructions
+        )
+    ):
+        findings.append("Preflight checks were not bound to a stable detached candidate reconstruction.")
     producer = evidence.get("producer") or {}
     if producer.get("path") != "tests/hermes_e2e.py" or producer.get("sha256") != _sha256(Path(__file__)):
         findings.append("Preflight evidence was not produced by this exact certification harness.")
@@ -1522,10 +1537,13 @@ def run_release_certification_preflight(
     evidence_path: Path,
     repository_root: Path = REPO_ROOT,
 ) -> dict[str, Any]:
-    """Execute and bind all cheap-to-expensive checks required before real Hermes."""
+    """Execute required checks in a detached exact-commit candidate snapshot."""
     repository_root = repository_root.resolve()
     release_root = release_root.resolve()
     candidate_workflow, release_identity = _certified_release(release_root)
+    signing_key = os.environ.get("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY")
+    if not signing_key:
+        raise ValueError("Release Certification preflight requires the production signing key.")
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=repository_root,
@@ -1542,6 +1560,12 @@ def run_release_certification_preflight(
     ).stdout.strip()
     if head != release_identity["git_commit"] or dirty:
         raise ValueError("Release Certification preflight requires a clean checkout at the candidate commit.")
+    snapshot_parent = Path(tempfile.mkdtemp(prefix="release-certification-preflight-"))
+    snapshot_root = snapshot_parent / "repository"
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(snapshot_root), head],
+        cwd=repository_root, check=True, capture_output=True, text=True,
+    )
     command_specs = (
         (
             "static_release_checks",
@@ -1572,66 +1596,122 @@ def run_release_certification_preflight(
     overall_status = "passed"
     check_environment = subprocess_environment()
     check_environment.pop("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY", None)
-    for name, command in command_specs:
-        started_at = datetime.now(timezone.utc).isoformat()
-        completed = subprocess.run(
-            command,
-            cwd=repository_root,
-            env=check_environment,
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        completed_at = datetime.now(timezone.utc).isoformat()
-        log_path = logs / f"{name}.log"
-        log_path.write_text(completed.stdout + completed.stderr, encoding="utf-8")
-        item: dict[str, Any] = {
-            "status": "passed" if completed.returncode == 0 else "failed",
-            "command": command,
-            "returncode": completed.returncode,
-            "started_at": started_at,
-            "completed_at": completed_at,
-            "log_path": log_path.relative_to(evidence_path.parent).as_posix(),
-            "sha256": _sha256(log_path),
+    reconstructed: list[dict[str, Any]] = []
+    try:
+        for phase in ("before",):
+            archive = snapshot_parent / f"candidate-{phase}.zip"
+            completed = subprocess.run(
+                [sys.executable, "scripts/workflow.py", "--package-release", str(archive)],
+                cwd=snapshot_root, env=check_environment, text=True,
+                capture_output=True, check=True,
+            )
+            package = json.loads(completed.stdout)
+            reconstructed.append({
+                "phase": phase,
+                "package_fingerprint": package["package_fingerprint"],
+                "git_commit": package["git_commit"],
+                "archive_sha256": _sha256(archive),
+            })
+        if any(
+            item["package_fingerprint"] != release_identity["package_fingerprint"]
+            or item["git_commit"] != head
+            for item in reconstructed
+        ):
+            raise ValueError("Detached preflight snapshot does not reconstruct the certified candidate.")
+        for name, command in command_specs:
+            started_at = datetime.now(timezone.utc).isoformat()
+            completed = subprocess.run(
+                command, cwd=snapshot_root, env=check_environment,
+                text=True, capture_output=True, check=False,
+            )
+            completed_at = datetime.now(timezone.utc).isoformat()
+            log_path = logs / f"{name}.log"
+            log_path.write_text(completed.stdout + completed.stderr, encoding="utf-8")
+            item: dict[str, Any] = {
+                "status": "passed" if completed.returncode == 0 else "failed",
+                "command": command,
+                "returncode": completed.returncode,
+                "started_at": started_at,
+                "completed_at": completed_at,
+                "log_path": log_path.relative_to(evidence_path.parent).as_posix(),
+                "sha256": _sha256(log_path),
+            }
+            if name == "layout_preservation_corpus":
+                item["coverage"] = list(CERTIFICATION_LAYOUT_COVERAGE)
+            elif name == "deterministic_branch_acceptance_corpus":
+                item["case_ids"] = list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
+                item["assurance"] = "recorded-drafting-structural-only"
+            elif name == "repository_regression_suite":
+                matches = re.findall(r"(\d+) passed", completed.stdout)
+                item["test_count"] = int(matches[-1]) if matches else 0
+            checks[name] = item
+            if completed.returncode != 0:
+                overall_status = "failed"
+                break
+        final_archive = snapshot_parent / "candidate-after.zip"
+        final_package = json.loads(subprocess.run(
+            [sys.executable, "scripts/workflow.py", "--package-release", str(final_archive)],
+            cwd=snapshot_root, env=check_environment, text=True,
+            capture_output=True, check=True,
+        ).stdout)
+        reconstructed.append({
+            "phase": "after",
+            "package_fingerprint": final_package["package_fingerprint"],
+            "git_commit": final_package["git_commit"],
+            "archive_sha256": _sha256(final_archive),
+        })
+        snapshot_dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=snapshot_root, text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        if (
+            snapshot_dirty
+            or final_package["package_fingerprint"] != release_identity["package_fingerprint"]
+            or final_package["git_commit"] != head
+        ):
+            raise ValueError("Detached preflight snapshot changed while checks executed.")
+        result = {
+            "schema_version": "release-certification-preflight/v1",
+            "status": overall_status,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "candidate": {**release_identity, "release_root": str(release_root.resolve())},
+            "snapshot": {
+                "git_commit": head,
+                "git_tree": subprocess.run(
+                    ["git", "rev-parse", "HEAD^{tree}"], cwd=snapshot_root,
+                    text=True, capture_output=True, check=True,
+                ).stdout.strip(),
+                "detached": subprocess.run(
+                    ["git", "symbolic-ref", "-q", "HEAD"], cwd=snapshot_root,
+                    text=True, capture_output=True, check=False,
+                ).returncode != 0,
+                "package_reconstructions": reconstructed,
+            },
+            "python_runtime": {
+                "version": sys.version,
+                "implementation": sys.implementation.name,
+                "executable_sha256": _sha256(Path(sys.executable).resolve()),
+            },
+            "repository_clean": True,
+            "producer": {
+                "path": "tests/hermes_e2e.py",
+                "sha256": _sha256(snapshot_root / "tests/hermes_e2e.py"),
+                "git_commit": head,
+            },
+            "checks": checks,
         }
-        if name == "layout_preservation_corpus":
-            item["coverage"] = list(CERTIFICATION_LAYOUT_COVERAGE)
-        elif name == "deterministic_branch_acceptance_corpus":
-            item["case_ids"] = list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
-            item["assurance"] = "recorded-drafting-structural-only"
-        elif name == "repository_regression_suite":
-            matches = re.findall(r"(\d+) passed", completed.stdout)
-            item["test_count"] = int(matches[-1]) if matches else 0
-        checks[name] = item
-        if completed.returncode != 0:
-            overall_status = "failed"
-            break
-    result = {
-        "schema_version": "release-certification-preflight/v1",
-        "status": overall_status,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-        "candidate": {**release_identity, "release_root": str(release_root.resolve())},
-        "python_runtime": {
-            "version": sys.version,
-            "implementation": sys.implementation.name,
-            "executable_sha256": _sha256(Path(sys.executable).resolve()),
-        },
-        "repository_clean": True,
-        "producer": {
-            "path": "tests/hermes_e2e.py",
-            "sha256": _sha256(Path(__file__)),
-            "git_commit": head,
-        },
-        "checks": checks,
-    }
-    signing_key = os.environ.get("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY")
-    if signing_key:
         result = candidate_workflow._sign_release_certification(
             result, Path(signing_key),
         )
-    evidence_path.parent.mkdir(parents=True, exist_ok=True)
-    evidence_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return result
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return result
+    finally:
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(snapshot_root)],
+            cwd=repository_root, capture_output=True, text=True, check=False,
+        )
+        shutil.rmtree(snapshot_parent, ignore_errors=True)
 
 
 def _contained_run_path(run_dir: Path, relative: Any) -> Path | None:

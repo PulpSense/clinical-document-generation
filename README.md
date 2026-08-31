@@ -78,6 +78,18 @@ through the Desktop opener. The standalone `--stage generate` loop is for
 development and controlled diagnostics; it is not sufficient evidence of
 Desktop delivery.
 
+Production Desktop operation also requires an absolute external parent-reviewer
+command. When delegated Visual QA fails, the adapter passes that command one
+JSON request path; the Desktop parent must inspect every referenced page and
+write the bound verification responses. Worker redispatch is never relabelled
+as parent review:
+
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --run-dir <run-dir> \
+  --desktop-opener-command /absolute/path/to/desktop-opener \
+  --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
+```
+
 The same shipped adapter owns controlled real-Hermes certification execution.
 `tests/hermes_e2e.py` prepares and audits the governed corpus but cannot replace
 the candidate's launcher, sandbox, response authentication, generation loop, or
@@ -117,6 +129,7 @@ six-case Branch Acceptance Corpus, and the repository regression suite passed
 before any real model call:
 
 ```bash
+export CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY=/absolute/path/to/production-signing-key.json
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --run-preflight \
   --preflight-evidence /absolute/path/release-certification-preflight.json \

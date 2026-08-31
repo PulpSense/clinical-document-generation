@@ -12,6 +12,7 @@ import json
 import math
 import os
 import platform
+import pwd
 import re
 import shlex
 import shutil
@@ -3803,6 +3804,29 @@ def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
     return environment
 
 
+def _production_sandbox_executable() -> Path:
+    sandbox = Path("/usr/bin/sandbox-exec")
+    if sandbox.is_symlink() or not sandbox.is_file() or not os.access(sandbox, os.X_OK):
+        raise RuntimeError("The governed OS sandbox executable is unavailable.")
+    return sandbox
+
+
+def _managed_hermes_pair() -> tuple[Path, Path]:
+    account_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+    launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
+    interpreter = launcher.parent / "python"
+    if (
+        launcher.is_symlink()
+        or not launcher.is_file()
+        or not os.access(launcher, os.X_OK)
+        or not interpreter.is_symlink()
+        or not interpreter.is_file()
+        or not os.access(interpreter, os.X_OK)
+    ):
+        raise RuntimeError("The governed Hermes virtual-environment launcher is unavailable.")
+    return launcher, interpreter
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -3811,40 +3835,20 @@ def _production_dispatch_handoffs(
     *,
     skill_root: Path,
     run_dir: Path,
+    runtime_identity: Mapping[str, Any],
 ) -> None:
     """Run one concurrent Hermes wave under a read-only candidate boundary."""
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float]] = []
     deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
     logs = run_dir / "logs/hermes-agents"
     logs.mkdir(parents=True, exist_ok=True)
-    sandbox = shutil.which("sandbox-exec")
-    if sandbox is None:
-        raise RuntimeError("No supported OS sandbox enforcement mechanism is available.")
+    sandbox = _production_sandbox_executable()
     environment = _production_subprocess_environment(skill_root)
     hermes_home = Path(environment["HERMES_HOME"])
-    launcher_candidates = []
-    discovered_launcher = shutil.which("hermes")
-    if discovered_launcher:
-        launcher_candidates.append(Path(discovered_launcher).absolute())
-    launcher_candidates.append(
-        Path.home() / ".hermes/hermes-agent/venv/bin/hermes"
-    )
-    managed_pair = next((
-        (candidate, candidate.parent / "python")
-        for candidate in dict.fromkeys(launcher_candidates)
-        if (
-            not candidate.is_symlink()
-            and candidate.is_file()
-            and os.access(candidate, os.X_OK)
-            and (candidate.parent / "python").is_symlink()
-            and (candidate.parent / "python").is_file()
-            and os.access(candidate.parent / "python", os.X_OK)
-        )
-    ), None)
-    if managed_pair is None:
-        raise RuntimeError("The managed Hermes virtual-environment interpreter is unavailable.")
-    hermes_launcher, managed_python = managed_pair
+    hermes_launcher, managed_python = _managed_hermes_pair()
     hermes_install_root = hermes_launcher.parent.parent.parent
+    runtime_executable = Path(str(runtime_identity["executable"])).absolute()
+    runtime_root = runtime_executable.parent.parent
 
     for handoff in handoffs:
         started = time.monotonic()
@@ -3855,13 +3859,19 @@ def _production_dispatch_handoffs(
             "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
         )
         profile.write("(version 1)\n(allow default)\n")
-        user_home = hermes_install_root.parent.parent
-        for development_root in (
-            user_home / "Documents", user_home / "Desktop", user_home / "Downloads",
-        ):
-            profile.write(
-                f"(deny file-read* (subpath {json.dumps(str(development_root.resolve()))}))\n"
+        readable_roots = (
+            Path("/System"), Path("/usr"), Path("/bin"), Path("/sbin"),
+            Path("/Library"), Path("/Applications/LibreOffice.app"),
+            Path("/private/etc"), Path("/etc"), Path("/dev"), Path("/private/var/db"),
+            hermes_install_root, hermes_home, skill_root, run_dir, runtime_root,
+        )
+        profile.write(
+            "(deny file-read* (require-not (require-any "
+            + " ".join(
+                f"(subpath {json.dumps(str(path.resolve()))})" for path in readable_roots
             )
+            + ")))\n"
+        )
         profile.write(
             "(deny file-write* (require-not (require-any "
             f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
@@ -3887,7 +3897,7 @@ def _production_dispatch_handoffs(
         stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
         stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
         process = subprocess.Popen(
-            [sandbox, "-f", profile.name, *command],
+            [str(sandbox), "-f", profile.name, *command],
             cwd=skill_root,
             env=environment,
             stdout=stdout_handle,
@@ -4124,6 +4134,7 @@ def run_production_desktop_operation(
         raise ValueError("Production Desktop execution requires the exact governed Hermes configuration.")
     if opener is None:
         raise ValueError("Production Desktop execution requires the actual Desktop opener.")
+    runtime_identity = resolve_python_runtime(environment=os.environ)
 
     def revision_dir() -> Path:
         reference = _read(run_dir / REFERENCE)
@@ -4137,7 +4148,7 @@ def run_production_desktop_operation(
         if selected is None:
             _production_dispatch_handoffs(
                 handoffs, remaining_seconds, revision_dir(), configuration,
-                skill_root=root, run_dir=run_dir,
+                skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
             )
         else:
             selected(handoffs, remaining_seconds, revision_dir(), configuration)
@@ -4145,17 +4156,12 @@ def run_production_desktop_operation(
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
         active_revision = revision_dir()
         if parent_visual_reviewer is None:
-            parent_handoffs = [
-                {**item, "reviewer_owner": "parent"} for item in handoffs
-            ]
-            _production_dispatch_handoffs(
-                parent_handoffs, remaining_seconds, active_revision, configuration,
-                skill_root=root, run_dir=run_dir,
+            raise RuntimeError(
+                "Delegated Visual QA failed; a genuine Desktop-parent reviewer callback is required."
             )
-        else:
-            parent_visual_reviewer(
-                handoffs, remaining_seconds, active_revision, configuration,
-            )
+        parent_visual_reviewer(
+            handoffs, remaining_seconds, active_revision, configuration,
+        )
         marker = run_dir / "logs/desktop-parent-visual-review.json"
         _write(marker, {
             "status": "completed",
@@ -4172,7 +4178,7 @@ def run_production_desktop_operation(
         fallback_handoff_runner=fallback,
         opener=opener,
         operation_id=operation_id,
-        runtime_identity=resolve_python_runtime(environment=os.environ),
+        runtime_identity=runtime_identity,
         release_identity={**identity, "hermes_configuration": configuration},
         cleanup=lambda _status, _remaining: {
             "owned_processes_reaped": True,
@@ -4206,6 +4212,40 @@ def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
         ).stdout
 
     return open_attachment
+
+
+def command_parent_visual_reviewer(
+    command_path: Path,
+) -> Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None]:
+    """Build the external Desktop-parent callback used by the public CLI."""
+    expanded = command_path.expanduser()
+    if not expanded.is_absolute():
+        raise ValueError("The Desktop-parent reviewer command must be an absolute executable file.")
+    command = expanded.absolute()
+    if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
+        raise ValueError("The Desktop-parent reviewer command must be an absolute executable file.")
+
+    def review(
+        handoffs: Sequence[Mapping[str, Any]],
+        remaining_seconds: float,
+        revision_dir: Path,
+        configuration: Mapping[str, Any],
+    ) -> None:
+        request_path = revision_dir / "hermes/desktop-parent-visual-review-request.json"
+        _write(request_path, {
+            "schema_version": "desktop-parent-visual-review-request/v1",
+            "revision_id": revision_dir.name,
+            "handoffs": [dict(item) for item in handoffs],
+            "required_producer_model_id": str(configuration["model_identifier"]),
+        })
+        subprocess.run(
+            [str(command), str(request_path)],
+            check=True,
+            timeout=max(1.0, remaining_seconds),
+            env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+        )
+
+    return review
 
 
 def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
@@ -5630,6 +5670,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-md")
     parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter")
     parser.add_argument("--desktop-opener-command")
+    parser.add_argument("--parent-visual-review-command")
     parser.add_argument("--operation-id", default="default")
     parser.add_argument("--release-gate", action="store_true")
     parser.add_argument("--release-gate-root")
@@ -5664,10 +5705,14 @@ def main(argv: list[str] | None = None) -> int:
     elif args.desktop_operation:
         if not args.run_dir: parser.error("--run-dir is required with --desktop-operation")
         if not args.desktop_opener_command: parser.error("--desktop-opener-command is required with --desktop-operation")
+        if not args.parent_visual_review_command: parser.error("--parent-visual-review-command is required with --desktop-operation")
         result = run_production_desktop_operation(
             Path(args.run_dir),
             operation_id=args.operation_id,
             opener=command_desktop_opener(Path(args.desktop_opener_command)),
+            parent_visual_reviewer=command_parent_visual_reviewer(
+                Path(args.parent_visual_review_command)
+            ),
         )
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)
@@ -5678,7 +5723,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "command_desktop_opener", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "command_desktop_opener", "command_parent_visual_reviewer", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

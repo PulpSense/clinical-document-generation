@@ -330,6 +330,20 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
             "package_fingerprint": "candidate-fingerprint",
             "git_commit": "a" * 40,
         },
+        "snapshot": {
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "detached": True,
+            "package_reconstructions": [
+                {
+                    "phase": phase,
+                    "package_fingerprint": "candidate-fingerprint",
+                    "git_commit": "a" * 40,
+                    "archive_sha256": "c" * 64,
+                }
+                for phase in ("before", "after")
+            ],
+        },
         "python_runtime": {
             "version": sys.version,
             "implementation": sys.implementation.name,
