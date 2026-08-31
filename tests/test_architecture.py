@@ -51,8 +51,9 @@ def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
     assert "def run_production_desktop_operation(" in production
     assert 'str(managed_python), str(hermes_launcher), "chat", "-q"' in production
     assert '"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"' in production
-    assert 'user_home / "Documents", user_home / "Desktop", user_home / "Downloads"' in production
-    assert '"(deny file-read* (subpath ' in production
+    assert 'Path("/usr/bin/sandbox-exec")' in production
+    assert 'pwd.getpwuid(os.getuid()).pw_dir' in production
+    assert '"(deny file-read* (require-not (require-any "' in production
     assert '"--safe-mode"' in production
     assert "(deny file-write* (require-not (require-any " in production
     assert '(literal \\"/dev/null\\")' in production
