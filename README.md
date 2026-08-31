@@ -110,8 +110,10 @@ unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/hermes-home/skills"
   --provision-candidate
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --fixture ambispective-sterling \
+  --preflight-evidence /absolute/path/release-certification-preflight.json \
   --release-root "$candidate_dir/hermes-home/skills/clinical-document-generation" \
-  --desktop-opener-command /absolute/path/to/desktop-opener
+  --desktop-opener-command /absolute/path/to/desktop-opener \
+  --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
 ```
 
 The corpus controller loads `run_production_desktop_operation` from that
@@ -140,7 +142,8 @@ export CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY=/absolute/path/to/production-
   --preflight-evidence /absolute/path/release-certification-preflight.json \
   --run-root /absolute/path/to/isolated-certification-runs \
   --release-root /absolute/path/to/hermes-home/skills/clinical-document-generation \
-  --desktop-opener-command /absolute/path/to/desktop-opener
+  --desktop-opener-command /absolute/path/to/desktop-opener \
+  --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
 ```
 
 The opener command is an external Desktop-host prerequisite, not a release

@@ -339,6 +339,9 @@ def test_production_adapter_uses_unpromoted_runtime_only_for_verified_certificat
 
     assert integrity_calls == [(skill_root.resolve(), {"require_promoted_runtime": False})]
     assert result["options"]["require_promoted_runtime"] is False
+    managed_identity = result["options"]["release_identity"]["managed_hermes_identity"]
+    assert len(managed_identity["launcher_sha256"]) == 64
+    assert len(managed_identity["interpreter_target_sha256"]) == 64
 
     monkeypatch.setattr(
         workflow,
@@ -432,6 +435,13 @@ def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypat
     assert selected_launcher == launcher
     assert selected_python == launcher.parent / "python"
     assert workflow._production_sandbox_executable() == Path("/usr/bin/sandbox-exec")
+    identity = workflow._managed_hermes_identity()
+    assert identity["launcher"] == str(launcher)
+    assert len(identity["launcher_sha256"]) == 64
+    assert identity["interpreter"] == str(launcher.parent / "python")
+    assert len(identity["interpreter_target_sha256"]) == 64
+    launcher.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    assert workflow._managed_hermes_identity() != identity
 
 
 def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):

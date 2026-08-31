@@ -2656,6 +2656,7 @@ def run_release_certification_corpus(
     run_root: Path,
     preflight_path: Path,
     desktop_opener: Callable[[str], bytes],
+    desktop_parent_reviewer: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None],
     operation_id: str = "release-corpus",
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
@@ -2707,21 +2708,11 @@ def run_release_certification_corpus(
             operation_id=f"{operation_id}-{fixture_id}",
             hermes_configuration=fixture["hermes_configuration"],
             desktop_opener=desktop_opener,
-            parent_visual_reviewer=lambda handoffs, remaining, validator, current=run_dir: wait_for_parent_visual_review(
-                current,
+            parent_visual_reviewer=lambda handoffs, remaining, _validator, current=run_dir, configuration=fixture["hermes_configuration"]: desktop_parent_reviewer(
                 handoffs,
                 remaining,
-                response_is_complete=validator,
-                model_identifier=str(fixture["hermes_configuration"]["model_identifier"]),
-                progress=lambda stage, available: _append_json_line(
-                    current / "logs/hermes-integration-events.jsonl",
-                    {
-                        "at": datetime.now(timezone.utc).isoformat(),
-                        "status": "running",
-                        "stage": stage,
-                        "remaining_seconds": round(available, 3),
-                    },
-                ),
+                current / "revisions" / str(((_read_json(current / "reference/study.reference.json") or {}).get("approval") or {}).get("revision_id") or ""),
+                configuration,
             ),
         )
         report_path = run_dir / "logs/hermes-integration-report.json"
@@ -2760,6 +2751,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--run-preflight", action="store_true", help="execute and record the governed checks required before --corpus")
     parser.add_argument("--preflight-evidence", type=Path, help="bound passing deterministic/static/regression evidence required before --corpus")
     parser.add_argument("--desktop-opener-command", type=Path, help="absolute external Desktop opener command; receives one attachment path and emits exact retrieved bytes")
+    parser.add_argument("--parent-visual-review-command", type=Path, help="absolute external Desktop-parent visual-review command")
     args = parser.parse_args(argv)
     run_dir = args.run_root / datetime.now(timezone.utc).strftime(
         f"{args.fixture}-%Y%m%dT%H%M%SZ"
@@ -2778,8 +2770,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.error("--desktop-opener-command is required for live certification")
     if args.preflight_evidence is None:
         parser.error("--preflight-evidence is required for live certification")
+    if args.parent_visual_review_command is None:
+        parser.error("--parent-visual-review-command is required for live certification")
     candidate_workflow, _candidate_identity = _certified_release(release_root)
     desktop_opener = candidate_workflow.command_desktop_opener(args.desktop_opener_command)
+    desktop_parent_reviewer = candidate_workflow.command_parent_visual_reviewer(
+        args.parent_visual_review_command
+    )
     if args.corpus:
         if args.preflight_evidence is None:
             parser.error("--preflight-evidence is required with --corpus")
@@ -2788,6 +2785,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             run_root=args.run_root,
             preflight_path=args.preflight_evidence,
             desktop_opener=desktop_opener,
+            desktop_parent_reviewer=desktop_parent_reviewer,
             operation_id=args.operation_id,
         )
         print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -2805,21 +2803,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         operation_id=args.operation_id,
         hermes_configuration=fixture["hermes_configuration"],
         desktop_opener=desktop_opener,
-        parent_visual_reviewer=lambda handoffs, remaining, validator: wait_for_parent_visual_review(
-            run_dir,
+        parent_visual_reviewer=lambda handoffs, remaining, _validator: desktop_parent_reviewer(
             handoffs,
             remaining,
-            response_is_complete=validator,
-            model_identifier=str(fixture["hermes_configuration"]["model_identifier"]),
-            progress=lambda stage, available: _append_json_line(
-                run_dir / "logs/hermes-integration-events.jsonl",
-                {
-                    "at": datetime.now(timezone.utc).isoformat(),
-                    "status": "running",
-                    "stage": stage,
-                    "remaining_seconds": round(available, 3),
-                },
-            ),
+            run_dir / "revisions" / str(((_read_json(run_dir / "reference/study.reference.json") or {}).get("approval") or {}).get("revision_id") or ""),
+            fixture["hermes_configuration"],
         ),
     )
     print(json.dumps(report, indent=2, ensure_ascii=False))

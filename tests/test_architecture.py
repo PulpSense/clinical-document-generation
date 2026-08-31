@@ -54,6 +54,8 @@ def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
     assert 'Path("/usr/bin/sandbox-exec")' in production
     assert 'pwd.getpwuid(os.getuid()).pw_dir' in production
     assert "_production_read_denials(readable_roots)" in production
+    assert '"managed_hermes_identity": managed_hermes_identity' in production
+    assert "expected_managed_hermes_identity=managed_hermes_identity" in production
     assert "Path(tempfile.gettempdir())" in production
     assert 'f"(deny file-read* ({filter_name} ' in production
     assert '"--safe-mode"' in production

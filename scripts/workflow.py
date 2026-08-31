@@ -3827,6 +3827,17 @@ def _managed_hermes_pair() -> tuple[Path, Path]:
     return launcher, interpreter
 
 
+def _managed_hermes_identity() -> dict[str, str]:
+    launcher, interpreter = _managed_hermes_pair()
+    return {
+        "launcher": str(launcher),
+        "launcher_sha256": sha256_file(launcher),
+        "interpreter": str(interpreter),
+        "interpreter_target": str(interpreter.resolve(strict=True)),
+        "interpreter_target_sha256": sha256_file(interpreter.resolve(strict=True)),
+    }
+
+
 def _production_read_denials(
     readable_roots: Sequence[Path],
     *,
@@ -3876,6 +3887,7 @@ def _production_dispatch_handoffs(
     skill_root: Path,
     run_dir: Path,
     runtime_identity: Mapping[str, Any],
+    expected_managed_hermes_identity: Mapping[str, str] | None = None,
 ) -> None:
     """Run one concurrent Hermes wave under a read-only candidate boundary."""
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float]] = []
@@ -3886,6 +3898,10 @@ def _production_dispatch_handoffs(
     environment = _production_subprocess_environment(skill_root)
     hermes_home = Path(environment["HERMES_HOME"])
     hermes_launcher, managed_python = _managed_hermes_pair()
+    if expected_managed_hermes_identity is not None and (
+        _managed_hermes_identity() != dict(expected_managed_hermes_identity)
+    ):
+        raise RuntimeError("The managed Hermes launcher or interpreter changed after operation binding.")
     hermes_install_root = hermes_launcher.parent.parent.parent
     runtime_executable = Path(str(runtime_identity["executable"])).absolute()
     runtime_root = runtime_executable.parent.parent
@@ -4173,6 +4189,8 @@ def run_production_desktop_operation(
     if opener is None:
         raise ValueError("Production Desktop execution requires the actual Desktop opener.")
     runtime_identity = resolve_python_runtime(environment=os.environ)
+    managed_hermes_identity = _managed_hermes_identity()
+    identity = {**identity, "managed_hermes_identity": managed_hermes_identity}
 
     def revision_dir() -> Path:
         reference = _read(run_dir / REFERENCE)
@@ -4187,6 +4205,7 @@ def run_production_desktop_operation(
             _production_dispatch_handoffs(
                 handoffs, remaining_seconds, revision_dir(), configuration,
                 skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
+                expected_managed_hermes_identity=managed_hermes_identity,
             )
         else:
             selected(handoffs, remaining_seconds, revision_dir(), configuration)

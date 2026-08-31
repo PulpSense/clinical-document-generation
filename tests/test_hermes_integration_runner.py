@@ -897,6 +897,7 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
         run_root=tmp_path / "runs",
         preflight_path=tmp_path / "preflight.json",
         desktop_opener=lambda path: Path(path).read_bytes(),
+        desktop_parent_reviewer=lambda *_args: None,
     )
 
     assert launched == ["prepare:retrospective", "run:retrospective"]
