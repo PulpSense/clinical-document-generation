@@ -1117,7 +1117,7 @@ def _state_bound_release_identity(
     return dict(operation_identity)
 
 
-def run_release_certification_operation(
+def _run_controlled_release_certification_operation(
     run_dir: Path,
     *,
     release_root: Path,
@@ -1423,6 +1423,30 @@ def run_release_certification_operation(
     report_path = run_dir / "logs/hermes-integration-report.json"
     report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return report
+
+
+def run_release_certification_operation(
+    run_dir: Path,
+    *,
+    release_root: Path,
+    preflight_evidence: Path | None = None,
+    operation_id: str = "default",
+    desktop_opener: Callable[[str], bytes] | None = None,
+    parent_visual_reviewer: Callable[[
+        list[Mapping[str, Any]], float, Callable[[Path, Path], bool] | None,
+    ], None] | None = None,
+    hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
+) -> dict[str, Any]:
+    """Run only the immutable candidate's shipped production Desktop adapter."""
+    return _run_controlled_release_certification_operation(
+        run_dir,
+        release_root=release_root,
+        preflight_evidence=preflight_evidence,
+        operation_id=operation_id,
+        desktop_opener=desktop_opener,
+        parent_visual_reviewer=parent_visual_reviewer,
+        hermes_configuration=hermes_configuration,
+    )
 
 
 def _preflight_evidence(

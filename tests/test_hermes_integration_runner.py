@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import shlex
 from datetime import datetime, timedelta
@@ -32,7 +33,6 @@ from hermes_e2e import (
     input_provenance,
     inspect_run,
     prepare_certification_run,
-    run_release_certification_operation,
     run_release_certification_corpus,
     subprocess_environment,
     sandbox_command,
@@ -831,6 +831,15 @@ def test_case_report_adopts_state_bound_managed_hermes_identity() -> None:
     assert observed == {**candidate, "managed_hermes_identity": managed}
 
 
+def test_public_release_certification_operation_rejects_dispatch_injection() -> None:
+    parameters = inspect.signature(
+        hermes_e2e.run_release_certification_operation
+    ).parameters
+    assert "desktop_operation" not in parameters
+    assert "release_identity" not in parameters
+    assert "state_path_resolver" not in parameters
+
+
 def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
@@ -1317,7 +1326,7 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
         "manifest": manifest_path.relative_to(run_dir).as_posix(),
     })
 
-    report = run_release_certification_operation(
+    report = hermes_e2e._run_controlled_release_certification_operation(
         run_dir,
         release_root=Path(__file__).resolve().parents[1],
         desktop_operation=workflow.run_desktop_operation,
@@ -1376,7 +1385,7 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
         }), encoding="utf-8")
         return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
 
-    run_release_certification_operation(
+    hermes_e2e._run_controlled_release_certification_operation(
         tmp_path,
         release_root=tmp_path,
         desktop_operation=controlled_operation,
@@ -1405,7 +1414,7 @@ def test_release_report_handles_a_resolved_state_path_behind_a_symlink(tmp_path:
         }), encoding="utf-8")
         return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
 
-    report = run_release_certification_operation(
+    report = hermes_e2e._run_controlled_release_certification_operation(
         alias,
         release_root=tmp_path,
         desktop_operation=controlled_operation,
