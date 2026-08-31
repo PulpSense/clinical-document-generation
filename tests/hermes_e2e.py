@@ -1130,7 +1130,6 @@ def _run_controlled_release_certification_operation(
     verification_response_validator: Callable[[Path, Path], bool] | None = None,
     hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
     state_path_resolver: Callable[[Path, str], Path] | None = None,
-    _production_execution: bool = False,
 ) -> dict[str, Any]:
     run_dir = run_dir.resolve()
     release_root = release_root.resolve()
@@ -1229,6 +1228,7 @@ def _run_controlled_release_certification_operation(
                 "late_responses_ignored": True,
             },
         )
+    production_execution = certified_workflow is not None
     timed_out = final_result.get("status") == "timeout"
     operation_elapsed = float(final_result.get("elapsed_seconds") or (time.monotonic() - progress_started))
     report = inspect_run(
@@ -1250,7 +1250,7 @@ def _run_controlled_release_certification_operation(
     release_identity = _state_bound_release_identity(release_identity, state)
     report["certification_scope"] = (
         "production_single_case_tracer"
-        if _production_execution
+        if production_execution
         else "controlled_single_case_tracer"
     )
     report["release_certification_status"] = "not_full_corpus"
@@ -1452,7 +1452,6 @@ def run_release_certification_operation(
         desktop_opener=desktop_opener,
         parent_visual_reviewer=parent_visual_reviewer,
         hermes_configuration=hermes_configuration,
-        _production_execution=True,
     )
 
 

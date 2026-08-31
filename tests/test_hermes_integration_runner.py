@@ -892,6 +892,9 @@ def test_public_release_certification_operation_rejects_dispatch_injection() -> 
     assert "desktop_operation" not in parameters
     assert "release_identity" not in parameters
     assert "state_path_resolver" not in parameters
+    assert "_production_execution" not in inspect.signature(
+        hermes_e2e._run_controlled_release_certification_operation
+    ).parameters
 
 
 def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Path, monkeypatch) -> None:
