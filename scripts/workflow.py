@@ -3938,6 +3938,33 @@ def _start_production_connect_proxy(
     return _ProductionConnectProxy(server=server, thread=thread)
 
 
+def _release_production_worker_resources(
+    stdout_handle: Any | None,
+    stderr_handle: Any | None,
+    profile: Path | None,
+    proxy: _ProductionConnectProxy | None,
+) -> list[BaseException]:
+    errors: list[BaseException] = []
+    for resource in (stdout_handle, stderr_handle):
+        if resource is None:
+            continue
+        try:
+            resource.close()
+        except BaseException as exc:
+            errors.append(exc)
+    if profile is not None:
+        try:
+            profile.unlink(missing_ok=True)
+        except BaseException as exc:
+            errors.append(exc)
+    if proxy is not None:
+        try:
+            proxy.close()
+        except BaseException as exc:
+            errors.append(exc)
+    return errors
+
+
 def _reap_production_worker(
     process: subprocess.Popen[str],
     stdout_handle: Any,
@@ -3945,21 +3972,24 @@ def _reap_production_worker(
     profile: Path,
     proxy: _ProductionConnectProxy,
 ) -> None:
-    if process.poll() is None:
-        try:
-            os.killpg(process.pid, signal.SIGTERM)
-            process.wait(timeout=5)
-        except (ProcessLookupError, subprocess.TimeoutExpired):
-            if process.poll() is None:
-                try:
-                    os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                process.wait()
-    stdout_handle.close()
-    stderr_handle.close()
-    profile.unlink(missing_ok=True)
-    proxy.close()
+    try:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                process.wait(timeout=5)
+            except (ProcessLookupError, subprocess.TimeoutExpired):
+                if process.poll() is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait()
+    finally:
+        errors = _release_production_worker_resources(
+            stdout_handle, stderr_handle, profile, proxy,
+        )
+    if errors:
+        raise RuntimeError("Production worker resources could not be fully released.") from errors[0]
 
 
 def _production_dispatch_handoffs(
@@ -4067,16 +4097,18 @@ def _production_dispatch_handoffs(
                 start_new_session=True,
             )
         except BaseException:
-            if stdout_handle is not None:
-                stdout_handle.close()
-            if stderr_handle is not None:
-                stderr_handle.close()
             if profile is not None:
                 if not profile.closed:
-                    profile.close()
-                Path(profile.name).unlink(missing_ok=True)
-            if proxy is not None:
-                proxy.close()
+                    try:
+                        profile.close()
+                    except BaseException:
+                        pass
+            _release_production_worker_resources(
+                stdout_handle,
+                stderr_handle,
+                Path(profile.name) if profile is not None else None,
+                proxy,
+            )
             for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
                 _reap_production_worker(
                     prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,

@@ -650,6 +650,7 @@ def test_production_profile_write_failure_closes_proxy_and_removes_profile(tmp_p
 
         def close(self):
             self.closed = True
+            raise RuntimeError("profile close failed")
 
     class FakeProxy:
         port = 43103
