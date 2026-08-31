@@ -447,9 +447,11 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
 
     def stop(command, **_kwargs):
         captured["command"] = command
+        captured["profile_path"] = Path(command[2])
         captured["profile"] = Path(command[2]).read_text(encoding="utf-8")
         raise RuntimeError("probe complete")
 
+    real_popen = subprocess.Popen
     monkeypatch.setattr(workflow.subprocess, "Popen", stop)
     with pytest.raises(RuntimeError, match="probe complete"):
         workflow._production_dispatch_handoffs(
@@ -460,10 +462,63 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
         )
 
     assert captured["command"][0] == "/usr/bin/sandbox-exec"
-    assert "deny file-read* (require-not" in captured["profile"]
-    assert str(skill_root.resolve()) in captured["profile"]
-    assert str(run_dir.resolve()) in captured["profile"]
-    assert str(tmp_path / "unrelated-checkout") not in captured["profile"]
+    assert "deny file-read*" in captured["profile"]
+    read_rules = "\n".join(
+        line for line in captured["profile"].splitlines() if "deny file-read*" in line
+    )
+    assert str(skill_root.resolve()) not in read_rules
+    assert str(run_dir.resolve()) not in read_rules
+    monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
+    completed = subprocess.run(
+        ["/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/true"],
+        capture_output=True, check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    captured["profile_path"].unlink(missing_ok=True)
+
+
+def test_production_read_denials_carve_out_only_governed_roots(tmp_path):
+    boundary = tmp_path / "private-tmp"
+    skill_root = boundary / "candidate/hermes-home/skills/clinical-document-generation"
+    run_dir = boundary / "candidate/run"
+    runtime_root = boundary / "validator"
+    unrelated = boundary / "unrelated-checkout"
+    for path in (skill_root, run_dir, runtime_root, unrelated):
+        path.mkdir(parents=True)
+
+    denied = workflow._production_read_denials(
+        (skill_root, run_dir, runtime_root), boundary_roots=(boundary,),
+    )
+
+    assert unrelated in denied
+    assert skill_root not in denied
+    assert run_dir not in denied
+    assert runtime_root not in denied
+    assert not any(path == skill_root or path in skill_root.parents for path in denied)
+
+    allowed_file = skill_root / "allowed.txt"
+    denied_file = unrelated / "denied.txt"
+    allowed_file.write_text("allowed", encoding="utf-8")
+    denied_file.write_text("denied", encoding="utf-8")
+    profile = tmp_path / "read-policy.sb"
+    profile.write_text(
+        "(version 1)\n(allow default)\n"
+        + "".join(
+            f'(deny file-read* (subpath {json.dumps(str(path))}))\n'
+            for path in denied
+        ),
+        encoding="utf-8",
+    )
+    allowed_read = subprocess.run(
+        ["/usr/bin/sandbox-exec", "-f", str(profile), "/bin/cat", str(allowed_file)],
+        capture_output=True, check=False,
+    )
+    denied_read = subprocess.run(
+        ["/usr/bin/sandbox-exec", "-f", str(profile), "/bin/cat", str(denied_file)],
+        capture_output=True, check=False,
+    )
+    assert allowed_read.returncode == 0
+    assert denied_read.returncode != 0
 
 
 def test_production_parent_fallback_never_redispatches_or_claims_parent_provenance(

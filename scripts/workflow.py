@@ -3827,6 +3827,41 @@ def _managed_hermes_pair() -> tuple[Path, Path]:
     return launcher, interpreter
 
 
+def _production_read_denials(
+    readable_roots: Sequence[Path],
+    *,
+    boundary_roots: Sequence[Path] | None = None,
+) -> list[Path]:
+    """Carve governed readable roots out of user, temporary, and volume trees."""
+    allowed = tuple(dict.fromkeys(path.absolute() for path in readable_roots))
+    boundaries = boundary_roots or (
+        Path("/Users"), Path("/private/tmp"), Path("/Volumes"),
+    )
+    denied: list[Path] = []
+
+    def carve(root: Path) -> None:
+        try:
+            children = sorted(root.iterdir(), key=lambda path: path.name)
+        except OSError:
+            return
+        for child in children:
+            lexical = child.absolute()
+            if child.is_symlink():
+                denied.append(lexical)
+                continue
+            if any(lexical == item or lexical in item.parents for item in allowed):
+                if lexical not in allowed:
+                    carve(lexical)
+                continue
+            if any(item == lexical or item in lexical.parents for item in allowed):
+                continue
+            denied.append(lexical)
+
+    for boundary in boundaries:
+        carve(boundary.absolute())
+    return list(dict.fromkeys(denied))
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -3865,13 +3900,11 @@ def _production_dispatch_handoffs(
             Path("/private/etc"), Path("/etc"), Path("/dev"), Path("/private/var/db"),
             hermes_install_root, hermes_home, skill_root, run_dir, runtime_root,
         )
-        profile.write(
-            "(deny file-read* (require-not (require-any "
-            + " ".join(
-                f"(subpath {json.dumps(str(path.resolve()))})" for path in readable_roots
+        for denied_path in _production_read_denials(readable_roots):
+            filter_name = "literal" if denied_path.is_file() or denied_path.is_symlink() else "subpath"
+            profile.write(
+                f"(deny file-read* ({filter_name} {json.dumps(str(denied_path))}))\n"
             )
-            + ")))\n"
-        )
         profile.write(
             "(deny file-write* (require-not (require-any "
             f"(subpath {json.dumps(str(hermes_home.resolve()))}) "

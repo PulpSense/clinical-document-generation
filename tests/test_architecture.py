@@ -53,7 +53,8 @@ def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
     assert '"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"' in production
     assert 'Path("/usr/bin/sandbox-exec")' in production
     assert 'pwd.getpwuid(os.getuid()).pw_dir' in production
-    assert '"(deny file-read* (require-not (require-any "' in production
+    assert "_production_read_denials(readable_roots)" in production
+    assert 'f"(deny file-read* ({filter_name} ' in production
     assert '"--safe-mode"' in production
     assert "(deny file-write* (require-not (require-any " in production
     assert '(literal \\"/dev/null\\")' in production
