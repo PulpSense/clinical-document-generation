@@ -3519,6 +3519,44 @@ def verification_response_is_complete(revision_dir: Path, request_path: Path) ->
     return not findings
 
 
+def verification_response_is_terminal(revision_dir: Path, request_path: Path) -> bool:
+    """Return whether a verifier produced a bound response the workflow can consume."""
+    try:
+        request = _json(request_path)
+        if not isinstance(request, Mapping):
+            return False
+        response = _json(revision_dir / str(request.get("response_path") or ""))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    if not isinstance(response, Mapping):
+        return False
+    if not verification_request_hash_valid(request):
+        return False
+    if any(
+        response.get(key) != expected
+        for key, expected in (
+            ("schema_version", RESPONSE_SCHEMA),
+            ("request_id", request.get("request_id")),
+            ("request_sha256", request.get("request_sha256")),
+            ("task", request.get("task")),
+        )
+    ):
+        return False
+    producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
+    if not _text(producer.get("model_id")):
+        return False
+    status = str(response.get("status") or "").casefold()
+    if status == "passed":
+        return verification_response_is_complete(revision_dir, request_path)
+    findings = response.get("findings") if isinstance(response.get("findings"), list) else []
+    if status == "blocked":
+        return bool(findings) and all(
+            isinstance(item, Mapping) and bool(_text(item.get("issue")))
+            for item in findings
+        )
+    return False
+
+
 def validate_verifications(
     revision_dir: Path,
     *,
@@ -3644,4 +3682,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "validate_verifications", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

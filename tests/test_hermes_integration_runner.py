@@ -1724,6 +1724,53 @@ def test_bound_but_incomplete_visual_pass_is_not_terminal(tmp_path: Path) -> Non
     ) is False
 
 
+def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Path) -> None:
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/verification-requests/content.json"
+    response_path = revision_dir / "hermes/verification-responses/content.json"
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "content",
+        "task": "clinical_content_verification",
+        "revision_id": "r-test",
+        "artifacts": [],
+        "sections": [],
+        "cross_document_checks": [],
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+    }
+    request["request_sha256"] = quality.verification_request_sha256(request)
+    response = {
+        "schema_version": "hermes-verification-response/v1",
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "gpt-5.6-sol"},
+        "status": "blocked",
+        "findings": [{
+            "target_ids": ["objectives"],
+            "issue": "Client-facing content exposes internal source-review language.",
+        }],
+        "section_assessments": [],
+        "cross_document_assessments": [],
+    }
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+    handoff = {
+        "request_path": request_path.relative_to(revision_dir).as_posix(),
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+        "task": request["task"],
+    }
+
+    assert workflow._production_response_is_bound(
+        revision_dir,
+        handoff,
+        model_identifier="gpt-5.6-sol",
+    ) is True
+    assert quality.verification_response_is_complete(revision_dir, request_path) is False
+
+
 def test_bound_drafting_response_is_terminal_without_visual_validation(tmp_path: Path) -> None:
     revision_dir = tmp_path / "revision"
     request_path = revision_dir / "hermes/requests/draft.json"
