@@ -569,12 +569,46 @@ def test_production_connect_proxy_attempts_every_close_after_shutdown_failure():
         def join(self, timeout=None):
             calls.append(("join", timeout))
 
+        def is_alive(self):
+            return True
+
     proxy = workflow._ProductionConnectProxy(FakeServer(), FakeThread())
 
     with pytest.raises(RuntimeError, match="could not be fully closed"):
         proxy.close()
 
     assert calls == ["shutdown", "server_close", ("join", 5.0)]
+
+
+def test_production_connect_proxy_closes_listener_when_thread_construction_fails(monkeypatch):
+    calls = []
+
+    class FakeServer:
+        def __init__(self, host, port):
+            calls.append(("server", host, port))
+
+        def serve_forever(self):
+            raise AssertionError("must not run")
+
+        def server_close(self):
+            calls.append("server_close")
+
+    class FakeThread:
+        def __init__(self, **_kwargs):
+            calls.append("thread_constructor")
+            raise RuntimeError("thread construction failed")
+
+    monkeypatch.setattr(workflow, "_ProductionConnectProxyServer", FakeServer)
+    monkeypatch.setattr(workflow.threading, "Thread", FakeThread)
+
+    with pytest.raises(RuntimeError, match="thread construction failed"):
+        workflow._start_production_connect_proxy()
+
+    assert calls == [
+        ("server", workflow.PRODUCTION_HERMES_NETWORK_HOST, workflow.PRODUCTION_HERMES_NETWORK_PORT),
+        "thread_constructor",
+        "server_close",
+    ]
 
 
 def test_production_connect_proxy_closes_listener_when_thread_start_fails(monkeypatch):
@@ -667,8 +701,14 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
         raise RuntimeError("third launch failed")
 
     killed = []
+
+    def killpg(pid, sig):
+        killed.append((pid, sig))
+        if pid == processes[0].pid and sig == signal.SIGTERM:
+            raise PermissionError("term denied")
+
     monkeypatch.setattr(workflow.subprocess, "Popen", popen)
-    monkeypatch.setattr(workflow.os, "killpg", lambda pid, sig: killed.append((pid, sig)))
+    monkeypatch.setattr(workflow.os, "killpg", killpg)
 
     with pytest.raises(RuntimeError, match="third launch failed"):
         workflow._production_dispatch_handoffs(

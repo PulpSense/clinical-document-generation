@@ -3933,6 +3933,11 @@ class _ProductionConnectProxy:
                 action()
             except BaseException as exc:
                 errors.append(exc)
+        try:
+            if self.thread.is_alive():
+                errors.append(RuntimeError("The governed network proxy thread is still running."))
+        except BaseException as exc:
+            errors.append(exc)
         if errors:
             raise RuntimeError("The governed network proxy could not be fully closed.") from errors[0]
 
@@ -3942,8 +3947,8 @@ def _start_production_connect_proxy(
     port: int = PRODUCTION_HERMES_NETWORK_PORT,
 ) -> _ProductionConnectProxy:
     server = _ProductionConnectProxyServer(host, port)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
     try:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
     except BaseException:
         try:
@@ -3988,24 +3993,38 @@ def _reap_production_worker(
     profile: Path,
     proxy: _ProductionConnectProxy,
 ) -> None:
+    process_errors: list[BaseException] = []
     try:
         if process.poll() is None:
             try:
                 os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            except BaseException as exc:
+                process_errors.append(exc)
+            try:
                 process.wait(timeout=5)
-            except (ProcessLookupError, subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
                 if process.poll() is None:
                     try:
                         os.killpg(process.pid, signal.SIGKILL)
                     except ProcessLookupError:
                         pass
-                    process.wait()
+                    except BaseException as exc:
+                        process_errors.append(exc)
+                    try:
+                        process.wait(timeout=5)
+                    except BaseException as exc:
+                        process_errors.append(exc)
+            except BaseException as exc:
+                process_errors.append(exc)
     finally:
         errors = _release_production_worker_resources(
             stdout_handle, stderr_handle, profile, proxy,
         )
+    errors = [*process_errors, *errors]
     if errors:
-        raise RuntimeError("Production worker resources could not be fully released.") from errors[0]
+        raise RuntimeError("Production worker process or resources could not be fully released.") from errors[0]
 
 
 def _production_dispatch_handoffs(
