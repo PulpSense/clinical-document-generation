@@ -3947,12 +3947,16 @@ def _start_production_connect_proxy(
     port: int = PRODUCTION_HERMES_NETWORK_PORT,
 ) -> _ProductionConnectProxy:
     server = _ProductionConnectProxyServer(host, port)
+    thread = None
     try:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
     except BaseException:
         try:
-            server.server_close()
+            if thread is not None and thread.is_alive():
+                _ProductionConnectProxy(server=server, thread=thread).close()
+            else:
+                server.server_close()
         except BaseException:
             pass
         raise
@@ -4018,6 +4022,17 @@ def _reap_production_worker(
                         process_errors.append(exc)
             except BaseException as exc:
                 process_errors.append(exc)
+                if process.poll() is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    except BaseException as kill_exc:
+                        process_errors.append(kill_exc)
+                    try:
+                        process.wait(timeout=5)
+                    except BaseException as wait_exc:
+                        process_errors.append(wait_exc)
     finally:
         errors = _release_production_worker_resources(
             stdout_handle, stderr_handle, profile, proxy,

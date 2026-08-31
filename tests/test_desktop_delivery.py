@@ -621,15 +621,27 @@ def test_production_connect_proxy_closes_listener_when_thread_start_fails(monkey
         def serve_forever(self):
             raise AssertionError("must not run")
 
+        def shutdown(self):
+            calls.append("shutdown")
+
         def server_close(self):
             calls.append("server_close")
 
     class FakeThread:
         def __init__(self, **kwargs):
             calls.append(("thread", kwargs["daemon"]))
+            self.alive = False
 
         def start(self):
+            self.alive = True
             raise RuntimeError("thread start failed")
+
+        def join(self, timeout=None):
+            calls.append(("join", timeout))
+            self.alive = False
+
+        def is_alive(self):
+            return self.alive
 
     monkeypatch.setattr(workflow, "_ProductionConnectProxyServer", FakeServer)
     monkeypatch.setattr(workflow.threading, "Thread", FakeThread)
@@ -640,7 +652,9 @@ def test_production_connect_proxy_closes_listener_when_thread_start_fails(monkey
     assert calls == [
         ("server", workflow.PRODUCTION_HERMES_NETWORK_HOST, workflow.PRODUCTION_HERMES_NETWORK_PORT),
         ("thread", True),
+        "shutdown",
         "server_close",
+        ("join", 5.0),
     ]
 
 
@@ -676,20 +690,23 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
     )
 
     class FakeProcess:
-        def __init__(self, pid):
+        def __init__(self, pid, *, fail_first_wait=False):
             self.pid = pid
             self.returncode = None
             self.wait_calls = 0
+            self.fail_first_wait = fail_first_wait
 
         def poll(self):
             return self.returncode
 
         def wait(self, timeout=None):
             self.wait_calls += 1
-            self.returncode = -signal.SIGTERM
+            if self.fail_first_wait and self.wait_calls == 1:
+                raise PermissionError("wait denied")
+            self.returncode = -signal.SIGKILL
             return self.returncode
 
-    processes = [FakeProcess(987654), FakeProcess(987655)]
+    processes = [FakeProcess(987654, fail_first_wait=True), FakeProcess(987655)]
     calls = []
     profile_paths = []
 
@@ -724,9 +741,10 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
 
     assert len(created_proxies) == 3
     assert all(proxy.closed for proxy in created_proxies)
-    assert [process.wait_calls for process in processes] == [1, 1]
+    assert [process.wait_calls for process in processes] == [2, 1]
     assert killed == [
         (processes[0].pid, signal.SIGTERM),
+        (processes[0].pid, signal.SIGKILL),
         (processes[1].pid, signal.SIGTERM),
     ]
     assert all(not path.exists() for path in profile_paths)
