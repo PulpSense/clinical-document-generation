@@ -536,7 +536,8 @@ def _replace_protocol_investigator_agreement(
             if _heading_level(paragraph) is not None:
                 break
             if (
-                not paragraph.text.strip()
+                branch == "Retrospective"
+                and not paragraph.text.strip()
                 and paragraph._p.xpath('.//w:br[@w:type="page"]')
             ):
                 following = element.getnext()
@@ -548,7 +549,9 @@ def _replace_protocol_investigator_agreement(
                 if (
                     following is not None
                     and following.tag == qn("w:p")
-                    and _heading_level(Paragraph(following, document)) is not None
+                    and "table of contents" in _protocol_heading_key(
+                        Paragraph(following, document).text
+                    )
                 ):
                     break
             parent.remove(element)
