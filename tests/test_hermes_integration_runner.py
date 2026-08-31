@@ -618,6 +618,7 @@ def _write_passing_case_report(
     }), encoding="utf-8")
     report = {
         "outcome": "passed",
+        "certification_scope": "production_single_case_tracer",
         "elapsed_seconds": elapsed_seconds,
         "release_identity": identity,
         "hermes_configuration": fixture["hermes_configuration"],
@@ -806,6 +807,32 @@ def test_complete_corpus_rejects_coherently_rehashed_incomplete_managed_identity
     assert all(case["status"] == "failed" for case in result["cases"])
     assert all(
         "Case managed Hermes launcher and interpreter identity is incomplete."
+        in case["findings"]
+        for case in result["cases"]
+    )
+
+
+def test_complete_corpus_rejects_controlled_single_case_reports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        report = json.loads(path.read_text())
+        report["certification_scope"] = "controlled_single_case_tracer"
+        path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert all(
+        "Case report was not produced by the sealed production certification adapter."
         in case["findings"]
         for case in result["cases"]
     )
@@ -1350,7 +1377,7 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
     assert report["release_identity"]["package_fingerprint"] == "controlled-candidate"
     assert report["hermes_configuration"]["safe_mode"] is True
     assert report["desktop_operation_evidence"]["stage_timings"] == state["stage_timings"]
-    assert report["certification_scope"] == "single_case_tracer"
+    assert report["certification_scope"] == "controlled_single_case_tracer"
     assert report["release_certification_status"] == "not_full_corpus"
     assert report["adapter_attempts"] == {"renderer": [], "page_renderer": []}
     assert report["bound_evidence"]["delivery_manifest"]["sha256"] == hashlib.sha256(

@@ -1130,6 +1130,7 @@ def _run_controlled_release_certification_operation(
     verification_response_validator: Callable[[Path, Path], bool] | None = None,
     hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
     state_path_resolver: Callable[[Path, str], Path] | None = None,
+    _production_execution: bool = False,
 ) -> dict[str, Any]:
     run_dir = run_dir.resolve()
     release_root = release_root.resolve()
@@ -1246,7 +1247,11 @@ def _run_controlled_release_certification_operation(
     state_path = state_path_resolver(run_dir, operation_id)
     state = _read_json(state_path) or {}
     release_identity = _state_bound_release_identity(release_identity, state)
-    report["certification_scope"] = "single_case_tracer"
+    report["certification_scope"] = (
+        "production_single_case_tracer"
+        if _production_execution
+        else "controlled_single_case_tracer"
+    )
     report["release_certification_status"] = "not_full_corpus"
     report["release_identity"] = dict(release_identity)
     report["hermes_configuration"] = dict(hermes_configuration)
@@ -1446,6 +1451,7 @@ def run_release_certification_operation(
         desktop_opener=desktop_opener,
         parent_visual_reviewer=parent_visual_reviewer,
         hermes_configuration=hermes_configuration,
+        _production_execution=True,
     )
 
 
@@ -2532,6 +2538,10 @@ def certify_release_corpus(
         fixture = fixtures.get(fixture_id)
         case_findings: list[str] = []
         identity = report.get("release_identity") or {}
+        if report.get("certification_scope") != "production_single_case_tracer":
+            case_findings.append(
+                "Case report was not produced by the sealed production certification adapter."
+            )
         managed_identity = identity.get("managed_hermes_identity")
         identities.append({
             "package_fingerprint": identity.get("package_fingerprint"),
