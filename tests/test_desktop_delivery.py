@@ -268,7 +268,10 @@ def test_production_verifier_relies_on_parent_validation_without_terminal_consen
     )
 
     assert "The Desktop parent validates it automatically" in prompt
-    assert "do not invoke terminal commands or wait for command approval" in prompt
+    assert "First try the write_file tool once" in prompt
+    assert "use exactly one /usr/bin/python3 -c terminal command" in prompt
+    assert "workspace-relative response path" in prompt
+    assert "do not wait for command approval" in prompt
     assert "python -c" not in prompt
 
 
