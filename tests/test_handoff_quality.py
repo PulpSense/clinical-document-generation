@@ -20,6 +20,22 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_single_artifact_retrospective_verification_omits_cross_document_checks(tmp_path):
+    revision_dir = tmp_path / "r-retrospective"
+    revision_dir.mkdir()
+
+    request_paths = create_verification_requests(
+        revision_dir,
+        {"meta": {"study_type": "Retrospective"}},
+        {"artifacts": []},
+    )
+    content_request = json.loads(request_paths[0].read_text(encoding="utf-8"))
+
+    assert content_request["task"] == "clinical_content_verification"
+    assert content_request["cross_document_checks"] == []
+    assert "assess every cross-document check" not in content_request["instructions"].casefold()
+
+
 def _require_renderer():
     assert workflow.renderer() is not None
 

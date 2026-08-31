@@ -3440,9 +3440,32 @@ def create_verification_requests(
     authorized_boilerplate = _json(boilerplate_path)
     if authorized_boilerplate.get("version") != BOILERPLATE_VERSION:
         raise ValueError("Verification boilerplate does not match the content contract.")
-    payloads = [
-        {"schema_version": VERIFY_SCHEMA, "request_id": f"{revision_dir.name}.verify.content", "task": "clinical_content_verification", "revision_id": revision_dir.name, "artifacts": content_files, "approved_source": reference, "authorized_boilerplate": authorized_boilerplate, "sections": sections, "checks": list(CONTENT_CHECKS), "cross_document_checks": list(CROSS_DOCUMENT_CHECKS), "instructions": "Assess every listed section against every content check and assess every cross-document check. Findings must include target_ids for affected section IDs. Treat exact authorized Fixed Clinical Boilerplate as approved non-study-specific content, not invention. Do not fail optional fields, dates, instruments, scoring rules, denominators, or policies that are absent from the approved source; instead fail only an unsupported affirmative claim or an omission of supplied material evidence. A document-control date may default from approval, while an unknown version must remain blank and must not be failed merely for being unknown.", "response_path": f"hermes/verification-responses/{revision_dir.name}.verify.content.json"},
-    ]
+    cross_document_checks = [] if branch == "Retrospective" else list(CROSS_DOCUMENT_CHECKS)
+    content_instructions = "Assess every listed section against every content check."
+    if cross_document_checks:
+        content_instructions += " Assess every cross-document check."
+    content_instructions += (
+        " Findings must include target_ids for affected section IDs. Treat exact authorized Fixed Clinical "
+        "Boilerplate as approved non-study-specific content, not invention. Do not fail optional fields, dates, "
+        "instruments, scoring rules, denominators, or policies that are absent from the approved source; instead "
+        "fail only an unsupported affirmative claim or an omission of supplied material evidence. A document-control "
+        "date may default from approval, while an unknown version must remain blank and must not be failed merely for "
+        "being unknown."
+    )
+    payloads = [{
+        "schema_version": VERIFY_SCHEMA,
+        "request_id": f"{revision_dir.name}.verify.content",
+        "task": "clinical_content_verification",
+        "revision_id": revision_dir.name,
+        "artifacts": content_files,
+        "approved_source": reference,
+        "authorized_boilerplate": authorized_boilerplate,
+        "sections": sections,
+        "checks": list(CONTENT_CHECKS),
+        "cross_document_checks": cross_document_checks,
+        "instructions": content_instructions,
+        "response_path": f"hermes/verification-responses/{revision_dir.name}.verify.content.json",
+    }]
     visual_artifacts = list(render_report.get("artifacts", []))
     visual_batches = [[artifact] for artifact in visual_artifacts] or [[]]
     for index, artifacts in enumerate(visual_batches, start=1):
