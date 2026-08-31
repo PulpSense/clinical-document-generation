@@ -811,6 +811,26 @@ def test_complete_corpus_rejects_coherently_rehashed_incomplete_managed_identity
     )
 
 
+def test_case_report_adopts_state_bound_managed_hermes_identity() -> None:
+    candidate = {
+        "package_fingerprint": "candidate-fingerprint",
+        "git_commit": "a" * 40,
+    }
+    managed = {
+        "launcher": "/managed/hermes/venv/bin/hermes",
+        "launcher_sha256": "1" * 64,
+        "interpreter": "/managed/hermes/venv/bin/python",
+        "interpreter_target": "/managed/python/bin/python3.11",
+        "interpreter_target_sha256": "2" * 64,
+    }
+
+    observed = hermes_e2e._state_bound_release_identity(candidate, {
+        "release_identity": {**candidate, "managed_hermes_identity": managed},
+    })
+
+    assert observed == {**candidate, "managed_hermes_identity": managed}
+
+
 def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
@@ -1347,8 +1367,13 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
     }
     parent_reviews = []
 
-    def controlled_operation(_run_dir, **kwargs):
+    def controlled_operation(run_dir, **kwargs):
         kwargs["fallback_handoff_runner"]([handoff], 12.0)
+        state_path = workflow.desktop_operation_state_path(run_dir, kwargs["operation_id"])
+        state_path.write_text(json.dumps({
+            "status": "blocked",
+            "release_identity": kwargs["release_identity"],
+        }), encoding="utf-8")
         return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
 
     run_release_certification_operation(
@@ -1374,7 +1399,10 @@ def test_release_report_handles_a_resolved_state_path_behind_a_symlink(tmp_path:
     def controlled_operation(run_dir, **kwargs):
         state_path = workflow.desktop_operation_state_path(run_dir, kwargs["operation_id"])
         state_path.parent.mkdir(parents=True)
-        state_path.write_text(json.dumps({"status": "blocked"}), encoding="utf-8")
+        state_path.write_text(json.dumps({
+            "status": "blocked",
+            "release_identity": kwargs["release_identity"],
+        }), encoding="utf-8")
         return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
 
     report = run_release_certification_operation(

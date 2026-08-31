@@ -626,6 +626,56 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
     assert all(not path.exists() for path in profile_paths)
 
 
+def test_production_profile_write_failure_closes_proxy_and_removes_profile(tmp_path, monkeypatch):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    run_dir = tmp_path / "run"
+    launcher = tmp_path / "managed/hermes/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    managed_python = launcher.parent / "python"
+    managed_python.symlink_to(Path(sys.executable).resolve())
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_managed_hermes_pair", lambda: (launcher, managed_python))
+
+    profile_path = tmp_path / "failed-profile.sb"
+
+    class FailingProfile:
+        name = str(profile_path)
+        closed = False
+
+        def write(self, _text):
+            profile_path.write_text("partial", encoding="utf-8")
+            raise RuntimeError("profile write failed")
+
+        def close(self):
+            self.closed = True
+
+    class FakeProxy:
+        port = 43103
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    profile = FailingProfile()
+    proxy = FakeProxy()
+    monkeypatch.setattr(workflow.tempfile, "NamedTemporaryFile", lambda *_args, **_kwargs: profile)
+    monkeypatch.setattr(workflow, "_start_production_connect_proxy", lambda: proxy)
+
+    with pytest.raises(RuntimeError, match="profile write failed"):
+        workflow._production_dispatch_handoffs(
+            [{"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"}],
+            30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
+            skill_root=skill_root, run_dir=run_dir,
+            runtime_identity={"executable": "/usr/bin/python3"},
+        )
+
+    assert profile.closed is True
+    assert proxy.closed is True
+    assert not profile_path.exists()
+
+
 def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, monkeypatch):
     probe_root = Path("/private/tmp") / f"issue56-managed-sandbox-{os.getpid()}"
     shutil.rmtree(probe_root, ignore_errors=True)

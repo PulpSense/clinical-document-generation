@@ -3996,63 +3996,67 @@ def _production_dispatch_handoffs(
     runtime_root = runtime_executable.parent.parent
 
     for handoff in handoffs:
-        proxy = _start_production_connect_proxy()
         started = time.monotonic()
         request_id = Path(str(handoff["request_path"])).stem
-        cache_dir = run_dir / ".hermes-cache"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        profile = tempfile.NamedTemporaryFile(
-            "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
-        )
-        profile.write("(version 1)\n(allow default)\n")
-        profile.write("(deny network*)\n")
-        profile.write(f"(allow network-outbound (remote tcp \"localhost:{proxy.port}\"))\n")
-        readable_roots = (
-            Path("/System"), Path("/usr"), Path("/bin"), Path("/sbin"),
-            Path("/Library"), Path("/Applications/LibreOffice.app"),
-            Path("/private/etc"), Path("/etc"), Path("/dev"), Path("/private/var/db"),
-            hermes_install_root, hermes_home, skill_root, run_dir, runtime_root,
-        )
-        read_boundaries = _production_read_boundaries()
-        for boundary in read_boundaries:
-            profile.write(f"(deny file-read* (subpath {json.dumps(str(boundary))}))\n")
-        for readable_root in dict.fromkeys(path.resolve(strict=False) for path in readable_roots):
-            if any(readable_root == boundary or boundary in readable_root.parents for boundary in read_boundaries):
-                profile.write(f"(allow file-read* (subpath {json.dumps(str(readable_root))}))\n")
-        profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
-        profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
-        profile.write(
-            "(deny file-write* (require-not (require-any "
-            f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
-            f"(subpath {json.dumps(str(run_dir.resolve()))}) "
-            "(literal \"/dev/null\"))))\n"
-        )
-        profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
-        for executable in ("pytest", "py.test", "pip", "pip3"):
-            profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
-            resolved = shutil.which(executable)
-            if resolved:
-                profile.write(f"(deny process-exec (literal {json.dumps(resolved)}))\n")
-        profile.close()
-        command = [
-            str(managed_python), str(hermes_launcher), "chat", "-q",
-            _production_agent_prompt(skill_root, revision_dir, handoff, configuration),
-            "--source", str(configuration["source"]),
-            "--max-turns", str(configuration["max_turns"]),
-            "--skills", str(configuration["skill"]),
-        ]
-        if configuration.get("safe_mode") is True:
-            command.append("--safe-mode")
-        stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
-        stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
-        worker_environment = dict(environment)
-        worker_environment.update({
-            "HTTPS_PROXY": f"http://127.0.0.1:{proxy.port}",
-            "HTTP_PROXY": f"http://127.0.0.1:{proxy.port}",
-            "ALL_PROXY": f"http://127.0.0.1:{proxy.port}",
-            "NO_PROXY": "",
-        })
+        profile = None
+        proxy = None
+        stdout_handle = None
+        stderr_handle = None
         try:
+            cache_dir = run_dir / ".hermes-cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            profile = tempfile.NamedTemporaryFile(
+                "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
+            )
+            proxy = _start_production_connect_proxy()
+            profile.write("(version 1)\n(allow default)\n")
+            profile.write("(deny network*)\n")
+            profile.write(f"(allow network-outbound (remote tcp \"localhost:{proxy.port}\"))\n")
+            readable_roots = (
+                Path("/System"), Path("/usr"), Path("/bin"), Path("/sbin"),
+                Path("/Library"), Path("/Applications/LibreOffice.app"),
+                Path("/private/etc"), Path("/etc"), Path("/dev"), Path("/private/var/db"),
+                hermes_install_root, hermes_home, skill_root, run_dir, runtime_root,
+            )
+            read_boundaries = _production_read_boundaries()
+            for boundary in read_boundaries:
+                profile.write(f"(deny file-read* (subpath {json.dumps(str(boundary))}))\n")
+            for readable_root in dict.fromkeys(path.resolve(strict=False) for path in readable_roots):
+                if any(readable_root == boundary or boundary in readable_root.parents for boundary in read_boundaries):
+                    profile.write(f"(allow file-read* (subpath {json.dumps(str(readable_root))}))\n")
+            profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
+            profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
+            profile.write(
+                "(deny file-write* (require-not (require-any "
+                f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
+                f"(subpath {json.dumps(str(run_dir.resolve()))}) "
+                "(literal \"/dev/null\"))))\n"
+            )
+            profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
+            for executable in ("pytest", "py.test", "pip", "pip3"):
+                profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
+                resolved = shutil.which(executable)
+                if resolved:
+                    profile.write(f"(deny process-exec (literal {json.dumps(resolved)}))\n")
+            profile.close()
+            command = [
+                str(managed_python), str(hermes_launcher), "chat", "-q",
+                _production_agent_prompt(skill_root, revision_dir, handoff, configuration),
+                "--source", str(configuration["source"]),
+                "--max-turns", str(configuration["max_turns"]),
+                "--skills", str(configuration["skill"]),
+            ]
+            if configuration.get("safe_mode") is True:
+                command.append("--safe-mode")
+            stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
+            stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
+            worker_environment = dict(environment)
+            worker_environment.update({
+                "HTTPS_PROXY": f"http://127.0.0.1:{proxy.port}",
+                "HTTP_PROXY": f"http://127.0.0.1:{proxy.port}",
+                "ALL_PROXY": f"http://127.0.0.1:{proxy.port}",
+                "NO_PROXY": "",
+            })
             process = subprocess.Popen(
                 [str(sandbox), "-f", profile.name, *command],
                 cwd=skill_root,
@@ -4063,15 +4067,23 @@ def _production_dispatch_handoffs(
                 start_new_session=True,
             )
         except BaseException:
-            stdout_handle.close()
-            stderr_handle.close()
-            Path(profile.name).unlink(missing_ok=True)
-            proxy.close()
+            if stdout_handle is not None:
+                stdout_handle.close()
+            if stderr_handle is not None:
+                stderr_handle.close()
+            if profile is not None:
+                if not profile.closed:
+                    profile.close()
+                Path(profile.name).unlink(missing_ok=True)
+            if proxy is not None:
+                proxy.close()
             for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
                 _reap_production_worker(
                     prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
                 )
             raise
+        assert profile is not None and proxy is not None
+        assert stdout_handle is not None and stderr_handle is not None
         processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started, proxy))
     try:
         pending = list(processes)

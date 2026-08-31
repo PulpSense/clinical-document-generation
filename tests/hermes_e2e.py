@@ -1104,6 +1104,19 @@ def _run_handoff_wave(
     return timed_out, missing
 
 
+def _state_bound_release_identity(
+    candidate_identity: Mapping[str, Any],
+    state: Mapping[str, Any],
+) -> dict[str, Any]:
+    operation_identity = state.get("release_identity") or {}
+    if not isinstance(operation_identity, Mapping) or any(
+        operation_identity.get(key) != candidate_identity.get(key)
+        for key in ("package_fingerprint", "git_commit")
+    ):
+        raise ValueError("The persisted Desktop operation identity does not match the candidate.")
+    return dict(operation_identity)
+
+
 def run_release_certification_operation(
     run_dir: Path,
     *,
@@ -1232,6 +1245,7 @@ def run_release_certification_operation(
         raise ValueError("The Desktop operation must expose its canonical persisted-state path resolver.")
     state_path = state_path_resolver(run_dir, operation_id)
     state = _read_json(state_path) or {}
+    release_identity = _state_bound_release_identity(release_identity, state)
     report["certification_scope"] = "single_case_tracer"
     report["release_certification_status"] = "not_full_corpus"
     report["release_identity"] = dict(release_identity)
