@@ -277,7 +277,23 @@ def normalized_docx_format_signature(path: Path) -> dict[str, Any]:
         "PAGE" in value.upper() for part in headers_footers for value in part["fields"]
     )
     update_fields = bool(settings_xml.xpath(".//*[local-name()='updateFields' and (@*[local-name()='val']='true' or @*[local-name()='val']='1')]"))
-    first_numbered = next((item["paragraph"] for item in headings if re.match(r"^\d+(?:\.|\s)", item["text"])), None)
+    numbered_headings = [
+        item for item in headings if re.match(r"^\d+(?:\.|\s)", item["text"])
+    ]
+    toc_index = next((
+        index for index, item in enumerate(headings)
+        if "table of contents" in re.sub(r"[^a-z0-9]+", " ", item["text"].casefold())
+    ), None)
+    body_headings = (
+        [
+            item for item in headings[toc_index + 1:]
+            if re.match(r"^\d+(?:\.|\s)", item["text"])
+        ]
+        if toc_index is not None
+        else numbered_headings
+    )
+    first_numbered = body_headings[0]["paragraph"] if body_headings else None
+    later_body_headings = body_headings[1:] if toc_index is not None else body_headings
     return {
         "section_geometry": section_geometry,
         "styles": {"count": len(styles_xml.xpath(".//*[local-name()='style']")), "semantic_sha256": _normalized_ooxml_hash(styles_xml, redact_text=False)},
@@ -300,7 +316,9 @@ def normalized_docx_format_signature(path: Path) -> dict[str, Any]:
         "pagination_relations": {
             "headings": headings,
             "first_numbered_body_paragraph": first_numbered,
-            "numbered_body_has_no_artificial_starts": all(not item["page_break_before"] for item in headings if re.match(r"^\d+(?:\.|\s)", item["text"])),
+            "numbered_body_has_no_artificial_starts": all(
+                not item["page_break_before"] for item in later_body_headings
+            ),
             "all_headings_keep_with_next": all(item["keep_with_next"] for item in headings),
         },
     }

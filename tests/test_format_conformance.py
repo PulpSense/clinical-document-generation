@@ -75,6 +75,37 @@ def test_format_conformance_matrix_is_complete_hash_addressed_and_ordered():
     assert declared_sha256 == quality.canonical_evidence_sha256(canonical)
 
 
+def test_protocol_signature_treats_only_the_first_post_toc_boundary_as_governed(tmp_path):
+    reference = json.loads(
+        (ROOT / "references/conformance-fixtures/prospective-acceptance-source.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    report = workflow.render_documents(
+        ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+    )
+
+    assert report["status"] == "passed"
+    signature = quality.normalized_docx_format_signature(
+        tmp_path / "candidate/protocol.docx"
+    )
+    pagination = signature["pagination_relations"]
+    headings = pagination["headings"]
+    toc_index = next(
+        index for index, item in enumerate(headings)
+        if "table of contents" in item["text"].casefold()
+    )
+    first_body = next(
+        item for item in headings[toc_index + 1:]
+        if item["text"][0].isdigit()
+    )
+
+    assert first_body["page_break_before"] is True
+    assert pagination["first_numbered_body_paragraph"] == first_body["paragraph"]
+    assert pagination["numbered_body_has_no_artificial_starts"] is True
+
+
 def test_gate_ledger_is_hash_bound_and_failed_gates_are_monotonic():
     evidence = {
         gate_id: {"gate": gate_id, "artifact_sha256": str(index) * 64}

@@ -395,15 +395,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 73,
-          "style": "TOC2",
-          "text_sha256": "1689252642c424e8d623daee0f17a5aa5cd314b51a8739c8bc320120843b78b5"
-        },
-        {
-          "categories": [
-            "consent"
-          ],
-          "paragraph": 130,
+          "paragraph": 85,
           "style": "Heading2",
           "text_sha256": "d16d8666bb4bcc7d7f80a395408dff8c52ded670da3638f3b29fea1609277a05"
         },
@@ -411,7 +403,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 131,
+          "paragraph": 86,
           "style": "Normal",
           "text_sha256": "d7e5587004a3fe63ff5b851fc726d457eeb968d84408a1ed830e43c44f11c2cb"
         },
@@ -419,7 +411,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 134,
+          "paragraph": 89,
           "style": "Normal",
           "text_sha256": "9d9aa28675ba438af8ad01b3f8576056a203ebca39026f1f20c7c50a78950be3"
         },
@@ -427,7 +419,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 154,
+          "paragraph": 109,
           "style": "Title",
           "text_sha256": "7013b601b960873e650cb09e16fa853b57861fb3514917025cd1bacc864bb5cc"
         },
@@ -436,7 +428,7 @@
             "consent",
             "withdraw"
           ],
-          "paragraph": 161,
+          "paragraph": 116,
           "style": "",
           "text_sha256": "3b91d38c9b2af17b5a33d20b8391f2288d026c3f8db9e788f860ae3586330a1a"
         },
@@ -444,7 +436,7 @@
           "categories": [
             "withdraw"
           ],
-          "paragraph": 162,
+          "paragraph": 117,
           "style": "",
           "text_sha256": "b572c6aaa2585c6157a91dfe5620076a1b287876554e6658fe4e4d55d313d07f"
         },
@@ -452,7 +444,7 @@
           "categories": [
             "privacy"
           ],
-          "paragraph": 180,
+          "paragraph": 135,
           "style": "",
           "text_sha256": "c1028664dab64ac07002bf65abb436c05b3f612aad1f7790199bb5c9e6121f00"
         },
@@ -460,7 +452,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 182,
+          "paragraph": 137,
           "style": "",
           "text_sha256": "895ad5a3587c454c40ea01c07125eabc47d8ea09e7baf7b34536ea537204efe9"
         },
@@ -468,7 +460,7 @@
           "categories": [
             "privacy"
           ],
-          "paragraph": 203,
+          "paragraph": 158,
           "style": "",
           "text_sha256": "b61c64c0ee7fd7b7c2dc8ac5cfce007151c399549fd3c3a93031f7a10f8d3e10"
         },
@@ -476,7 +468,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 208,
+          "paragraph": 163,
           "style": "Normal",
           "text_sha256": "debf62db449749e5750e8ec7502a1d9739cafd9a12a911dcbd72b0dbec73a988"
         },
@@ -484,7 +476,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 215,
+          "paragraph": 170,
           "style": "TableText",
           "text_sha256": "d37e0cd00f18a366f040d864a3fa641b54039aab8f55f60e09a1f11fde972caf"
         },
@@ -493,7 +485,7 @@
             "privacy",
             "confidential"
           ],
-          "paragraph": 221,
+          "paragraph": 176,
           "style": "",
           "text_sha256": "c630aef2c649940aa668fa0d74b8eaa60bd3325d1a913494bf6d77e61ec01e8c"
         },
@@ -501,7 +493,7 @@
           "categories": [
             "injury"
           ],
-          "paragraph": 223,
+          "paragraph": 178,
           "style": "",
           "text_sha256": "2eec53f4741ab820569de18be0fb6d0505712b7b1cb11157bc985dffdf529477"
         },
@@ -509,7 +501,7 @@
           "categories": [
             "compensation"
           ],
-          "paragraph": 224,
+          "paragraph": 179,
           "style": "",
           "text_sha256": "c3a07bd8749151453042e1166158c8080c53fd07f67297b915de80330e010f1f"
         },
@@ -517,7 +509,7 @@
           "categories": [
             "injury"
           ],
-          "paragraph": 225,
+          "paragraph": 180,
           "style": "",
           "text_sha256": "ec384cb3b2e737da7eee90fc4572606ed45c9fa5d03bbe6fd1cad48d7dc27612"
         },
@@ -525,7 +517,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 230,
+          "paragraph": 185,
           "style": "Normal",
           "text_sha256": "7a327f4ac618de1897ac68c020c1828fc1420859b1871d74c9983ead3a5e2908"
         },
@@ -534,7 +526,7 @@
             "consent",
             "withdraw"
           ],
-          "paragraph": 233,
+          "paragraph": 188,
           "style": "Normal",
           "text_sha256": "9b78eea615fdef85650181f216d2d85820226bde0a1175329117e47bcf325b50"
         },
@@ -542,7 +534,7 @@
           "categories": [
             "withdraw"
           ],
-          "paragraph": 234,
+          "paragraph": 189,
           "style": "Normal",
           "text_sha256": "151f74e88294da345a06ef81cbb78a9172f9b89bd42d9fd8f7149e70d8b7e261"
         },
@@ -550,7 +542,7 @@
           "categories": [
             "privacy"
           ],
-          "paragraph": 237,
+          "paragraph": 192,
           "style": "",
           "text_sha256": "519be10903c5bad969062434b718f72512551c775b16f941da7d1e66780f11c7"
         },
@@ -558,7 +550,7 @@
           "categories": [
             "consent"
           ],
-          "paragraph": 243,
+          "paragraph": 198,
           "style": "",
           "text_sha256": "fbc04445421619215002873bf7d4b88a658066f4bea5eb348bfb4795b25b82bd"
         },
@@ -566,13 +558,15 @@
           "categories": [
             "privacy"
           ],
-          "paragraph": 248,
+          "paragraph": 203,
           "style": "Normal",
           "text_sha256": "43e4e7302ecdd9a28ae40b160387cc414ed2e6089898280c233c7c6f570135c7"
         }
       ],
       "fields_toc": {
-        "codes": [],
+        "codes": [
+          "TOC \\o \"1-2\" \\h \\z \\u"
+        ],
         "update_fields": true
       },
       "headers_footers": [
@@ -628,7 +622,7 @@
       },
       "pagination_relations": {
         "all_headings_keep_with_next": true,
-        "first_numbered_body_paragraph": 3,
+        "first_numbered_body_paragraph": 61,
         "headings": [
           {
             "keep_with_next": true,
@@ -660,295 +654,295 @@
           },
           {
             "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 106,
+            "page_break_before": true,
+            "paragraph": 61,
             "style": "Heading1",
             "text": "5. INTRODUCTION"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 111,
+            "paragraph": 66,
             "style": "Heading1",
             "text": "6. OBJECTIVE(S)"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 114,
+            "paragraph": 69,
             "style": "Heading1",
             "text": "7. SUBJECTS"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 115,
+            "paragraph": 70,
             "style": "Heading2",
             "text": "7.1. Subject Population"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 118,
+            "paragraph": 73,
             "style": "Heading2",
             "text": "7.2. Inclusion Criteria"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 121,
+            "paragraph": 76,
             "style": "Heading2",
             "text": "7.3. Exclusion Criteria"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 123,
+            "paragraph": 78,
             "style": "Heading1",
             "text": "8. STUDY DESIGN"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 124,
+            "paragraph": 79,
             "style": "Heading2",
             "text": "8.1. Study Design"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 126,
+            "paragraph": 81,
             "style": "Heading2",
             "text": "8.2. Methods Used to Minimize Bias"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 129,
+            "paragraph": 84,
             "style": "Heading1",
             "text": "9. STUDY PROCEDURE"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 130,
+            "paragraph": 85,
             "style": "Heading2",
             "text": "9.1. Informed Consent / Subject enrollment"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 132,
+            "paragraph": 87,
             "style": "Heading2",
             "text": "9.2. Visits and Examinations"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 152,
+            "paragraph": 107,
             "style": "Heading2",
             "text": "9.3. Study Methods and Measurements"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 158,
+            "paragraph": 113,
             "style": "Heading2",
             "text": "9.4. Unscheduled Visits"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 160,
+            "paragraph": 115,
             "style": "Heading2",
             "text": "9.5. Discontinued Subjects"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 163,
+            "paragraph": 118,
             "style": "Heading1",
             "text": "10. ANALYSIS PLAN"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 164,
+            "paragraph": 119,
             "style": "Heading2",
             "text": "10.1. Analysis Data Sets"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 167,
+            "paragraph": 122,
             "style": "Heading2",
             "text": "10.2. Statistical Methodology"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 170,
+            "paragraph": 125,
             "style": "Heading2",
             "text": "10.3. General Statistical Considerations"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 173,
+            "paragraph": 128,
             "style": "Heading1",
             "text": "11. SAMPLE SIZE JUSTIFICATION"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 175,
+            "paragraph": 130,
             "style": "Heading1",
             "text": "12. CONFIDENTIALITY/PUBLICATION OF THE STUDY"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 177,
+            "paragraph": 132,
             "style": "Heading1",
             "text": "13. QUALITY COMPLAINTS AND ADVERSE EVENTS"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 178,
+            "paragraph": 133,
             "style": "Heading2",
             "text": "13.1. General Information"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 181,
+            "paragraph": 136,
             "style": "Heading2",
             "text": "13.2. Monitoring for Adverse Events"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 183,
+            "paragraph": 138,
             "style": "Heading2",
             "text": "13.3. Procedures for Recording and Reporting AEs and SAEs"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 197,
+            "paragraph": 152,
             "style": "Heading2",
             "text": "13.4. Follow-Up of Adverse Events and Quality Complaints"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 199,
+            "paragraph": 154,
             "style": "Heading2",
             "text": "13.5. Safety Analyses"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 202,
+            "paragraph": 157,
             "style": "Heading1",
             "text": "14. GCP, ICH and ETHICAL CONSIDERATIONS"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 204,
+            "paragraph": 159,
             "style": "Heading2",
             "text": "14.1 Confidentiality"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 206,
+            "paragraph": 161,
             "style": "Heading1",
             "text": "15. STANDARD EVALUATION PROCEDURES"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 209,
+            "paragraph": 164,
             "style": "Heading2",
             "text": "Table 15.1. Proposed Visits and Study Assessments"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 219,
+            "paragraph": 174,
             "style": "Heading1",
             "text": "16. CONFIDENTIALITY"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 222,
+            "paragraph": 177,
             "style": "Heading1",
             "text": "17. FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 226,
+            "paragraph": 181,
             "style": "Heading1",
             "text": "18. STUDY ENDPOINT CRITERIA"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 227,
+            "paragraph": 182,
             "style": "Heading2",
             "text": "18.1. Patient Completion of Study"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 232,
+            "paragraph": 187,
             "style": "Heading2",
             "text": "18.2. Patient Discontinuation"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 235,
+            "paragraph": 190,
             "style": "Heading2",
             "text": "18.3. Patient Termination"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 238,
+            "paragraph": 193,
             "style": "Heading2",
             "text": "18.4. Study Termination"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 240,
+            "paragraph": 195,
             "style": "Heading2",
             "text": "18.5. Study Completion"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 245,
+            "paragraph": 200,
             "style": "Heading1",
             "text": "19. SUMMARY OF RISKS AND BENEFITS"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 246,
+            "paragraph": 201,
             "style": "Heading2",
             "text": "19.1. Summary of risks"
           },
           {
             "keep_with_next": true,
             "page_break_before": false,
-            "paragraph": 249,
+            "paragraph": 204,
             "style": "Heading2",
             "text": "19.2. Summary of benefits"
           }
@@ -956,8 +950,8 @@
         "numbered_body_has_no_artificial_starts": true
       },
       "paragraph_rhythm": {
-        "paragraph_count": 252,
-        "semantic_sha256": "de6c8ba949aec4c22f6159162b4acb4b4db6a0aa59f552f7b588e3d724876699"
+        "paragraph_count": 207,
+        "semantic_sha256": "82e61c1ca9c4b0b85a569865e1d57200aed9af1bd3c515ab0e05334bc573868c"
       },
       "section_geometry": [
         {
@@ -990,7 +984,7 @@
           "text_sha256": "7978d521261cec2db3a62a2b5189caff7a603ee94069c8d0e0408ed02e5b6f21"
         },
         {
-          "paragraph": 131,
+          "paragraph": 86,
           "style": "Normal",
           "text_sha256": "d7e5587004a3fe63ff5b851fc726d457eeb968d84408a1ed830e43c44f11c2cb"
         }
