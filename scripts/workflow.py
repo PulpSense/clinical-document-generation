@@ -3938,6 +3938,30 @@ def _start_production_connect_proxy(
     return _ProductionConnectProxy(server=server, thread=thread)
 
 
+def _reap_production_worker(
+    process: subprocess.Popen[str],
+    stdout_handle: Any,
+    stderr_handle: Any,
+    profile: Path,
+    proxy: _ProductionConnectProxy,
+) -> None:
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=5)
+        except (ProcessLookupError, subprocess.TimeoutExpired):
+            if process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.wait()
+    stdout_handle.close()
+    stderr_handle.close()
+    profile.unlink(missing_ok=True)
+    proxy.close()
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -4041,7 +4065,12 @@ def _production_dispatch_handoffs(
         except BaseException:
             stdout_handle.close()
             stderr_handle.close()
+            Path(profile.name).unlink(missing_ok=True)
             proxy.close()
+            for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
+                _reap_production_worker(
+                    prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
+                )
             raise
         processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started, proxy))
     try:
@@ -4078,22 +4107,8 @@ def _production_dispatch_handoffs(
             )
     finally:
         for process, handoff, stdout_handle, stderr_handle, profile, started, proxy in processes:
-            if process.poll() is None:
-                try:
-                    os.killpg(process.pid, signal.SIGTERM)
-                    process.wait(timeout=5)
-                except (ProcessLookupError, subprocess.TimeoutExpired):
-                    if process.poll() is None:
-                        try:
-                            os.killpg(process.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass
-                        process.wait()
+            _reap_production_worker(process, stdout_handle, stderr_handle, profile, proxy)
             ended = time.monotonic()
-            stdout_handle.close()
-            stderr_handle.close()
-            profile.unlink(missing_ok=True)
-            proxy.close()
             event_path = run_dir / "logs/hermes-agent-events.jsonl"
             event_path.parent.mkdir(parents=True, exist_ok=True)
             response_path = revision_dir / str(handoff.get("response_path") or "")

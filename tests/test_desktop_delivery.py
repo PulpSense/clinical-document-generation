@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import socket
 import socketserver
 import subprocess
@@ -466,7 +467,8 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     def stop(command, **kwargs):
         captured["command"] = command
         captured["environment"] = kwargs["env"]
-        captured["profile_path"] = Path(command[2])
+        captured["profile_path"] = tmp_path / "captured-production-profile.sb"
+        shutil.copyfile(command[2], captured["profile_path"])
         captured["profile"] = captured["profile_path"].read_text(encoding="utf-8")
         raise RuntimeError("probe complete")
 
@@ -550,6 +552,80 @@ def test_production_connect_proxy_relays_only_the_governed_target():
         upstream_thread.join(timeout=5.0)
 
 
+def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_path, monkeypatch):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    run_dir = tmp_path / "run"
+    launcher = tmp_path / "managed/hermes/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    managed_python = launcher.parent / "python"
+    managed_python.symlink_to(Path(sys.executable).resolve())
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_managed_hermes_pair", lambda: (launcher, managed_python))
+
+    class FakeProxy:
+        def __init__(self, port):
+            self.port = port
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    created_proxies = [FakeProxy(43101), FakeProxy(43102)]
+    pending_proxies = iter(created_proxies)
+    monkeypatch.setattr(
+        workflow, "_start_production_connect_proxy", lambda: next(pending_proxies),
+    )
+
+    class FakeProcess:
+        pid = 987654
+
+        def __init__(self):
+            self.returncode = None
+            self.wait_calls = 0
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            self.wait_calls += 1
+            self.returncode = -signal.SIGTERM
+            return self.returncode
+
+    first_process = FakeProcess()
+    calls = []
+    profile_paths = []
+
+    def popen(command, **_kwargs):
+        calls.append(command)
+        profile_paths.append(Path(command[2]))
+        if len(calls) == 1:
+            return first_process
+        raise RuntimeError("second launch failed")
+
+    killed = []
+    monkeypatch.setattr(workflow.subprocess, "Popen", popen)
+    monkeypatch.setattr(workflow.os, "killpg", lambda pid, sig: killed.append((pid, sig)))
+
+    with pytest.raises(RuntimeError, match="second launch failed"):
+        workflow._production_dispatch_handoffs(
+            [
+                {"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"},
+                {"request_path": "hermes/requests/b.json", "response_path": "hermes/responses/b.json"},
+            ],
+            30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
+            skill_root=skill_root, run_dir=run_dir,
+            runtime_identity={"executable": "/usr/bin/python3"},
+        )
+
+    assert len(created_proxies) == 2
+    assert all(proxy.closed for proxy in created_proxies)
+    assert first_process.wait_calls == 1
+    assert killed == [(first_process.pid, signal.SIGTERM)]
+    assert all(not path.exists() for path in profile_paths)
+
+
 def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, monkeypatch):
     probe_root = Path("/private/tmp") / f"issue56-managed-sandbox-{os.getpid()}"
     shutil.rmtree(probe_root, ignore_errors=True)
@@ -569,7 +645,8 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
     real_popen = subprocess.Popen
 
     def stop(command, **_kwargs):
-        captured["profile_path"] = Path(command[2])
+        captured["profile_path"] = probe_root / "captured-production-profile.sb"
+        shutil.copyfile(command[2], captured["profile_path"])
         raise RuntimeError("probe complete")
 
     monkeypatch.setattr(workflow.subprocess, "Popen", stop)
