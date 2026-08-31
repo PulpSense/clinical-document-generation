@@ -137,6 +137,7 @@
         "first_numbered_body_paragraph": 60,
         "headings": [
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 3,
@@ -144,6 +145,7 @@
             "text": "1. TITLE PAGE"
           },
           {
+            "effective_page_boundary": true,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 23,
@@ -151,6 +153,7 @@
             "text": "2. INVESTIGATOR AGREEMENT"
           },
           {
+            "effective_page_boundary": true,
             "keep_with_next": true,
             "page_break_before": true,
             "paragraph": 37,
@@ -158,6 +161,7 @@
             "text": "3. TABLE OF CONTENTS"
           },
           {
+            "effective_page_boundary": true,
             "keep_with_next": true,
             "page_break_before": true,
             "paragraph": 60,
@@ -165,6 +169,7 @@
             "text": "4. INTRODUCTION"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 64,
@@ -172,6 +177,7 @@
             "text": "5. OBJECTIVE(S)"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 67,
@@ -179,6 +185,7 @@
             "text": "6. SUBJECTS"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 68,
@@ -186,6 +193,7 @@
             "text": "6.1. Subject Population"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 71,
@@ -193,6 +201,7 @@
             "text": "6.2. Inclusion/Exclusion Criteria"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 73,
@@ -200,6 +209,7 @@
             "text": "7. STUDY DESIGN"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 74,
@@ -207,6 +217,7 @@
             "text": "7.1. Study Design"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 76,
@@ -214,6 +225,7 @@
             "text": "7.2. Methods Used to Minimize Bias"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 79,
@@ -221,6 +233,7 @@
             "text": "8. STUDY PROCEDURE"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 80,
@@ -228,6 +241,7 @@
             "text": "8.1. Informed Consent / Subject Enrollment"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 85,
@@ -235,6 +249,7 @@
             "text": "9. ANALYSIS PLAN"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 86,
@@ -242,6 +257,7 @@
             "text": "9.1. Analysis Data Sets"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 88,
@@ -249,6 +265,7 @@
             "text": "9.2. Statistical Methodology"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 90,
@@ -256,6 +273,7 @@
             "text": "9.3. General Statistical Considerations"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 92,
@@ -263,6 +281,7 @@
             "text": "10. SAMPLE SIZE JUSTIFICATION"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 94,
@@ -270,6 +289,7 @@
             "text": "11. CONFIDENTIALITY/PUBLICATION OF THE STUDY"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 97,
@@ -277,6 +297,7 @@
             "text": "12. QUALITY COMPLAINTS AND ADVERSE EVENTS"
           },
           {
+            "effective_page_boundary": false,
             "keep_with_next": true,
             "page_break_before": false,
             "paragraph": 101,
