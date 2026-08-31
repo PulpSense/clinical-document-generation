@@ -3739,9 +3739,17 @@ def _production_agent_prompt(
     revision_dir: Path,
     handoff: Mapping[str, Any],
     configuration: Mapping[str, Any],
+    *,
+    workspace_root: Path,
 ) -> str:
-    request_path = revision_dir / str(handoff["request_path"])
-    response_path = revision_dir / str(handoff["response_path"])
+    skill_path = skill_root.resolve().relative_to(workspace_root).as_posix()
+    revision_path = revision_dir.resolve().relative_to(workspace_root).as_posix()
+    request_path = (revision_dir / str(handoff["request_path"])).resolve().relative_to(
+        workspace_root
+    ).as_posix()
+    response_path = (revision_dir / str(handoff["response_path"])).resolve().relative_to(
+        workspace_root
+    ).as_posix()
     task = str(handoff.get("task") or "")
     model_identifier = str(configuration["model_identifier"])
     if task == "rendered_page_visual_verification":
@@ -3764,9 +3772,9 @@ def _production_agent_prompt(
     )
     return (
         "Complete one isolated clinical-document Hermes handoff.\n"
-        f"Certified skill: {skill_root}\nRun revision: {revision_dir}\n"
+        f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
-        f"Read {skill_root / 'SKILL.md'} and load the clinical-document-generation skill. "
+        f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
         f"Read the request completely. {task_rule} Write exact JSON directly to the response "
         f"path and bind every schema, request ID, request hash, task, target, and evidence "
         f"reference exactly. producer.model_id must be exactly {model_identifier!r}."
@@ -4061,6 +4069,9 @@ def _production_dispatch_handoffs(
     sandbox = _production_sandbox_executable()
     environment = _production_subprocess_environment(skill_root)
     hermes_home = Path(environment["HERMES_HOME"])
+    workspace_root = Path(os.path.commonpath((
+        str(hermes_home.resolve()), str(run_dir.resolve()),
+    )))
     hermes_launcher, managed_python = _managed_hermes_pair()
     if expected_managed_hermes_identity is not None and (
         _managed_hermes_identity() != dict(expected_managed_hermes_identity)
@@ -4104,6 +4115,9 @@ def _production_dispatch_handoffs(
             for readable_root in dict.fromkeys(path.resolve(strict=False) for path in readable_roots):
                 if any(readable_root == boundary or boundary in readable_root.parents for boundary in read_boundaries):
                     profile.write(f"(allow file-read* (subpath {json.dumps(str(readable_root))}))\n")
+            profile.write(
+                f"(allow file-read* (literal {json.dumps(str(workspace_root.resolve()))}))\n"
+            )
             profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
             profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
             profile.write(
@@ -4121,7 +4135,10 @@ def _production_dispatch_handoffs(
             profile.close()
             command = [
                 str(managed_python), str(hermes_launcher), "chat", "-q",
-                _production_agent_prompt(skill_root, revision_dir, handoff, configuration),
+                _production_agent_prompt(
+                    skill_root, revision_dir, handoff, configuration,
+                    workspace_root=workspace_root,
+                ),
                 "--source", str(configuration["source"]),
                 "--max-turns", str(configuration["max_turns"]),
                 "--skills", str(configuration["skill"]),
@@ -4139,7 +4156,7 @@ def _production_dispatch_handoffs(
             })
             process = subprocess.Popen(
                 [str(sandbox), "-f", profile.name, *command],
-                cwd=skill_root,
+                cwd=workspace_root,
                 env=worker_environment,
                 stdout=stdout_handle,
                 stderr=stderr_handle,

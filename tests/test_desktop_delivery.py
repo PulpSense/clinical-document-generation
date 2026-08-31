@@ -264,6 +264,7 @@ def test_production_verifier_relies_on_parent_validation_without_terminal_consen
             "task": "rendered_page_visual_verification",
         },
         {"model_identifier": "test-model"},
+        workspace_root=tmp_path,
     )
 
     assert "The Desktop parent validates it automatically" in prompt
@@ -466,6 +467,7 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
 
     def stop(command, **kwargs):
         captured["command"] = command
+        captured["cwd"] = kwargs["cwd"]
         captured["environment"] = kwargs["env"]
         captured["profile_path"] = tmp_path / "captured-production-profile.sb"
         shutil.copyfile(command[2], captured["profile_path"])
@@ -483,6 +485,13 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
         )
 
     assert captured["command"][0] == "/usr/bin/sandbox-exec"
+    assert captured["cwd"] == tmp_path
+    prompt = next(part for part in captured["command"] if part.startswith("Complete one isolated"))
+    assert str(skill_root.resolve()) not in prompt
+    assert str((run_dir / "revision").resolve()) not in prompt
+    assert "profile/skills/clinical-document-generation/SKILL.md" in prompt
+    assert "run/revision/hermes/requests/a.json" in prompt
+    assert "run/revision/hermes/responses/a.json" in prompt
     assert "deny file-read*" in captured["profile"]
     read_rules = "\n".join(
         line for line in captured["profile"].splitlines() if "deny file-read*" in line
@@ -509,6 +518,29 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
         capture_output=True, check=False,
     )
     assert completed.returncode == 0, completed.stderr
+    response_dir = run_dir / "revision/hermes/responses"
+    response_dir.mkdir(parents=True)
+    relative_response = "run/revision/hermes/responses/probe.json"
+    allowed_write = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+            "/usr/bin/python3", "-c",
+            f"from pathlib import Path; Path({relative_response!r}).write_text('passed')",
+        ],
+        cwd=tmp_path, capture_output=True, check=False,
+    )
+    assert allowed_write.returncode == 0, allowed_write.stderr
+    assert (tmp_path / relative_response).read_text(encoding="utf-8") == "passed"
+    denied_skill_write = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+            "/usr/bin/python3", "-c",
+            "from pathlib import Path; Path('profile/skills/clinical-document-generation/probe').write_text('blocked')",
+        ],
+        cwd=tmp_path, capture_output=True, check=False,
+    )
+    assert denied_skill_write.returncode != 0
+    assert not (skill_root / "probe").exists()
     denied_file = unrelated / "created-after-profile"
     denied_file.write_text("denied", encoding="utf-8")
     denied = subprocess.run(
