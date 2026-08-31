@@ -389,25 +389,23 @@ def test_layout_repair_is_scoped_to_one_artifact_and_rule(tmp_path):
     assert repaired["contracted_template_bundle"]["layout_preservation_baseline"] == baseline["contracted_template_bundle"]["layout_preservation_baseline"]
 
 
-def test_body_pagination_repair_overrides_only_the_named_body_heading(tmp_path):
-    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks():
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "artificial_pagination",
+        "element": "15. REFERENCES",
+        "target_ids": ["layout:protocol"],
+        "issue": "A later template-owned heading starts on a new page.",
+    }
 
-    render_documents(
-        ROOT,
-        tmp_path,
-        reference,
-        {"protocol": [], "icf": {}, "prs": {}},
-        artifact_names={"protocol"},
-        layout_repairs={"protocol": ({"rule": "body_pagination", "target": "6. OBJECTIVE(S)"},)},
-    )
+    plan, unsupported = workflow._layout_repair_plan([finding])
 
-    protocol = Document(tmp_path / "candidate/protocol.docx")
-    target = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "6. OBJECTIVE(S)")
-    title = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "1. TITLE PAGE")
-    toc = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "4. TABLE OF CONTENTS")
-    assert target.paragraph_format.page_break_before is False
-    assert title.paragraph_format.page_break_before is not False
-    assert toc.paragraph_format.page_break_before is not False
+    assert plan == {}
+    assert unsupported == [{
+        **finding,
+        "required": "Classify the visual defect with one supported artifact, Layout Contract check, and exact heading or table-caption element before deterministic repair.",
+    }]
 
 
 def _visible_formatting_fingerprint(path):

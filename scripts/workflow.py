@@ -14,13 +14,17 @@ import os
 import platform
 import pwd
 import re
+import select
 import shlex
 import shutil
 import signal
+import socket
+import socketserver
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
@@ -3785,7 +3789,7 @@ def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
         name: os.environ[name]
         for name in (
             "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR",
-            "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY",
+            "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
         )
         if os.environ.get(name)
     }
@@ -3846,6 +3850,94 @@ def _production_read_boundaries() -> tuple[Path, ...]:
     ))
 
 
+PRODUCTION_HERMES_NETWORK_HOST = "chatgpt.com"
+PRODUCTION_HERMES_NETWORK_PORT = 443
+
+
+class _ProductionConnectProxyHandler(socketserver.BaseRequestHandler):
+    def handle(self) -> None:
+        client = self.request
+        client.settimeout(10.0)
+        request = b""
+        while b"\r\n\r\n" not in request and len(request) <= 16 * 1024:
+            chunk = client.recv(4096)
+            if not chunk:
+                return
+            request += chunk
+        if b"\r\n\r\n" not in request or len(request) > 16 * 1024:
+            client.sendall(b"HTTP/1.1 431 Request Header Fields Too Large\r\n\r\n")
+            return
+        header, pending = request.split(b"\r\n\r\n", 1)
+        try:
+            method, target, version = header.split(b"\r\n", 1)[0].decode("ascii").split()
+        except (UnicodeDecodeError, ValueError):
+            client.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+            return
+        server = self.server
+        if not isinstance(server, _ProductionConnectProxyServer):
+            return
+        expected = f"{server.governed_host}:{server.governed_port}"
+        if method != "CONNECT" or target.casefold() != expected.casefold() or version not in {"HTTP/1.0", "HTTP/1.1"}:
+            client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+            return
+        try:
+            upstream = socket.create_connection(
+                (server.governed_host, server.governed_port), timeout=10.0,
+            )
+        except OSError:
+            client.sendall(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
+            return
+        with upstream:
+            client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            if pending:
+                upstream.sendall(pending)
+            client.settimeout(None)
+            upstream.settimeout(None)
+            peers = (client, upstream)
+            while True:
+                readable, _, _ = select.select(peers, (), (), 1.0)
+                for source in readable:
+                    payload = source.recv(64 * 1024)
+                    if not payload:
+                        return
+                    (upstream if source is client else client).sendall(payload)
+
+
+class _ProductionConnectProxyServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = False
+    daemon_threads = True
+
+    def __init__(self, host: str, port: int):
+        self.governed_host = host
+        self.governed_port = port
+        super().__init__(("127.0.0.1", 0), _ProductionConnectProxyHandler)
+
+
+@dataclass
+class _ProductionConnectProxy:
+    server: _ProductionConnectProxyServer
+    thread: threading.Thread
+
+    @property
+    def port(self) -> int:
+        return int(self.server.server_address[1])
+
+    def close(self) -> None:
+        self.server.shutdown()
+        self.server.server_close()
+        self.thread.join(timeout=5.0)
+
+
+def _start_production_connect_proxy(
+    host: str = PRODUCTION_HERMES_NETWORK_HOST,
+    port: int = PRODUCTION_HERMES_NETWORK_PORT,
+) -> _ProductionConnectProxy:
+    server = _ProductionConnectProxyServer(host, port)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return _ProductionConnectProxy(server=server, thread=thread)
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -3858,7 +3950,7 @@ def _production_dispatch_handoffs(
     expected_managed_hermes_identity: Mapping[str, str] | None = None,
 ) -> None:
     """Run one concurrent Hermes wave under a read-only candidate boundary."""
-    processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float]] = []
+    processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
     deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
     logs = run_dir / "logs/hermes-agents"
     logs.mkdir(parents=True, exist_ok=True)
@@ -3880,6 +3972,7 @@ def _production_dispatch_handoffs(
     runtime_root = runtime_executable.parent.parent
 
     for handoff in handoffs:
+        proxy = _start_production_connect_proxy()
         started = time.monotonic()
         request_id = Path(str(handoff["request_path"])).stem
         cache_dir = run_dir / ".hermes-cache"
@@ -3888,6 +3981,8 @@ def _production_dispatch_handoffs(
             "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
         )
         profile.write("(version 1)\n(allow default)\n")
+        profile.write("(deny network*)\n")
+        profile.write(f"(allow network-outbound (remote tcp \"localhost:{proxy.port}\"))\n")
         readable_roots = (
             Path("/System"), Path("/usr"), Path("/bin"), Path("/sbin"),
             Path("/Library"), Path("/Applications/LibreOffice.app"),
@@ -3926,21 +4021,34 @@ def _production_dispatch_handoffs(
             command.append("--safe-mode")
         stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
         stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
-        process = subprocess.Popen(
-            [str(sandbox), "-f", profile.name, *command],
-            cwd=skill_root,
-            env=environment,
-            stdout=stdout_handle,
-            stderr=stderr_handle,
-            text=True,
-            start_new_session=True,
-        )
-        processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started))
+        worker_environment = dict(environment)
+        worker_environment.update({
+            "HTTPS_PROXY": f"http://127.0.0.1:{proxy.port}",
+            "HTTP_PROXY": f"http://127.0.0.1:{proxy.port}",
+            "ALL_PROXY": f"http://127.0.0.1:{proxy.port}",
+            "NO_PROXY": "",
+        })
+        try:
+            process = subprocess.Popen(
+                [str(sandbox), "-f", profile.name, *command],
+                cwd=skill_root,
+                env=worker_environment,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+                text=True,
+                start_new_session=True,
+            )
+        except BaseException:
+            stdout_handle.close()
+            stderr_handle.close()
+            proxy.close()
+            raise
+        processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started, proxy))
     try:
         pending = list(processes)
         while pending and time.monotonic() < deadline:
             for row in list(pending):
-                process, handoff, _, _, _, _ = row
+                process, handoff, _, _, _, _, _ = row
                 if _production_response_is_bound(
                     revision_dir, handoff,
                     model_identifier=str(configuration["model_identifier"]),
@@ -3958,7 +4066,7 @@ def _production_dispatch_handoffs(
                 time.sleep(0.05)
         missing = [
             str(handoff.get("response_path") or "")
-            for process, handoff, _, _, _, _ in processes
+            for process, handoff, _, _, _, _, _ in processes
             if not _production_response_is_bound(
                 revision_dir, handoff,
                 model_identifier=str(configuration["model_identifier"]),
@@ -3969,7 +4077,7 @@ def _production_dispatch_handoffs(
                 "Hermes workers did not produce complete bound responses: " + ", ".join(missing)
             )
     finally:
-        for process, handoff, stdout_handle, stderr_handle, profile, started in processes:
+        for process, handoff, stdout_handle, stderr_handle, profile, started, proxy in processes:
             if process.poll() is None:
                 try:
                     os.killpg(process.pid, signal.SIGTERM)
@@ -3985,6 +4093,7 @@ def _production_dispatch_handoffs(
             stdout_handle.close()
             stderr_handle.close()
             profile.unlink(missing_ok=True)
+            proxy.close()
             event_path = run_dir / "logs/hermes-agent-events.jsonl"
             event_path.parent.mkdir(parents=True, exist_ok=True)
             response_path = revision_dir / str(handoff.get("response_path") or "")

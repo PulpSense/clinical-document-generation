@@ -2,8 +2,11 @@ import json
 import os
 from pathlib import Path
 import shutil
+import socket
+import socketserver
 import subprocess
 import sys
+import threading
 
 import pytest
 
@@ -460,10 +463,11 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
         lambda: (Path("/managed/hermes/venv/bin/hermes"), Path(sys.executable)),
     )
 
-    def stop(command, **_kwargs):
+    def stop(command, **kwargs):
         captured["command"] = command
+        captured["environment"] = kwargs["env"]
         captured["profile_path"] = Path(command[2])
-        captured["profile"] = Path(command[2]).read_text(encoding="utf-8")
+        captured["profile"] = captured["profile_path"].read_text(encoding="utf-8")
         raise RuntimeError("probe complete")
 
     real_popen = subprocess.Popen
@@ -490,6 +494,13 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     assert str(skill_root.resolve()) in allow_rules
     assert str(run_dir.resolve()) in allow_rules
     assert str(unrelated.resolve()) not in allow_rules
+    assert "(deny network*)" in captured["profile"]
+    proxy_url = captured["environment"]["HTTPS_PROXY"]
+    assert proxy_url.startswith("http://127.0.0.1:")
+    assert captured["environment"]["HTTP_PROXY"] == proxy_url
+    assert captured["environment"]["ALL_PROXY"] == proxy_url
+    assert captured["environment"]["NO_PROXY"] == ""
+    assert f'(remote tcp "localhost:{proxy_url.rsplit(":", 1)[1]}")' in captured["profile"]
     monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
     completed = subprocess.run(
         ["/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/true"],
@@ -508,6 +519,35 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     )
     assert denied.returncode != 0
     captured["profile_path"].unlink(missing_ok=True)
+
+
+def test_production_connect_proxy_relays_only_the_governed_target():
+    class EchoHandler(socketserver.BaseRequestHandler):
+        def handle(self):
+            while payload := self.request.recv(4096):
+                self.request.sendall(payload)
+
+    upstream = socketserver.ThreadingTCPServer(("127.0.0.1", 0), EchoHandler)
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    proxy = workflow._start_production_connect_proxy(
+        "127.0.0.1", int(upstream.server_address[1]),
+    )
+    try:
+        with socket.create_connection(("127.0.0.1", proxy.port), timeout=2.0) as client:
+            target = f"127.0.0.1:{upstream.server_address[1]}"
+            client.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode("ascii"))
+            assert client.recv(4096).startswith(b"HTTP/1.1 200")
+            client.sendall(b"governed-relay")
+            assert client.recv(4096) == b"governed-relay"
+        with socket.create_connection(("127.0.0.1", proxy.port), timeout=2.0) as client:
+            client.sendall(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            assert client.recv(4096).startswith(b"HTTP/1.1 403")
+    finally:
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5.0)
 
 
 def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, monkeypatch):

@@ -2055,26 +2055,6 @@ def _repair_heading_cohesion(document: Document, target: str, *, protocol: bool)
                 paragraph.paragraph_format.widow_control = True
 
 
-def _repair_protocol_body_pagination(document: Document, target: str) -> None:
-    """Remove an evidenced forced start from one numbered Protocol heading."""
-    heading = _target_heading(document, target, protocol=True)
-    key = _protocol_heading_key(heading.text)
-    if key in {_protocol_heading_key("1. TITLE PAGE"), _protocol_heading_key("TABLE OF CONTENTS")}:
-        raise LayoutRepairTargetError(f"Front matter is not a body-pagination repair target: {target}")
-    if not re.match(r"^\d+(?:\.\d+)*\.?\s+", heading.text.strip()):
-        raise LayoutRepairTargetError(f"Body-pagination repair target is not a numbered Protocol heading: {target}")
-    # An explicit false also overrides a style-level forced page start.
-    heading.paragraph_format.page_break_before = False
-    previous = heading._p.getprevious()
-    while previous is not None and previous.tag == qn("w:p"):
-        paragraph = Paragraph(previous, document)
-        if paragraph.text.strip():
-            break
-        for page_break in list(previous.xpath('.//w:br[@w:type="page"]')):
-            page_break.getparent().remove(page_break)
-        previous = previous.getprevious()
-
-
 def _table_caption_paragraphs(document: Document, table: Table) -> list[Paragraph]:
     paragraphs: list[Paragraph] = []
     previous = table._tbl.getprevious()
@@ -2311,8 +2291,6 @@ def _template_document(
         target = repair["target"]
         if rule == "heading_cohesion":
             _repair_heading_cohesion(document, target, protocol=not icf)
-        elif rule == "body_pagination" and not icf:
-            _repair_protocol_body_pagination(document, target)
         elif rule == "table_pagination":
             _repair_table_pagination(document, target)
     _set_update_fields(document)
