@@ -408,6 +408,22 @@ def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks(
     }]
 
 
+def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
+    finding = {
+        "category": "visual",
+        "artifact": "icf",
+        "check": "excessive_whitespace",
+        "element": "DURATION",
+        "target_ids": ["layout:icf"],
+        "issue": "A large vertical gap separates DURATION from its first substantive paragraph.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding])
+
+    assert plan == {"icf": [{"rule": "heading_cohesion", "target": "DURATION"}]}
+    assert unsupported == []
+
+
 def _visible_formatting_fingerprint(path):
     document = Document(path)
     paragraph_layout = tuple(
