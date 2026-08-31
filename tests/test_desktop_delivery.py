@@ -235,15 +235,15 @@ def test_shipped_production_adapter_drives_actual_desktop_operation(tmp_path, mo
     })
     dispatched = []
 
-    def dispatch(handoffs, remaining_seconds, revision_dir, configuration):
+    def dispatch(handoffs, remaining_seconds, revision_dir, configuration, **_kwargs):
         assert remaining_seconds > 0
         assert revision_dir == tmp_path / "revisions/r1"
         assert configuration["safe_mode"] is True
         dispatched.extend(handoff["task"] for handoff in handoffs)
 
+    monkeypatch.setattr(workflow, "_production_dispatch_handoffs", dispatch)
     result = workflow.run_production_desktop_operation(
         tmp_path,
-        dispatch_handoffs=dispatch,
         opener=lambda _path: b"1234",
         release_identity={"package_fingerprint": "production-candidate"},
     )

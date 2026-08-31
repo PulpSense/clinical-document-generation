@@ -260,16 +260,40 @@ def normalized_docx_format_signature(path: Path) -> dict[str, Any]:
         for index, text, style, _ in visible_paragraphs if legal_pattern.search(text)
     ]
     headings = []
+    protocol_document = path.name == "protocol.docx"
+    style_page_breaks = {
+        str(style_node.get(qn("w:styleId"), ""))
+        for style_node in styles_xml.xpath(".//*[local-name()='style']")
+        if style_node.xpath("./*[local-name()='pPr']/*[local-name()='pageBreakBefore']")
+    }
     for index, text, style, paragraph in visible_paragraphs:
         if not style.casefold().startswith("heading"):
             continue
         ppr_matches = paragraph.xpath("./*[local-name()='pPr']")
         ppr = ppr_matches[0] if ppr_matches else None
+        direct_page_break = bool(ppr is not None and ppr.xpath("./*[local-name()='pageBreakBefore']"))
+        effective_page_boundary = direct_page_break or style in style_page_breaks
+        if protocol_document and not effective_page_boundary:
+            previous = paragraph.getprevious()
+            while previous is not None and ET.QName(previous).localname == "p":
+                if previous.xpath('.//*[local-name()="br" and @*[local-name()="type"]="page"]'):
+                    effective_page_boundary = True
+                    break
+                section = previous.xpath("./*[local-name()='pPr']/*[local-name()='sectPr']")
+                if section and not section[0].xpath(
+                    "./*[local-name()='type' and @*[local-name()='val']='continuous']"
+                ):
+                    effective_page_boundary = True
+                    break
+                if previous.xpath('.//*[local-name()="t" and normalize-space(text())]'):
+                    break
+                previous = previous.getprevious()
         headings.append({
             "paragraph": index,
             "text": text,
             "style": style,
-            "page_break_before": bool(ppr is not None and ppr.xpath("./*[local-name()='pageBreakBefore']")),
+            "page_break_before": direct_page_break,
+            **({"effective_page_boundary": effective_page_boundary} if protocol_document else {}),
             "keep_with_next": bool(ppr is not None and ppr.xpath("./*[local-name()='keepNext']")),
         })
     field_codes = [" ".join(str(node.text or "").split()) for node in document_xml.xpath(".//*[local-name()='instrText']")]

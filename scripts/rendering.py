@@ -711,6 +711,22 @@ def _replace_protocol_leaf_bodies(
                 next_level = _heading_level(paragraph)
                 if next_level is not None and next_level <= level:
                     break
+                if (
+                    not paragraph.text.strip()
+                    and paragraph._p.xpath('.//w:br[@w:type="page"]')
+                ):
+                    following = element.getnext()
+                    while following is not None and following.tag == qn("w:p"):
+                        following_paragraph = Paragraph(following, document)
+                        if following_paragraph.text.strip():
+                            break
+                        following = following.getnext()
+                    if (
+                        following is not None
+                        and following.tag == qn("w:p")
+                        and _heading_level(Paragraph(following, document)) is not None
+                    ):
+                        break
                 if section.section_id in table_sections and paragraph.text.strip().casefold().startswith("table "):
                     caption_open = True
                     continue

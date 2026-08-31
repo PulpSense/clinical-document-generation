@@ -4333,7 +4333,6 @@ def _certification_preflight_authorizes_candidate(
 def run_production_desktop_operation(
     run_dir: Path,
     *,
-    dispatch_handoffs: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None] | None = None,
     opener: Callable[[str], Any] | None = None,
     parent_visual_reviewer: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None] | None = None,
     release_identity: Mapping[str, Any] | None = None,
@@ -4409,15 +4408,11 @@ def run_production_desktop_operation(
         return run_dir / "revisions" / revision_id
 
     def route(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
-        selected = dispatch_handoffs
-        if selected is None:
-            _production_dispatch_handoffs(
-                handoffs, remaining_seconds, revision_dir(), configuration,
-                skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
-                expected_managed_hermes_identity=managed_hermes_identity,
-            )
-        else:
-            selected(handoffs, remaining_seconds, revision_dir(), configuration)
+        _production_dispatch_handoffs(
+            handoffs, remaining_seconds, revision_dir(), configuration,
+            skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
+            expected_managed_hermes_identity=managed_hermes_identity,
+        )
 
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
         active_revision = revision_dir()

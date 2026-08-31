@@ -15,7 +15,7 @@ from pypdf import PdfReader, PdfWriter
 from contracts import batch_plan
 from drafting import create_drafting_request, recorded_acceptance_response, validate_response
 from quality import deterministic_content_check, render_pages, sha256_file
-from rendering import _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
+from rendering import _has_page_boundary_before, _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -2111,6 +2111,44 @@ def test_protocol_toc_boundaries_preserve_selected_client_template_without_packa
         output_media = {name for name in output_package.namelist() if name.startswith("word/media/")}
     assert output_media == template_media
     assert output_path.stat().st_size <= template_path.stat().st_size + 256 * 1024
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    ("prospective-acceptance-source.json", "ambispective-acceptance-source.json"),
+)
+def test_leaf_body_replacement_preserves_template_break_before_section_15(
+    tmp_path, fixture_name,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8")
+    )
+    report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {
+            "protocol": [{
+                "section_id": "ethics.confidentiality",
+                "paragraphs": [{"text": "Approved confidentiality replacement."}],
+                "lists": [],
+            }],
+            "icf": {},
+            "prs": {},
+        },
+        artifact_names={"protocol"},
+    )
+
+    assert report["status"] == "passed"
+    document = Document(tmp_path / "candidate/protocol.docx")
+    section_15 = next(
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.strip() == "15. STANDARD EVALUATION PROCEDURES"
+    )
+    assert _has_page_boundary_before(section_15) is True
+    previous = section_15._p.getprevious()
+    assert previous is not None
+    assert previous.xpath('.//w:br[@w:type="page"]')
 
 
 def test_protocol_toc_boundaries_are_added_once_when_template_has_none_and_toc_spans_pages():
