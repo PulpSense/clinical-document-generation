@@ -2101,6 +2101,8 @@ def test_protocol_toc_boundaries_preserve_selected_client_template_without_packa
     assert protocol_report["template"].endswith(expected_template)
     assert protocol_report["template_sha256"] == sha256_file(template_path)
     assert _page_boundary_before(toc)
+    if expected_template == "retrospective-protocol.template.docx":
+        assert toc.paragraph_format.page_break_before is not True
     assert _page_boundary_before(first_body)
     assert first_body.paragraph_format.page_break_before is not True
     assert all(

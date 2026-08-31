@@ -535,6 +535,22 @@ def _replace_protocol_investigator_agreement(
             paragraph = Paragraph(element, document)
             if _heading_level(paragraph) is not None:
                 break
+            if (
+                not paragraph.text.strip()
+                and paragraph._p.xpath('.//w:br[@w:type="page"]')
+            ):
+                following = element.getnext()
+                while following is not None and following.tag == qn("w:p"):
+                    following_paragraph = Paragraph(following, document)
+                    if following_paragraph.text.strip():
+                        break
+                    following = following.getnext()
+                if (
+                    following is not None
+                    and following.tag == qn("w:p")
+                    and _heading_level(Paragraph(following, document)) is not None
+                ):
+                    break
             parent.remove(element)
     agreement_key = "investigator-agreement-retrospective" if branch == "Retrospective" else "investigator-agreement-prospective"
     statements = [
