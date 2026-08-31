@@ -437,8 +437,11 @@ def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypat
 def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     run_dir = tmp_path / "run"
+    unrelated = tmp_path / "unrelated-checkout"
     skill_root.mkdir(parents=True)
+    unrelated.mkdir()
     captured = {}
+    monkeypatch.setattr(workflow.tempfile, "gettempdir", lambda: str(tmp_path))
     monkeypatch.setattr(workflow, "_production_sandbox_executable", lambda: Path("/usr/bin/sandbox-exec"))
     monkeypatch.setattr(
         workflow, "_managed_hermes_pair",
@@ -468,6 +471,7 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     )
     assert str(skill_root.resolve()) not in read_rules
     assert str(run_dir.resolve()) not in read_rules
+    assert str(unrelated.resolve()) in read_rules
     monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
     completed = subprocess.run(
         ["/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/true"],

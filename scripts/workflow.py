@@ -3833,22 +3833,27 @@ def _production_read_denials(
     boundary_roots: Sequence[Path] | None = None,
 ) -> list[Path]:
     """Carve governed readable roots out of user, temporary, and volume trees."""
-    allowed = tuple(dict.fromkeys(path.absolute() for path in readable_roots))
+    allowed = tuple(dict.fromkeys(path.resolve(strict=False) for path in readable_roots))
     boundaries = boundary_roots or (
-        Path("/Users"), Path("/private/tmp"), Path("/Volumes"),
+        Path("/Users"), Path("/private/tmp"), Path(tempfile.gettempdir()), Path("/Volumes"),
     )
     denied: list[Path] = []
 
     def carve(root: Path) -> None:
+        if root in allowed or any(item in root.parents for item in allowed):
+            return
+        if not any(root in item.parents for item in allowed):
+            denied.append(root)
+            return
         try:
             children = sorted(root.iterdir(), key=lambda path: path.name)
         except OSError:
             return
         for child in children:
-            lexical = child.absolute()
             if child.is_symlink():
-                denied.append(lexical)
+                denied.append(child.absolute())
                 continue
+            lexical = child.resolve(strict=False)
             if any(lexical == item or lexical in item.parents for item in allowed):
                 if lexical not in allowed:
                     carve(lexical)
@@ -3858,7 +3863,7 @@ def _production_read_denials(
             denied.append(lexical)
 
     for boundary in boundaries:
-        carve(boundary.absolute())
+        carve(boundary.resolve(strict=False))
     return list(dict.fromkeys(denied))
 
 
