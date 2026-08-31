@@ -2499,15 +2499,16 @@ def _release_certification_evidence_bundle(
     }
 
 
-def certify_release_corpus(
+def _reduce_release_certification_corpus(
     case_report_paths: Sequence[Path],
     *,
     release_root: Path,
     preflight_path: Path,
+    controller_report_sha256: Mapping[str, str],
     output_path: Path | None = None,
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
-    """Reduce three immutable real-Hermes case reports into one release decision."""
+    """Reduce case reports bound in memory by the sealed corpus controller."""
     certified_workflow, certified_identity = _certified_release(release_root.resolve())
     fixtures = {
         str(fixture["fixture_id"]): fixture
@@ -2543,6 +2544,10 @@ def certify_release_corpus(
         if report.get("certification_scope") != "production_single_case_tracer":
             case_findings.append(
                 "Case report was not produced by the sealed production certification adapter."
+            )
+        if controller_report_sha256.get(str(path)) != _sha256(path):
+            case_findings.append(
+                "Case report is not byte-bound to the sealed production corpus controller."
             )
         managed_identity = identity.get("managed_hermes_identity")
         identities.append({
@@ -2723,6 +2728,25 @@ def certify_release_corpus(
     return result
 
 
+def certify_release_corpus(
+    case_report_paths: Sequence[Path],
+    *,
+    release_root: Path,
+    preflight_path: Path,
+    output_path: Path | None = None,
+    fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
+) -> dict[str, Any]:
+    """Fail closed when reports were not captured by the sealed corpus controller."""
+    return _reduce_release_certification_corpus(
+        case_report_paths,
+        release_root=release_root,
+        preflight_path=preflight_path,
+        controller_report_sha256={},
+        output_path=output_path,
+        fixture_root=fixture_root,
+    )
+
+
 def run_release_certification_corpus(
     *,
     release_root: Path,
@@ -2765,6 +2789,7 @@ def run_release_certification_corpus(
     attempt_root = run_root / attempt_id
     attempt_root.mkdir()
     report_paths: list[Path] = []
+    controller_report_sha256: dict[str, str] = {}
     for fixture in fixtures:
         fixture_id = str(fixture["fixture_id"])
         run_dir = attempt_root / fixture_id
@@ -2790,6 +2815,7 @@ def run_release_certification_corpus(
         )
         report_path = run_dir / "logs/hermes-integration-report.json"
         report_paths.append(report_path)
+        controller_report_sha256[str(report_path.resolve())] = _sha256(report_path.resolve())
         try:
             elapsed = float(
                 (report.get("approval_to_confirmed_retrieval_evidence") or {}).get("elapsed_seconds")
@@ -2803,10 +2829,11 @@ def run_release_certification_corpus(
             or _certification_runtime_exceeded(fixture_id, elapsed)
         ):
             break
-    return certify_release_corpus(
+    return _reduce_release_certification_corpus(
         report_paths,
         release_root=release_root,
         preflight_path=preflight_path,
+        controller_report_sha256=controller_report_sha256,
         output_path=attempt_root / "release-certification-corpus.json",
         fixture_root=fixture_root,
     )

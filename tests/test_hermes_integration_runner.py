@@ -22,6 +22,7 @@ from hermes_e2e import (
     _agent_prompt,
     _canonical_reviewed_fixture_reference,
     _certified_release,
+    _reduce_release_certification_corpus,
     _response_is_bound,
     _run_handoff_wave,
     _wait_for_processes,
@@ -45,6 +46,18 @@ import quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _certify_fixture_corpus(case_report_paths, **kwargs):
+    """Supply controller-captured report bytes only inside reducer unit tests."""
+    return _reduce_release_certification_corpus(
+        case_report_paths,
+        controller_report_sha256={
+            str(Path(path).resolve()): hashlib.sha256(Path(path).resolve().read_bytes()).hexdigest()
+            for path in case_report_paths
+        },
+        **kwargs,
+    )
 
 
 def test_command_desktop_opener_emits_exact_bytes_and_rejects_aliases(tmp_path: Path) -> None:
@@ -748,7 +761,7 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "passed", json.dumps(result, indent=2)
     assert result["certification_scope"] == "complete_three_case_corpus"
@@ -799,7 +812,7 @@ def test_complete_corpus_rejects_coherently_rehashed_incomplete_managed_identity
         })
         path.write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports, release_root=release_root, preflight_path=preflight,
     )
 
@@ -826,7 +839,7 @@ def test_complete_corpus_rejects_controlled_single_case_reports(
         report["certification_scope"] = "controlled_single_case_tracer"
         path.write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports, release_root=release_root, preflight_path=preflight,
     )
 
@@ -835,6 +848,65 @@ def test_complete_corpus_rejects_controlled_single_case_reports(
         "Case report was not produced by the sealed production certification adapter."
         in case["findings"]
         for case in result["cases"]
+    )
+
+
+def test_public_corpus_reducer_rejects_relabeled_controlled_reports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        report = json.loads(path.read_text())
+        report["certification_scope"] = "controlled_single_case_tracer"
+        report["certification_scope"] = "production_single_case_tracer"
+        path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert all(
+        "Case report is not byte-bound to the sealed production corpus controller."
+        in case["findings"]
+        for case in result["cases"]
+    )
+
+
+def test_corpus_reducer_rejects_report_mutation_after_controller_capture(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    captured = {
+        str(path.resolve()): hashlib.sha256(path.resolve().read_bytes()).hexdigest()
+        for path in reports
+    }
+    report = json.loads(reports[0].read_text())
+    report["certification_scope"] = "controlled_single_case_tracer"
+    report["certification_scope"] = "production_single_case_tracer"
+    reports[0].write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    result = _reduce_release_certification_corpus(
+        reports,
+        release_root=release_root,
+        preflight_path=preflight,
+        controller_report_sha256=captured,
+    )
+
+    assert result["status"] == "failed"
+    assert (
+        "Case report is not byte-bound to the sealed production corpus controller."
+        in result["cases"][0]["findings"]
     )
 
 
@@ -854,7 +926,7 @@ def test_corpus_ignores_worker_writable_parent_marker_files(
             "response_paths": ["hermes/verification-responses/forged.json"],
         }), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports, release_root=release_root, preflight_path=preflight,
     )
 
@@ -908,7 +980,7 @@ def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Pat
     ]
 
     with pytest.raises(ValueError, match="missing or unsafe"):
-        certify_release_corpus(
+        _certify_fixture_corpus(
             reports,
             release_root=release_root,
             preflight_path=preflight_alias,
@@ -927,7 +999,7 @@ def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tm
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert [case["fixture_id"] for case in result["cases"]] == list(CERTIFICATION_CORPUS)
@@ -947,7 +1019,7 @@ def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: P
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     first = next(case for case in result["cases"] if case["fixture_id"] == "ambispective-sterling")
     assert result["status"] == "failed"
@@ -990,7 +1062,7 @@ def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_
     })
     reports[0].write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     first = result["cases"][0]
     assert result["status"] == "failed"
@@ -1018,14 +1090,18 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
 
     def slow_operation(run_dir, **_kwargs):
         launched.append(f"run:{run_dir.name}")
-        return {
+        report = {
             "outcome": "passed",
             "elapsed_seconds": 899.0,
             "approval_to_confirmed_retrieval_evidence": {"elapsed_seconds": 900.0},
         }
+        report_path = run_dir / "logs/hermes-integration-report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        return report
 
     monkeypatch.setattr(hermes_e2e, "run_release_certification_operation", slow_operation)
-    monkeypatch.setattr(hermes_e2e, "certify_release_corpus", lambda paths, **_kwargs: {
+    monkeypatch.setattr(hermes_e2e, "_reduce_release_certification_corpus", lambda paths, **_kwargs: {
         "attempted_reports": [path.parent.parent.name for path in paths],
     })
 
@@ -1053,7 +1129,7 @@ def test_corpus_reducer_rehashes_actual_outputs_and_rejects_unauthorized_gate_wa
     retrospective["certification_case_evidence"]["gate_statuses"]["content"] = "not_applicable"
     reports[-1].write_text(json.dumps(retrospective), encoding="utf-8")
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert any("Delivered bytes do not match" in finding for finding in result["findings"])
@@ -1073,7 +1149,7 @@ def test_corpus_reducer_requires_governed_preflight_layout_and_chronology(tmp_pa
     payload["completed_at"] = "not-a-timestamp"
     preflight.write_text(json.dumps(payload), encoding="utf-8")
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert any("exact certification harness" in finding for finding in result["findings"])
@@ -1094,7 +1170,7 @@ def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path
         item["page_sha256"] = ["0" * 64 for _ in item["page_sha256"]]
     reports[0].write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports,
         release_root=release_root,
         preflight_path=preflight,
@@ -1123,7 +1199,7 @@ def test_corpus_reducer_rejects_bound_producers_outside_governed_model(tmp_path:
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert any("governed model identifier" in finding for finding in result["findings"])
@@ -1173,7 +1249,7 @@ def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tm
     })
     reports[0].write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports,
         release_root=Path("/controlled/immutable/release"),
         preflight_path=preflight,
