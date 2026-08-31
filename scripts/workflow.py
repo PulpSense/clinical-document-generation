@@ -3903,6 +3903,7 @@ def _production_dispatch_handoffs(
     ):
         raise RuntimeError("The managed Hermes launcher or interpreter changed after operation binding.")
     hermes_install_root = hermes_launcher.parent.parent.parent
+    managed_interpreter_root = managed_python.resolve(strict=True).parent.parent
     runtime_executable = Path(str(runtime_identity["executable"])).absolute()
     runtime_root = runtime_executable.parent.parent
 
@@ -3926,6 +3927,9 @@ def _production_dispatch_handoffs(
             profile.write(
                 f"(deny file-read* ({filter_name} {json.dumps(str(denied_path))}))\n"
             )
+        profile.write(
+            f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n"
+        )
         profile.write(
             "(deny file-write* (require-not (require-any "
             f"(subpath {json.dumps(str(hermes_home.resolve()))}) "

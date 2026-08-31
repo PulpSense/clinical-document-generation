@@ -1,5 +1,7 @@
 import json
+import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -455,7 +457,7 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_production_sandbox_executable", lambda: Path("/usr/bin/sandbox-exec"))
     monkeypatch.setattr(
         workflow, "_managed_hermes_pair",
-        lambda: (Path("/managed/hermes/venv/bin/hermes"), Path("/managed/hermes/venv/bin/python")),
+        lambda: (Path("/managed/hermes/venv/bin/hermes"), Path(sys.executable)),
     )
 
     def stop(command, **_kwargs):
@@ -489,6 +491,76 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     )
     assert completed.returncode == 0, completed.stderr
     captured["profile_path"].unlink(missing_ok=True)
+
+
+def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, monkeypatch):
+    probe_root = Path("/private/tmp") / f"issue56-managed-sandbox-{os.getpid()}"
+    shutil.rmtree(probe_root, ignore_errors=True)
+    skill_root = probe_root / "profile/skills/clinical-document-generation"
+    run_dir = probe_root / "run"
+    launcher = probe_root / "managed/hermes/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    managed_python = launcher.parent / "python"
+    managed_python.symlink_to(Path(sys.executable).resolve())
+    skill_root.mkdir(parents=True)
+    unrelated_home_file = Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt"
+    unrelated_home_file.write_text("denied", encoding="utf-8")
+    captured = {}
+    monkeypatch.setattr(
+        workflow, "_managed_hermes_pair", lambda: (launcher, managed_python),
+    )
+    real_popen = subprocess.Popen
+
+    def stop(command, **_kwargs):
+        captured["profile_path"] = Path(command[2])
+        raise RuntimeError("probe complete")
+
+    monkeypatch.setattr(workflow.subprocess, "Popen", stop)
+    try:
+        with pytest.raises(RuntimeError, match="probe complete"):
+            workflow._production_dispatch_handoffs(
+                [{
+                    "request_path": "hermes/requests/a.json",
+                    "response_path": "hermes/responses/a.json",
+                }],
+                30.0,
+                run_dir / "revision",
+                workflow.CERTIFIED_HERMES_CONFIGURATION,
+                skill_root=skill_root,
+                run_dir=run_dir,
+                runtime_identity={"executable": "/usr/bin/python3"},
+            )
+        monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
+        assert captured["profile_path"].stat().st_size <= 65_535
+
+        for interpreter in (managed_python, managed_python.resolve(strict=True)):
+            completed = subprocess.run(
+                [
+                    "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+                    str(interpreter), "-c", "print('managed-interpreter-ok')",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert completed.returncode == 0, completed.stderr
+            assert completed.stdout.strip() == "managed-interpreter-ok"
+
+        denied = subprocess.run(
+            [
+                "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+                "/bin/cat", str(unrelated_home_file),
+            ],
+            capture_output=True,
+            check=False,
+        )
+        assert denied.returncode != 0
+    finally:
+        Path(captured.get("profile_path", "")).unlink(missing_ok=True)
+        unrelated_home_file.unlink(missing_ok=True)
+        shutil.rmtree(probe_root, ignore_errors=True)
 
 
 def test_production_read_denials_carve_out_only_governed_roots(tmp_path):
