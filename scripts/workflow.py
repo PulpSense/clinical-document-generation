@@ -4399,6 +4399,7 @@ def run_production_desktop_operation(
     runtime_identity = resolve_python_runtime(environment=os.environ)
     managed_hermes_identity = _managed_hermes_identity()
     identity = {**identity, "managed_hermes_identity": managed_hermes_identity}
+    parent_review_record: dict[str, Any] | None = None
 
     def revision_dir() -> Path:
         reference = _read(run_dir / REFERENCE)
@@ -4415,6 +4416,7 @@ def run_production_desktop_operation(
         )
 
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        nonlocal parent_review_record
         active_revision = revision_dir()
         if parent_visual_reviewer is None:
             raise RuntimeError(
@@ -4423,17 +4425,16 @@ def run_production_desktop_operation(
         parent_visual_reviewer(
             handoffs, remaining_seconds, active_revision, configuration,
         )
-        marker = run_dir / "logs/desktop-parent-visual-review.json"
-        _write(marker, {
+        parent_review_record = {
             "status": "completed",
             "revision_id": active_revision.name,
             "request_paths": [str(item.get("request_path") or "") for item in handoffs],
             "response_paths": [str(item.get("response_path") or "") for item in handoffs],
             "completion_requirement": "Desktop parent must inspect every bound page image.",
             "required_producer_model_id": str(configuration["model_identifier"]),
-        })
+        }
 
-    return run_desktop_operation(
+    result = run_desktop_operation(
         run_dir,
         handoff_runner=route,
         fallback_handoff_runner=fallback,
@@ -4447,6 +4448,7 @@ def run_production_desktop_operation(
         },
         require_promoted_runtime=require_promoted_runtime,
     )
+    return {**result, "parent_visual_review": parent_review_record}
 
 
 def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:

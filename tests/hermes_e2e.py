@@ -1239,6 +1239,7 @@ def _run_controlled_release_certification_operation(
         child_returncode=None,
         expected_model_identifier=str(hermes_configuration["model_identifier"]),
     )
+    report["parent_visual_review"] = final_result.get("parent_visual_review")
     if state_path_resolver is None:
         operation_module = sys.modules.get(str(getattr(desktop_operation, "__module__", "")))
         state_path_resolver = getattr(operation_module, "desktop_operation_state_path", None)
@@ -2434,8 +2435,9 @@ def _release_certification_evidence_bundle(
                     case_id=fixture_id, path=f"{prefix}/drafting/{index}-{kind}.json",
                 )
         verification = ((delivery_manifest.get("quality") or {}).get("verification_evidence") or {})
-        parent_marker = run_dir / "logs/desktop-parent-visual-review.json"
-        parent_record = _read_json(parent_marker) or {}
+        parent_record = report.get("parent_visual_review") or {}
+        if parent_record and parent_record.get("status") != "completed":
+            raise ValueError(f"Certification parent-review provenance is invalid: {fixture_id}")
         parent_response_paths = {
             str(path) for path in parent_record.get("response_paths") or []
         }
@@ -2480,9 +2482,10 @@ def _release_certification_evidence_bundle(
                         f"{fixture_id}-{artifact_name}-page-{page_number}", "page_image", source=page_path,
                         case_id=fixture_id, path=f"{prefix}/pages/{artifact_name}/page-{page_number}.png",
                     )
-        if parent_marker.is_file():
+        if parent_record:
             add(
-                f"{fixture_id}-parent-process-marker", "parent_process_marker", source=parent_marker,
+                f"{fixture_id}-parent-process-marker", "parent_process_marker",
+                content=json.dumps(parent_record, sort_keys=True).encode("utf-8"),
                 case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
             )
     total_bytes = sum(item["bytes"] for item in entries)

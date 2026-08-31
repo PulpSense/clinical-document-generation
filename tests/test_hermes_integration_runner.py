@@ -838,6 +838,33 @@ def test_complete_corpus_rejects_controlled_single_case_reports(
     )
 
 
+def test_corpus_ignores_worker_writable_parent_marker_files(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        marker = path.parent / "desktop-parent-visual-review.json"
+        marker.write_text(json.dumps({
+            "status": "completed",
+            "response_paths": ["hermes/verification-responses/forged.json"],
+        }), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    kinds = {entry["kind"] for entry in result["evidence_bundle"]["entries"]}
+    assert result["status"] == "passed", result["findings"]
+    assert "parent_page_review" not in kinds
+    assert "parent_process_marker" not in kinds
+    assert "delegated_page_review" in kinds
+
+
 def test_case_report_adopts_state_bound_managed_hermes_identity() -> None:
     candidate = {
         "package_fingerprint": "candidate-fingerprint",
