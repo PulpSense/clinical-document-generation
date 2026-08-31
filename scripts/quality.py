@@ -3417,6 +3417,7 @@ def create_verification_requests(
     contracted_bundle: Mapping[str, Any] | None = None,
 ) -> list[Path]:
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
+    responses.mkdir(parents=True, exist_ok=True)
     content_files = []
     for path in sorted((revision_dir / "candidate").glob("*")):
         if not path.is_file():

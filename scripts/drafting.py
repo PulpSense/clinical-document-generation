@@ -434,6 +434,7 @@ def create_drafting_request(
         recorded = _read_json(ledger_path)
         if recorded.get("request_sha256") != payload["request_sha256"]:
             raise ValueError(f"Draft request identity collision: {request_id}")
+    response_path.parent.mkdir(parents=True, exist_ok=True)
     _write_json(request_path, payload)
     _write_json(ledger_path, {"request_id": request_id, "request_sha256": payload["request_sha256"]})
     return request_path

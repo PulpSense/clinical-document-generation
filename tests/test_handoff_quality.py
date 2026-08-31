@@ -71,6 +71,7 @@ def test_drafting_request_is_scoped_and_hash_bound(tmp_path):
     reference = fixture(); batch = batch_plan("Prospective")[0]
     path = create_drafting_request(repo_root=ROOT, revision_dir=tmp_path, revision_id="r-test", reference=reference, batch=batch, attempts={item: 1 for item in batch.section_ids}, wave="initial")
     request = json.loads(path.read_text(encoding="utf-8"))
+    assert (tmp_path / request["response_path"]).parent.is_dir()
     assert set(request["approved_source"]) <= set(batch.field_families)
     assert "template_fields" not in request["approved_source"]
     response = recorded_acceptance_response(request)
@@ -963,6 +964,7 @@ def test_content_verifier_receives_authorized_boilerplate_and_blank_field_policy
     content_path = next(path for path in paths if json.loads(path.read_text())["task"] == "clinical_content_verification")
     request = json.loads(content_path.read_text(encoding="utf-8"))
 
+    assert (tmp_path / request["response_path"]).parent.is_dir()
     assert request["authorized_boilerplate"]["version"]
     assert request["authorized_boilerplate"]["sections"]["costs"]
     assert "Do not fail optional fields" in request["instructions"]
