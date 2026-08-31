@@ -552,6 +552,31 @@ def test_production_connect_proxy_relays_only_the_governed_target():
         upstream_thread.join(timeout=5.0)
 
 
+def test_production_connect_proxy_attempts_every_close_after_shutdown_failure():
+    calls = []
+
+    class FakeServer:
+        server_address = ("127.0.0.1", 43100)
+
+        def shutdown(self):
+            calls.append("shutdown")
+            raise RuntimeError("shutdown failed")
+
+        def server_close(self):
+            calls.append("server_close")
+
+    class FakeThread:
+        def join(self, timeout=None):
+            calls.append(("join", timeout))
+
+    proxy = workflow._ProductionConnectProxy(FakeServer(), FakeThread())
+
+    with pytest.raises(RuntimeError, match="could not be fully closed"):
+        proxy.close()
+
+    assert calls == ["shutdown", "server_close", ("join", 5.0)]
+
+
 def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_path, monkeypatch):
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     run_dir = tmp_path / "run"
@@ -565,23 +590,27 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
     monkeypatch.setattr(workflow, "_managed_hermes_pair", lambda: (launcher, managed_python))
 
     class FakeProxy:
-        def __init__(self, port):
+        def __init__(self, port, *, fail=False):
             self.port = port
             self.closed = False
+            self.fail = fail
 
         def close(self):
             self.closed = True
+            if self.fail:
+                raise RuntimeError("proxy close failed")
 
-    created_proxies = [FakeProxy(43101), FakeProxy(43102)]
+    created_proxies = [
+        FakeProxy(43101, fail=True), FakeProxy(43102), FakeProxy(43103),
+    ]
     pending_proxies = iter(created_proxies)
     monkeypatch.setattr(
         workflow, "_start_production_connect_proxy", lambda: next(pending_proxies),
     )
 
     class FakeProcess:
-        pid = 987654
-
-        def __init__(self):
+        def __init__(self, pid):
+            self.pid = pid
             self.returncode = None
             self.wait_calls = 0
 
@@ -593,36 +622,40 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
             self.returncode = -signal.SIGTERM
             return self.returncode
 
-    first_process = FakeProcess()
+    processes = [FakeProcess(987654), FakeProcess(987655)]
     calls = []
     profile_paths = []
 
     def popen(command, **_kwargs):
         calls.append(command)
         profile_paths.append(Path(command[2]))
-        if len(calls) == 1:
-            return first_process
-        raise RuntimeError("second launch failed")
+        if len(calls) <= 2:
+            return processes[len(calls) - 1]
+        raise RuntimeError("third launch failed")
 
     killed = []
     monkeypatch.setattr(workflow.subprocess, "Popen", popen)
     monkeypatch.setattr(workflow.os, "killpg", lambda pid, sig: killed.append((pid, sig)))
 
-    with pytest.raises(RuntimeError, match="second launch failed"):
+    with pytest.raises(RuntimeError, match="third launch failed"):
         workflow._production_dispatch_handoffs(
             [
                 {"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"},
                 {"request_path": "hermes/requests/b.json", "response_path": "hermes/responses/b.json"},
+                {"request_path": "hermes/requests/c.json", "response_path": "hermes/responses/c.json"},
             ],
             30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
             skill_root=skill_root, run_dir=run_dir,
             runtime_identity={"executable": "/usr/bin/python3"},
         )
 
-    assert len(created_proxies) == 2
+    assert len(created_proxies) == 3
     assert all(proxy.closed for proxy in created_proxies)
-    assert first_process.wait_calls == 1
-    assert killed == [(first_process.pid, signal.SIGTERM)]
+    assert [process.wait_calls for process in processes] == [1, 1]
+    assert killed == [
+        (processes[0].pid, signal.SIGTERM),
+        (processes[1].pid, signal.SIGTERM),
+    ]
     assert all(not path.exists() for path in profile_paths)
 
 

@@ -3923,9 +3923,18 @@ class _ProductionConnectProxy:
         return int(self.server.server_address[1])
 
     def close(self) -> None:
-        self.server.shutdown()
-        self.server.server_close()
-        self.thread.join(timeout=5.0)
+        errors: list[BaseException] = []
+        for action in (
+            self.server.shutdown,
+            self.server.server_close,
+            lambda: self.thread.join(timeout=5.0),
+        ):
+            try:
+                action()
+            except BaseException as exc:
+                errors.append(exc)
+        if errors:
+            raise RuntimeError("The governed network proxy could not be fully closed.") from errors[0]
 
 
 def _start_production_connect_proxy(
@@ -4110,9 +4119,12 @@ def _production_dispatch_handoffs(
                 proxy,
             )
             for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
-                _reap_production_worker(
-                    prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
-                )
+                try:
+                    _reap_production_worker(
+                        prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
+                    )
+                except BaseException:
+                    pass
             raise
         assert profile is not None and proxy is not None
         assert stdout_handle is not None and stderr_handle is not None
@@ -4150,26 +4162,38 @@ def _production_dispatch_handoffs(
                 "Hermes workers did not produce complete bound responses: " + ", ".join(missing)
             )
     finally:
-        for process, handoff, stdout_handle, stderr_handle, profile, started, proxy in processes:
-            _reap_production_worker(process, stdout_handle, stderr_handle, profile, proxy)
+        cleanup_errors: list[BaseException] = []
+        for process, _, stdout_handle, stderr_handle, profile, _, proxy in processes:
+            try:
+                _reap_production_worker(process, stdout_handle, stderr_handle, profile, proxy)
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        for process, handoff, _, _, _, started, _ in processes:
             ended = time.monotonic()
             event_path = run_dir / "logs/hermes-agent-events.jsonl"
-            event_path.parent.mkdir(parents=True, exist_ok=True)
-            response_path = revision_dir / str(handoff.get("response_path") or "")
-            with event_path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps({
-                    "request_path": str(handoff.get("request_path") or ""),
-                    "response_path": str(handoff.get("response_path") or ""),
-                    "task": handoff.get("task"),
-                    "batch_id": handoff.get("batch_id"),
-                    "started_monotonic": started,
-                    "ended_monotonic": ended,
-                    "elapsed_seconds": round(ended - started, 3),
-                    "returncode": process.returncode,
-                    "response_exists": response_path.is_file(),
-                    "stdout_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stdout.log",
-                    "stderr_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stderr.log",
-                }, ensure_ascii=False) + "\n")
+            try:
+                event_path.parent.mkdir(parents=True, exist_ok=True)
+                response_path = revision_dir / str(handoff.get("response_path") or "")
+                with event_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({
+                        "request_path": str(handoff.get("request_path") or ""),
+                        "response_path": str(handoff.get("response_path") or ""),
+                        "task": handoff.get("task"),
+                        "batch_id": handoff.get("batch_id"),
+                        "started_monotonic": started,
+                        "ended_monotonic": ended,
+                        "elapsed_seconds": round(ended - started, 3),
+                        "returncode": process.returncode,
+                        "response_exists": response_path.is_file(),
+                        "stdout_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stdout.log",
+                        "stderr_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stderr.log",
+                    }, ensure_ascii=False) + "\n")
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if cleanup_errors:
+            raise RuntimeError(
+                "One or more production workers could not be fully reaped."
+            ) from cleanup_errors[0]
 
 
 def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
