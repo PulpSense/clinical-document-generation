@@ -3838,44 +3838,12 @@ def _managed_hermes_identity() -> dict[str, str]:
     }
 
 
-def _production_read_denials(
-    readable_roots: Sequence[Path],
-    *,
-    boundary_roots: Sequence[Path] | None = None,
-) -> list[Path]:
-    """Carve governed readable roots out of user, temporary, and volume trees."""
-    allowed = tuple(dict.fromkeys(path.resolve(strict=False) for path in readable_roots))
-    boundaries = boundary_roots or (
-        Path("/Users"), Path("/private/tmp"), Path(tempfile.gettempdir()), Path("/Volumes"),
-    )
-    denied: list[Path] = []
-
-    def carve(root: Path) -> None:
-        if root in allowed or any(item in root.parents for item in allowed):
-            return
-        if not any(root in item.parents for item in allowed):
-            denied.append(root)
-            return
-        try:
-            children = sorted(root.iterdir(), key=lambda path: path.name)
-        except OSError:
-            return
-        for child in children:
-            if child.is_symlink():
-                denied.append(child.absolute())
-                continue
-            lexical = child.resolve(strict=False)
-            if any(lexical == item or lexical in item.parents for item in allowed):
-                if lexical not in allowed:
-                    carve(lexical)
-                continue
-            if any(item == lexical or item in lexical.parents for item in allowed):
-                continue
-            denied.append(lexical)
-
-    for boundary in boundaries:
-        carve(boundary.resolve(strict=False))
-    return list(dict.fromkeys(denied))
+def _production_read_boundaries() -> tuple[Path, ...]:
+    """Return stable host trees denied before exact governed read exceptions."""
+    return tuple(dict.fromkeys(
+        path.resolve(strict=False)
+        for path in (Path("/Users"), Path("/private/tmp"), Path(tempfile.gettempdir()), Path("/Volumes"))
+    ))
 
 
 def _production_dispatch_handoffs(
@@ -3903,6 +3871,10 @@ def _production_dispatch_handoffs(
     ):
         raise RuntimeError("The managed Hermes launcher or interpreter changed after operation binding.")
     hermes_install_root = hermes_launcher.parent.parent.parent
+    interpreter_link_target = Path(os.readlink(managed_python))
+    if not interpreter_link_target.is_absolute():
+        interpreter_link_target = managed_python.parent / interpreter_link_target
+    interpreter_link_root = interpreter_link_target.absolute().parent.parent
     managed_interpreter_root = managed_python.resolve(strict=True).parent.parent
     runtime_executable = Path(str(runtime_identity["executable"])).absolute()
     runtime_root = runtime_executable.parent.parent
@@ -3922,14 +3894,14 @@ def _production_dispatch_handoffs(
             Path("/private/etc"), Path("/etc"), Path("/dev"), Path("/private/var/db"),
             hermes_install_root, hermes_home, skill_root, run_dir, runtime_root,
         )
-        for denied_path in _production_read_denials(readable_roots):
-            filter_name = "literal" if denied_path.is_file() or denied_path.is_symlink() else "subpath"
-            profile.write(
-                f"(deny file-read* ({filter_name} {json.dumps(str(denied_path))}))\n"
-            )
-        profile.write(
-            f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n"
-        )
+        read_boundaries = _production_read_boundaries()
+        for boundary in read_boundaries:
+            profile.write(f"(deny file-read* (subpath {json.dumps(str(boundary))}))\n")
+        for readable_root in dict.fromkeys(path.resolve(strict=False) for path in readable_roots):
+            if any(readable_root == boundary or boundary in readable_root.parents for boundary in read_boundaries):
+                profile.write(f"(allow file-read* (subpath {json.dumps(str(readable_root))}))\n")
+        profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
+        profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
         profile.write(
             "(deny file-write* (require-not (require-any "
             f"(subpath {json.dumps(str(hermes_home.resolve()))}) "

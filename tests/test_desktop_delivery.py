@@ -481,15 +481,32 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     read_rules = "\n".join(
         line for line in captured["profile"].splitlines() if "deny file-read*" in line
     )
+    allow_rules = "\n".join(
+        line for line in captured["profile"].splitlines() if "allow file-read*" in line
+    )
     assert str(skill_root.resolve()) not in read_rules
     assert str(run_dir.resolve()) not in read_rules
-    assert str(unrelated.resolve()) in read_rules
+    assert str(tmp_path.resolve()) in read_rules
+    assert str(skill_root.resolve()) in allow_rules
+    assert str(run_dir.resolve()) in allow_rules
+    assert str(unrelated.resolve()) not in allow_rules
     monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
     completed = subprocess.run(
         ["/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/true"],
         capture_output=True, check=False,
     )
     assert completed.returncode == 0, completed.stderr
+    denied_file = unrelated / "created-after-profile"
+    denied_file.write_text("denied", encoding="utf-8")
+    denied = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+            "/bin/cat", str(denied_file),
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert denied.returncode != 0
     captured["profile_path"].unlink(missing_ok=True)
 
 
@@ -505,8 +522,6 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
     managed_python = launcher.parent / "python"
     managed_python.symlink_to(Path(sys.executable).resolve())
     skill_root.mkdir(parents=True)
-    unrelated_home_file = Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt"
-    unrelated_home_file.write_text("denied", encoding="utf-8")
     captured = {}
     monkeypatch.setattr(
         workflow, "_managed_hermes_pair", lambda: (launcher, managed_python),
@@ -534,6 +549,11 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
             )
         monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
         assert captured["profile_path"].stat().st_size <= 65_535
+        unrelated_home_file = Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt"
+        unrelated_private_tmp = Path("/private/tmp") / f"issue56-sandbox-denied-{os.getpid()}.txt"
+        unrelated_mac_tmp = tmp_path / "created-after-profile.txt"
+        for sentinel in (unrelated_home_file, unrelated_private_tmp, unrelated_mac_tmp):
+            sentinel.write_text("denied", encoding="utf-8")
 
         for interpreter in (managed_python, managed_python.resolve(strict=True)):
             completed = subprocess.run(
@@ -548,63 +568,34 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
             assert completed.returncode == 0, completed.stderr
             assert completed.stdout.strip() == "managed-interpreter-ok"
 
-        denied = subprocess.run(
-            [
-                "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
-                "/bin/cat", str(unrelated_home_file),
-            ],
-            capture_output=True,
-            check=False,
-        )
-        assert denied.returncode != 0
+        for sentinel in (unrelated_home_file, unrelated_private_tmp, unrelated_mac_tmp):
+            denied = subprocess.run(
+                [
+                    "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+                    "/bin/cat", str(sentinel),
+                ],
+                capture_output=True,
+                check=False,
+            )
+            assert denied.returncode != 0
     finally:
         Path(captured.get("profile_path", "")).unlink(missing_ok=True)
-        unrelated_home_file.unlink(missing_ok=True)
+        for sentinel in (
+            Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt",
+            Path("/private/tmp") / f"issue56-sandbox-denied-{os.getpid()}.txt",
+            tmp_path / "created-after-profile.txt",
+        ):
+            sentinel.unlink(missing_ok=True)
         shutil.rmtree(probe_root, ignore_errors=True)
 
 
-def test_production_read_denials_carve_out_only_governed_roots(tmp_path):
-    boundary = tmp_path / "private-tmp"
-    skill_root = boundary / "candidate/hermes-home/skills/clinical-document-generation"
-    run_dir = boundary / "candidate/run"
-    runtime_root = boundary / "validator"
-    unrelated = boundary / "unrelated-checkout"
-    for path in (skill_root, run_dir, runtime_root, unrelated):
-        path.mkdir(parents=True)
+def test_production_read_boundaries_are_stable_and_broad():
+    boundaries = workflow._production_read_boundaries()
 
-    denied = workflow._production_read_denials(
-        (skill_root, run_dir, runtime_root), boundary_roots=(boundary,),
-    )
-
-    assert unrelated in denied
-    assert skill_root not in denied
-    assert run_dir not in denied
-    assert runtime_root not in denied
-    assert not any(path == skill_root or path in skill_root.parents for path in denied)
-
-    allowed_file = skill_root / "allowed.txt"
-    denied_file = unrelated / "denied.txt"
-    allowed_file.write_text("allowed", encoding="utf-8")
-    denied_file.write_text("denied", encoding="utf-8")
-    profile = tmp_path / "read-policy.sb"
-    profile.write_text(
-        "(version 1)\n(allow default)\n"
-        + "".join(
-            f'(deny file-read* (subpath {json.dumps(str(path))}))\n'
-            for path in denied
-        ),
-        encoding="utf-8",
-    )
-    allowed_read = subprocess.run(
-        ["/usr/bin/sandbox-exec", "-f", str(profile), "/bin/cat", str(allowed_file)],
-        capture_output=True, check=False,
-    )
-    denied_read = subprocess.run(
-        ["/usr/bin/sandbox-exec", "-f", str(profile), "/bin/cat", str(denied_file)],
-        capture_output=True, check=False,
-    )
-    assert allowed_read.returncode == 0
-    assert denied_read.returncode != 0
+    assert Path("/Users") in boundaries
+    assert Path("/private/tmp") in boundaries
+    assert Path("/Volumes") in boundaries
+    assert Path(workflow.tempfile.gettempdir()).resolve() in boundaries
 
 
 def test_production_parent_fallback_never_redispatches_or_claims_parent_provenance(
