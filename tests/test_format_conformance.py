@@ -101,7 +101,8 @@ def test_protocol_signature_treats_only_the_first_post_toc_boundary_as_governed(
         if item["text"][0].isdigit()
     )
 
-    assert first_body["page_break_before"] is True
+    assert first_body["page_break_before"] is False
+    assert first_body["effective_page_boundary"] is True
     assert pagination["first_numbered_body_paragraph"] == first_body["paragraph"]
     assert pagination["numbered_body_has_no_artificial_starts"] is True
 
