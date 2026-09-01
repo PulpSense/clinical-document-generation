@@ -634,6 +634,23 @@ def _draft_blocks(section: Mapping[str, Any]) -> list[tuple[str, bool]]:
     return blocks
 
 
+def _retrospective_eligibility_blocks(
+    reference: Mapping[str, Any],
+) -> list[tuple[str, bool]]:
+    """Render approved retrospective criteria verbatim instead of paraphrasing them."""
+    blocks: list[tuple[str, bool]] = []
+    for label, path in (
+        ("Inclusion criteria:", "population.inclusion_criteria"),
+        ("Exclusion criteria:", "population.exclusion_criteria"),
+    ):
+        items = _list(get_path(reference, path, []))
+        if not items:
+            continue
+        blocks.append((label, False))
+        blocks.extend((item, True) for item in items)
+    return blocks
+
+
 def _bullet_num_id(document: Document) -> int:
     numbering = document.part.numbering_part.element
     abstracts = {
@@ -739,6 +756,7 @@ def _normalize_typed_bullet_paragraphs(document: Document) -> None:
 def _replace_protocol_leaf_bodies(
     document: Document,
     model: Mapping[str, Any],
+    reference: Mapping[str, Any],
     branch: str,
     authority: Document,
 ) -> None:
@@ -749,6 +767,8 @@ def _replace_protocol_leaf_bodies(
         if section.role == "container":
             continue
         blocks = _draft_blocks(drafts.get(section.section_id, {}))
+        if branch == "Retrospective" and section.section_id == "subjects.eligibility":
+            blocks = _retrospective_eligibility_blocks(reference)
         if not blocks:
             continue
         expected = _protocol_heading_key(f"{section.number} {section.title}")
@@ -2474,7 +2494,7 @@ def _template_document(
         _apply_protocol_visit_table_layout(document, authority)
         _ensure_contract_headings(document, branch)
         _normalize_protocol_container_introductions(document, branch, boilerplate)
-        _replace_protocol_leaf_bodies(document, model, branch, authority)
+        _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
         _normalize_protocol_title_controls(document, reference)
         _normalize_protocol_summary_table(document)
         _ensure_protocol_references(document, authority, reference)

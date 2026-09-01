@@ -201,6 +201,48 @@ def test_recorded_retrospective_schedule_uses_readable_visit_list(tmp_path):
     }]
 
 
+def test_retrospective_eligibility_preserves_approved_criteria_verbatim(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/retrospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["population"]["inclusion_criteria"] = (
+        "Adults with eligible historical vitrectomy records during the study period."
+    )
+    reference["population"]["exclusion_criteria"] = (
+        "Incomplete records or missing baseline and follow-up visual acuity documentation."
+    )
+    model = {
+        "protocol": [{
+            "section_id": "subjects.eligibility",
+            "paragraphs": [{
+                "text": (
+                    "Adults with eligible historical vitrectomy records are included. "
+                    "Incomplete records and records missing baseline or follow-up visual acuity "
+                    "documentation are excluded."
+                ),
+                "evidence_refs": [
+                    "source:population.inclusion_criteria",
+                    "source:population.exclusion_criteria",
+                ],
+                "boilerplate_refs": [],
+            }],
+            "lists": [],
+        }],
+        "icf": {},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    visible = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
+    assert reference["population"]["inclusion_criteria"] in visible
+    assert reference["population"]["exclusion_criteria"] in visible
+    assert not any(
+        finding.get("field") == "subjects.eligibility"
+        for finding in deterministic_content_check(tmp_path, reference)
+    )
+
+
 def test_sterling_icf_removes_review_metadata_and_uses_heading_styles(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["meta"]["icf_template"] = "Sterling"
