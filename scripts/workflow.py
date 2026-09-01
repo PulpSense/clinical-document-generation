@@ -4150,10 +4150,11 @@ def _production_dispatch_handoffs(
                 ),
                 "--source", str(configuration["source"]),
                 "--max-turns", str(configuration["max_turns"]),
-                "--skills", str(configuration["skill"]),
             ]
             if configuration.get("safe_mode") is True:
                 command.append("--safe-mode")
+            else:
+                command.extend(("--skills", str(configuration["skill"])))
             stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
             stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
             worker_environment = dict(environment)

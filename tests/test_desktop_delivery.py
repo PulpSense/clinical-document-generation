@@ -489,6 +489,8 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
 
     assert captured["command"][0] == "/usr/bin/sandbox-exec"
     assert captured["cwd"] == tmp_path
+    assert "--safe-mode" in captured["command"]
+    assert "--skills" not in captured["command"]
     prompt = next(part for part in captured["command"] if part.startswith("Complete one isolated"))
     assert str(skill_root.resolve()) not in prompt
     assert str((run_dir / "revision").resolve()) not in prompt

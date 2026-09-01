@@ -1033,11 +1033,11 @@ def _run_handoff_wave(
             str(hermes_configuration["source"]),
             "--max-turns",
             str(hermes_configuration["max_turns"]),
-            "--skills",
-            str(hermes_configuration["skill"]),
         ]
         if hermes_configuration.get("safe_mode") is True:
             command.append("--safe-mode")
+        else:
+            command.extend(("--skills", str(hermes_configuration["skill"])))
         sandbox_profile = None
         if sandbox:
             command, sandbox_profile = sandbox_command(skill_root, run_dir, command)
