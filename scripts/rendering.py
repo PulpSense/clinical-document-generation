@@ -2096,6 +2096,7 @@ def _remove_empty_intervening_paragraphs(heading: Paragraph) -> None:
             return
         has_page_boundary = (
             element.find(qn("w:pPr") + "/" + qn("w:pageBreakBefore")) is not None
+            or element.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
             or any(child.tag in {qn("w:br"), qn("w:lastRenderedPageBreak")} for child in element.iter())
         )
         if has_page_boundary:

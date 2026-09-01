@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 from contracts import contracted_template_bundle
@@ -457,6 +458,26 @@ def test_heading_cohesion_removes_empty_template_paragraphs_before_its_first_blo
 
     duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
     assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
+
+
+def test_heading_whitespace_cohesion_preserves_empty_section_boundary_paragraph():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    section_boundary = document.add_paragraph("")
+    section_boundary._p.get_or_add_pPr().append(OxmlElement("w:sectPr"))
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained.text == ""
+    assert retained._p.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
 
 
 def _visible_formatting_fingerprint(path):
