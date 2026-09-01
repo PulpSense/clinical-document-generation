@@ -726,6 +726,51 @@ def test_production_connect_proxy_attempts_every_close_after_shutdown_failure():
     assert calls == ["shutdown", "server_close", ("join", 5.0)]
 
 
+def test_production_connect_proxy_treats_peer_reset_as_normal_close(monkeypatch):
+    class FakeClient:
+        def __init__(self):
+            self.reads = 0
+
+        def settimeout(self, _timeout):
+            pass
+
+        def recv(self, _size):
+            self.reads += 1
+            if self.reads == 1:
+                return b"CONNECT chatgpt.com:443 HTTP/1.1\r\n\r\n"
+            raise ConnectionResetError("peer closed")
+
+        def sendall(self, _payload):
+            pass
+
+    class FakeUpstream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def settimeout(self, _timeout):
+            pass
+
+        def recv(self, _size):
+            return b""
+
+        def sendall(self, _payload):
+            pass
+
+    client = FakeClient()
+    server = object.__new__(workflow._ProductionConnectProxyServer)
+    server.governed_host = "chatgpt.com"
+    server.governed_port = 443
+    monkeypatch.setattr(workflow.socket, "create_connection", lambda *_args, **_kwargs: FakeUpstream())
+    monkeypatch.setattr(workflow.select, "select", lambda *_args, **_kwargs: ([client], (), ()))
+
+    workflow._ProductionConnectProxyHandler(client, ("127.0.0.1", 12345), server)
+
+    assert client.reads == 2
+
+
 def test_production_connect_proxy_closes_listener_when_thread_construction_fails(monkeypatch):
     calls = []
 
@@ -999,6 +1044,7 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
                     "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
                     str(interpreter), "-c", "print('managed-interpreter-ok')",
                 ],
+                cwd=run_dir,
                 capture_output=True,
                 text=True,
                 check=False,

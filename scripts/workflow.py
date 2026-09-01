@@ -3971,10 +3971,16 @@ class _ProductionConnectProxyHandler(socketserver.BaseRequestHandler):
             while True:
                 readable, _, _ = select.select(peers, (), (), 1.0)
                 for source in readable:
-                    payload = source.recv(64 * 1024)
+                    try:
+                        payload = source.recv(64 * 1024)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return
                     if not payload:
                         return
-                    (upstream if source is client else client).sendall(payload)
+                    try:
+                        (upstream if source is client else client).sendall(payload)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return
 
 
 class _ProductionConnectProxyServer(socketserver.ThreadingTCPServer):
