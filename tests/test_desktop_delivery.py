@@ -275,6 +275,27 @@ def test_production_verifier_relies_on_parent_validation_without_terminal_consen
     assert "python -c" not in prompt
 
 
+def test_production_verifier_prompt_includes_layout_preservation_notes(tmp_path):
+    prompt = workflow._production_agent_prompt(
+        tmp_path / "skill",
+        tmp_path / "revision",
+        {
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "task": "rendered_page_visual_verification",
+        },
+        {
+            "model_identifier": "test-model",
+            "layout_preservation_notes": [
+                "Keep Section 15 and its assessment table together on the following page.",
+            ],
+        },
+        workspace_root=tmp_path,
+    )
+
+    assert "Keep Section 15 and its assessment table together on the following page." in prompt
+
+
 def test_production_adapter_uses_unpromoted_runtime_only_for_verified_certification_candidate(
     tmp_path, monkeypatch,
 ):
@@ -529,15 +550,15 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
         )
 
     assert captured["command"][0] == "/usr/bin/sandbox-exec"
-    assert captured["cwd"] == tmp_path
+    assert captured["cwd"] == run_dir
     assert "--safe-mode" in captured["command"]
     assert "--skills" not in captured["command"]
     prompt = next(part for part in captured["command"] if part.startswith("Complete one isolated"))
     assert str(skill_root.resolve()) not in prompt
     assert str((run_dir / "revision").resolve()) not in prompt
     assert "profile/skills/clinical-document-generation/SKILL.md" in prompt
-    assert "run/revision/hermes/requests/a.json" in prompt
-    assert "run/revision/hermes/responses/a.json" in prompt
+    assert "revision/hermes/requests/a.json" in prompt
+    assert "revision/hermes/responses/a.json" in prompt
     assert "deny file-read*" in captured["profile"]
     read_rules = "\n".join(
         line for line in captured["profile"].splitlines() if "deny file-read*" in line
@@ -569,17 +590,17 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     assert completed.returncode == 0, completed.stderr
     response_dir = run_dir / "revision/hermes/responses"
     response_dir.mkdir(parents=True)
-    relative_response = "run/revision/hermes/responses/probe.json"
+    relative_response = "revision/hermes/responses/probe.json"
     allowed_write = subprocess.run(
         [
             "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
             "/usr/bin/python3", "-c",
             f"from pathlib import Path; Path({relative_response!r}).write_text('passed')",
         ],
-        cwd=tmp_path, capture_output=True, check=False,
+        cwd=run_dir, capture_output=True, check=False,
     )
     assert allowed_write.returncode == 0, allowed_write.stderr
-    assert (tmp_path / relative_response).read_text(encoding="utf-8") == "passed"
+    assert (run_dir / relative_response).read_text(encoding="utf-8") == "passed"
     denied_skill_write = subprocess.run(
         [
             "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),

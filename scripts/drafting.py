@@ -1678,8 +1678,11 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
             label = path.rsplit(".", 1)[-1].replace("_", " ")
             section_label = str(contract.get("title") or result.get("section_id") or "section").strip().casefold()
             if path == "procedures.minimum_days_before_screening_without_participation":
+                duration = value_text(source[path]).rstrip(".")
+                if not re.search(r"\bdays?\s*$", duration, re.I):
+                    duration = f"{duration} days"
                 text = (
-                    f"At least {value_text(source[path]).rstrip('.')} days without participation "
+                    f"At least {duration} without participation "
                     "in another study are required before screening."
                 )
             elif section_id == "quality-safety" and path == "safety.roles":

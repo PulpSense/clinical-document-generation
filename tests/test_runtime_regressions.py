@@ -13,7 +13,7 @@ from docx.oxml.ns import qn
 from contracts import contracted_template_bundle
 from quality import RESPONSE_SCHEMA, validate_verifications, verification_request_sha256
 import quality
-from rendering import render_documents
+from rendering import render_documents, render_fields
 import rendering
 from prs_xml import generate as generate_xml
 import workflow
@@ -1216,6 +1216,74 @@ def test_approved_investigator_and_facility_values_populate_protocol_agreement(t
     assert "Alex Investigator" in values
     assert "MD" in values
     assert "Site One" in values
+
+
+def test_render_fields_normalize_markdown_email_population_and_day_units():
+    reference = _source()
+    reference["parties"]["study_coordinator"]["email"] = (
+        "[jamie.chen@example.org](mailto:jamie.chen@example.org)"
+    )
+    reference["population"].pop("study_population", None)
+    reference["population"]["inclusion_criteria"] = [
+        "Adults 18 to 80 years old with eligible historical records.",
+    ]
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = "30 days"
+
+    fields = render_fields(reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    assert fields["studyCordinatorEmail"] == "jamie.chen@example.org"
+    assert fields["AI_populationShort"] == (
+        "Adults 18 to 80 years old with eligible historical records."
+    )
+    assert fields["daysBeforeScreening"] == "30"
+
+
+def test_protocol_summary_rows_keep_together(tmp_path):
+    reference = _source()
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    summary = next(
+        table for table in document.tables
+        if table.rows and table.rows[0].cells[0].text.strip() == "Objective"
+    )
+    variables = next(row for row in summary.rows if row.cells[0].text.strip() == "Variables")
+
+    assert all(
+        paragraph.paragraph_format.keep_together is True
+        for cell in variables.cells
+        for paragraph in cell.paragraphs
+    )
+
+
+def test_assessment_table_splits_plain_language_schedule_into_readable_rows(tmp_path):
+    reference = _source()
+    reference["procedures"].pop("visit_schedule", None)
+    reference["procedures"].pop("visit_schedule_table", None)
+    reference["procedures"]["assessments"] = (
+        "Historical chart abstraction, baseline prospective visit, Month 1 phone "
+        "follow-up, and Month 3 clinic follow-up, including pain score review, device "
+        "usage download, and usability questionnaire."
+    )
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    table = next(
+        item for item in document.tables
+        if item.rows and item.rows[0].cells[0].text.strip() == "Approved visit or assessment"
+    )
+    rows = [(row.cells[0].text.strip(), row.cells[1].text.strip()) for row in table.rows[1:]]
+
+    assert rows == [
+        ("Historical chart abstraction", "Historical record review"),
+        ("baseline prospective visit", "Baseline"),
+        ("Month 1 phone follow-up", "Month 1"),
+        ("Month 3 clinic follow-up", "Month 3"),
+        ("pain score review", "Per approved schedule"),
+        ("device usage download", "Per approved schedule"),
+        ("usability questionnaire", "Per approved schedule"),
+    ]
 
 
 def test_protocol_visit_schedule_has_rows_when_approved_source_has_assessments_only(tmp_path):

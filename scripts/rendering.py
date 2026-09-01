@@ -32,6 +32,7 @@ TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 INTERNAL_LANGUAGE = re.compile(r"\b(?:section_id|evidence_refs|boilerplate_refs)\s*:", re.I)
 DUPLICATE_WORD = re.compile(r"\b([A-Za-z][A-Za-z'-]+)\s+\1\b", re.I)
 AUTHORING_LANGUAGE = re.compile(r"table of contents updates automatically|selected consent template", re.I)
+WHOLE_MARKDOWN_LINK = re.compile(r"^\[([^\]]+)\]\((?:mailto:)?[^)]+\)$", re.I)
 
 
 class LayoutRepairTargetError(ValueError):
@@ -43,7 +44,9 @@ def _text(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
-        return value.strip()
+        text = value.strip()
+        link = WHOLE_MARKDOWN_LINK.fullmatch(text)
+        return link.group(1).strip() if link else text
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, Mapping):
@@ -68,6 +71,34 @@ def _list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return [part.strip() for part in _text(value).splitlines() if part.strip()]
     return [part for item in value if (part := _text(item))]
+
+
+def _day_count_text(value: Any) -> str:
+    return re.sub(r"\s+days?\s*$", "", _text(value), flags=re.I).strip()
+
+
+def _plain_language_assessments(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return _list(value)
+    text = _text(value).rstrip(".")
+    if not text:
+        return []
+    text = re.sub(r",\s*including\s+", ", ", text, flags=re.I)
+    return [part.strip() for part in re.split(r",\s*(?:and\s+)?", text) if part.strip()]
+
+
+def _assessment_timing(label: str) -> str:
+    timepoint = re.search(r"\b(?:Month|Week|Day)\s+[+-]?\d+\b", label, re.I)
+    if timepoint:
+        return timepoint.group(0)
+    lowered = label.casefold()
+    if "baseline" in lowered:
+        return "Baseline"
+    if "historical" in lowered:
+        return "Historical record review"
+    if "screening" in lowered:
+        return "Screening"
+    return "Per approved schedule"
 
 
 def _draft_text(model: Mapping[str, Any], section_id: str, *, bullets: bool = False) -> str:
@@ -201,9 +232,9 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "sampleSize": _text(get_path(reference, "population.sample_size")),
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
-        "daysBeforeScreening": _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation")),
+        "daysBeforeScreening": _day_count_text(get_path(reference, "procedures.minimum_days_before_screening_without_participation")),
         "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if isinstance(visits, list) else "",
-        "AI_duration": _text(get_path(reference, "study.timeline")), "AI_populationShort": _text(get_path(reference, "population.study_population")),
+        "AI_duration": _text(get_path(reference, "study.timeline")), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
         "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True) or "\n".join(f"• {item}" for item in inclusion),
         "AI_exclusionCriteria": _draft_text(model, "subjects.exclusion", bullets=True) or _draft_text(model, "subjects.eligibility", bullets=True),
@@ -370,6 +401,9 @@ def _normalize_protocol_summary_table(document: Document) -> None:
         paragraph.paragraph_format.first_line_indent = None
         row.height = None
         _prevent_row_split(row)
+        for cell in row.cells:
+            for cell_paragraph in cell.paragraphs:
+                cell_paragraph.paragraph_format.keep_together = True
 
 
 def _normalize_protocol_title_controls(document: Document, reference: Mapping[str, Any]) -> None:
@@ -2267,7 +2301,12 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
                     if label:
                         entries.append((label, timing))
         if not entries:
-            entries = [(item, "") for item in _list(get_path(reference, "procedures.assessments", []))]
+            entries = [
+                (item, _assessment_timing(item))
+                for item in _plain_language_assessments(
+                    get_path(reference, "procedures.assessments", [])
+                )
+            ]
         if not entries:
             return
         row_values = [["Approved visit or assessment", "Approved timing"], *[list(item) for item in entries]]

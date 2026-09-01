@@ -92,6 +92,26 @@ def test_screening_washout_is_included_in_prs_eligibility(tmp_path):
     assert "30 days without participation in another study before screening" in criteria
 
 
+def test_screening_washout_does_not_duplicate_supplied_day_units(tmp_path):
+    reference = fixture()
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = "30 days"
+    output = tmp_path / "study.xml"
+
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+    )
+
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+    criteria = study.findtext("eligibility/criteria/textblock") or ""
+    if not criteria:
+        criteria = " ".join(study.find("eligibility").itertext())
+    assert "30 days without participation in another study before screening" in criteria
+    assert "days days" not in criteria
+
+
 def test_optional_prs_roles_are_not_inferred_and_official_affiliation_uses_the_approved_site(tmp_path):
     reference = fixture()
     reference["regulatory"]["prs"].pop("responsible_party_type", None)

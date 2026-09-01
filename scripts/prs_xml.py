@@ -70,7 +70,10 @@ SOURCE_SCALAR_BINDINGS: dict[str, tuple[str, ...]] = {
 
 def _text(value: Any) -> str:
     if value is None: return ""
-    if isinstance(value, str): return value.strip()
+    if isinstance(value, str):
+        text = value.strip()
+        link = re.fullmatch(r"\[([^\]]+)\]\((?:mailto:)?[^)]+\)", text, re.I)
+        return link.group(1).strip() if link else text
     if isinstance(value, (int, float)): return str(value)
     if isinstance(value, Mapping):
         for key in ("label", "measure", "outcome_measure", "name", "title", "description", "text"):
@@ -224,7 +227,8 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
     inclusion = [_text(item) for item in get_path(reference, "population.inclusion_criteria", []) or []]
     minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
     if minimum_days:
-        inclusion.append(f"At least {minimum_days} days without participation in another study before screening")
+        duration = minimum_days if re.search(r"\bdays?\s*$", minimum_days, re.I) else f"{minimum_days} days"
+        inclusion.append(f"At least {duration} without participation in another study before screening")
     criteria = "Inclusion Criteria:\n" + "\n".join(f"• {item}" for item in inclusion)
     criteria += "\n\nExclusion Criteria:\n" + "\n".join(f"• {_text(item)}" for item in get_path(reference, "population.exclusion_criteria", []) or [])
     brief = narrative.get("brief_summary", {}) if isinstance(narrative.get("brief_summary"), Mapping) else narrative.get("brief_summary")

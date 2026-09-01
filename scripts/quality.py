@@ -3376,7 +3376,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             findings.append({"category": "content", "field": "icf.study-purpose", "target_ids": ["icf.study-purpose"], "issue": "Observational ICF retains interventional clinical-trial language."})
         minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
         if minimum_days:
-            day_pattern = re.compile(rf"\b{re.escape(minimum_days)}\s*[- ]?\s*days?\b", re.I)
+            day_count = re.sub(r"\s+days?\s*$", "", minimum_days, flags=re.I).strip()
+            day_pattern = re.compile(rf"\b{re.escape(day_count)}\s*[- ]?\s*days?\b", re.I)
             if not day_pattern.search(visible):
                 findings.append({"category": "content", "field": "subjects.inclusion", "target_ids": ["subjects.inclusion"], "issue": "Protocol omits the approved minimum interval without participation in another study before screening."})
             if not day_pattern.search(icf_visible):
