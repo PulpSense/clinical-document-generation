@@ -62,6 +62,7 @@ def test_shipped_workflow_owns_the_real_hermes_desktop_adapter():
     assert '"--safe-mode"' in production
     assert 'command.extend(("--skills", str(configuration["skill"])))' in production
     assert 'str(_production_authentication_path())' in production
+    assert 'deny file-write* (literal' in production
     assert "(deny file-write* (require-not (require-any " in production
     assert '(literal \\"/dev/null\\")' in production
     assert 'parser.add_argument("--desktop-operation"' in production

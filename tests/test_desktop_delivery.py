@@ -513,6 +513,7 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     assert str(run_dir.resolve()) in allow_rules
     assert f'(literal "{authentication_path}")' in allow_rules
     assert f'(subpath "{authentication_path.parent}")' not in allow_rules
+    assert f'(deny file-write* (literal "{authentication_path}"))' in captured["profile"]
     assert str(unrelated.resolve()) not in allow_rules
     assert "(deny network*)" in captured["profile"]
     proxy_url = captured["environment"]["HTTPS_PROXY"]

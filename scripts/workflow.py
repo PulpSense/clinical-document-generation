@@ -4144,6 +4144,9 @@ def _production_dispatch_handoffs(
                 f"(subpath {json.dumps(str(run_dir.resolve()))}) "
                 "(literal \"/dev/null\"))))\n"
             )
+            profile.write(
+                f"(deny file-write* (literal {json.dumps(str(_production_authentication_path()))}))\n"
+            )
             profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
             for executable in ("pytest", "py.test", "pip", "pip3"):
                 profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
