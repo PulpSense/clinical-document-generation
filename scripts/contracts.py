@@ -57,7 +57,7 @@ def recovery_finding(
 
 LAYOUT_REPAIR_RULES = {
     "protocol": ("heading_cohesion", "table_pagination"),
-    "icf": ("heading_cohesion", "table_pagination"),
+    "icf": ("heading_cohesion", "heading_whitespace_cohesion", "table_pagination"),
 }
 
 BUNDLED_FONT_FILES = {

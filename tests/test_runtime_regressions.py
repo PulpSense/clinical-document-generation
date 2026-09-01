@@ -420,8 +420,27 @@ def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
 
     plan, unsupported = workflow._layout_repair_plan([finding])
 
-    assert plan == {"icf": [{"rule": "heading_cohesion", "target": "DURATION"}]}
+    assert plan == {"icf": [{"rule": "heading_whitespace_cohesion", "target": "DURATION"}]}
     assert unsupported == []
+
+
+def test_heading_cohesion_removes_empty_template_paragraphs_before_its_first_block():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    document.add_paragraph("")
+    document.add_paragraph("")
+    document.add_paragraph("")
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
 
 
 def _visible_formatting_fingerprint(path):

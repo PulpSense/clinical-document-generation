@@ -2358,7 +2358,7 @@ VERIFICATION_TASK_BY_TARGET = {
 
 LAYOUT_RULE_BY_VISUAL_CHECK = {
     "orphan_heading": "heading_cohesion",
-    "excessive_whitespace": "heading_cohesion",
+    "excessive_whitespace": "heading_whitespace_cohesion",
     "artificial_pagination": "body_pagination",
     "bad_table_split": "table_pagination",
 }

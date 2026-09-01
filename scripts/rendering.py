@@ -2087,12 +2087,38 @@ def _first_substantive_block(document: Document, heading: Paragraph) -> Paragrap
     return None
 
 
-def _repair_heading_cohesion(document: Document, target: str, *, protocol: bool) -> None:
+def _remove_empty_intervening_paragraphs(heading: Paragraph) -> None:
+    """Remove only ordinary empty template paragraphs after one repaired heading."""
+    element = heading._p.getnext()
+    while element is not None and element.tag == qn("w:p"):
+        paragraph = Paragraph(element, heading._parent)
+        if paragraph.text.strip():
+            return
+        has_page_boundary = (
+            element.find(qn("w:pPr") + "/" + qn("w:pageBreakBefore")) is not None
+            or any(child.tag in {qn("w:br"), qn("w:lastRenderedPageBreak")} for child in element.iter())
+        )
+        if has_page_boundary:
+            return
+        next_element = element.getnext()
+        element.getparent().remove(element)
+        element = next_element
+
+
+def _repair_heading_cohesion(
+    document: Document,
+    target: str,
+    *,
+    protocol: bool,
+    remove_empty_intervening_paragraphs: bool = False,
+) -> None:
     """Strengthen only the heading/content pair named by visual evidence."""
     heading = _target_heading(document, target, protocol=protocol)
     heading.paragraph_format.keep_with_next = True
     heading.paragraph_format.keep_together = True
     heading.paragraph_format.widow_control = True
+    if remove_empty_intervening_paragraphs:
+        _remove_empty_intervening_paragraphs(heading)
     block = _first_substantive_block(document, heading)
     if isinstance(block, Paragraph):
         # Widow control preserves a visible first fragment without making a long
@@ -2341,6 +2367,13 @@ def _template_document(
         target = repair["target"]
         if rule == "heading_cohesion":
             _repair_heading_cohesion(document, target, protocol=not icf)
+        elif rule == "heading_whitespace_cohesion":
+            _repair_heading_cohesion(
+                document,
+                target,
+                protocol=not icf,
+                remove_empty_intervening_paragraphs=True,
+            )
         elif rule == "table_pagination":
             _repair_table_pagination(document, target)
     _set_update_fields(document)
