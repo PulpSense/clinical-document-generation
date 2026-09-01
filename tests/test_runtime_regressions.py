@@ -424,6 +424,22 @@ def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
     assert unsupported == []
 
 
+def test_protocol_excessive_whitespace_retains_non_destructive_heading_cohesion():
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "excessive_whitespace",
+        "element": "19.2 Study Completion",
+        "target_ids": ["layout:protocol"],
+        "issue": "A heading is isolated above excessive remaining whitespace.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding])
+
+    assert plan == {"protocol": [{"rule": "heading_cohesion", "target": "19.2 Study Completion"}]}
+    assert unsupported == []
+
+
 def test_heading_cohesion_removes_empty_template_paragraphs_before_its_first_block():
     document = Document()
     document.add_heading("DURATION", level=1)

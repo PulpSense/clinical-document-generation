@@ -2358,7 +2358,7 @@ VERIFICATION_TASK_BY_TARGET = {
 
 LAYOUT_RULE_BY_VISUAL_CHECK = {
     "orphan_heading": "heading_cohesion",
-    "excessive_whitespace": "heading_whitespace_cohesion",
+    "excessive_whitespace": "heading_cohesion",
     "artificial_pagination": "body_pagination",
     "bad_table_split": "table_pagination",
 }
@@ -4834,7 +4834,11 @@ def _layout_repair_plan(findings: Iterable[Mapping[str, Any]]) -> tuple[dict[str
         artifact = str(finding.get("artifact") or layout_targets[0]).removesuffix(".docx")
         check = str(finding.get("check") or "")
         target = " ".join(str(finding.get("element") or "").split())
-        rule = LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
+        rule = (
+            "heading_whitespace_cohesion"
+            if check == "excessive_whitespace" and artifact == "icf"
+            else LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
+        )
         if rule not in LAYOUT_REPAIR_RULES.get(artifact, ()) or not target:
             unsupported.append({
                 **finding,
