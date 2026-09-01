@@ -2103,12 +2103,24 @@ def _remove_empty_intervening_paragraphs(heading: Paragraph) -> None:
                 style_page_boundary = True
                 break
             style = style.base_style
-        ordinary_structure = all(child.tag == qn("w:pPr") for child in element)
+        ordinary_structure = all(
+            child.tag == qn("w:pPr")
+            or (
+                child.tag == qn("w:r")
+                and all(run_child.tag == qn("w:rPr") for run_child in child)
+            )
+            for child in element
+        )
         paragraph_properties = element.find(qn("w:pPr"))
         cosmetic_properties_only = (
             paragraph_properties is None
             or all(
-                child.tag in {qn("w:jc"), qn("w:rPr")}
+                child.tag in {
+                    qn("w:jc"),
+                    qn("w:rPr"),
+                    qn("w:keepNext"),
+                    qn("w:keepLines"),
+                }
                 for child in paragraph_properties
             )
         )

@@ -492,6 +492,63 @@ def test_heading_cohesion_removes_empty_template_paragraphs_before_its_first_blo
     assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
 
 
+def test_heading_whitespace_cohesion_removes_contracted_keep_together_spacers():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    for _ in range(3):
+        spacer = document.add_paragraph("")
+        properties = spacer._p.get_or_add_pPr()
+        properties.append(OxmlElement("w:keepNext"))
+        properties.append(OxmlElement("w:keepLines"))
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
+
+
+def test_sterling_duration_whitespace_repair_removes_contracted_template_spacers(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["meta"]["icf_template"] = "Sterling"
+    model = {"protocol": [], "icf": {}, "prs": {}}
+    baseline_dir = tmp_path / "baseline"
+    repaired_dir = tmp_path / "repaired"
+
+    baseline = render_documents(ROOT, baseline_dir, reference, model, artifact_names={"icf"})
+    repaired = render_documents(
+        ROOT,
+        repaired_dir,
+        reference,
+        model,
+        artifact_names={"icf"},
+        layout_repairs={
+            "icf": ({"rule": "heading_whitespace_cohesion", "target": "DURATION"},),
+        },
+    )
+
+    def empty_paragraphs_after_duration(path):
+        paragraphs = Document(path).paragraphs
+        duration = next(index for index, paragraph in enumerate(paragraphs) if paragraph.text == "DURATION")
+        count = 0
+        for paragraph in paragraphs[duration + 1 :]:
+            if paragraph.text.strip():
+                break
+            count += 1
+        return count
+
+    assert baseline["status"] == repaired["status"] == "passed"
+    assert empty_paragraphs_after_duration(baseline_dir / "candidate/icf.docx") == 3
+    assert empty_paragraphs_after_duration(repaired_dir / "candidate/icf.docx") == 0
+
+
 def test_heading_whitespace_cohesion_preserves_empty_section_boundary_paragraph():
     document = Document()
     document.add_heading("DURATION", level=1)
