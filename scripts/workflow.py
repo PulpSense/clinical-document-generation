@@ -4835,7 +4835,11 @@ def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> l
     return [normalized[key] for key in sorted(normalized)]
 
 
-def _layout_repair_plan(findings: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
+def _layout_repair_plan(
+    findings: Iterable[Mapping[str, Any]],
+    *,
+    icf_template: str | None = None,
+) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
     plan: dict[str, list[dict[str, str]]] = {}
     unsupported: list[dict[str, Any]] = []
     for raw in findings:
@@ -4847,9 +4851,15 @@ def _layout_repair_plan(findings: Iterable[Mapping[str, Any]]) -> tuple[dict[str
         artifact = str(finding.get("artifact") or layout_targets[0]).removesuffix(".docx")
         check = str(finding.get("check") or "")
         target = " ".join(str(finding.get("element") or "").split())
+        exact_sterling_duration_gap = (
+            check == "excessive_whitespace"
+            and artifact == "icf"
+            and target.casefold() == "duration"
+            and str(icf_template or "").casefold() == "sterling"
+        )
         rule = (
             "heading_whitespace_cohesion"
-            if check == "excessive_whitespace" and artifact == "icf"
+            if exact_sterling_duration_gap
             else LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
         )
         if rule not in LAYOUT_REPAIR_RULES.get(artifact, ()) or not target:
@@ -5322,7 +5332,10 @@ def _quality_retry(
             return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
     if has_layout_target:
         generation = working_reference.setdefault("generation", {})
-        repair_plan, unsupported = _layout_repair_plan(normalized)
+        repair_plan, unsupported = _layout_repair_plan(
+            normalized,
+            icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
+        )
         if unsupported:
             return _repair_block(
                 run_dir,

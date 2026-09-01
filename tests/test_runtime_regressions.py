@@ -419,9 +419,41 @@ def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
         "issue": "A large vertical gap separates DURATION from its first substantive paragraph.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding])
+    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Sterling")
 
     assert plan == {"icf": [{"rule": "heading_whitespace_cohesion", "target": "DURATION"}]}
+    assert unsupported == []
+
+
+def test_excessive_whitespace_at_other_sterling_heading_remains_non_destructive():
+    finding = {
+        "category": "visual",
+        "artifact": "icf",
+        "check": "excessive_whitespace",
+        "element": "RISKS",
+        "target_ids": ["layout:icf"],
+        "issue": "A large vertical gap follows an unrelated ICF heading.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Sterling")
+
+    assert plan == {"icf": [{"rule": "heading_cohesion", "target": "RISKS"}]}
+    assert unsupported == []
+
+
+def test_excessive_whitespace_at_advarra_duration_remains_non_destructive():
+    finding = {
+        "category": "visual",
+        "artifact": "icf",
+        "check": "excessive_whitespace",
+        "element": "DURATION",
+        "target_ids": ["layout:icf"],
+        "issue": "A large vertical gap follows an Advarra ICF heading.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Advarra")
+
+    assert plan == {"icf": [{"rule": "heading_cohesion", "target": "DURATION"}]}
     assert unsupported == []
 
 
