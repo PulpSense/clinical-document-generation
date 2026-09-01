@@ -402,6 +402,17 @@ def _normalize_protocol_summary_table(document: Document) -> None:
         row.height = None
         _prevent_row_split(row)
         for cell in row.cells:
+            cell_margins = cell._tc.get_or_add_tcPr().find(qn("w:tcMar"))
+            if cell_margins is None:
+                cell_margins = OxmlElement("w:tcMar")
+                cell._tc.get_or_add_tcPr().append(cell_margins)
+            for side in ("top", "bottom"):
+                margin = cell_margins.find(qn(f"w:{side}"))
+                if margin is None:
+                    margin = OxmlElement(f"w:{side}")
+                    cell_margins.append(margin)
+                margin.set(qn("w:w"), "0")
+                margin.set(qn("w:type"), "dxa")
             for cell_paragraph in cell.paragraphs:
                 cell_paragraph.paragraph_format.keep_together = True
 
@@ -2065,11 +2076,31 @@ def _normalize_protocol_section_pagination(document: Document) -> None:
     ), None)
     if toc_index is None:
         return
+    toc = headings[toc_index]
+    break_carrier = toc._p.getprevious()
+    if (
+        break_carrier is not None
+        and break_carrier.tag == qn("w:p")
+        and break_carrier.xpath('.//w:br[@w:type="page"]')
+    ):
+        spacer = break_carrier.getprevious()
+        while (
+            spacer is not None
+            and spacer.tag == qn("w:p")
+            and not Paragraph(spacer, document).text.strip()
+            and not spacer.xpath('.//w:br[@w:type="page"]')
+            and not spacer.xpath('./w:pPr/w:sectPr')
+        ):
+            previous = spacer.getprevious()
+            spacer.getparent().remove(spacer)
+            spacer = previous
+        toc.paragraph_format.page_break_before = True
+        break_carrier.getparent().remove(break_carrier)
     first_body = next((
         paragraph for paragraph in headings[toc_index + 1:]
         if re.match(r"^\d+(?:\.\d+)*\.?\s+", paragraph.text.strip())
     ), None)
-    for boundary in (headings[toc_index], first_body):
+    for boundary in (toc, first_body):
         if boundary is not None and not _has_page_boundary_before(boundary):
             boundary.paragraph_format.page_break_before = True
 

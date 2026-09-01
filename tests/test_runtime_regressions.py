@@ -1254,6 +1254,12 @@ def test_protocol_summary_rows_keep_together(tmp_path):
         for cell in variables.cells
         for paragraph in cell.paragraphs
     )
+    assert all(
+        cell._tc.tcPr.find(qn("w:tcMar")).find(qn(side)).get(qn("w:w")) == "0"
+        for row in summary.rows
+        for cell in row.cells
+        for side in ("w:top", "w:bottom")
+    )
 
 
 def test_assessment_table_splits_plain_language_schedule_into_readable_rows(tmp_path):

@@ -2112,8 +2112,7 @@ def test_protocol_toc_boundaries_preserve_selected_client_template_without_packa
     assert protocol_report["template"].endswith(expected_template)
     assert protocol_report["template_sha256"] == sha256_file(template_path)
     assert _page_boundary_before(toc)
-    if expected_template == "retrospective-protocol.template.docx":
-        assert toc.paragraph_format.page_break_before is not True
+    assert toc.paragraph_format.page_break_before is True
     assert _page_boundary_before(first_body)
     assert first_body.paragraph_format.page_break_before is not True
     assert all(
@@ -2190,6 +2189,8 @@ def test_protocol_toc_boundaries_are_added_once_when_template_has_none_and_toc_s
 def test_protocol_toc_boundaries_preserve_existing_template_breaks_without_duplicates():
     document = Document()
     document.add_paragraph("3. GENERAL INFORMATION", style="Heading 1")
+    cosmetic_spacer_one = document.add_paragraph()
+    cosmetic_spacer_two = document.add_paragraph()
     before_toc = document.add_paragraph()
     _add_page_break(before_toc)
     toc = document.add_paragraph("4. TABLE OF CONTENTS", style="Heading 1")
@@ -2203,9 +2204,12 @@ def test_protocol_toc_boundaries_preserve_existing_template_breaks_without_dupli
 
     assert _page_boundary_before(toc)
     assert _page_boundary_before(first_body)
-    assert toc.paragraph_format.page_break_before is not True
+    assert toc.paragraph_format.page_break_before is True
     assert first_body.paragraph_format.page_break_before is not True
     assert _explicit_page_break_count(document) == 2
+    assert before_toc._p.getparent() is None
+    assert cosmetic_spacer_one._p.getparent() is None
+    assert cosmetic_spacer_two._p.getparent() is None
 
 
 def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, governed_pdfium):
