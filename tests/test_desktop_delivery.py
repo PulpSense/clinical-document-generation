@@ -268,11 +268,54 @@ def test_production_verifier_relies_on_parent_validation_without_terminal_consen
     )
 
     assert "The Desktop parent validates it automatically" in prompt
-    assert "First try the write_file tool once" in prompt
-    assert "use exactly one /usr/bin/python3 -c terminal command" in prompt
-    assert "workspace-relative response path" in prompt
-    assert "do not wait for command approval" in prompt
-    assert "python -c" not in prompt
+    assert "Return the exact response JSON as your final answer" in prompt
+    assert "Do not call write_file, patch, or terminal to publish the response" in prompt
+    assert "/usr/bin/python3 -c" not in prompt
+
+
+def test_production_parent_publishes_bound_quiet_stdout_response(tmp_path):
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/requests/draft.json"
+    response_path = revision_dir / "hermes/responses/draft.json"
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-request/v2",
+        "request_id": "draft-1",
+        "request_sha256": "a" * 64,
+        "revision_id": "r1",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+    }
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": "hermes-response/v2",
+        "request_id": "draft-1",
+        "request_sha256": "a" * 64,
+        "revision_id": "r1",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {"model_id": "test-model"},
+        "section_results": [],
+    }
+    stdout_log = tmp_path / "worker.stdout.log"
+    stdout_log.write_text(
+        "session_id: test-session\n" + json.dumps(response, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    handoff = {
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+    }
+
+    assert workflow._production_publish_quiet_response(
+        revision_dir,
+        handoff,
+        stdout_log,
+        model_identifier="test-model",
+    ) is True
+    assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
 
 def test_production_verifier_prompt_includes_layout_preservation_notes(tmp_path):
@@ -551,6 +594,7 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
 
     assert captured["command"][0] == "/usr/bin/sandbox-exec"
     assert captured["cwd"] == run_dir
+    assert "-Q" in captured["command"]
     assert "--safe-mode" in captured["command"]
     assert "--skills" not in captured["command"]
     prompt = next(part for part in captured["command"] if part.startswith("Complete one isolated"))

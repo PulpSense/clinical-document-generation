@@ -3735,6 +3735,44 @@ def _production_response_is_bound(
     ))
 
 
+def _production_publish_quiet_response(
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+    stdout_log: Path,
+    *,
+    model_identifier: str,
+) -> bool:
+    """Publish one validated JSON final answer from Hermes quiet-mode stdout."""
+    if _production_response_is_bound(
+        revision_dir, handoff, model_identifier=model_identifier,
+    ):
+        return True
+    try:
+        payload = stdout_log.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    decoder = json.JSONDecoder()
+    candidates: list[Mapping[str, Any]] = []
+    for match in re.finditer(r"\{", payload):
+        try:
+            candidate, _end = decoder.raw_decode(payload, match.start())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(candidate, Mapping):
+            candidates.append(candidate)
+    if not candidates:
+        return False
+    response_path = revision_dir / str(handoff.get("response_path") or "")
+    for candidate in reversed(candidates):
+        _write(response_path, candidate)
+        if _production_response_is_bound(
+            revision_dir, handoff, model_identifier=model_identifier,
+        ):
+            return True
+        response_path.unlink(missing_ok=True)
+    return False
+
+
 def _production_agent_prompt(
     skill_root: Path,
     revision_dir: Path,
@@ -3783,16 +3821,12 @@ def _production_agent_prompt(
         else ""
     )
     response_write_rule = (
-        " The response parent directory already exists; do not create or modify directories. "
-        "First try the write_file tool once with the workspace-relative response path. If that "
-        "tool refuses because it revalidates an absolute ancestor, use exactly one "
-        "/usr/bin/python3 -c terminal command to write the complete JSON directly to the same "
-        "workspace-relative response path. Do not use an absolute path, mkdir, shell redirection, "
-        "or any other terminal command."
+        " Do not call write_file, patch, or terminal to publish the response. Return the exact "
+        "response JSON as your final answer with no Markdown fence or surrounding prose. The "
+        "Desktop parent writes that final JSON atomically to the bound response path."
     )
     verification_rule = (
-        " Write the response exactly once. The Desktop parent validates it automatically; "
-        "do not wait for command approval."
+        " The Desktop parent validates it automatically."
         if task in {"clinical_content_verification", "rendered_page_visual_verification"}
         else " The next generate invocation is the authoritative response validator."
     )
@@ -4180,6 +4214,7 @@ def _production_dispatch_handoffs(
                 ),
                 "--source", str(configuration["source"]),
                 "--max-turns", str(configuration["max_turns"]),
+                "-Q",
             ]
             if configuration.get("safe_mode") is True:
                 command.append("--safe-mode")
@@ -4244,9 +4279,26 @@ def _production_dispatch_handoffs(
                     process.wait(timeout=5)
                     pending.remove(row)
                 elif process.poll() is not None:
+                    stdout_handle = row[2]
+                    stdout_handle.flush()
+                    _production_publish_quiet_response(
+                        revision_dir,
+                        handoff,
+                        Path(str(stdout_handle.name)),
+                        model_identifier=str(configuration["model_identifier"]),
+                    )
                     pending.remove(row)
             if pending:
                 time.sleep(0.05)
+        for process, handoff, stdout_handle, _, _, _, _ in processes:
+            if process.poll() is not None:
+                stdout_handle.flush()
+                _production_publish_quiet_response(
+                    revision_dir,
+                    handoff,
+                    Path(str(stdout_handle.name)),
+                    model_identifier=str(configuration["model_identifier"]),
+                )
         missing = [
             str(handoff.get("response_path") or "")
             for process, handoff, _, _, _, _, _ in processes
