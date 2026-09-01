@@ -3867,6 +3867,12 @@ def _production_read_boundaries() -> tuple[Path, ...]:
     ))
 
 
+def _production_authentication_path() -> Path:
+    """Return the one centralized credential file required by managed Hermes."""
+    account_home = Path(pwd.getpwuid(os.getuid()).pw_dir).expanduser().resolve()
+    return account_home / ".hermes/auth.json"
+
+
 PRODUCTION_HERMES_NETWORK_HOST = "chatgpt.com"
 PRODUCTION_HERMES_NETWORK_PORT = 443
 
@@ -4126,6 +4132,9 @@ def _production_dispatch_handoffs(
                     profile.write(f"(allow file-read* (subpath {json.dumps(str(readable_root))}))\n")
             profile.write(
                 f"(allow file-read* (literal {json.dumps(str(workspace_root.resolve()))}))\n"
+            )
+            profile.write(
+                f"(allow file-read* (literal {json.dumps(str(_production_authentication_path()))}))\n"
             )
             profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
             profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")

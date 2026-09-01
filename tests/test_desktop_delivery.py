@@ -458,11 +458,13 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     run_dir = tmp_path / "run"
     unrelated = tmp_path / "unrelated-checkout"
+    authentication_path = tmp_path / "account/.hermes/auth.json"
     skill_root.mkdir(parents=True)
     unrelated.mkdir()
     captured = {}
     monkeypatch.setattr(workflow.tempfile, "gettempdir", lambda: str(tmp_path))
     monkeypatch.setattr(workflow, "_production_sandbox_executable", lambda: Path("/usr/bin/sandbox-exec"))
+    monkeypatch.setattr(workflow, "_production_authentication_path", lambda: authentication_path)
     monkeypatch.setattr(
         workflow, "_managed_hermes_pair",
         lambda: (Path("/managed/hermes/venv/bin/hermes"), Path(sys.executable)),
@@ -509,6 +511,8 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     assert str(tmp_path.resolve()) in read_rules
     assert str(skill_root.resolve()) in allow_rules
     assert str(run_dir.resolve()) in allow_rules
+    assert f'(literal "{authentication_path}")' in allow_rules
+    assert f'(subpath "{authentication_path.parent}")' not in allow_rules
     assert str(unrelated.resolve()) not in allow_rules
     assert "(deny network*)" in captured["profile"]
     proxy_url = captured["environment"]["HTTPS_PROXY"]
