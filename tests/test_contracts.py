@@ -476,8 +476,10 @@ def test_retrospective_multisite_count_is_not_compared_with_the_single_required_
     assert not any(item["field"] == "design.number_of_sites" for item in input_findings(reference))
 
 
-def test_retrospective_safety_roles_require_structured_party_responsibility_records():
+def test_retrospective_safety_roles_are_optional_but_structured_when_supplied():
     reference = fixture("retrospective-acceptance-source.json")
+    assert not any(item["field"] == "safety.roles" for item in input_findings(reference))
+    reference.pop("safety")
     assert not any(item["field"] == "safety.roles" for item in input_findings(reference))
 
     malformed_values = [

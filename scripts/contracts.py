@@ -267,7 +267,6 @@ RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("population.sample_size"),
     RequiredInput("population.sample_justification", ("statistics.sample_size_justification",)),
     RequiredInput("statistics.analysis_plan"),
-    RequiredInput("safety.roles", kind="records"),
     RequiredInput("parties.irb.name"),
     RequiredInput("parties.irb.address"),
     RequiredInput("parties.sponsor.name"),
@@ -746,9 +745,8 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.time_frame", "issue": "Outcome time frame is missing.", "required": "Reviewer-approved outcome time frame."})
     else:
         safety_roles = get_path(reference, "safety.roles")
-        if (
+        if meaningful(safety_roles) and (
             not isinstance(safety_roles, list)
-            or not safety_roles
             or any(not _valid_safety_role_record(item) for item in safety_roles)
             or len({_safety_party_identity(item["party"]) for item in safety_roles if isinstance(item, Mapping)}) != len(safety_roles)
         ):
