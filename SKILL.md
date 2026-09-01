@@ -34,6 +34,19 @@ Prospective and Ambispective use the same obligatory input contract. Retrospecti
 ## Public interface
 
 Run commands from this skill folder. `scripts/workflow.py` is the only CLI entrypoint.
+Provision a new Hermes host once before generation by creating a dedicated
+Python environment in writable storage and installing the pinned runtime
+dependencies. This explicit setup operation is separate from document
+generation. On the client Linux host, use:
+
+```bash
+/usr/local/bin/uv venv /opt/data/clinical-document-runtime --python /usr/bin/python3.13
+/usr/local/bin/uv pip install --python /opt/data/clinical-document-runtime/bin/python python-docx==1.2.0 lxml==6.1.1 pypdf==6.10.0
+export CLINICAL_PYTHON=/opt/data/clinical-document-runtime/bin/python
+```
+
+The release carries its pinned Linux x86_64 PDFium page renderer. Microsoft
+Word or LibreOffice remains the host prerequisite for DOCX-to-PDF rendering.
 Resolve one supported interpreter first and retain its absolute path; do not
 delegate launch to an ambiguous `python3` command. The Desktop launcher uses
 `workflow.resolve_python_runtime`, launches with the returned `executable`,
@@ -292,7 +305,8 @@ Repeat until the workflow passes or blocks. A missing response remains pending a
 
 `awaiting_hermes` is internal orchestration state. Do not expose its requests, findings, drafting decisions, or progress questions to the reviewer.
 
-During normal generation, do not patch code or templates, install packages,
+During normal generation, use the provisioned `CLINICAL_PYTHON`; do not patch
+code or templates, install packages,
 run the repository development test suite, create a recovery operation, or
 start a new deadline. An implementation defect becomes one technical blocker
 for separate maintenance. Emit concise stage changes and a brief update at

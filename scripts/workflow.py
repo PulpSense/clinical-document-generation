@@ -76,9 +76,9 @@ MINIMUM_PYTHON_VERSION = (3, 10)
 PDF_PAGE_RENDERER = {
     "kind": "pypdfium2",
     "version": "5.13.0",
-    "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
-    "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
-    "platform": "macosx_13_0_arm64",
+    "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "wheel_sha256": "81df25c1ab4c13ff773102d3cbea1967511d079123b067fc077bd0c4d57d91d8",
+    "platform": "manylinux_2_17_x86_64",
 }
 PRODUCTION_MODULES = {
     "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
@@ -1174,10 +1174,12 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
         }]}
     platform_tag = str(identity.get("platform") or "")
     host = f"{platform.system()} {platform.machine()}"
+    system = platform.system().casefold()
+    machine = platform.machine().casefold()
     compatible = (
-        platform.system() == "Darwin"
-        and "macosx" in platform_tag
-        and platform.machine().casefold() in platform_tag.casefold()
+        system == "linux"
+        and "manylinux" in platform_tag.casefold()
+        and machine in platform_tag.casefold()
     )
     if not compatible:
         return {"status": "blocked", "findings": [{

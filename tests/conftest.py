@@ -20,7 +20,7 @@ import quality
 @pytest.fixture
 def governed_pdfium(tmp_path, monkeypatch):
     """Provide the exact shape of a release-owned PDFium test runtime."""
-    source_wheel = ROOT / "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
+    source_wheel = ROOT / "tests/fixtures/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
     wheel = tmp_path / "assets/runtime-wheels" / source_wheel.name
     wheel.parent.mkdir(parents=True)
     shutil.copy2(source_wheel, wheel)
