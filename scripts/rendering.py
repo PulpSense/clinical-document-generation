@@ -2094,12 +2094,23 @@ def _remove_empty_intervening_paragraphs(heading: Paragraph) -> None:
         paragraph = Paragraph(element, heading._parent)
         if paragraph.text.strip():
             return
+        style = paragraph.style
+        style_page_boundary = False
+        seen_styles: set[str] = set()
+        while style is not None and style.style_id not in seen_styles:
+            seen_styles.add(style.style_id)
+            if style.paragraph_format.page_break_before is True:
+                style_page_boundary = True
+                break
+            style = style.base_style
+        ordinary_structure = all(child.tag == qn("w:pPr") for child in element)
         has_page_boundary = (
             element.find(qn("w:pPr") + "/" + qn("w:pageBreakBefore")) is not None
             or element.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
             or any(child.tag in {qn("w:br"), qn("w:lastRenderedPageBreak")} for child in element.iter())
+            or style_page_boundary
         )
-        if has_page_boundary:
+        if has_page_boundary or not ordinary_structure:
             return
         next_element = element.getnext()
         element.getparent().remove(element)

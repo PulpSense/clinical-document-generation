@@ -480,6 +480,50 @@ def test_heading_whitespace_cohesion_preserves_empty_section_boundary_paragraph(
     assert retained._p.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
 
 
+def test_heading_whitespace_cohesion_preserves_empty_bookmark_paragraph():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    bookmark_paragraph = document.add_paragraph("")
+    bookmark = OxmlElement("w:bookmarkStart")
+    bookmark.set(qn("w:id"), "7")
+    bookmark.set(qn("w:name"), "duration-boundary")
+    bookmark_paragraph._p.append(bookmark)
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained._p.find(qn("w:bookmarkStart")) is not None
+
+
+def test_heading_whitespace_cohesion_preserves_inherited_page_boundary():
+    document = Document()
+    boundary_style = document.styles.add_style("Boundary Style", WD_STYLE_TYPE.PARAGRAPH)
+    boundary_style.paragraph_format.page_break_before = True
+    document.add_heading("DURATION", level=1)
+    boundary_paragraph = document.add_paragraph("")
+    boundary_paragraph.style = boundary_style
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained.style.name == "Boundary Style"
+    assert retained.style.paragraph_format.page_break_before is True
+
+
 def _visible_formatting_fingerprint(path):
     document = Document(path)
     paragraph_layout = tuple(
