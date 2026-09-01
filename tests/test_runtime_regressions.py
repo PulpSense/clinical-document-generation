@@ -502,6 +502,31 @@ def test_heading_whitespace_cohesion_preserves_empty_bookmark_paragraph():
     assert retained._p.find(qn("w:bookmarkStart")) is not None
 
 
+def test_heading_whitespace_cohesion_preserves_empty_numbered_paragraph():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    numbered_paragraph = document.add_paragraph("")
+    numbering = OxmlElement("w:numPr")
+    level = OxmlElement("w:ilvl")
+    level.set(qn("w:val"), "0")
+    number_id = OxmlElement("w:numId")
+    number_id.set(qn("w:val"), "1")
+    numbering.extend((level, number_id))
+    numbered_paragraph._p.get_or_add_pPr().append(numbering)
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained._p.find(qn("w:pPr") + "/" + qn("w:numPr")) is not None
+
+
 def test_heading_whitespace_cohesion_preserves_inherited_page_boundary():
     document = Document()
     boundary_style = document.styles.add_style("Boundary Style", WD_STYLE_TYPE.PARAGRAPH)
