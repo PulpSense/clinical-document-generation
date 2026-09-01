@@ -19,6 +19,7 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 - Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect.
 - After approval, use one persistent Desktop operation. Aim for 10–12 minutes; 12 minutes remains successful, while 30 minutes is the hard correctness ceiling. Ten or twelve minutes is not a cutoff.
 - Normal generation is not software maintenance. The installed skill and its templates, contracts, tests, and implementation remain read-only; only the run workspace and isolated runtime caches may be written.
+- For ordinary client document generation, use `--manual-review`. This complete unsigned client workflow does not require a certification key or `PROMOTION-RECORD.json`. Run certification, signing, `--bind-certification`, or `--install-release` only when the user explicitly requests a formally certified release; a missing signing key is never a generation blocker.
 
 ## Branch outputs
 
@@ -44,7 +45,8 @@ Python 3.10+ path.
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 "$CLINICAL_PYTHON" scripts/workflow.py --format-conformance --format-conformance-root <evidence-root>
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
@@ -220,7 +222,7 @@ After approval, do not ask the reviewer any additional clinical or document-cont
 ### 4. Run the bounded Desktop operation
 
 The Desktop parent must use the shipped
-`scripts/workflow.py --desktop-operation --run-dir <run-dir>` adapter for the
+`scripts/workflow.py --desktop-operation --manual-review --run-dir <run-dir>` adapter for the
 entire post-approval lifecycle. Its production API is
 `workflow.run_production_desktop_operation`; callers supply only the actual
 Desktop file opener and, when required, the Desktop-parent visual fallback.
@@ -231,6 +233,15 @@ under the run workspace, so retries and resume calls cannot reset either. It
 records every compatible runtime identity used to resume. Persisted monotonic
 timestamps are never treated as portable; monotonic time is used only inside
 one process and converted to the persisted UTC anchor.
+
+For ordinary client generation, use `--manual-review` from a provisioned
+candidate skill root. This mode
+uses the same drafting, template rendering, content checks, and every-page
+Visual QA, but labels the operation `manual_pre_release` and permits the
+candidate's verified page-renderer runtime without `PROMOTION-RECORD.json`.
+Its outputs are the client-review deliverables. Formal promotion, certification,
+signing, and certified installation remain separate operations and are never
+started by manual-review mode unless the user explicitly requests them.
 
 The operation also persists the Promoted Release fingerprint, exact pending
 stage and handoffs, drafting and verification attempts, delivery attempts,
@@ -263,7 +274,7 @@ developing or diagnosing the inner lifecycle outside a client request, its CLI
 form is:
 
 ```bash
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
 ```
 
 The workflow advances deterministically until it passes, blocks, or returns `status: awaiting_hermes` with one or more request paths.

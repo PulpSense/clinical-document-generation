@@ -1900,7 +1900,14 @@ def _procedure_items(value: Any) -> list[str]:
     return [item.strip() for item in re.split(r"[;\n]", _text(value)) if item.strip()]
 
 
-def _copy_cell_design(destination, source, text: str, *, compact: bool = False) -> None:
+def _copy_cell_design(
+    destination,
+    source,
+    text: str,
+    *,
+    compact: bool = False,
+    run_properties=None,
+) -> None:
     destination_properties = destination._tc.get_or_add_tcPr()
     source_properties = source._tc.tcPr
     if source_properties is not None:
@@ -1922,8 +1929,13 @@ def _copy_cell_design(destination, source, text: str, *, compact: bool = False) 
             paragraph._p.replace(existing, copied)
     run = paragraph.add_run(text)
     source_run = next((item for item in source_paragraph.runs if item.text.strip()), source_paragraph.runs[0] if source_paragraph.runs else None)
-    if source_run is not None and source_run._r.rPr is not None:
-        run._r.insert(0, copy.deepcopy(source_run._r.rPr))
+    resolved_run_properties = (
+        run_properties
+        if run_properties is not None
+        else source_run._r.rPr if source_run is not None else None
+    )
+    if resolved_run_properties is not None:
+        run._r.insert(0, copy.deepcopy(resolved_run_properties))
     if compact:
         run.font.size = Pt(7)
     destination.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
@@ -2263,6 +2275,14 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
 
     authority = Document(authority_path)
     design = authority.tables[-1]
+    body_run_properties = next((
+        run._r.rPr
+        for row in design.rows[2:]
+        for cell in row.cells
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+        if run.text.strip() and run.font.name and run.font.size is not None
+    ), None)
     table = document.add_table(rows=len(row_values), cols=len(row_values[0]))
     destination_properties = table._tbl.tblPr
     destination_properties.getparent().replace(destination_properties, copy.deepcopy(design._tbl.tblPr))
@@ -2278,6 +2298,7 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
                 design.rows[source_row_index].cells[source_column_index],
                 value,
                 compact=compact or (row_index < header_rows and len(row_values[0]) > 4),
+                run_properties=body_run_properties if row_index >= header_rows else None,
             )
         _prevent_row_split(table.rows[row_index])
         if row_index < header_rows:

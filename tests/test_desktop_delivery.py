@@ -391,6 +391,45 @@ def test_production_adapter_uses_unpromoted_runtime_only_for_verified_certificat
         )
 
 
+def test_production_adapter_allows_explicit_manual_review_on_verified_unpromoted_candidate(
+    tmp_path, monkeypatch,
+):
+    skill_root = tmp_path / "isolated-home/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "manual-review-candidate",
+        "git_commit": "candidate-commit",
+        "source": "shipped_production_adapter",
+    })
+    integrity_calls = []
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda root, **options: integrity_calls.append((root, options)) or {"status": "passed"},
+    )
+    monkeypatch.setattr(
+        workflow,
+        "run_desktop_operation",
+        lambda _run_dir, **options: {"status": "passed", "options": options},
+    )
+
+    result = workflow.run_production_desktop_operation(
+        tmp_path / "run",
+        opener=lambda _path: b"unused",
+        release_identity={
+            "package_fingerprint": "manual-review-candidate",
+            "git_commit": "candidate-commit",
+        },
+        skill_root=skill_root,
+        manual_review=True,
+    )
+
+    assert integrity_calls == [(skill_root.resolve(), {"require_promoted_runtime": False})]
+    assert result["options"]["require_promoted_runtime"] is False
+    assert result["options"]["release_identity"]["manual_review"] is True
+    assert result["review_mode"] == "manual_pre_release"
+
+
 def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp_path, monkeypatch):
     hermes_home = tmp_path / "isolated-home"
     skill_root = hermes_home / "skills/clinical-document-generation"

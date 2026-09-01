@@ -1520,6 +1520,17 @@ def test_client_protocol_template_renders_source_supported_schedule_of_assessmen
     continuation_borders = first_column[1].tcPr.find(qn("w:tcBorders"))
     continuation_top = None if continuation_borders is None else continuation_borders.find(qn("w:top"))
     assert continuation_top is None or continuation_top.get(qn("w:val")) == "nil"
+    body_runs = [
+        run
+        for row in assessment.rows[2:]
+        for cell in row.cells
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+        if run.text.strip()
+    ]
+    assert body_runs
+    assert all(run.font.name == "Arial" for run in body_runs)
+    assert all(_points(run.font.size) == 10 for run in body_runs)
     for cell in assessment._tbl.tr_lst[-1].tc_lst:
         bottom = cell.tcPr.find(f"{qn('w:tcBorders')}/{qn('w:bottom')}")
         assert bottom is not None

@@ -4093,9 +4093,12 @@ def _production_dispatch_handoffs(
     ):
         raise RuntimeError("The managed Hermes launcher or interpreter changed after operation binding.")
     hermes_install_root = hermes_launcher.parent.parent.parent
-    interpreter_link_target = Path(os.readlink(managed_python))
-    if not interpreter_link_target.is_absolute():
-        interpreter_link_target = managed_python.parent / interpreter_link_target
+    if managed_python.is_symlink():
+        interpreter_link_target = Path(os.readlink(managed_python))
+        if not interpreter_link_target.is_absolute():
+            interpreter_link_target = managed_python.parent / interpreter_link_target
+    else:
+        interpreter_link_target = managed_python
     interpreter_link_root = interpreter_link_target.absolute().parent.parent
     managed_interpreter_root = managed_python.resolve(strict=True).parent.parent
     runtime_executable = Path(str(runtime_identity["executable"])).absolute()
@@ -4379,8 +4382,9 @@ def run_production_desktop_operation(
     operation_id: str = "default",
     skill_root: Path | None = None,
     certification_preflight: Path | None = None,
+    manual_review: bool = False,
 ) -> dict[str, Any]:
-    """Shipped host adapter for normal and certification Desktop execution."""
+    """Shipped host adapter for normal, manual-review, and certification execution."""
     run_dir = run_dir.expanduser().resolve()
     untrusted_root = (skill_root or SCRIPT_DIR.parent).expanduser().absolute()
     if any(path.is_symlink() for path in (
@@ -4396,7 +4400,19 @@ def run_production_desktop_operation(
         raise ValueError("Supplied release identity does not match the installed candidate manifest.")
     identity = installed_identity
     require_promoted_runtime = True
-    if certification_preflight is not None:
+    if manual_review and certification_preflight is not None:
+        raise ValueError("Manual pre-release review and Release Certification are distinct execution modes.")
+    if manual_review:
+        candidate_runtime = _pdfium_runtime_integrity(
+            root, require_promoted_runtime=False,
+        )
+        if candidate_runtime.get("status") != "passed":
+            raise ValueError(
+                "Manual pre-release review requires a verified provisioned candidate runtime."
+            )
+        require_promoted_runtime = False
+        identity = {**identity, "manual_review": True}
+    elif certification_preflight is not None:
         if not _certification_preflight_authorizes_candidate(
             root, certification_preflight, identity,
         ):
@@ -4487,7 +4503,11 @@ def run_production_desktop_operation(
         },
         require_promoted_runtime=require_promoted_runtime,
     )
-    return {**result, "parent_visual_review": parent_review_record}
+    return {
+        **result,
+        "parent_visual_review": parent_review_record,
+        "review_mode": "manual_pre_release" if manual_review else "governed_delivery",
+    }
 
 
 def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
@@ -5988,6 +6008,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--approved-by", default="client")
     parser.add_argument("--source-md")
     parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter")
+    parser.add_argument("--manual-review", action="store_true", help="generate local pre-release review outputs from a provisioned candidate without requiring promotion")
     parser.add_argument("--desktop-opener-command")
     parser.add_argument("--parent-visual-review-command")
     parser.add_argument("--operation-id", default="default")
@@ -6006,6 +6027,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release")
     parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.manual_review and not (
+        args.desktop_operation or (args.stage == "generate" and args.run_dir)
+    ):
+        parser.error("--manual-review is supported only with --desktop-operation or --stage generate")
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.provision_candidate:
@@ -6032,13 +6057,20 @@ def main(argv: list[str] | None = None) -> int:
             parent_visual_reviewer=command_parent_visual_reviewer(
                 Path(args.parent_visual_review_command)
             ),
+            manual_review=args.manual_review,
         )
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)
     else:
         if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless a release or conformance operation is used")
         run_dir = Path(args.run_dir).expanduser().resolve()
-        result = {"prepare": prepare, "approve": approve, "validate": validate, "generate": generate}[args.stage](run_dir, approved_by=args.approved_by, source_md=Path(args.source_md).expanduser() if args.source_md else None)
+        stage_options: dict[str, Any] = {
+            "approved_by": args.approved_by,
+            "source_md": Path(args.source_md).expanduser() if args.source_md else None,
+        }
+        if args.stage == "generate" and args.manual_review:
+            stage_options["require_promoted_runtime"] = False
+        result = {"prepare": prepare, "approve": approve, "validate": validate, "generate": generate}[args.stage](run_dir, **stage_options)
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
