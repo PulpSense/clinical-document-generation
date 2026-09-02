@@ -260,11 +260,11 @@ runtime outcome.
 Before installation, the same `config.yaml` must select only the active path and
 declare the certified launch settings under `skills.clinical_document_generation`:
 `source: clinical-release-certification`, `max_turns: 80`,
-`skill: clinical-document-generation`, `safe_mode: true`,
-`model_identifier: gpt-5.6-sol`, and
-`reasoning_configuration: Hermes Desktop governed default`. The host also needs
-`model.default: gpt-5.6-sol`, `agent.reasoning_effort: medium`, and at least 80
-agent turns. A mismatch stops before activation with one configuration finding.
+`skill: clinical-document-generation`, `safe_mode: true`, and
+`reasoning_configuration: Hermes Desktop governed default`. The host may use any
+non-empty user-selected `model.default`; responses record the actual producing
+model. The host also needs `agent.reasoning_effort: medium` and at least 80 agent
+turns. A mismatch stops before activation with one configuration finding.
 
 `--rollback-release` verifies the immediately previous release before one
 atomic swap, restores it as active, and quarantines the suspect release without

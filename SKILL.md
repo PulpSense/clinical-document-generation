@@ -13,7 +13,7 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 - Never invent study-specific facts. Before approval, return all missing Required Source Inputs in one focused checklist. Approval closes source intake.
 - Approved Fixed Clinical Boilerplate from `references/fixed-clinical-boilerplate.json` is allowed only where a request lists it.
 - Python owns contracts, state, rendering, XML structure, validation, retries, and publication. Python never drafts clinical prose and never calls a model.
-- Hermes owns model calls. Use the JSON request/response handoff described below.
+- Hermes owns model calls and uses the model selected by the user in their active Hermes configuration. Responses must record the actual producing model; the skill does not require a specific model.
 - Do not expose drafts, PDFs, page images, logs, or repair artifacts as client outputs.
 - Publish nothing unless the complete branch package passes.
 - Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect.
@@ -113,7 +113,7 @@ release is quarantined under its fingerprint without rewriting retained run
 revisions. The archive contains
 `RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
 also requires Hermes `skills.external_dirs` to name only the promoted active
-path, validates the certified model/reasoning/safe-mode/turn settings declared
+path, validates recorded model provenance plus the certified reasoning/safe-mode/turn settings declared
 under `skills.clinical_document_generation`, and records the activation in
 `PROMOTION-RECORD.json`.
 

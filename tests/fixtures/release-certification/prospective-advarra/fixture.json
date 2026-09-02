@@ -35,7 +35,6 @@
     "max_turns": 80,
     "skill": "clinical-document-generation",
     "safe_mode": true,
-    "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
     "layout_preservation_notes": [
       "The Advarra ICF family retains its authority-derived headings, consent language, and signature-table structure; those features are not style defects."

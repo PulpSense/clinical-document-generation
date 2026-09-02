@@ -88,7 +88,6 @@ CERTIFIED_HERMES_CONFIGURATION = {
     "max_turns": 80,
     "skill": "clinical-document-generation",
     "safe_mode": True,
-    "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
 }
 CERTIFICATION_GATES = {
@@ -745,6 +744,7 @@ def _certification_attestation(
         )
         output_by_path = {str(item.get("path") or ""): item for item in outputs}
         visual = case.get("visual_qa") or {}
+        case_models = set(case.get("model_identifiers") or [])
         expected_visual = {Path(path).stem for path in expected_outputs if path.endswith(".docx")}
         try:
             elapsed = float(case.get("elapsed_seconds"))
@@ -777,7 +777,7 @@ def _certification_attestation(
                 and _is_sha256(item.get("response_sha256"))
                 and _is_sha256(item.get("pdf_sha256"))
                 and _is_sha256(item.get("docx_sha256"))
-                and item.get("producer_model_id") == CERTIFIED_HERMES_CONFIGURATION["model_identifier"]
+                and str(item.get("producer_model_id") or "").strip() in case_models
                 and item.get("docx_sha256") == output_by_path.get(f"output/{artifact}.docx", {}).get("sha256")
                 for artifact, item in visual.items()
             )
@@ -805,7 +805,8 @@ def _certification_attestation(
             not case.get("findings"),
             case.get("release_identity") == identity,
             case.get("hermes_configuration_sha256") == expected_configuration_hashes.get(fixture_id),
-            set(case.get("model_identifiers") or []) == {CERTIFIED_HERMES_CONFIGURATION["model_identifier"]},
+            bool(case_models),
+            all(isinstance(model, str) and model.strip() for model in case_models),
             _is_sha256(case.get("report_sha256")),
             runtime_valid,
             desktop_elapsed > 0.0,
@@ -821,7 +822,7 @@ def _certification_attestation(
             case.get("layout_preservation_baseline_identity") == (expected_bundle.get("layout_preservation_baseline") or {}).get("sha256"),
         ))
     if not valid:
-        return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, model, and configuration."}]
+        return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, recorded model provenance, and configuration."}]
     return report, []
 
 
@@ -1031,13 +1032,13 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     except ValueError:
         host_turns_sufficient = False
     host_matches = all((
-        scalars.get(("model", "default")) == CERTIFIED_HERMES_CONFIGURATION["model_identifier"],
+        bool(str(scalars.get(("model", "default")) or "").strip()),
         scalars.get(("agent", "reasoning_effort")) == "medium",
         host_turns_sufficient,
     ))
     normalized_entries = [str(Path(entry).expanduser().resolve()) for entry in entries]
     if duplicate_paths or external_definitions != 1 or normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
-        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
+        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active}, configure a non-empty user-selected default model, and match the medium-reasoning, safe-mode, and 80-turn governed settings."}]
     return []
 
 
@@ -2416,6 +2417,54 @@ def _approved_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _approval_governing_compatible(
+    skill_root: Path,
+    current_governing: Mapping[str, Any],
+    approved_governing_sha256: str,
+) -> bool:
+    """Accept one manifest-bound Linux adapter-only predecessor hash."""
+    if platform.system() != "Linux":
+        return False
+    try:
+        manifest = _read(skill_root / RELEASE_MANIFEST)
+        compatibility = manifest.get("approval_compatibility")
+        if not isinstance(compatibility, Mapping) or set(compatibility) != {
+            "schema_version", "scope", "implementation_path",
+            "predecessor_sha256", "current_sha256",
+        }:
+            return False
+        if (
+            compatibility.get("schema_version") != "approval-compatibility/v1"
+            or compatibility.get("scope") != "linux-desktop-adapter-only"
+            or compatibility.get("implementation_path") != "scripts/workflow.py"
+        ):
+            return False
+        implementation = current_governing.get("implementation_sha256")
+        if not isinstance(implementation, Mapping):
+            return False
+        workflow_path = skill_root / "scripts/workflow.py"
+        current_sha256 = sha256_file(workflow_path)
+        rows = [
+            row for row in manifest.get("files", [])
+            if isinstance(row, Mapping) and row.get("path") == "scripts/workflow.py"
+        ]
+        if (
+            len(rows) != 1
+            or rows[0].get("sha256") != current_sha256
+            or implementation.get("scripts/workflow.py") != current_sha256
+            or compatibility.get("current_sha256") != current_sha256
+        ):
+            return False
+        predecessor_sha256 = str(compatibility.get("predecessor_sha256") or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", predecessor_sha256):
+            return False
+        predecessor = copy.deepcopy(dict(current_governing))
+        predecessor["implementation_sha256"]["scripts/workflow.py"] = predecessor_sha256
+        return sha256_value(predecessor) == approved_governing_sha256
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return False
+
+
 def _approval_valid(
     run_dir: Path,
     reference: Mapping[str, Any],
@@ -2439,12 +2488,20 @@ def _approval_valid(
     snapshot = _read(snapshot_path)
     if _approved_payload(reference) != _approved_payload(snapshot):
         return False, "Study inputs changed after approval; prepare and approve a new Source-of-Truth revision."
-    expected_governing = sha256_value(governing_resources(
+    current_governing = governing_resources(
         SCRIPT_DIR.parent,
         snapshot,
         contracted_bundle=contracted_bundle,
-    ))
-    if approval.get("governing_sha256") != expected_governing:
+    )
+    expected_governing = sha256_value(current_governing)
+    if (
+        approval.get("governing_sha256") != expected_governing
+        and not _approval_governing_compatible(
+            SCRIPT_DIR.parent,
+            current_governing,
+            str(approval.get("governing_sha256") or ""),
+        )
+    ):
         return False, "Generation contracts, templates, or implementation changed after approval; approve the unchanged Source-of-Truth again to create a new immutable revision."
     return True, ""
 
@@ -3710,8 +3767,6 @@ def run_desktop_operation(
 def _production_response_is_bound(
     revision_dir: Path,
     handoff: Mapping[str, Any],
-    *,
-    model_identifier: str,
 ) -> bool:
     """Authenticate one worker response before reaping its Hermes process."""
     request_path = revision_dir / str(handoff.get("request_path") or "")
@@ -3721,7 +3776,8 @@ def _production_response_is_bound(
         response = _read(response_path)
     except (OSError, ValueError, json.JSONDecodeError):
         return False
-    if str((response.get("producer") or {}).get("model_id") or "") != model_identifier:
+    producer_model_id = str((response.get("producer") or {}).get("model_id") or "").strip()
+    if not producer_model_id:
         return False
     if str(handoff.get("task") or "") in {
         "clinical_content_verification", "rendered_page_visual_verification",
@@ -3741,12 +3797,10 @@ def _production_publish_quiet_response(
     revision_dir: Path,
     handoff: Mapping[str, Any],
     stdout_log: Path,
-    *,
-    model_identifier: str,
 ) -> bool:
     """Publish one validated JSON final answer from Hermes quiet-mode stdout."""
     if _production_response_is_bound(
-        revision_dir, handoff, model_identifier=model_identifier,
+        revision_dir, handoff,
     ):
         return True
     try:
@@ -3768,7 +3822,7 @@ def _production_publish_quiet_response(
     for candidate in reversed(candidates):
         _write(response_path, candidate)
         if _production_response_is_bound(
-            revision_dir, handoff, model_identifier=model_identifier,
+            revision_dir, handoff,
         ):
             return True
         response_path.unlink(missing_ok=True)
@@ -3792,7 +3846,6 @@ def _production_agent_prompt(
         (revision_dir / str(handoff["response_path"])).resolve(), workspace_root.resolve(),
     )).as_posix()
     task = str(handoff.get("task") or "")
-    model_identifier = str(configuration["model_identifier"])
     if task == "rendered_page_visual_verification":
         task_rule = (
             "Act as an independent visual verifier. Load and inspect every supplied page PNG "
@@ -3839,7 +3892,7 @@ def _production_agent_prompt(
         f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
         f"Read the request completely. {task_rule}{layout_rule} Write exact JSON directly to the response "
         f"path and bind every schema, request ID, request hash, task, target, and evidence "
-        f"reference exactly. producer.model_id must be exactly {model_identifier!r}."
+        "reference exactly. producer.model_id must record the actual model used for this response."
         f"{response_write_rule}{verification_rule} The validator interpreter is dependency-complete; do not search "
         "the filesystem for Python or dependency paths. Do not modify production code or "
         "approved source material."
@@ -3885,9 +3938,29 @@ def _production_sandbox_executable() -> Path:
     return sandbox
 
 
+def _production_sandbox_prefix(profile: Path) -> list[str]:
+    """Return the platform-native worker isolation launch prefix."""
+    if platform.system() == "Darwin":
+        return [str(_production_sandbox_executable()), "-f", str(profile)]
+    if platform.system() == "Linux":
+        setpriv = Path("/usr/bin/setpriv")
+        if setpriv.is_symlink() or not setpriv.is_file() or not os.access(setpriv, os.X_OK):
+            raise RuntimeError("The governed Linux privilege-isolation executable is unavailable.")
+        return [
+            str(setpriv),
+            "--no-new-privs",
+            "--inh-caps=-all",
+            "--ambient-caps=-all",
+        ]
+    raise RuntimeError("The governed OS sandbox is unsupported on this platform.")
+
+
 def _managed_hermes_pair() -> tuple[Path, Path]:
-    account_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-    launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
+    if platform.system() == "Linux":
+        launcher = Path("/opt/hermes/.venv/bin/hermes")
+    else:
+        account_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+        launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
     interpreter = launcher.parent / "python"
     if (
         launcher.is_symlink()
@@ -4140,7 +4213,6 @@ def _production_dispatch_handoffs(
     deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
     logs = run_dir / "logs/hermes-agents"
     logs.mkdir(parents=True, exist_ok=True)
-    sandbox = _production_sandbox_executable()
     environment = _production_subprocess_environment(skill_root)
     hermes_home = Path(environment["HERMES_HOME"])
     workspace_root = run_dir.resolve()
@@ -4238,7 +4310,7 @@ def _production_dispatch_handoffs(
                 "NO_PROXY": "",
             })
             process = subprocess.Popen(
-                [str(sandbox), "-f", profile.name, *command],
+                [*_production_sandbox_prefix(Path(profile.name)), *command],
                 cwd=workspace_root,
                 env=worker_environment,
                 stdout=stdout_handle,
@@ -4277,7 +4349,6 @@ def _production_dispatch_handoffs(
                 process, handoff, _, _, _, _, _ = row
                 if _production_response_is_bound(
                     revision_dir, handoff,
-                    model_identifier=str(configuration["model_identifier"]),
                 ):
                     if process.poll() is None:
                         try:
@@ -4293,7 +4364,6 @@ def _production_dispatch_handoffs(
                         revision_dir,
                         handoff,
                         Path(str(stdout_handle.name)),
-                        model_identifier=str(configuration["model_identifier"]),
                     )
                     pending.remove(row)
             if pending:
@@ -4305,14 +4375,12 @@ def _production_dispatch_handoffs(
                     revision_dir,
                     handoff,
                     Path(str(stdout_handle.name)),
-                    model_identifier=str(configuration["model_identifier"]),
                 )
         missing = [
             str(handoff.get("response_path") or "")
             for process, handoff, _, _, _, _, _ in processes
             if not _production_response_is_bound(
                 revision_dir, handoff,
-                model_identifier=str(configuration["model_identifier"]),
             )
         ]
         if missing:
@@ -4561,7 +4629,7 @@ def run_production_desktop_operation(
             "request_paths": [str(item.get("request_path") or "") for item in handoffs],
             "response_paths": [str(item.get("response_path") or "") for item in handoffs],
             "completion_requirement": "Desktop parent must inspect every bound page image.",
-            "required_producer_model_id": str(configuration["model_identifier"]),
+            "producer_model_policy": "record_actual_nonempty_model_id",
         }
 
     result = run_desktop_operation(
@@ -4633,7 +4701,7 @@ def command_parent_visual_reviewer(
             "schema_version": "desktop-parent-visual-review-request/v1",
             "revision_id": revision_dir.name,
             "handoffs": [dict(item) for item in handoffs],
-            "required_producer_model_id": str(configuration["model_identifier"]),
+            "producer_model_policy": "record_actual_nonempty_model_id",
         })
         subprocess.run(
             [str(command), str(request_path)],

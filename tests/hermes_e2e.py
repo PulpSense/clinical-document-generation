@@ -63,7 +63,6 @@ GOVERNED_HERMES_CONFIGURATION_FIELDS = (
     "max_turns",
     "skill",
     "safe_mode",
-    "model_identifier",
     "reasoning_configuration",
 )
 CERTIFICATION_VISUAL_CHECKS = frozenset({
@@ -82,7 +81,6 @@ DEFAULT_HERMES_CONFIGURATION = {
     "max_turns": 80,
     "skill": "clinical-document-generation",
     "safe_mode": True,
-    "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
 }
 FIRST_WAVE_BATCHES = frozenset(
@@ -544,14 +542,8 @@ def inspect_run(
         stage_elapsed_seconds[stage] = round(stage_elapsed_seconds.get(stage, 0.0) + _interval_seconds(intervals), 3)
     repair_report_path = run_dir / "reference/repair-report.md"
     expected_model_identifier = str(expected_model_identifier or "").strip()
-    noncanonical_model_identifiers = sorted(
-        model_id for model_id in model_identifiers
-        if expected_model_identifier and model_id != expected_model_identifier
-    )
-    model_identity_complete = bool(
-        not expected_model_identifier
-        or model_identifiers == {expected_model_identifier}
-    )
+    noncanonical_model_identifiers: list[str] = []
+    model_identity_complete = bool(model_identifiers)
     valid_delivery = (
         final_result.get("status") == "passed"
         and output_files == required_outputs
@@ -781,7 +773,6 @@ def _agent_prompt(
     response_path = revision_dir / str(handoff["response_path"])
     task = str(handoff.get("task") or "")
     visual_verification = task == "rendered_page_visual_verification"
-    model_identifier = str(hermes_configuration.get("model_identifier") or "gpt-5.6-sol")
     if task == "rendered_page_visual_verification":
         verification_rule = (
             "Act as an independent verifier. Load and inspect every supplied page PNG with the vision tool, assess every listed check for every page, then write the bound response promptly. "
@@ -842,7 +833,7 @@ Task: {task}
 
 Read {skill_root / 'SKILL.md'} and load the clinical-document-generation skill. Read the request completely. {verification_rule}
 {preservation_rule}
-Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must be exactly "{model_identifier}", the canonical identifier for the configured model serving this handoff. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
+Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must record the actual model used for this response. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
 def _wait_for_processes(
@@ -922,13 +913,12 @@ def _response_is_bound(
     task = str(handoff.get("task") or "")
     response_path = revision_dir / str(handoff.get("response_path") or "")
     response: dict[str, Any] | None = None
-    if expected_model_identifier:
-        try:
-            response = _read_json(response_path)
-        except (OSError, ValueError, json.JSONDecodeError):
-            return False
-        if str(((response or {}).get("producer") or {}).get("model_id") or "").strip() != expected_model_identifier:
-            return False
+    try:
+        response = _read_json(response_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    if not str(((response or {}).get("producer") or {}).get("model_id") or "").strip():
+        return False
     if task in {"section_drafting", "prs_narrative_drafting"}:
         try:
             request = _read_json(request_path)
@@ -955,7 +945,6 @@ def wait_for_parent_visual_review(
     remaining_seconds: float,
     *,
     response_is_complete: Callable[[Path, Path], bool],
-    model_identifier: str = "gpt-5.6-sol",
     progress: Callable[[str, float], None] | None = None,
 ) -> None:
     """Wait inside the original operation for Desktop-parent page review evidence."""
@@ -973,7 +962,7 @@ def wait_for_parent_visual_review(
             "request_paths": [str(item.get("request_path") or "") for item in handoffs],
             "response_paths": response_paths,
             "completion_requirement": "Desktop parent must inspect every bound page image.",
-            "required_producer_model_id": model_identifier,
+            "producer_model_policy": "record_actual_nonempty_model_id",
         }, indent=2) + "\n", encoding="utf-8")
 
     record("awaiting_desktop_parent")
@@ -985,7 +974,6 @@ def wait_for_parent_visual_review(
             revision_dir,
             handoff,
             response_is_complete,
-            expected_model_identifier=model_identifier,
         ) for handoff in handoffs):
             record("completed")
             return
@@ -1071,7 +1059,6 @@ def _run_handoff_wave(
                 revision_dir,
                 handoff_by_process[id(process)],
                 response_is_complete,
-                expected_model_identifier=str(hermes_configuration["model_identifier"]),
             ),
         )
     finally:
@@ -1237,7 +1224,6 @@ def _run_controlled_release_certification_operation(
         elapsed_seconds=round(operation_elapsed, 3),
         timed_out=timed_out,
         child_returncode=None,
-        expected_model_identifier=str(hermes_configuration["model_identifier"]),
     )
     report["parent_visual_review"] = final_result.get("parent_visual_review")
     if state_path_resolver is None:
@@ -2172,13 +2158,8 @@ def _case_artifact_findings(
     ):
         findings.append("Recorded or synthetic producers cannot satisfy live drafting or verification gates.")
     derived_evidence["model_identifiers"] = sorted(model_identifiers)
-    expected_model_identifier = str(
-        ((fixture or {}).get("hermes_configuration") or {}).get("model_identifier") or ""
-    ).strip()
-    if not expected_model_identifier or model_identifiers != {expected_model_identifier}:
-        findings.append(
-            "Hermes drafting, verifier, and Desktop-parent producers do not all match the governed model identifier."
-        )
+    if not model_identifiers:
+        findings.append("Hermes drafting and verifier evidence must record actual producing model identifiers.")
     derived_evidence["visual_qa"] = derived_visual_qa
     approval = (actual_reference or {}).get("approval") or {}
     working_reference = _read_json(run_dir / "reference/study.reference.json") or {}

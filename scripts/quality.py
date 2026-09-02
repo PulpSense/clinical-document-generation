@@ -1159,7 +1159,7 @@ def _certification_evidence_findings(
             or parent_marker.get("status") != "completed"
             or parent_marker.get("completion_requirement")
             != "Desktop parent must inspect every bound page image."
-            or parent_marker.get("required_producer_model_id") not in models
+            or parent_marker.get("producer_model_policy") != "record_actual_nonempty_model_id"
         ):
             findings.append(f"Desktop-parent review completion evidence is invalid for {fixture}.")
         if not parent_review_items and parent_marker_items:

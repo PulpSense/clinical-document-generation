@@ -263,7 +263,7 @@ def test_production_verifier_relies_on_parent_validation_without_terminal_consen
             "response_path": "hermes/verification-responses/visual.json",
             "task": "rendered_page_visual_verification",
         },
-        {"model_identifier": "test-model"},
+        {},
         workspace_root=tmp_path,
     )
 
@@ -313,7 +313,6 @@ def test_production_parent_publishes_bound_quiet_stdout_response(tmp_path):
         revision_dir,
         handoff,
         stdout_log,
-        model_identifier="test-model",
     ) is True
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
@@ -328,7 +327,6 @@ def test_production_verifier_prompt_includes_layout_preservation_notes(tmp_path)
             "task": "rendered_page_visual_verification",
         },
         {
-            "model_identifier": "test-model",
             "layout_preservation_notes": [
                 "Keep Section 15 and its assessment table together on the following page.",
             ],
@@ -1130,11 +1128,11 @@ def test_external_parent_visual_reviewer_receives_one_bound_request_path(tmp_pat
     reviewer([{
         "request_path": "hermes/verification-requests/visual.json",
         "response_path": "hermes/verification-responses/visual.json",
-    }], 10.0, revision, {"model_identifier": "review-model"})
+    }], 10.0, revision, {})
 
     request = json.loads((revision / "hermes/desktop-parent-visual-review-request.json").read_text())
     assert request["revision_id"] == "r1"
-    assert request["required_producer_model_id"] == "review-model"
+    assert request["producer_model_policy"] == "record_actual_nonempty_model_id"
     assert len(request["handoffs"]) == 1
 
 

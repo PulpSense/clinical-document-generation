@@ -1187,7 +1187,7 @@ def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path
     )
 
 
-def test_corpus_reducer_rejects_bound_producers_outside_governed_model(tmp_path: Path, monkeypatch) -> None:
+def test_corpus_reducer_accepts_actual_nonempty_producer_models(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
     reports = [
@@ -1201,8 +1201,8 @@ def test_corpus_reducer_rejects_bound_producers_outside_governed_model(tmp_path:
 
     result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
-    assert result["status"] == "failed"
-    assert any("governed model identifier" in finding for finding in result["findings"])
+    assert result["status"] == "passed"
+    assert not result["findings"]
 
 
 def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tmp_path: Path, monkeypatch) -> None:
@@ -1320,7 +1320,6 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
             "task": "rendered_page_visual_verification",
         },
         hermes_configuration={
-            "model_identifier": "gpt-5.6-sol",
             "layout_preservation_notes": [
                 "The two-line Table 13.3.-1 contact caption is authority-preserved."
             ],
@@ -1330,7 +1329,7 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
     assert "The two-line Table 13.3.-1 contact caption is authority-preserved." in prompt
     assert "Do not normalize" in prompt
     assert "Do not inspect production code or tests" in prompt
-    assert 'producer.model_id must be exactly "gpt-5.6-sol"' in prompt
+    assert "producer.model_id must record the actual model used" in prompt
     assert 'top-level status and every page status must be exactly "passed"' in prompt
 
 
@@ -1470,7 +1469,6 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
             "max_turns": 80,
             "skill": "clinical-document-generation",
             "safe_mode": True,
-            "model_identifier": "gpt-5.6-sol",
             "reasoning_configuration": "Hermes Desktop governed default",
         },
     )
@@ -1576,7 +1574,7 @@ def test_parent_visual_review_waits_for_bound_desktop_responses(tmp_path: Path) 
     marker = json.loads((tmp_path / "logs/desktop-parent-visual-review.json").read_text())
     assert marker["status"] == "completed"
     assert marker["response_paths"] == ["hermes/verification-responses/visual.json"]
-    assert marker["required_producer_model_id"] == "gpt-5.6-sol"
+    assert marker["producer_model_policy"] == "record_actual_nonempty_model_id"
 
 
 def test_parent_visual_review_reports_progress_while_waiting(tmp_path: Path, monkeypatch) -> None:
@@ -1766,7 +1764,6 @@ def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Pat
     assert workflow._production_response_is_bound(
         revision_dir,
         handoff,
-        model_identifier="gpt-5.6-sol",
     ) is True
     assert quality.verification_response_is_complete(revision_dir, request_path) is False
 
@@ -1822,7 +1819,7 @@ def test_bound_drafting_response_is_terminal_without_visual_validation(tmp_path:
         handoff,
         lambda *_args: True,
         expected_model_identifier="gpt-5.6-sol",
-    ) is False
+    ) is True
 
 
 def test_complete_visual_pass_is_terminal(tmp_path: Path) -> None:
@@ -2077,8 +2074,8 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
     assert slow_delivery["outcome"] == DiagnosticOutcome.NON_CERTIFYING_RUNTIME.value
     assert slow_delivery["output_published"] is True
     assert with_delivery["required_outputs"] == ["protocol.docx"]
-    assert wrong_model_delivery["outcome"] == DiagnosticOutcome.INVALID_HERMES_RESPONSE.value
-    assert wrong_model_delivery["noncanonical_model_identifiers"] == ["other-model"]
+    assert wrong_model_delivery["outcome"] == DiagnosticOutcome.PASSED.value
+    assert wrong_model_delivery["noncanonical_model_identifiers"] == []
 
 
 def test_diagnostic_preserves_a_classified_layout_blocker_after_response_invalidation(tmp_path: Path) -> None:

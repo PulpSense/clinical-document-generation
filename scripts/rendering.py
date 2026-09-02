@@ -414,6 +414,12 @@ def _normalize_protocol_summary_table(document: Document) -> None:
                 margin.set(qn("w:w"), "0")
                 margin.set(qn("w:type"), "dxa")
             for cell_paragraph in cell.paragraphs:
+                # Template value cells carry large right indents that narrow the
+                # usable column and can strand the final summary row on a nearly
+                # blank page. The table columns already own horizontal geometry.
+                cell_paragraph.paragraph_format.left_indent = None
+                cell_paragraph.paragraph_format.right_indent = None
+                cell_paragraph.paragraph_format.first_line_indent = None
                 cell_paragraph.paragraph_format.keep_together = True
 
 

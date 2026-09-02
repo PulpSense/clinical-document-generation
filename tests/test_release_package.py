@@ -491,7 +491,7 @@ def _certify_archive(
                 json.dumps({
                     "status": "completed",
                     "completion_requirement": "Desktop parent must inspect every bound page image.",
-                    "required_producer_model_id": "gpt-5.6-sol",
+                    "producer_model_policy": "record_actual_nonempty_model_id",
                 }, sort_keys=True).encode(),
                 case_id=fixture,
                 path=f"cases/{fixture}/parent-process-review.json",
@@ -547,7 +547,6 @@ def _hermes_config(skills_dir: Path) -> Path:
         "    max_turns: 80\n"
         "    skill: clinical-document-generation\n"
         "    safe_mode: true\n"
-        "    model_identifier: gpt-5.6-sol\n"
         "    reasoning_configuration: Hermes Desktop governed default\n",
         encoding="utf-8",
     )
@@ -2026,7 +2025,7 @@ def test_hermes_configuration_requires_typed_exact_governed_values(tmp_path):
     _certify_archive(archive_path)
     for index, replacement in enumerate((
         ("safe_mode: true", 'safe_mode: "true"'),
-        ("model_identifier: gpt-5.6-sol", "model_identifier: GPT-5.6-SOL"),
+        ("default: gpt-5.6-sol", 'default: ""'),
         ("skill: clinical-document-generation", "skill: Clinical-Document-Generation"),
     )):
         skills_dir = tmp_path / f"skills-{index}"
