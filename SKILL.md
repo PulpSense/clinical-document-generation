@@ -204,6 +204,34 @@ Do not add a second workflow entrypoint. The installation-owned `runtime/`
 directory contains only the manifest-bound PDFium runtime and packaged fonts
 used by Render Assurance; host Word or LibreOffice remains the DOCX renderer.
 
+## Run directory policy
+
+Keep every study run under `/opt/data/clinical-document-runs/`, with exactly one
+dedicated top-level folder per run. Before starting generation, derive and show
+the proposed folder name, then use it unless the user requests a different
+approved study title:
+
+```text
+<filesystem-safe-approved-study-title>__<study-type>__<YYYY-MM-DD>
+```
+
+Apply these rules:
+
+1. Use the approved study title from the study input.
+2. Use exactly `Prospective`, `Ambispective`, or `Retrospective` for the study-type label.
+3. Use the Hermes host's current local date when the folder is first created, formatted `YYYY-MM-DD`.
+4. Convert the title to a readable filesystem-safe name: replace spaces with hyphens; remove slashes, colons, and unsupported characters; and retain enough text to identify the study clearly.
+5. Never reuse or overwrite a run folder. If the base name exists, append `__02`, `__03`, and so on, choosing the first unused suffix.
+6. Create the selected folder directly under `/opt/data/clinical-document-runs/` and pass its exact absolute path as every workflow command's `--run-dir`.
+7. Keep all source inputs, the approved Source-of-Truth, revisions, drafts, logs, QA evidence, render evidence, and final documents inside that run folder.
+8. Keep final deliverables only in `<run-folder>/output/`; `client_outputs` is the workflow result field that lists those published files, not a separate directory.
+9. Never generate files directly in `/opt/data`, inside this installed skill, or inside another study's run folder.
+10. Never delete or alter an earlier study-run folder.
+11. At completion, report the approved study title, study type, creation date, complete run-folder path, `output` path, and final deliverable filenames.
+
+Folder selection is complete only after confirming the proposed path does not
+already exist and the chosen path is the first available collision-safe name.
+
 ## Full loop
 
 ### 1. Preserve and normalize inputs

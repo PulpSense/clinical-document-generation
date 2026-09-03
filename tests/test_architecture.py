@@ -122,6 +122,25 @@ def test_unsigned_linux_drop_in_is_provisioned_and_smoke_tested_before_generatio
         assert "does not confer promotion or certification" in authority
 
 
+def test_skill_keeps_each_study_in_a_named_collision_safe_run_directory():
+    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    policy = instructions[instructions.index("## Run directory policy"):]
+
+    assert "/opt/data/clinical-document-runs/" in policy
+    assert (
+        "<filesystem-safe-approved-study-title>__<study-type>__<YYYY-MM-DD>"
+        in policy
+    )
+    assert all(
+        f"`{study_type}`" in policy
+        for study_type in ("Prospective", "Ambispective", "Retrospective")
+    )
+    assert "first unused suffix" in policy
+    assert "every workflow command's `--run-dir`" in policy
+    assert "final deliverables only in `<run-folder>/output/`" in policy
+    assert "`client_outputs` is the workflow result field" in policy
+
+
 def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     assert "Use the returned `handoffs` as routing metadata" in instructions
