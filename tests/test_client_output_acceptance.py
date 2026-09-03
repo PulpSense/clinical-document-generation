@@ -2476,6 +2476,87 @@ def test_rendered_ambispective_section_three_flows_after_investigator_agreement(
     assert "Table 9.2-1. Visit Schedule" in visits_heading_page
 
 
+def test_section_three_table_repair_moves_the_complete_block_before_the_toc(
+    tmp_path,
+    governed_pdfium,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reference["study"].update({
+        "title": (
+            "Prospective Evaluation of the NovaStep Activity Sensor in Adults "
+            "Recovering From Total Knee Arthroplasty"
+        ),
+        "short_title": "NovaStep Recovery Study",
+        "timeline": (
+            "Enrollment is expected to last 8 months. Each participant is followed "
+            "from screening through Week 12, for "
+            + "additional scheduled follow-up context " * 16
+            + "extra words approximately 11 weeks after the baseline device fitting."
+        ),
+    })
+    reference["objectives"]["primary"] = [
+        "Describe the change in average daily step count from baseline at Week 2 "
+        "to Week 12 after total knee arthroplasty."
+    ]
+    reference["population"].update({
+        "sample_size": "72 participants",
+        "study_population": (
+            "Adults recovering from primary unilateral total knee arthroplasty who "
+            "can complete study visits and use the NovaStep sensor."
+        ),
+    })
+    reference["design"].update({
+        "number_of_sites": 2,
+        "study_design": (
+            "Prospective, multi-site, single-arm observational device study. The "
+            "device is used only for measurement and does not direct treatment."
+        ),
+    })
+
+    document_report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+        layout_repairs={
+            "protocol": ({
+                "rule": "table_pagination",
+                "target": "3. GENERAL INFORMATION",
+            },),
+        },
+    )
+    render_report = render_pages(
+        tmp_path,
+        page_renderer_identities=[governed_pdfium],
+    )
+
+    assert document_report["status"] == "passed"
+    assert render_report["status"] == "passed", render_report
+    protocol = next(
+        item for item in render_report["artifacts"]
+        if item["artifact"] == "protocol"
+    )
+    pages = [
+        " ".join((page.extract_text() or "").split())
+        for page in PdfReader(tmp_path / protocol["pdf"]).pages
+    ]
+    toc_page = next(
+        index for index, text in enumerate(pages)
+        if "4. TABLE OF CONTENTS" in text
+    )
+    section_three_page = pages[toc_page - 1]
+
+    assert "3. GENERAL INFORMATION" in section_three_page
+    assert "Duration / Follow-up" in section_three_page
+    assert "device fitting." in section_three_page
+    assert len(section_three_page.split()) >= 150
+
+
 def test_content_gate_rejects_same_section_duplicates_and_flattened_schedule_prose(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
     duplicate = "The analysis data sets will be organized around the approved outcome summaries."

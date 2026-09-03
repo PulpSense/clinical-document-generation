@@ -2305,9 +2305,17 @@ def _repair_table_pagination(document: Document, target: str) -> None:
     if caption is not None:
         caption.paragraph_format.keep_with_next = True
         caption.paragraph_format.keep_together = True
-        # A table-specific boundary must never be attached to a numbered body
-        # heading; only a separately identified caption may own it.
-        if not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption.text.strip()):
+        is_section_three_summary = (
+            _protocol_heading_key(caption.text) == "3 general information"
+        )
+        # A classified split in the front-matter summary is repaired by moving
+        # its complete heading-and-table block ahead of the fixed TOC boundary.
+        # Numbered body tables keep natural pagination; only a separately
+        # identified caption may own a table-specific boundary there.
+        if (
+            is_section_three_summary
+            or not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption.text.strip())
+        ):
             caption.paragraph_format.page_break_before = True
 
 
