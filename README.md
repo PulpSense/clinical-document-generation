@@ -49,16 +49,13 @@ The client outputs are standard `.docx` and `.xml` files. The authoring host mus
 
 Protocol and ICF rendering begins from the bundled client Word families. The renderer preserves their visual design, replaces study-specific Protocol bodies with accepted drafts, keeps applicable ICF regulatory language, removes example-study leakage, and blocks empty or near-empty rendered pages.
 
-Install Python dependencies in the Hermes environment:
-
-```bash
-"$CLINICAL_PYTHON" -m pip install -r requirements.txt
-```
-
-`CLINICAL_PYTHON` must be the absolute Python 3.10+ path returned by
-`workflow.resolve_python_runtime`; do not rely on the host's unqualified
-`python3`. The Desktop operation records that identity and every later runtime
-used to resume it.
+For the normative Hermes setup—including the dedicated Python environment,
+one-time unsigned-candidate provisioning, installation smoke, and the boundary
+between `--manual-review` and formally certified activation—follow
+[SKILL.md's Public interface](SKILL.md#public-interface). `CLINICAL_PYTHON` must
+be the resolved absolute Python 3.10+ path; do not rely on the host's
+unqualified `python3`. The Desktop operation records that identity and every
+later runtime used to resume it.
 
 ## Public commands
 

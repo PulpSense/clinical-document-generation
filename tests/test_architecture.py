@@ -89,6 +89,39 @@ def test_skill_requires_source_truth_as_file_not_inline_chat():
     assert "Do not paste the Source-of-Truth contents into chat" in instructions
 
 
+def test_unsigned_linux_drop_in_is_provisioned_and_smoke_tested_before_generation():
+    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    public_interface = instructions.index("## Public interface")
+    provision = instructions.index(
+        '"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate',
+        public_interface,
+    )
+    smoke = instructions.index(
+        '"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation',
+        provision,
+    )
+    manual_generation = instructions.index(
+        '"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review',
+        public_interface,
+    )
+
+    assert provision < smoke < manual_generation
+    normalized = " ".join(instructions.split())
+    assert "Do not use `--install-release` for this unsigned drop-in path." in normalized
+    assert (
+        "promoted release fingerprint, or the candidate manifest fingerprint for "
+        "`manual_pre_release`" in normalized
+    )
+    for authority_path in (
+        ROOT / "CONTEXT.md",
+        ROOT / "docs/adr/0018-own-render-assurance-capabilities.md",
+        ROOT / "docs/specs/render-assurance-fallbacks.md",
+    ):
+        authority = authority_path.read_text(encoding="utf-8")
+        assert "manual_pre_release" in authority
+        assert "does not confer promotion or certification" in authority
+
+
 def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
     assert "Use the returned `handoffs` as routing metadata" in instructions

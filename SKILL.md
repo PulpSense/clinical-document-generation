@@ -43,7 +43,20 @@ generation. On the client Linux host, use:
 /usr/local/bin/uv venv /opt/data/clinical-document-runtime --python /usr/bin/python3.13
 /usr/local/bin/uv pip install --python /opt/data/clinical-document-runtime/bin/python python-docx==1.2.0 lxml==6.1.1 pypdf==6.10.0
 export CLINICAL_PYTHON=/opt/data/clinical-document-runtime/bin/python
+cd /absolute/path/to/hermes/skills/clinical-document-generation
+"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate
+"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
 ```
+
+Run the final two commands once after every fresh extraction of an unsigned
+client ZIP and require both JSON results to report `"status": "passed"` before
+generation. `--provision-candidate` installs only the archive's hash-bound
+Linux x86_64 PDFium wheel into that extracted skill; it does not download a
+renderer or modify the host Python environment. `--verify-installation` then
+smoke-tests the exact DOCX-to-PDF-to-page-image path through the host's Word or
+LibreOffice installation. Do not use `--install-release` for this unsigned
+drop-in path. That command remains reserved for a signed, fully certified
+archive.
 
 The release carries its pinned Linux x86_64 PDFium page renderer. Microsoft
 Word or LibreOffice remains the host prerequisite for DOCX-to-PDF rendering.
@@ -256,10 +269,11 @@ Its outputs are the client-review deliverables. Formal promotion, certification,
 signing, and certified installation remain separate operations and are never
 started by manual-review mode unless the user explicitly requests them.
 
-The operation also persists the Promoted Release fingerprint, exact pending
-stage and handoffs, drafting and verification attempts, delivery attempts,
-stage timings, soft-budget diagnostics, cleanup evidence, and the terminal
-result. A missing response redispatches only its unchanged request identity;
+The operation also persists the promoted release fingerprint, or the candidate
+manifest fingerprint for `manual_pre_release`, plus the exact pending stage and
+handoffs, drafting and verification attempts, delivery attempts, stage timings,
+soft-budget diagnostics, cleanup evidence, and the terminal result. A missing
+response redispatches only its unchanged request identity;
 changed request bytes fail closed. Soft stage budgets may trigger diagnostics
 or the parent visual fallback, but only the original UTC deadline terminates
 the operation. A late worker or opener completion cannot change a terminal
