@@ -47,6 +47,7 @@ from rendering import render_documents
 
 REFERENCE = Path("reference/study.reference.json")
 MAX_VERIFICATION_ATTEMPTS = 3
+MAX_REVIEW_SETS = 3
 DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 720.0
@@ -4976,14 +4977,39 @@ def _publish(
     return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
 
 
-def _clear_verification_responses(revision_dir: Path, tasks: set[str] | None = None) -> None:
+def _clear_verification_responses(
+    revision_dir: Path,
+    tasks: set[str] | None = None,
+    *,
+    request_ids: set[str] | None = None,
+) -> None:
     for request_path in (revision_dir / "hermes/verification-requests").glob("*.json"):
         try:
             request = _read(request_path)
         except (OSError, ValueError, json.JSONDecodeError):
             continue
-        if tasks is None or str(request.get("task")) in tasks:
+        if (
+            (request_ids is not None and str(request.get("request_id")) in request_ids)
+            or (request_ids is None and (tasks is None or str(request.get("task")) in tasks))
+        ):
             (revision_dir / str(request.get("response_path", ""))).unlink(missing_ok=True)
+
+
+def _reset_verification_set(revision_dir: Path) -> None:
+    """Remove the current bound set so every reviewer assesses the repaired candidate."""
+    request_root = revision_dir / "hermes/verification-requests"
+    response_root = revision_dir / "hermes/verification-responses"
+    for request_path in request_root.glob("*.json"):
+        try:
+            request = _read(request_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            request = {}
+        response_path = request.get("response_path")
+        if response_path:
+            (revision_dir / str(response_path)).unlink(missing_ok=True)
+        request_path.unlink(missing_ok=True)
+    for response_path in response_root.glob("*.json"):
+        response_path.unlink(missing_ok=True)
 
 
 def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
@@ -5377,19 +5403,30 @@ def _quality_retry(
     if transient:
         verification_attempts = working_reference.setdefault("generation", {}).setdefault("verification_attempts", {})
         exhausted = []
-        tasks = set()
-        for item in transient:
+        request_ids: set[str] = set()
+        fallback_tasks: set[str] = set()
+        transient_by_reviewer: dict[str, dict[str, Any]] = {}
+        for raw in transient:
+            item = dict(raw)
             target = str((item.get("target_ids") or [item.get("field")])[0])
-            next_attempt = int(verification_attempts.get(target, 0)) + 1
-            verification_attempts[target] = next_attempt
+            request_id = str(item.get("verification_request_id") or "").strip()
+            retry_key = request_id or target
+            transient_by_reviewer.setdefault(retry_key, item)
+        for retry_key, item in transient_by_reviewer.items():
+            target = str((item.get("target_ids") or [item.get("field")])[0])
+            next_attempt = int(verification_attempts.get(retry_key, 0)) + 1
+            verification_attempts[retry_key] = next_attempt
             retry_target = RetryTarget.parse(target)
             task = VERIFICATION_TASK_BY_TARGET.get(retry_target.value) if retry_target.category == "verification" else None
-            if task:
-                tasks.add(task)
+            request_id = str(item.get("verification_request_id") or "").strip()
+            if request_id:
+                request_ids.add(request_id)
+            elif task:
+                fallback_tasks.add(task)
             if next_attempt > MAX_VERIFICATION_ATTEMPTS:
                 exhausted.append({
                     **dict(item),
-                    "field": target,
+                    "field": retry_key,
                     "issue": f"Reviewer retry limit reached after {MAX_VERIFICATION_ATTEMPTS} attempts. {item.get('issue', '')}".strip(),
                 })
         _write(reference_path, working_reference)
@@ -5397,13 +5434,16 @@ def _quality_retry(
             path = run_dir / "reference/repair-report.md"
             path.write_text(repair_report(exhausted), encoding="utf-8")
             return {"status": "blocked", "stage": "reviewer_retry_limit", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-        _clear_verification_responses(revision_dir, tasks)
+        if request_ids:
+            _clear_verification_responses(revision_dir, request_ids=request_ids)
+        if fallback_tasks:
+            _clear_verification_responses(revision_dir, fallback_tasks)
         remaining = [item for item in findings if item.get("recovery_class") != "verifier_transient"]
         if not remaining:
             return _awaiting(
                 revision_dir,
                 stage="independent_verification_retry",
-                paths=sorted((revision_dir / "hermes/verification-requests").glob("*.json")),
+                paths=pending_verifications(revision_dir),
                 findings=transient,
             )
         findings = remaining
@@ -5480,22 +5520,9 @@ def _quality_retry(
             "repair_report": path.relative_to(run_dir).as_posix(),
             "client_outputs": [],
         }
-    attempts, exhausted = retry_attempts(normalized, prior_attempts)
-    working_reference.setdefault("generation", {})["attempts"] = attempts
-    _write(reference_path, working_reference)
-    if exhausted:
-        path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(exhausted), encoding="utf-8")
-        return {"status": "blocked", "stage": stage, "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-    if section_targets:
-        invalidate_accepted_targets(revision_dir, section_targets)
-        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
-        _clear_verification_responses(revision_dir)
-        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized, contracted_bundle=contracted_bundle)
-        if created:
-            return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
+    layout_plan: dict[str, list[dict[str, str]]] = {}
     if has_layout_target:
-        generation = working_reference.setdefault("generation", {})
-        repair_plan, unsupported = _layout_repair_plan(
+        layout_plan, unsupported = _layout_repair_plan(
             normalized,
             icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
         )
@@ -5506,14 +5533,49 @@ def _quality_retry(
                 unsupported,
                 candidate_outputs=_candidate_outputs(revision_dir),
             )
+    attempts, exhausted = retry_attempts(normalized, prior_attempts)
+    if exhausted:
+        working_reference.setdefault("generation", {})["attempts"] = attempts
+        _write(reference_path, working_reference)
+        path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(exhausted), encoding="utf-8")
+        return {"status": "blocked", "stage": stage, "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
+    if stage == "quality" and (section_targets or has_layout_target):
+        generation = working_reference.setdefault("generation", {})
+        current_review_set = max(1, int(generation.get("review_set", 1)))
+        if current_review_set >= MAX_REVIEW_SETS:
+            exhausted_review = [{
+                **dict(item),
+                "field": "review_set",
+                "issue": f"Independent verification still found a defect after {MAX_REVIEW_SETS} complete review sets. {item.get('issue', '')}".strip(),
+            } for item in normalized]
+            return _repair_block(
+                run_dir,
+                "review_set_limit",
+                exhausted_review,
+                candidate_outputs=_candidate_outputs(revision_dir),
+            )
+        generation["review_set"] = current_review_set + 1
+        _reset_verification_set(revision_dir)
+    working_reference.setdefault("generation", {})["attempts"] = attempts
+    _write(reference_path, working_reference)
+    created: list[Path] = []
+    if section_targets:
+        invalidate_accepted_targets(revision_dir, section_targets)
+        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
+        _clear_verification_responses(revision_dir)
+        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized, contracted_bundle=contracted_bundle)
+    if has_layout_target:
+        generation = working_reference.setdefault("generation", {})
         persisted_repairs = generation.setdefault("layout_repairs", {})
-        for artifact, repairs in repair_plan.items():
+        for artifact, repairs in layout_plan.items():
             existing = persisted_repairs.get(artifact, ())
             persisted_repairs[artifact] = _normalized_layout_repair_records([*existing, *repairs])
             _invalidate_layout_artifact(revision_dir, artifact)
-        generation["pending_layout_artifacts"] = sorted(repair_plan)
+        generation["pending_layout_artifacts"] = sorted(layout_plan)
         _write(reference_path, working_reference)
-    else:
+    if created:
+        return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
+    if not has_layout_target:
         tasks = {
             task
             for target in targets
@@ -5817,7 +5879,15 @@ def generate(
     observe_stage("render_assurance")
     if state.pop("pending_layout_artifacts", None) is not None:
         _write(reference_path, working_reference)
-    create_verification_requests(revision_dir, reference, render_report, contracted_bundle=bundle)
+    review_set = max(1, int(state.setdefault("review_set", 1)))
+    _write(reference_path, working_reference)
+    create_verification_requests(
+        revision_dir,
+        reference,
+        render_report,
+        contracted_bundle=bundle,
+        review_set=review_set,
+    )
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)

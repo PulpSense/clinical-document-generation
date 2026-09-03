@@ -342,6 +342,8 @@ Subagents return section-level structured content, never a whole document. The w
 - Visual defect: repair/rebuild the affected layout artifact and rerun rendered-page verification.
 - Reuse unaffected accepted drafts.
 - A fourth attempt is never created. After three failed attempts, block with `reference/repair-report.md` and no client outputs.
+- Independent verification runs in at most three complete review sets. If any content or visual reviewer finds a governed repairable defect, preserve the failed evidence, repair only the implicated draft/layout target, then rerun the package-wide content review and every document-scoped visual review against the repaired candidate. Never reuse a pass from an earlier set.
+- A transient API or malformed-routing response retries only that reviewer within the current set and does not consume a new complete review set. If the third complete set still finds a defect, preserve the candidate and block with `reference/repair-report.md`.
 
 ## Independent verification
 
@@ -353,6 +355,12 @@ concurrently so every-page image inspection stays off the serial critical path:
 - `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
 
 The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery.
+
+Each request records its one-based `review_set`. A genuine finding invalidates
+the entire prior verification set after its evidence is archived; all reviewers
+then run concurrently on the repaired candidate. Missing or invalid repair
+routing is treated as an incomplete reviewer response and must be corrected by
+that reviewer—it is never silently ignored or guessed by the workflow.
 
 The Generation Manifest contains one hash-bound monotonic gate ledger in this
 fixed order: clinical fidelity; content completeness and consistency; DOCX/PRS

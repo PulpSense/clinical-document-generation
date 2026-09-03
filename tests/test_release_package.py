@@ -553,6 +553,22 @@ def _hermes_config(skills_dir: Path) -> Path:
     return path
 
 
+def test_hermes_configuration_accepts_any_nonempty_user_selected_model(tmp_path):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    config = _hermes_config(skills_dir)
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "default: gpt-5.6-sol",
+            "default: unsloth/Qwen3.8-27B-GGUF:Q8_K_XL",
+        ),
+        encoding="utf-8",
+    )
+
+    assert workflow._validate_hermes_discovery(config, active) == []
+
+
 def test_release_packaging_refuses_an_uncommitted_release_owned_resource(tmp_path):
     dirty_resource = ROOT / "ticket-44-uncommitted-resource.txt"
     dirty_resource.write_text("not committed", encoding="utf-8")

@@ -1401,6 +1401,175 @@ def test_transient_verifier_failure_is_classified_for_retry_without_accepting_qa
     assert findings[0]["target_ids"] == ["verification:content"]
     assert findings[0]["recovery_class"] == "verifier_transient"
     assert findings[0]["action"] == "retry_verifier"
+    assert findings[0]["verification_request_id"] == request["request_id"]
+
+
+def test_content_finding_without_a_section_target_reprompts_the_reviewer(tmp_path):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/r.verify.content.json",
+        "sections": [],
+        "cross_document_checks": [],
+        "artifacts": [],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    (requests / "content.json").write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "user-selected-local-model"},
+        "status": "blocked",
+        "findings": [{"issue": "A substantive source fact is missing."}],
+        "section_assessments": [],
+        "cross_document_assessments": [],
+    }
+    (responses / "r.verify.content.json").write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(revision)
+
+    routing = next(item for item in findings if "source fact" in item["issue"])
+    assert routing["target_ids"] == ["verification:content"]
+    assert routing["recovery_class"] == "verifier_transient"
+    assert routing["action"] == "retry_verifier"
+
+
+def test_reviewer_defect_starts_a_fresh_complete_review_set(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    request_dir = revision / "hermes/verification-requests"
+    response_dir = revision / "hermes/verification-responses"
+    reference_path.parent.mkdir(parents=True)
+    request_dir.mkdir(parents=True)
+    response_dir.mkdir()
+    reference_path.write_text(json.dumps({"generation": {"review_set": 1}}), encoding="utf-8")
+    for name, task in (
+        ("content", "clinical_content_verification"),
+        ("protocol", "rendered_page_visual_verification"),
+        ("icf", "rendered_page_visual_verification"),
+    ):
+        response_path = f"hermes/verification-responses/{name}.json"
+        (request_dir / f"{name}.json").write_text(json.dumps({
+            "task": task,
+            "response_path": response_path,
+            "artifacts": [{"artifact": name}] if task.startswith("rendered") else [],
+        }), encoding="utf-8")
+        (revision / response_path).write_text("{}", encoding="utf-8")
+    (revision / "candidate-build.json").write_text("{}", encoding="utf-8")
+    rerun = {"status": "awaiting_hermes", "stage": "independent_verification"}
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: rerun)
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {"review_set": 1}},
+        {},
+        revision,
+        {},
+        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
+        "quality",
+    )
+
+    assert result == rerun
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["generation"]["review_set"] == 2
+    assert list(request_dir.glob("*.json")) == []
+    assert list(response_dir.glob("*.json")) == []
+
+
+def test_third_failed_review_set_blocks_before_a_fourth_set(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {"review_set": 3}}), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda *_args, **_kwargs: pytest.fail("must not start a fourth review set"))
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {"review_set": 3}},
+        {},
+        revision,
+        {},
+        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
+        "quality",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "review_set_limit"
+    assert "3 complete review sets" in result["findings"][0]["issue"]
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert "attempts" not in state["generation"]
+
+
+def test_mixed_content_and_visual_findings_queue_both_repairs(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {"review_set": 1}}), encoding="utf-8")
+    (revision / "candidate-build.json").parent.mkdir(parents=True)
+    (revision / "candidate-build.json").write_text("{}", encoding="utf-8")
+    approved = json.loads(
+        (ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+
+    def fake_schedule_requests(**_kwargs):
+        path = revision / "hermes/drafting-requests/introduction.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({
+            "task": "draft_sections",
+            "response_path": "hermes/drafting-responses/introduction.json",
+        }), encoding="utf-8")
+        return [path]
+
+    monkeypatch.setattr(workflow, "schedule_requests", fake_schedule_requests)
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {"review_set": 1}},
+        approved,
+        revision,
+        {},
+        [
+            {"category": "verification", "field": "introduction", "target_ids": ["introduction"], "recovery_class": "drafting_defect", "action": "retry_drafting_target", "issue": "missing context"},
+            {"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"},
+        ],
+        "quality",
+    )
+
+    assert result["stage"] == "drafting_retry"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
+    assert state["review_set"] == 2
+    assert state["pending_layout_artifacts"] == ["protocol"]
+    assert state["layout_repairs"] == {
+        "protocol": [{"rule": "heading_cohesion", "target": "5. INTRODUCTION"}],
+    }
+
+
+def test_timeline_coverage_allows_grammar_but_preserves_milestone_pairing():
+    approved = (
+        "IRB review and data access: Month 1; extraction and abstraction: Months 2 to 4; "
+        "quality control and analysis: Months 5 to 6; final report: Month 7."
+    )
+    grammatical = (
+        "The approved study timeline is IRB review and data access in Month 1; extraction and abstraction "
+        "in Months 2 to 4; quality control and analysis in Months 5 to 6; and the final report in Month 7."
+    )
+    swapped = grammatical.replace("Month 1", "Month 7", 1)
+
+    assert quality._timeline_covered(approved, grammatical)
+    assert not quality._timeline_covered(approved, swapped)
 
 
 def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
@@ -1433,6 +1602,50 @@ def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["generation"]["verification_attempts"]["verification:content"] == 1
     assert not (revision / "hermes/verification-responses/clinical_content_verification.json").exists()
+
+
+def test_multiple_transient_findings_from_one_reviewer_consume_one_retry(tmp_path):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    response_path = revision / "hermes/verification-responses/content.json"
+    reference_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
+    response_path.write_text("{}", encoding="utf-8")
+    request_id = "r-test.review-1.verify.content"
+    request_path = revision / "hermes/verification-requests/content.json"
+    request_path.parent.mkdir(parents=True)
+    request_path.write_text(json.dumps({
+        "request_id": request_id,
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+    }), encoding="utf-8")
+    finding = {
+        "category": "reviewer-transient",
+        "field": "clinical_content_verification",
+        "target_ids": ["verification:content"],
+        "verification_request_id": request_id,
+        "recovery_class": "verifier_transient",
+        "action": "retry_verifier",
+        "issue": "incomplete response",
+    }
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {}},
+        {},
+        revision,
+        {},
+        [finding, {**finding, "field": "section_assessments"}],
+        "quality",
+    )
+
+    assert result["status"] == "awaiting_hermes"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["generation"]["verification_attempts"][request_id] == 1
+    assert not response_path.exists()
 
 
 def test_quality_retry_rejects_a_finding_without_a_governed_recovery_class(tmp_path):
@@ -1550,6 +1763,8 @@ def test_layout_failure_blocks_only_after_three_total_attempts(tmp_path):
     assert result["stage"] == "quality"
     assert result["findings"][0]["field"] == "layout:protocol.docx"
     assert "after 3 attempts" in result["findings"][0]["issue"]
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert "review_set" not in state["generation"]
 
 
 def test_prs_generation_validates_against_the_retained_client_manual_authority(tmp_path):
@@ -1615,7 +1830,7 @@ def test_protocol_omits_references_heading_when_no_references_are_supplied():
     assert "REFERENCES" not in [paragraph.text.strip() for paragraph in document.paragraphs]
 
 
-def test_layout_failure_invalidates_only_the_affected_artifact_evidence(tmp_path, monkeypatch):
+def test_layout_failure_repairs_only_the_affected_artifact_but_resets_all_review_evidence(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
     reference_path = run_dir / "reference/study.reference.json"
@@ -1676,6 +1891,6 @@ def test_layout_failure_invalidates_only_the_affected_artifact_evidence(tmp_path
     assert (revision / "candidate/icf.docx").is_file()
     assert (revision / "rendered/icf.pdf").is_file()
     assert (revision / "rendered/icf/page-1.png").is_file()
-    assert (requests / "visual-icf.json").is_file()
-    assert (responses / "visual-icf.json").is_file()
+    assert not (requests / "visual-icf.json").exists()
+    assert not (responses / "visual-icf.json").exists()
     assert (revision / "candidate-build.json").is_file()

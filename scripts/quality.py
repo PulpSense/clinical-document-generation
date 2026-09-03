@@ -3202,6 +3202,30 @@ def _artifact_hashes(revision_dir: Path, paths: Iterable[Path]) -> list[dict[str
     ]
 
 
+def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
+    """Accept grammatical glue while keeping every milestone bound to its time value."""
+    approved = re.sub(r"\s+", " ", _text(approved_timeline)).strip().casefold().rstrip(".")
+    visible = re.sub(r"\s+", " ", _text(visible_text)).strip().casefold()
+    if not approved or approved in visible:
+        return True
+    clauses = [clause.strip(" .") for clause in approved.split(";") if clause.strip(" .")]
+    pairs: list[tuple[str, str]] = []
+    for clause in clauses:
+        if ":" not in clause:
+            return False
+        milestone, time_value = (part.strip(" ,.") for part in clause.split(":", 1))
+        if not milestone or not time_value:
+            return False
+        pairs.append((milestone, time_value))
+    return bool(pairs) and all(
+        re.search(
+            rf"\b{re.escape(milestone)}\b[^.;]{{0,80}}\b{re.escape(time_value)}\b",
+            visible,
+        )
+        for milestone, time_value in pairs
+    )
+
+
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -3319,8 +3343,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 expected = re.sub(r"\s+", " ", _text(item)).strip().casefold().rstrip(".")
                 if expected and expected not in normalized_visible:
                     findings.append({"category": "content", "field": "subjects.eligibility", "target_ids": ["subjects.eligibility"], "issue": f"Retrospective eligibility omits approved source content from {field}."})
-        timeline = re.sub(r"\s+", " ", _text(get_path(reference, "study.timeline"))).strip().casefold().rstrip(".")
-        if timeline and timeline not in normalized_visible:
+        timeline = get_path(reference, "study.timeline")
+        if timeline and not _timeline_covered(timeline, normalized_visible):
             findings.append({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": "Retrospective study procedure omits the approved study timeline."})
         schedule = get_path(reference, "procedures.visit_schedule_table", []) or []
         visit_names = [item.get("visitName") or item.get("visit") for item in schedule if isinstance(item, Mapping)]
@@ -3416,6 +3440,7 @@ def create_verification_requests(
     render_report: Mapping[str, Any],
     *,
     contracted_bundle: Mapping[str, Any] | None = None,
+    review_set: int = 1,
 ) -> list[Path]:
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
     responses.mkdir(parents=True, exist_ok=True)
@@ -3442,7 +3467,7 @@ def create_verification_requests(
     if authorized_boilerplate.get("version") != BOILERPLATE_VERSION:
         raise ValueError("Verification boilerplate does not match the content contract.")
     cross_document_checks = [] if branch == "Retrospective" else list(CROSS_DOCUMENT_CHECKS)
-    content_instructions = "Assess every listed section against every content check."
+    content_instructions = f"This is complete review set {review_set}. Assess every listed section against every content check."
     if cross_document_checks:
         content_instructions += " Assess every cross-document check."
     content_instructions += (
@@ -3455,9 +3480,10 @@ def create_verification_requests(
     )
     payloads = [{
         "schema_version": VERIFY_SCHEMA,
-        "request_id": f"{revision_dir.name}.verify.content",
+        "request_id": f"{revision_dir.name}.review-{review_set}.verify.content",
         "task": "clinical_content_verification",
         "revision_id": revision_dir.name,
+        "review_set": review_set,
         "artifacts": content_files,
         "approved_source": reference,
         "authorized_boilerplate": authorized_boilerplate,
@@ -3472,7 +3498,7 @@ def create_verification_requests(
     for index, artifacts in enumerate(visual_batches, start=1):
         artifact_name = str(artifacts[0].get("artifact", "documents")) if artifacts else "documents"
         artifact_id = re.sub(r"[^a-z0-9]+", "-", artifact_name.casefold()).strip("-") or f"document-{index}"
-        request_id = f"{revision_dir.name}.verify.visual.{artifact_id}"
+        request_id = f"{revision_dir.name}.review-{review_set}.verify.visual.{artifact_id}"
         request_artifacts = [
             {key: value for key, value in artifact.items() if key not in {"renderer", "page_renderer"}}
             for artifact in artifacts
@@ -3482,11 +3508,12 @@ def create_verification_requests(
             "request_id": request_id,
             "task": "rendered_page_visual_verification",
             "revision_id": revision_dir.name,
+            "review_set": review_set,
             "renderer": artifacts[0].get("renderer", render_report.get("renderer")) if artifacts else render_report.get("renderer"),
             "page_renderer": artifacts[0].get("page_renderer", render_report.get("page_renderer")) if artifacts else render_report.get("page_renderer"),
             "artifacts": request_artifacts,
             "checks": list(VISUAL_CHECKS),
-            "instructions": "Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local.",
+            "instructions": f"This is complete review set {review_set}. Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local.",
             "reviewer_policy": {
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",
@@ -3612,14 +3639,14 @@ def validate_verifications(
             }, "document_structure_defect"))
             continue
         if not response_path.is_file():
-            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
+            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
         try: response = _json(response_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
+            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
         for key, expected in (("schema_version", RESPONSE_SCHEMA), ("request_id", request["request_id"]), ("request_sha256", request["request_sha256"]), ("task", request["task"])):
             if response.get(key) != expected: findings.append(recovery_finding({"category": "verification", "field": key, "issue": f"Verification response binding mismatch for {key}."}, "document_structure_defect"))
         producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
-        if not _text(producer.get("model_id")): findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "issue": "Verifier identity is missing."}, "verifier_transient"))
+        if not _text(producer.get("model_id")): findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier identity is missing."}, "verifier_transient"))
         error = response.get("error") if isinstance(response.get("error"), Mapping) else {}
         error_type = _text(error.get("type")).casefold()
         transient = str(response.get("status") or "").casefold() in TRANSIENT_REVIEW_STATUSES or error_type in {
@@ -3630,6 +3657,7 @@ def validate_verifications(
                 "category": "reviewer-transient",
                 "field": request["task"],
                 "target_ids": [verification_target],
+                "verification_request_id": request["request_id"],
                 "issue": _text(error.get("message")) or "Independent Hermes verifier reported a transient API failure.",
             }, "verifier_transient"))
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
@@ -3643,13 +3671,45 @@ def validate_verifications(
                 for key in ("target_ids", "artifact", "page", "check", "element"):
                     if key in source: finding[key] = source[key]
                 if category == "visual":
-                    finding["target_ids"] = [f"layout:{source.get('artifact') or 'documents'}"]
-                elif not finding.get("target_ids"):
-                    finding["target_ids"] = ["verification:content"]
-                findings.append(recovery_finding(
-                    finding,
-                    "visual_defect" if category == "visual" else "drafting_defect",
-                ))
+                    expected_artifacts = {
+                        str(artifact.get("artifact"))
+                        for artifact in request.get("artifacts", [])
+                        if isinstance(artifact, Mapping)
+                    }
+                    artifact = _text(source.get("artifact"))
+                    check = _text(source.get("check"))
+                    element = _text(source.get("element"))
+                    if artifact not in expected_artifacts or check not in VISUAL_CHECKS or not element:
+                        findings.append(recovery_finding({
+                            **finding,
+                            "target_ids": [verification_target],
+                            "verification_request_id": request["request_id"],
+                            "issue": f"Verifier finding is missing governed visual repair routing. {finding['issue']}".strip(),
+                        }, "verifier_transient"))
+                    else:
+                        finding["target_ids"] = [f"layout:{artifact}"]
+                        findings.append(recovery_finding(finding, "visual_defect"))
+                else:
+                    supplied_targets = [
+                        str(target) for target in source.get("target_ids", []) if str(target).strip()
+                    ] if isinstance(source.get("target_ids"), list) else []
+                    permitted_targets = {
+                        str(section.get("section_id"))
+                        for section in request.get("sections", [])
+                        if isinstance(section, Mapping)
+                    }
+                    if any(str(artifact.get("path", "")).endswith("study.xml") for artifact in request.get("artifacts", []) if isinstance(artifact, Mapping)):
+                        permitted_targets.update(("prs.brief-summary", "prs.detailed-description"))
+                    if not supplied_targets or any(target not in permitted_targets for target in supplied_targets):
+                        findings.append(recovery_finding({
+                            **finding,
+                            "target_ids": [verification_target],
+                            "verification_request_id": request["request_id"],
+                            "issue": f"Verifier finding is missing a governed section target. {finding['issue']}".strip(),
+                        }, "verifier_transient"))
+                    else:
+                        finding["target_ids"] = supplied_targets
+                        findings.append(recovery_finding(finding, "drafting_defect"))
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
@@ -3673,17 +3733,17 @@ def validate_verifications(
             valid_section_rows = [item for item in response.get("section_assessments", []) if isinstance(item, Mapping) and item.get("status") == "passed" and set(item.get("checks", [])) == set(CONTENT_CHECKS)]
             assessed_sections = {(item.get("artifact"), item.get("section_id")) for item in valid_section_rows}
             if expected_sections != assessed_sections or len(valid_section_rows) != len(expected_sections):
-                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": f"Every contracted section and content check must be explicitly assessed; expected {len(expected_sections)}, accepted {len(assessed_sections)}."}, "verifier_transient"))
+                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every contracted section and content check must be explicitly assessed; expected {len(expected_sections)}, accepted {len(assessed_sections)}."}, "verifier_transient"))
             expected_cross = set(request.get("cross_document_checks", []))
             valid_cross_rows = [item for item in response.get("cross_document_assessments", []) if isinstance(item, Mapping) and item.get("status") == "passed"]
             assessed_cross = {item.get("check") for item in valid_cross_rows}
             if expected_cross != assessed_cross or len(valid_cross_rows) != len(expected_cross):
-                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, "verifier_transient"))
+                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, "verifier_transient"))
         if request["task"] == "rendered_page_visual_verification":
             expected_pages = {(a["artifact"], p["page"], p["sha256"]) for a in request.get("artifacts", []) for p in a.get("pages", [])}
             valid_page_rows = [p for p in response.get("page_assessments", []) if isinstance(p, Mapping) and p.get("status") == "passed" and set(p.get("checks", [])) == set(VISUAL_CHECKS)]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
-            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))
+            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))
         evidence[evidence_key] = {
             "request": request_path.relative_to(revision_dir).as_posix(),
             "request_sha256": sha256_file(request_path),

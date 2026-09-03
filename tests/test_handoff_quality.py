@@ -1259,7 +1259,7 @@ def test_visual_gate_rejects_unassessed_pages(tmp_path):
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": []}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": []}]}
     request["request_sha256"] = verification_request_sha256(request)
     response = {
         "schema_version": RESPONSE_SCHEMA,
