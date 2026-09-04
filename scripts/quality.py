@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, meaningful, protocol_contract, protocol_table_contracts, recovery_finding
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 from drafting import evidence_grounded
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -3252,11 +3252,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
 
     headings = [heading_key(p.text) for p in document.paragraphs if p.style.name.casefold().startswith("heading") and p.text.strip()]
     sections = protocol_contract(branch)
-    def section_applies(section: Any) -> bool:
-        return section.required or any(meaningful(get_path(reference, path)) for path in section.evidence)
-
     for section in sections:
-        if not section_applies(section):
+        if not section_applies(reference, section):
             continue
         expected = heading_key(f"{section.number} {section.title}")
         count = headings.count(expected)
@@ -3341,7 +3338,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         return "\n".join(values)
 
     for section in sections:
-        if section.role == "container" or not section_applies(section):
+        if section.role == "container" or not section_applies(reference, section):
             continue
         content = section_content(section)
         if content is not None and len(re.findall(r"\b\w+\b", content)) < 3:
@@ -3523,7 +3520,16 @@ def create_verification_requests(
             artifact["sha256"] = sha256_file(path)
         content_files.append(artifact)
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    sections = [{"artifact": "protocol", "section_id": section.section_id, "number": section.number, "title": section.title} for section in protocol_contract(branch)]
+    sections = [
+        {
+            "artifact": "protocol",
+            "section_id": section.section_id,
+            "number": section.number,
+            "title": section.title,
+        }
+        for section in protocol_contract(branch)
+        if section_applies(reference, section)
+    ]
     if branch != "Retrospective":
         choice = str(get_path(reference, "meta.icf_template", "Advarra"))
         sections.extend({"artifact": "icf", "section_id": section.section_id, "number": section.number, "title": section.title} for section in icf_contract(branch, choice))

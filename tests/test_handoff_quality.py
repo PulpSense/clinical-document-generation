@@ -4,6 +4,7 @@ import shutil
 from datetime import date
 from pathlib import Path
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from pypdf import PdfWriter
@@ -1033,6 +1034,45 @@ def test_content_verifier_receives_authorized_boilerplate_and_blank_field_policy
     assert expected_retained <= assessed_ids
     assert "icf.introduction" in assessed_ids
     assert "icf.leaving-study" in assessed_ids
+
+
+@pytest.mark.parametrize(
+    ("assignment_method", "expected_in_scope"),
+    [
+        (None, False),
+        ("Single observational cohort; no treatment assignment", True),
+    ],
+)
+def test_content_verifier_scope_matches_optional_source_sections(
+    tmp_path, assignment_method, expected_in_scope
+):
+    reference = fixture()
+    if assignment_method is None:
+        reference["design"].pop("assignment_method", None)
+    else:
+        reference["design"]["assignment_method"] = assignment_method
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    for name in ("protocol.docx", "icf.docx", "study.xml"):
+        (candidate / name).write_bytes(b"candidate")
+
+    paths = create_verification_requests(
+        tmp_path,
+        reference,
+        {"renderer": {}, "artifacts": []},
+    )
+    content_path = next(
+        path for path in paths
+        if json.loads(path.read_text())["task"] == "clinical_content_verification"
+    )
+    request = json.loads(content_path.read_text(encoding="utf-8"))
+    protocol_section_ids = {
+        item["section_id"]
+        for item in request["sections"]
+        if item["artifact"] == "protocol"
+    }
+
+    assert ("study-design.assignment" in protocol_section_ids) is expected_in_scope
 
 
 def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path):

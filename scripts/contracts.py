@@ -1107,6 +1107,11 @@ def evidence_available(reference: Mapping[str, Any], paths: Iterable[str]) -> li
     return [path for path in paths if meaningful(get_path(reference, path))]
 
 
+def section_applies(reference: Mapping[str, Any], section: SectionSpec) -> bool:
+    """Return the single contract decision used to scope a document section."""
+    return section.required or bool(evidence_available(reference, section.evidence))
+
+
 def contract_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
@@ -1492,5 +1497,5 @@ __all__ = [
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth",
-    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "set_path", "source_contract", "source_truth_markdown",
+    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown",
 ]

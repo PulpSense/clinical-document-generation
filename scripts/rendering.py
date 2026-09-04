@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, protocol_table_contracts, recovery_finding
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -358,6 +358,7 @@ def _insert_source_bound_sections(document: Document, reference: Mapping[str, An
     for index, section in enumerate(sections):
         if section.role != "source":
             continue
+        applies = section_applies(reference, section)
         value = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), None)
         heading_key = _protocol_heading_key(f"{section.number} {section.title}")
         heading = next((
@@ -365,7 +366,7 @@ def _insert_source_bound_sections(document: Document, reference: Mapping[str, An
             if _heading_level(paragraph) is not None
             and _protocol_heading_key(paragraph.text) == heading_key
         ), None)
-        if heading is None and meaningful(value):
+        if heading is None and applies:
             next_section = next((candidate for candidate in sections[index + 1:] if candidate.number), None)
             if next_section is None:
                 continue
@@ -392,7 +393,7 @@ def _insert_source_bound_sections(document: Document, reference: Mapping[str, An
                     break
             heading._p.getparent().remove(following)
             following = next_element
-        if not meaningful(value):
+        if not applies:
             heading._p.getparent().remove(heading._p)
             continue
         body = document.add_paragraph(_text(value), style="Normal")
