@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.19"
+CONTRACT_VERSION = "clinical-documents-v2.20"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -179,6 +179,7 @@ class SectionSpec:
     content_expectations: tuple[str, ...] = ()
     source_coverage: str = "all_material_evidence"
     fidelity_evidence: tuple[str, ...] = ()
+    evidence_scopes: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -310,6 +311,11 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "with the exact approved party name, state only that party's approved safety-event responsibilities, "
             "and name no other responsible party; also explain the approved risks and safety boundary."
         ),
+        "quality-safety.analysis": (
+            "Explain only the approved adverse-event or safety-analysis facts supplied for this subsection; "
+            "do not restate unrelated efficacy endpoints, confidence intervals, sensor outcomes, usability, "
+            "or missing-data methods from a broader analysis-plan field."
+        ),
         "icf.study-purpose": "Explain the study purpose, hypothesis, primary endpoint, and background in clear participant-facing language.",
         "icf.procedures": "Explain every approved visit, procedure, and minimum interval without participation in another study before screening in participant-facing sequence.",
         "icf.duration": "State the approved participation duration and relevant time points.",
@@ -355,6 +361,15 @@ def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
     }.get(section_id, ())
 
 
+def _evidence_scopes(section_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Limit broad source fields to the clauses owned by a narrow section."""
+    return {
+        "quality-safety.analysis": (
+            ("statistics.analysis_plan", ("adverse event", "safety")),
+        ),
+    }.get(section_id, ())
+
+
 def _section_spec(
     section_id: str,
     number: str,
@@ -377,6 +392,7 @@ def _section_spec(
         content_expectations=_content_expectations(section_id, title),
         source_coverage=_source_coverage(section_id),
         fidelity_evidence=_fidelity_evidence(section_id),
+        evidence_scopes=_evidence_scopes(section_id),
     )
 
 

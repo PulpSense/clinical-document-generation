@@ -96,6 +96,165 @@ def test_drafting_request_is_scoped_and_hash_bound(tmp_path):
     assert accepted and not findings
 
 
+def test_retry_guidance_identifies_the_uncited_paragraph_and_allowed_references(tmp_path):
+    """Reproduce the final protocol-operations response from Hermes run __03."""
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["procedures"]["assessments"] = [
+        "Screening, consent, and baseline visit",
+        "Sensor wear on Days 1 to 14, Weeks 6 to 8, and Weeks 10 to 12",
+        "Telephone contact at Week 3",
+        "Clinic visits at Weeks 6 and 12",
+        "Record abstraction",
+        "Sensor insertion and removal",
+        "Sensor data download",
+        "Medication review",
+        "Adverse-event assessment",
+        "Hemoglobin A1c at Week 12",
+        "Usability questionnaire",
+    ]
+    reference["procedures"].pop("visit_schedule", None)
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-operations"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-hermes-03-evaluation",
+        reference=reference,
+        batch=batch,
+        target_ids=("evaluation-procedures",),
+        attempts={"evaluation-procedures": 3},
+        wave="retry",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = response_template(request, model_id="Hermes reproduction")
+    result = response["section_results"][0]
+    result["paragraphs"] = [{
+        "text": "The Schedule of Assessments includes the following approved visits, monitoring periods, contacts, and procedures.",
+        "evidence_refs": [],
+        "boilerplate_refs": [],
+    }]
+    result["lists"] = [{
+        "items": reference["procedures"]["assessments"],
+        "evidence_refs": ["source:procedures.assessments"],
+        "boilerplate_refs": [],
+    }]
+
+    accepted, findings = validate_response(request, response)
+    finding = next(
+        item for item in findings
+        if item["field"] == "evaluation-procedures"
+        and "no approved evidence" in item["issue"]
+    )
+
+    assert "evaluation-procedures" not in {
+        item["section_id"] for item in (accepted or {}).get("drafts", [])
+    }
+    assert "Paragraph 1" in finding["next_action"]
+    assert "source:procedures.assessments" in finding["next_action"]
+    assert any(
+        "Every paragraph object and every list object" in constraint
+        for constraint in request["constraints"]
+    )
+
+    result["paragraphs"][0]["evidence_refs"] = ["source:procedures.assessments"]
+    accepted, findings = validate_response(request, response)
+
+    assert not findings
+    assert [item["section_id"] for item in accepted["drafts"]] == [
+        "evaluation-procedures"
+    ]
+
+
+def test_safety_analysis_uses_only_its_material_analysis_plan_clause(tmp_path):
+    """Reproduce the final analysis response from Hermes run __03."""
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["statistics"]["analysis_plan"] = (
+        "Summarize historical and prospective measures descriptively. "
+        "For participants with both measurements, report the mean within-participant "
+        "change in hemoglobin A1c with a two-sided 95% confidence interval. "
+        "Summarize time in range, usable sensor time, usability, missing data, and "
+        "adverse events using descriptive statistics."
+    )
+    reference["safety"].pop("adverse_events", None)
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-analysis-and-oversight"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-hermes-03-safety-analysis",
+        reference=reference,
+        batch=batch,
+        target_ids=("quality-safety.analysis",),
+        attempts={"quality-safety.analysis": 3},
+        wave="retry",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    contract = request["section_contracts"][0]
+    response = response_template(request, model_id="Hermes reproduction")
+    response["section_results"][0]["paragraphs"] = [
+        {
+            "text": contract["fixed_boilerplate"][0]["text"],
+            "evidence_refs": [],
+            "boilerplate_refs": ["safety-analysis"],
+        },
+        {
+            "text": "In accordance with the approved analysis plan, adverse events will be summarized using descriptive statistics.",
+            "evidence_refs": ["source:statistics.analysis_plan"],
+            "boilerplate_refs": [],
+        },
+    ]
+
+    accepted, findings = validate_response(request, response)
+
+    scope = contract["evidence_scopes"][0]
+    assert scope["path"] == "statistics.analysis_plan"
+    assert scope["value"] == (
+        "Summarize adverse events using descriptive statistics."
+    )
+    assert "hemoglobin A1c" not in scope["value"]
+    assert "sensor" not in scope["value"]
+    assert scope["sha256"] == sha256_value(scope["value"])
+    assert not findings
+    assert [item["section_id"] for item in accepted["drafts"]] == [
+        "quality-safety.analysis"
+    ]
+
+
+def test_safety_analysis_does_not_offer_an_efficacy_only_plan_as_evidence(tmp_path):
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["statistics"]["analysis_plan"] = (
+        "Report the mean within-participant hemoglobin A1c change with a two-sided "
+        "95% confidence interval."
+    )
+    reference["safety"].pop("adverse_events", None)
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-analysis-and-oversight"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-efficacy-only-safety-analysis",
+        reference=reference,
+        batch=batch,
+        target_ids=("quality-safety.analysis",),
+        attempts={"quality-safety.analysis": 1},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    contract = request["section_contracts"][0]
+
+    assert contract["evidence_scopes"][0]["value"] == ""
+    assert "statistics.analysis_plan" not in contract["minimum_evidence"]
+
+
 def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_missing_facts(tmp_path):
     reference = fixture()
     reference["study"]["background"] = " ".join(

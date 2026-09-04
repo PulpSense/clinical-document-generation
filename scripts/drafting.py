@@ -38,7 +38,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v9-source-proportional-detail"
+PROMPT_VERSION = "section-drafting-v10-explicit-evidence-binding"
 MAX_ATTEMPTS = 3
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
@@ -106,6 +106,7 @@ def _request_constraints() -> list[str]:
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
         "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+        "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays.",
     ]
 
 
@@ -335,6 +336,34 @@ def _source_detail_budget(reference: Mapping[str, Any], section: SectionSpec) ->
     return words, int(words * ratio) if ratio and words >= 80 else 0
 
 
+def _focused_evidence_value(value: Any, focus_terms: Iterable[str]) -> str:
+    """Return the source-owned clause fragment relevant to one narrow section."""
+    terms = tuple(term.casefold() for term in focus_terms)
+    excerpts = []
+    leading_verbs = {
+        "analyze", "assess", "compare", "describe", "evaluate", "monitor",
+        "report", "review", "summarize", "tabulate",
+    }
+    for leaf in _leaf_texts(value):
+        for clause in re.split(r"(?<=[.!?])\s+|(?<=;)\s+", leaf):
+            lowered = clause.casefold()
+            matches = [lowered.find(term) for term in terms if term in lowered]
+            if not matches:
+                continue
+            start = min(matches)
+            prefix = clause[:start]
+            negation = re.search(r"\b(?:no|not|without)\b(?:\s+[A-Za-z-]+){0,3}\s*$", prefix, re.I)
+            if negation:
+                excerpt = clause[negation.start():].strip()
+            else:
+                excerpt = clause[start:].strip()
+                first_word = re.match(r"[A-Za-z]+", clause)
+                if first_word and first_word.group(0).casefold() in leading_verbs:
+                    excerpt = f"{first_word.group(0)} {excerpt}"
+            excerpts.append(excerpt)
+    return " ".join(dict.fromkeys(excerpts))
+
+
 def _section_payload(
     section: SectionSpec,
     boilerplate: Mapping[str, str],
@@ -349,6 +378,24 @@ def _section_payload(
             raise ValueError(f"Missing Fixed Clinical Boilerplate: {section.boilerplate_key}")
         boilerplate_items.append({"boilerplate_id": section.boilerplate_key, "text": text, "sha256": sha256_value(text)})
     approved_source_words, minimum_detail_words = _source_detail_budget(reference, section)
+    evidence_scopes = []
+    for path, focus_terms in section.evidence_scopes:
+        value = get_path(reference, path)
+        scoped_value = _focused_evidence_value(value, focus_terms)
+        evidence_scopes.append({
+            "path": path,
+            "focus_terms": list(focus_terms),
+            "value": scoped_value,
+            "sha256": sha256_value(scoped_value),
+        })
+    scoped_values = {
+        item["path"]: item["value"]
+        for item in evidence_scopes
+    }
+    minimum_evidence = [
+        path for path in section.evidence
+        if path not in scoped_values or scoped_values[path]
+    ]
     return {
         "section_id": section.section_id,
         "number": section.number,
@@ -356,10 +403,11 @@ def _section_payload(
         "role": section.role,
         "required": section.required,
         "allowed_modes": allowed,
-        "minimum_evidence": list(section.evidence),
+        "minimum_evidence": minimum_evidence,
         "fixed_boilerplate": boilerplate_items,
         "content_expectations": list(section.content_expectations),
         "source_coverage": section.source_coverage,
+        "evidence_scopes": evidence_scopes,
         "approved_source_word_count": approved_source_words,
         "reference_detail_target_words": minimum_detail_words,
     }
@@ -882,11 +930,17 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
         for item in request.get("approved_input", [])
         if isinstance(item, Mapping)
     }
-    return {
-        path: source[path]
-        for path in map(str, contract.get("minimum_evidence", []))
-        if path in source and _leaf_texts(source[path])
+    scopes = {
+        str(item.get("path")): item.get("value")
+        for item in contract.get("evidence_scopes", [])
+        if isinstance(item, Mapping)
     }
+    material: dict[str, Any] = {}
+    for path in map(str, contract.get("minimum_evidence", [])):
+        value = scopes[path] if path in scopes else source.get(path)
+        if _leaf_texts(value):
+            material[path] = value
+    return material
 
 
 def _coverage_findings(
@@ -953,7 +1007,45 @@ def _coverage_findings(
     return findings
 
 
-def _validate_paragraph(paragraph: Any, request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+def _reference_next_action(
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    *,
+    content_type: str,
+    position: int,
+) -> str:
+    allowed_request_evidence = _allowed_evidence(request)
+    evidence_refs = sorted(
+        f"source:{path}"
+        for path in map(str, contract.get("minimum_evidence", []))
+        if f"source:{path}" in allowed_request_evidence
+    )
+    boilerplate_refs = sorted(
+        str(item.get("boilerplate_id"))
+        for item in contract.get("fixed_boilerplate", [])
+        if isinstance(item, Mapping) and item.get("boilerplate_id")
+    )
+    choices = []
+    if evidence_refs:
+        choices.append(f"evidence_refs=[{', '.join(evidence_refs)}]")
+    if boilerplate_refs:
+        choices.append(f"boilerplate_refs=[{', '.join(boilerplate_refs)}]")
+    allowed = " or ".join(choices) or "an allowed section reference"
+    suffix = (
+        " If it only introduces an already-cited list, omit the paragraph."
+        if content_type == "Paragraph"
+        else ""
+    )
+    return f"{content_type} {position} must include at least one of {allowed}.{suffix}"
+
+
+def _validate_paragraph(
+    paragraph: Any,
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    section_id: str,
+    position: int = 1,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     if not isinstance(paragraph, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}]
@@ -978,11 +1070,17 @@ def _validate_paragraph(paragraph: Any, request: Mapping[str, Any], contract: Ma
     if invalid_boilerplate:
         findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported boilerplate references: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
     if not evidence_refs and not boilerplate_refs:
-        findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": "Cite its approved support."})
+        findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)})
     return {"text": text, "evidence_refs": list(map(str, evidence_refs)), "boilerplate_refs": list(map(str, boilerplate_refs))}, findings
 
 
-def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+def _validate_list(
+    group: Any,
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    section_id: str,
+    position: int = 1,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     if not isinstance(group, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}]
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
@@ -996,7 +1094,7 @@ def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str
     invalid_boilerplate = sorted(set(boilerplate_refs) - allowed_boilerplate)
     if invalid_evidence or unrelated: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported section evidence: {', '.join(invalid_evidence or unrelated)}", "next_action": "Cite only listed section evidence."})
     if invalid_boilerplate: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported boilerplate: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
-    if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": "Cite its approved support."})
+    if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="List", position=position)})
     return {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}, findings
 
 
@@ -1205,15 +1303,15 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             continue
         paragraphs = item.get("paragraphs") if isinstance(item.get("paragraphs"), list) else []
         clean_paragraphs: list[dict[str, Any]] = []
-        for paragraph in paragraphs:
-            clean, paragraph_findings = _validate_paragraph(paragraph, request, expected_contracts[section_id], section_id)
+        for position, paragraph in enumerate(paragraphs, start=1):
+            clean, paragraph_findings = _validate_paragraph(paragraph, request, expected_contracts[section_id], section_id, position)
             findings.extend(paragraph_findings)
             if clean:
                 clean_paragraphs.append(clean)
         raw_lists = item.get("lists") if isinstance(item.get("lists"), list) else []
         lists = []
-        for group in raw_lists:
-            clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id)
+        for position, group in enumerate(raw_lists, start=1):
+            clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id, position)
             findings.extend(list_findings)
             if clean_group: lists.append(clean_group)
         combined_content = "\n".join(
