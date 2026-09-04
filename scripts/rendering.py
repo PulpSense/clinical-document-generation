@@ -25,13 +25,14 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, recovery_finding
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 INTERNAL_LANGUAGE = re.compile(r"\b(?:section_id|evidence_refs|boilerplate_refs)\s*:", re.I)
 DUPLICATE_WORD = re.compile(r"\b([A-Za-z][A-Za-z'-]+)\s+\1\b", re.I)
 AUTHORING_LANGUAGE = re.compile(r"table of contents updates automatically|selected consent template", re.I)
+WHOLE_MARKDOWN_LINK = re.compile(r"^\[([^\]]+)\]\((?:mailto:)?[^)]+\)$", re.I)
 
 
 class LayoutRepairTargetError(ValueError):
@@ -43,7 +44,9 @@ def _text(value: Any) -> str:
     if value is None:
         return ""
     if isinstance(value, str):
-        return value.strip()
+        text = value.strip()
+        link = WHOLE_MARKDOWN_LINK.fullmatch(text)
+        return link.group(1).strip() if link else text
     if isinstance(value, (int, float)):
         return str(value)
     if isinstance(value, Mapping):
@@ -68,6 +71,34 @@ def _list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return [part.strip() for part in _text(value).splitlines() if part.strip()]
     return [part for item in value if (part := _text(item))]
+
+
+def _day_count_text(value: Any) -> str:
+    return re.sub(r"\s+days?\s*$", "", _text(value), flags=re.I).strip()
+
+
+def _plain_language_assessments(value: Any) -> list[str]:
+    if isinstance(value, list):
+        return _list(value)
+    text = _text(value).rstrip(".")
+    if not text:
+        return []
+    text = re.sub(r",\s*including\s+", ", ", text, flags=re.I)
+    return [part.strip() for part in re.split(r",\s*(?:and\s+)?", text) if part.strip()]
+
+
+def _assessment_timing(label: str) -> str:
+    timepoint = re.search(r"\b(?:Month|Week|Day)\s+[+-]?\d+\b", label, re.I)
+    if timepoint:
+        return timepoint.group(0)
+    lowered = label.casefold()
+    if "baseline" in lowered:
+        return "Baseline"
+    if "historical" in lowered:
+        return "Historical record review"
+    if "screening" in lowered:
+        return "Screening"
+    return "Per approved schedule"
 
 
 def _draft_text(model: Mapping[str, Any], section_id: str, *, bullets: bool = False) -> str:
@@ -118,14 +149,25 @@ def _address(value: Any) -> str:
 
 
 def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primary", "secondary", "other")) -> str:
-    values = []
+    lines: list[str] = []
+    default_categories = {
+        "primary": "Primary endpoint(s)",
+        "secondary": "Secondary endpoint(s)",
+        "other": "Exploratory endpoint(s)",
+    }
     for kind in kinds:
+        active_category = ""
         for item in get_path(reference, f"endpoints.{kind}", []) or []:
             label = _text(item)
             timepoint = _text(item.get("time_point") or item.get("time_frame")) if isinstance(item, Mapping) else ""
             if label:
-                values.append(f"{label}{f' ({timepoint})' if timepoint else ''}")
-    return "\n".join(f"• {item}" for item in values)
+                category = _text(item.get("category")) if isinstance(item, Mapping) else ""
+                category = category or default_categories[kind]
+                if category != active_category:
+                    lines.append(f"{category}:")
+                    active_category = category
+                lines.append(f"• {label}{f' ({timepoint})' if timepoint else ''}")
+    return "\n".join(lines)
 
 
 def _document_control_date(reference: Mapping[str, Any]) -> str:
@@ -170,6 +212,12 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     facility_locality = ", ".join(filter(None, (facility_city, facility_state, facility_country)))
     visits = get_path(reference, "procedures.visit_schedule", []) or get_path(reference, "procedures.assessments", []) or []
     inclusion = _list(get_path(reference, "population.inclusion_criteria", []))
+    interventions = [
+        item for item in (get_path(reference, "design.interventions", []) or [])
+        if isinstance(item, Mapping)
+    ]
+    first_intervention = _text(interventions[0].get("name") or interventions[0].get("intervention_name")) if interventions else ""
+    second_intervention = _text(interventions[1].get("name") or interventions[1].get("intervention_name")) if len(interventions) > 1 else ""
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     icf_visits_overview, icf_visit_details = _icf_procedure_parts(model)
     protocol_visits_overview, protocol_visit_details = _overview_and_detail(_draft_text(model, "study-procedure.visits"))
@@ -197,13 +245,13 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "studyContactPhones": " / ".join(filter(None, [_text(coordinator.get("business_phone")), _text(coordinator.get("office_phone"))])),
         "sterlingSecondaryPhone": _text(coordinator.get("office_phone")),
         "objective": "; ".join(_list(get_path(reference, "objectives.primary", []))),
-        "studyDesignShort": _text(get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
+        "studyDesignShort": _text(get_path(reference, "design.study_design_summary") or get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
         "sampleSize": _text(get_path(reference, "population.sample_size")),
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
-        "daysBeforeScreening": _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation")),
+        "daysBeforeScreening": _day_count_text(get_path(reference, "procedures.minimum_days_before_screening_without_participation")),
         "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if isinstance(visits, list) else "",
-        "AI_duration": _text(get_path(reference, "study.timeline")), "AI_populationShort": _text(get_path(reference, "population.study_population")),
+        "AI_duration": _text(get_path(reference, "study.timeline")), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
         "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True) or "\n".join(f"• {item}" for item in inclusion),
         "AI_exclusionCriteria": _draft_text(model, "subjects.exclusion", bullets=True) or _draft_text(model, "subjects.eligibility", bullets=True),
@@ -230,8 +278,8 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "references": _text(reference.get("references")),
         "fundingSourceName": _text(get_path(reference, "parties.funding_source.name")), "fundingSourceAdress": _address(get_path(reference, "parties.funding_source.address")),
         "fundingSourceClarification": _text(get_path(reference, "parties.funding_source.clarification")),
-        "testArticle(s)": _text(get_path(reference, "design.arms")) or _text(get_path(reference, "design.intervention_name")),
-        "controlArticle(s)": _text(get_path(reference, "design.control")),
+        "testArticle(s)": _text(get_path(reference, "design.test_articles") or get_path(reference, "design.intervention_name")) or first_intervention or _text(get_path(reference, "design.arms")),
+        "controlArticle(s)": _text(get_path(reference, "design.control_articles") or get_path(reference, "design.control")) or second_intervention,
     }
     if branch == "Retrospective":
         values["AI_inclusionCriteria"] = _draft_text(model, "subjects.eligibility", bullets=True)
@@ -304,6 +352,55 @@ def _ensure_contract_headings(document: Document, branch: str) -> None:
             if target is not None: _insert_before(target, "8.1. Informed Consent / Subject Enrollment", "Heading 2")
 
 
+def _insert_source_bound_sections(document: Document, reference: Mapping[str, Any], branch: str) -> None:
+    """Render every source-mode contract section directly from its approved evidence."""
+    sections = list(protocol_contract(branch))
+    for index, section in enumerate(sections):
+        if section.role != "source":
+            continue
+        applies = section_applies(reference, section)
+        value = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), None)
+        heading_key = _protocol_heading_key(f"{section.number} {section.title}")
+        heading = next((
+            paragraph for paragraph in document.paragraphs
+            if _heading_level(paragraph) is not None
+            and _protocol_heading_key(paragraph.text) == heading_key
+        ), None)
+        if heading is None and applies:
+            next_section = next((candidate for candidate in sections[index + 1:] if candidate.number), None)
+            if next_section is None:
+                continue
+            target_key = _protocol_heading_key(f"{next_section.number} {next_section.title}")
+            target = next((
+                paragraph for paragraph in document.paragraphs
+                if _heading_level(paragraph) is not None
+                and _protocol_heading_key(paragraph.text) == target_key
+            ), None)
+            if target is None:
+                continue
+            heading = document.add_paragraph(f"{section.number} {section.title}", style="Heading 2")
+            target._p.addprevious(heading._p)
+        if heading is None:
+            continue
+        level = _heading_level(heading) or 1
+        following = heading._p.getnext()
+        while following is not None and following.tag != qn("w:sectPr"):
+            next_element = following.getnext()
+            if following.tag == qn("w:p"):
+                paragraph = Paragraph(following, document)
+                next_level = _heading_level(paragraph)
+                if next_level is not None and next_level <= level:
+                    break
+            heading._p.getparent().remove(following)
+            following = next_element
+        if not applies:
+            heading._p.getparent().remove(heading._p)
+            continue
+        body = document.add_paragraph(_text(value), style="Normal")
+        heading._p.addnext(body._p)
+        heading.paragraph_format.keep_with_next = True
+
+
 def _split_heading_content(document: Document) -> None:
     """Keep generated body prose out of Heading runs and therefore out of the Word TOC."""
     for paragraph in list(document.paragraphs):
@@ -370,6 +467,26 @@ def _normalize_protocol_summary_table(document: Document) -> None:
         paragraph.paragraph_format.first_line_indent = None
         row.height = None
         _prevent_row_split(row)
+        for cell in row.cells:
+            cell_margins = cell._tc.get_or_add_tcPr().find(qn("w:tcMar"))
+            if cell_margins is None:
+                cell_margins = OxmlElement("w:tcMar")
+                cell._tc.get_or_add_tcPr().append(cell_margins)
+            for side in ("top", "bottom"):
+                margin = cell_margins.find(qn(f"w:{side}"))
+                if margin is None:
+                    margin = OxmlElement(f"w:{side}")
+                    cell_margins.append(margin)
+                margin.set(qn("w:w"), "0")
+                margin.set(qn("w:type"), "dxa")
+            for cell_paragraph in cell.paragraphs:
+                # Template value cells carry large right indents that narrow the
+                # usable column and can strand the final summary row on a nearly
+                # blank page. The table columns already own horizontal geometry.
+                cell_paragraph.paragraph_format.left_indent = None
+                cell_paragraph.paragraph_format.right_indent = None
+                cell_paragraph.paragraph_format.first_line_indent = None
+                cell_paragraph.paragraph_format.keep_together = True
 
 
 def _normalize_protocol_title_controls(document: Document, reference: Mapping[str, Any]) -> None:
@@ -535,6 +652,25 @@ def _replace_protocol_investigator_agreement(
             paragraph = Paragraph(element, document)
             if _heading_level(paragraph) is not None:
                 break
+            if (
+                branch == "Retrospective"
+                and not paragraph.text.strip()
+                and paragraph._p.xpath('.//w:br[@w:type="page"]')
+            ):
+                following = element.getnext()
+                while following is not None and following.tag == qn("w:p"):
+                    following_paragraph = Paragraph(following, document)
+                    if following_paragraph.text.strip():
+                        break
+                    following = following.getnext()
+                if (
+                    following is not None
+                    and following.tag == qn("w:p")
+                    and "table of contents" in _protocol_heading_key(
+                        Paragraph(following, document).text
+                    )
+                ):
+                    break
             parent.remove(element)
     agreement_key = "investigator-agreement-retrospective" if branch == "Retrospective" else "investigator-agreement-prospective"
     statements = [
@@ -567,6 +703,23 @@ def _draft_blocks(section: Mapping[str, Any]) -> list[tuple[str, bool]]:
         if not isinstance(group, Mapping):
             continue
         blocks.extend((item, True) for item in _list(group.get("items")))
+    return blocks
+
+
+def _retrospective_eligibility_blocks(
+    reference: Mapping[str, Any],
+) -> list[tuple[str, bool]]:
+    """Render approved retrospective criteria verbatim instead of paraphrasing them."""
+    blocks: list[tuple[str, bool]] = []
+    for label, path in (
+        ("Inclusion criteria:", "population.inclusion_criteria"),
+        ("Exclusion criteria:", "population.exclusion_criteria"),
+    ):
+        items = _list(get_path(reference, path, []))
+        if not items:
+            continue
+        blocks.append((label, False))
+        blocks.extend((item, True) for item in items)
     return blocks
 
 
@@ -675,16 +828,34 @@ def _normalize_typed_bullet_paragraphs(document: Document) -> None:
 def _replace_protocol_leaf_bodies(
     document: Document,
     model: Mapping[str, Any],
+    reference: Mapping[str, Any],
     branch: str,
     authority: Document,
 ) -> None:
     """Use the client shell for design and accepted section drafts for clinical body content."""
     drafts = {str(item.get("section_id")): item for item in model.get("protocol", []) if isinstance(item, Mapping)}
     table_sections = {"study-procedure.visits", "quality-safety.reporting", "evaluation-procedures"}
+    table_caption_keys = {
+        "study-procedure.visits": {_layout_target_key("Table 9.2-1. Visit Schedule")},
+        "quality-safety.reporting": {_layout_target_key("Table 13.3.-1:")},
+        "evaluation-procedures": {_layout_target_key("Table 15.1. Proposed Visits and Study Assessments")},
+    }
     for section in protocol_contract(branch):
-        if section.role == "container":
+        if section.role != "leaf":
             continue
         blocks = _draft_blocks(drafts.get(section.section_id, {}))
+        if section.section_id in table_sections:
+            # The client template owns these captions. A model may echo one from
+            # the source document, but retaining that echo would duplicate both
+            # the caption and (when it shares a placeholder paragraph) the full
+            # section body around the governed table.
+            caption_keys = table_caption_keys.get(section.section_id, set())
+            blocks = [
+                block for block in blocks
+                if _layout_target_key(block[0]) not in caption_keys
+            ]
+        if branch == "Retrospective" and section.section_id == "subjects.eligibility":
+            blocks = _retrospective_eligibility_blocks(reference)
         if not blocks:
             continue
         expected = _protocol_heading_key(f"{section.number} {section.title}")
@@ -711,7 +882,27 @@ def _replace_protocol_leaf_bodies(
                 next_level = _heading_level(paragraph)
                 if next_level is not None and next_level <= level:
                     break
-                if section.section_id in table_sections and paragraph.text.strip().casefold().startswith("table "):
+                if (
+                    not paragraph.text.strip()
+                    and paragraph._p.xpath('.//w:br[@w:type="page"]')
+                ):
+                    following = element.getnext()
+                    while following is not None and following.tag == qn("w:p"):
+                        following_paragraph = Paragraph(following, document)
+                        if following_paragraph.text.strip():
+                            break
+                        following = following.getnext()
+                    if (
+                        following is not None
+                        and following.tag == qn("w:p")
+                        and _heading_level(Paragraph(following, document)) is not None
+                    ):
+                        break
+                if (
+                    section.section_id in table_sections
+                    and _layout_target_key(paragraph.text)
+                    in table_caption_keys.get(section.section_id, set())
+                ):
                     caption_open = True
                     continue
                 if section.section_id in table_sections and caption_open:
@@ -1730,7 +1921,22 @@ def _replace_static_toc(document: Document) -> None:
     end = OxmlElement("w:fldChar"); end.set(qn("w:fldCharType"), "end")
     for node in (begin, instruction, separate, placeholder, end): run._r.append(node)
     anchor._p.addprevious(field_paragraph._p)
-    for paragraph in paragraphs[start:body]: paragraph._element.getparent().remove(paragraph._element)
+    preserve_from = body
+    for index in range(body - 1, start - 1, -1):
+        paragraph = paragraphs[index]
+        if paragraph.text.strip():
+            break
+        properties = paragraph._p.find(qn("w:pPr"))
+        section = None if properties is None else properties.find(qn("w:sectPr"))
+        section_type = None if section is None else section.find(qn("w:type"))
+        if (
+            paragraph._p.xpath('.//w:br[@w:type="page"]')
+            or section is not None
+            and (section_type is None or section_type.get(qn("w:val")) != "continuous")
+        ):
+            preserve_from = index
+    for paragraph in paragraphs[start:preserve_from]:
+        paragraph._element.getparent().remove(paragraph._element)
 
 
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
@@ -1850,7 +2056,14 @@ def _procedure_items(value: Any) -> list[str]:
     return [item.strip() for item in re.split(r"[;\n]", _text(value)) if item.strip()]
 
 
-def _copy_cell_design(destination, source, text: str, *, compact: bool = False) -> None:
+def _copy_cell_design(
+    destination,
+    source,
+    text: str,
+    *,
+    compact: bool = False,
+    run_properties=None,
+) -> None:
     destination_properties = destination._tc.get_or_add_tcPr()
     source_properties = source._tc.tcPr
     if source_properties is not None:
@@ -1872,8 +2085,13 @@ def _copy_cell_design(destination, source, text: str, *, compact: bool = False) 
             paragraph._p.replace(existing, copied)
     run = paragraph.add_run(text)
     source_run = next((item for item in source_paragraph.runs if item.text.strip()), source_paragraph.runs[0] if source_paragraph.runs else None)
-    if source_run is not None and source_run._r.rPr is not None:
-        run._r.insert(0, copy.deepcopy(source_run._r.rPr))
+    resolved_run_properties = (
+        run_properties
+        if run_properties is not None
+        else source_run._r.rPr if source_run is not None else None
+    )
+    if resolved_run_properties is not None:
+        run._r.insert(0, copy.deepcopy(resolved_run_properties))
     if compact:
         run.font.size = Pt(7)
     destination.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
@@ -1935,20 +2153,67 @@ def _normalize_protocol_table_pagination(document: Document) -> None:
                     caption_head.paragraph_format.page_break_before = None
 
 
+def _has_page_boundary_before(paragraph: Paragraph) -> bool:
+    if (
+        paragraph.paragraph_format.page_break_before is True
+        or paragraph.style.paragraph_format.page_break_before is True
+    ):
+        return True
+    previous = paragraph._p.getprevious()
+    while previous is not None and previous.tag == qn("w:p"):
+        if previous.xpath('.//w:br[@w:type="page"]'):
+            return True
+        properties = previous.find(qn("w:pPr"))
+        section = None if properties is None else properties.find(qn("w:sectPr"))
+        if section is not None:
+            section_type = section.find(qn("w:type"))
+            if section_type is None or section_type.get(qn("w:val")) != "continuous":
+                return True
+        if Paragraph(previous, paragraph._parent).text.strip():
+            break
+        previous = previous.getprevious()
+    return False
+
+
 def _normalize_protocol_section_pagination(document: Document) -> None:
-    """Remove forced numbered-body starts and retain front-matter boundaries."""
-    front_matter = {
-        _protocol_heading_key("1. TITLE PAGE"),
-        _protocol_heading_key("TABLE OF CONTENTS"),
-    }
-    for heading in document.paragraphs:
-        if _heading_level(heading) is None:
-            continue
-        key = _protocol_heading_key(heading.text)
-        if key in front_matter or not re.match(r"^\d+(?:\.\d+)*\.?\s+", heading.text.strip()):
-            continue
-        if heading.paragraph_format.page_break_before is True:
-            heading.paragraph_format.page_break_before = None
+    """Preserve template breaks and guarantee only the two TOC boundaries."""
+    headings = [
+        paragraph for paragraph in document.paragraphs
+        if _heading_level(paragraph) is not None
+    ]
+    toc_index = next((
+        index for index, paragraph in enumerate(headings)
+        if "table of contents" in _protocol_heading_key(paragraph.text)
+    ), None)
+    if toc_index is None:
+        return
+    toc = headings[toc_index]
+    break_carrier = toc._p.getprevious()
+    if (
+        break_carrier is not None
+        and break_carrier.tag == qn("w:p")
+        and break_carrier.xpath('.//w:br[@w:type="page"]')
+    ):
+        spacer = break_carrier.getprevious()
+        while (
+            spacer is not None
+            and spacer.tag == qn("w:p")
+            and not Paragraph(spacer, document).text.strip()
+            and not spacer.xpath('.//w:br[@w:type="page"]')
+            and not spacer.xpath('./w:pPr/w:sectPr')
+        ):
+            previous = spacer.getprevious()
+            spacer.getparent().remove(spacer)
+            spacer = previous
+        toc.paragraph_format.page_break_before = True
+        break_carrier.getparent().remove(break_carrier)
+    first_body = next((
+        paragraph for paragraph in headings[toc_index + 1:]
+        if re.match(r"^\d+(?:\.\d+)*\.?\s+", paragraph.text.strip())
+    ), None)
+    for boundary in (toc, first_body):
+        if boundary is not None and not _has_page_boundary_before(boundary):
+            boundary.paragraph_format.page_break_before = True
 
 
 def _protect_protocol_heading_content(document: Document) -> None:
@@ -2010,12 +2275,70 @@ def _first_substantive_block(document: Document, heading: Paragraph) -> Paragrap
     return None
 
 
-def _repair_heading_cohesion(document: Document, target: str, *, protocol: bool) -> None:
+def _remove_empty_intervening_paragraphs(heading: Paragraph) -> None:
+    """Remove only ordinary empty template paragraphs after one repaired heading."""
+    element = heading._p.getnext()
+    while element is not None and element.tag == qn("w:p"):
+        paragraph = Paragraph(element, heading._parent)
+        if paragraph.text.strip():
+            return
+        style = paragraph.style
+        style_page_boundary = False
+        seen_styles: set[str] = set()
+        while style is not None and style.style_id not in seen_styles:
+            seen_styles.add(style.style_id)
+            if style.paragraph_format.page_break_before is True:
+                style_page_boundary = True
+                break
+            style = style.base_style
+        ordinary_structure = all(
+            child.tag == qn("w:pPr")
+            or (
+                child.tag == qn("w:r")
+                and all(run_child.tag == qn("w:rPr") for run_child in child)
+            )
+            for child in element
+        )
+        paragraph_properties = element.find(qn("w:pPr"))
+        cosmetic_properties_only = (
+            paragraph_properties is None
+            or all(
+                child.tag in {
+                    qn("w:jc"),
+                    qn("w:rPr"),
+                    qn("w:keepNext"),
+                    qn("w:keepLines"),
+                }
+                for child in paragraph_properties
+            )
+        )
+        has_page_boundary = (
+            element.find(qn("w:pPr") + "/" + qn("w:pageBreakBefore")) is not None
+            or element.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
+            or any(child.tag in {qn("w:br"), qn("w:lastRenderedPageBreak")} for child in element.iter())
+            or style_page_boundary
+        )
+        if has_page_boundary or not ordinary_structure or not cosmetic_properties_only:
+            return
+        next_element = element.getnext()
+        element.getparent().remove(element)
+        element = next_element
+
+
+def _repair_heading_cohesion(
+    document: Document,
+    target: str,
+    *,
+    protocol: bool,
+    remove_empty_intervening_paragraphs: bool = False,
+) -> None:
     """Strengthen only the heading/content pair named by visual evidence."""
     heading = _target_heading(document, target, protocol=protocol)
     heading.paragraph_format.keep_with_next = True
     heading.paragraph_format.keep_together = True
     heading.paragraph_format.widow_control = True
+    if remove_empty_intervening_paragraphs:
+        _remove_empty_intervening_paragraphs(heading)
     block = _first_substantive_block(document, heading)
     if isinstance(block, Paragraph):
         # Widow control preserves a visible first fragment without making a long
@@ -2026,26 +2349,6 @@ def _repair_heading_cohesion(document: Document, target: str, *, protocol: bool)
         for cell in block.rows[0].cells:
             for paragraph in cell.paragraphs:
                 paragraph.paragraph_format.widow_control = True
-
-
-def _repair_protocol_body_pagination(document: Document, target: str) -> None:
-    """Remove an evidenced forced start from one numbered Protocol heading."""
-    heading = _target_heading(document, target, protocol=True)
-    key = _protocol_heading_key(heading.text)
-    if key in {_protocol_heading_key("1. TITLE PAGE"), _protocol_heading_key("TABLE OF CONTENTS")}:
-        raise LayoutRepairTargetError(f"Front matter is not a body-pagination repair target: {target}")
-    if not re.match(r"^\d+(?:\.\d+)*\.?\s+", heading.text.strip()):
-        raise LayoutRepairTargetError(f"Body-pagination repair target is not a numbered Protocol heading: {target}")
-    # An explicit false also overrides a style-level forced page start.
-    heading.paragraph_format.page_break_before = False
-    previous = heading._p.getprevious()
-    while previous is not None and previous.tag == qn("w:p"):
-        paragraph = Paragraph(previous, document)
-        if paragraph.text.strip():
-            break
-        for page_break in list(previous.xpath('.//w:br[@w:type="page"]')):
-            page_break.getparent().remove(page_break)
-        previous = previous.getprevious()
 
 
 def _table_caption_paragraphs(document: Document, table: Table) -> list[Paragraph]:
@@ -2087,9 +2390,17 @@ def _repair_table_pagination(document: Document, target: str) -> None:
     if caption is not None:
         caption.paragraph_format.keep_with_next = True
         caption.paragraph_format.keep_together = True
-        # A table-specific boundary must never be attached to a numbered body
-        # heading; only a separately identified caption may own it.
-        if not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption.text.strip()):
+        is_section_three_summary = (
+            _protocol_heading_key(caption.text) == "3 general information"
+        )
+        # A classified split in the front-matter summary is repaired by moving
+        # its complete heading-and-table block ahead of the fixed TOC boundary.
+        # Numbered body tables keep natural pagination; only a separately
+        # identified caption may own a table-specific boundary there.
+        if (
+            is_section_three_summary
+            or not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption.text.strip())
+        ):
             caption.paragraph_format.page_break_before = True
 
 
@@ -2098,56 +2409,26 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     placeholder = next((paragraph for paragraph in document.paragraphs if "{visitsTable}" in paragraph.text), None)
     if placeholder is None:
         return
-    schedule = get_path(reference, "procedures.visit_schedule", []) or []
-    visits: list[dict[str, Any]] = []
-    if isinstance(schedule, list):
-        for index, item in enumerate(schedule, 1):
-            if not isinstance(item, Mapping):
-                continue
-            visits.append({
-                "name": _text(item.get("visit") or item.get("visitName")) or f"Visit {index}",
-                "timing": _text(item.get("timing") or item.get("visitWindow")),
-                "procedures": _procedure_items(item.get("procedures")),
-            })
-    activities = list(dict.fromkeys(activity for visit in visits for activity in visit["procedures"]))
-    matrix_mode = bool(visits and activities)
+    table_contract = protocol_table_contracts(reference)["schedule-of-assessments"]
+    row_values = table_contract["rows"]
+    header_rows = int(table_contract["header_rows"])
+    if not row_values:
+        return
+    matrix_mode = header_rows == 2
     if matrix_mode:
-        def header_label(visit: Mapping[str, Any]) -> str:
-            name, timing = str(visit["name"]), str(visit["timing"])
-            if not timing:
-                return name
-            if re.fullmatch(r"day\s*[+-]?\d+", timing, re.I):
-                return f"{name}\n({timing})"
-            return timing
-
-        row_values = [
-            ["Activity", *[header_label(visit) for visit in visits]],
-            ["", *[f"Visit {index}" for index, _visit in enumerate(visits, 1)]],
-            *[
-                [activity, *["X" if activity in visit["procedures"] else "" for visit in visits]]
-                for activity in activities
-            ],
-        ]
-        header_rows = 2
-    else:
-        entries: list[tuple[str, str]] = []
-        schedule_table = get_path(reference, "procedures.visit_schedule_table", []) or []
-        if isinstance(schedule_table, list):
-            for item in schedule_table:
-                if isinstance(item, Mapping):
-                    label = _text(item.get("visitName") or item.get("visit"))
-                    timing = _text(item.get("visitWindow") or item.get("timing"))
-                    if label:
-                        entries.append((label, timing))
-        if not entries:
-            entries = [(item, "") for item in _list(get_path(reference, "procedures.assessments", []))]
-        if not entries:
-            return
-        row_values = [["Approved visit or assessment", "Approved timing"], *[list(item) for item in entries]]
-        header_rows = 1
+        row_values = [list(row) for row in row_values]
+        row_values[1][0] = ""
 
     authority = Document(authority_path)
     design = authority.tables[-1]
+    body_run_properties = next((
+        run._r.rPr
+        for row in design.rows[2:]
+        for cell in row.cells
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+        if run.text.strip() and run.font.name and run.font.size is not None
+    ), None)
     table = document.add_table(rows=len(row_values), cols=len(row_values[0]))
     destination_properties = table._tbl.tblPr
     destination_properties.getparent().replace(destination_properties, copy.deepcopy(design._tbl.tblPr))
@@ -2163,6 +2444,7 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
                 design.rows[source_row_index].cells[source_column_index],
                 value,
                 compact=compact or (row_index < header_rows and len(row_values[0]) > 4),
+                run_properties=body_run_properties if row_index >= header_rows else None,
             )
         _prevent_row_split(table.rows[row_index])
         if row_index < header_rows:
@@ -2213,6 +2495,56 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
             bottom.set(qn(key), value)
     placeholder._p.addprevious(table._tbl)
     placeholder._element.getparent().remove(placeholder._element)
+
+
+def _sample_size_evidence_table(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
+    """Render every approved sample-size evidence row as an auditable Section 11 table."""
+    table_contract = protocol_table_contracts(reference)["sample-size-evidence"]
+    row_values = table_contract["rows"]
+    if not row_values:
+        return
+    target = next((
+        paragraph for paragraph in document.paragraphs
+        if _heading_level(paragraph) is not None
+        and _protocol_heading_key(paragraph.text) == _protocol_heading_key("12. CONFIDENTIALITY/PUBLICATION OF THE STUDY")
+    ), None)
+    if target is None:
+        return
+    authority = Document(authority_path)
+    design = authority.tables[-1]
+    table = document.add_table(rows=len(row_values), cols=len(row_values[0]))
+    destination_properties = table._tbl.tblPr
+    destination_properties.getparent().replace(destination_properties, copy.deepcopy(design._tbl.tblPr))
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    for row_index, values in enumerate(row_values):
+        source_row_index = min(row_index, len(design.rows) - 1)
+        for column_index, value in enumerate(values):
+            source_column_index = min(column_index, len(design.columns) - 1)
+            _copy_cell_design(
+                table.rows[row_index].cells[column_index],
+                design.rows[source_row_index].cells[source_column_index],
+                value,
+                compact=len(row_values[0]) > 5,
+            )
+        _prevent_row_split(table.rows[row_index])
+    _set_repeat_header(table.rows[0])
+    available_width = document.sections[0].page_width - document.sections[0].left_margin - document.sections[0].right_margin
+    widths = [int(available_width / len(row_values[0]))] * len(row_values[0])
+    for column, width in zip(table._tbl.tblGrid.gridCol_lst, widths):
+        column.w = width
+    for row in table.rows:
+        for cell, width in zip(row.cells, widths):
+            cell.width = width
+    caption = document.add_paragraph(str(table_contract["caption"]))
+    exemplar = next((
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.strip().casefold().startswith("table 9.2-1")
+    ), None)
+    _copy_paragraph_design(caption, exemplar)
+    caption.paragraph_format.keep_with_next = True
+    target._p.addprevious(caption._p)
+    target._p.addprevious(table._tbl)
 
 
 def _template_document(
@@ -2267,8 +2599,10 @@ def _template_document(
         _normalize_protocol_running_header(document)
         _apply_protocol_visit_table_layout(document, authority)
         _ensure_contract_headings(document, branch)
+        _insert_source_bound_sections(document, reference, branch)
         _normalize_protocol_container_introductions(document, branch, boilerplate)
-        _replace_protocol_leaf_bodies(document, model, branch, authority)
+        _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
+        _sample_size_evidence_table(document, reference, authority_path)
         _normalize_protocol_title_controls(document, reference)
         _normalize_protocol_summary_table(document)
         _ensure_protocol_references(document, authority, reference)
@@ -2284,8 +2618,13 @@ def _template_document(
         target = repair["target"]
         if rule == "heading_cohesion":
             _repair_heading_cohesion(document, target, protocol=not icf)
-        elif rule == "body_pagination" and not icf:
-            _repair_protocol_body_pagination(document, target)
+        elif rule == "heading_whitespace_cohesion":
+            _repair_heading_cohesion(
+                document,
+                target,
+                protocol=not icf,
+                remove_empty_intervening_paragraphs=True,
+            )
         elif rule == "table_pagination":
             _repair_table_pagination(document, target)
     _set_update_fields(document)

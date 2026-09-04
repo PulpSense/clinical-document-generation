@@ -11,6 +11,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import math
 import re
 import unicodedata
 from dataclasses import dataclass
@@ -37,7 +38,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v8-release-facing-client-authority"
+PROMPT_VERSION = "section-drafting-v10-explicit-evidence-binding"
 MAX_ATTEMPTS = 3
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
@@ -101,9 +102,11 @@ def _request_constraints() -> list[str]:
         "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
         "Use participant-facing language for ICF sections.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
+        "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
         "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+        "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays.",
     ]
 
 
@@ -157,7 +160,7 @@ def _expected_section_contracts(
     if unknown:
         raise ValueError(f"Draft request contains unknown section IDs: {', '.join(unknown)}")
     boilerplate = load_boilerplate(repo_root, reference, contracted_bundle=contracted_bundle)
-    return [_section_payload(known[target], boilerplate) for target in target_list]
+    return [_section_payload(known[target], boilerplate, reference) for target in target_list]
 
 
 def _request_matches_approved_reference(
@@ -301,7 +304,71 @@ def _source_items(value: Any, prefix: str = "") -> list[dict[str, Any]]:
     return items
 
 
-def _section_payload(section: SectionSpec, boilerplate: Mapping[str, str]) -> dict[str, Any]:
+_SOURCE_DETAIL_RATIOS = {
+    "introduction": 0.70,
+    "subjects.inclusion": 0.75,
+    "subjects.exclusion": 0.75,
+    "study-design.design": 0.65,
+    "study-procedure.visits": 0.65,
+    "study-procedure.measurements": 0.60,
+    "analysis-plan.datasets": 0.65,
+    "analysis-plan.methodology": 0.65,
+    "sample-size": 0.60,
+    "confidentiality": 0.65,
+    "financial-injury": 0.65,
+    "risks-benefits.risks": 0.70,
+    "risks-benefits.benefits": 0.70,
+}
+
+
+def _source_detail_budget(reference: Mapping[str, Any], section: SectionSpec) -> tuple[int, int]:
+    """Measure unique approved detail and set a floor only for source-rich sections."""
+    seen: set[str] = set()
+    words = 0
+    for path in section.evidence:
+        for leaf in _leaf_texts(get_path(reference, path)):
+            normalized = re.sub(r"\s+", " ", leaf).strip().casefold()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            words += len(re.findall(r"\b[\w'-]+\b", leaf))
+    ratio = _SOURCE_DETAIL_RATIOS.get(section.section_id, 0.0)
+    return words, int(words * ratio) if ratio and words >= 80 else 0
+
+
+def _focused_evidence_value(value: Any, focus_terms: Iterable[str]) -> str:
+    """Return the source-owned clause fragment relevant to one narrow section."""
+    terms = tuple(term.casefold() for term in focus_terms)
+    excerpts = []
+    leading_verbs = {
+        "analyze", "assess", "compare", "describe", "evaluate", "monitor",
+        "report", "review", "summarize", "tabulate",
+    }
+    for leaf in _leaf_texts(value):
+        for clause in re.split(r"(?<=[.!?])\s+|(?<=;)\s+", leaf):
+            lowered = clause.casefold()
+            matches = [lowered.find(term) for term in terms if term in lowered]
+            if not matches:
+                continue
+            start = min(matches)
+            prefix = clause[:start]
+            negation = re.search(r"\b(?:no|not|without)\b(?:\s+[A-Za-z-]+){0,3}\s*$", prefix, re.I)
+            if negation:
+                excerpt = clause[negation.start():].strip()
+            else:
+                excerpt = clause[start:].strip()
+                first_word = re.match(r"[A-Za-z]+", clause)
+                if first_word and first_word.group(0).casefold() in leading_verbs:
+                    excerpt = f"{first_word.group(0)} {excerpt}"
+            excerpts.append(excerpt)
+    return " ".join(dict.fromkeys(excerpts))
+
+
+def _section_payload(
+    section: SectionSpec,
+    boilerplate: Mapping[str, str],
+    reference: Mapping[str, Any],
+) -> dict[str, Any]:
     allowed = ["agent_draft"]
     boilerplate_items: list[dict[str, str]] = []
     if section.boilerplate_key:
@@ -310,6 +377,25 @@ def _section_payload(section: SectionSpec, boilerplate: Mapping[str, str]) -> di
         if not text:
             raise ValueError(f"Missing Fixed Clinical Boilerplate: {section.boilerplate_key}")
         boilerplate_items.append({"boilerplate_id": section.boilerplate_key, "text": text, "sha256": sha256_value(text)})
+    approved_source_words, minimum_detail_words = _source_detail_budget(reference, section)
+    evidence_scopes = []
+    for path, focus_terms in section.evidence_scopes:
+        value = get_path(reference, path)
+        scoped_value = _focused_evidence_value(value, focus_terms)
+        evidence_scopes.append({
+            "path": path,
+            "focus_terms": list(focus_terms),
+            "value": scoped_value,
+            "sha256": sha256_value(scoped_value),
+        })
+    scoped_values = {
+        item["path"]: item["value"]
+        for item in evidence_scopes
+    }
+    minimum_evidence = [
+        path for path in section.evidence
+        if path not in scoped_values or scoped_values[path]
+    ]
     return {
         "section_id": section.section_id,
         "number": section.number,
@@ -317,10 +403,13 @@ def _section_payload(section: SectionSpec, boilerplate: Mapping[str, str]) -> di
         "role": section.role,
         "required": section.required,
         "allowed_modes": allowed,
-        "minimum_evidence": list(section.evidence),
+        "minimum_evidence": minimum_evidence,
         "fixed_boilerplate": boilerplate_items,
         "content_expectations": list(section.content_expectations),
         "source_coverage": section.source_coverage,
+        "evidence_scopes": evidence_scopes,
+        "approved_source_word_count": approved_source_words,
+        "reference_detail_target_words": minimum_detail_words,
     }
 
 
@@ -434,6 +523,7 @@ def create_drafting_request(
         recorded = _read_json(ledger_path)
         if recorded.get("request_sha256") != payload["request_sha256"]:
             raise ValueError(f"Draft request identity collision: {request_id}")
+    response_path.parent.mkdir(parents=True, exist_ok=True)
     _write_json(request_path, payload)
     _write_json(ledger_path, {"request_id": request_id, "request_sha256": payload["request_sha256"]})
     return request_path
@@ -475,6 +565,18 @@ _GROUNDING_STOPWORDS = {
     "retrospective", "study", "subject", "subjects",
 }
 
+_GROUNDING_TOKEN_EQUIVALENTS = {
+    # A source may name the clinical state while client-facing prose describes
+    # the person who has it. Keep these equivalences explicit and narrow so
+    # all other clinical concepts and every numeric value remain observable.
+    "pregnancy": "pregnancy",
+    "pregnant": "pregnancy",
+}
+
+_NON_SUBSTANTIVE_LIST_ITEMS = {
+    "n/a", "na", "no", "none", "not applicable", "other", "same", "unknown", "yes",
+}
+
 
 def _leaf_texts(value: Any) -> list[str]:
     if isinstance(value, Mapping):
@@ -487,10 +589,24 @@ def _leaf_texts(value: Any) -> list[str]:
 
 def _grounding_tokens(value: str) -> set[str]:
     return {
-        token.rstrip("s")
+        _GROUNDING_TOKEN_EQUIVALENTS.get(token.rstrip("s"), token.rstrip("s"))
         for token in re.findall(r"[A-Za-z0-9]+", value.casefold())
         if (len(token) > 1 or token.isdigit()) and token not in _GROUNDING_STOPWORDS
     }
+
+
+def _substantive_list_item(value: str) -> bool:
+    """Accept concise clinical terms while continuing to reject non-content."""
+    text = re.sub(r"\s+", " ", value).strip()
+    lowered = text.casefold().strip(" .,:;!?()[]{}")
+    if (
+        not text
+        or PLACEHOLDER.search(text)
+        or lowered in _NON_SUBSTANTIVE_LIST_ITEMS
+        or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE)
+    ):
+        return False
+    return bool(_grounding_tokens(text))
 
 
 def _party_words(value: str) -> list[str]:
@@ -769,9 +885,20 @@ def _direct_safety_role_errors(
     return errors
 
 
-def _evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
+def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
     """Require observable anchors for every material scalar supplied by a cited source path."""
     content_tokens = _grounding_tokens(content)
+    def numeric_tokens(text: str) -> set[str]:
+        values = set()
+        for token in re.findall(r"\d+(?:\.\d+)?", text.casefold()):
+            if "." in token:
+                whole, fraction = token.split(".", 1)
+                values.add(f"{int(whole)}.{fraction.rstrip('0') or '0'}")
+            else:
+                values.add(str(int(token)))
+        return values
+
+    content_numbers = numeric_tokens(content)
     leaves = _leaf_texts(value)
     if not leaves:
         return True
@@ -779,22 +906,22 @@ def _evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> 
     negative_content_tokens = {"no", "not", "none", "without", "neither"}
     if all(leaf.casefold().strip().rstrip(".") in negative_source_values for leaf in leaves):
         return bool(content_tokens & negative_content_tokens)
-    if not all_items:
-        expected = set().union(*(_grounding_tokens(leaf) for leaf in leaves))
-        if not expected:
-            return True
-        required = 1 if len(expected) == 1 else 2 if len(expected) <= 8 else 3
-        return len(expected & content_tokens) >= required
-    for leaf in leaves:
+    def grounded(leaf: str) -> bool:
         expected = _grounding_tokens(leaf)
         if not expected:
             expected = {token.rstrip("s") for token in re.findall(r"[A-Za-z0-9]+", leaf.casefold()) if token}
         if not expected:
-            continue
-        required = 1 if len(expected) == 1 else 2 if len(expected) <= 8 else 3
-        if len(expected & content_tokens) < required:
+            return True
+        numbers = numeric_tokens(leaf)
+        if not numbers <= content_numbers:
             return False
-    return True
+        required = min(12, max(1, math.ceil(len(expected) * 0.45)))
+        return len(expected & content_tokens) >= required
+
+    if all_items:
+        return all(grounded(leaf) for leaf in leaves)
+    combined = " ".join(leaves)
+    return grounded(combined)
 
 
 def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
@@ -803,11 +930,17 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
         for item in request.get("approved_input", [])
         if isinstance(item, Mapping)
     }
-    return {
-        path: source[path]
-        for path in map(str, contract.get("minimum_evidence", []))
-        if path in source and _leaf_texts(source[path])
+    scopes = {
+        str(item.get("path")): item.get("value")
+        for item in contract.get("evidence_scopes", [])
+        if isinstance(item, Mapping)
     }
+    material: dict[str, Any] = {}
+    for path in map(str, contract.get("minimum_evidence", [])):
+        value = scopes[path] if path in scopes else source.get(path)
+        if _leaf_texts(value):
+            material[path] = value
+    return material
 
 
 def _coverage_findings(
@@ -837,7 +970,7 @@ def _coverage_findings(
         for path, value in material.items()
         if f"source:{path}" in cited
         and not (section_id == "quality-safety" and path == "safety.roles")
-        and not _evidence_grounded(content, value, all_items=all_items)
+        and not evidence_grounded(content, value, all_items=all_items)
     ]
     if ungrounded:
         findings.append({
@@ -874,7 +1007,45 @@ def _coverage_findings(
     return findings
 
 
-def _validate_paragraph(paragraph: Any, request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+def _reference_next_action(
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    *,
+    content_type: str,
+    position: int,
+) -> str:
+    allowed_request_evidence = _allowed_evidence(request)
+    evidence_refs = sorted(
+        f"source:{path}"
+        for path in map(str, contract.get("minimum_evidence", []))
+        if f"source:{path}" in allowed_request_evidence
+    )
+    boilerplate_refs = sorted(
+        str(item.get("boilerplate_id"))
+        for item in contract.get("fixed_boilerplate", [])
+        if isinstance(item, Mapping) and item.get("boilerplate_id")
+    )
+    choices = []
+    if evidence_refs:
+        choices.append(f"evidence_refs=[{', '.join(evidence_refs)}]")
+    if boilerplate_refs:
+        choices.append(f"boilerplate_refs=[{', '.join(boilerplate_refs)}]")
+    allowed = " or ".join(choices) or "an allowed section reference"
+    suffix = (
+        " If it only introduces an already-cited list, omit the paragraph."
+        if content_type == "Paragraph"
+        else ""
+    )
+    return f"{content_type} {position} must include at least one of {allowed}.{suffix}"
+
+
+def _validate_paragraph(
+    paragraph: Any,
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    section_id: str,
+    position: int = 1,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     if not isinstance(paragraph, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}]
@@ -899,17 +1070,23 @@ def _validate_paragraph(paragraph: Any, request: Mapping[str, Any], contract: Ma
     if invalid_boilerplate:
         findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported boilerplate references: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
     if not evidence_refs and not boilerplate_refs:
-        findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": "Cite its approved support."})
+        findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)})
     return {"text": text, "evidence_refs": list(map(str, evidence_refs)), "boilerplate_refs": list(map(str, boilerplate_refs))}, findings
 
 
-def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+def _validate_list(
+    group: Any,
+    request: Mapping[str, Any],
+    contract: Mapping[str, Any],
+    section_id: str,
+    position: int = 1,
+) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     if not isinstance(group, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}]
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
     evidence_refs = list(map(str, group.get("evidence_refs") or [])); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
     findings: list[dict[str, Any]] = []
-    if not items or any(PLACEHOLDER.search(item) or len(item.split()) < 2 for item in items):
+    if not items or any(not _substantive_list_item(item) for item in items):
         findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
     section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
     invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)
@@ -917,7 +1094,7 @@ def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str
     invalid_boilerplate = sorted(set(boilerplate_refs) - allowed_boilerplate)
     if invalid_evidence or unrelated: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported section evidence: {', '.join(invalid_evidence or unrelated)}", "next_action": "Cite only listed section evidence."})
     if invalid_boilerplate: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported boilerplate: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
-    if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": "Cite its approved support."})
+    if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="List", position=position)})
     return {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}, findings
 
 
@@ -1126,15 +1303,15 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             continue
         paragraphs = item.get("paragraphs") if isinstance(item.get("paragraphs"), list) else []
         clean_paragraphs: list[dict[str, Any]] = []
-        for paragraph in paragraphs:
-            clean, paragraph_findings = _validate_paragraph(paragraph, request, expected_contracts[section_id], section_id)
+        for position, paragraph in enumerate(paragraphs, start=1):
+            clean, paragraph_findings = _validate_paragraph(paragraph, request, expected_contracts[section_id], section_id, position)
             findings.extend(paragraph_findings)
             if clean:
                 clean_paragraphs.append(clean)
         raw_lists = item.get("lists") if isinstance(item.get("lists"), list) else []
         lists = []
-        for group in raw_lists:
-            clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id)
+        for position, group in enumerate(raw_lists, start=1):
+            clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id, position)
             findings.extend(list_findings)
             if clean_group: lists.append(clean_group)
         combined_content = "\n".join(
@@ -1279,7 +1456,7 @@ def missing_drafts(
         if repo_root is not None
         else None
     )
-    required = [section.section_id for section in protocol_contract(branch) if section.role != "container"]
+    required = [section.section_id for section in protocol_contract(branch) if section.role == "leaf"]
     if branch != "Retrospective":
         required.extend(section.section_id for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))))
         prs_record = accepted_prs_record(revision_dir, expected)
@@ -1672,13 +1849,16 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
         all_items = contract.get("source_coverage") == "all_material_items"
         for path in allowed_paths:
             ref = f"source:{path}"
-            if ref in used_refs and _evidence_grounded(existing, source[path], all_items=all_items):
+            if ref in used_refs and evidence_grounded(existing, source[path], all_items=all_items):
                 continue
             label = path.rsplit(".", 1)[-1].replace("_", " ")
             section_label = str(contract.get("title") or result.get("section_id") or "section").strip().casefold()
             if path == "procedures.minimum_days_before_screening_without_participation":
+                duration = value_text(source[path]).rstrip(".")
+                if not re.search(r"\bdays?\s*$", duration, re.I):
+                    duration = f"{duration} days"
                 text = (
-                    f"At least {value_text(source[path]).rstrip('.')} days without participation "
+                    f"At least {duration} without participation "
                     "in another study are required before screening."
                 )
             elif section_id == "quality-safety" and path == "safety.roles":
@@ -1698,6 +1878,6 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "MAX_ATTEMPTS", "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
-    "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
+    "evidence_grounded", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
     "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
 ]

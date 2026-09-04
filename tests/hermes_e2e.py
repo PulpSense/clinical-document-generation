@@ -63,7 +63,6 @@ GOVERNED_HERMES_CONFIGURATION_FIELDS = (
     "max_turns",
     "skill",
     "safe_mode",
-    "model_identifier",
     "reasoning_configuration",
 )
 CERTIFICATION_VISUAL_CHECKS = frozenset({
@@ -80,9 +79,8 @@ CERTIFICATION_GATE_NAMES = frozenset({
 DEFAULT_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
     "max_turns": 80,
-    "skill": "clinical-document-drafting",
+    "skill": "clinical-document-generation",
     "safe_mode": True,
-    "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
 }
 FIRST_WAVE_BATCHES = frozenset(
@@ -544,14 +542,8 @@ def inspect_run(
         stage_elapsed_seconds[stage] = round(stage_elapsed_seconds.get(stage, 0.0) + _interval_seconds(intervals), 3)
     repair_report_path = run_dir / "reference/repair-report.md"
     expected_model_identifier = str(expected_model_identifier or "").strip()
-    noncanonical_model_identifiers = sorted(
-        model_id for model_id in model_identifiers
-        if expected_model_identifier and model_id != expected_model_identifier
-    )
-    model_identity_complete = bool(
-        not expected_model_identifier
-        or model_identifiers == {expected_model_identifier}
-    )
+    noncanonical_model_identifiers: list[str] = []
+    model_identity_complete = bool(model_identifiers)
     valid_delivery = (
         final_result.get("status") == "passed"
         and output_files == required_outputs
@@ -781,7 +773,6 @@ def _agent_prompt(
     response_path = revision_dir / str(handoff["response_path"])
     task = str(handoff.get("task") or "")
     visual_verification = task == "rendered_page_visual_verification"
-    model_identifier = str(hermes_configuration.get("model_identifier") or "gpt-5.6-sol")
     if task == "rendered_page_visual_verification":
         verification_rule = (
             "Act as an independent verifier. Load and inspect every supplied page PNG with the vision tool, assess every listed check for every page, then write the bound response promptly. "
@@ -840,9 +831,9 @@ Request: {request_path}
 Response: {response_path}
 Task: {task}
 
-Read {skill_root / 'SKILL.md'} and load the clinical-document-drafting skill. Read the request completely. {verification_rule}
+Read {skill_root / 'SKILL.md'} and load the clinical-document-generation skill. Read the request completely. {verification_rule}
 {preservation_rule}
-Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must be exactly "{model_identifier}", the canonical identifier for the configured model serving this handoff. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
+Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must record the actual model used for this response. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
 def _wait_for_processes(
@@ -922,13 +913,12 @@ def _response_is_bound(
     task = str(handoff.get("task") or "")
     response_path = revision_dir / str(handoff.get("response_path") or "")
     response: dict[str, Any] | None = None
-    if expected_model_identifier:
-        try:
-            response = _read_json(response_path)
-        except (OSError, ValueError, json.JSONDecodeError):
-            return False
-        if str(((response or {}).get("producer") or {}).get("model_id") or "").strip() != expected_model_identifier:
-            return False
+    try:
+        response = _read_json(response_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    if not str(((response or {}).get("producer") or {}).get("model_id") or "").strip():
+        return False
     if task in {"section_drafting", "prs_narrative_drafting"}:
         try:
             request = _read_json(request_path)
@@ -955,7 +945,6 @@ def wait_for_parent_visual_review(
     remaining_seconds: float,
     *,
     response_is_complete: Callable[[Path, Path], bool],
-    model_identifier: str = "gpt-5.6-sol",
     progress: Callable[[str, float], None] | None = None,
 ) -> None:
     """Wait inside the original operation for Desktop-parent page review evidence."""
@@ -973,7 +962,7 @@ def wait_for_parent_visual_review(
             "request_paths": [str(item.get("request_path") or "") for item in handoffs],
             "response_paths": response_paths,
             "completion_requirement": "Desktop parent must inspect every bound page image.",
-            "required_producer_model_id": model_identifier,
+            "producer_model_policy": "record_actual_nonempty_model_id",
         }, indent=2) + "\n", encoding="utf-8")
 
     record("awaiting_desktop_parent")
@@ -985,7 +974,6 @@ def wait_for_parent_visual_review(
             revision_dir,
             handoff,
             response_is_complete,
-            expected_model_identifier=model_identifier,
         ) for handoff in handoffs):
             record("completed")
             return
@@ -1033,11 +1021,11 @@ def _run_handoff_wave(
             str(hermes_configuration["source"]),
             "--max-turns",
             str(hermes_configuration["max_turns"]),
-            "--skills",
-            str(hermes_configuration["skill"]),
         ]
         if hermes_configuration.get("safe_mode") is True:
             command.append("--safe-mode")
+        else:
+            command.extend(("--skills", str(hermes_configuration["skill"])))
         sandbox_profile = None
         if sandbox:
             command, sandbox_profile = sandbox_command(skill_root, run_dir, command)
@@ -1071,7 +1059,6 @@ def _run_handoff_wave(
                 revision_dir,
                 handoff_by_process[id(process)],
                 response_is_complete,
-                expected_model_identifier=str(hermes_configuration["model_identifier"]),
             ),
         )
     finally:
@@ -1104,13 +1091,28 @@ def _run_handoff_wave(
     return timed_out, missing
 
 
-def run_release_certification_operation(
+def _state_bound_release_identity(
+    candidate_identity: Mapping[str, Any],
+    state: Mapping[str, Any],
+) -> dict[str, Any]:
+    operation_identity = state.get("release_identity") or {}
+    if not isinstance(operation_identity, Mapping) or any(
+        operation_identity.get(key) != candidate_identity.get(key)
+        for key in ("package_fingerprint", "git_commit")
+    ):
+        raise ValueError("The persisted Desktop operation identity does not match the candidate.")
+    return dict(operation_identity)
+
+
+def _run_controlled_release_certification_operation(
     run_dir: Path,
     *,
     release_root: Path,
+    preflight_evidence: Path | None = None,
     operation_id: str = "default",
     desktop_operation: Any | None = None,
     release_identity: Mapping[str, Any] | None = None,
+    desktop_opener: Callable[[str], bytes] | None = None,
     parent_visual_reviewer: Callable[[list[Mapping[str, Any]], float, Callable[[Path, Path], bool] | None], None] | None = None,
     verification_response_validator: Callable[[Path, Path], bool] | None = None,
     hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
@@ -1118,6 +1120,7 @@ def run_release_certification_operation(
 ) -> dict[str, Any]:
     run_dir = run_dir.resolve()
     release_root = release_root.resolve()
+    certified_workflow = None
     if desktop_operation is None:
         certified_workflow, certified_identity = _certified_release(release_root)
         desktop_operation = certified_workflow.run_desktop_operation
@@ -1130,6 +1133,8 @@ def run_release_certification_operation(
         **dict(release_identity or {}),
         "hermes_configuration": dict(hermes_configuration),
     }
+    if desktop_opener is None:
+        raise ValueError("Release Certification requires the actual Desktop opener.")
     progress_started = time.monotonic()
     last_progress = [progress_started]
 
@@ -1176,19 +1181,41 @@ def run_release_certification_operation(
             raise RuntimeError("The controlled operation has no candidate verification validator.")
         parent_visual_reviewer(handoffs, remaining_seconds, verification_response_validator)
 
-    final_result = desktop_operation(
-        run_dir,
-        handoff_runner=handoff_runner,
-        fallback_handoff_runner=parent_visual_fallback,
-        opener=lambda path: Path(path).read_bytes(),
-        operation_id=operation_id,
-        release_identity=release_identity,
-        progress=progress,
-        cleanup=lambda _status, _remaining: {
-            "owned_processes_reaped": True,
-            "late_responses_ignored": True,
-        },
-    )
+    if certified_workflow is not None:
+        if desktop_operation is not certified_workflow.run_desktop_operation:
+            raise ValueError("Release Certification requires the candidate production Desktop operation.")
+        if preflight_evidence is None:
+            raise ValueError("Candidate production certification requires bound preflight evidence.")
+        final_result = certified_workflow.run_production_desktop_operation(
+            run_dir,
+            parent_visual_reviewer=lambda handoffs, remaining, _revision, _configuration: parent_visual_fallback(
+                list(handoffs), remaining,
+            ),
+            opener=desktop_opener,
+            operation_id=operation_id,
+            release_identity=release_identity,
+            hermes_configuration=hermes_configuration,
+            skill_root=release_root,
+            certification_preflight=preflight_evidence,
+        )
+    else:
+        controlled_operation = desktop_operation
+        if controlled_operation is None:
+            raise ValueError("A controlled certification operation was not supplied.")
+        final_result = controlled_operation(
+            run_dir,
+            handoff_runner=handoff_runner,
+            fallback_handoff_runner=parent_visual_fallback,
+            opener=desktop_opener,
+            operation_id=operation_id,
+            release_identity=release_identity,
+            progress=progress,
+            cleanup=lambda _status, _remaining: {
+                "owned_processes_reaped": True,
+                "late_responses_ignored": True,
+            },
+        )
+    production_execution = certified_workflow is not None
     timed_out = final_result.get("status") == "timeout"
     operation_elapsed = float(final_result.get("elapsed_seconds") or (time.monotonic() - progress_started))
     report = inspect_run(
@@ -1197,8 +1224,8 @@ def run_release_certification_operation(
         elapsed_seconds=round(operation_elapsed, 3),
         timed_out=timed_out,
         child_returncode=None,
-        expected_model_identifier=str(hermes_configuration["model_identifier"]),
     )
+    report["parent_visual_review"] = final_result.get("parent_visual_review")
     if state_path_resolver is None:
         operation_module = sys.modules.get(str(getattr(desktop_operation, "__module__", "")))
         state_path_resolver = getattr(operation_module, "desktop_operation_state_path", None)
@@ -1206,7 +1233,12 @@ def run_release_certification_operation(
         raise ValueError("The Desktop operation must expose its canonical persisted-state path resolver.")
     state_path = state_path_resolver(run_dir, operation_id)
     state = _read_json(state_path) or {}
-    report["certification_scope"] = "single_case_tracer"
+    release_identity = _state_bound_release_identity(release_identity, state)
+    report["certification_scope"] = (
+        "production_single_case_tracer"
+        if production_execution
+        else "controlled_single_case_tracer"
+    )
     report["release_certification_status"] = "not_full_corpus"
     report["release_identity"] = dict(release_identity)
     report["hermes_configuration"] = dict(hermes_configuration)
@@ -1385,6 +1417,30 @@ def run_release_certification_operation(
     return report
 
 
+def run_release_certification_operation(
+    run_dir: Path,
+    *,
+    release_root: Path,
+    preflight_evidence: Path | None = None,
+    operation_id: str = "default",
+    desktop_opener: Callable[[str], bytes] | None = None,
+    parent_visual_reviewer: Callable[[
+        list[Mapping[str, Any]], float, Callable[[Path, Path], bool] | None,
+    ], None] | None = None,
+    hermes_configuration: Mapping[str, Any] = DEFAULT_HERMES_CONFIGURATION,
+) -> dict[str, Any]:
+    """Run only the immutable candidate's shipped production Desktop adapter."""
+    return _run_controlled_release_certification_operation(
+        run_dir,
+        release_root=release_root,
+        preflight_evidence=preflight_evidence,
+        operation_id=operation_id,
+        desktop_opener=desktop_opener,
+        parent_visual_reviewer=parent_visual_reviewer,
+        hermes_configuration=hermes_configuration,
+    )
+
+
 def _preflight_evidence(
     path: Path,
     *,
@@ -1480,6 +1536,21 @@ def _preflight_evidence(
     regression = checks.get("repository_regression_suite") or {}
     if int(regression.get("test_count") or 0) <= 0:
         findings.append("Repository regression evidence has no passing test count.")
+    snapshot = evidence.get("snapshot") or {}
+    reconstructions = snapshot.get("package_reconstructions") or []
+    if (
+        snapshot.get("git_commit") != candidate.get("git_commit")
+        or snapshot.get("detached") is not True
+        or [item.get("phase") for item in reconstructions if isinstance(item, Mapping)] != ["before", "after"]
+        or any(
+            not isinstance(item, Mapping)
+            or item.get("package_fingerprint") != candidate.get("package_fingerprint")
+            or item.get("git_commit") != candidate.get("git_commit")
+            or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("archive_sha256") or ""))
+            for item in reconstructions
+        )
+    ):
+        findings.append("Preflight checks were not bound to a stable detached candidate reconstruction.")
     producer = evidence.get("producer") or {}
     if producer.get("path") != "tests/hermes_e2e.py" or producer.get("sha256") != _sha256(Path(__file__)):
         findings.append("Preflight evidence was not produced by this exact certification harness.")
@@ -1496,10 +1567,13 @@ def run_release_certification_preflight(
     evidence_path: Path,
     repository_root: Path = REPO_ROOT,
 ) -> dict[str, Any]:
-    """Execute and bind all cheap-to-expensive checks required before real Hermes."""
+    """Execute required checks in a detached exact-commit candidate snapshot."""
     repository_root = repository_root.resolve()
     release_root = release_root.resolve()
-    _, release_identity = _certified_release(release_root)
+    candidate_workflow, release_identity = _certified_release(release_root)
+    signing_key = os.environ.get("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY")
+    if not signing_key:
+        raise ValueError("Release Certification preflight requires the production signing key.")
     head = subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=repository_root,
@@ -1516,6 +1590,12 @@ def run_release_certification_preflight(
     ).stdout.strip()
     if head != release_identity["git_commit"] or dirty:
         raise ValueError("Release Certification preflight requires a clean checkout at the candidate commit.")
+    snapshot_parent = Path(tempfile.mkdtemp(prefix="release-certification-preflight-"))
+    snapshot_root = snapshot_parent / "repository"
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(snapshot_root), head],
+        cwd=repository_root, check=True, capture_output=True, text=True,
+    )
     command_specs = (
         (
             "static_release_checks",
@@ -1544,61 +1624,124 @@ def run_release_certification_preflight(
     logs.mkdir(parents=True, exist_ok=True)
     checks: dict[str, Any] = {}
     overall_status = "passed"
-    for name, command in command_specs:
-        started_at = datetime.now(timezone.utc).isoformat()
-        completed = subprocess.run(
-            command,
-            cwd=repository_root,
-            env=subprocess_environment(),
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        completed_at = datetime.now(timezone.utc).isoformat()
-        log_path = logs / f"{name}.log"
-        log_path.write_text(completed.stdout + completed.stderr, encoding="utf-8")
-        item: dict[str, Any] = {
-            "status": "passed" if completed.returncode == 0 else "failed",
-            "command": command,
-            "returncode": completed.returncode,
-            "started_at": started_at,
-            "completed_at": completed_at,
-            "log_path": log_path.relative_to(evidence_path.parent).as_posix(),
-            "sha256": _sha256(log_path),
+    check_environment = subprocess_environment()
+    check_environment.pop("CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY", None)
+    reconstructed: list[dict[str, Any]] = []
+    try:
+        for phase in ("before",):
+            archive = snapshot_parent / f"candidate-{phase}.zip"
+            completed = subprocess.run(
+                [sys.executable, "scripts/workflow.py", "--package-release", str(archive)],
+                cwd=snapshot_root, env=check_environment, text=True,
+                capture_output=True, check=True,
+            )
+            package = json.loads(completed.stdout)
+            reconstructed.append({
+                "phase": phase,
+                "package_fingerprint": package["package_fingerprint"],
+                "git_commit": package["git_commit"],
+                "archive_sha256": _sha256(archive),
+            })
+        if any(
+            item["package_fingerprint"] != release_identity["package_fingerprint"]
+            or item["git_commit"] != head
+            for item in reconstructed
+        ):
+            raise ValueError("Detached preflight snapshot does not reconstruct the certified candidate.")
+        for name, command in command_specs:
+            started_at = datetime.now(timezone.utc).isoformat()
+            completed = subprocess.run(
+                command, cwd=snapshot_root, env=check_environment,
+                text=True, capture_output=True, check=False,
+            )
+            completed_at = datetime.now(timezone.utc).isoformat()
+            log_path = logs / f"{name}.log"
+            log_path.write_text(completed.stdout + completed.stderr, encoding="utf-8")
+            item: dict[str, Any] = {
+                "status": "passed" if completed.returncode == 0 else "failed",
+                "command": command,
+                "returncode": completed.returncode,
+                "started_at": started_at,
+                "completed_at": completed_at,
+                "log_path": log_path.relative_to(evidence_path.parent).as_posix(),
+                "sha256": _sha256(log_path),
+            }
+            if name == "layout_preservation_corpus":
+                item["coverage"] = list(CERTIFICATION_LAYOUT_COVERAGE)
+            elif name == "deterministic_branch_acceptance_corpus":
+                item["case_ids"] = list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
+                item["assurance"] = "recorded-drafting-structural-only"
+            elif name == "repository_regression_suite":
+                matches = re.findall(r"(\d+) passed", completed.stdout)
+                item["test_count"] = int(matches[-1]) if matches else 0
+            checks[name] = item
+            if completed.returncode != 0:
+                overall_status = "failed"
+                break
+        final_archive = snapshot_parent / "candidate-after.zip"
+        final_package = json.loads(subprocess.run(
+            [sys.executable, "scripts/workflow.py", "--package-release", str(final_archive)],
+            cwd=snapshot_root, env=check_environment, text=True,
+            capture_output=True, check=True,
+        ).stdout)
+        reconstructed.append({
+            "phase": "after",
+            "package_fingerprint": final_package["package_fingerprint"],
+            "git_commit": final_package["git_commit"],
+            "archive_sha256": _sha256(final_archive),
+        })
+        snapshot_dirty = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=snapshot_root, text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        if (
+            snapshot_dirty
+            or final_package["package_fingerprint"] != release_identity["package_fingerprint"]
+            or final_package["git_commit"] != head
+        ):
+            raise ValueError("Detached preflight snapshot changed while checks executed.")
+        result = {
+            "schema_version": "release-certification-preflight/v1",
+            "status": overall_status,
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "candidate": {**release_identity, "release_root": str(release_root.resolve())},
+            "snapshot": {
+                "git_commit": head,
+                "git_tree": subprocess.run(
+                    ["git", "rev-parse", "HEAD^{tree}"], cwd=snapshot_root,
+                    text=True, capture_output=True, check=True,
+                ).stdout.strip(),
+                "detached": subprocess.run(
+                    ["git", "symbolic-ref", "-q", "HEAD"], cwd=snapshot_root,
+                    text=True, capture_output=True, check=False,
+                ).returncode != 0,
+                "package_reconstructions": reconstructed,
+            },
+            "python_runtime": {
+                "version": sys.version,
+                "implementation": sys.implementation.name,
+                "executable_sha256": _sha256(Path(sys.executable).resolve()),
+            },
+            "repository_clean": True,
+            "producer": {
+                "path": "tests/hermes_e2e.py",
+                "sha256": _sha256(snapshot_root / "tests/hermes_e2e.py"),
+                "git_commit": head,
+            },
+            "checks": checks,
         }
-        if name == "layout_preservation_corpus":
-            item["coverage"] = list(CERTIFICATION_LAYOUT_COVERAGE)
-        elif name == "deterministic_branch_acceptance_corpus":
-            item["case_ids"] = list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
-            item["assurance"] = "recorded-drafting-structural-only"
-        elif name == "repository_regression_suite":
-            matches = re.findall(r"(\d+) passed", completed.stdout)
-            item["test_count"] = int(matches[-1]) if matches else 0
-        checks[name] = item
-        if completed.returncode != 0:
-            overall_status = "failed"
-            break
-    result = {
-        "schema_version": "release-certification-preflight/v1",
-        "status": overall_status,
-        "completed_at": datetime.now(timezone.utc).isoformat(),
-        "candidate": release_identity,
-        "python_runtime": {
-            "version": sys.version,
-            "implementation": sys.implementation.name,
-            "executable_sha256": _sha256(Path(sys.executable).resolve()),
-        },
-        "repository_clean": True,
-        "producer": {
-            "path": "tests/hermes_e2e.py",
-            "sha256": _sha256(Path(__file__)),
-            "git_commit": head,
-        },
-        "checks": checks,
-    }
-    evidence_path.parent.mkdir(parents=True, exist_ok=True)
-    evidence_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return result
+        result = candidate_workflow._sign_release_certification(
+            result, Path(signing_key),
+        )
+        evidence_path.parent.mkdir(parents=True, exist_ok=True)
+        evidence_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return result
+    finally:
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(snapshot_root)],
+            cwd=repository_root, capture_output=True, text=True, check=False,
+        )
+        shutil.rmtree(snapshot_parent, ignore_errors=True)
 
 
 def _contained_run_path(run_dir: Path, relative: Any) -> Path | None:
@@ -2015,13 +2158,8 @@ def _case_artifact_findings(
     ):
         findings.append("Recorded or synthetic producers cannot satisfy live drafting or verification gates.")
     derived_evidence["model_identifiers"] = sorted(model_identifiers)
-    expected_model_identifier = str(
-        ((fixture or {}).get("hermes_configuration") or {}).get("model_identifier") or ""
-    ).strip()
-    if not expected_model_identifier or model_identifiers != {expected_model_identifier}:
-        findings.append(
-            "Hermes drafting, verifier, and Desktop-parent producers do not all match the governed model identifier."
-        )
+    if not model_identifiers:
+        findings.append("Hermes drafting and verifier evidence must record actual producing model identifiers.")
     derived_evidence["visual_qa"] = derived_visual_qa
     approval = (actual_reference or {}).get("approval") or {}
     working_reference = _read_json(run_dir / "reference/study.reference.json") or {}
@@ -2277,6 +2415,12 @@ def _release_certification_evidence_bundle(
                     case_id=fixture_id, path=f"{prefix}/drafting/{index}-{kind}.json",
                 )
         verification = ((delivery_manifest.get("quality") or {}).get("verification_evidence") or {})
+        parent_record = report.get("parent_visual_review") or {}
+        if parent_record and parent_record.get("status") != "completed":
+            raise ValueError(f"Certification parent-review provenance is invalid: {fixture_id}")
+        parent_response_paths = {
+            str(path) for path in parent_record.get("response_paths") or []
+        }
         for evidence_id, evidence in verification.items():
             request = _contained_run_path(manifest_run_path.parent, evidence.get("request"))
             response = _contained_run_path(manifest_run_path.parent, evidence.get("response"))
@@ -2286,7 +2430,12 @@ def _release_certification_evidence_bundle(
                 f"{fixture_id}-{evidence_id}-request", "verification_request", source=request,
                 case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-request.json",
             )
-            response_kind = "verification_response" if evidence_id == "clinical_content_verification" else "parent_page_review"
+            if evidence_id == "clinical_content_verification":
+                response_kind = "verification_response"
+            elif str(evidence.get("response") or "") in parent_response_paths:
+                response_kind = "parent_page_review"
+            else:
+                response_kind = "delegated_page_review"
             add(
                 f"{fixture_id}-{evidence_id}-response", response_kind, source=response,
                 case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-response.json",
@@ -2313,11 +2462,12 @@ def _release_certification_evidence_bundle(
                         f"{fixture_id}-{artifact_name}-page-{page_number}", "page_image", source=page_path,
                         case_id=fixture_id, path=f"{prefix}/pages/{artifact_name}/page-{page_number}.png",
                     )
-        parent_marker = run_dir / "logs/desktop-parent-visual-review.json"
-        add(
-            f"{fixture_id}-parent-process-marker", "parent_process_marker", source=parent_marker,
-            case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
-        )
+        if parent_record:
+            add(
+                f"{fixture_id}-parent-process-marker", "parent_process_marker",
+                content=json.dumps(parent_record, sort_keys=True).encode("utf-8"),
+                case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
+            )
     total_bytes = sum(item["bytes"] for item in entries)
     if total_bytes > 128 * 1024 * 1024:
         raise ValueError("Certification evidence exceeds the governed bundle limit.")
@@ -2330,15 +2480,16 @@ def _release_certification_evidence_bundle(
     }
 
 
-def certify_release_corpus(
+def _reduce_release_certification_corpus(
     case_report_paths: Sequence[Path],
     *,
     release_root: Path,
     preflight_path: Path,
+    controller_report_sha256: Mapping[str, str],
     output_path: Path | None = None,
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
-    """Reduce three immutable real-Hermes case reports into one release decision."""
+    """Reduce case reports bound in memory by the sealed corpus controller."""
     certified_workflow, certified_identity = _certified_release(release_root.resolve())
     fixtures = {
         str(fixture["fixture_id"]): fixture
@@ -2371,15 +2522,44 @@ def certify_release_corpus(
         fixture = fixtures.get(fixture_id)
         case_findings: list[str] = []
         identity = report.get("release_identity") or {}
+        if report.get("certification_scope") != "production_single_case_tracer":
+            case_findings.append(
+                "Case report was not produced by the sealed production certification adapter."
+            )
+        if controller_report_sha256.get(str(path)) != _sha256(path):
+            case_findings.append(
+                "Case report is not byte-bound to the sealed production corpus controller."
+            )
+        managed_identity = identity.get("managed_hermes_identity")
         identities.append({
             "package_fingerprint": identity.get("package_fingerprint"),
             "git_commit": identity.get("git_commit"),
+            "managed_hermes_identity": (
+                dict(managed_identity) if isinstance(managed_identity, Mapping) else {}
+            ),
         })
         if any(
             identities[-1].get(key) != certified_identity.get(key)
             for key in ("package_fingerprint", "git_commit")
         ):
             case_findings.append("Case report identity does not match the immutable candidate.")
+        managed = identities[-1]["managed_hermes_identity"]
+        if (
+            set(managed) != {
+                "launcher", "launcher_sha256", "interpreter",
+                "interpreter_target", "interpreter_target_sha256",
+            }
+            or any(
+                not isinstance(managed.get(key), str)
+                or not Path(str(managed.get(key))).is_absolute()
+                for key in ("launcher", "interpreter", "interpreter_target")
+            )
+            or any(
+                re.fullmatch(r"[0-9a-f]{64}", str(managed.get(key) or "")) is None
+                for key in ("launcher_sha256", "interpreter_target_sha256")
+            )
+        ):
+            case_findings.append("Case managed Hermes launcher and interpreter identity is incomplete.")
         if fixture is None:
             case_findings.append("Case is not part of the declared Release Certification Corpus.")
         else:
@@ -2487,7 +2667,9 @@ def certify_release_corpus(
         for identity in identities
     }
     if len(distinct_identities) != 1 or not identities or not all(identities[0].values()):
-        findings.append("All real cases must bind the same complete candidate commit and package fingerprint.")
+        findings.append(
+            "All real cases must bind the same complete candidate, launcher, and interpreter identity."
+        )
     release_identity = identities[0] if len(distinct_identities) == 1 and identities else {}
     preflight, preflight_findings = _preflight_evidence(
         preflight_path.resolve(),
@@ -2527,11 +2709,32 @@ def certify_release_corpus(
     return result
 
 
+def certify_release_corpus(
+    case_report_paths: Sequence[Path],
+    *,
+    release_root: Path,
+    preflight_path: Path,
+    output_path: Path | None = None,
+    fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
+) -> dict[str, Any]:
+    """Fail closed when reports were not captured by the sealed corpus controller."""
+    return _reduce_release_certification_corpus(
+        case_report_paths,
+        release_root=release_root,
+        preflight_path=preflight_path,
+        controller_report_sha256={},
+        output_path=output_path,
+        fixture_root=fixture_root,
+    )
+
+
 def run_release_certification_corpus(
     *,
     release_root: Path,
     run_root: Path,
     preflight_path: Path,
+    desktop_opener: Callable[[str], bytes],
+    desktop_parent_reviewer: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None],
     operation_id: str = "release-corpus",
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
@@ -2567,6 +2770,7 @@ def run_release_certification_corpus(
     attempt_root = run_root / attempt_id
     attempt_root.mkdir()
     report_paths: list[Path] = []
+    controller_report_sha256: dict[str, str] = {}
     for fixture in fixtures:
         fixture_id = str(fixture["fixture_id"])
         run_dir = attempt_root / fixture_id
@@ -2579,27 +2783,20 @@ def run_release_certification_corpus(
         report = run_release_certification_operation(
             run_dir,
             release_root=release_root,
+            preflight_evidence=preflight_path,
             operation_id=f"{operation_id}-{fixture_id}",
             hermes_configuration=fixture["hermes_configuration"],
-            parent_visual_reviewer=lambda handoffs, remaining, validator, current=run_dir: wait_for_parent_visual_review(
-                current,
+            desktop_opener=desktop_opener,
+            parent_visual_reviewer=lambda handoffs, remaining, _validator, current=run_dir, configuration=fixture["hermes_configuration"]: desktop_parent_reviewer(
                 handoffs,
                 remaining,
-                response_is_complete=validator,
-                model_identifier=str(fixture["hermes_configuration"]["model_identifier"]),
-                progress=lambda stage, available: _append_json_line(
-                    current / "logs/hermes-integration-events.jsonl",
-                    {
-                        "at": datetime.now(timezone.utc).isoformat(),
-                        "status": "running",
-                        "stage": stage,
-                        "remaining_seconds": round(available, 3),
-                    },
-                ),
+                current / "revisions" / str(((_read_json(current / "reference/study.reference.json") or {}).get("approval") or {}).get("revision_id") or ""),
+                configuration,
             ),
         )
         report_path = run_dir / "logs/hermes-integration-report.json"
         report_paths.append(report_path)
+        controller_report_sha256[str(report_path.resolve())] = _sha256(report_path.resolve())
         try:
             elapsed = float(
                 (report.get("approval_to_confirmed_retrieval_evidence") or {}).get("elapsed_seconds")
@@ -2613,10 +2810,11 @@ def run_release_certification_corpus(
             or _certification_runtime_exceeded(fixture_id, elapsed)
         ):
             break
-    return certify_release_corpus(
+    return _reduce_release_certification_corpus(
         report_paths,
         release_root=release_root,
         preflight_path=preflight_path,
+        controller_report_sha256=controller_report_sha256,
         output_path=attempt_root / "release-certification-corpus.json",
         fixture_root=fixture_root,
     )
@@ -2633,6 +2831,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--corpus", action="store_true", help="run the complete three-case Release Certification Corpus sequentially")
     parser.add_argument("--run-preflight", action="store_true", help="execute and record the governed checks required before --corpus")
     parser.add_argument("--preflight-evidence", type=Path, help="bound passing deterministic/static/regression evidence required before --corpus")
+    parser.add_argument("--desktop-opener-command", type=Path, help="absolute external Desktop opener command; receives one attachment path and emits exact retrieved bytes")
+    parser.add_argument("--parent-visual-review-command", type=Path, help="absolute external Desktop-parent visual-review command")
     args = parser.parse_args(argv)
     run_dir = args.run_root / datetime.now(timezone.utc).strftime(
         f"{args.fixture}-%Y%m%dT%H%M%SZ"
@@ -2647,6 +2847,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if report["status"] == "passed" else 1
+    if args.desktop_opener_command is None:
+        parser.error("--desktop-opener-command is required for live certification")
+    if args.preflight_evidence is None:
+        parser.error("--preflight-evidence is required for live certification")
+    if args.parent_visual_review_command is None:
+        parser.error("--parent-visual-review-command is required for live certification")
+    candidate_workflow, _candidate_identity = _certified_release(release_root)
+    desktop_opener = candidate_workflow.command_desktop_opener(args.desktop_opener_command)
+    desktop_parent_reviewer = candidate_workflow.command_parent_visual_reviewer(
+        args.parent_visual_review_command
+    )
     if args.corpus:
         if args.preflight_evidence is None:
             parser.error("--preflight-evidence is required with --corpus")
@@ -2654,6 +2865,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             release_root=release_root,
             run_root=args.run_root,
             preflight_path=args.preflight_evidence,
+            desktop_opener=desktop_opener,
+            desktop_parent_reviewer=desktop_parent_reviewer,
             operation_id=args.operation_id,
         )
         print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -2667,23 +2880,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     report = run_release_certification_operation(
         run_dir,
         release_root=release_root,
+        preflight_evidence=args.preflight_evidence,
         operation_id=args.operation_id,
         hermes_configuration=fixture["hermes_configuration"],
-        parent_visual_reviewer=lambda handoffs, remaining, validator: wait_for_parent_visual_review(
-            run_dir,
+        desktop_opener=desktop_opener,
+        parent_visual_reviewer=lambda handoffs, remaining, _validator: desktop_parent_reviewer(
             handoffs,
             remaining,
-            response_is_complete=validator,
-            model_identifier=str(fixture["hermes_configuration"]["model_identifier"]),
-            progress=lambda stage, available: _append_json_line(
-                run_dir / "logs/hermes-integration-events.jsonl",
-                {
-                    "at": datetime.now(timezone.utc).isoformat(),
-                    "status": "running",
-                    "stage": stage,
-                    "remaining_seconds": round(available, 3),
-                },
-            ),
+            run_dir / "revisions" / str(((_read_json(run_dir / "reference/study.reference.json") or {}).get("approval") or {}).get("revision_id") or ""),
+            fixture["hermes_configuration"],
         ),
     )
     print(json.dumps(report, indent=2, ensure_ascii=False))

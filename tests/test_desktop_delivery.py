@@ -1,6 +1,13 @@
 import json
+import os
 from pathlib import Path
+import shutil
+import signal
+import socket
+import socketserver
 import subprocess
+import sys
+import threading
 
 import pytest
 
@@ -192,6 +199,978 @@ def test_desktop_operation_persists_governed_identity_attempts_timings_and_clean
     assert state["cleanup"] == {"owned_processes_reaped": True}
     assert state["result"] == result
     assert cleanups == ["passed"]
+
+
+def test_shipped_production_adapter_drives_actual_desktop_operation(tmp_path, monkeypatch):
+    branch_manifest = {
+        "status": "passed",
+        "client_outputs": [{
+            **_manifest()["client_outputs"][0],
+            "path": "output/protocol.docx",
+        }],
+    }
+    handoff = {
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+    }
+    results = iter([
+        {"status": "awaiting_hermes", "stage": "drafting", "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "passed", "stage": "delivery", "manifest": "revisions/r1/delivery-manifest.json"},
+    ])
+    manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(json.dumps(branch_manifest), encoding="utf-8")
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({
+        "meta": {"study_type": "Retrospective"},
+        "approval": {"status": "approved", "revision_id": "r1"},
+    }), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "production-candidate",
+        "git_commit": None,
+        "source": "shipped_production_adapter",
+    })
+    dispatched = []
+
+    def dispatch(handoffs, remaining_seconds, revision_dir, configuration, **_kwargs):
+        assert remaining_seconds > 0
+        assert revision_dir == tmp_path / "revisions/r1"
+        assert configuration["safe_mode"] is True
+        dispatched.extend(handoff["task"] for handoff in handoffs)
+
+    monkeypatch.setattr(workflow, "_production_dispatch_handoffs", dispatch)
+    result = workflow.run_production_desktop_operation(
+        tmp_path,
+        opener=lambda _path: b"1234",
+        release_identity={"package_fingerprint": "production-candidate"},
+    )
+
+    assert result["status"] == "passed", result
+    assert result["stage"] == "desktop_delivery"
+    assert result["delivery"]["confirmed"] is True
+    assert dispatched == ["section_drafting"]
+
+
+def test_production_verifier_relies_on_parent_validation_without_terminal_consent(tmp_path):
+    prompt = workflow._production_agent_prompt(
+        tmp_path / "skill",
+        tmp_path / "revision",
+        {
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "task": "rendered_page_visual_verification",
+        },
+        {},
+        workspace_root=tmp_path,
+    )
+
+    assert "The Desktop parent validates it automatically" in prompt
+    assert "Return the exact response JSON as your final answer" in prompt
+    assert "Do not call write_file, patch, or terminal to publish the response" in prompt
+    assert "/usr/bin/python3 -c" not in prompt
+
+
+def test_production_parent_publishes_bound_quiet_stdout_response(tmp_path):
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/requests/draft.json"
+    response_path = revision_dir / "hermes/responses/draft.json"
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-request/v2",
+        "request_id": "draft-1",
+        "request_sha256": "a" * 64,
+        "revision_id": "r1",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+    }
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": "hermes-response/v2",
+        "request_id": "draft-1",
+        "request_sha256": "a" * 64,
+        "revision_id": "r1",
+        "task": "section_drafting",
+        "batch_id": "protocol-foundations",
+        "producer": {"model_id": "test-model"},
+        "section_results": [],
+    }
+    stdout_log = tmp_path / "worker.stdout.log"
+    stdout_log.write_text(
+        "session_id: test-session\n" + json.dumps(response, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    handoff = {
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+    }
+
+    assert workflow._production_publish_quiet_response(
+        revision_dir,
+        handoff,
+        stdout_log,
+    ) is True
+    assert json.loads(response_path.read_text(encoding="utf-8")) == response
+
+
+def test_production_verifier_prompt_includes_layout_preservation_notes(tmp_path):
+    prompt = workflow._production_agent_prompt(
+        tmp_path / "skill",
+        tmp_path / "revision",
+        {
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "task": "rendered_page_visual_verification",
+        },
+        {
+            "layout_preservation_notes": [
+                "Keep Section 15 and its assessment table together on the following page.",
+            ],
+        },
+        workspace_root=tmp_path,
+    )
+
+    assert "Keep Section 15 and its assessment table together on the following page." in prompt
+
+
+def test_production_adapter_uses_unpromoted_runtime_only_for_verified_certification_candidate(
+    tmp_path, monkeypatch,
+):
+    skill_root = tmp_path / "isolated-home/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "certification-candidate",
+        "git_commit": "candidate-commit",
+        "source": "shipped_production_adapter",
+    })
+    integrity_calls = []
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda root, **options: integrity_calls.append((root, options)) or {"status": "passed"},
+    )
+    monkeypatch.setattr(
+        workflow,
+        "run_desktop_operation",
+        lambda _run_dir, **options: {"status": "passed", "options": options},
+    )
+    preflight = tmp_path / "evidence/preflight.json"
+    preflight.parent.mkdir()
+    unsigned_preflight = {
+        "schema_version": "release-certification-preflight/v1",
+        "status": "passed",
+        "repository_clean": True,
+        "candidate": {
+            "package_fingerprint": "certification-candidate",
+            "git_commit": "candidate-commit",
+            "release_root": str(skill_root.resolve()),
+        },
+        "producer": {
+            "path": "tests/hermes_e2e.py",
+            "git_commit": "candidate-commit",
+        },
+        "checks": {
+            name: {"status": "passed", "returncode": 0}
+            for name in (
+                "static_release_checks", "layout_preservation_corpus",
+                "deterministic_branch_acceptance_corpus", "repository_regression_suite",
+            )
+        },
+    }
+    signing_key_path = Path(__file__).parent / "fixtures/test-certification-signing-key.json"
+    signing_key = json.loads(signing_key_path.read_text(encoding="utf-8"))
+    public_key = {
+        key: value for key, value in signing_key.items()
+        if key != "private_exponent"
+    }
+    public_key_path = skill_root / workflow.RELEASE_CERTIFICATION_PUBLIC_KEY
+    public_key_path.parent.mkdir(parents=True)
+    public_key_path.write_text(json.dumps(public_key), encoding="utf-8")
+    monkeypatch.setattr(
+        workflow, "RELEASE_CERTIFICATION_TRUSTED_KEY_ID",
+        workflow.release_certification_key_id(public_key),
+    )
+    preflight.write_text(json.dumps(
+        workflow._sign_release_certification(unsigned_preflight, signing_key_path)
+    ), encoding="utf-8")
+
+    result = workflow.run_production_desktop_operation(
+        tmp_path / "run",
+        opener=lambda _path: b"unused",
+        release_identity={
+            "package_fingerprint": "certification-candidate",
+            "git_commit": "candidate-commit",
+        },
+        skill_root=skill_root,
+        certification_preflight=preflight,
+    )
+
+    assert integrity_calls == [(skill_root.resolve(), {"require_promoted_runtime": False})]
+    assert result["options"]["require_promoted_runtime"] is False
+    managed_identity = result["options"]["release_identity"]["managed_hermes_identity"]
+    assert len(managed_identity["launcher_sha256"]) == 64
+    assert len(managed_identity["interpreter_target_sha256"]) == 64
+
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda *_args, **_kwargs: {
+            "status": "blocked",
+            "finding": {"code": "renderer.pdfium_runtime_file_changed"},
+        },
+    )
+    with pytest.raises(ValueError, match="verified provisioned certification candidate"):
+        workflow.run_production_desktop_operation(
+            tmp_path / "run",
+            opener=lambda _path: b"unused",
+            release_identity={
+                "package_fingerprint": "certification-candidate",
+                "git_commit": "candidate-commit",
+            },
+            skill_root=skill_root,
+            certification_preflight=preflight,
+        )
+
+    rebound = json.loads(preflight.read_text())
+    rebound["candidate"]["release_root"] = str(
+        tmp_path / "copied-home/skills/clinical-document-generation"
+    )
+    preflight.write_text(json.dumps(rebound), encoding="utf-8")
+    with pytest.raises(ValueError, match="lifecycle-owned preflight"):
+        workflow.run_production_desktop_operation(
+            tmp_path / "run",
+            opener=lambda _path: b"unused",
+            release_identity={
+                "package_fingerprint": "certification-candidate",
+                "git_commit": "candidate-commit",
+            },
+            skill_root=skill_root,
+            certification_preflight=preflight,
+        )
+
+
+def test_production_adapter_allows_explicit_manual_review_on_verified_unpromoted_candidate(
+    tmp_path, monkeypatch,
+):
+    skill_root = tmp_path / "isolated-home/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "manual-review-candidate",
+        "git_commit": "candidate-commit",
+        "source": "shipped_production_adapter",
+    })
+    integrity_calls = []
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda root, **options: integrity_calls.append((root, options)) or {"status": "passed"},
+    )
+    monkeypatch.setattr(
+        workflow,
+        "run_desktop_operation",
+        lambda _run_dir, **options: {"status": "passed", "options": options},
+    )
+
+    result = workflow.run_production_desktop_operation(
+        tmp_path / "run",
+        opener=lambda _path: b"unused",
+        release_identity={
+            "package_fingerprint": "manual-review-candidate",
+            "git_commit": "candidate-commit",
+        },
+        skill_root=skill_root,
+        manual_review=True,
+    )
+
+    assert integrity_calls == [(skill_root.resolve(), {"require_promoted_runtime": False})]
+    assert result["options"]["require_promoted_runtime"] is False
+    assert result["options"]["release_identity"]["manual_review"] is True
+    assert result["review_mode"] == "manual_pre_release"
+
+
+def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp_path, monkeypatch):
+    hermes_home = tmp_path / "isolated-home"
+    skill_root = hermes_home / "skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    monkeypatch.setenv("HOME", "/ambient/home")
+    monkeypatch.setenv("HERMES_HOME", "/ambient/hermes")
+    monkeypatch.setenv("PYTHONPATH", "/ambient/python")
+    monkeypatch.setenv("PATH", "/ambient/editable/bin")
+    monkeypatch.setenv("DEVELOPMENT_CHECKOUT", "/ambient/editable/checkout")
+
+    environment = workflow._production_subprocess_environment(skill_root)
+
+    assert environment["HOME"] == str(hermes_home.resolve())
+    assert environment["HERMES_HOME"] == str(hermes_home.resolve())
+    assert "PYTHONPATH" not in environment
+    assert "DEVELOPMENT_CHECKOUT" not in environment
+    assert environment["PATH"] == "/usr/bin:/bin:/usr/sbin:/sbin"
+    assert environment["TMPDIR"] == str(hermes_home.resolve() / ".tmp")
+    assert environment["XDG_CACHE_HOME"] == str(hermes_home.resolve() / ".cache")
+
+    linked_root = hermes_home / "skills/linked-clinical-document-generation"
+    linked_root.symlink_to(skill_root, target_is_directory=True)
+    with pytest.raises(ValueError, match="non-symlinked"):
+        workflow._production_subprocess_environment(linked_root)
+
+    real_home = tmp_path / "real-home"
+    (real_home / "skills/clinical-document-generation").mkdir(parents=True)
+    linked_home = tmp_path / "linked-home"
+    linked_home.symlink_to(real_home, target_is_directory=True)
+    with pytest.raises(ValueError, match="non-symlinked"):
+        workflow._production_subprocess_environment(
+            linked_home / "skills/clinical-document-generation"
+        )
+
+
+def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypatch):
+    account_home = tmp_path / "account"
+    launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    (launcher.parent / "python").symlink_to(Path(sys.executable))
+    attacker = tmp_path / "attacker/bin"
+    attacker.mkdir(parents=True)
+    monkeypatch.setenv("PATH", str(attacker))
+    monkeypatch.setattr(
+        workflow.pwd, "getpwuid", lambda _uid: type("Account", (), {"pw_dir": str(account_home)})(),
+    )
+
+    selected_launcher, selected_python = workflow._managed_hermes_pair()
+
+    assert selected_launcher == launcher
+    assert selected_python == launcher.parent / "python"
+    assert workflow._production_sandbox_executable() == Path("/usr/bin/sandbox-exec")
+    identity = workflow._managed_hermes_identity()
+    assert identity["launcher"] == str(launcher)
+    assert len(identity["launcher_sha256"]) == 64
+    assert identity["interpreter"] == str(launcher.parent / "python")
+    assert len(identity["interpreter_target_sha256"]) == 64
+    launcher.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    assert workflow._managed_hermes_identity() != identity
+
+
+def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    run_dir = tmp_path / "run"
+    unrelated = tmp_path / "unrelated-checkout"
+    authentication_path = tmp_path / "account/.hermes/auth.json"
+    skill_root.mkdir(parents=True)
+    unrelated.mkdir()
+    captured = {}
+    monkeypatch.setattr(workflow.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(workflow, "_production_sandbox_executable", lambda: Path("/usr/bin/sandbox-exec"))
+    monkeypatch.setattr(workflow, "_production_authentication_path", lambda: authentication_path)
+    monkeypatch.setattr(
+        workflow, "_managed_hermes_pair",
+        lambda: (Path("/managed/hermes/venv/bin/hermes"), Path(sys.executable)),
+    )
+
+    def stop(command, **kwargs):
+        captured["command"] = command
+        captured["cwd"] = kwargs["cwd"]
+        captured["environment"] = kwargs["env"]
+        captured["profile_path"] = tmp_path / "captured-production-profile.sb"
+        shutil.copyfile(command[2], captured["profile_path"])
+        captured["profile"] = captured["profile_path"].read_text(encoding="utf-8")
+        raise RuntimeError("probe complete")
+
+    real_popen = subprocess.Popen
+    monkeypatch.setattr(workflow.subprocess, "Popen", stop)
+    with pytest.raises(RuntimeError, match="probe complete"):
+        workflow._production_dispatch_handoffs(
+            [{"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"}],
+            30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
+            skill_root=skill_root, run_dir=run_dir,
+            runtime_identity={"executable": sys.executable},
+        )
+
+    assert captured["command"][0] == "/usr/bin/sandbox-exec"
+    assert captured["cwd"] == run_dir
+    assert "-Q" in captured["command"]
+    assert "--safe-mode" in captured["command"]
+    assert "--skills" not in captured["command"]
+    prompt = next(part for part in captured["command"] if part.startswith("Complete one isolated"))
+    assert str(skill_root.resolve()) not in prompt
+    assert str((run_dir / "revision").resolve()) not in prompt
+    assert "profile/skills/clinical-document-generation/SKILL.md" in prompt
+    assert "revision/hermes/requests/a.json" in prompt
+    assert "revision/hermes/responses/a.json" in prompt
+    assert "deny file-read*" in captured["profile"]
+    read_rules = "\n".join(
+        line for line in captured["profile"].splitlines() if "deny file-read*" in line
+    )
+    allow_rules = "\n".join(
+        line for line in captured["profile"].splitlines() if "allow file-read*" in line
+    )
+    assert str(skill_root.resolve()) not in read_rules
+    assert str(run_dir.resolve()) not in read_rules
+    assert str(tmp_path.resolve()) in read_rules
+    assert str(skill_root.resolve()) in allow_rules
+    assert str(run_dir.resolve()) in allow_rules
+    assert f'(literal "{authentication_path}")' in allow_rules
+    assert f'(subpath "{authentication_path.parent}")' not in allow_rules
+    assert f'(deny file-write* (literal "{authentication_path}"))' in captured["profile"]
+    assert str(unrelated.resolve()) not in allow_rules
+    assert "(deny network*)" in captured["profile"]
+    proxy_url = captured["environment"]["HTTPS_PROXY"]
+    assert proxy_url.startswith("http://127.0.0.1:")
+    assert captured["environment"]["HTTP_PROXY"] == proxy_url
+    assert captured["environment"]["ALL_PROXY"] == proxy_url
+    assert captured["environment"]["NO_PROXY"] == ""
+    assert f'(remote tcp "localhost:{proxy_url.rsplit(":", 1)[1]}")' in captured["profile"]
+    monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
+    completed = subprocess.run(
+        ["/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/true"],
+        capture_output=True, check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+    response_dir = run_dir / "revision/hermes/responses"
+    response_dir.mkdir(parents=True)
+    relative_response = "revision/hermes/responses/probe.json"
+    allowed_write = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+            "/usr/bin/python3", "-c",
+            f"from pathlib import Path; Path({relative_response!r}).write_text('passed')",
+        ],
+        cwd=run_dir, capture_output=True, check=False,
+    )
+    assert allowed_write.returncode == 0, allowed_write.stderr
+    assert (run_dir / relative_response).read_text(encoding="utf-8") == "passed"
+    denied_skill_write = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+            "/usr/bin/python3", "-c",
+            "from pathlib import Path; Path('profile/skills/clinical-document-generation/probe').write_text('blocked')",
+        ],
+        cwd=tmp_path, capture_output=True, check=False,
+    )
+    assert denied_skill_write.returncode != 0
+    assert not (skill_root / "probe").exists()
+    denied_file = unrelated / "created-after-profile"
+    denied_file.write_text("denied", encoding="utf-8")
+    denied = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+            "/bin/cat", str(denied_file),
+        ],
+        capture_output=True,
+        check=False,
+    )
+    assert denied.returncode != 0
+    captured["profile_path"].unlink(missing_ok=True)
+
+
+def test_production_connect_proxy_relays_only_the_governed_target():
+    class EchoHandler(socketserver.BaseRequestHandler):
+        def handle(self):
+            while payload := self.request.recv(4096):
+                self.request.sendall(payload)
+
+    upstream = socketserver.ThreadingTCPServer(("127.0.0.1", 0), EchoHandler)
+    upstream_thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    upstream_thread.start()
+    proxy = workflow._start_production_connect_proxy(
+        "127.0.0.1", int(upstream.server_address[1]),
+    )
+    try:
+        with socket.create_connection(("127.0.0.1", proxy.port), timeout=2.0) as client:
+            target = f"127.0.0.1:{upstream.server_address[1]}"
+            client.sendall(f"CONNECT {target} HTTP/1.1\r\nHost: {target}\r\n\r\n".encode("ascii"))
+            assert client.recv(4096).startswith(b"HTTP/1.1 200")
+            client.sendall(b"governed-relay")
+            assert client.recv(4096) == b"governed-relay"
+        with socket.create_connection(("127.0.0.1", proxy.port), timeout=2.0) as client:
+            client.sendall(b"CONNECT example.com:443 HTTP/1.1\r\n\r\n")
+            assert client.recv(4096).startswith(b"HTTP/1.1 403")
+    finally:
+        proxy.close()
+        upstream.shutdown()
+        upstream.server_close()
+        upstream_thread.join(timeout=5.0)
+
+
+def test_production_connect_proxy_attempts_every_close_after_shutdown_failure():
+    calls = []
+
+    class FakeServer:
+        server_address = ("127.0.0.1", 43100)
+
+        def shutdown(self):
+            calls.append("shutdown")
+            raise RuntimeError("shutdown failed")
+
+        def server_close(self):
+            calls.append("server_close")
+
+    class FakeThread:
+        def join(self, timeout=None):
+            calls.append(("join", timeout))
+
+        def is_alive(self):
+            return True
+
+    proxy = workflow._ProductionConnectProxy(FakeServer(), FakeThread())
+
+    with pytest.raises(RuntimeError, match="could not be fully closed"):
+        proxy.close()
+
+    assert calls == ["shutdown", "server_close", ("join", 5.0)]
+
+
+def test_production_connect_proxy_treats_peer_reset_as_normal_close(monkeypatch):
+    class FakeClient:
+        def __init__(self):
+            self.reads = 0
+
+        def settimeout(self, _timeout):
+            pass
+
+        def recv(self, _size):
+            self.reads += 1
+            if self.reads == 1:
+                return b"CONNECT chatgpt.com:443 HTTP/1.1\r\n\r\n"
+            raise ConnectionResetError("peer closed")
+
+        def sendall(self, _payload):
+            pass
+
+    class FakeUpstream:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            pass
+
+        def settimeout(self, _timeout):
+            pass
+
+        def recv(self, _size):
+            return b""
+
+        def sendall(self, _payload):
+            pass
+
+    client = FakeClient()
+    server = object.__new__(workflow._ProductionConnectProxyServer)
+    server.governed_host = "chatgpt.com"
+    server.governed_port = 443
+    monkeypatch.setattr(workflow.socket, "create_connection", lambda *_args, **_kwargs: FakeUpstream())
+    monkeypatch.setattr(workflow.select, "select", lambda *_args, **_kwargs: ([client], (), ()))
+
+    workflow._ProductionConnectProxyHandler(client, ("127.0.0.1", 12345), server)
+
+    assert client.reads == 2
+
+
+def test_production_connect_proxy_closes_listener_when_thread_construction_fails(monkeypatch):
+    calls = []
+
+    class FakeServer:
+        def __init__(self, host, port):
+            calls.append(("server", host, port))
+
+        def serve_forever(self):
+            raise AssertionError("must not run")
+
+        def server_close(self):
+            calls.append("server_close")
+
+    class FakeThread:
+        def __init__(self, **_kwargs):
+            calls.append("thread_constructor")
+            raise RuntimeError("thread construction failed")
+
+    monkeypatch.setattr(workflow, "_ProductionConnectProxyServer", FakeServer)
+    monkeypatch.setattr(workflow.threading, "Thread", FakeThread)
+
+    with pytest.raises(RuntimeError, match="thread construction failed"):
+        workflow._start_production_connect_proxy()
+
+    assert calls == [
+        ("server", workflow.PRODUCTION_HERMES_NETWORK_HOST, workflow.PRODUCTION_HERMES_NETWORK_PORT),
+        "thread_constructor",
+        "server_close",
+    ]
+
+
+def test_production_connect_proxy_closes_listener_when_thread_start_fails(monkeypatch):
+    calls = []
+
+    class FakeServer:
+        def __init__(self, host, port):
+            calls.append(("server", host, port))
+
+        def serve_forever(self):
+            raise AssertionError("must not run")
+
+        def shutdown(self):
+            calls.append("shutdown")
+
+        def server_close(self):
+            calls.append("server_close")
+
+    class FakeThread:
+        def __init__(self, **kwargs):
+            calls.append(("thread", kwargs["daemon"]))
+            self.alive = False
+
+        def start(self):
+            self.alive = True
+            raise RuntimeError("thread start failed")
+
+        def join(self, timeout=None):
+            calls.append(("join", timeout))
+            self.alive = False
+
+        def is_alive(self):
+            return self.alive
+
+    monkeypatch.setattr(workflow, "_ProductionConnectProxyServer", FakeServer)
+    monkeypatch.setattr(workflow.threading, "Thread", FakeThread)
+
+    with pytest.raises(RuntimeError, match="thread start failed"):
+        workflow._start_production_connect_proxy()
+
+    assert calls == [
+        ("server", workflow.PRODUCTION_HERMES_NETWORK_HOST, workflow.PRODUCTION_HERMES_NETWORK_PORT),
+        ("thread", True),
+        "shutdown",
+        "server_close",
+        ("join", 5.0),
+    ]
+
+
+def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_path, monkeypatch):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    run_dir = tmp_path / "run"
+    launcher = tmp_path / "managed/hermes/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    managed_python = launcher.parent / "python"
+    managed_python.symlink_to(Path(sys.executable).resolve())
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_managed_hermes_pair", lambda: (launcher, managed_python))
+
+    class FakeProxy:
+        def __init__(self, port, *, fail=False):
+            self.port = port
+            self.closed = False
+            self.fail = fail
+
+        def close(self):
+            self.closed = True
+            if self.fail:
+                raise RuntimeError("proxy close failed")
+
+    created_proxies = [
+        FakeProxy(43101, fail=True), FakeProxy(43102), FakeProxy(43103),
+    ]
+    pending_proxies = iter(created_proxies)
+    monkeypatch.setattr(
+        workflow, "_start_production_connect_proxy", lambda: next(pending_proxies),
+    )
+
+    class FakeProcess:
+        def __init__(self, pid, *, fail_first_wait=False):
+            self.pid = pid
+            self.returncode = None
+            self.wait_calls = 0
+            self.fail_first_wait = fail_first_wait
+
+        def poll(self):
+            return self.returncode
+
+        def wait(self, timeout=None):
+            self.wait_calls += 1
+            if self.fail_first_wait and self.wait_calls == 1:
+                raise PermissionError("wait denied")
+            self.returncode = -signal.SIGKILL
+            return self.returncode
+
+    processes = [FakeProcess(987654, fail_first_wait=True), FakeProcess(987655)]
+    calls = []
+    profile_paths = []
+
+    def popen(command, **_kwargs):
+        calls.append(command)
+        profile_paths.append(Path(command[2]))
+        if len(calls) <= 2:
+            return processes[len(calls) - 1]
+        raise RuntimeError("third launch failed")
+
+    killed = []
+
+    def killpg(pid, sig):
+        killed.append((pid, sig))
+        if pid == processes[0].pid and sig == signal.SIGTERM:
+            raise PermissionError("term denied")
+
+    monkeypatch.setattr(workflow.subprocess, "Popen", popen)
+    monkeypatch.setattr(workflow.os, "killpg", killpg)
+
+    with pytest.raises(RuntimeError, match="third launch failed"):
+        workflow._production_dispatch_handoffs(
+            [
+                {"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"},
+                {"request_path": "hermes/requests/b.json", "response_path": "hermes/responses/b.json"},
+                {"request_path": "hermes/requests/c.json", "response_path": "hermes/responses/c.json"},
+            ],
+            30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
+            skill_root=skill_root, run_dir=run_dir,
+            runtime_identity={"executable": "/usr/bin/python3"},
+        )
+
+    assert len(created_proxies) == 3
+    assert all(proxy.closed for proxy in created_proxies)
+    assert [process.wait_calls for process in processes] == [2, 1]
+    assert killed == [
+        (processes[0].pid, signal.SIGTERM),
+        (processes[0].pid, signal.SIGKILL),
+        (processes[1].pid, signal.SIGTERM),
+    ]
+    assert all(not path.exists() for path in profile_paths)
+
+
+def test_production_profile_write_failure_closes_proxy_and_removes_profile(tmp_path, monkeypatch):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    run_dir = tmp_path / "run"
+    launcher = tmp_path / "managed/hermes/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    managed_python = launcher.parent / "python"
+    managed_python.symlink_to(Path(sys.executable).resolve())
+    skill_root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_managed_hermes_pair", lambda: (launcher, managed_python))
+
+    profile_path = tmp_path / "failed-profile.sb"
+
+    class FailingProfile:
+        name = str(profile_path)
+        closed = False
+
+        def write(self, _text):
+            profile_path.write_text("partial", encoding="utf-8")
+            raise RuntimeError("profile write failed")
+
+        def close(self):
+            self.closed = True
+            raise RuntimeError("profile close failed")
+
+    class FakeProxy:
+        port = 43103
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    profile = FailingProfile()
+    proxy = FakeProxy()
+    monkeypatch.setattr(workflow.tempfile, "NamedTemporaryFile", lambda *_args, **_kwargs: profile)
+    monkeypatch.setattr(workflow, "_start_production_connect_proxy", lambda: proxy)
+
+    with pytest.raises(RuntimeError, match="profile write failed"):
+        workflow._production_dispatch_handoffs(
+            [{"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"}],
+            30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
+            skill_root=skill_root, run_dir=run_dir,
+            runtime_identity={"executable": "/usr/bin/python3"},
+        )
+
+    assert profile.closed is True
+    assert proxy.closed is True
+    assert not profile_path.exists()
+
+
+def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, monkeypatch):
+    probe_root = Path("/private/tmp") / f"issue56-managed-sandbox-{os.getpid()}"
+    shutil.rmtree(probe_root, ignore_errors=True)
+    skill_root = probe_root / "profile/skills/clinical-document-generation"
+    run_dir = probe_root / "run"
+    launcher = probe_root / "managed/hermes/venv/bin/hermes"
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text("#!/bin/sh\n", encoding="utf-8")
+    launcher.chmod(0o700)
+    managed_python = launcher.parent / "python"
+    managed_python.symlink_to(Path(sys.executable).resolve())
+    skill_root.mkdir(parents=True)
+    captured = {}
+    monkeypatch.setattr(
+        workflow, "_managed_hermes_pair", lambda: (launcher, managed_python),
+    )
+    real_popen = subprocess.Popen
+
+    def stop(command, **_kwargs):
+        captured["profile_path"] = probe_root / "captured-production-profile.sb"
+        shutil.copyfile(command[2], captured["profile_path"])
+        raise RuntimeError("probe complete")
+
+    monkeypatch.setattr(workflow.subprocess, "Popen", stop)
+    try:
+        with pytest.raises(RuntimeError, match="probe complete"):
+            workflow._production_dispatch_handoffs(
+                [{
+                    "request_path": "hermes/requests/a.json",
+                    "response_path": "hermes/responses/a.json",
+                }],
+                30.0,
+                run_dir / "revision",
+                workflow.CERTIFIED_HERMES_CONFIGURATION,
+                skill_root=skill_root,
+                run_dir=run_dir,
+                runtime_identity={"executable": "/usr/bin/python3"},
+            )
+        monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
+        assert captured["profile_path"].stat().st_size <= 65_535
+        unrelated_home_file = Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt"
+        unrelated_private_tmp = Path("/private/tmp") / f"issue56-sandbox-denied-{os.getpid()}.txt"
+        unrelated_mac_tmp = tmp_path / "created-after-profile.txt"
+        for sentinel in (unrelated_home_file, unrelated_private_tmp, unrelated_mac_tmp):
+            sentinel.write_text("denied", encoding="utf-8")
+
+        for interpreter in (managed_python, managed_python.resolve(strict=True)):
+            completed = subprocess.run(
+                [
+                    "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+                    str(interpreter), "-c", "print('managed-interpreter-ok')",
+                ],
+                cwd=run_dir,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            assert completed.returncode == 0, completed.stderr
+            assert completed.stdout.strip() == "managed-interpreter-ok"
+
+        for sentinel in (unrelated_home_file, unrelated_private_tmp, unrelated_mac_tmp):
+            denied = subprocess.run(
+                [
+                    "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
+                    "/bin/cat", str(sentinel),
+                ],
+                capture_output=True,
+                check=False,
+            )
+            assert denied.returncode != 0
+    finally:
+        Path(captured.get("profile_path", "")).unlink(missing_ok=True)
+        for sentinel in (
+            Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt",
+            Path("/private/tmp") / f"issue56-sandbox-denied-{os.getpid()}.txt",
+            tmp_path / "created-after-profile.txt",
+        ):
+            sentinel.unlink(missing_ok=True)
+        shutil.rmtree(probe_root, ignore_errors=True)
+
+
+def test_production_read_boundaries_are_stable_and_broad():
+    boundaries = workflow._production_read_boundaries()
+
+    assert Path("/Users") in boundaries
+    assert Path("/private/tmp") in boundaries
+    assert Path("/Volumes") in boundaries
+    assert Path(workflow.tempfile.gettempdir()).resolve() in boundaries
+
+
+def test_production_parent_fallback_never_redispatches_or_claims_parent_provenance(
+    tmp_path, monkeypatch,
+):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    reference = tmp_path / "run/reference/study.reference.json"
+    reference.parent.mkdir(parents=True)
+    reference.write_text(json.dumps({"approval": {"revision_id": "r1"}}), encoding="utf-8")
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "installed", "git_commit": "abc", "source": "test",
+    })
+    monkeypatch.setattr(
+        workflow, "resolve_python_runtime",
+        lambda **_kwargs: {"executable": sys.executable, "version_info": [3, 11, 0]},
+    )
+
+    def invoke_fallback(_run_dir, **options):
+        options["fallback_handoff_runner"]([{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+        }], 10.0)
+
+    monkeypatch.setattr(workflow, "run_desktop_operation", invoke_fallback)
+    monkeypatch.setattr(
+        workflow, "_production_dispatch_handoffs",
+        lambda *_args, **_kwargs: pytest.fail("parent fallback must not redispatch to a worker"),
+    )
+
+    with pytest.raises(RuntimeError, match="genuine Desktop-parent"):
+        workflow.run_production_desktop_operation(
+            tmp_path / "run", skill_root=skill_root,
+            opener=lambda _path: b"unused",
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc"},
+        )
+    assert not (tmp_path / "run/logs/desktop-parent-visual-review.json").exists()
+
+
+def test_external_parent_visual_reviewer_receives_one_bound_request_path(tmp_path):
+    command = tmp_path / "parent-reviewer"
+    command.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    command.chmod(0o700)
+    revision = tmp_path / "revisions/r1"
+    revision.mkdir(parents=True)
+    reviewer = workflow.command_parent_visual_reviewer(command)
+
+    reviewer([{
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+    }], 10.0, revision, {})
+
+    request = json.loads((revision / "hermes/desktop-parent-visual-review-request.json").read_text())
+    assert request["revision_id"] == "r1"
+    assert request["producer_model_policy"] == "record_actual_nonempty_model_id"
+    assert len(request["handoffs"]) == 1
+
+
+def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "installed",
+        "git_commit": "abc123",
+        "source": "shipped_production_adapter",
+    })
+
+    with pytest.raises(ValueError, match="does not match the installed candidate"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "forged", "git_commit": "abc123"},
+        )
+
+    with pytest.raises(ValueError, match="exact governed Hermes configuration"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc123"},
+            hermes_configuration={**workflow.CERTIFIED_HERMES_CONFIGURATION, "safe_mode": False},
+        )
+
+    with pytest.raises(ValueError, match="exact governed Hermes configuration"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc123"},
+            hermes_configuration={
+                **workflow.CERTIFIED_HERMES_CONFIGURATION,
+                "unexpected": "not-governed",
+            },
+        )
+
+    with pytest.raises(ValueError, match="actual Desktop opener"):
+        workflow.run_production_desktop_operation(
+            tmp_path,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc123"},
+        )
 
 
 def test_missing_worker_response_cannot_be_replaced_by_a_changed_request(tmp_path, monkeypatch):
@@ -498,30 +1477,30 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
         {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": handoffs},
         {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
     ])
-    primary_timeouts = []
+    primary_calls = []
     parent_reviews = []
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
 
     def primary(received_handoffs, timeout_seconds):
-        primary_timeouts.append(timeout_seconds)
+        primary_calls.append((received_handoffs, timeout_seconds))
         response_root = tmp_path / "revisions/r1/hermes/verification-responses"
         response_root.mkdir(parents=True, exist_ok=True)
-        content_response = {
-            "request_id": content_request["request_id"],
-            "request_sha256": content_request["request_sha256"],
-            "task": content_request["task"],
-        }
-        response_root.joinpath("content.json").write_text(json.dumps(content_response), encoding="utf-8")
-        response_root.joinpath("protocol.json").write_text(json.dumps(protocol_response), encoding="utf-8")
-        (tmp_path / "revisions/r1" / received_handoffs[2]["response_path"]).write_text(
-            json.dumps({
-                "request_id": icf_request["request_id"],
-                "request_sha256": icf_request["request_sha256"],
-                "task": icf_request["task"],
-            }),
-            encoding="utf-8",
-        )
-        now[0] += timeout_seconds
+        if received_handoffs == [protocol_handoff, icf_handoff]:
+            response_root.joinpath("protocol.json").write_text(
+                json.dumps(protocol_response), encoding="utf-8",
+            )
+            now[0] += timeout_seconds
+        elif received_handoffs == [content_handoff]:
+            content_response = {
+                "request_id": content_request["request_id"],
+                "request_sha256": content_request["request_sha256"],
+                "task": content_request["task"],
+            }
+            response_root.joinpath("content.json").write_text(
+                json.dumps(content_response), encoding="utf-8",
+            )
+        else:
+            raise AssertionError(f"unexpected mixed timeout domain: {received_handoffs!r}")
 
     result = workflow.run_desktop_operation(
         tmp_path,
@@ -535,8 +1514,15 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
 
     state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
     assert result["status"] == "blocked"
-    assert primary_timeouts == [240.0]
-    assert parent_reviews == [handoffs[2]]
+    timeouts_by_tasks = {
+        tuple(item["task"] for item in received): timeout
+        for received, timeout in primary_calls
+    }
+    assert timeouts_by_tasks == {
+        ("rendered_page_visual_verification", "rendered_page_visual_verification"): 240.0,
+        ("clinical_content_verification",): 1_800.0,
+    }
+    assert parent_reviews == [icf_handoff]
     assert state["soft_budget_events"] == [{
         "stage": "independent_verification",
         "budget_seconds": 240.0,
@@ -544,6 +1530,71 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
         "action": "early_parent_fallback",
     }]
     assert state["deadline_at_epoch"] == 2_800.0
+
+
+def test_new_visual_request_hash_gets_a_fresh_soft_budget(tmp_path, monkeypatch):
+    now = [0.0]
+    first_handoff, first_request, _ = _visual_handoff_fixture(tmp_path, "protocol")
+    second_request = json.loads(json.dumps(first_request))
+    second_handoff = dict(first_handoff)
+    second_request["request_id"] = f'{first_request["request_id"]}.retry'
+    second_request["response_path"] = "hermes/verification-responses/protocol-retry.json"
+    second_request.pop("request_sha256", None)
+    second_request["request_sha256"] = verification_request_sha256(second_request)
+    second_handoff["request_path"] = "hermes/verification-requests/protocol-retry.json"
+    second_handoff["response_path"] = second_request["response_path"]
+    second_handoff["request_id"] = second_request["request_id"]
+    second_handoff["request_sha256"] = second_request["request_sha256"]
+    second_request_path = tmp_path / "revisions/r1" / second_handoff["request_path"]
+    calls = [0]
+
+    def generate(_run_dir, **_kwargs):
+        calls[0] += 1
+        if calls[0] == 1:
+            return {
+                "status": "awaiting_hermes",
+                "stage": "independent_verification",
+                "revision_id": "r1",
+                "handoffs": [first_handoff],
+            }
+        if calls[0] == 2:
+            second_request_path.write_text(json.dumps(second_request), encoding="utf-8")
+            return {
+                "status": "awaiting_hermes",
+                "stage": "independent_verification",
+                "revision_id": "r1",
+                "handoffs": [second_handoff],
+            }
+        return {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []}
+
+    timeouts = []
+
+    def complete_visual(handoffs, timeout_seconds):
+        handoff = handoffs[0]
+        timeouts.append(timeout_seconds)
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps({
+            "request_id": handoff["request_id"],
+            "request_sha256": handoff["request_sha256"],
+            "task": handoff["task"],
+        }), encoding="utf-8")
+        now[0] += timeout_seconds
+
+    monkeypatch.setattr(workflow, "generate", generate)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=complete_visual,
+        fallback_handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+        stage_soft_budgets={"independent_verification": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert timeouts == [5.0, 5.0], (result, calls, timeouts)
 
 
 def test_verifier_exception_falls_back_only_for_incomplete_parent_work(tmp_path, monkeypatch):
@@ -603,6 +1654,35 @@ def test_mutated_visual_request_cannot_suppress_parent_fallback(tmp_path, monkey
 
     assert result["status"] == "blocked"
     assert parent_reviews == [handoff]
+
+
+def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monkeypatch):
+    handoff, _, _ = _visual_handoff_fixture(tmp_path, "protocol")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "awaiting_hermes",
+        "stage": "independent_verification",
+        "revision_id": "r1",
+        "handoffs": [handoff],
+    })
+    fallback_calls = []
+
+    def failed_fallback(pending, _remaining):
+        fallback_calls.append(list(pending))
+        raise RuntimeError("parent fallback failed")
+
+    def failed_worker(*_args):
+        raise RuntimeError("worker failed")
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=failed_worker,
+        fallback_handoff_runner=failed_fallback,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert fallback_calls == [[handoff]]
 
 
 def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):

@@ -4,6 +4,7 @@ import shutil
 from datetime import date
 from pathlib import Path
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from pypdf import PdfWriter
@@ -18,6 +19,22 @@ import workflow
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_single_artifact_retrospective_verification_omits_cross_document_checks(tmp_path):
+    revision_dir = tmp_path / "r-retrospective"
+    revision_dir.mkdir()
+
+    request_paths = create_verification_requests(
+        revision_dir,
+        {"meta": {"study_type": "Retrospective"}},
+        {"artifacts": []},
+    )
+    content_request = json.loads(request_paths[0].read_text(encoding="utf-8"))
+
+    assert content_request["task"] == "clinical_content_verification"
+    assert content_request["cross_document_checks"] == []
+    assert "assess every cross-document check" not in content_request["instructions"].casefold()
 
 
 def _require_renderer():
@@ -71,11 +88,214 @@ def test_drafting_request_is_scoped_and_hash_bound(tmp_path):
     reference = fixture(); batch = batch_plan("Prospective")[0]
     path = create_drafting_request(repo_root=ROOT, revision_dir=tmp_path, revision_id="r-test", reference=reference, batch=batch, attempts={item: 1 for item in batch.section_ids}, wave="initial")
     request = json.loads(path.read_text(encoding="utf-8"))
+    assert (tmp_path / request["response_path"]).parent.is_dir()
     assert set(request["approved_source"]) <= set(batch.field_families)
     assert "template_fields" not in request["approved_source"]
     response = recorded_acceptance_response(request)
     accepted, findings = validate_response(request, response)
     assert accepted and not findings
+
+
+def test_retry_guidance_identifies_the_uncited_paragraph_and_allowed_references(tmp_path):
+    """Reproduce the final protocol-operations response from Hermes run __03."""
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["procedures"]["assessments"] = [
+        "Screening, consent, and baseline visit",
+        "Sensor wear on Days 1 to 14, Weeks 6 to 8, and Weeks 10 to 12",
+        "Telephone contact at Week 3",
+        "Clinic visits at Weeks 6 and 12",
+        "Record abstraction",
+        "Sensor insertion and removal",
+        "Sensor data download",
+        "Medication review",
+        "Adverse-event assessment",
+        "Hemoglobin A1c at Week 12",
+        "Usability questionnaire",
+    ]
+    reference["procedures"].pop("visit_schedule", None)
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-operations"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-hermes-03-evaluation",
+        reference=reference,
+        batch=batch,
+        target_ids=("evaluation-procedures",),
+        attempts={"evaluation-procedures": 3},
+        wave="retry",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = response_template(request, model_id="Hermes reproduction")
+    result = response["section_results"][0]
+    result["paragraphs"] = [{
+        "text": "The Schedule of Assessments includes the following approved visits, monitoring periods, contacts, and procedures.",
+        "evidence_refs": [],
+        "boilerplate_refs": [],
+    }]
+    result["lists"] = [{
+        "items": reference["procedures"]["assessments"],
+        "evidence_refs": ["source:procedures.assessments"],
+        "boilerplate_refs": [],
+    }]
+
+    accepted, findings = validate_response(request, response)
+    finding = next(
+        item for item in findings
+        if item["field"] == "evaluation-procedures"
+        and "no approved evidence" in item["issue"]
+    )
+
+    assert "evaluation-procedures" not in {
+        item["section_id"] for item in (accepted or {}).get("drafts", [])
+    }
+    assert "Paragraph 1" in finding["next_action"]
+    assert "source:procedures.assessments" in finding["next_action"]
+    assert any(
+        "Every paragraph object and every list object" in constraint
+        for constraint in request["constraints"]
+    )
+
+    result["paragraphs"][0]["evidence_refs"] = ["source:procedures.assessments"]
+    accepted, findings = validate_response(request, response)
+
+    assert not findings
+    assert [item["section_id"] for item in accepted["drafts"]] == [
+        "evaluation-procedures"
+    ]
+
+
+def test_safety_analysis_uses_only_its_material_analysis_plan_clause(tmp_path):
+    """Reproduce the final analysis response from Hermes run __03."""
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["statistics"]["analysis_plan"] = (
+        "Summarize historical and prospective measures descriptively. "
+        "For participants with both measurements, report the mean within-participant "
+        "change in hemoglobin A1c with a two-sided 95% confidence interval. "
+        "Summarize time in range, usable sensor time, usability, missing data, and "
+        "adverse events using descriptive statistics."
+    )
+    reference["safety"].pop("adverse_events", None)
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-analysis-and-oversight"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-hermes-03-safety-analysis",
+        reference=reference,
+        batch=batch,
+        target_ids=("quality-safety.analysis",),
+        attempts={"quality-safety.analysis": 3},
+        wave="retry",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    contract = request["section_contracts"][0]
+    response = response_template(request, model_id="Hermes reproduction")
+    response["section_results"][0]["paragraphs"] = [
+        {
+            "text": contract["fixed_boilerplate"][0]["text"],
+            "evidence_refs": [],
+            "boilerplate_refs": ["safety-analysis"],
+        },
+        {
+            "text": "In accordance with the approved analysis plan, adverse events will be summarized using descriptive statistics.",
+            "evidence_refs": ["source:statistics.analysis_plan"],
+            "boilerplate_refs": [],
+        },
+    ]
+
+    accepted, findings = validate_response(request, response)
+
+    scope = contract["evidence_scopes"][0]
+    assert scope["path"] == "statistics.analysis_plan"
+    assert scope["value"] == (
+        "Summarize adverse events using descriptive statistics."
+    )
+    assert "hemoglobin A1c" not in scope["value"]
+    assert "sensor" not in scope["value"]
+    assert scope["sha256"] == sha256_value(scope["value"])
+    assert not findings
+    assert [item["section_id"] for item in accepted["drafts"]] == [
+        "quality-safety.analysis"
+    ]
+
+
+def test_safety_analysis_does_not_offer_an_efficacy_only_plan_as_evidence(tmp_path):
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["statistics"]["analysis_plan"] = (
+        "Report the mean within-participant hemoglobin A1c change with a two-sided "
+        "95% confidence interval."
+    )
+    reference["safety"].pop("adverse_events", None)
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-analysis-and-oversight"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-efficacy-only-safety-analysis",
+        reference=reference,
+        batch=batch,
+        target_ids=("quality-safety.analysis",),
+        attempts={"quality-safety.analysis": 1},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    contract = request["section_contracts"][0]
+
+    assert contract["evidence_scopes"][0]["value"] == ""
+    assert "statistics.analysis_plan" not in contract["minimum_evidence"]
+
+
+def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_missing_facts(tmp_path):
+    reference = fixture()
+    reference["study"]["background"] = " ".join(
+        f"approved-background-detail-{index}" for index in range(120)
+    )
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations")
+    path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-depth",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(path.read_text(encoding="utf-8"))
+    introduction_contract = next(
+        item for item in request["section_contracts"] if item["section_id"] == "introduction"
+    )
+    assert introduction_contract["approved_source_word_count"] >= 120
+    assert introduction_contract["reference_detail_target_words"] >= 80
+
+    response = recorded_acceptance_response(request)
+    introduction = next(
+        item for item in response["section_results"] if item["section_id"] == "introduction"
+    )
+    introduction["paragraphs"] = [{
+        "text": "Approved background detail supports the stated study title hypothesis and primary endpoint.",
+        "evidence_refs": [f"source:{path}" for path in introduction_contract["minimum_evidence"]],
+        "boilerplate_refs": [],
+    }]
+    introduction["lists"] = []
+
+    _accepted, findings = validate_response(request, response)
+
+    assert not any("source-proportional detail" in item.get("issue", "") for item in findings)
+    assert any(
+        item.get("field") == "introduction"
+        and "material facts are not observable" in item.get("issue", "")
+        for item in findings
+    )
 
 
 def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp_path):
@@ -963,6 +1183,7 @@ def test_content_verifier_receives_authorized_boilerplate_and_blank_field_policy
     content_path = next(path for path in paths if json.loads(path.read_text())["task"] == "clinical_content_verification")
     request = json.loads(content_path.read_text(encoding="utf-8"))
 
+    assert (tmp_path / request["response_path"]).parent.is_dir()
     assert request["authorized_boilerplate"]["version"]
     assert request["authorized_boilerplate"]["sections"]["costs"]
     assert "Do not fail optional fields" in request["instructions"]
@@ -972,6 +1193,45 @@ def test_content_verifier_receives_authorized_boilerplate_and_blank_field_policy
     assert expected_retained <= assessed_ids
     assert "icf.introduction" in assessed_ids
     assert "icf.leaving-study" in assessed_ids
+
+
+@pytest.mark.parametrize(
+    ("assignment_method", "expected_in_scope"),
+    [
+        (None, False),
+        ("Single observational cohort; no treatment assignment", True),
+    ],
+)
+def test_content_verifier_scope_matches_optional_source_sections(
+    tmp_path, assignment_method, expected_in_scope
+):
+    reference = fixture()
+    if assignment_method is None:
+        reference["design"].pop("assignment_method", None)
+    else:
+        reference["design"]["assignment_method"] = assignment_method
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    for name in ("protocol.docx", "icf.docx", "study.xml"):
+        (candidate / name).write_bytes(b"candidate")
+
+    paths = create_verification_requests(
+        tmp_path,
+        reference,
+        {"renderer": {}, "artifacts": []},
+    )
+    content_path = next(
+        path for path in paths
+        if json.loads(path.read_text())["task"] == "clinical_content_verification"
+    )
+    request = json.loads(content_path.read_text(encoding="utf-8"))
+    protocol_section_ids = {
+        item["section_id"]
+        for item in request["sections"]
+        if item["artifact"] == "protocol"
+    }
+
+    assert ("study-design.assignment" in protocol_section_ids) is expected_in_scope
 
 
 def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path):
@@ -1241,7 +1501,7 @@ def test_visual_gate_rejects_unassessed_pages(tmp_path):
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": []}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": []}]}
     request["request_sha256"] = verification_request_sha256(request)
     response = {
         "schema_version": RESPONSE_SCHEMA,

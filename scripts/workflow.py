@@ -12,18 +12,26 @@ import json
 import math
 import os
 import platform
+import pwd
 import re
+import select
+import shlex
 import shutil
+import signal
+import socket
+import socketserver
 import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
 import time
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from docx import Document
 
@@ -33,12 +41,13 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
 
 
 REFERENCE = Path("reference/study.reference.json")
 MAX_VERIFICATION_ATTEMPTS = 3
+MAX_REVIEW_SETS = 3
 DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 720.0
@@ -68,9 +77,9 @@ MINIMUM_PYTHON_VERSION = (3, 10)
 PDF_PAGE_RENDERER = {
     "kind": "pypdfium2",
     "version": "5.13.0",
-    "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl",
-    "wheel_sha256": "da5c7b74eebf40b5c1fbe1de01aa1edc8827a79fb1efd999616bc20dcaf77ba4",
-    "platform": "macosx_13_0_arm64",
+    "wheel": "assets/runtime-wheels/pypdfium2-5.13.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+    "wheel_sha256": "81df25c1ab4c13ff773102d3cbea1967511d079123b067fc077bd0c4d57d91d8",
+    "platform": "manylinux_2_17_x86_64",
 }
 PRODUCTION_MODULES = {
     "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
@@ -78,9 +87,8 @@ PRODUCTION_MODULES = {
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
     "max_turns": 80,
-    "skill": "clinical-document-drafting",
+    "skill": "clinical-document-generation",
     "safe_mode": True,
-    "model_identifier": "gpt-5.6-sol",
     "reasoning_configuration": "Hermes Desktop governed default",
 }
 CERTIFICATION_GATES = {
@@ -103,7 +111,7 @@ def _runtime_version(value: Mapping[str, Any]) -> tuple[int, int, int]:
 
 def _current_python_runtime() -> dict[str, Any]:
     runtime = {
-        "executable": str(Path(sys.executable).resolve()),
+        "executable": str(Path(sys.executable).absolute()),
         "implementation": platform.python_implementation(),
         "version": platform.python_version(),
         "version_info": list(sys.version_info[:3]),
@@ -131,7 +139,7 @@ def resolve_python_runtime(
         candidates = discovered
     probe = (
         "import json,platform,sys;"
-        "print(json.dumps({'executable':str(__import__('pathlib').Path(sys.executable).resolve()),"
+        "print(json.dumps({'executable':str(__import__('pathlib').Path(sys.executable).absolute()),"
         "'implementation':platform.python_implementation(),'version':platform.python_version(),"
         "'version_info':list(sys.version_info[:3])}))"
     )
@@ -737,6 +745,7 @@ def _certification_attestation(
         )
         output_by_path = {str(item.get("path") or ""): item for item in outputs}
         visual = case.get("visual_qa") or {}
+        case_models = set(case.get("model_identifiers") or [])
         expected_visual = {Path(path).stem for path in expected_outputs if path.endswith(".docx")}
         try:
             elapsed = float(case.get("elapsed_seconds"))
@@ -769,7 +778,7 @@ def _certification_attestation(
                 and _is_sha256(item.get("response_sha256"))
                 and _is_sha256(item.get("pdf_sha256"))
                 and _is_sha256(item.get("docx_sha256"))
-                and item.get("producer_model_id") == CERTIFIED_HERMES_CONFIGURATION["model_identifier"]
+                and str(item.get("producer_model_id") or "").strip() in case_models
                 and item.get("docx_sha256") == output_by_path.get(f"output/{artifact}.docx", {}).get("sha256")
                 for artifact, item in visual.items()
             )
@@ -797,7 +806,8 @@ def _certification_attestation(
             not case.get("findings"),
             case.get("release_identity") == identity,
             case.get("hermes_configuration_sha256") == expected_configuration_hashes.get(fixture_id),
-            set(case.get("model_identifiers") or []) == {CERTIFIED_HERMES_CONFIGURATION["model_identifier"]},
+            bool(case_models),
+            all(isinstance(model, str) and model.strip() for model in case_models),
             _is_sha256(case.get("report_sha256")),
             runtime_valid,
             desktop_elapsed > 0.0,
@@ -813,7 +823,7 @@ def _certification_attestation(
             case.get("layout_preservation_baseline_identity") == (expected_bundle.get("layout_preservation_baseline") or {}).get("sha256"),
         ))
     if not valid:
-        return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, model, and configuration."}]
+        return None, [{"category": "installation", "field": RELEASE_CERTIFICATION, "issue": "The embedded Release Certification report does not pass and bind this exact commit, fingerprint, corpus, recorded model provenance, and configuration."}]
     return report, []
 
 
@@ -1023,13 +1033,13 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     except ValueError:
         host_turns_sufficient = False
     host_matches = all((
-        scalars.get(("model", "default")) == CERTIFIED_HERMES_CONFIGURATION["model_identifier"],
+        bool(str(scalars.get(("model", "default")) or "").strip()),
         scalars.get(("agent", "reasoning_effort")) == "medium",
         host_turns_sufficient,
     ))
     normalized_entries = [str(Path(entry).expanduser().resolve()) for entry in entries]
     if duplicate_paths or external_definitions != 1 or normalized_entries != [str(active.resolve())] or not governed_matches or not host_matches:
-        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active} and match the certified model, medium reasoning, safe-mode, and 80-turn governed settings."}]
+        return [{"category": "installation", "field": "hermes_configuration", "issue": f"Hermes must select only {active}, configure a non-empty user-selected default model, and match the medium-reasoning, safe-mode, and 80-turn governed settings."}]
     return []
 
 
@@ -1166,10 +1176,12 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
         }]}
     platform_tag = str(identity.get("platform") or "")
     host = f"{platform.system()} {platform.machine()}"
+    system = platform.system().casefold()
+    machine = platform.machine().casefold()
     compatible = (
-        platform.system() == "Darwin"
-        and "macosx" in platform_tag
-        and platform.machine().casefold() in platform_tag.casefold()
+        system == "linux"
+        and "manylinux" in platform_tag.casefold()
+        and machine in platform_tag.casefold()
     )
     if not compatible:
         return {"status": "blocked", "findings": [{
@@ -1213,6 +1225,8 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
         skill_root=skill_root, require_promoted_runtime=False
     )
     if len(installed) != 1:
+        (skill_root / "runtime/PDF-RENDERER.json").unlink(missing_ok=True)
+        shutil.rmtree(runtime_python, ignore_errors=True)
         return {"status": "blocked", "findings": [{
             "category": "installation",
             "field": "pdf_page_renderer",
@@ -1225,26 +1239,34 @@ def _provision_page_renderer(skill_root: Path) -> dict[str, Any]:
 def provision_render_assurance(skill_root: Path) -> dict[str, Any]:
     """Provision PDFium offline and verify the required host office renderer."""
     skill_root = skill_root.resolve()
+    manifest_findings = _manifest_integrity(skill_root, allow_runtime_state=True)
+    if manifest_findings:
+        return {
+            "status": "blocked",
+            "findings": manifest_findings,
+            "renderer": None,
+            "page_renderer": None,
+        }
     office_renderers = [
         item for item in renderers(skill_root=skill_root)
         if item.get("kind") in {"Microsoft Word", "LibreOffice"}
     ]
+    if not office_renderers:
+        return {"status": "blocked", "findings": [{
+            "category": "installation",
+            "field": "office_renderer",
+            "code": "installation.office_renderer_required",
+            "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
+        }]}
     page_provision = _provision_page_renderer(skill_root)
     if page_provision.get("status") != "passed":
         return page_provision
-    if office_renderers:
-        return {
-            "status": "passed",
-            "renderer": office_renderers[0],
-            "page_renderer": page_provision["page_renderer"],
-            "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
-        }
-    return {"status": "blocked", "findings": [{
-        "category": "installation",
-        "field": "office_renderer",
-        "code": "installation.office_renderer_required",
-        "issue": "Install or enable Microsoft Word or LibreOffice on the host, then rerun release installation.",
-    }]}
+    return {
+        "status": "passed",
+        "renderer": office_renderers[0],
+        "page_renderer": page_provision["page_renderer"],
+        "provisioned": {"renderer": False, "page_renderer": page_provision["provisioned"]},
+    }
 
 
 def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> Any:
@@ -2340,6 +2362,7 @@ VERIFICATION_TASK_BY_TARGET = {
 
 LAYOUT_RULE_BY_VISUAL_CHECK = {
     "orphan_heading": "heading_cohesion",
+    "excessive_whitespace": "heading_cohesion",
     "artificial_pagination": "body_pagination",
     "bad_table_split": "table_pagination",
 }
@@ -2395,6 +2418,54 @@ def _approved_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def _approval_governing_compatible(
+    skill_root: Path,
+    current_governing: Mapping[str, Any],
+    approved_governing_sha256: str,
+) -> bool:
+    """Accept one manifest-bound Linux adapter-only predecessor hash."""
+    if platform.system() != "Linux":
+        return False
+    try:
+        manifest = _read(skill_root / RELEASE_MANIFEST)
+        compatibility = manifest.get("approval_compatibility")
+        if not isinstance(compatibility, Mapping) or set(compatibility) != {
+            "schema_version", "scope", "implementation_path",
+            "predecessor_sha256", "current_sha256",
+        }:
+            return False
+        if (
+            compatibility.get("schema_version") != "approval-compatibility/v1"
+            or compatibility.get("scope") != "linux-desktop-adapter-only"
+            or compatibility.get("implementation_path") != "scripts/workflow.py"
+        ):
+            return False
+        implementation = current_governing.get("implementation_sha256")
+        if not isinstance(implementation, Mapping):
+            return False
+        workflow_path = skill_root / "scripts/workflow.py"
+        current_sha256 = sha256_file(workflow_path)
+        rows = [
+            row for row in manifest.get("files", [])
+            if isinstance(row, Mapping) and row.get("path") == "scripts/workflow.py"
+        ]
+        if (
+            len(rows) != 1
+            or rows[0].get("sha256") != current_sha256
+            or implementation.get("scripts/workflow.py") != current_sha256
+            or compatibility.get("current_sha256") != current_sha256
+        ):
+            return False
+        predecessor_sha256 = str(compatibility.get("predecessor_sha256") or "")
+        if not re.fullmatch(r"[0-9a-f]{64}", predecessor_sha256):
+            return False
+        predecessor = copy.deepcopy(dict(current_governing))
+        predecessor["implementation_sha256"]["scripts/workflow.py"] = predecessor_sha256
+        return sha256_value(predecessor) == approved_governing_sha256
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        return False
+
+
 def _approval_valid(
     run_dir: Path,
     reference: Mapping[str, Any],
@@ -2418,12 +2489,20 @@ def _approval_valid(
     snapshot = _read(snapshot_path)
     if _approved_payload(reference) != _approved_payload(snapshot):
         return False, "Study inputs changed after approval; prepare and approve a new Source-of-Truth revision."
-    expected_governing = sha256_value(governing_resources(
+    current_governing = governing_resources(
         SCRIPT_DIR.parent,
         snapshot,
         contracted_bundle=contracted_bundle,
-    ))
-    if approval.get("governing_sha256") != expected_governing:
+    )
+    expected_governing = sha256_value(current_governing)
+    if (
+        approval.get("governing_sha256") != expected_governing
+        and not _approval_governing_compatible(
+            SCRIPT_DIR.parent,
+            current_governing,
+            str(approval.get("governing_sha256") or ""),
+        )
+    ):
         return False, "Generation contracts, templates, or implementation changed after approval; approve the unchanged Source-of-Truth again to create a new immutable revision."
     return True, ""
 
@@ -3018,6 +3097,7 @@ def run_desktop_operation(
     progress: Callable[[str, float], Any] | None = None,
     cleanup: Callable[[str, float], Mapping[str, Any] | None] | None = None,
     stage_soft_budgets: Mapping[str, float] | None = None,
+    require_promoted_runtime: bool = True,
 ) -> dict[str, Any]:
     """Run the post-approval lifecycle and confirm its Desktop file delivery.
 
@@ -3386,6 +3466,7 @@ def run_desktop_operation(
                 operation_deadline=process_deadline_monotonic,
                 clock=clock,
                 stage_observer=observe_generate_stage,
+                require_promoted_runtime=require_promoted_runtime,
             )
         finally:
             generate_elapsed = clock() - generate_started
@@ -3444,6 +3525,7 @@ def run_desktop_operation(
             remaining = remaining_seconds()
             if remaining <= 0:
                 continue
+            fallback_attempted: set[str] = set()
             try:
                 for handoff in handoffs:
                     if not isinstance(handoff, Mapping):
@@ -3459,31 +3541,110 @@ def run_desktop_operation(
                         attempt_counters["handoff_dispatches"][dispatch_key] = int(
                             attempt_counters["handoff_dispatches"].get(dispatch_key) or 0
                         ) + 1
-                handoff_started = clock()
                 stage_elapsed = float(stage_timings.get(stage, {}).get("elapsed_seconds") or 0.0)
-                soft_remaining = max(0.0, soft_budgets.get(stage, remaining) - stage_elapsed)
                 supports_parent_fallback = (
                     stage == "independent_verification"
                     and any(item.get("fallback_owner") == "parent" for item in handoffs)
                 )
-                runner_timeout = min(remaining, soft_remaining) if supports_parent_fallback else remaining
+                revision_id = str(result.get("revision_id") or "")
+                fallback_owned: list[Mapping[str, Any]] = [
+                    item for item in handoffs
+                    if item.get("fallback_owner") == "parent"
+                ]
+                non_fallback: list[Mapping[str, Any]] = [
+                    item for item in handoffs
+                    if item.get("fallback_owner") != "parent"
+                ]
+                dispatch_handoffs: list[Mapping[str, Any]] = [item for item in handoffs]
+                fresh_fallback_owned: list[Mapping[str, Any]] = []
+                replayed_fallback_owned: list[Mapping[str, Any]] = []
+                for item in fallback_owned:
+                    dispatch_key = str(
+                        item.get("request_sha256") or item.get("request_id")
+                        or item.get("request_path") or ""
+                    )
+                    target = (
+                        fresh_fallback_owned
+                        if int(attempt_counters["handoff_dispatches"].get(dispatch_key) or 0) == 1
+                        else replayed_fallback_owned
+                    )
+                    target.append(item)
+                soft_timeout = min(remaining, soft_budgets.get(stage, remaining))
+
+                def fallback_or_raise(
+                    dispatch_error: Exception,
+                    dispatched: Sequence[Mapping[str, Any]],
+                ) -> None:
+                    incomplete = [
+                        item for item in dispatched
+                        if item.get("fallback_owner") == "parent"
+                        and revision_id
+                        and not _handoff_response_is_bound(run_dir, revision_id, item)
+                    ]
+                    if incomplete and fallback_handoff_runner is not None:
+                        fallback_attempted.update(
+                            str(item.get("response_path") or "") for item in incomplete
+                        )
+                        fallback_handoff_runner(incomplete, remaining_seconds())
+                        return
+                    raise dispatch_error
+
+                handoff_started = clock()
                 save("running")
                 try:
-                    handoff_runner(handoffs, runner_timeout)
+                    if supports_parent_fallback and fallback_owned and non_fallback:
+                        with ThreadPoolExecutor(max_workers=1) as executor:
+                            hard_future = executor.submit(
+                                handoff_runner, non_fallback, remaining,
+                            )
+                            for delegated, timeout in (
+                                (replayed_fallback_owned, 0.0),
+                                (fresh_fallback_owned, soft_timeout),
+                            ):
+                                if not delegated:
+                                    continue
+                                try:
+                                    handoff_runner(delegated, timeout)
+                                except Exception as exc:
+                                    fallback_or_raise(exc, delegated)
+                            hard_future.result()
+                    elif supports_parent_fallback and fallback_owned:
+                        for delegated, timeout in (
+                            (replayed_fallback_owned, 0.0),
+                            (fresh_fallback_owned, soft_timeout),
+                        ):
+                            if not delegated:
+                                continue
+                            try:
+                                handoff_runner(delegated, timeout)
+                            except Exception as exc:
+                                fallback_or_raise(exc, delegated)
+                    else:
+                        try:
+                            handoff_runner(
+                                dispatch_handoffs,
+                                soft_timeout if supports_parent_fallback else remaining,
+                            )
+                        except Exception as exc:
+                            fallback_or_raise(exc, dispatch_handoffs)
                 finally:
                     record_timing(stage, clock() - handoff_started)
                     record_soft_budget_event(stage)
                     save("running")
-                revision_id = str(result.get("revision_id") or "")
                 fallback_handoffs = [
                     item for item in handoffs
                     if item.get("fallback_owner") == "parent"
+                    and str(item.get("response_path") or "") not in fallback_attempted
                     and revision_id
                     and not _handoff_response_is_bound(run_dir, revision_id, item)
                 ]
                 if fallback_handoffs:
                     remaining = remaining_seconds()
                     if remaining > 0:
+                        fallback_attempted.update(
+                            str(item.get("response_path") or "")
+                            for item in fallback_handoffs
+                        )
                         if fallback_handoff_runner is not None:
                             fallback_handoff_runner(fallback_handoffs, remaining)
                         else:
@@ -3494,6 +3655,7 @@ def run_desktop_operation(
                 fallback_handoffs = [
                     item for item in handoffs
                     if item.get("fallback_owner") == "parent"
+                    and str(item.get("response_path") or "") not in fallback_attempted
                     and revision_id
                     and not _handoff_response_is_bound(run_dir, revision_id, item)
                 ]
@@ -3501,6 +3663,10 @@ def run_desktop_operation(
                     remaining = remaining_seconds()
                     if remaining > 0:
                         try:
+                            fallback_attempted.update(
+                                str(item.get("response_path") or "")
+                                for item in fallback_handoffs
+                            )
                             if fallback_handoff_runner is not None:
                                 fallback_handoff_runner(fallback_handoffs, remaining)
                             else:
@@ -3597,6 +3763,955 @@ def run_desktop_operation(
         if not delivery["confirmed"]:
             final["client_outputs"] = []
         return finish(final)
+
+
+def _production_response_is_bound(
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+) -> bool:
+    """Authenticate one worker response before reaping its Hermes process."""
+    request_path = revision_dir / str(handoff.get("request_path") or "")
+    response_path = revision_dir / str(handoff.get("response_path") or "")
+    try:
+        request = _read(request_path)
+        response = _read(response_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    producer_model_id = str((response.get("producer") or {}).get("model_id") or "").strip()
+    if not producer_model_id:
+        return False
+    if str(handoff.get("task") or "") in {
+        "clinical_content_verification", "rendered_page_visual_verification",
+    }:
+        return verification_response_is_terminal(revision_dir, request_path)
+    return all((
+        response.get("schema_version") == "hermes-response/v2",
+        response.get("request_id") == request.get("request_id"),
+        response.get("request_sha256") == request.get("request_sha256"),
+        response.get("revision_id") == request.get("revision_id"),
+        response.get("task") == request.get("task"),
+        response.get("batch_id") == request.get("batch_id"),
+    ))
+
+
+def _production_publish_quiet_response(
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+    stdout_log: Path,
+) -> bool:
+    """Publish one validated JSON final answer from Hermes quiet-mode stdout."""
+    if _production_response_is_bound(
+        revision_dir, handoff,
+    ):
+        return True
+    try:
+        payload = stdout_log.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    decoder = json.JSONDecoder()
+    candidates: list[Mapping[str, Any]] = []
+    for match in re.finditer(r"\{", payload):
+        try:
+            candidate, _end = decoder.raw_decode(payload, match.start())
+        except json.JSONDecodeError:
+            continue
+        if isinstance(candidate, Mapping):
+            candidates.append(candidate)
+    if not candidates:
+        return False
+    response_path = revision_dir / str(handoff.get("response_path") or "")
+    for candidate in reversed(candidates):
+        _write(response_path, candidate)
+        if _production_response_is_bound(
+            revision_dir, handoff,
+        ):
+            return True
+        response_path.unlink(missing_ok=True)
+    return False
+
+
+def _production_agent_prompt(
+    skill_root: Path,
+    revision_dir: Path,
+    handoff: Mapping[str, Any],
+    configuration: Mapping[str, Any],
+    *,
+    workspace_root: Path,
+) -> str:
+    skill_path = Path(os.path.relpath(skill_root.resolve(), workspace_root.resolve())).as_posix()
+    revision_path = Path(os.path.relpath(revision_dir.resolve(), workspace_root.resolve())).as_posix()
+    request_path = Path(os.path.relpath(
+        (revision_dir / str(handoff["request_path"])).resolve(), workspace_root.resolve(),
+    )).as_posix()
+    response_path = Path(os.path.relpath(
+        (revision_dir / str(handoff["response_path"])).resolve(), workspace_root.resolve(),
+    )).as_posix()
+    task = str(handoff.get("task") or "")
+    if task == "rendered_page_visual_verification":
+        task_rule = (
+            "Act as an independent visual verifier. Load and inspect every supplied page PNG "
+            "with the vision tool and assess every requested check for every page."
+        )
+    elif task == "clinical_content_verification":
+        task_rule = (
+            "Act as an independent clinical-content verifier. Assess every bound section and "
+            "cross-document check directly from the request evidence."
+        )
+    else:
+        task_rule = "Draft only the requested sections from the closed approved evidence package."
+    layout_notes = [
+        str(note).strip()
+        for note in configuration.get("layout_preservation_notes", [])
+        if str(note).strip()
+    ]
+    if task == "rendered_page_visual_verification" and not layout_notes:
+        layout_notes = [
+            "In the protocol, Section 15 heading, introduction, caption, and assessment table "
+            "may move together to the next page; resulting blank space on the preceding page "
+            "is intentional keep-with-next pagination.",
+        ]
+    layout_rule = (
+        " Approved layout-preservation notes (do not report these intentional features as defects): "
+        + " ".join(f"[{index}] {note}" for index, note in enumerate(layout_notes, 1))
+        if task == "rendered_page_visual_verification" and layout_notes
+        else ""
+    )
+    response_write_rule = (
+        " Do not call write_file, patch, or terminal to publish the response. Return the exact "
+        "response JSON as your final answer with no Markdown fence or surrounding prose. The "
+        "Desktop parent writes that final JSON atomically to the bound response path."
+    )
+    verification_rule = (
+        " The Desktop parent validates it automatically."
+        if task in {"clinical_content_verification", "rendered_page_visual_verification"}
+        else " The next generate invocation is the authoritative response validator."
+    )
+    return (
+        "Complete one isolated clinical-document Hermes handoff.\n"
+        f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
+        f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
+        f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
+        f"Read the request completely. {task_rule}{layout_rule} Write exact JSON directly to the response "
+        f"path and bind every schema, request ID, request hash, task, target, and evidence "
+        "reference exactly. producer.model_id must record the actual model used for this response."
+        f"{response_write_rule}{verification_rule} The validator interpreter is dependency-complete; do not search "
+        "the filesystem for Python or dependency paths. Do not modify production code or "
+        "approved source material."
+    )
+
+
+def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
+    """Bind Hermes process state to the profile containing the installed skill."""
+    untrusted_root = skill_root.expanduser().absolute()
+    profile_paths = (untrusted_root, untrusted_root.parent, untrusted_root.parent.parent)
+    if any(path.is_symlink() for path in profile_paths) or untrusted_root.parent.name != "skills":
+        raise ValueError(
+            "Production Desktop execution requires a non-symlinked skill and profile under an isolated Hermes skills directory."
+        )
+    hermes_home = untrusted_root.parent.parent.resolve()
+    environment = {
+        name: os.environ[name]
+        for name in (
+            "LANG", "LC_ALL", "SSL_CERT_FILE", "SSL_CERT_DIR",
+            "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
+        )
+        if os.environ.get(name)
+    }
+    environment.update({
+        "HERMES_HOME": str(hermes_home),
+        "HOME": str(hermes_home),
+        "TMPDIR": str(hermes_home / ".tmp"),
+        "XDG_CACHE_HOME": str(hermes_home / ".cache"),
+        "XDG_CONFIG_HOME": str(hermes_home / ".config"),
+        "XDG_DATA_HOME": str(hermes_home / ".local/share"),
+        "XDG_STATE_HOME": str(hermes_home / ".local/state"),
+        "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+    })
+    for name in (".tmp", ".cache", ".config", ".local/share", ".local/state"):
+        (hermes_home / name).mkdir(parents=True, exist_ok=True)
+    return environment
+
+
+def _production_sandbox_executable() -> Path:
+    sandbox = Path("/usr/bin/sandbox-exec")
+    if sandbox.is_symlink() or not sandbox.is_file() or not os.access(sandbox, os.X_OK):
+        raise RuntimeError("The governed OS sandbox executable is unavailable.")
+    return sandbox
+
+
+def _production_sandbox_prefix(profile: Path) -> list[str]:
+    """Return the platform-native worker isolation launch prefix."""
+    if platform.system() == "Darwin":
+        return [str(_production_sandbox_executable()), "-f", str(profile)]
+    if platform.system() == "Linux":
+        setpriv = Path("/usr/bin/setpriv")
+        if setpriv.is_symlink() or not setpriv.is_file() or not os.access(setpriv, os.X_OK):
+            raise RuntimeError("The governed Linux privilege-isolation executable is unavailable.")
+        return [
+            str(setpriv),
+            "--no-new-privs",
+            "--inh-caps=-all",
+            "--ambient-caps=-all",
+        ]
+    raise RuntimeError("The governed OS sandbox is unsupported on this platform.")
+
+
+def _managed_hermes_pair() -> tuple[Path, Path]:
+    if platform.system() == "Linux":
+        launcher = Path("/opt/hermes/.venv/bin/hermes")
+    else:
+        account_home = Path(pwd.getpwuid(os.getuid()).pw_dir)
+        launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
+    interpreter = launcher.parent / "python"
+    if (
+        launcher.is_symlink()
+        or not launcher.is_file()
+        or not os.access(launcher, os.X_OK)
+        or not interpreter.is_symlink()
+        or not interpreter.is_file()
+        or not os.access(interpreter, os.X_OK)
+    ):
+        raise RuntimeError("The governed Hermes virtual-environment launcher is unavailable.")
+    return launcher, interpreter
+
+
+def _managed_hermes_identity() -> dict[str, str]:
+    launcher, interpreter = _managed_hermes_pair()
+    return {
+        "launcher": str(launcher),
+        "launcher_sha256": sha256_file(launcher),
+        "interpreter": str(interpreter),
+        "interpreter_target": str(interpreter.resolve(strict=True)),
+        "interpreter_target_sha256": sha256_file(interpreter.resolve(strict=True)),
+    }
+
+
+def _production_read_boundaries() -> tuple[Path, ...]:
+    """Return stable host trees denied before exact governed read exceptions."""
+    return tuple(dict.fromkeys(
+        path.resolve(strict=False)
+        for path in (Path("/Users"), Path("/private/tmp"), Path(tempfile.gettempdir()), Path("/Volumes"))
+    ))
+
+
+def _production_authentication_path() -> Path:
+    """Return the one centralized credential file required by managed Hermes."""
+    account_home = Path(pwd.getpwuid(os.getuid()).pw_dir).expanduser().resolve()
+    return account_home / ".hermes/auth.json"
+
+
+PRODUCTION_HERMES_NETWORK_HOST = "chatgpt.com"
+PRODUCTION_HERMES_NETWORK_PORT = 443
+
+
+class _ProductionConnectProxyHandler(socketserver.BaseRequestHandler):
+    def handle(self) -> None:
+        client = self.request
+        client.settimeout(10.0)
+        request = b""
+        while b"\r\n\r\n" not in request and len(request) <= 16 * 1024:
+            chunk = client.recv(4096)
+            if not chunk:
+                return
+            request += chunk
+        if b"\r\n\r\n" not in request or len(request) > 16 * 1024:
+            client.sendall(b"HTTP/1.1 431 Request Header Fields Too Large\r\n\r\n")
+            return
+        header, pending = request.split(b"\r\n\r\n", 1)
+        try:
+            method, target, version = header.split(b"\r\n", 1)[0].decode("ascii").split()
+        except (UnicodeDecodeError, ValueError):
+            client.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
+            return
+        server = self.server
+        if not isinstance(server, _ProductionConnectProxyServer):
+            return
+        expected = f"{server.governed_host}:{server.governed_port}"
+        if method != "CONNECT" or target.casefold() != expected.casefold() or version not in {"HTTP/1.0", "HTTP/1.1"}:
+            client.sendall(b"HTTP/1.1 403 Forbidden\r\n\r\n")
+            return
+        try:
+            upstream = socket.create_connection(
+                (server.governed_host, server.governed_port), timeout=10.0,
+            )
+        except OSError:
+            client.sendall(b"HTTP/1.1 502 Bad Gateway\r\n\r\n")
+            return
+        with upstream:
+            client.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+            if pending:
+                upstream.sendall(pending)
+            client.settimeout(None)
+            upstream.settimeout(None)
+            peers = (client, upstream)
+            while True:
+                readable, _, _ = select.select(peers, (), (), 1.0)
+                for source in readable:
+                    try:
+                        payload = source.recv(64 * 1024)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return
+                    if not payload:
+                        return
+                    try:
+                        (upstream if source is client else client).sendall(payload)
+                    except (BrokenPipeError, ConnectionResetError):
+                        return
+
+
+class _ProductionConnectProxyServer(socketserver.ThreadingTCPServer):
+    allow_reuse_address = False
+    daemon_threads = True
+
+    def __init__(self, host: str, port: int):
+        self.governed_host = host
+        self.governed_port = port
+        super().__init__(("127.0.0.1", 0), _ProductionConnectProxyHandler)
+
+
+@dataclass
+class _ProductionConnectProxy:
+    server: _ProductionConnectProxyServer
+    thread: threading.Thread
+
+    @property
+    def port(self) -> int:
+        return int(self.server.server_address[1])
+
+    def close(self) -> None:
+        errors: list[BaseException] = []
+        for action in (
+            self.server.shutdown,
+            self.server.server_close,
+            lambda: self.thread.join(timeout=5.0),
+        ):
+            try:
+                action()
+            except BaseException as exc:
+                errors.append(exc)
+        try:
+            if self.thread.is_alive():
+                errors.append(RuntimeError("The governed network proxy thread is still running."))
+        except BaseException as exc:
+            errors.append(exc)
+        if errors:
+            raise RuntimeError("The governed network proxy could not be fully closed.") from errors[0]
+
+
+def _start_production_connect_proxy(
+    host: str = PRODUCTION_HERMES_NETWORK_HOST,
+    port: int = PRODUCTION_HERMES_NETWORK_PORT,
+) -> _ProductionConnectProxy:
+    server = _ProductionConnectProxyServer(host, port)
+    thread = None
+    try:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+    except BaseException:
+        try:
+            if thread is not None and thread.is_alive():
+                _ProductionConnectProxy(server=server, thread=thread).close()
+            else:
+                server.server_close()
+        except BaseException:
+            pass
+        raise
+    return _ProductionConnectProxy(server=server, thread=thread)
+
+
+def _release_production_worker_resources(
+    stdout_handle: Any | None,
+    stderr_handle: Any | None,
+    profile: Path | None,
+    proxy: _ProductionConnectProxy | None,
+) -> list[BaseException]:
+    errors: list[BaseException] = []
+    for resource in (stdout_handle, stderr_handle):
+        if resource is None:
+            continue
+        try:
+            resource.close()
+        except BaseException as exc:
+            errors.append(exc)
+    if profile is not None:
+        try:
+            profile.unlink(missing_ok=True)
+        except BaseException as exc:
+            errors.append(exc)
+    if proxy is not None:
+        try:
+            proxy.close()
+        except BaseException as exc:
+            errors.append(exc)
+    return errors
+
+
+def _reap_production_worker(
+    process: subprocess.Popen[str],
+    stdout_handle: Any,
+    stderr_handle: Any,
+    profile: Path,
+    proxy: _ProductionConnectProxy,
+) -> None:
+    process_errors: list[BaseException] = []
+    try:
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            except BaseException as exc:
+                process_errors.append(exc)
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                if process.poll() is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    except BaseException as exc:
+                        process_errors.append(exc)
+                    try:
+                        process.wait(timeout=5)
+                    except BaseException as exc:
+                        process_errors.append(exc)
+            except BaseException as exc:
+                process_errors.append(exc)
+                if process.poll() is None:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    except BaseException as kill_exc:
+                        process_errors.append(kill_exc)
+                    try:
+                        process.wait(timeout=5)
+                    except BaseException as wait_exc:
+                        process_errors.append(wait_exc)
+    finally:
+        errors = _release_production_worker_resources(
+            stdout_handle, stderr_handle, profile, proxy,
+        )
+    errors = [*process_errors, *errors]
+    if errors:
+        raise RuntimeError("Production worker process or resources could not be fully released.") from errors[0]
+
+
+def _production_dispatch_handoffs(
+    handoffs: Sequence[Mapping[str, Any]],
+    remaining_seconds: float,
+    revision_dir: Path,
+    configuration: Mapping[str, Any],
+    *,
+    skill_root: Path,
+    run_dir: Path,
+    runtime_identity: Mapping[str, Any],
+    expected_managed_hermes_identity: Mapping[str, str] | None = None,
+) -> None:
+    """Run one concurrent Hermes wave under a read-only candidate boundary."""
+    processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
+    deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
+    logs = run_dir / "logs/hermes-agents"
+    logs.mkdir(parents=True, exist_ok=True)
+    environment = _production_subprocess_environment(skill_root)
+    hermes_home = Path(environment["HERMES_HOME"])
+    workspace_root = run_dir.resolve()
+    hermes_launcher, managed_python = _managed_hermes_pair()
+    if expected_managed_hermes_identity is not None and (
+        _managed_hermes_identity() != dict(expected_managed_hermes_identity)
+    ):
+        raise RuntimeError("The managed Hermes launcher or interpreter changed after operation binding.")
+    hermes_install_root = hermes_launcher.parent.parent.parent
+    if managed_python.is_symlink():
+        interpreter_link_target = Path(os.readlink(managed_python))
+        if not interpreter_link_target.is_absolute():
+            interpreter_link_target = managed_python.parent / interpreter_link_target
+    else:
+        interpreter_link_target = managed_python
+    interpreter_link_root = interpreter_link_target.absolute().parent.parent
+    managed_interpreter_root = managed_python.resolve(strict=True).parent.parent
+    runtime_executable = Path(str(runtime_identity["executable"])).absolute()
+    runtime_root = runtime_executable.parent.parent
+
+    for handoff in handoffs:
+        started = time.monotonic()
+        request_id = Path(str(handoff["request_path"])).stem
+        profile = None
+        proxy = None
+        stdout_handle = None
+        stderr_handle = None
+        try:
+            cache_dir = run_dir / ".hermes-cache"
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            profile = tempfile.NamedTemporaryFile(
+                "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
+            )
+            proxy = _start_production_connect_proxy()
+            profile.write("(version 1)\n(allow default)\n")
+            profile.write("(deny network*)\n")
+            profile.write(f"(allow network-outbound (remote tcp \"localhost:{proxy.port}\"))\n")
+            readable_roots = (
+                Path("/System"), Path("/usr"), Path("/bin"), Path("/sbin"),
+                Path("/Library"), Path("/Applications/LibreOffice.app"),
+                Path("/private/etc"), Path("/etc"), Path("/dev"), Path("/private/var/db"),
+                hermes_install_root, hermes_home, skill_root, run_dir, runtime_root,
+            )
+            read_boundaries = _production_read_boundaries()
+            for boundary in read_boundaries:
+                profile.write(f"(deny file-read* (subpath {json.dumps(str(boundary))}))\n")
+            for readable_root in dict.fromkeys(path.resolve(strict=False) for path in readable_roots):
+                if any(readable_root == boundary or boundary in readable_root.parents for boundary in read_boundaries):
+                    profile.write(f"(allow file-read* (subpath {json.dumps(str(readable_root))}))\n")
+            profile.write(
+                f"(allow file-read* (literal {json.dumps(str(workspace_root.resolve()))}))\n"
+            )
+            profile.write(
+                f"(allow file-read* (literal {json.dumps(str(_production_authentication_path()))}))\n"
+            )
+            profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
+            profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
+            profile.write(
+                "(deny file-write* (require-not (require-any "
+                f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
+                f"(subpath {json.dumps(str(run_dir.resolve()))}) "
+                "(literal \"/dev/null\"))))\n"
+            )
+            profile.write(
+                f"(deny file-write* (literal {json.dumps(str(_production_authentication_path()))}))\n"
+            )
+            profile.write(f"(deny file-write* (subpath {json.dumps(str(skill_root.resolve()))}))\n")
+            for executable in ("pytest", "py.test", "pip", "pip3"):
+                profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
+                resolved = shutil.which(executable)
+                if resolved:
+                    profile.write(f"(deny process-exec (literal {json.dumps(resolved)}))\n")
+            profile.close()
+            command = [
+                str(managed_python), str(hermes_launcher), "chat", "-q",
+                _production_agent_prompt(
+                    skill_root, revision_dir, handoff, configuration,
+                    workspace_root=workspace_root,
+                ),
+                "--source", str(configuration["source"]),
+                "--max-turns", str(configuration["max_turns"]),
+                "-Q",
+            ]
+            if configuration.get("safe_mode") is True:
+                command.append("--safe-mode")
+            else:
+                command.extend(("--skills", str(configuration["skill"])))
+            stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
+            stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
+            worker_environment = dict(environment)
+            worker_environment.update({
+                "HTTPS_PROXY": f"http://127.0.0.1:{proxy.port}",
+                "HTTP_PROXY": f"http://127.0.0.1:{proxy.port}",
+                "ALL_PROXY": f"http://127.0.0.1:{proxy.port}",
+                "NO_PROXY": "",
+            })
+            process = subprocess.Popen(
+                [*_production_sandbox_prefix(Path(profile.name)), *command],
+                cwd=workspace_root,
+                env=worker_environment,
+                stdout=stdout_handle,
+                stderr=stderr_handle,
+                text=True,
+                start_new_session=True,
+            )
+        except BaseException:
+            if profile is not None:
+                if not profile.closed:
+                    try:
+                        profile.close()
+                    except BaseException:
+                        pass
+            _release_production_worker_resources(
+                stdout_handle,
+                stderr_handle,
+                Path(profile.name) if profile is not None else None,
+                proxy,
+            )
+            for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
+                try:
+                    _reap_production_worker(
+                        prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
+                    )
+                except BaseException:
+                    pass
+            raise
+        assert profile is not None and proxy is not None
+        assert stdout_handle is not None and stderr_handle is not None
+        processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started, proxy))
+    try:
+        pending = list(processes)
+        while pending and time.monotonic() < deadline:
+            for row in list(pending):
+                process, handoff, _, _, _, _, _ = row
+                if _production_response_is_bound(
+                    revision_dir, handoff,
+                ):
+                    if process.poll() is None:
+                        try:
+                            os.killpg(process.pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                    process.wait(timeout=5)
+                    pending.remove(row)
+                elif process.poll() is not None:
+                    stdout_handle = row[2]
+                    stdout_handle.flush()
+                    _production_publish_quiet_response(
+                        revision_dir,
+                        handoff,
+                        Path(str(stdout_handle.name)),
+                    )
+                    pending.remove(row)
+            if pending:
+                time.sleep(0.05)
+        for process, handoff, stdout_handle, _, _, _, _ in processes:
+            if process.poll() is not None:
+                stdout_handle.flush()
+                _production_publish_quiet_response(
+                    revision_dir,
+                    handoff,
+                    Path(str(stdout_handle.name)),
+                )
+        missing = [
+            str(handoff.get("response_path") or "")
+            for process, handoff, _, _, _, _, _ in processes
+            if not _production_response_is_bound(
+                revision_dir, handoff,
+            )
+        ]
+        if missing:
+            raise RuntimeError(
+                "Hermes workers did not produce complete bound responses: " + ", ".join(missing)
+            )
+    finally:
+        cleanup_errors: list[BaseException] = []
+        for process, _, stdout_handle, stderr_handle, profile, _, proxy in processes:
+            try:
+                _reap_production_worker(process, stdout_handle, stderr_handle, profile, proxy)
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        for process, handoff, _, _, _, started, _ in processes:
+            ended = time.monotonic()
+            event_path = run_dir / "logs/hermes-agent-events.jsonl"
+            try:
+                event_path.parent.mkdir(parents=True, exist_ok=True)
+                response_path = revision_dir / str(handoff.get("response_path") or "")
+                with event_path.open("a", encoding="utf-8") as handle:
+                    handle.write(json.dumps({
+                        "request_path": str(handoff.get("request_path") or ""),
+                        "response_path": str(handoff.get("response_path") or ""),
+                        "task": handoff.get("task"),
+                        "batch_id": handoff.get("batch_id"),
+                        "started_monotonic": started,
+                        "ended_monotonic": ended,
+                        "elapsed_seconds": round(ended - started, 3),
+                        "returncode": process.returncode,
+                        "response_exists": response_path.is_file(),
+                        "stdout_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stdout.log",
+                        "stderr_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stderr.log",
+                    }, ensure_ascii=False) + "\n")
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if cleanup_errors:
+            raise RuntimeError(
+                "One or more production workers could not be fully reaped."
+            ) from cleanup_errors[0]
+
+
+def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
+    untrusted_root = skill_root.expanduser().absolute()
+    if any(path.is_symlink() for path in (
+        untrusted_root, untrusted_root.parent, untrusted_root.parent.parent,
+    )):
+        raise ValueError("The installed release root and profile must not contain symlinks.")
+    skill_root = untrusted_root.resolve()
+    findings = _manifest_integrity(skill_root, allow_runtime_state=True)
+    if findings:
+        raise ValueError(
+            "Production Desktop adapter requires an intact packaged release: "
+            + "; ".join(str(item.get("issue") or "") for item in findings)
+        )
+    manifest = _read(skill_root / RELEASE_MANIFEST)
+    return {
+        "package_fingerprint": manifest["package_fingerprint"],
+        "git_commit": manifest["git_commit"],
+        "source": "shipped_production_adapter",
+    }
+
+
+def _certification_preflight_authorizes_candidate(
+    skill_root: Path,
+    preflight_path: Path,
+    identity: Mapping[str, Any],
+) -> bool:
+    """Require lifecycle-owned preflight evidence outside the candidate tree."""
+    supplied = preflight_path.expanduser().absolute()
+    if supplied != supplied.resolve() or supplied.is_symlink() or not supplied.is_file():
+        return False
+    root = skill_root.resolve()
+    try:
+        supplied.relative_to(root)
+        return False
+    except ValueError:
+        pass
+    try:
+        evidence = _read(supplied)
+        trusted_key = _read(root / RELEASE_CERTIFICATION_PUBLIC_KEY)
+    except (OSError, ValueError, json.JSONDecodeError, TypeError):
+        return False
+    candidate = evidence.get("candidate") or {}
+    producer = evidence.get("producer") or {}
+    checks = evidence.get("checks") or {}
+    attestation = evidence.get("evidence_attestation") or {}
+    try:
+        modulus = int(str(trusted_key.get("modulus") or ""), 16)
+        exponent = int(str(trusted_key.get("exponent") or ""))
+        signature = base64.b64decode(
+            str(attestation.get("signature_base64") or ""), validate=True,
+        )
+        unsigned = dict(evidence)
+        unsigned.pop("evidence_attestation", None)
+        payload_digest = hashlib.sha256(release_certification_payload(unsigned)).digest()
+        digest_info = bytes.fromhex("3031300d060960864801650304020105000420") + payload_digest
+        encoded_bytes = (modulus.bit_length() + 7) // 8
+        expected = b"\x00\x01" + b"\xff" * (encoded_bytes - len(digest_info) - 3) + b"\x00" + digest_info
+        verified_signature = pow(
+            int.from_bytes(signature, "big"), exponent, modulus,
+        ).to_bytes(encoded_bytes, "big")
+    except (ValueError, TypeError, binascii.Error, OverflowError):
+        return False
+    return bool(
+        evidence.get("schema_version") == "release-certification-preflight/v1"
+        and evidence.get("status") == "passed"
+        and evidence.get("repository_clean") is True
+        and candidate.get("release_root") == str(root)
+        and all(
+            candidate.get(field) == identity.get(field)
+            for field in ("package_fingerprint", "git_commit")
+        )
+        and producer.get("path") == "tests/hermes_e2e.py"
+        and producer.get("git_commit") == identity.get("git_commit")
+        and attestation.get("schema_version") == "release-certification-attestation/v1"
+        and attestation.get("algorithm") == RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM
+        and attestation.get("key_id") == RELEASE_CERTIFICATION_TRUSTED_KEY_ID
+        and attestation.get("key_id") == release_certification_key_id(trusted_key)
+        and attestation.get("payload_sha256") == payload_digest.hex()
+        and len(signature) == encoded_bytes
+        and verified_signature == expected
+        and set(checks) == {
+            "static_release_checks", "layout_preservation_corpus",
+            "deterministic_branch_acceptance_corpus", "repository_regression_suite",
+        }
+        and all(
+            isinstance(item, Mapping)
+            and item.get("status") == "passed"
+            and item.get("returncode") == 0
+            for item in checks.values()
+        )
+    )
+
+
+def run_production_desktop_operation(
+    run_dir: Path,
+    *,
+    opener: Callable[[str], Any] | None = None,
+    parent_visual_reviewer: Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None] | None = None,
+    release_identity: Mapping[str, Any] | None = None,
+    hermes_configuration: Mapping[str, Any] = CERTIFIED_HERMES_CONFIGURATION,
+    operation_id: str = "default",
+    skill_root: Path | None = None,
+    certification_preflight: Path | None = None,
+    manual_review: bool = False,
+) -> dict[str, Any]:
+    """Shipped host adapter for normal, manual-review, and certification execution."""
+    run_dir = run_dir.expanduser().resolve()
+    untrusted_root = (skill_root or SCRIPT_DIR.parent).expanduser().absolute()
+    if any(path.is_symlink() for path in (
+        untrusted_root, untrusted_root.parent, untrusted_root.parent.parent,
+    )):
+        raise ValueError("The installed release root and profile must not contain symlinks.")
+    root = untrusted_root.resolve()
+    installed_identity = _installed_release_identity(root)
+    if release_identity is not None and any(
+        release_identity.get(field) != installed_identity.get(field)
+        for field in ("package_fingerprint", "git_commit")
+    ):
+        raise ValueError("Supplied release identity does not match the installed candidate manifest.")
+    identity = installed_identity
+    require_promoted_runtime = True
+    if manual_review and certification_preflight is not None:
+        raise ValueError("Manual pre-release review and Release Certification are distinct execution modes.")
+    if manual_review:
+        candidate_runtime = _pdfium_runtime_integrity(
+            root, require_promoted_runtime=False,
+        )
+        if candidate_runtime.get("status") != "passed":
+            raise ValueError(
+                "Manual pre-release review requires a verified provisioned candidate runtime."
+            )
+        require_promoted_runtime = False
+        identity = {**identity, "manual_review": True}
+    elif certification_preflight is not None:
+        if not _certification_preflight_authorizes_candidate(
+            root, certification_preflight, identity,
+        ):
+            raise ValueError(
+                "Certification execution requires passing lifecycle-owned preflight evidence for the exact candidate root."
+            )
+        candidate_runtime = _pdfium_runtime_integrity(
+            root, require_promoted_runtime=False,
+        )
+        if candidate_runtime.get("status") != "passed":
+            raise ValueError(
+                "Certification execution requires a verified provisioned certification candidate."
+            )
+        require_promoted_runtime = False
+    configuration = dict(hermes_configuration)
+    allowed_configuration_fields = set(CERTIFIED_HERMES_CONFIGURATION) | {
+        "layout_preservation_notes",
+    }
+    if set(configuration) not in (
+        set(CERTIFIED_HERMES_CONFIGURATION), allowed_configuration_fields,
+    ):
+        raise ValueError("Production Desktop execution requires the exact governed Hermes configuration.")
+    if "layout_preservation_notes" in configuration and (
+        not isinstance(configuration["layout_preservation_notes"], list)
+        or any(
+            not isinstance(note, str) or not note.strip()
+            for note in configuration["layout_preservation_notes"]
+        )
+    ):
+        raise ValueError("Production Desktop execution requires governed layout-preservation notes.")
+    governed_configuration = {
+        field: configuration.get(field)
+        for field in CERTIFIED_HERMES_CONFIGURATION
+    }
+    if governed_configuration != CERTIFIED_HERMES_CONFIGURATION:
+        raise ValueError("Production Desktop execution requires the exact governed Hermes configuration.")
+    if opener is None:
+        raise ValueError("Production Desktop execution requires the actual Desktop opener.")
+    runtime_identity = resolve_python_runtime(environment=os.environ)
+    managed_hermes_identity = _managed_hermes_identity()
+    identity = {**identity, "managed_hermes_identity": managed_hermes_identity}
+    parent_review_record: dict[str, Any] | None = None
+
+    def revision_dir() -> Path:
+        reference = _read(run_dir / REFERENCE)
+        revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
+        if not revision_id:
+            raise RuntimeError("The approved Run Revision identity is missing.")
+        return run_dir / "revisions" / revision_id
+
+    def route(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        _production_dispatch_handoffs(
+            handoffs, remaining_seconds, revision_dir(), configuration,
+            skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
+            expected_managed_hermes_identity=managed_hermes_identity,
+        )
+
+    def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
+        nonlocal parent_review_record
+        active_revision = revision_dir()
+        if parent_visual_reviewer is None:
+            raise RuntimeError(
+                "Delegated Visual QA failed; a genuine Desktop-parent reviewer callback is required."
+            )
+        parent_visual_reviewer(
+            handoffs, remaining_seconds, active_revision, configuration,
+        )
+        parent_review_record = {
+            "status": "completed",
+            "revision_id": active_revision.name,
+            "request_paths": [str(item.get("request_path") or "") for item in handoffs],
+            "response_paths": [str(item.get("response_path") or "") for item in handoffs],
+            "completion_requirement": "Desktop parent must inspect every bound page image.",
+            "producer_model_policy": "record_actual_nonempty_model_id",
+        }
+
+    result = run_desktop_operation(
+        run_dir,
+        handoff_runner=route,
+        fallback_handoff_runner=fallback,
+        opener=opener,
+        operation_id=operation_id,
+        runtime_identity=runtime_identity,
+        release_identity={**identity, "hermes_configuration": configuration},
+        cleanup=lambda _status, _remaining: {
+            "owned_processes_reaped": True,
+            "late_responses_ignored": True,
+        },
+        require_promoted_runtime=require_promoted_runtime,
+    )
+    return {
+        **result,
+        "parent_visual_review": parent_review_record,
+        "review_mode": "manual_pre_release" if manual_review else "governed_delivery",
+    }
+
+
+def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
+    """Build an external host opener that emits exact retrieved bytes."""
+    expanded = command_path.expanduser()
+    if not expanded.is_absolute():
+        raise ValueError(
+            "The Desktop opener command must be an absolute, non-symlinked executable file."
+        )
+    command = expanded.absolute()
+    if command.is_symlink() or not command.is_file():
+        raise ValueError(
+            "The Desktop opener command must be an absolute, non-symlinked executable file."
+        )
+    if not os.access(command, os.X_OK):
+        raise ValueError("The Desktop opener command is not executable.")
+
+    def open_attachment(path: str) -> bytes:
+        return subprocess.run(
+            [str(command), path],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        ).stdout
+
+    return open_attachment
+
+
+def command_parent_visual_reviewer(
+    command_path: Path,
+) -> Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None]:
+    """Build the external Desktop-parent callback used by the public CLI."""
+    expanded = command_path.expanduser()
+    if not expanded.is_absolute():
+        raise ValueError("The Desktop-parent reviewer command must be an absolute executable file.")
+    command = expanded.absolute()
+    if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
+        raise ValueError("The Desktop-parent reviewer command must be an absolute executable file.")
+
+    def review(
+        handoffs: Sequence[Mapping[str, Any]],
+        remaining_seconds: float,
+        revision_dir: Path,
+        configuration: Mapping[str, Any],
+    ) -> None:
+        request_path = revision_dir / "hermes/desktop-parent-visual-review-request.json"
+        _write(request_path, {
+            "schema_version": "desktop-parent-visual-review-request/v1",
+            "revision_id": revision_dir.name,
+            "handoffs": [dict(item) for item in handoffs],
+            "producer_model_policy": "record_actual_nonempty_model_id",
+        })
+        subprocess.run(
+            [str(command), str(request_path)],
+            check=True,
+            timeout=max(1.0, remaining_seconds),
+            env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+        )
+
+    return review
 
 
 def _drafting_evidence(revision_dir: Path) -> list[dict[str, Any]]:
@@ -3862,14 +4977,39 @@ def _publish(
     return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
 
 
-def _clear_verification_responses(revision_dir: Path, tasks: set[str] | None = None) -> None:
+def _clear_verification_responses(
+    revision_dir: Path,
+    tasks: set[str] | None = None,
+    *,
+    request_ids: set[str] | None = None,
+) -> None:
     for request_path in (revision_dir / "hermes/verification-requests").glob("*.json"):
         try:
             request = _read(request_path)
         except (OSError, ValueError, json.JSONDecodeError):
             continue
-        if tasks is None or str(request.get("task")) in tasks:
+        if (
+            (request_ids is not None and str(request.get("request_id")) in request_ids)
+            or (request_ids is None and (tasks is None or str(request.get("task")) in tasks))
+        ):
             (revision_dir / str(request.get("response_path", ""))).unlink(missing_ok=True)
+
+
+def _reset_verification_set(revision_dir: Path) -> None:
+    """Remove the current bound set so every reviewer assesses the repaired candidate."""
+    request_root = revision_dir / "hermes/verification-requests"
+    response_root = revision_dir / "hermes/verification-responses"
+    for request_path in request_root.glob("*.json"):
+        try:
+            request = _read(request_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            request = {}
+        response_path = request.get("response_path")
+        if response_path:
+            (revision_dir / str(response_path)).unlink(missing_ok=True)
+        request_path.unlink(missing_ok=True)
+    for response_path in response_root.glob("*.json"):
+        response_path.unlink(missing_ok=True)
 
 
 def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
@@ -3884,7 +5024,11 @@ def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> l
     return [normalized[key] for key in sorted(normalized)]
 
 
-def _layout_repair_plan(findings: Iterable[Mapping[str, Any]]) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
+def _layout_repair_plan(
+    findings: Iterable[Mapping[str, Any]],
+    *,
+    icf_template: str | None = None,
+) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
     plan: dict[str, list[dict[str, str]]] = {}
     unsupported: list[dict[str, Any]] = []
     for raw in findings:
@@ -3896,7 +5040,17 @@ def _layout_repair_plan(findings: Iterable[Mapping[str, Any]]) -> tuple[dict[str
         artifact = str(finding.get("artifact") or layout_targets[0]).removesuffix(".docx")
         check = str(finding.get("check") or "")
         target = " ".join(str(finding.get("element") or "").split())
-        rule = LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
+        exact_sterling_duration_gap = (
+            check == "excessive_whitespace"
+            and artifact == "icf"
+            and target.casefold() == "duration"
+            and str(icf_template or "").casefold() == "sterling"
+        )
+        rule = (
+            "heading_whitespace_cohesion"
+            if exact_sterling_duration_gap
+            else LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
+        )
         if rule not in LAYOUT_REPAIR_RULES.get(artifact, ()) or not target:
             unsupported.append({
                 **finding,
@@ -4249,19 +5403,30 @@ def _quality_retry(
     if transient:
         verification_attempts = working_reference.setdefault("generation", {}).setdefault("verification_attempts", {})
         exhausted = []
-        tasks = set()
-        for item in transient:
+        request_ids: set[str] = set()
+        fallback_tasks: set[str] = set()
+        transient_by_reviewer: dict[str, dict[str, Any]] = {}
+        for raw in transient:
+            item = dict(raw)
             target = str((item.get("target_ids") or [item.get("field")])[0])
-            next_attempt = int(verification_attempts.get(target, 0)) + 1
-            verification_attempts[target] = next_attempt
+            request_id = str(item.get("verification_request_id") or "").strip()
+            retry_key = request_id or target
+            transient_by_reviewer.setdefault(retry_key, item)
+        for retry_key, item in transient_by_reviewer.items():
+            target = str((item.get("target_ids") or [item.get("field")])[0])
+            next_attempt = int(verification_attempts.get(retry_key, 0)) + 1
+            verification_attempts[retry_key] = next_attempt
             retry_target = RetryTarget.parse(target)
             task = VERIFICATION_TASK_BY_TARGET.get(retry_target.value) if retry_target.category == "verification" else None
-            if task:
-                tasks.add(task)
+            request_id = str(item.get("verification_request_id") or "").strip()
+            if request_id:
+                request_ids.add(request_id)
+            elif task:
+                fallback_tasks.add(task)
             if next_attempt > MAX_VERIFICATION_ATTEMPTS:
                 exhausted.append({
                     **dict(item),
-                    "field": target,
+                    "field": retry_key,
                     "issue": f"Reviewer retry limit reached after {MAX_VERIFICATION_ATTEMPTS} attempts. {item.get('issue', '')}".strip(),
                 })
         _write(reference_path, working_reference)
@@ -4269,13 +5434,16 @@ def _quality_retry(
             path = run_dir / "reference/repair-report.md"
             path.write_text(repair_report(exhausted), encoding="utf-8")
             return {"status": "blocked", "stage": "reviewer_retry_limit", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-        _clear_verification_responses(revision_dir, tasks)
+        if request_ids:
+            _clear_verification_responses(revision_dir, request_ids=request_ids)
+        if fallback_tasks:
+            _clear_verification_responses(revision_dir, fallback_tasks)
         remaining = [item for item in findings if item.get("recovery_class") != "verifier_transient"]
         if not remaining:
             return _awaiting(
                 revision_dir,
                 stage="independent_verification_retry",
-                paths=sorted((revision_dir / "hermes/verification-requests").glob("*.json")),
+                paths=pending_verifications(revision_dir),
                 findings=transient,
             )
         findings = remaining
@@ -4352,22 +5520,12 @@ def _quality_retry(
             "repair_report": path.relative_to(run_dir).as_posix(),
             "client_outputs": [],
         }
-    attempts, exhausted = retry_attempts(normalized, prior_attempts)
-    working_reference.setdefault("generation", {})["attempts"] = attempts
-    _write(reference_path, working_reference)
-    if exhausted:
-        path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(exhausted), encoding="utf-8")
-        return {"status": "blocked", "stage": stage, "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-    if section_targets:
-        invalidate_accepted_targets(revision_dir, section_targets)
-        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
-        _clear_verification_responses(revision_dir)
-        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized, contracted_bundle=contracted_bundle)
-        if created:
-            return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
+    layout_plan: dict[str, list[dict[str, str]]] = {}
     if has_layout_target:
-        generation = working_reference.setdefault("generation", {})
-        repair_plan, unsupported = _layout_repair_plan(normalized)
+        layout_plan, unsupported = _layout_repair_plan(
+            normalized,
+            icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
+        )
         if unsupported:
             return _repair_block(
                 run_dir,
@@ -4375,14 +5533,49 @@ def _quality_retry(
                 unsupported,
                 candidate_outputs=_candidate_outputs(revision_dir),
             )
+    attempts, exhausted = retry_attempts(normalized, prior_attempts)
+    if exhausted:
+        working_reference.setdefault("generation", {})["attempts"] = attempts
+        _write(reference_path, working_reference)
+        path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(exhausted), encoding="utf-8")
+        return {"status": "blocked", "stage": stage, "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
+    if stage == "quality" and (section_targets or has_layout_target):
+        generation = working_reference.setdefault("generation", {})
+        current_review_set = max(1, int(generation.get("review_set", 1)))
+        if current_review_set >= MAX_REVIEW_SETS:
+            exhausted_review = [{
+                **dict(item),
+                "field": "review_set",
+                "issue": f"Independent verification still found a defect after {MAX_REVIEW_SETS} complete review sets. {item.get('issue', '')}".strip(),
+            } for item in normalized]
+            return _repair_block(
+                run_dir,
+                "review_set_limit",
+                exhausted_review,
+                candidate_outputs=_candidate_outputs(revision_dir),
+            )
+        generation["review_set"] = current_review_set + 1
+        _reset_verification_set(revision_dir)
+    working_reference.setdefault("generation", {})["attempts"] = attempts
+    _write(reference_path, working_reference)
+    created: list[Path] = []
+    if section_targets:
+        invalidate_accepted_targets(revision_dir, section_targets)
+        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
+        _clear_verification_responses(revision_dir)
+        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized, contracted_bundle=contracted_bundle)
+    if has_layout_target:
+        generation = working_reference.setdefault("generation", {})
         persisted_repairs = generation.setdefault("layout_repairs", {})
-        for artifact, repairs in repair_plan.items():
+        for artifact, repairs in layout_plan.items():
             existing = persisted_repairs.get(artifact, ())
             persisted_repairs[artifact] = _normalized_layout_repair_records([*existing, *repairs])
             _invalidate_layout_artifact(revision_dir, artifact)
-        generation["pending_layout_artifacts"] = sorted(repair_plan)
+        generation["pending_layout_artifacts"] = sorted(layout_plan)
         _write(reference_path, working_reference)
-    else:
+    if created:
+        return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
+    if not has_layout_target:
         tasks = {
             task
             for target in targets
@@ -4686,7 +5879,15 @@ def generate(
     observe_stage("render_assurance")
     if state.pop("pending_layout_artifacts", None) is not None:
         _write(reference_path, working_reference)
-    create_verification_requests(revision_dir, reference, render_report, contracted_bundle=bundle)
+    review_set = max(1, int(state.setdefault("review_set", 1)))
+    _write(reference_path, working_reference)
+    create_verification_requests(
+        revision_dir,
+        reference,
+        render_report,
+        contracted_bundle=bundle,
+        review_set=review_set,
+    )
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
@@ -5014,8 +6215,35 @@ def run_format_conformance(
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument("--run-dir"); parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate")); parser.add_argument("--approved-by", default="client"); parser.add_argument("--source-md"); parser.add_argument("--release-gate", action="store_true"); parser.add_argument("--release-gate-root"); parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix"); parser.add_argument("--format-conformance-root"); parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive"); parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate"); parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive"); parser.add_argument("--release-archive", help="candidate archive used with --bind-certification"); parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release"); parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive"); parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release"); parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback"); parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release"); parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--run-dir")
+    parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate"))
+    parser.add_argument("--approved-by", default="client")
+    parser.add_argument("--source-md")
+    parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter")
+    parser.add_argument("--manual-review", action="store_true", help="generate local pre-release review outputs from a provisioned candidate without requiring promotion")
+    parser.add_argument("--desktop-opener-command")
+    parser.add_argument("--parent-visual-review-command")
+    parser.add_argument("--operation-id", default="default")
+    parser.add_argument("--release-gate", action="store_true")
+    parser.add_argument("--release-gate-root")
+    parser.add_argument("--format-conformance", action="store_true", help="run the non-certifying deterministic format matrix")
+    parser.add_argument("--format-conformance-root")
+    parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive")
+    parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate")
+    parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive")
+    parser.add_argument("--release-archive", help="candidate archive used with --bind-certification")
+    parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release")
+    parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive")
+    parser.add_argument("--rollback-release", action="store_true", help="verify and atomically restore the immediately previous release")
+    parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback")
+    parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release")
+    parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
+    if args.manual_review and not (
+        args.desktop_operation or (args.stage == "generate" and args.run_dir)
+    ):
+        parser.error("--manual-review is supported only with --desktop-operation or --stage generate")
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.provision_candidate:
@@ -5031,16 +6259,35 @@ def main(argv: list[str] | None = None) -> int:
     elif args.rollback_release:
         if not args.skills_dir: parser.error("--skills-dir is required with --rollback-release")
         result = rollback_release(Path(args.skills_dir))
+    elif args.desktop_operation:
+        if not args.run_dir: parser.error("--run-dir is required with --desktop-operation")
+        if not args.desktop_opener_command: parser.error("--desktop-opener-command is required with --desktop-operation")
+        if not args.parent_visual_review_command: parser.error("--parent-visual-review-command is required with --desktop-operation")
+        result = run_production_desktop_operation(
+            Path(args.run_dir),
+            operation_id=args.operation_id,
+            opener=command_desktop_opener(Path(args.desktop_opener_command)),
+            parent_visual_reviewer=command_parent_visual_reviewer(
+                Path(args.parent_visual_review_command)
+            ),
+            manual_review=args.manual_review,
+        )
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)
     else:
         if not args.run_dir or not args.stage: parser.error("--run-dir and --stage are required unless a release or conformance operation is used")
         run_dir = Path(args.run_dir).expanduser().resolve()
-        result = {"prepare": prepare, "approve": approve, "validate": validate, "generate": generate}[args.stage](run_dir, approved_by=args.approved_by, source_md=Path(args.source_md).expanduser() if args.source_md else None)
+        stage_options: dict[str, Any] = {
+            "approved_by": args.approved_by,
+            "source_md": Path(args.source_md).expanduser() if args.source_md else None,
+        }
+        if args.stage == "generate" and args.manual_review:
+            stage_options["require_promoted_runtime"] = False
+        result = {"prepare": prepare, "approve": approve, "validate": validate, "generate": generate}[args.stage](run_dir, **stage_options)
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "command_desktop_opener", "command_parent_visual_reviewer", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

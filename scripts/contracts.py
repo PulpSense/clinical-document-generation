@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.13"
+CONTRACT_VERSION = "clinical-documents-v2.20"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -56,8 +56,8 @@ def recovery_finding(
     }
 
 LAYOUT_REPAIR_RULES = {
-    "protocol": ("heading_cohesion", "body_pagination", "table_pagination"),
-    "icf": ("heading_cohesion", "table_pagination"),
+    "protocol": ("heading_cohesion", "table_pagination"),
+    "icf": ("heading_cohesion", "heading_whitespace_cohesion", "table_pagination"),
 }
 
 BUNDLED_FONT_FILES = {
@@ -178,6 +178,8 @@ class SectionSpec:
     required: bool = True
     content_expectations: tuple[str, ...] = ()
     source_coverage: str = "all_material_evidence"
+    fidelity_evidence: tuple[str, ...] = ()
+    evidence_scopes: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -226,6 +228,11 @@ PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("population.sample_size"),
     RequiredInput("population.sample_justification", ("statistics.sample_size_justification",)),
     RequiredInput(
+        "statistics.sample_size_evidence",
+        ("population.sample_size_evidence",),
+        "sample-size evidence rows",
+    ),
+    RequiredInput(
         "risks_benefits.compensation_or_reimbursement",
         ("risks_benefits.compensation", "risks_benefits.reimbursement", "risks_benefits.payment"),
     ),
@@ -267,7 +274,6 @@ RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("population.sample_size"),
     RequiredInput("population.sample_justification", ("statistics.sample_size_justification",)),
     RequiredInput("statistics.analysis_plan"),
-    RequiredInput("safety.roles", kind="records"),
     RequiredInput("parties.irb.name"),
     RequiredInput("parties.irb.address"),
     RequiredInput("parties.sponsor.name"),
@@ -296,12 +302,19 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "endpoint-criteria.study-completion": "Name every approved visit and time point, then state the study-completion rule without omitting supplied follow-up.",
         "analysis-plan.datasets": "Identify the analysis populations or data sets supported by the approved analysis plan.",
         "analysis-plan.methodology": "Explain the approved statistical methods and map them explicitly to every supplied primary and secondary endpoint.",
-        "analysis-plan.considerations": "Explain the approved analysis conventions and interpretation considerations, including only source-supported handling of paired or missing observations.",
+        "analysis-plan.considerations": "Explain the approved analysis conventions, software/version, and interpretation considerations, including only source-supported handling of paired or missing observations.",
         "sample-size": "State the approved sample size and explain its approved justification.",
+        "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
+        "study-procedure.discontinued": "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
         "quality-safety": (
             "For each approved safety.roles record, write a separate direct active-voice sentence beginning "
             "with the exact approved party name, state only that party's approved safety-event responsibilities, "
             "and name no other responsible party; also explain the approved risks and safety boundary."
+        ),
+        "quality-safety.analysis": (
+            "Explain only the approved adverse-event or safety-analysis facts supplied for this subsection; "
+            "do not restate unrelated efficacy endpoints, confidence intervals, sensor outcomes, usability, "
+            "or missing-data methods from a broader analysis-plan field."
         ),
         "icf.study-purpose": "Explain the study purpose, hypothesis, primary endpoint, and background in clear participant-facing language.",
         "icf.procedures": "Explain every approved visit, procedure, and minimum interval without participation in another study before screening in participant-facing sequence.",
@@ -322,10 +335,39 @@ def _source_coverage(section_id: str) -> str:
         "objectives",
         "subjects.inclusion", "subjects.exclusion", "subjects.eligibility",
         "study-procedure.visits", "study-procedure.measurements", "study-procedure.enrollment",
+        "study-procedure.discontinued",
         "evaluation-procedures", "endpoint-criteria.completion",
-        "endpoint-criteria.study-completion", "icf.procedures",
+        "endpoint-criteria.discontinuation", "endpoint-criteria.study-completion", "analysis-plan.datasets",
+        "analysis-plan.methodology", "analysis-plan.considerations", "sample-size", "confidentiality-publication", "confidentiality",
+        "financial-injury", "risks-benefits.risks", "risks-benefits.benefits",
+        "icf.procedures", "icf.risks", "icf.benefits", "icf.payment", "icf.privacy",
     }
     return "all_material_items" if section_id in item_complete_sections else "all_material_evidence"
+
+
+def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
+    """Name source fields whose concrete operational qualifiers must survive rendering."""
+    return {
+        "study-procedure.visits": ("procedures.assessment_details", "procedures.intervention_management"),
+        "study-procedure.discontinued": ("procedures.discontinued_subjects",),
+        "analysis-plan.datasets": ("statistics.analysis_populations",),
+        "analysis-plan.methodology": ("statistics.methodology", "endpoints.other"),
+        "analysis-plan.considerations": ("statistics.software",),
+        "confidentiality-publication": ("confidentiality.retention",),
+        "financial-injury": ("risks_benefits.injury_handling",),
+        "risks-benefits.risks": ("risks_benefits.risks",),
+        "risks-benefits.benefits": ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"),
+        "endpoint-criteria.discontinuation": ("procedures.discontinuation", "procedures.replacement"),
+    }.get(section_id, ())
+
+
+def _evidence_scopes(section_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Limit broad source fields to the clauses owned by a narrow section."""
+    return {
+        "quality-safety.analysis": (
+            ("statistics.analysis_plan", ("adverse event", "safety")),
+        ),
+    }.get(section_id, ())
 
 
 def _section_spec(
@@ -336,6 +378,7 @@ def _section_spec(
     evidence: Iterable[str] = (),
     boilerplate: str | None = None,
     role: str = "leaf",
+    required: bool = True,
 ) -> SectionSpec:
     return SectionSpec(
         section_id,
@@ -345,8 +388,11 @@ def _section_spec(
         batch,
         tuple(evidence),
         boilerplate,
+        required,
         content_expectations=_content_expectations(section_id, title),
         source_coverage=_source_coverage(section_id),
+        fidelity_evidence=_fidelity_evidence(section_id),
+        evidence_scopes=_evidence_scopes(section_id),
     )
 
 
@@ -356,7 +402,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("general-information", "3.", "GENERAL INFORMATION", role="container"),
     _section_spec("table-of-contents", "4.", "TABLE OF CONTENTS", role="container"),
     _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.title", "study.hypothesis", "endpoints.primary")),
-    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary")),
+    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "procedures.minimum_days_before_screening_without_participation")),
@@ -364,18 +410,26 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design",)),
     _section_spec("study-design.bias", "8.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design",), "bias"),
+    _section_spec(
+        "study-design.assignment",
+        "8.3.",
+        "Method of Assigning Subjects to Treatment Arms",
+        evidence=("design.assignment_method",),
+        role="source",
+        required=False,
+    ),
     _section_spec("study-procedure", "9.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.consent", "9.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent",), "consent"),
-    _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule")),
-    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessments", "procedures.visit_schedule", "study.hypothesis", "endpoints.primary", "endpoints.secondary")),
+    _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "procedures.intervention_management")),
+    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
     _section_spec("study-procedure.unscheduled", "9.4.", "Unscheduled Visits", "protocol-operations", ("procedures.unscheduled_visits",), "unscheduled"),
-    _section_spec("study-procedure.discontinued", "9.5.", "Discontinued Subjects", "protocol-operations", ("procedures.discontinued_subjects", "procedures.discontinuation"), "discontinued-subjects"),
+    _section_spec("study-procedure.discontinued", "9.5.", "Discontinued Subjects", "protocol-operations", ("procedures.discontinued_subjects",), "discontinued-subjects"),
     _section_spec("analysis-plan", "10.", "ANALYSIS PLAN", role="container"),
-    _section_spec("analysis-plan.datasets", "10.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "endpoints.primary", "endpoints.secondary")),
-    _section_spec("analysis-plan.methodology", "10.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan", "endpoints.primary", "endpoints.secondary")),
-    _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "endpoints.primary", "endpoints.secondary")),
-    _section_spec("sample-size", "11.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification")),
-    _section_spec("confidentiality-publication", "12.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("confidentiality.publication",), "publication"),
+    _section_spec("analysis-plan.datasets", "10.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.analysis_populations", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
+    _section_spec("analysis-plan.methodology", "10.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
+    _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.software", "endpoints.primary", "endpoints.secondary")),
+    _section_spec("sample-size", "11.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification", "population.sample_size_evidence", "statistics.sample_size_evidence")),
+    _section_spec("confidentiality-publication", "12.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("confidentiality.publication", "confidentiality.retention"), "publication"),
     _section_spec("quality-safety", "13.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", role="container"),
     _section_spec("quality-safety.general", "13.1.", "General Information", "protocol-analysis-and-oversight", ("safety.general_information", "risks_benefits.risks"), "safety-general"),
     _section_spec("quality-safety.monitoring", "13.2.", "Monitoring for Adverse Events", "protocol-analysis-and-oversight", ("safety.monitoring",), "safety-monitoring"),
@@ -389,13 +443,13 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.injury_handling"), "injury"),
     _section_spec("endpoint-criteria", "18.", "STUDY ENDPOINT CRITERIA", role="container"),
     _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "completion"),
-    _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation",), "discontinuation"),
+    _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation", "procedures.replacement"), "discontinuation"),
     _section_spec("endpoint-criteria.termination", "18.3.", "Patient Termination", "protocol-operations", ("procedures.termination", "risks_benefits.risks"), "termination"),
     _section_spec("endpoint-criteria.study-termination", "18.4.", "Study Termination", "protocol-operations", ("procedures.study_termination",), "study-termination"),
     _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion"),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks",), "protocol-sparse-risks"),
-    _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits",), "protocol-sparse-benefits"),
+    _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"), "protocol-sparse-benefits"),
 )
 
 RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
@@ -574,6 +628,168 @@ def meaningful(value: Any) -> bool:
     return True
 
 
+SAMPLE_SIZE_EVIDENCE_COLUMNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    ("study", "Study", ()),
+    ("timepoint", "Timepoint", ("time_point",)),
+    ("mean_change_ods_vas", "Mean Change ODS-VAS", ()),
+    ("se", "SE", ("standard_error",)),
+    ("estimated_sd", "Estimated SD", ("estimated_standard_deviation",)),
+    ("evidence", "Evidence", ()),
+    ("value", "Value", ()),
+    ("source", "Source", ()),
+)
+DETAILED_SAMPLE_SIZE_COLUMNS = (
+    "study",
+    "timepoint",
+    "mean_change_ods_vas",
+    "se",
+    "estimated_sd",
+)
+LEGACY_SAMPLE_SIZE_COLUMNS = ("evidence", "value", "source")
+
+
+def _table_value(row: Mapping[str, Any], key: str, aliases: tuple[str, ...]) -> str:
+    for candidate in (key, *aliases):
+        if meaningful(row.get(candidate)):
+            return str(row[candidate]).strip()
+    return ""
+
+
+def _sample_size_evidence_records(
+    reference: Mapping[str, Any],
+) -> list[tuple[str, int, Mapping[str, Any]]]:
+    """Combine unique rows while preserving each row's approved source path."""
+    records: list[tuple[str, int, Mapping[str, Any]]] = []
+    seen: set[str] = set()
+    for path in ("statistics.sample_size_evidence", "population.sample_size_evidence"):
+        value = get_path(reference, path, [])
+        if not isinstance(value, list):
+            continue
+        for index, row in enumerate(value):
+            if not isinstance(row, Mapping):
+                continue
+            identity = json.dumps(row, ensure_ascii=False, sort_keys=True, default=str)
+            if identity not in seen:
+                records.append((path, index, row))
+                seen.add(identity)
+    return records
+
+
+def _sample_size_evidence_rows(reference: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [row for _path, _index, row in _sample_size_evidence_records(reference)]
+
+
+def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return typed, source-derived Protocol table matrices for rendering and QA."""
+    schedule = get_path(reference, "procedures.visit_schedule", [])
+    visits = [item for item in schedule if isinstance(item, Mapping)] if isinstance(schedule, list) else []
+    assessment_rows: list[list[str]] = []
+    if visits:
+        normalized_visits = []
+        for index, visit in enumerate(visits, 1):
+            name = str(visit.get("visit") or visit.get("visitName") or f"Visit {index}").strip()
+            timing = str(visit.get("timing") or visit.get("visitWindow") or "").strip()
+            raw_procedures = visit.get("procedures")
+            procedures = (
+                [str(item).strip() for item in raw_procedures if meaningful(item)]
+                if isinstance(raw_procedures, list)
+                else [item.strip() for item in re.split(r"[;\n]", str(raw_procedures or "")) if item.strip()]
+            )
+            normalized_visits.append({"name": name, "timing": timing, "procedures": procedures})
+        activities = list(dict.fromkeys(
+            activity for visit in normalized_visits for activity in visit["procedures"]
+        ))
+        if activities:
+            def header_label(visit: Mapping[str, Any]) -> str:
+                name, timing = str(visit["name"]), str(visit["timing"])
+                if not timing:
+                    return name
+                normalized_name = re.sub(r"\s+", " ", name).strip().casefold()
+                normalized_timing = re.sub(r"\s+", " ", timing).strip().casefold()
+                return name if normalized_name == normalized_timing else f"{name}\n({timing})"
+
+            assessment_rows = [
+                ["Activity", *[header_label(visit) for visit in normalized_visits]],
+                ["Activity", *[f"Visit {index}" for index, _visit in enumerate(normalized_visits, 1)]],
+                *[
+                    [activity, *["X" if activity in visit["procedures"] else "" for visit in normalized_visits]]
+                    for activity in activities
+                ],
+            ]
+    if not assessment_rows:
+        entries = []
+        schedule_table = get_path(reference, "procedures.visit_schedule_table", [])
+        if isinstance(schedule_table, list):
+            for item in schedule_table:
+                if not isinstance(item, Mapping):
+                    continue
+                label = str(item.get("visitName") or item.get("visit") or "").strip()
+                timing = str(item.get("visitWindow") or item.get("timing") or "").strip()
+                if label:
+                    entries.append([label, timing])
+        if entries:
+            assessment_rows = [["Approved visit or assessment", "Approved timing"], *entries]
+        else:
+            assessments = get_path(reference, "procedures.assessments", [])
+            if isinstance(assessments, list):
+                labels = [str(item).strip() for item in assessments if meaningful(item)]
+            else:
+                labels = [
+                    item.strip()
+                    for item in re.split(r",\s*(?:including\s+|and\s+)?|\n", str(assessments or "").rstrip("."), flags=re.I)
+                    if item.strip()
+                ]
+            def assessment_timing(label: str) -> str:
+                match = re.search(r"\b(?:Month|Week|Day)\s+[+-]?\d+\b", label, re.I)
+                if match:
+                    return match.group(0)
+                lowered = label.casefold()
+                if "baseline" in lowered:
+                    return "Baseline"
+                if "historical" in lowered:
+                    return "Historical record review"
+                if "screening" in lowered:
+                    return "Screening"
+                return "Per approved schedule"
+            if labels:
+                assessment_rows = [
+                    ["Approved visit or assessment", "Approved timing"],
+                    *[[label, assessment_timing(label)] for label in labels],
+                ]
+
+    evidence_rows = _sample_size_evidence_rows(reference)
+    selected_columns = [
+        (key, label, aliases)
+        for key, label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
+        if any(_table_value(row, key, aliases) for row in evidence_rows)
+    ]
+    sample_rows = (
+        [
+            [label for _key, label, _aliases in selected_columns],
+            *[
+                [_table_value(row, key, aliases) for key, _label, aliases in selected_columns]
+                for row in evidence_rows
+            ],
+        ]
+        if evidence_rows and selected_columns
+        else []
+    )
+    return {
+        "schedule-of-assessments": {
+            "section_id": "evaluation-procedures",
+            "caption": "Table 15.1. Proposed Visits and Study Assessments",
+            "header_rows": 2 if assessment_rows and assessment_rows[0][0] == "Activity" else 1,
+            "rows": assessment_rows,
+        },
+        "sample-size-evidence": {
+            "section_id": "sample-size",
+            "caption": "Table 11-1. Sample Size Supporting Evidence",
+            "header_rows": 1,
+            "rows": sample_rows,
+        },
+    }
+
+
 def _site_group(reference: Mapping[str, Any], kind: str) -> Any:
     sites = reference.get("sites") if isinstance(reference.get("sites"), list) else []
     key = {"site_facilities": "facility", "site_contacts": "contact", "site_investigators": "investigator"}[kind]
@@ -614,8 +830,15 @@ def _candidate_signature(value: Any) -> str | None:
 
 def _sample_size_signature(value: Any) -> str | None:
     """Normalize common count forms such as 40 and '40 participants'."""
-    if isinstance(value, Mapping) and "value" in value:
-        value = value.get("value")
+    if isinstance(value, Mapping):
+        explicit = next((
+            value.get(key)
+            for key in ("planned_sample_size", "sample_size", "participants", "participant_count", "enrollment", "value")
+            if meaningful(value.get(key))
+        ), None)
+        if explicit is None:
+            return None
+        value = explicit
     if not meaningful(value):
         return None
     text = re.sub(r"\s+", " ", str(value)).strip().casefold()
@@ -713,11 +936,103 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     sample_size = _sample_size_signature(get_path(reference, "population.sample_size"))
     for evidence_path in ("population.sample_size_evidence", "statistics.sample_size_evidence"):
         rows = get_path(reference, evidence_path, [])
+        if meaningful(rows) and not isinstance(rows, list):
+            findings.append({
+                "category": "source-evidence",
+                "field": evidence_path,
+                "issue": "Sample-size evidence must be a list of typed row objects.",
+                "required": "A list using only the approved sample-size evidence columns.",
+            })
+            continue
         if not isinstance(rows, list):
             continue
+        allowed_keys = {
+            candidate
+            for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
+            for candidate in (key, *aliases)
+        }
+        for index, row in enumerate(rows):
+            if not isinstance(row, Mapping):
+                findings.append({
+                    "category": "source-evidence",
+                    "field": f"{evidence_path}.{index}",
+                    "issue": "Sample-size evidence rows must be typed objects.",
+                    "required": "One object using only the approved sample-size evidence columns.",
+                })
+                continue
+            unsupported = sorted(str(key) for key in set(row) - allowed_keys)
+            if unsupported:
+                findings.append({
+                    "category": "source-evidence",
+                    "field": f"{evidence_path}.{index}",
+                    "issue": "Sample-size evidence contains unsupported columns that cannot be rendered without data loss: " + ", ".join(unsupported),
+                    "required": "Use the approved sample-size evidence schema or extend the versioned contract before approval.",
+                })
+            for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS:
+                values = {
+                    str(row[candidate]).strip()
+                    for candidate in (key, *aliases)
+                    if meaningful(row.get(candidate))
+                }
+                if len(values) > 1:
+                    findings.append({
+                        "category": "source-evidence",
+                        "field": f"{evidence_path}.{index}.{key}",
+                        "issue": "Sample-size evidence aliases contain conflicting values.",
+                        "required": "One approved value for the column.",
+                    })
         evidence_sizes = {_sample_size_signature(row) for row in rows if _sample_size_signature(row)}
         if sample_size and any(value != sample_size for value in evidence_sizes):
             findings.append({"category": "source-evidence", "field": evidence_path, "issue": "Sample-size evidence conflicts with the approved planned sample size.", "required": "Evidence rows that use the same participant count as population.sample_size."})
+    combined_records = _sample_size_evidence_records(reference)
+    combined_evidence = [row for _path, _index, row in combined_records]
+    if branch != "Retrospective" and combined_evidence:
+        present_columns = {
+            key
+            for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
+            if any(_table_value(row, key, aliases) for row in combined_evidence)
+        }
+        detailed_present = set(DETAILED_SAMPLE_SIZE_COLUMNS) & present_columns
+        legacy_present = set(LEGACY_SAMPLE_SIZE_COLUMNS) & present_columns
+        schema = DETAILED_SAMPLE_SIZE_COLUMNS if detailed_present else LEGACY_SAMPLE_SIZE_COLUMNS
+        missing = [column for column in schema if column not in present_columns]
+        if missing:
+            findings.append({
+                "category": "source-evidence",
+                "field": "statistics.sample_size_evidence",
+                "issue": "Sample-size evidence is missing required table columns: " + ", ".join(missing),
+                "required": "A complete detailed evidence schema or the complete approved legacy evidence schema.",
+            })
+        if detailed_present and legacy_present:
+            findings.append({
+                "category": "source-evidence",
+                "field": "statistics.sample_size_evidence",
+                "issue": "Sample-size evidence mixes detailed and legacy table schemas.",
+                "required": "Use one complete approved sample-size evidence schema per study.",
+            })
+        column_aliases = {
+            key: aliases for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
+        }
+        aggregate_labels = {"average", "pooled", "combined", "overall"}
+        for evidence_path, source_index, row in combined_records:
+            allowed_blanks: set[str] = set()
+            if schema == DETAILED_SAMPLE_SIZE_COLUMNS:
+                label = _table_value(row, "study", column_aliases["study"]).casefold()
+                if label in aggregate_labels:
+                    allowed_blanks = {"timepoint", "se"}
+            row_missing = [
+                column
+                for column in schema
+                if column not in allowed_blanks
+                and not _table_value(row, column, column_aliases[column])
+            ]
+            if row_missing:
+                findings.append({
+                    "category": "source-evidence",
+                    "field": f"{evidence_path}.{source_index}",
+                    "issue": "Sample-size evidence row is missing required values: " + ", ".join(row_missing),
+                    "required": "Populate every required cell; only aggregate rows may leave timepoint and SE blank.",
+                })
     timeline_days = _duration_days(get_path(reference, "study.timeline"))
     scheduled_days = _scheduled_duration_days(reference)
     tolerance = max(1.0, timeline_days * 0.02) if timeline_days is not None else 0.0
@@ -746,9 +1061,8 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.time_frame", "issue": "Outcome time frame is missing.", "required": "Reviewer-approved outcome time frame."})
     else:
         safety_roles = get_path(reference, "safety.roles")
-        if (
+        if meaningful(safety_roles) and (
             not isinstance(safety_roles, list)
-            or not safety_roles
             or any(not _valid_safety_role_record(item) for item in safety_roles)
             or len({_safety_party_identity(item["party"]) for item in safety_roles if isinstance(item, Mapping)}) != len(safety_roles)
         ):
@@ -807,6 +1121,11 @@ def source_contract(
 
 def evidence_available(reference: Mapping[str, Any], paths: Iterable[str]) -> list[str]:
     return [path for path in paths if meaningful(get_path(reference, path))]
+
+
+def section_applies(reference: Mapping[str, Any], section: SectionSpec) -> bool:
+    """Return the single contract decision used to scope a document section."""
+    return section.required or bool(evidence_available(reference, section.evidence))
 
 
 def contract_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
@@ -1194,5 +1513,5 @@ __all__ = [
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth",
-    "icf_contract", "icf_retained_sections", "protocol_contract", "recovery_finding", "repair_report", "set_path", "source_contract", "source_truth_markdown",
+    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown",
 ]

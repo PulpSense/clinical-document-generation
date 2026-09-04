@@ -49,16 +49,13 @@ The client outputs are standard `.docx` and `.xml` files. The authoring host mus
 
 Protocol and ICF rendering begins from the bundled client Word families. The renderer preserves their visual design, replaces study-specific Protocol bodies with accepted drafts, keeps applicable ICF regulatory language, removes example-study leakage, and blocks empty or near-empty rendered pages.
 
-Install Python dependencies in the Hermes environment:
-
-```bash
-"$CLINICAL_PYTHON" -m pip install -r requirements.txt
-```
-
-`CLINICAL_PYTHON` must be the absolute Python 3.10+ path returned by
-`workflow.resolve_python_runtime`; do not rely on the host's unqualified
-`python3`. The Desktop operation records that identity and every later runtime
-used to resume it.
+For the normative Hermes setup—including the dedicated Python environment,
+one-time unsigned-candidate provisioning, installation smoke, and the boundary
+between `--manual-review` and formally certified activation—follow
+[SKILL.md's Public interface](SKILL.md#public-interface). `CLINICAL_PYTHON` must
+be the resolved absolute Python 3.10+ path; do not rely on the host's
+unqualified `python3`. The Desktop operation records that identity and every
+later runtime used to resume it.
 
 ## Public commands
 
@@ -71,15 +68,29 @@ used to resume it.
 
 `generate` may return `awaiting_hermes`. It is the deterministic inner lifecycle
 step. Normal post-approval Desktop delivery uses
-`workflow.run_desktop_operation`, which owns one cross-process UTC deadline, routes
-those handoffs, and confirms every final attachment through the Desktop opener.
-The standalone CLI loop is for development and controlled diagnostics; it is
-not sufficient evidence of Desktop delivery.
+the shipped `scripts/workflow.py --desktop-operation` adapter, which owns one
+cross-process UTC deadline, launches safe-mode Hermes workers behind a read-only
+candidate boundary, routes bound responses, and confirms every final attachment
+through the Desktop opener. The standalone `--stage generate` loop is for
+development and controlled diagnostics; it is not sufficient evidence of
+Desktop delivery.
 
-The same operation interface is used by the controlled real-Hermes certification
-adapter in `tests/hermes_e2e.py`. That adapter supplies only environment-specific
-Hermes process, read-only sandbox, file-opening, progress, and cleanup behavior;
-it does not own another generation loop or deadline. The persisted operation
+Production Desktop operation also requires an absolute external parent-reviewer
+command. When delegated Visual QA fails, the adapter passes that command one
+JSON request path; the Desktop parent must inspect every referenced page and
+write the bound verification responses. Worker redispatch is never relabelled
+as parent review:
+
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --run-dir <run-dir> \
+  --desktop-opener-command /absolute/path/to/desktop-opener \
+  --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
+```
+
+The same shipped adapter owns controlled real-Hermes certification execution.
+`tests/hermes_e2e.py` prepares and audits the governed corpus but cannot replace
+the candidate's launcher, sandbox, response authentication, generation loop, or
+deadline. The persisted operation
 state binds the release fingerprint and compatible runtimes to the original UTC
 deadline, exact pending handoffs, attempt counters, stage timing and soft-budget
 diagnostics, cleanup evidence, and immutable terminal result.
@@ -89,18 +100,23 @@ editable checkout:
 
 ```bash
 candidate_dir="$(mktemp -d /tmp/clinical-release-candidate.XXXXXX)"
+mkdir -p "$candidate_dir/hermes-home/skills"
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release "$candidate_dir/release.zip"
-unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/extracted"
-"$CLINICAL_PYTHON" "$candidate_dir/extracted/clinical-document-generation/scripts/workflow.py" \
+unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/hermes-home/skills"
+"$CLINICAL_PYTHON" "$candidate_dir/hermes-home/skills/clinical-document-generation/scripts/workflow.py" \
   --provision-candidate
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --fixture ambispective-sterling \
-  --release-root "$candidate_dir/extracted/clinical-document-generation"
+  --preflight-evidence /absolute/path/release-certification-preflight.json \
+  --release-root "$candidate_dir/hermes-home/skills/clinical-document-generation" \
+  --desktop-opener-command /absolute/path/to/desktop-opener \
+  --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
 ```
 
-The adapter loads `run_desktop_operation` from that candidate, launches Hermes
-with the candidate read-only, and binds the operation to its release-manifest
-fingerprint. Its cleanup reserve remains inside the one 30-minute operation;
+The corpus controller loads `run_production_desktop_operation` from that
+candidate; the candidate launches Hermes with its own files read-only and binds
+the operation to its independently verified release-manifest fingerprint. Its
+cleanup reserve remains inside the one 30-minute operation;
 there is no shorter certification timeout. A successful single fixture is
 case evidence only; it does not certify a release until the complete three-study
 corpus has passed.
@@ -112,17 +128,26 @@ six-case Branch Acceptance Corpus, and the repository regression suite passed
 before any real model call:
 
 ```bash
+export CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY=/absolute/path/to/production-signing-key.json
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --run-preflight \
   --preflight-evidence /absolute/path/release-certification-preflight.json \
-  --release-root /absolute/path/to/extracted/clinical-document-generation
+  --release-root /absolute/path/to/hermes-home/skills/clinical-document-generation
 
 "$CLINICAL_PYTHON" tests/hermes_e2e.py \
   --corpus \
   --preflight-evidence /absolute/path/release-certification-preflight.json \
   --run-root /absolute/path/to/isolated-certification-runs \
-  --release-root /absolute/path/to/extracted/clinical-document-generation
+  --release-root /absolute/path/to/hermes-home/skills/clinical-document-generation \
+  --desktop-opener-command /absolute/path/to/desktop-opener \
+  --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
 ```
+
+The opener command is an external Desktop-host prerequisite, not a release
+resource. It receives one attachment path and must emit exactly the bytes
+retrieved through the actual Desktop opener on stdout; certification rejects a
+missing, relative, non-executable, or symlinked command and never substitutes a
+local filesystem read.
 
 The harness creates the preflight evidence by checking a clean candidate commit,
 compiling exactly the six production modules, running the identical-content
@@ -232,11 +257,16 @@ runtime outcome.
 Before installation, the same `config.yaml` must select only the active path and
 declare the certified launch settings under `skills.clinical_document_generation`:
 `source: clinical-release-certification`, `max_turns: 80`,
-`skill: clinical-document-drafting`, `safe_mode: true`,
-`model_identifier: gpt-5.6-sol`, and
-`reasoning_configuration: Hermes Desktop governed default`. The host also needs
-`model.default: gpt-5.6-sol`, `agent.reasoning_effort: medium`, and at least 80
-agent turns. A mismatch stops before activation with one configuration finding.
+`skill: clinical-document-generation`, `safe_mode: true`, and
+`reasoning_configuration: Hermes Desktop governed default`. The host may use any
+non-empty user-selected `model.default`; responses record the actual producing
+model. The host also needs `agent.reasoning_effort: medium` and at least 80 agent
+turns. A mismatch stops before activation with one configuration finding.
+
+Independent verification is bounded to three complete review sets. A genuine
+content or visual defect triggers a targeted repair followed by a fresh
+package-wide content review and fresh every-page visual reviews for every DOCX;
+transient API failures retry only the affected reviewer inside the current set.
 
 `--rollback-release` verifies the immediately previous release before one
 atomic swap, restores it as active, and quarantines the suspect release without

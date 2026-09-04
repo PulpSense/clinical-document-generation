@@ -13,12 +13,13 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 - Never invent study-specific facts. Before approval, return all missing Required Source Inputs in one focused checklist. Approval closes source intake.
 - Approved Fixed Clinical Boilerplate from `references/fixed-clinical-boilerplate.json` is allowed only where a request lists it.
 - Python owns contracts, state, rendering, XML structure, validation, retries, and publication. Python never drafts clinical prose and never calls a model.
-- Hermes owns model calls. Use the JSON request/response handoff described below.
+- Hermes owns model calls and uses the model selected by the user in their active Hermes configuration. Responses must record the actual producing model; the skill does not require a specific model.
 - Do not expose drafts, PDFs, page images, logs, or repair artifacts as client outputs.
 - Publish nothing unless the complete branch package passes.
 - Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect.
 - After approval, use one persistent Desktop operation. Aim for 10–12 minutes; 12 minutes remains successful, while 30 minutes is the hard correctness ceiling. Ten or twelve minutes is not a cutoff.
 - Normal generation is not software maintenance. The installed skill and its templates, contracts, tests, and implementation remain read-only; only the run workspace and isolated runtime caches may be written.
+- For ordinary client document generation, use `--manual-review`. This complete unsigned client workflow does not require a certification key or `PROMOTION-RECORD.json`. Run certification, signing, `--bind-certification`, or `--install-release` only when the user explicitly requests a formally certified release; a missing signing key is never a generation blocker.
 
 ## Branch outputs
 
@@ -33,6 +34,32 @@ Prospective and Ambispective use the same obligatory input contract. Retrospecti
 ## Public interface
 
 Run commands from this skill folder. `scripts/workflow.py` is the only CLI entrypoint.
+Provision a new Hermes host once before generation by creating a dedicated
+Python environment in writable storage and installing the pinned runtime
+dependencies. This explicit setup operation is separate from document
+generation. On the client Linux host, use:
+
+```bash
+/usr/local/bin/uv venv /opt/data/clinical-document-runtime --python /usr/bin/python3.13
+/usr/local/bin/uv pip install --python /opt/data/clinical-document-runtime/bin/python python-docx==1.2.0 lxml==6.1.1 pypdf==6.10.0
+export CLINICAL_PYTHON=/opt/data/clinical-document-runtime/bin/python
+cd /absolute/path/to/hermes/skills/clinical-document-generation
+"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate
+"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
+```
+
+Run the final two commands once after every fresh extraction of an unsigned
+client ZIP and require both JSON results to report `"status": "passed"` before
+generation. `--provision-candidate` installs only the archive's hash-bound
+Linux x86_64 PDFium wheel into that extracted skill; it does not download a
+renderer or modify the host Python environment. `--verify-installation` then
+smoke-tests the exact DOCX-to-PDF-to-page-image path through the host's Word or
+LibreOffice installation. Do not use `--install-release` for this unsigned
+drop-in path. That command remains reserved for a signed, fully certified
+archive.
+
+The release carries its pinned Linux x86_64 PDFium page renderer. Microsoft
+Word or LibreOffice remains the host prerequisite for DOCX-to-PDF rendering.
 Resolve one supported interpreter first and retain its absolute path; do not
 delegate launch to an ambiguous `python3` command. The Desktop launcher uses
 `workflow.resolve_python_runtime`, launches with the returned `executable`,
@@ -44,7 +71,8 @@ Python 3.10+ path.
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 "$CLINICAL_PYTHON" scripts/workflow.py --format-conformance --format-conformance-root <evidence-root>
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
@@ -98,7 +126,7 @@ release is quarantined under its fingerprint without rewriting retained run
 revisions. The archive contains
 `RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
 also requires Hermes `skills.external_dirs` to name only the promoted active
-path, validates the certified model/reasoning/safe-mode/turn settings declared
+path, validates recorded model provenance plus the certified reasoning/safe-mode/turn settings declared
 under `skills.clinical_document_generation`, and records the activation in
 `PROMOTION-RECORD.json`.
 
@@ -176,6 +204,34 @@ Do not add a second workflow entrypoint. The installation-owned `runtime/`
 directory contains only the manifest-bound PDFium runtime and packaged fonts
 used by Render Assurance; host Word or LibreOffice remains the DOCX renderer.
 
+## Run directory policy
+
+Keep every study run under `/opt/data/clinical-document-runs/`, with exactly one
+dedicated top-level folder per run. Before starting generation, derive and show
+the proposed folder name, then use it unless the user requests a different
+approved study title:
+
+```text
+<filesystem-safe-approved-study-title>__<study-type>__<YYYY-MM-DD>
+```
+
+Apply these rules:
+
+1. Use the approved study title from the study input.
+2. Use exactly `Prospective`, `Ambispective`, or `Retrospective` for the study-type label.
+3. Use the Hermes host's current local date when the folder is first created, formatted `YYYY-MM-DD`.
+4. Convert the title to a readable filesystem-safe name: replace spaces with hyphens; remove slashes, colons, and unsupported characters; and retain enough text to identify the study clearly.
+5. Never reuse or overwrite a run folder. If the base name exists, append `__02`, `__03`, and so on, choosing the first unused suffix.
+6. Create the selected folder directly under `/opt/data/clinical-document-runs/` and pass its exact absolute path as every workflow command's `--run-dir`.
+7. Keep all source inputs, the approved Source-of-Truth, revisions, drafts, logs, QA evidence, render evidence, and final documents inside that run folder.
+8. Keep final deliverables only in `<run-folder>/output/`; `client_outputs` is the workflow result field that lists those published files, not a separate directory.
+9. Never generate files directly in `/opt/data`, inside this installed skill, or inside another study's run folder.
+10. Never delete or alter an earlier study-run folder.
+11. At completion, report the approved study title, study type, creation date, complete run-folder path, `output` path, and final deliverable filenames.
+
+Folder selection is complete only after confirming the proposed path does not
+already exist and the chosen path is the first available collision-safe name.
+
 ## Full loop
 
 ### 1. Preserve and normalize inputs
@@ -219,26 +275,42 @@ After approval, do not ask the reviewer any additional clinical or document-cont
 
 ### 4. Run the bounded Desktop operation
 
-The Desktop parent must call `workflow.run_desktop_operation` for the entire
-post-approval lifecycle. Supply the host's Hermes handoff runner and actual
-Desktop file opener. The operation persists its start and cross-process UTC deadline
+The Desktop parent must use the shipped
+`scripts/workflow.py --desktop-operation --manual-review --run-dir <run-dir>` adapter for the
+entire post-approval lifecycle. Its production API is
+`workflow.run_production_desktop_operation`; callers supply only the actual
+Desktop file opener and, when required, the Desktop-parent visual fallback.
+The adapter owns the safe-mode Hermes launcher, read-only candidate sandbox,
+response authentication, and process cleanup. The operation persists its start
+and cross-process UTC deadline
 under the run workspace, so retries and resume calls cannot reset either. It
 records every compatible runtime identity used to resume. Persisted monotonic
 timestamps are never treated as portable; monotonic time is used only inside
 one process and converted to the persisted UTC anchor.
 
-The operation also persists the Promoted Release fingerprint, exact pending
-stage and handoffs, drafting and verification attempts, delivery attempts,
-stage timings, soft-budget diagnostics, cleanup evidence, and the terminal
-result. A missing response redispatches only its unchanged request identity;
+For ordinary client generation, use `--manual-review` from a provisioned
+candidate skill root. This mode
+uses the same drafting, template rendering, content checks, and every-page
+Visual QA, but labels the operation `manual_pre_release` and permits the
+candidate's verified page-renderer runtime without `PROMOTION-RECORD.json`.
+Its outputs are the client-review deliverables. Formal promotion, certification,
+signing, and certified installation remain separate operations and are never
+started by manual-review mode unless the user explicitly requests them.
+
+The operation also persists the promoted release fingerprint, or the candidate
+manifest fingerprint for `manual_pre_release`, plus the exact pending stage and
+handoffs, drafting and verification attempts, delivery attempts, stage timings,
+soft-budget diagnostics, cleanup evidence, and the terminal result. A missing
+response redispatches only its unchanged request identity;
 changed request bytes fail closed. Soft stage budgets may trigger diagnostics
 or the parent visual fallback, but only the original UTC deadline terminates
 the operation. A late worker or opener completion cannot change a terminal
 result or confirm delivery after that deadline.
 
-Release Certification supplies `run_desktop_operation` from an extracted,
-hash-verified candidate release built from the exact commit recorded in its
-manifest and binds its fingerprint. It must not
+Release Certification calls `run_production_desktop_operation` from an
+extracted, hash-verified candidate release built from the exact commit recorded
+in its manifest and binds its fingerprint. The corpus controller may prepare
+fixtures and reduce evidence but must not inject a test-only worker launcher. It must not
 import or launch the editable checkout, and it does not replace the operation's
 30-minute deadline with a harness timeout. The certification adapter must wire
 visual fallback to a Desktop-parent review callback; it must never redispatch
@@ -257,7 +329,7 @@ developing or diagnosing the inner lifecycle outside a client request, its CLI
 form is:
 
 ```bash
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
 ```
 
 The workflow advances deterministically until it passes, blocks, or returns `status: awaiting_hermes` with one or more request paths.
@@ -275,7 +347,8 @@ Repeat until the workflow passes or blocks. A missing response remains pending a
 
 `awaiting_hermes` is internal orchestration state. Do not expose its requests, findings, drafting decisions, or progress questions to the reviewer.
 
-During normal generation, do not patch code or templates, install packages,
+During normal generation, use the provisioned `CLINICAL_PYTHON`; do not patch
+code or templates, install packages,
 run the repository development test suite, create a recovery operation, or
 start a new deadline. An implementation defect becomes one technical blocker
 for separate maintenance. Emit concise stage changes and a brief update at
@@ -302,6 +375,19 @@ This is the cost/quality balance approved for the skill:
 
 Subagents return section-level structured content, never a whole document. The workflow validates section IDs, request hashes, evidence references, boilerplate references, completeness, and forbidden placeholders before accepting a response.
 
+For source-rich protocol sections, each drafting contract includes an
+`approved_source_word_count` and a conservative `reference_detail_target_words`
+soft compression signal. Semantic source coverage, not word count, governs
+acceptance: retain the supplied clinical, statistical, visit, eligibility,
+safety, retention, injury, and intervention detail without padding, repetition,
+invention, or source-gap commentary. The Document Section Contract owns the
+optional source-mode Section 8.3 and renders supplied treatment assignment
+verbatim. Its typed table contracts render structured visit/procedure
+relationships as the complete Schedule of Assessments and structured
+sample-size evidence as its own Section 11 table. Both tables must preserve the
+contracted headers, row and column order, cell associations, allowed blanks,
+timing, and values before release.
+
 ## Retry behavior
 
 - Maximum: three attempts per stable section target.
@@ -311,6 +397,8 @@ Subagents return section-level structured content, never a whole document. The w
 - Visual defect: repair/rebuild the affected layout artifact and rerun rendered-page verification.
 - Reuse unaffected accepted drafts.
 - A fourth attempt is never created. After three failed attempts, block with `reference/repair-report.md` and no client outputs.
+- Independent verification runs in at most three complete review sets. If any content or visual reviewer finds a governed repairable defect, preserve the failed evidence, repair only the implicated draft/layout target, then rerun the package-wide content review and every document-scoped visual review against the repaired candidate. Never reuse a pass from an earlier set.
+- A transient API or malformed-routing response retries only that reviewer within the current set and does not consume a new complete review set. If the third complete set still finds a defect, preserve the candidate and block with `reference/repair-report.md`.
 
 ## Independent verification
 
@@ -322,6 +410,12 @@ concurrently so every-page image inspection stays off the serial critical path:
 - `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
 
 The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery.
+
+Each request records its one-based `review_set`. A genuine finding invalidates
+the entire prior verification set after its evidence is archived; all reviewers
+then run concurrently on the repaired candidate. Missing or invalid repair
+routing is treated as an incomplete reviewer response and must be corrected by
+that reviewer—it is never silently ignored or guessed by the workflow.
 
 The Generation Manifest contains one hash-bound monotonic gate ledger in this
 fixed order: clinical fidelity; content completeness and consistency; DOCX/PRS
@@ -353,7 +447,7 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 ## Word template authorities
 
 - Every Protocol branch uses the bundled Protocol client authority for page geometry, typography, headers/footers, heading hierarchy, document-control surfaces, and table design.
-- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Never insert unconditional body-section breaks merely to copy or stabilize a prior pagination result. Keep every heading with its first substantive paragraph, list, or table while preserving intentional title-page and table-of-contents boundaries.
+- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Preserve the template's page breaks; ensure the Table of Contents and its first following body section each begin at a page boundary without adding breaks before later body sections. Keep every heading with its first substantive paragraph, list, or table.
 - Advarra ICF output uses the bundled Advarra authority; Sterling output uses the bundled Sterling authority.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
@@ -364,6 +458,9 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 - Keep `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml` as the structural authority derived from the client’s correct manual XML.
 - Python alone owns XML tags, ordering, optional nodes, namespaces, escaping, and repeated blocks.
 - Derive intervention, arm, primary/secondary/other outcome, and location counts from the approved source—not from generated fields.
+- Validate every source-backed value inside every intervention, arm, outcome,
+  and location block in addition to validating repeated-block counts and the
+  client template's tag order and structure.
 - The PRS subagent may return only `brief_summary` and `detailed_description` prose.
 - Any XML failure blocks the complete Prospective/Ambispective package.
 

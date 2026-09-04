@@ -7,12 +7,13 @@ from types import SimpleNamespace
 import pytest
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 from contracts import contracted_template_bundle
-from quality import RESPONSE_SCHEMA, validate_verifications, verification_request_sha256
+from quality import RESPONSE_SCHEMA, deterministic_content_check, validate_verifications, verification_request_sha256
 import quality
-from rendering import render_documents
+from rendering import render_documents, render_fields
 import rendering
 from prs_xml import generate as generate_xml
 import workflow
@@ -389,25 +390,252 @@ def test_layout_repair_is_scoped_to_one_artifact_and_rule(tmp_path):
     assert repaired["contracted_template_bundle"]["layout_preservation_baseline"] == baseline["contracted_template_bundle"]["layout_preservation_baseline"]
 
 
-def test_body_pagination_repair_overrides_only_the_named_body_heading(tmp_path):
-    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks():
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "artificial_pagination",
+        "element": "15. REFERENCES",
+        "target_ids": ["layout:protocol"],
+        "issue": "A later template-owned heading starts on a new page.",
+    }
 
-    render_documents(
-        ROOT,
-        tmp_path,
-        reference,
-        {"protocol": [], "icf": {}, "prs": {}},
-        artifact_names={"protocol"},
-        layout_repairs={"protocol": ({"rule": "body_pagination", "target": "6. OBJECTIVE(S)"},)},
+    plan, unsupported = workflow._layout_repair_plan([finding])
+
+    assert plan == {}
+    assert unsupported == [{
+        **finding,
+        "required": "Classify the visual defect with one supported artifact, Layout Contract check, and exact heading or table-caption element before deterministic repair.",
+    }]
+
+
+def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
+    finding = {
+        "category": "visual",
+        "artifact": "icf",
+        "check": "excessive_whitespace",
+        "element": "DURATION",
+        "target_ids": ["layout:icf"],
+        "issue": "A large vertical gap separates DURATION from its first substantive paragraph.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Sterling")
+
+    assert plan == {"icf": [{"rule": "heading_whitespace_cohesion", "target": "DURATION"}]}
+    assert unsupported == []
+
+
+def test_excessive_whitespace_at_other_sterling_heading_remains_non_destructive():
+    finding = {
+        "category": "visual",
+        "artifact": "icf",
+        "check": "excessive_whitespace",
+        "element": "RISKS",
+        "target_ids": ["layout:icf"],
+        "issue": "A large vertical gap follows an unrelated ICF heading.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Sterling")
+
+    assert plan == {"icf": [{"rule": "heading_cohesion", "target": "RISKS"}]}
+    assert unsupported == []
+
+
+def test_excessive_whitespace_at_advarra_duration_remains_non_destructive():
+    finding = {
+        "category": "visual",
+        "artifact": "icf",
+        "check": "excessive_whitespace",
+        "element": "DURATION",
+        "target_ids": ["layout:icf"],
+        "issue": "A large vertical gap follows an Advarra ICF heading.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Advarra")
+
+    assert plan == {"icf": [{"rule": "heading_cohesion", "target": "DURATION"}]}
+    assert unsupported == []
+
+
+def test_protocol_excessive_whitespace_retains_non_destructive_heading_cohesion():
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "excessive_whitespace",
+        "element": "19.2 Study Completion",
+        "target_ids": ["layout:protocol"],
+        "issue": "A heading is isolated above excessive remaining whitespace.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding])
+
+    assert plan == {"protocol": [{"rule": "heading_cohesion", "target": "19.2 Study Completion"}]}
+    assert unsupported == []
+
+
+def test_heading_cohesion_removes_empty_template_paragraphs_before_its_first_block():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    document.add_paragraph("")
+    document.add_paragraph("")
+    document.add_paragraph("")
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
     )
 
-    protocol = Document(tmp_path / "candidate/protocol.docx")
-    target = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "6. OBJECTIVE(S)")
-    title = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "1. TITLE PAGE")
-    toc = next(paragraph for paragraph in protocol.paragraphs if paragraph.text.strip() == "4. TABLE OF CONTENTS")
-    assert target.paragraph_format.page_break_before is False
-    assert title.paragraph_format.page_break_before is not False
-    assert toc.paragraph_format.page_break_before is not False
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
+
+
+def test_heading_whitespace_cohesion_removes_contracted_keep_together_spacers():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    for _ in range(3):
+        spacer = document.add_paragraph("")
+        properties = spacer._p.get_or_add_pPr()
+        properties.append(OxmlElement("w:keepNext"))
+        properties.append(OxmlElement("w:keepLines"))
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
+
+
+def test_sterling_duration_whitespace_repair_removes_contracted_template_spacers(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["meta"]["icf_template"] = "Sterling"
+    model = {"protocol": [], "icf": {}, "prs": {}}
+    baseline_dir = tmp_path / "baseline"
+    repaired_dir = tmp_path / "repaired"
+
+    baseline = render_documents(ROOT, baseline_dir, reference, model, artifact_names={"icf"})
+    repaired = render_documents(
+        ROOT,
+        repaired_dir,
+        reference,
+        model,
+        artifact_names={"icf"},
+        layout_repairs={
+            "icf": ({"rule": "heading_whitespace_cohesion", "target": "DURATION"},),
+        },
+    )
+
+    def empty_paragraphs_after_duration(path):
+        paragraphs = Document(path).paragraphs
+        duration = next(index for index, paragraph in enumerate(paragraphs) if paragraph.text == "DURATION")
+        count = 0
+        for paragraph in paragraphs[duration + 1 :]:
+            if paragraph.text.strip():
+                break
+            count += 1
+        return count
+
+    assert baseline["status"] == repaired["status"] == "passed"
+    assert empty_paragraphs_after_duration(baseline_dir / "candidate/icf.docx") == 3
+    assert empty_paragraphs_after_duration(repaired_dir / "candidate/icf.docx") == 0
+
+
+def test_heading_whitespace_cohesion_preserves_empty_section_boundary_paragraph():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    section_boundary = document.add_paragraph("")
+    section_boundary._p.get_or_add_pPr().append(OxmlElement("w:sectPr"))
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained.text == ""
+    assert retained._p.find(qn("w:pPr") + "/" + qn("w:sectPr")) is not None
+
+
+def test_heading_whitespace_cohesion_preserves_empty_bookmark_paragraph():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    bookmark_paragraph = document.add_paragraph("")
+    bookmark = OxmlElement("w:bookmarkStart")
+    bookmark.set(qn("w:id"), "7")
+    bookmark.set(qn("w:name"), "duration-boundary")
+    bookmark_paragraph._p.append(bookmark)
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained._p.find(qn("w:bookmarkStart")) is not None
+
+
+def test_heading_whitespace_cohesion_preserves_empty_numbered_paragraph():
+    document = Document()
+    document.add_heading("DURATION", level=1)
+    numbered_paragraph = document.add_paragraph("")
+    numbering = OxmlElement("w:numPr")
+    level = OxmlElement("w:ilvl")
+    level.set(qn("w:val"), "0")
+    number_id = OxmlElement("w:numId")
+    number_id.set(qn("w:val"), "1")
+    numbering.extend((level, number_id))
+    numbered_paragraph._p.get_or_add_pPr().append(numbering)
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained._p.find(qn("w:pPr") + "/" + qn("w:numPr")) is not None
+
+
+def test_heading_whitespace_cohesion_preserves_inherited_page_boundary():
+    document = Document()
+    boundary_style = document.styles.add_style("Boundary Style", WD_STYLE_TYPE.PARAGRAPH)
+    boundary_style.paragraph_format.page_break_before = True
+    document.add_heading("DURATION", level=1)
+    boundary_paragraph = document.add_paragraph("")
+    boundary_paragraph.style = boundary_style
+    document.add_paragraph("The study lasts approximately 14 weeks.")
+
+    rendering._repair_heading_cohesion(
+        document,
+        "DURATION",
+        protocol=False,
+        remove_empty_intervening_paragraphs=True,
+    )
+
+    duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
+    retained = document.paragraphs[duration + 1]
+    assert retained.style.name == "Boundary Style"
+    assert retained.style.paragraph_format.page_break_before is True
 
 
 def _visible_formatting_fingerprint(path):
@@ -990,6 +1218,96 @@ def test_approved_investigator_and_facility_values_populate_protocol_agreement(t
     assert "Site One" in values
 
 
+def test_render_fields_normalize_markdown_email_population_and_day_units():
+    reference = _source()
+    reference["parties"]["study_coordinator"]["email"] = (
+        "[jamie.chen@example.org](mailto:jamie.chen@example.org)"
+    )
+    reference["population"].pop("study_population", None)
+    reference["population"]["inclusion_criteria"] = [
+        "Adults 18 to 80 years old with eligible historical records.",
+    ]
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = "30 days"
+
+    fields = render_fields(reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    assert fields["studyCordinatorEmail"] == "jamie.chen@example.org"
+    assert fields["AI_populationShort"] == (
+        "Adults 18 to 80 years old with eligible historical records."
+    )
+    assert fields["daysBeforeScreening"] == "30"
+
+
+def test_render_fields_prefers_approved_protocol_summary_and_named_articles():
+    reference = _source()
+    reference["design"].update({
+        "study_design_summary": "Prospective randomized parallel-group study",
+        "study_design": "A much longer approved design narrative for the body section.",
+        "intervention_name": "Acoltremon 0.003%",
+        "control": "Preservative-free artificial tears",
+    })
+
+    fields = render_fields(reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    assert fields["studyDesignShort"] == "Prospective randomized parallel-group study"
+    assert fields["testArticle(s)"] == "Acoltremon 0.003%"
+    assert fields["controlArticle(s)"] == "Preservative-free artificial tears"
+
+
+def test_protocol_summary_rows_keep_together(tmp_path):
+    reference = _source()
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    summary = next(
+        table for table in document.tables
+        if table.rows and table.rows[0].cells[0].text.strip() == "Objective"
+    )
+    variables = next(row for row in summary.rows if row.cells[0].text.strip() == "Variables")
+
+    assert all(
+        paragraph.paragraph_format.keep_together is True
+        for cell in variables.cells
+        for paragraph in cell.paragraphs
+    )
+    assert all(
+        cell._tc.tcPr.find(qn("w:tcMar")).find(qn(side)).get(qn("w:w")) == "0"
+        for row in summary.rows
+        for cell in row.cells
+        for side in ("w:top", "w:bottom")
+    )
+
+
+def test_assessment_table_splits_plain_language_schedule_into_readable_rows(tmp_path):
+    reference = _source()
+    reference["procedures"].pop("visit_schedule", None)
+    reference["procedures"].pop("visit_schedule_table", None)
+    reference["procedures"]["assessments"] = (
+        "Historical chart abstraction, baseline prospective visit, Month 1 phone "
+        "follow-up, and Month 3 clinic follow-up, including pain score review, device "
+        "usage download, and usability questionnaire."
+    )
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    table = next(
+        item for item in document.tables
+        if item.rows and item.rows[0].cells[0].text.strip() == "Approved visit or assessment"
+    )
+    rows = [(row.cells[0].text.strip(), row.cells[1].text.strip()) for row in table.rows[1:]]
+
+    assert rows == [
+        ("Historical chart abstraction", "Historical record review"),
+        ("baseline prospective visit", "Baseline"),
+        ("Month 1 phone follow-up", "Month 1"),
+        ("Month 3 clinic follow-up", "Month 3"),
+        ("pain score review", "Per approved schedule"),
+        ("device usage download", "Per approved schedule"),
+        ("usability questionnaire", "Per approved schedule"),
+    ]
+
+
 def test_protocol_visit_schedule_has_rows_when_approved_source_has_assessments_only(tmp_path):
     reference = _source()
     reference["procedures"].pop("visit_schedule", None)
@@ -1099,6 +1417,175 @@ def test_transient_verifier_failure_is_classified_for_retry_without_accepting_qa
     assert findings[0]["target_ids"] == ["verification:content"]
     assert findings[0]["recovery_class"] == "verifier_transient"
     assert findings[0]["action"] == "retry_verifier"
+    assert findings[0]["verification_request_id"] == request["request_id"]
+
+
+def test_content_finding_without_a_section_target_reprompts_the_reviewer(tmp_path):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/r.verify.content.json",
+        "sections": [],
+        "cross_document_checks": [],
+        "artifacts": [],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    (requests / "content.json").write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "user-selected-local-model"},
+        "status": "blocked",
+        "findings": [{"issue": "A substantive source fact is missing."}],
+        "section_assessments": [],
+        "cross_document_assessments": [],
+    }
+    (responses / "r.verify.content.json").write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(revision)
+
+    routing = next(item for item in findings if "source fact" in item["issue"])
+    assert routing["target_ids"] == ["verification:content"]
+    assert routing["recovery_class"] == "verifier_transient"
+    assert routing["action"] == "retry_verifier"
+
+
+def test_reviewer_defect_starts_a_fresh_complete_review_set(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    request_dir = revision / "hermes/verification-requests"
+    response_dir = revision / "hermes/verification-responses"
+    reference_path.parent.mkdir(parents=True)
+    request_dir.mkdir(parents=True)
+    response_dir.mkdir()
+    reference_path.write_text(json.dumps({"generation": {"review_set": 1}}), encoding="utf-8")
+    for name, task in (
+        ("content", "clinical_content_verification"),
+        ("protocol", "rendered_page_visual_verification"),
+        ("icf", "rendered_page_visual_verification"),
+    ):
+        response_path = f"hermes/verification-responses/{name}.json"
+        (request_dir / f"{name}.json").write_text(json.dumps({
+            "task": task,
+            "response_path": response_path,
+            "artifacts": [{"artifact": name}] if task.startswith("rendered") else [],
+        }), encoding="utf-8")
+        (revision / response_path).write_text("{}", encoding="utf-8")
+    (revision / "candidate-build.json").write_text("{}", encoding="utf-8")
+    rerun = {"status": "awaiting_hermes", "stage": "independent_verification"}
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: rerun)
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {"review_set": 1}},
+        {},
+        revision,
+        {},
+        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
+        "quality",
+    )
+
+    assert result == rerun
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["generation"]["review_set"] == 2
+    assert list(request_dir.glob("*.json")) == []
+    assert list(response_dir.glob("*.json")) == []
+
+
+def test_third_failed_review_set_blocks_before_a_fourth_set(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {"review_set": 3}}), encoding="utf-8")
+    monkeypatch.setattr(workflow, "generate", lambda *_args, **_kwargs: pytest.fail("must not start a fourth review set"))
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {"review_set": 3}},
+        {},
+        revision,
+        {},
+        [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
+        "quality",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "review_set_limit"
+    assert "3 complete review sets" in result["findings"][0]["issue"]
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert "attempts" not in state["generation"]
+
+
+def test_mixed_content_and_visual_findings_queue_both_repairs(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {"review_set": 1}}), encoding="utf-8")
+    (revision / "candidate-build.json").parent.mkdir(parents=True)
+    (revision / "candidate-build.json").write_text("{}", encoding="utf-8")
+    approved = json.loads(
+        (ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+
+    def fake_schedule_requests(**_kwargs):
+        path = revision / "hermes/drafting-requests/introduction.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps({
+            "task": "draft_sections",
+            "response_path": "hermes/drafting-responses/introduction.json",
+        }), encoding="utf-8")
+        return [path]
+
+    monkeypatch.setattr(workflow, "schedule_requests", fake_schedule_requests)
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {"review_set": 1}},
+        approved,
+        revision,
+        {},
+        [
+            {"category": "verification", "field": "introduction", "target_ids": ["introduction"], "recovery_class": "drafting_defect", "action": "retry_drafting_target", "issue": "missing context"},
+            {"category": "visual", "field": "protocol", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"},
+        ],
+        "quality",
+    )
+
+    assert result["stage"] == "drafting_retry"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
+    assert state["review_set"] == 2
+    assert state["pending_layout_artifacts"] == ["protocol"]
+    assert state["layout_repairs"] == {
+        "protocol": [{"rule": "heading_cohesion", "target": "5. INTRODUCTION"}],
+    }
+
+
+def test_timeline_coverage_allows_grammar_but_preserves_milestone_pairing():
+    approved = (
+        "IRB review and data access: Month 1; extraction and abstraction: Months 2 to 4; "
+        "quality control and analysis: Months 5 to 6; final report: Month 7."
+    )
+    grammatical = (
+        "The approved study timeline is IRB review and data access in Month 1; extraction and abstraction "
+        "in Months 2 to 4; quality control and analysis in Months 5 to 6; and the final report in Month 7."
+    )
+    swapped = grammatical.replace("Month 1", "Month 7", 1)
+
+    assert quality._timeline_covered(approved, grammatical)
+    assert not quality._timeline_covered(approved, swapped)
 
 
 def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
@@ -1131,6 +1618,50 @@ def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["generation"]["verification_attempts"]["verification:content"] == 1
     assert not (revision / "hermes/verification-responses/clinical_content_verification.json").exists()
+
+
+def test_multiple_transient_findings_from_one_reviewer_consume_one_retry(tmp_path):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    response_path = revision / "hermes/verification-responses/content.json"
+    reference_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
+    response_path.write_text("{}", encoding="utf-8")
+    request_id = "r-test.review-1.verify.content"
+    request_path = revision / "hermes/verification-requests/content.json"
+    request_path.parent.mkdir(parents=True)
+    request_path.write_text(json.dumps({
+        "request_id": request_id,
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+    }), encoding="utf-8")
+    finding = {
+        "category": "reviewer-transient",
+        "field": "clinical_content_verification",
+        "target_ids": ["verification:content"],
+        "verification_request_id": request_id,
+        "recovery_class": "verifier_transient",
+        "action": "retry_verifier",
+        "issue": "incomplete response",
+    }
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": {}},
+        {},
+        revision,
+        {},
+        [finding, {**finding, "field": "section_assessments"}],
+        "quality",
+    )
+
+    assert result["status"] == "awaiting_hermes"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["generation"]["verification_attempts"][request_id] == 1
+    assert not response_path.exists()
 
 
 def test_quality_retry_rejects_a_finding_without_a_governed_recovery_class(tmp_path):
@@ -1248,6 +1779,8 @@ def test_layout_failure_blocks_only_after_three_total_attempts(tmp_path):
     assert result["stage"] == "quality"
     assert result["findings"][0]["field"] == "layout:protocol.docx"
     assert "after 3 attempts" in result["findings"][0]["issue"]
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert "review_set" not in state["generation"]
 
 
 def test_prs_generation_validates_against_the_retained_client_manual_authority(tmp_path):
@@ -1313,7 +1846,7 @@ def test_protocol_omits_references_heading_when_no_references_are_supplied():
     assert "REFERENCES" not in [paragraph.text.strip() for paragraph in document.paragraphs]
 
 
-def test_layout_failure_invalidates_only_the_affected_artifact_evidence(tmp_path, monkeypatch):
+def test_layout_failure_repairs_only_the_affected_artifact_but_resets_all_review_evidence(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
     reference_path = run_dir / "reference/study.reference.json"
@@ -1374,6 +1907,179 @@ def test_layout_failure_invalidates_only_the_affected_artifact_evidence(tmp_path
     assert (revision / "candidate/icf.docx").is_file()
     assert (revision / "rendered/icf.pdf").is_file()
     assert (revision / "rendered/icf/page-1.png").is_file()
-    assert (requests / "visual-icf.json").is_file()
-    assert (responses / "visual-icf.json").is_file()
+    assert not (requests / "visual-icf.json").exists()
+    assert not (responses / "visual-icf.json").exists()
     assert (revision / "candidate-build.json").is_file()
+
+
+def test_protocol_renders_assignment_endpoint_hierarchy_and_both_operational_tables(tmp_path):
+    reference = _source()
+    reference["design"]["assignment_method"] = (
+        "Subjects will be assigned 1:1 to TRYPTYR or control using the approved randomization schedule."
+    )
+    reference["endpoints"]["other"] = [
+        {"category": "Powered exploratory endpoints in hierarchical order", "label": "Schirmer change versus control", "time_point": "Month 12"},
+        {"category": "Descriptive exploratory endpoints", "label": "Ocular discomfort score", "time_point": "Months 1, 3, 6, 9, and 12"},
+    ]
+    visit_names = ["Baseline", "Day 14", "Month 1", "Month 3", "Month 6", "Month 9", "Month 12"]
+    activities = [f"Assessment {index}" for index in range(1, 20)]
+    reference["procedures"]["visit_schedule"] = [
+        {"visit": visit, "timing": visit, "procedures": activities if index == 0 else activities[index::3]}
+        for index, visit in enumerate(visit_names)
+    ]
+    reference["statistics"]["sample_size_evidence"] = [
+        {"study": "COMET-2", "timepoint": "Day 28", "mean_change_ods_vas": "-25.20", "se": "1.96", "estimated_sd": "30.0"},
+        {"study": "COMET-3", "timepoint": "Day 90", "mean_change_ods_vas": "-29.60", "se": "1.97", "estimated_sd": "30.0"},
+    ]
+    reference["population"]["sample_size_evidence"] = []
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    visible = _visible(document)
+    headings = [p.text for p in document.paragraphs if p.style.name.casefold().startswith("heading")]
+    assessment = next(table for table in document.tables if table.rows[0].cells[0].text.strip() == "Activity")
+    sample_evidence = next(table for table in document.tables if table.rows[0].cells[0].text.strip() == "Study")
+
+    assert "8.3. Method of Assigning Subjects to Treatment Arms" in headings
+    assert reference["design"]["assignment_method"] in visible
+    assert "Powered exploratory endpoints in hierarchical order" in visible
+    assert "Descriptive exploratory endpoints" in visible
+    assert len(assessment.rows) == 21
+    assert len(assessment.columns) == 8
+    assert len(sample_evidence.rows) == 3
+    assert len(sample_evidence.columns) == 5
+    guarded_fields = {"study-design.assignment", "procedures.visit_schedule", "statistics.sample_size_evidence"}
+    assert not guarded_fields & {
+        item["field"] for item in deterministic_content_check(tmp_path, reference)
+    }
+
+    assessment.cell(2, 1).text, assessment.cell(2, 2).text = assessment.cell(2, 2).text, assessment.cell(2, 1).text
+    sample_evidence.cell(1, 0).text = "Changed study"
+    document.save(tmp_path / "candidate/protocol.docx")
+    guarded_findings = {
+        item["field"] for item in deterministic_content_check(tmp_path, reference)
+    }
+    assert "procedures.visit_schedule" in guarded_findings
+    assert "statistics.sample_size_evidence" in guarded_findings
+
+
+def test_retrospective_quality_does_not_require_prospective_table_contracts(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/release-certification/retrospective/approved-reference.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    fields = {item["field"] for item in deterministic_content_check(tmp_path, reference)}
+
+    assert "procedures.visit_schedule" not in fields
+    assert "statistics.sample_size_evidence" not in fields
+
+
+def test_protocol_does_not_duplicate_a_model_echoed_visit_table_caption_or_details(tmp_path):
+    reference = _source()
+    model = {
+        "protocol": [{
+            "section_id": "study-procedure.visits",
+            "paragraphs": [
+                {"text": "Participants complete the approved visits in sequence."},
+                {"text": "Table 9.2-1. Visit Schedule"},
+                {"text": "Unique source-bound visit procedure detail."},
+            ],
+            "lists": [],
+        }],
+        "icf": {},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs]
+    assert paragraphs.count("Table 9.2-1. Visit Schedule") == 1
+    assert paragraphs.count("Unique source-bound visit procedure detail.") == 1
+    assert not any(
+        "Table 9.2-1. Visit Schedule" in paragraph
+        and "Unique source-bound visit procedure detail." in paragraph
+        for paragraph in paragraphs
+    )
+
+
+def test_protocol_fidelity_gate_rejects_loss_of_operational_source_detail(tmp_path):
+    reference = _source()
+    reference["procedures"].update({
+        "assessment_details": "Each visit includes ODS-VAS and unanesthetized Schirmer testing.",
+        "intervention_management": "TRYPTYR 0.003% is administered twice daily and reconciled at every visit.",
+        "discontinuation": "Participants may withdraw at any time without penalty.",
+        "replacement": "Participants discontinued during enrollment will be replaced.",
+    })
+    reference["statistics"].update({
+        "analysis_populations": "The intent-to-treat and per-protocol populations will be analyzed.",
+        "methodology": "A mixed model for repeated measures will compare change from baseline.",
+        "software": "Analyses will use R version 4.4.2.",
+    })
+    reference.setdefault("confidentiality", {})["retention"] = "Study records will be retained for 15 years after study closure."
+    reference["risks_benefits"].update({
+        "injury_handling": "Research-related injuries will receive immediate evaluation by the investigator.",
+        "risks": "Transient ocular burning and privacy loss are foreseeable risks.",
+        "benefits": "Participants may experience improved tear production, but benefit is not guaranteed.",
+        "compensation_or_reimbursement": "Participants will receive $50 for each completed visit.",
+    })
+    model = {
+        "protocol": [
+            {"section_id": "study-procedure.visits", "paragraphs": [{"text": f'{reference["procedures"]["assessment_details"]} {reference["procedures"]["intervention_management"]}'}], "lists": []},
+            {"section_id": "analysis-plan.datasets", "paragraphs": [{"text": reference["statistics"]["analysis_populations"]}], "lists": []},
+            {"section_id": "analysis-plan.methodology", "paragraphs": [{"text": reference["statistics"]["methodology"]}], "lists": []},
+            {"section_id": "analysis-plan.considerations", "paragraphs": [{"text": reference["statistics"]["software"]}], "lists": []},
+            {"section_id": "confidentiality-publication", "paragraphs": [{"text": reference["confidentiality"]["retention"]}], "lists": []},
+            {"section_id": "financial-injury", "paragraphs": [{"text": reference["risks_benefits"]["injury_handling"]}], "lists": []},
+            {"section_id": "endpoint-criteria.discontinuation", "paragraphs": [{"text": f'{reference["procedures"]["discontinuation"]} {reference["procedures"]["replacement"]}'}], "lists": []},
+            {"section_id": "risks-benefits.risks", "paragraphs": [{"text": reference["risks_benefits"]["risks"]}], "lists": []},
+            {"section_id": "risks-benefits.benefits", "paragraphs": [{"text": f'{reference["risks_benefits"]["benefits"]} {reference["risks_benefits"]["compensation_or_reimbursement"]}'}], "lists": []},
+        ],
+        "icf": {},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    guarded = {
+        "study-procedure.visits",
+        "analysis-plan.datasets",
+        "analysis-plan.methodology",
+        "analysis-plan.considerations",
+        "confidentiality-publication",
+        "financial-injury",
+        "endpoint-criteria.discontinuation",
+        "risks-benefits.risks",
+        "risks-benefits.benefits",
+    }
+    assert not guarded & {item["field"] for item in deterministic_content_check(tmp_path, reference)}
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    heading_titles = {
+        "9.2. Visits and Examinations",
+        "10.1. Analysis Data Sets",
+        "10.2. Statistical Methodology",
+        "10.3. General Statistical Considerations",
+        "12. CONFIDENTIALITY/PUBLICATION OF THE STUDY",
+        "17. FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES",
+        "18.2. Patient Discontinuation",
+        "19.1. Summary of risks",
+        "19.2. Summary of benefits",
+    }
+    for index, paragraph in enumerate(document.paragraphs):
+        if paragraph.text.strip() not in heading_titles:
+            continue
+        for target in document.paragraphs[index + 1:]:
+            if target.style.name.casefold().startswith("heading"):
+                break
+            if target.text.strip():
+                target.text = "Generic text that omits every approved operational qualifier."
+                break
+    document.save(tmp_path / "candidate/protocol.docx")
+
+    assert guarded <= {item["field"] for item in deterministic_content_check(tmp_path, reference)}

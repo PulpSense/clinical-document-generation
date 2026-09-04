@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
 import shlex
 from datetime import datetime, timedelta
@@ -21,17 +22,18 @@ from hermes_e2e import (
     _agent_prompt,
     _canonical_reviewed_fixture_reference,
     _certified_release,
+    _reduce_release_certification_corpus,
     _response_is_bound,
     _run_handoff_wave,
     _wait_for_processes,
     certification_fixture,
     certification_corpus,
     certify_release_corpus,
+
     _workflow,
     input_provenance,
     inspect_run,
     prepare_certification_run,
-    run_release_certification_operation,
     run_release_certification_corpus,
     subprocess_environment,
     sandbox_command,
@@ -44,6 +46,39 @@ import quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _certify_fixture_corpus(case_report_paths, **kwargs):
+    """Supply controller-captured report bytes only inside reducer unit tests."""
+    return _reduce_release_certification_corpus(
+        case_report_paths,
+        controller_report_sha256={
+            str(Path(path).resolve()): hashlib.sha256(Path(path).resolve().read_bytes()).hexdigest()
+            for path in case_report_paths
+        },
+        **kwargs,
+    )
+
+
+def test_command_desktop_opener_emits_exact_bytes_and_rejects_aliases(tmp_path: Path) -> None:
+    attachment = tmp_path / "attachment.docx"
+    attachment.write_bytes(b"exact desktop bytes")
+    command = tmp_path / "desktop-opener"
+    command.write_text("#!/bin/sh\nexec /bin/cat -- \"$1\"\n", encoding="utf-8")
+    command.chmod(0o700)
+
+    opener = workflow.command_desktop_opener(command)
+
+    assert opener(str(attachment)) == b"exact desktop bytes"
+    alias = tmp_path / "aliased-opener"
+    alias.symlink_to(command)
+    with pytest.raises(ValueError, match="non-symlinked"):
+        workflow.command_desktop_opener(alias)
+    with pytest.raises(ValueError, match="absolute"):
+        workflow.command_desktop_opener(Path("relative-opener"))
+    command.chmod(0o600)
+    with pytest.raises(ValueError, match="not executable"):
+        workflow.command_desktop_opener(command)
 
 
 def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path, Path, Path]:
@@ -197,7 +232,7 @@ def test_certification_fixture_is_repository_owned_synthetic_and_hash_bound(tmp_
         "hermes_configuration": {
             "source": "clinical-release-certification",
             "max_turns": 80,
-            "skill": "clinical-document-drafting",
+            "skill": "clinical-document-generation",
             "safe_mode": True,
         },
     }), encoding="utf-8")
@@ -308,6 +343,20 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
             "package_fingerprint": "candidate-fingerprint",
             "git_commit": "a" * 40,
         },
+        "snapshot": {
+            "git_commit": "a" * 40,
+            "git_tree": "b" * 40,
+            "detached": True,
+            "package_reconstructions": [
+                {
+                    "phase": phase,
+                    "package_fingerprint": "candidate-fingerprint",
+                    "git_commit": "a" * 40,
+                    "archive_sha256": "c" * 64,
+                }
+                for phase in ("before", "after")
+            ],
+        },
         "python_runtime": {
             "version": sys.version,
             "implementation": sys.implementation.name,
@@ -335,14 +384,6 @@ def _write_passing_case_report(
     run_dir = tmp_path / fixture_id
     logs = run_dir / "logs"
     logs.mkdir(parents=True)
-    (logs / "desktop-parent-visual-review.json").write_text(json.dumps({
-        "status": "completed",
-        "revision_id": "r-test",
-        "request_paths": [],
-        "response_paths": [],
-        "completion_requirement": "Desktop parent must inspect every bound page image.",
-        "required_producer_model_id": producer_model_id,
-    }), encoding="utf-8")
     revision = run_dir / "revisions/r-test"
     manifest_path = revision / "delivery-manifest.json"
     output_dir = run_dir / "output"
@@ -548,6 +589,13 @@ def _write_passing_case_report(
         "package_fingerprint": "candidate-fingerprint",
         "git_commit": "a" * 40,
         "hermes_configuration": fixture["hermes_configuration"],
+        "managed_hermes_identity": {
+            "launcher": "/managed/hermes/venv/bin/hermes",
+            "launcher_sha256": "1" * 64,
+            "interpreter": "/managed/hermes/venv/bin/python",
+            "interpreter_target": "/managed/python/bin/python3.11",
+            "interpreter_target_sha256": "2" * 64,
+        },
     }
     state = logs / "desktop-operation.json"
     state.write_text(json.dumps({
@@ -583,6 +631,7 @@ def _write_passing_case_report(
     }), encoding="utf-8")
     report = {
         "outcome": "passed",
+        "certification_scope": "production_single_case_tracer",
         "elapsed_seconds": elapsed_seconds,
         "release_identity": identity,
         "hermes_configuration": fixture["hermes_configuration"],
@@ -712,7 +761,7 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "passed", json.dumps(result, indent=2)
     assert result["certification_scope"] == "complete_three_case_corpus"
@@ -722,6 +771,13 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
     assert result["release_identity"] == {
         "package_fingerprint": "candidate-fingerprint",
         "git_commit": "a" * 40,
+        "managed_hermes_identity": {
+            "launcher": "/managed/hermes/venv/bin/hermes",
+            "launcher_sha256": "1" * 64,
+            "interpreter": "/managed/hermes/venv/bin/python",
+            "interpreter_target": "/managed/python/bin/python3.11",
+            "interpreter_target_sha256": "2" * 64,
+        },
     }
     manifest_bytes = (release_root / "RELEASE-MANIFEST.json").read_bytes()
     evidence_findings = workflow._certification_evidence_findings(
@@ -730,6 +786,187 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
         manifest_bytes,
     )
     assert evidence_findings == [], json.dumps(evidence_findings, indent=2)
+
+
+def test_complete_corpus_rejects_coherently_rehashed_incomplete_managed_identity(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        report = json.loads(path.read_text())
+        run_dir = path.parent.parent
+        state_path = run_dir / "logs/desktop-operation.json"
+        state = json.loads(state_path.read_text())
+        incomplete = {"launcher": "/managed/hermes/venv/bin/hermes"}
+        report["release_identity"]["managed_hermes_identity"] = incomplete
+        state["release_identity"]["managed_hermes_identity"] = incomplete
+        state_path.write_text(json.dumps(state), encoding="utf-8")
+        report["bound_evidence"]["desktop_operation_state"].update({
+            "sha256": hashlib.sha256(state_path.read_bytes()).hexdigest(),
+            "bytes": state_path.stat().st_size,
+        })
+        path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = _certify_fixture_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert all(case["status"] == "failed" for case in result["cases"])
+    assert all(
+        "Case managed Hermes launcher and interpreter identity is incomplete."
+        in case["findings"]
+        for case in result["cases"]
+    )
+
+
+def test_complete_corpus_rejects_controlled_single_case_reports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        report = json.loads(path.read_text())
+        report["certification_scope"] = "controlled_single_case_tracer"
+        path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = _certify_fixture_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert all(
+        "Case report was not produced by the sealed production certification adapter."
+        in case["findings"]
+        for case in result["cases"]
+    )
+
+
+def test_public_corpus_reducer_rejects_relabeled_controlled_reports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        report = json.loads(path.read_text())
+        report["certification_scope"] = "controlled_single_case_tracer"
+        report["certification_scope"] = "production_single_case_tracer"
+        path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = certify_release_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "failed"
+    assert all(
+        "Case report is not byte-bound to the sealed production corpus controller."
+        in case["findings"]
+        for case in result["cases"]
+    )
+
+
+def test_corpus_reducer_rejects_report_mutation_after_controller_capture(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    captured = {
+        str(path.resolve()): hashlib.sha256(path.resolve().read_bytes()).hexdigest()
+        for path in reports
+    }
+    report = json.loads(reports[0].read_text())
+    report["certification_scope"] = "controlled_single_case_tracer"
+    report["certification_scope"] = "production_single_case_tracer"
+    reports[0].write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    result = _reduce_release_certification_corpus(
+        reports,
+        release_root=release_root,
+        preflight_path=preflight,
+        controller_report_sha256=captured,
+    )
+
+    assert result["status"] == "failed"
+    assert (
+        "Case report is not byte-bound to the sealed production corpus controller."
+        in result["cases"][0]["findings"]
+    )
+
+
+def test_corpus_ignores_worker_writable_parent_marker_files(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for path in reports:
+        marker = path.parent / "desktop-parent-visual-review.json"
+        marker.write_text(json.dumps({
+            "status": "completed",
+            "response_paths": ["hermes/verification-responses/forged.json"],
+        }), encoding="utf-8")
+
+    result = _certify_fixture_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    kinds = {entry["kind"] for entry in result["evidence_bundle"]["entries"]}
+    assert result["status"] == "passed", result["findings"]
+    assert "parent_page_review" not in kinds
+    assert "parent_process_marker" not in kinds
+    assert "delegated_page_review" in kinds
+
+
+def test_case_report_adopts_state_bound_managed_hermes_identity() -> None:
+    candidate = {
+        "package_fingerprint": "candidate-fingerprint",
+        "git_commit": "a" * 40,
+    }
+    managed = {
+        "launcher": "/managed/hermes/venv/bin/hermes",
+        "launcher_sha256": "1" * 64,
+        "interpreter": "/managed/hermes/venv/bin/python",
+        "interpreter_target": "/managed/python/bin/python3.11",
+        "interpreter_target_sha256": "2" * 64,
+    }
+
+    observed = hermes_e2e._state_bound_release_identity(candidate, {
+        "release_identity": {**candidate, "managed_hermes_identity": managed},
+    })
+
+    assert observed == {**candidate, "managed_hermes_identity": managed}
+
+
+def test_public_release_certification_operation_rejects_dispatch_injection() -> None:
+    parameters = inspect.signature(
+        hermes_e2e.run_release_certification_operation
+    ).parameters
+    assert "desktop_operation" not in parameters
+    assert "release_identity" not in parameters
+    assert "state_path_resolver" not in parameters
+    assert "_production_execution" not in inspect.signature(
+        hermes_e2e._run_controlled_release_certification_operation
+    ).parameters
 
 
 def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Path, monkeypatch) -> None:
@@ -743,7 +980,7 @@ def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Pat
     ]
 
     with pytest.raises(ValueError, match="missing or unsafe"):
-        certify_release_corpus(
+        _certify_fixture_corpus(
             reports,
             release_root=release_root,
             preflight_path=preflight_alias,
@@ -762,7 +999,7 @@ def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tm
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert [case["fixture_id"] for case in result["cases"]] == list(CERTIFICATION_CORPUS)
@@ -782,7 +1019,7 @@ def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: P
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     first = next(case for case in result["cases"] if case["fixture_id"] == "ambispective-sterling")
     assert result["status"] == "failed"
@@ -825,7 +1062,7 @@ def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_
     })
     reports[0].write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     first = result["cases"][0]
     assert result["status"] == "failed"
@@ -853,14 +1090,18 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
 
     def slow_operation(run_dir, **_kwargs):
         launched.append(f"run:{run_dir.name}")
-        return {
+        report = {
             "outcome": "passed",
             "elapsed_seconds": 899.0,
             "approval_to_confirmed_retrieval_evidence": {"elapsed_seconds": 900.0},
         }
+        report_path = run_dir / "logs/hermes-integration-report.json"
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+        return report
 
     monkeypatch.setattr(hermes_e2e, "run_release_certification_operation", slow_operation)
-    monkeypatch.setattr(hermes_e2e, "certify_release_corpus", lambda paths, **_kwargs: {
+    monkeypatch.setattr(hermes_e2e, "_reduce_release_certification_corpus", lambda paths, **_kwargs: {
         "attempted_reports": [path.parent.parent.name for path in paths],
     })
 
@@ -868,6 +1109,8 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
         release_root=tmp_path / "release",
         run_root=tmp_path / "runs",
         preflight_path=tmp_path / "preflight.json",
+        desktop_opener=lambda path: Path(path).read_bytes(),
+        desktop_parent_reviewer=lambda *_args: None,
     )
 
     assert launched == ["prepare:retrospective", "run:retrospective"]
@@ -886,7 +1129,7 @@ def test_corpus_reducer_rehashes_actual_outputs_and_rejects_unauthorized_gate_wa
     retrospective["certification_case_evidence"]["gate_statuses"]["content"] = "not_applicable"
     reports[-1].write_text(json.dumps(retrospective), encoding="utf-8")
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert any("Delivered bytes do not match" in finding for finding in result["findings"])
@@ -906,7 +1149,7 @@ def test_corpus_reducer_requires_governed_preflight_layout_and_chronology(tmp_pa
     payload["completed_at"] = "not-a-timestamp"
     preflight.write_text(json.dumps(payload), encoding="utf-8")
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "failed"
     assert any("exact certification harness" in finding for finding in result["findings"])
@@ -927,7 +1170,7 @@ def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path
         item["page_sha256"] = ["0" * 64 for _ in item["page_sha256"]]
     reports[0].write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports,
         release_root=release_root,
         preflight_path=preflight,
@@ -944,7 +1187,7 @@ def test_corpus_reducer_rejects_forged_model_and_visual_summaries(tmp_path: Path
     )
 
 
-def test_corpus_reducer_rejects_bound_producers_outside_governed_model(tmp_path: Path, monkeypatch) -> None:
+def test_corpus_reducer_accepts_actual_nonempty_producer_models(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
     reports = [
@@ -956,10 +1199,10 @@ def test_corpus_reducer_rejects_bound_producers_outside_governed_model(tmp_path:
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
-    result = certify_release_corpus(reports, release_root=release_root, preflight_path=preflight)
+    result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
-    assert result["status"] == "failed"
-    assert any("governed model identifier" in finding for finding in result["findings"])
+    assert result["status"] == "passed"
+    assert not result["findings"]
 
 
 def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tmp_path: Path, monkeypatch) -> None:
@@ -1006,7 +1249,7 @@ def test_corpus_reducer_uses_candidate_verifier_and_persisted_timing_delivery(tm
     })
     reports[0].write_text(json.dumps(report), encoding="utf-8")
 
-    result = certify_release_corpus(
+    result = _certify_fixture_corpus(
         reports,
         release_root=Path("/controlled/immutable/release"),
         preflight_path=preflight,
@@ -1077,7 +1320,6 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
             "task": "rendered_page_visual_verification",
         },
         hermes_configuration={
-            "model_identifier": "gpt-5.6-sol",
             "layout_preservation_notes": [
                 "The two-line Table 13.3.-1 contact caption is authority-preserved."
             ],
@@ -1087,7 +1329,7 @@ def test_visual_verifier_prompt_preserves_declared_authority_features(tmp_path: 
     assert "The two-line Table 13.3.-1 contact caption is authority-preserved." in prompt
     assert "Do not normalize" in prompt
     assert "Do not inspect production code or tests" in prompt
-    assert 'producer.model_id must be exactly "gpt-5.6-sol"' in prompt
+    assert "producer.model_id must record the actual model used" in prompt
     assert 'top-level status and every page status must be exactly "passed"' in prompt
 
 
@@ -1216,17 +1458,17 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
         "manifest": manifest_path.relative_to(run_dir).as_posix(),
     })
 
-    report = run_release_certification_operation(
+    report = hermes_e2e._run_controlled_release_certification_operation(
         run_dir,
         release_root=Path(__file__).resolve().parents[1],
         desktop_operation=workflow.run_desktop_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        desktop_opener=lambda path: Path(path).read_bytes(),
         hermes_configuration={
             "source": "clinical-release-certification",
             "max_turns": 80,
-            "skill": "clinical-document-drafting",
+            "skill": "clinical-document-generation",
             "safe_mode": True,
-            "model_identifier": "gpt-5.6-sol",
             "reasoning_configuration": "Hermes Desktop governed default",
         },
     )
@@ -1239,7 +1481,7 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
     assert report["release_identity"]["package_fingerprint"] == "controlled-candidate"
     assert report["hermes_configuration"]["safe_mode"] is True
     assert report["desktop_operation_evidence"]["stage_timings"] == state["stage_timings"]
-    assert report["certification_scope"] == "single_case_tracer"
+    assert report["certification_scope"] == "controlled_single_case_tracer"
     assert report["release_certification_status"] == "not_full_corpus"
     assert report["adapter_attempts"] == {"renderer": [], "page_renderer": []}
     assert report["bound_evidence"]["delivery_manifest"]["sha256"] == hashlib.sha256(
@@ -1265,15 +1507,21 @@ def test_release_certification_routes_visual_fallback_to_the_desktop_parent(tmp_
     }
     parent_reviews = []
 
-    def controlled_operation(_run_dir, **kwargs):
+    def controlled_operation(run_dir, **kwargs):
         kwargs["fallback_handoff_runner"]([handoff], 12.0)
+        state_path = workflow.desktop_operation_state_path(run_dir, kwargs["operation_id"])
+        state_path.write_text(json.dumps({
+            "status": "blocked",
+            "release_identity": kwargs["release_identity"],
+        }), encoding="utf-8")
         return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
 
-    run_release_certification_operation(
+    hermes_e2e._run_controlled_release_certification_operation(
         tmp_path,
         release_root=tmp_path,
         desktop_operation=controlled_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        desktop_opener=lambda path: Path(path).read_bytes(),
         parent_visual_reviewer=lambda handoffs, remaining, _validator: parent_reviews.append((handoffs, remaining)),
         verification_response_validator=quality.verification_response_is_complete,
         state_path_resolver=workflow.desktop_operation_state_path,
@@ -1291,14 +1539,18 @@ def test_release_report_handles_a_resolved_state_path_behind_a_symlink(tmp_path:
     def controlled_operation(run_dir, **kwargs):
         state_path = workflow.desktop_operation_state_path(run_dir, kwargs["operation_id"])
         state_path.parent.mkdir(parents=True)
-        state_path.write_text(json.dumps({"status": "blocked"}), encoding="utf-8")
+        state_path.write_text(json.dumps({
+            "status": "blocked",
+            "release_identity": kwargs["release_identity"],
+        }), encoding="utf-8")
         return {"status": "blocked", "stage": "quality", "elapsed_seconds": 1.0, "client_outputs": []}
 
-    report = run_release_certification_operation(
+    report = hermes_e2e._run_controlled_release_certification_operation(
         alias,
         release_root=tmp_path,
         desktop_operation=controlled_operation,
         release_identity={"package_fingerprint": "controlled-candidate"},
+        desktop_opener=lambda path: Path(path).read_bytes(),
         state_path_resolver=workflow.desktop_operation_state_path,
     )
 
@@ -1322,7 +1574,7 @@ def test_parent_visual_review_waits_for_bound_desktop_responses(tmp_path: Path) 
     marker = json.loads((tmp_path / "logs/desktop-parent-visual-review.json").read_text())
     assert marker["status"] == "completed"
     assert marker["response_paths"] == ["hermes/verification-responses/visual.json"]
-    assert marker["required_producer_model_id"] == "gpt-5.6-sol"
+    assert marker["producer_model_policy"] == "record_actual_nonempty_model_id"
 
 
 def test_parent_visual_review_reports_progress_while_waiting(tmp_path: Path, monkeypatch) -> None:
@@ -1470,6 +1722,52 @@ def test_bound_but_incomplete_visual_pass_is_not_terminal(tmp_path: Path) -> Non
     ) is False
 
 
+def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Path) -> None:
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/verification-requests/content.json"
+    response_path = revision_dir / "hermes/verification-responses/content.json"
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "content",
+        "task": "clinical_content_verification",
+        "revision_id": "r-test",
+        "artifacts": [],
+        "sections": [],
+        "cross_document_checks": [],
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+    }
+    request["request_sha256"] = quality.verification_request_sha256(request)
+    response = {
+        "schema_version": "hermes-verification-response/v1",
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "gpt-5.6-sol"},
+        "status": "blocked",
+        "findings": [{
+            "target_ids": ["objectives"],
+            "issue": "Client-facing content exposes internal source-review language.",
+        }],
+        "section_assessments": [],
+        "cross_document_assessments": [],
+    }
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+    handoff = {
+        "request_path": request_path.relative_to(revision_dir).as_posix(),
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+        "task": request["task"],
+    }
+
+    assert workflow._production_response_is_bound(
+        revision_dir,
+        handoff,
+    ) is True
+    assert quality.verification_response_is_complete(revision_dir, request_path) is False
+
+
 def test_bound_drafting_response_is_terminal_without_visual_validation(tmp_path: Path) -> None:
     revision_dir = tmp_path / "revision"
     request_path = revision_dir / "hermes/requests/draft.json"
@@ -1521,7 +1819,7 @@ def test_bound_drafting_response_is_terminal_without_visual_validation(tmp_path:
         handoff,
         lambda *_args: True,
         expected_model_identifier="gpt-5.6-sol",
-    ) is False
+    ) is True
 
 
 def test_complete_visual_pass_is_terminal(tmp_path: Path) -> None:
@@ -1776,8 +2074,8 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
     assert slow_delivery["outcome"] == DiagnosticOutcome.NON_CERTIFYING_RUNTIME.value
     assert slow_delivery["output_published"] is True
     assert with_delivery["required_outputs"] == ["protocol.docx"]
-    assert wrong_model_delivery["outcome"] == DiagnosticOutcome.INVALID_HERMES_RESPONSE.value
-    assert wrong_model_delivery["noncanonical_model_identifiers"] == ["other-model"]
+    assert wrong_model_delivery["outcome"] == DiagnosticOutcome.PASSED.value
+    assert wrong_model_delivery["noncanonical_model_identifiers"] == []
 
 
 def test_diagnostic_preserves_a_classified_layout_blocker_after_response_invalidation(tmp_path: Path) -> None:

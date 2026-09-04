@@ -3,6 +3,7 @@ import re
 import zipfile
 from pathlib import Path
 
+import pytest
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
@@ -12,9 +13,9 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader, PdfWriter
 
 from contracts import batch_plan
-from drafting import create_drafting_request, recorded_acceptance_response, validate_response
+from drafting import create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
 from quality import deterministic_content_check, render_pages, sha256_file
-from rendering import refresh_toc_from_pdf, render_documents, render_fields
+from rendering import _has_page_boundary_before, _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +79,30 @@ def _doc_default_font(docx_path: Path):
     return fonts.get(qn("w:ascii")), fonts.get(qn("w:hAnsi"))
 
 
+def _explicit_page_break_count(document: Document) -> int:
+    return len(document.element.body.xpath('.//w:pageBreakBefore | .//w:br[@w:type="page"]'))
+
+
+def _add_page_break(paragraph) -> None:
+    run = paragraph.add_run()
+    page_break = run._r.makeelement(qn("w:br"), {qn("w:type"): "page"})
+    run._r.append(page_break)
+
+
+def _page_boundary_before(paragraph) -> bool:
+    if paragraph.paragraph_format.page_break_before is True:
+        return True
+    previous = paragraph._p.getprevious()
+    while previous is not None and previous.tag == qn("w:p"):
+        prior = Paragraph(previous, paragraph._parent)
+        if previous.xpath('.//w:br[@w:type="page"]'):
+            return True
+        if prior.text.strip():
+            break
+        previous = previous.getprevious()
+    return False
+
+
 def _numbering_level_signature(document: Document, paragraph):
     numbering_properties = paragraph._p.get_or_add_pPr().find(qn("w:numPr"))
     assert numbering_properties is not None
@@ -137,6 +162,99 @@ def test_recorded_acceptance_coverage_sentences_are_section_specific(tmp_path):
     assert duplicates == set()
 
 
+@pytest.mark.parametrize(
+    "exclusion_items",
+    [
+        [
+            "Type 1 diabetes or gestational diabetes.",
+            "Known allergy to medical-grade adhesive.",
+            "A skin condition at a proposed sensor site.",
+            "Dialysis.",
+            "Pregnancy.",
+            "Participation in another interventional study within 30 days before screening.",
+            "Missing historical source records.",
+            "An investigator-determined safety concern.",
+        ],
+        [
+            "Type 1 diabetes or gestational diabetes.",
+            "Known allergy to medical-grade adhesive.",
+            "A skin condition at a proposed sensor site.",
+            "Receiving dialysis.",
+            "Being pregnant.",
+            "Participation in another interventional study within 30 days before screening.",
+            "Missing historical source records.",
+            "An investigator-determined safety concern.",
+        ],
+    ],
+)
+def test_exclusion_drafts_accept_source_complete_clinical_wording(tmp_path, exclusion_items):
+    """Reproduce the exact accepted facts and wording returned by the Hermes run."""
+    reference = json.loads((
+        ROOT / "tests/fixtures/prospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["population"]["exclusion_criteria"] = [
+        "Type 1 or gestational diabetes",
+        "Known allergy to medical-grade adhesive",
+        "Skin condition at proposed sensor sites",
+        "Dialysis",
+        "Pregnancy",
+        "Participation in another interventional study within 30 days before screening",
+        "Missing historical source records",
+        "Investigator-determined safety concern",
+    ]
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-foundations"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-hermes-exclusion-regression",
+        reference=reference,
+        batch=batch,
+        attempts={section_id: 1 for section_id in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    exclusion = next(
+        item for item in response["section_results"]
+        if item["section_id"] == "subjects.exclusion"
+    )
+    exclusion["paragraphs"] = [{
+        "text": "An individual who meets any of the following criteria will be excluded from the study:",
+        "evidence_refs": ["source:population.exclusion_criteria"],
+        "boilerplate_refs": [],
+    }]
+    exclusion["lists"] = [{
+        "items": exclusion_items,
+        "evidence_refs": ["source:population.exclusion_criteria"],
+        "boilerplate_refs": [],
+    }]
+
+    accepted, findings = validate_response(request, response)
+
+    assert not [
+        finding for finding in findings
+        if finding.get("field") == "subjects.exclusion"
+    ]
+    assert any(
+        draft["section_id"] == "subjects.exclusion"
+        for draft in (accepted or {}).get("drafts", [])
+    )
+
+
+def test_clinical_wording_equivalence_does_not_weaken_fact_or_numeric_grounding():
+    assert evidence_grounded("Being pregnant.", "Pregnancy")
+    assert evidence_grounded("Pregnancy.", "Pregnancy")
+    assert not evidence_grounded("Being present.", "Pregnancy")
+    assert not evidence_grounded(
+        "Participation in another interventional study before screening.",
+        "Participation in another interventional study within 30 days before screening",
+    )
+
+
 def test_recorded_retrospective_schedule_uses_readable_visit_list(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["procedures"]["visit_schedule_table"].append({
@@ -174,6 +292,48 @@ def test_recorded_retrospective_schedule_uses_readable_visit_list(tmp_path):
         "evidence_refs": ["source:procedures.visit_schedule_table"],
         "boilerplate_refs": [],
     }]
+
+
+def test_retrospective_eligibility_preserves_approved_criteria_verbatim(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/retrospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["population"]["inclusion_criteria"] = (
+        "Adults with eligible historical vitrectomy records during the study period."
+    )
+    reference["population"]["exclusion_criteria"] = (
+        "Incomplete records or missing baseline and follow-up visual acuity documentation."
+    )
+    model = {
+        "protocol": [{
+            "section_id": "subjects.eligibility",
+            "paragraphs": [{
+                "text": (
+                    "Adults with eligible historical vitrectomy records are included. "
+                    "Incomplete records and records missing baseline or follow-up visual acuity "
+                    "documentation are excluded."
+                ),
+                "evidence_refs": [
+                    "source:population.inclusion_criteria",
+                    "source:population.exclusion_criteria",
+                ],
+                "boilerplate_refs": [],
+            }],
+            "lists": [],
+        }],
+        "icf": {},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    visible = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
+    assert reference["population"]["inclusion_criteria"] in visible
+    assert reference["population"]["exclusion_criteria"] in visible
+    assert not any(
+        finding.get("field") == "subjects.eligibility"
+        for finding in deterministic_content_check(tmp_path, reference)
+    )
 
 
 def test_sterling_icf_removes_review_metadata_and_uses_heading_styles(tmp_path):
@@ -1495,6 +1655,17 @@ def test_client_protocol_template_renders_source_supported_schedule_of_assessmen
     continuation_borders = first_column[1].tcPr.find(qn("w:tcBorders"))
     continuation_top = None if continuation_borders is None else continuation_borders.find(qn("w:top"))
     assert continuation_top is None or continuation_top.get(qn("w:val")) == "nil"
+    body_runs = [
+        run
+        for row in assessment.rows[2:]
+        for cell in row.cells
+        for paragraph in cell.paragraphs
+        for run in paragraph.runs
+        if run.text.strip()
+    ]
+    assert body_runs
+    assert all(run.font.name == "Arial" for run in body_runs)
+    assert all(_points(run.font.size) == 10 for run in body_runs)
     for cell in assessment._tbl.tr_lst[-1].tc_lst:
         bottom = cell.tcPr.find(f"{qn('w:tcBorders')}/{qn('w:bottom')}")
         assert bottom is not None
@@ -2041,7 +2212,139 @@ def test_ambispective_body_sections_follow_template_pagination_and_spacing(tmp_p
         paragraph for paragraph in protocol.paragraphs[toc_index + 1:]
         if paragraph.style.name.casefold().startswith("heading")
     ]
-    assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in body_headings)
+    first_body = next(paragraph for paragraph in body_headings if "INTRODUCTION" in paragraph.text)
+    assert _page_boundary_before(first_body)
+    assert all(
+        paragraph.paragraph_format.page_break_before is not True
+        for paragraph in body_headings
+        if paragraph is not first_body
+    )
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "expected_template"),
+    (
+        ("retrospective-acceptance-source.json", "retrospective-protocol.template.docx"),
+        ("ambispective-acceptance-source.json", "ambispective-protocol.template.docx"),
+        ("prospective-acceptance-source.json", "prospective-protocol.template.docx"),
+    ),
+)
+def test_protocol_toc_boundaries_preserve_selected_client_template_without_package_growth(
+    tmp_path, fixture_name, expected_template,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+
+    report = render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    protocol_report = next(item for item in report["artifacts"] if item["artifact"] == "protocol")
+    output_path = tmp_path / protocol_report["path"]
+    template_path = ROOT / protocol_report["template"]
+    protocol = Document(output_path)
+    headings = [paragraph for paragraph in protocol.paragraphs if paragraph.style.name.casefold().startswith("heading")]
+    toc = next(paragraph for paragraph in headings if "TABLE OF CONTENTS" in paragraph.text)
+    first_body = next(paragraph for paragraph in headings if "INTRODUCTION" in paragraph.text)
+
+    assert protocol_report["template"].endswith(expected_template)
+    assert protocol_report["template_sha256"] == sha256_file(template_path)
+    assert _page_boundary_before(toc)
+    assert toc.paragraph_format.page_break_before is True
+    assert _page_boundary_before(first_body)
+    assert first_body.paragraph_format.page_break_before is not True
+    assert all(
+        paragraph.paragraph_format.page_break_before is not True
+        for paragraph in headings[headings.index(first_body) + 1:]
+    )
+    with zipfile.ZipFile(template_path) as template_package, zipfile.ZipFile(output_path) as output_package:
+        template_media = {name for name in template_package.namelist() if name.startswith("word/media/")}
+        output_media = {name for name in output_package.namelist() if name.startswith("word/media/")}
+    assert output_media == template_media
+    assert output_path.stat().st_size <= template_path.stat().st_size + 256 * 1024
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    ("prospective-acceptance-source.json", "ambispective-acceptance-source.json"),
+)
+def test_leaf_body_replacement_preserves_template_break_before_section_15(
+    tmp_path, fixture_name,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8")
+    )
+    report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {
+            "protocol": [{
+                "section_id": "ethics.confidentiality",
+                "paragraphs": [{"text": "Approved confidentiality replacement."}],
+                "lists": [],
+            }],
+            "icf": {},
+            "prs": {},
+        },
+        artifact_names={"protocol"},
+    )
+
+    assert report["status"] == "passed"
+    document = Document(tmp_path / "candidate/protocol.docx")
+    section_15 = next(
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.strip() == "15. STANDARD EVALUATION PROCEDURES"
+    )
+    assert _has_page_boundary_before(section_15) is True
+    previous = section_15._p.getprevious()
+    assert previous is not None
+    assert previous.xpath('.//w:br[@w:type="page"]')
+
+
+def test_protocol_toc_boundaries_are_added_once_when_template_has_none_and_toc_spans_pages():
+    document = Document()
+    document.add_paragraph("3. GENERAL INFORMATION", style="Heading 1")
+    toc = document.add_paragraph("4. TABLE OF CONTENTS", style="Heading 1")
+    for index in range(80):
+        entry = document.add_paragraph(f"{index + 1}. Generated TOC entry")
+        if index == 39:
+            _add_page_break(entry)
+    first_body = document.add_paragraph("5. INTRODUCTION", style="Heading 1")
+    later_body = document.add_paragraph("6. OBJECTIVES", style="Heading 1")
+
+    _normalize_protocol_section_pagination(document)
+    first_count = _explicit_page_break_count(document)
+    _normalize_protocol_section_pagination(document)
+
+    assert _page_boundary_before(toc)
+    assert _page_boundary_before(first_body)
+    assert later_body.paragraph_format.page_break_before is not True
+    assert first_count == 3  # TOC start, simulated continuation page, first body start.
+    assert _explicit_page_break_count(document) == first_count
+
+
+def test_protocol_toc_boundaries_preserve_existing_template_breaks_without_duplicates():
+    document = Document()
+    document.add_paragraph("3. GENERAL INFORMATION", style="Heading 1")
+    cosmetic_spacer_one = document.add_paragraph()
+    cosmetic_spacer_two = document.add_paragraph()
+    before_toc = document.add_paragraph()
+    _add_page_break(before_toc)
+    toc = document.add_paragraph("4. TABLE OF CONTENTS", style="Heading 1")
+    document.add_paragraph("Cached TOC entry")
+    before_body = document.add_paragraph()
+    _add_page_break(before_body)
+    first_body = document.add_paragraph("5. INTRODUCTION", style="Heading 1")
+
+    _normalize_protocol_section_pagination(document)
+    _normalize_protocol_section_pagination(document)
+
+    assert _page_boundary_before(toc)
+    assert _page_boundary_before(first_body)
+    assert toc.paragraph_format.page_break_before is True
+    assert first_body.paragraph_format.page_break_before is not True
+    assert _explicit_page_break_count(document) == 2
+    assert before_toc._p.getparent() is None
+    assert cosmetic_spacer_one._p.getparent() is None
+    assert cosmetic_spacer_two._p.getparent() is None
 
 
 def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, governed_pdfium):
@@ -2158,7 +2461,13 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
                 and content_marker in page[page.index(heading_marker) + len(heading_marker):]
                 for page in normalized_pages
             ), f"Rendered heading is orphaned from first content: {heading.text}"
-        assert all(paragraph.paragraph_format.page_break_before is not True for paragraph in numbered_body_headings)
+        first_body_heading = next(paragraph for paragraph in numbered_body_headings if "INTRODUCTION" in paragraph.text)
+        assert _page_boundary_before(first_body_heading)
+        assert all(
+            paragraph.paragraph_format.page_break_before is not True
+            for paragraph in numbered_body_headings
+            if paragraph is not first_body_heading
+        )
         assert all(
             paragraph.paragraph_format.keep_with_next is True
             or paragraph.style.paragraph_format.keep_with_next is True
@@ -2258,6 +2567,87 @@ def test_rendered_ambispective_section_three_flows_after_investigator_agreement(
     assert len(section_three_page.split()) >= 120
     assert "15. STANDARD EVALUATION PROCEDURES" in section_sixteen_page
     assert "Table 9.2-1. Visit Schedule" in visits_heading_page
+
+
+def test_section_three_table_repair_moves_the_complete_block_before_the_toc(
+    tmp_path,
+    governed_pdfium,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reference["study"].update({
+        "title": (
+            "Prospective Evaluation of the NovaStep Activity Sensor in Adults "
+            "Recovering From Total Knee Arthroplasty"
+        ),
+        "short_title": "NovaStep Recovery Study",
+        "timeline": (
+            "Enrollment is expected to last 8 months. Each participant is followed "
+            "from screening through Week 12, for "
+            + "additional scheduled follow-up context " * 16
+            + "extra words approximately 11 weeks after the baseline device fitting."
+        ),
+    })
+    reference["objectives"]["primary"] = [
+        "Describe the change in average daily step count from baseline at Week 2 "
+        "to Week 12 after total knee arthroplasty."
+    ]
+    reference["population"].update({
+        "sample_size": "72 participants",
+        "study_population": (
+            "Adults recovering from primary unilateral total knee arthroplasty who "
+            "can complete study visits and use the NovaStep sensor."
+        ),
+    })
+    reference["design"].update({
+        "number_of_sites": 2,
+        "study_design": (
+            "Prospective, multi-site, single-arm observational device study. The "
+            "device is used only for measurement and does not direct treatment."
+        ),
+    })
+
+    document_report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+        layout_repairs={
+            "protocol": ({
+                "rule": "table_pagination",
+                "target": "3. GENERAL INFORMATION",
+            },),
+        },
+    )
+    render_report = render_pages(
+        tmp_path,
+        page_renderer_identities=[governed_pdfium],
+    )
+
+    assert document_report["status"] == "passed"
+    assert render_report["status"] == "passed", render_report
+    protocol = next(
+        item for item in render_report["artifacts"]
+        if item["artifact"] == "protocol"
+    )
+    pages = [
+        " ".join((page.extract_text() or "").split())
+        for page in PdfReader(tmp_path / protocol["pdf"]).pages
+    ]
+    toc_page = next(
+        index for index, text in enumerate(pages)
+        if "4. TABLE OF CONTENTS" in text
+    )
+    section_three_page = pages[toc_page - 1]
+
+    assert "3. GENERAL INFORMATION" in section_three_page
+    assert "Duration / Follow-up" in section_three_page
+    assert "device fitting." in section_three_page
+    assert len(section_three_page.split()) >= 150
 
 
 def test_content_gate_rejects_same_section_duplicates_and_flattened_schedule_prose(tmp_path):
