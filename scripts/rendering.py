@@ -479,6 +479,7 @@ def _normalize_protocol_summary_table(document: Document) -> None:
                     cell_margins.append(margin)
                 margin.set(qn("w:w"), "0")
                 margin.set(qn("w:type"), "dxa")
+        for cell in row.cells:
             for cell_paragraph in cell.paragraphs:
                 # Template value cells carry large right indents that narrow the
                 # usable column and can strand the final summary row on a nearly
@@ -2025,6 +2026,13 @@ def _normalize_protocol_contact_table(document: Document) -> None:
     ), None)
     if table is None:
         return
+    for cell in table.rows[0].cells:
+        if "24-hour" in re.sub(r"\s+", " ", cell.text).casefold():
+            for paragraph in cell.paragraphs:
+                _set_paragraph_text(
+                    paragraph,
+                    re.sub(r"\b24[- ]hour\b\s*", "", paragraph.text, flags=re.I).strip(),
+                )
     headers = [re.sub(r"\s+", " ", cell.text).strip().casefold() for cell in table.rows[0].cells]
     if len(headers) == 4:
         widths = [Inches(1.30), Inches(1.15), Inches(2.50), Inches(1.15)]

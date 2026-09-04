@@ -409,6 +409,24 @@ def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks(
     }]
 
 
+def test_section_three_endpoint_split_routes_to_the_exact_summary_table_heading():
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "bad_table_split",
+        "element": "3. GENERAL INFORMATION – Variables / Secondary endpoint(s)",
+        "target_ids": ["layout:protocol"],
+        "issue": "The Secondary endpoint(s) label is separated from its first bullet.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding])
+
+    assert plan == {
+        "protocol": [{"rule": "table_pagination", "target": "3. GENERAL INFORMATION"}],
+    }
+    assert unsupported == []
+
+
 def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
     finding = {
         "category": "visual",
@@ -1276,6 +1294,20 @@ def test_protocol_summary_rows_keep_together(tmp_path):
         for cell in row.cells
         for side in ("w:top", "w:bottom")
     )
+
+
+def test_protocol_contact_table_does_not_invent_round_the_clock_availability(tmp_path):
+    reference = _source()
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    contact = next(
+        table for table in document.tables
+        if table.rows and table.rows[0].cells[0].text.strip() == "Study Staff"
+    )
+    headers = [" ".join(cell.text.split()) for cell in contact.rows[0].cells]
+
+    assert headers == ["Study Staff", "Business Phone", "e-mail", "Office Phone"]
 
 
 def test_assessment_table_splits_plain_language_schedule_into_readable_rows(tmp_path):

@@ -174,6 +174,11 @@ expires, `<run>/logs/desktop-parent-visual-review.json` identifies the exact
 page requests the Desktop parent must inspect and bind inside the unchanged
 operation deadline.
 
+The Desktop-parent visual-review command prints each complete outer verification
+response to stdout and leaves response selection to the installed workflow. The
+workflow ignores nested finding objects and persists only the unique response
+bound to the request schema, ID, hash, and task.
+
 The normal approval-to-accessible-files target is 10–12 minutes. The target is
 not a cutoff. The complete operation, including retries, verification,
 attachment retrieval, and owned-process cleanup, has a 30-minute ceiling.

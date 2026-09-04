@@ -222,6 +222,20 @@ def test_screening_washout_is_contractually_bound_to_protocol_and_icf():
     assert "procedures.minimum_days_before_screening_without_participation" in icf["icf.procedures"].evidence
 
 
+def test_operational_safeguards_costs_and_device_role_are_bound_to_their_target_sections():
+    protocol = {section.section_id: section for section in protocol_contract("Ambispective")}
+    icf = {section.section_id: section for section in ICF_STUDY_SECTIONS}
+
+    assert "risks_benefits.risk_mitigation" in protocol["risks-benefits.risks"].evidence
+    assert "risks_benefits.risk_mitigation" in protocol["risks-benefits.risks"].fidelity_evidence
+    assert "risks_benefits.costs" in protocol["financial-injury"].evidence
+    assert "risks_benefits.costs" in protocol["financial-injury"].fidelity_evidence
+    assert "design.intervention_description" in icf["icf.procedures"].evidence
+    assert "design.intervention_description" in icf["icf.procedures"].fidelity_evidence
+    assert "risks_benefits.risk_mitigation" in icf["icf.risks"].evidence
+    assert "risks_benefits.risk_mitigation" in icf["icf.risks"].fidelity_evidence
+
+
 def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     protocol = {section.section_id: section for section in protocol_contract("Prospective")}
     retrospective = {section.section_id: section for section in protocol_contract("Retrospective")}

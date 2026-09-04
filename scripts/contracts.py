@@ -317,9 +317,9 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "or missing-data methods from a broader analysis-plan field."
         ),
         "icf.study-purpose": "Explain the study purpose, hypothesis, primary endpoint, and background in clear participant-facing language.",
-        "icf.procedures": "Explain every approved visit, procedure, and minimum interval without participation in another study before screening in participant-facing sequence.",
+        "icf.procedures": "Explain every approved visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
         "icf.duration": "State the approved participation duration and relevant time points.",
-        "icf.risks": "Disclose every approved risk or discomfort without minimizing or inventing risk.",
+        "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
         "icf.payment": "State the approved payment or reimbursement terms exactly enough for participant use.",
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
@@ -354,10 +354,12 @@ def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
         "analysis-plan.methodology": ("statistics.methodology", "endpoints.other"),
         "analysis-plan.considerations": ("statistics.software",),
         "confidentiality-publication": ("confidentiality.retention",),
-        "financial-injury": ("risks_benefits.injury_handling",),
-        "risks-benefits.risks": ("risks_benefits.risks",),
+        "financial-injury": ("risks_benefits.injury_handling", "risks_benefits.costs"),
+        "risks-benefits.risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
         "risks-benefits.benefits": ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"),
         "endpoint-criteria.discontinuation": ("procedures.discontinuation", "procedures.replacement"),
+        "icf.procedures": ("design.intervention_description",),
+        "icf.risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
     }.get(section_id, ())
 
 
@@ -440,7 +442,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("ethics.confidentiality", "14.1.", "Confidentiality", "protocol-analysis-and-oversight", ("ethics.confidentiality", "confidentiality.data_handling"), "confidentiality-cross-reference"),
     _section_spec("evaluation-procedures", "15.", "STANDARD EVALUATION PROCEDURES", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule")),
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),
-    _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.injury_handling"), "injury"),
+    _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.costs", "risks_benefits.injury_handling"), "injury"),
     _section_spec("endpoint-criteria", "18.", "STUDY ENDPOINT CRITERIA", role="container"),
     _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "completion"),
     _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation", "procedures.replacement"), "discontinuation"),
@@ -448,7 +450,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("endpoint-criteria.study-termination", "18.4.", "Study Termination", "protocol-operations", ("procedures.study_termination",), "study-termination"),
     _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion"),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
-    _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks",), "protocol-sparse-risks"),
+    _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "protocol-sparse-risks"),
     _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"), "protocol-sparse-benefits"),
 )
 
@@ -478,9 +480,9 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
 
 ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.background", "study.hypothesis", "endpoints.primary")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline", "population.sample_size")),
-    _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks",), "icf-sparse-risks"),
+    _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
     _section_spec("icf.payment", "", "Payment", "icf-narrative", ("risks_benefits.compensation_or_reimbursement",)),
     _section_spec("icf.costs", "", "Costs", "icf-narrative", ("risks_benefits.costs",), "costs"),

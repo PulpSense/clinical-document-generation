@@ -225,12 +225,20 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
     study_type = _text(get_path(reference, "regulatory.prs.study_type"))
     observational = _text(get_path(reference, "regulatory.prs.observational_study_design"))
     inclusion = [_text(item) for item in get_path(reference, "population.inclusion_criteria", []) or []]
+    exclusion = [_text(item) for item in get_path(reference, "population.exclusion_criteria", []) or []]
     minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
     if minimum_days:
         duration = minimum_days if re.search(r"\bdays?\s*$", minimum_days, re.I) else f"{minimum_days} days"
-        inclusion.append(f"At least {duration} without participation in another study before screening")
+        participation_scope = "another study"
+        for criterion in (*inclusion, *exclusion):
+            match = re.search(r"\banother\s+([a-z][a-z -]{0,40}?\s+)?stud(?:y|ies)\b", criterion, re.I)
+            if match:
+                participation_scope = re.sub(r"\s+", " ", match.group(0)).strip().casefold()
+                if participation_scope != "another study":
+                    break
+        inclusion.append(f"At least {duration} without participation in {participation_scope} before screening")
     criteria = "Inclusion Criteria:\n" + "\n".join(f"• {item}" for item in inclusion)
-    criteria += "\n\nExclusion Criteria:\n" + "\n".join(f"• {_text(item)}" for item in get_path(reference, "population.exclusion_criteria", []) or [])
+    criteria += "\n\nExclusion Criteria:\n" + "\n".join(f"• {item}" for item in exclusion)
     brief = narrative.get("brief_summary", {}) if isinstance(narrative.get("brief_summary"), Mapping) else narrative.get("brief_summary")
     detailed = narrative.get("detailed_description", {}) if isinstance(narrative.get("detailed_description"), Mapping) else narrative.get("detailed_description")
     values = {

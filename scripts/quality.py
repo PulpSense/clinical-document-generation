@@ -3587,7 +3587,7 @@ def create_verification_requests(
             "page_renderer": artifacts[0].get("page_renderer", render_report.get("page_renderer")) if artifacts else render_report.get("page_renderer"),
             "artifacts": request_artifacts,
             "checks": list(VISUAL_CHECKS),
-            "instructions": f"This is complete review set {review_set}. Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local.",
+            "instructions": f"This is complete review set {review_set}. Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local. Route a split inside the Protocol Section 3 summary table with element exactly `3. GENERAL INFORMATION`.",
             "reviewer_policy": {
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",

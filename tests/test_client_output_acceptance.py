@@ -162,6 +162,80 @@ def test_recorded_acceptance_coverage_sentences_are_section_specific(tmp_path):
     assert duplicates == set()
 
 
+def test_bundle04_operational_omissions_are_rejected_before_candidate_construction(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
+    reference["design"]["intervention_description"] = (
+        "An upper-arm wearable sensor used for research measurement that does not direct treatment."
+    )
+    reference["risks_benefits"]["risk_mitigation"] = (
+        "Trained staff insert and remove sensors, skin is assessed at visits, participants receive "
+        "contact instructions, research results do not direct treatment, and access is restricted by role."
+    )
+    reference["risks_benefits"]["costs"] = (
+        "The sensor and study-only procedures are free; usual care remains the participant's or insurer's responsibility."
+    )
+
+    cases = {
+        "protocol-analysis-and-oversight": {
+            "financial-injury": (
+                "Compensation and injury handling follow the approved terms.",
+                ["source:risks_benefits.compensation_or_reimbursement", "source:risks_benefits.injury_handling"],
+            ),
+            "risks-benefits.risks": (
+                "The study risks include the approved discomforts and confidentiality risk.",
+                ["source:risks_benefits.risks"],
+            ),
+        },
+        "icf-narrative": {
+            "icf.procedures": (
+                "You will complete the approved study visits and procedures after the screening interval.",
+                [
+                    "source:procedures.assessments",
+                    "source:procedures.visit_schedule",
+                    "source:procedures.minimum_days_before_screening_without_participation",
+                ],
+            ),
+            "icf.risks": (
+                "You may experience the approved study risks and discomforts.",
+                ["source:risks_benefits.risks"],
+            ),
+        },
+    }
+    rejected = set()
+    findings = []
+    for batch_id, replacements in cases.items():
+        batch = next(item for item in batch_plan("Ambispective", "Sterling") if item.batch_id == batch_id)
+        request_path = create_drafting_request(
+            repo_root=ROOT,
+            revision_dir=tmp_path / batch_id,
+            revision_id=f"r-{batch_id}",
+            reference=reference,
+            batch=batch,
+            attempts={section_id: 1 for section_id in batch.section_ids},
+            wave="initial",
+        )
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        response = recorded_acceptance_response(request)
+        for result in response["section_results"]:
+            if result["section_id"] not in replacements:
+                continue
+            text, evidence_refs = replacements[result["section_id"]]
+            result["paragraphs"] = [{
+                "text": text,
+                "evidence_refs": evidence_refs,
+                "boilerplate_refs": [],
+            }]
+            result["lists"] = []
+        accepted, batch_findings = validate_response(request, response)
+        accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
+        rejected.update(set(replacements) - accepted_ids)
+        findings.extend(batch_findings)
+
+    expected = {"financial-injury", "risks-benefits.risks", "icf.procedures", "icf.risks"}
+    assert rejected == expected
+    assert expected <= {item["field"] for item in findings}
+
+
 @pytest.mark.parametrize(
     "exclusion_items",
     [
@@ -2410,7 +2484,7 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
         if any("Table 13.3.-1" in paragraph.text for paragraph in protocol.paragraphs):
             assert any(
                 "Table 13.3.-1" in page
-                and "Study Staff Business Phone e-mail 24-hour Office Phone" in page
+                and "Study Staff Business Phone e-mail Office Phone" in page
                 for page in protocol_pages
             )
         general_information = next((

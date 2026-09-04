@@ -166,6 +166,25 @@ def test_screening_washout_does_not_duplicate_supplied_day_units(tmp_path):
     assert "days days" not in criteria
 
 
+def test_screening_washout_preserves_approved_interventional_study_qualifier(tmp_path):
+    reference = fixture()
+    reference["population"]["exclusion_criteria"].append(
+        "Participation in another interventional study within 30 days before screening."
+    )
+    output = tmp_path / "study.xml"
+
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+    )
+
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+    criteria = study.findtext("eligibility/criteria/textblock") or ""
+    assert "30 days without participation in another interventional study before screening" in criteria
+
+
 def test_optional_prs_roles_are_not_inferred_and_official_affiliation_uses_the_approved_site(tmp_path):
     reference = fixture()
     reference["regulatory"]["prs"].pop("responsible_party_type", None)

@@ -2509,6 +2509,7 @@ def _approval_valid(
 
 _OPTIONAL_REVIEW_FIELDS = (
     "study.condition",
+    "design.intervention_description",
     "procedures.methods",
     "procedures.unscheduled_visits",
     "procedures.discontinuation",
@@ -2524,6 +2525,7 @@ _OPTIONAL_REVIEW_FIELDS = (
     "confidentiality.data_handling",
     "confidentiality.publication",
     "risks_benefits.risks",
+    "risks_benefits.risk_mitigation",
     "risks_benefits.benefits",
     "risks_benefits.costs",
     "risks_benefits.alternatives",
@@ -4691,6 +4693,20 @@ def command_parent_visual_reviewer(
     if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
         raise ValueError("The Desktop-parent reviewer command must be an absolute executable file.")
 
+    def response_candidates(output: str) -> list[dict[str, Any]]:
+        decoder = json.JSONDecoder()
+        candidates: list[dict[str, Any]] = []
+        for index, character in enumerate(output):
+            if character != "{":
+                continue
+            try:
+                value, _ = decoder.raw_decode(output, index)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                candidates.append(value)
+        return candidates
+
     def review(
         handoffs: Sequence[Mapping[str, Any]],
         remaining_seconds: float,
@@ -4704,12 +4720,49 @@ def command_parent_visual_reviewer(
             "handoffs": [dict(item) for item in handoffs],
             "producer_model_policy": "record_actual_nonempty_model_id",
         })
-        subprocess.run(
+        completed = subprocess.run(
             [str(command), str(request_path)],
             check=True,
             timeout=max(1.0, remaining_seconds),
             env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
         )
+        candidates = response_candidates(completed.stdout)
+        for handoff in handoffs:
+            bound_request_path = (revision_dir / str(handoff.get("request_path") or "")).resolve()
+            try:
+                bound_request_path.relative_to(revision_dir.resolve())
+            except ValueError as exc:
+                raise ValueError("Desktop-parent request path escapes the active revision.") from exc
+            if verification_response_is_terminal(revision_dir, bound_request_path):
+                continue
+            if not candidates:
+                continue
+            request = _read(bound_request_path)
+            matching = {
+                json.dumps(candidate, sort_keys=True, ensure_ascii=False): candidate
+                for candidate in candidates
+                if candidate.get("schema_version") == RESPONSE_SCHEMA
+                and candidate.get("request_id") == request.get("request_id")
+                and candidate.get("request_sha256") == request.get("request_sha256")
+                and candidate.get("task") == request.get("task")
+            }
+            if len(matching) != 1:
+                continue
+            response_path = (revision_dir / str(request.get("response_path") or "")).resolve()
+            try:
+                response_path.relative_to(revision_dir.resolve())
+            except ValueError as exc:
+                raise ValueError("Desktop-parent response path escapes the active revision.") from exc
+            response_path.parent.mkdir(parents=True, exist_ok=True)
+            temporary = response_path.with_name(f".{response_path.name}.tmp-{os.getpid()}")
+            temporary.write_text(
+                json.dumps(next(iter(matching.values())), indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(temporary, response_path)
 
     return review
 
@@ -5040,6 +5093,14 @@ def _layout_repair_plan(
         artifact = str(finding.get("artifact") or layout_targets[0]).removesuffix(".docx")
         check = str(finding.get("check") or "")
         target = " ".join(str(finding.get("element") or "").split())
+        section_three_summary_split = (
+            check == "bad_table_split"
+            and artifact == "protocol"
+            and "general information" in target.casefold()
+            and any(token in target.casefold() for token in ("variables", "endpoint"))
+        )
+        if section_three_summary_split:
+            target = "3. GENERAL INFORMATION"
         exact_sterling_duration_gap = (
             check == "excessive_whitespace"
             and artifact == "icf"

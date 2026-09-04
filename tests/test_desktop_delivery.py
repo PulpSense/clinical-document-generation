@@ -1136,6 +1136,56 @@ def test_external_parent_visual_reviewer_receives_one_bound_request_path(tmp_pat
     assert len(request["handoffs"]) == 1
 
 
+def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested_finding(tmp_path):
+    revision = tmp_path / "revisions/r1"
+    request_path = revision / "hermes/verification-requests/visual.json"
+    response_path = revision / "hermes/verification-responses/visual.json"
+    request_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r1.verify.visual.protocol",
+        "task": "rendered_page_visual_verification",
+        "response_path": "hermes/verification-responses/visual.json",
+        "artifacts": [{"artifact": "protocol", "pages": []}],
+        "checks": list(VISUAL_CHECKS),
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "test-parent-model"},
+        "status": "blocked",
+        "findings": [{
+            "artifact": "protocol",
+            "page": 3,
+            "check": "bad_table_split",
+            "element": "3. GENERAL INFORMATION – Variables / Secondary endpoint(s)",
+            "issue": "The label is separated from its first bullet.",
+        }],
+        "page_assessments": [],
+    }
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        "#!/bin/sh\nprintf '%s\\n' '" + json.dumps(response) + "'\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    reviewer = workflow.command_parent_visual_reviewer(command)
+    reviewer([{
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+    }], 10.0, revision, {})
+
+    assert json.loads(response_path.read_text(encoding="utf-8")) == response
+
+
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
         "package_fingerprint": "installed",
