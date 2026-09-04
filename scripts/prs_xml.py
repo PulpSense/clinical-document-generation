@@ -386,13 +386,17 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
         country = address.get("country") or facility.get("country")
         postal_code = address.get("zip") or facility.get("zip") or facility.get("postal_code")
         contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}; investigator = (site.get("investigators") or [{}])[0]
+        contact_fields = _contact_fields(contact)
         backup_fields = _contact_fields(_site_backup_contact(site))
-        cf, cm, cl = _name(contact.get("name")); inf, inm, inl = _name(investigator.get("name"))
+        investigator_fields = _contact_fields(investigator)
         _set(node, "status", site.get("status")); _set(node, "facility/name", facility.get("name")); _set(node, "facility/address/city", city); _set(node, "facility/address/state", state); _set(node, "facility/address/country", country); _set(node, "facility/address/zip", postal_code)
-        _set(node, "contact/first_name", cf); _set(node, "contact/middle_name", cm); _set(node, "contact/last_name", cl); _set(node, "contact/degrees", contact.get("degrees")); _set(node, "contact/phone", contact.get("phone")); _set(node, "contact/email", contact.get("email"))
+        for field, value in contact_fields.items():
+            _set(node, f"contact/{field}", value)
         for field, value in backup_fields.items():
             _set(node, f"contact_backup/{field}", value)
-        _set(node, "investigator/first_name", inf); _set(node, "investigator/middle_name", inm); _set(node, "investigator/last_name", inl); _set(node, "investigator/degrees", investigator.get("degrees")); _set(node, "investigator/role", investigator.get("role"))
+        for field in ("first_name", "middle_name", "last_name", "degrees"):
+            _set(node, f"investigator/{field}", investigator_fields[field])
+        _set(node, "investigator/role", investigator.get("role"))
 
 
 def expected_counts(reference: Mapping[str, Any]) -> dict[str, int]:
@@ -421,24 +425,48 @@ def compare_structure(reference_path: Path, candidate_path: Path) -> list[str]:
         expected_children, actual_children = list(expected), list(actual)
         expected_tags, actual_tags = [], []
         expected_by_tag, actual_by_tag = {}, {}
+        design_branches = {"interventional_design", "observational_design"}
+        def contract_tag(tag: str) -> str:
+            return "__study_design_branch__" if tag in design_branches else tag
         for child in expected_children:
-            expected_by_tag.setdefault(child.tag, child)
-            if child.tag not in expected_tags: expected_tags.append(child.tag)
+            key = contract_tag(child.tag)
+            expected_by_tag.setdefault(key, child)
+            if key not in expected_tags: expected_tags.append(key)
         for child in actual_children:
-            actual_by_tag.setdefault(child.tag, child)
-            if child.tag not in actual_tags: actual_tags.append(child.tag)
-        optional = {"interventional_design", "observational_design"}
-        expected_present = [tag for tag in expected_tags if tag in actual_tags or (tag not in REPEATED and tag not in optional)]
+            key = contract_tag(child.tag)
+            actual_by_tag.setdefault(key, child)
+            if key not in actual_tags: actual_tags.append(key)
+        expected_present = [tag for tag in expected_tags if tag in actual_tags or tag not in REPEATED]
         if expected_present != actual_tags:
             findings.append(f"{path}: direct-child names or ordering differ")
         for tag in expected_present:
             if tag in actual_by_tag:
-                compare(expected_by_tag[tag], actual_by_tag[tag], f"{path}/{tag}", findings)
+                if tag != "__study_design_branch__":
+                    compare(expected_by_tag[tag], actual_by_tag[tag], f"{path}/{tag}", findings)
     try:
         findings: list[str] = []
         compare(_study(ET.parse(reference_path).getroot()), _study(ET.parse(candidate_path).getroot()), "clinical_study", findings)
         return findings
     except (OSError, ET.ParseError, ValueError) as exc: return [f"PRS XML structural parse error: {exc}"]
+
+
+def _scalar_template_bindings(template_path: Path) -> list[tuple[str, str]]:
+    """Map non-repeated template tokens to their deterministic XML paths."""
+    study = _study(ET.parse(template_path).getroot())
+    bindings: list[tuple[str, str]] = []
+
+    def visit(node: ET.Element, path: str) -> None:
+        for child in node:
+            child_path = f"{path}/{child.tag}" if path else child.tag
+            if child.tag in REPEATED:
+                continue
+            match = TOKEN.fullmatch((child.text or "").strip())
+            if match:
+                bindings.append((child_path, match.group(1)))
+            visit(child, child_path)
+
+    visit(study, "")
+    return bindings
 
 
 def generate(
@@ -466,11 +494,22 @@ def generate(
         if element.tail: element.tail = TOKEN.sub(lambda match: fields.get(match.group(1), ""), element.tail)
     ET.indent(tree, space="  "); output_path.parent.mkdir(parents=True, exist_ok=True)
     tree.write(output_path, encoding="utf-8", xml_declaration=True)
-    findings = validate_output(output_path, reference, structural_template or template_path)
+    findings = validate_output(
+        output_path,
+        reference,
+        structural_template or template_path,
+        generation_template=template_path,
+    )
     return {"artifact": "xml", "path": output_path.name, "status": "passed" if not findings else "blocked", "findings": findings, "counts": repeated_counts(output_path)}
 
 
-def validate_output(path: Path, reference: Mapping[str, Any], structural_template: Path) -> list[dict[str, str]]:
+def validate_output(
+    path: Path,
+    reference: Mapping[str, Any],
+    structural_template: Path,
+    *,
+    generation_template: Path | None = None,
+) -> list[dict[str, str]]:
     findings = []
     try:
         raw = path.read_text(encoding="utf-8"); ET.parse(path)
@@ -479,14 +518,73 @@ def validate_output(path: Path, reference: Mapping[str, Any], structural_templat
     actual, expected = repeated_counts(path), expected_counts(reference)
     for tag, count in expected.items():
         if actual[tag] != count: findings.append({"category": "xml", "field": tag, "issue": f"Expected {count} source-derived blocks; generated {actual[tag]}."})
-    for difference in compare_structure(structural_template, path): findings.append({"category": "xml", "field": "structure", "issue": difference})
+    structure_differences = compare_structure(structural_template, path)
+    if generation_template is not None:
+        try:
+            expected_study = _study(ET.parse(generation_template).getroot())
+            actual_study = _study(ET.parse(path).getroot())
+            expected_design = expected_study.find("study_design")
+            actual_design = actual_study.find("study_design")
+            actual_branch = next((node for node in list(actual_design or []) if node.tag in {"interventional_design", "observational_design"}), None)
+            expected_branch = expected_design.find(actual_branch.tag) if expected_design is not None and actual_branch is not None else None
+            if actual_branch is None or expected_branch is None:
+                structure_differences.append("clinical_study/study_design: selected design branch is missing from the governed generation template")
+            else:
+                def compare_branch(expected: ET.Element, actual: ET.Element, branch_path: str) -> None:
+                    expected_tags = [child.tag for child in expected]
+                    actual_tags = [child.tag for child in actual]
+                    if expected_tags != actual_tags:
+                        structure_differences.append(
+                            f"{branch_path}: direct-child names or ordering differ"
+                        )
+                    for expected_child, actual_child in zip(expected, actual):
+                        if expected_child.tag == actual_child.tag:
+                            compare_branch(
+                                expected_child,
+                                actual_child,
+                                f"{branch_path}/{expected_child.tag}",
+                            )
+
+                compare_branch(
+                    expected_branch,
+                    actual_branch,
+                    f"clinical_study/study_design/{actual_branch.tag}",
+                )
+        except (OSError, ET.ParseError, ValueError) as exc:
+            structure_differences.append(f"PRS XML branch-template parse error: {exc}")
+    for difference in structure_differences: findings.append({"category": "xml", "field": "structure", "issue": difference})
     study = _study(ET.parse(path).getroot())
     for tag in ("provider_study_id", "org_name", "brief_title", "official_title", "brief_summary", "detailed_description", "enrollment", "study_type"):
         node = study.find(f".//{tag}")
         if node is None or not _text("".join(node.itertext())): findings.append({"category": "xml", "field": tag, "issue": "Required PRS value is empty."})
+    scalar_template = generation_template or structural_template
+    narrative = {
+        "brief_summary": {"text": _text(study.findtext("brief_summary/textblock"))},
+        "detailed_description": {"text": _text(study.findtext("detailed_description/textblock"))},
+    }
+    expected_fields = _fields(reference, narrative)
+    for target_path, token_name in _scalar_template_bindings(scalar_template):
+        if token_name in {"briefSummary", "detailedDescription"}:
+            continue
+        target = study.find(target_path)
+        if target is None and any(branch in target_path for branch in ("interventional_design", "observational_design")):
+            continue
+        expected_value = _text(expected_fields.get(token_name))
+        actual_value = _text("".join(target.itertext())) if target is not None else ""
+        if actual_value != expected_value:
+            findings.append({
+                "category": "xml",
+                "field": target_path,
+                "issue": f"Generated PRS scalar value does not match source mapping {token_name}.",
+            })
     scalar_sources = {
         "uid": _stable_study_uid(reference),
+        "id_info/provider_study_id": _source_value(reference, "regulatory.prs.provider_study_id", "meta.protocol_number"),
+        "id_info/org_name": _source_value(reference, "regulatory.prs.org_name", "regulatory.prs.organization_name", "parties.sponsor.name"),
+        "brief_title": _source_value(reference, "study.short_title", "study.title"),
+        "official_title": get_path(reference, "study.title"),
         "condition": get_path(reference, "study.condition"),
+        "study_design/study_type": get_path(reference, "regulatory.prs.study_type"),
         "start_date": get_path(reference, "regulatory.prs.start_date"),
         "start_date_type": get_path(reference, "regulatory.prs.start_date_type"),
         "verification_date": get_path(reference, "regulatory.prs.verification_date"),
@@ -562,6 +660,63 @@ def validate_output(path: Path, reference: Mapping[str, Any], structural_templat
                     "field": f"location[{index}].contact_backup.{field}",
                     "issue": f"Generated PRS value does not preserve approved source field sites[{index - 1}].contact_backup/contact alias.",
                 })
+
+    def require_repeated_value(node: ET.Element, target_path: str, expected_value: Any, field: str) -> None:
+        if meaningful(expected_value) and _text(node.findtext(target_path)) != _text(expected_value):
+            findings.append({
+                "category": "xml",
+                "field": field,
+                "issue": "Generated PRS repeated-block value does not match the approved source.",
+            })
+
+    interventions = _items(reference, "design.interventions")
+    if not interventions and meaningful(get_path(reference, "design.intervention_name")):
+        interventions = [{
+            "type": get_path(reference, "design.intervention_type"),
+            "name": get_path(reference, "design.intervention_name"),
+            "description": get_path(reference, "design.intervention_description"),
+            "arm_group_label": _text((get_path(reference, "design.arms", [{}]) or [{}])[0]),
+        }]
+    for index, (node, item) in enumerate(zip(study.findall("intervention"), interventions), start=1):
+        require_repeated_value(node, "intervention_type", item.get("intervention_type") or item.get("type"), f"intervention[{index}].intervention_type")
+        require_repeated_value(node, "intervention_name", item.get("intervention_name") or item.get("name"), f"intervention[{index}].intervention_name")
+        require_repeated_value(node, "intervention_description/textblock", item.get("intervention_description") or item.get("description"), f"intervention[{index}].intervention_description")
+        require_repeated_value(node, "arm_group_label", item.get("arm_group_label") or item.get("armGroupLabel"), f"intervention[{index}].arm_group_label")
+
+    arms = _items(reference, "design.arms")
+    for index, (node, item) in enumerate(zip(study.findall("arm_group"), arms), start=1):
+        require_repeated_value(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name"), f"arm_group[{index}].arm_group_label")
+        require_repeated_value(node, "arm_type", item.get("arm_type") or item.get("type"), f"arm_group[{index}].arm_type")
+        require_repeated_value(node, "arm_group_description/textblock", item.get("description"), f"arm_group[{index}].arm_group_description")
+
+    for tag, source_path in (("primary_outcome", "endpoints.primary"), ("secondary_outcome", "endpoints.secondary"), ("other_outcome", "endpoints.other")):
+        for index, (node, item) in enumerate(zip(study.findall(tag), _items(reference, source_path)), start=1):
+            require_repeated_value(node, "outcome_measure", item.get("outcome_measure") or item.get("measure") or item.get("label"), f"{tag}[{index}].outcome_measure")
+            require_repeated_value(node, "outcome_time_frame", item.get("outcome_time_frame") or item.get("time_frame") or item.get("time_point"), f"{tag}[{index}].outcome_time_frame")
+            require_repeated_value(node, "outcome_description/textblock", item.get("description"), f"{tag}[{index}].outcome_description")
+
+    for index, (node, site) in enumerate(zip(generated_locations, source_sites), start=1):
+        facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
+        address = facility.get("address") if isinstance(facility.get("address"), Mapping) else {}
+        require_repeated_value(node, "status", site.get("status"), f"location[{index}].status")
+        require_repeated_value(node, "facility/name", facility.get("name"), f"location[{index}].facility.name")
+        for field, expected_value in (
+            ("city", address.get("city") or facility.get("city")),
+            ("state", address.get("state") or facility.get("state")),
+            ("country", address.get("country") or facility.get("country")),
+            ("zip", address.get("zip") or facility.get("zip") or facility.get("postal_code")),
+        ):
+            require_repeated_value(node, f"facility/address/{field}", expected_value, f"location[{index}].facility.address.{field}")
+        contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}
+        investigator = (site.get("investigators") or [{}])[0]
+        for field, expected_value in _contact_fields(contact).items():
+            require_repeated_value(node, f"contact/{field}", expected_value, f"location[{index}].contact.{field}")
+        investigator_fields = _contact_fields(investigator)
+        for field, expected_value in {
+            **{key: investigator_fields[key] for key in ("first_name", "middle_name", "last_name", "degrees")},
+            "role": investigator.get("role"),
+        }.items():
+            require_repeated_value(node, f"investigator/{field}", expected_value, f"location[{index}].investigator.{field}")
     expected_enrollment = _enrollment_count(get_path(reference, "population.sample_size"))
     if expected_enrollment and _text(study.findtext("enrollment")) != expected_enrollment:
         findings.append({"category": "xml", "field": "enrollment", "issue": "Generated enrollment does not match the approved total sample size."})

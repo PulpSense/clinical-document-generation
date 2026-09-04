@@ -375,6 +375,19 @@ This is the cost/quality balance approved for the skill:
 
 Subagents return section-level structured content, never a whole document. The workflow validates section IDs, request hashes, evidence references, boilerplate references, completeness, and forbidden placeholders before accepting a response.
 
+For source-rich protocol sections, each drafting contract includes an
+`approved_source_word_count` and a conservative `reference_detail_target_words`
+soft compression signal. Semantic source coverage, not word count, governs
+acceptance: retain the supplied clinical, statistical, visit, eligibility,
+safety, retention, injury, and intervention detail without padding, repetition,
+invention, or source-gap commentary. The Document Section Contract owns the
+optional source-mode Section 8.3 and renders supplied treatment assignment
+verbatim. Its typed table contracts render structured visit/procedure
+relationships as the complete Schedule of Assessments and structured
+sample-size evidence as its own Section 11 table. Both tables must preserve the
+contracted headers, row and column order, cell associations, allowed blanks,
+timing, and values before release.
+
 ## Retry behavior
 
 - Maximum: three attempts per stable section target.
@@ -445,6 +458,9 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 - Keep `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml` as the structural authority derived from the client’s correct manual XML.
 - Python alone owns XML tags, ordering, optional nodes, namespaces, escaping, and repeated blocks.
 - Derive intervention, arm, primary/secondary/other outcome, and location counts from the approved source—not from generated fields.
+- Validate every source-backed value inside every intervention, arm, outcome,
+  and location block in addition to validating repeated-block counts and the
+  client template's tag order and structure.
 - The PRS subagent may return only `brief_summary` and `detailed_description` prose.
 - Any XML failure blocks the complete Prospective/Ambispective package.
 

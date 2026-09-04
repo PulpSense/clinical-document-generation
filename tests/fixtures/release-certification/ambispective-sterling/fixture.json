@@ -15,20 +15,20 @@
   "artifacts": {
     "source_input": {
       "path": "source-input.md",
-      "sha256": "b54328aa5f7f26b53109e4eccb5efc4665a2ed23a90e169da4c7a9aa6c6c768b"
+      "sha256": "a5ebaf98b6b475bb202e15b1ea269a72e963ac392387955e85d9fbdb005ce8da"
     },
     "approved_source": {
       "path": "approved-source.md",
-      "sha256": "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f"
+      "sha256": "325a3ca32e61de72548417cd3c11a0491b26156084b64e0df71e47c16016312c"
     },
     "approved_reference": {
       "path": "approved-reference.json",
-      "sha256": "fbc6184614dad6073a38e71b63bb9b07200ade8ffa135df2ae9173e30f840788"
+      "sha256": "acf55cdd0d544792caed04756321abd43b65f5bb66e8f05c10b7de6b20c2971d"
     }
   },
   "approved_normalization": {
-    "source_input_sha256": "b54328aa5f7f26b53109e4eccb5efc4665a2ed23a90e169da4c7a9aa6c6c768b",
-    "approved_source_sha256": "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f"
+    "source_input_sha256": "a5ebaf98b6b475bb202e15b1ea269a72e963ac392387955e85d9fbdb005ce8da",
+    "approved_source_sha256": "325a3ca32e61de72548417cd3c11a0491b26156084b64e0df71e47c16016312c"
   },
   "hermes_configuration": {
     "source": "clinical-release-certification",

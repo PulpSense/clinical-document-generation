@@ -11,7 +11,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
 from contracts import contracted_template_bundle
-from quality import RESPONSE_SCHEMA, validate_verifications, verification_request_sha256
+from quality import RESPONSE_SCHEMA, deterministic_content_check, validate_verifications, verification_request_sha256
 import quality
 from rendering import render_documents, render_fields
 import rendering
@@ -1238,6 +1238,22 @@ def test_render_fields_normalize_markdown_email_population_and_day_units():
     assert fields["daysBeforeScreening"] == "30"
 
 
+def test_render_fields_prefers_approved_protocol_summary_and_named_articles():
+    reference = _source()
+    reference["design"].update({
+        "study_design_summary": "Prospective randomized parallel-group study",
+        "study_design": "A much longer approved design narrative for the body section.",
+        "intervention_name": "Acoltremon 0.003%",
+        "control": "Preservative-free artificial tears",
+    })
+
+    fields = render_fields(reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    assert fields["studyDesignShort"] == "Prospective randomized parallel-group study"
+    assert fields["testArticle(s)"] == "Acoltremon 0.003%"
+    assert fields["controlArticle(s)"] == "Preservative-free artificial tears"
+
+
 def test_protocol_summary_rows_keep_together(tmp_path):
     reference = _source()
     render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
@@ -1894,3 +1910,176 @@ def test_layout_failure_repairs_only_the_affected_artifact_but_resets_all_review
     assert not (requests / "visual-icf.json").exists()
     assert not (responses / "visual-icf.json").exists()
     assert (revision / "candidate-build.json").is_file()
+
+
+def test_protocol_renders_assignment_endpoint_hierarchy_and_both_operational_tables(tmp_path):
+    reference = _source()
+    reference["design"]["assignment_method"] = (
+        "Subjects will be assigned 1:1 to TRYPTYR or control using the approved randomization schedule."
+    )
+    reference["endpoints"]["other"] = [
+        {"category": "Powered exploratory endpoints in hierarchical order", "label": "Schirmer change versus control", "time_point": "Month 12"},
+        {"category": "Descriptive exploratory endpoints", "label": "Ocular discomfort score", "time_point": "Months 1, 3, 6, 9, and 12"},
+    ]
+    visit_names = ["Baseline", "Day 14", "Month 1", "Month 3", "Month 6", "Month 9", "Month 12"]
+    activities = [f"Assessment {index}" for index in range(1, 20)]
+    reference["procedures"]["visit_schedule"] = [
+        {"visit": visit, "timing": visit, "procedures": activities if index == 0 else activities[index::3]}
+        for index, visit in enumerate(visit_names)
+    ]
+    reference["statistics"]["sample_size_evidence"] = [
+        {"study": "COMET-2", "timepoint": "Day 28", "mean_change_ods_vas": "-25.20", "se": "1.96", "estimated_sd": "30.0"},
+        {"study": "COMET-3", "timepoint": "Day 90", "mean_change_ods_vas": "-29.60", "se": "1.97", "estimated_sd": "30.0"},
+    ]
+    reference["population"]["sample_size_evidence"] = []
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    visible = _visible(document)
+    headings = [p.text for p in document.paragraphs if p.style.name.casefold().startswith("heading")]
+    assessment = next(table for table in document.tables if table.rows[0].cells[0].text.strip() == "Activity")
+    sample_evidence = next(table for table in document.tables if table.rows[0].cells[0].text.strip() == "Study")
+
+    assert "8.3. Method of Assigning Subjects to Treatment Arms" in headings
+    assert reference["design"]["assignment_method"] in visible
+    assert "Powered exploratory endpoints in hierarchical order" in visible
+    assert "Descriptive exploratory endpoints" in visible
+    assert len(assessment.rows) == 21
+    assert len(assessment.columns) == 8
+    assert len(sample_evidence.rows) == 3
+    assert len(sample_evidence.columns) == 5
+    guarded_fields = {"study-design.assignment", "procedures.visit_schedule", "statistics.sample_size_evidence"}
+    assert not guarded_fields & {
+        item["field"] for item in deterministic_content_check(tmp_path, reference)
+    }
+
+    assessment.cell(2, 1).text, assessment.cell(2, 2).text = assessment.cell(2, 2).text, assessment.cell(2, 1).text
+    sample_evidence.cell(1, 0).text = "Changed study"
+    document.save(tmp_path / "candidate/protocol.docx")
+    guarded_findings = {
+        item["field"] for item in deterministic_content_check(tmp_path, reference)
+    }
+    assert "procedures.visit_schedule" in guarded_findings
+    assert "statistics.sample_size_evidence" in guarded_findings
+
+
+def test_retrospective_quality_does_not_require_prospective_table_contracts(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/release-certification/retrospective/approved-reference.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    fields = {item["field"] for item in deterministic_content_check(tmp_path, reference)}
+
+    assert "procedures.visit_schedule" not in fields
+    assert "statistics.sample_size_evidence" not in fields
+
+
+def test_protocol_does_not_duplicate_a_model_echoed_visit_table_caption_or_details(tmp_path):
+    reference = _source()
+    model = {
+        "protocol": [{
+            "section_id": "study-procedure.visits",
+            "paragraphs": [
+                {"text": "Participants complete the approved visits in sequence."},
+                {"text": "Table 9.2-1. Visit Schedule"},
+                {"text": "Unique source-bound visit procedure detail."},
+            ],
+            "lists": [],
+        }],
+        "icf": {},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    paragraphs = [paragraph.text.strip() for paragraph in document.paragraphs]
+    assert paragraphs.count("Table 9.2-1. Visit Schedule") == 1
+    assert paragraphs.count("Unique source-bound visit procedure detail.") == 1
+    assert not any(
+        "Table 9.2-1. Visit Schedule" in paragraph
+        and "Unique source-bound visit procedure detail." in paragraph
+        for paragraph in paragraphs
+    )
+
+
+def test_protocol_fidelity_gate_rejects_loss_of_operational_source_detail(tmp_path):
+    reference = _source()
+    reference["procedures"].update({
+        "assessment_details": "Each visit includes ODS-VAS and unanesthetized Schirmer testing.",
+        "intervention_management": "TRYPTYR 0.003% is administered twice daily and reconciled at every visit.",
+        "discontinuation": "Participants may withdraw at any time without penalty.",
+        "replacement": "Participants discontinued during enrollment will be replaced.",
+    })
+    reference["statistics"].update({
+        "analysis_populations": "The intent-to-treat and per-protocol populations will be analyzed.",
+        "methodology": "A mixed model for repeated measures will compare change from baseline.",
+        "software": "Analyses will use R version 4.4.2.",
+    })
+    reference.setdefault("confidentiality", {})["retention"] = "Study records will be retained for 15 years after study closure."
+    reference["risks_benefits"].update({
+        "injury_handling": "Research-related injuries will receive immediate evaluation by the investigator.",
+        "risks": "Transient ocular burning and privacy loss are foreseeable risks.",
+        "benefits": "Participants may experience improved tear production, but benefit is not guaranteed.",
+        "compensation_or_reimbursement": "Participants will receive $50 for each completed visit.",
+    })
+    model = {
+        "protocol": [
+            {"section_id": "study-procedure.visits", "paragraphs": [{"text": f'{reference["procedures"]["assessment_details"]} {reference["procedures"]["intervention_management"]}'}], "lists": []},
+            {"section_id": "analysis-plan.datasets", "paragraphs": [{"text": reference["statistics"]["analysis_populations"]}], "lists": []},
+            {"section_id": "analysis-plan.methodology", "paragraphs": [{"text": reference["statistics"]["methodology"]}], "lists": []},
+            {"section_id": "analysis-plan.considerations", "paragraphs": [{"text": reference["statistics"]["software"]}], "lists": []},
+            {"section_id": "confidentiality-publication", "paragraphs": [{"text": reference["confidentiality"]["retention"]}], "lists": []},
+            {"section_id": "financial-injury", "paragraphs": [{"text": reference["risks_benefits"]["injury_handling"]}], "lists": []},
+            {"section_id": "endpoint-criteria.discontinuation", "paragraphs": [{"text": f'{reference["procedures"]["discontinuation"]} {reference["procedures"]["replacement"]}'}], "lists": []},
+            {"section_id": "risks-benefits.risks", "paragraphs": [{"text": reference["risks_benefits"]["risks"]}], "lists": []},
+            {"section_id": "risks-benefits.benefits", "paragraphs": [{"text": f'{reference["risks_benefits"]["benefits"]} {reference["risks_benefits"]["compensation_or_reimbursement"]}'}], "lists": []},
+        ],
+        "icf": {},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    guarded = {
+        "study-procedure.visits",
+        "analysis-plan.datasets",
+        "analysis-plan.methodology",
+        "analysis-plan.considerations",
+        "confidentiality-publication",
+        "financial-injury",
+        "endpoint-criteria.discontinuation",
+        "risks-benefits.risks",
+        "risks-benefits.benefits",
+    }
+    assert not guarded & {item["field"] for item in deterministic_content_check(tmp_path, reference)}
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    heading_titles = {
+        "9.2. Visits and Examinations",
+        "10.1. Analysis Data Sets",
+        "10.2. Statistical Methodology",
+        "10.3. General Statistical Considerations",
+        "12. CONFIDENTIALITY/PUBLICATION OF THE STUDY",
+        "17. FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES",
+        "18.2. Patient Discontinuation",
+        "19.1. Summary of risks",
+        "19.2. Summary of benefits",
+    }
+    for index, paragraph in enumerate(document.paragraphs):
+        if paragraph.text.strip() not in heading_titles:
+            continue
+        for target in document.paragraphs[index + 1:]:
+            if target.style.name.casefold().startswith("heading"):
+                break
+            if target.text.strip():
+                target.text = "Generic text that omits every approved operational qualifier."
+                break
+    document.save(tmp_path / "candidate/protocol.docx")
+
+    assert guarded <= {item["field"] for item in deterministic_content_check(tmp_path, reference)}

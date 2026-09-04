@@ -32,7 +32,8 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, protocol_contract, recovery_finding
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, meaningful, protocol_contract, protocol_table_contracts, recovery_finding
+from drafting import evidence_grounded
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -3238,7 +3239,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     protocol = revision_dir / "candidate/protocol.docx"
     findings.extend(audit_docx(protocol, required_phrases=[str(get_path(reference, "study.title", ""))]))
     document = Document(protocol)
-    visible = "\n".join(p.text for p in document.paragraphs)
+    table_text = "\n".join(
+        cell.text for table in document.tables for row in table.rows for cell in row.cells
+    )
+    visible = "\n".join([*(p.text for p in document.paragraphs), table_text])
     normalized_visible = re.sub(r"\s+", " ", visible).casefold()
     source_visible = json.dumps(reference, ensure_ascii=False).casefold()
     def heading_key(value: str) -> str:
@@ -3248,11 +3252,45 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
 
     headings = [heading_key(p.text) for p in document.paragraphs if p.style.name.casefold().startswith("heading") and p.text.strip()]
     sections = protocol_contract(branch)
+    def section_applies(section: Any) -> bool:
+        return section.required or any(meaningful(get_path(reference, path)) for path in section.evidence)
+
     for section in sections:
+        if not section_applies(section):
+            continue
         expected = heading_key(f"{section.number} {section.title}")
         count = headings.count(expected)
         if count != 1:
             findings.append({"category": "content", "field": section.section_id, "target_ids": [section.section_id], "issue": f"Protocol section heading must appear exactly once; found {count}: {section.number} {section.title}"})
+
+    def normalized_matrix(table: Table) -> list[list[str]]:
+        return [
+            [re.sub(r"\s+", " ", cell.text).strip() for cell in row.cells]
+            for row in table.rows
+        ]
+
+    contracted_section_ids = {section.section_id for section in sections}
+    for table_id, table_contract in protocol_table_contracts(reference).items():
+        if branch == "Retrospective" or table_contract["section_id"] not in contracted_section_ids:
+            continue
+        expected_rows = [
+            [re.sub(r"\s+", " ", str(cell)).strip() for cell in row]
+            for row in table_contract["rows"]
+        ]
+        if not expected_rows:
+            continue
+        matches = [
+            table for table in document.tables
+            if table.rows
+            and re.sub(r"\s+", " ", table.rows[0].cells[0].text).strip() == expected_rows[0][0]
+        ]
+        if len(matches) != 1 or normalized_matrix(matches[0]) != expected_rows:
+            findings.append({
+                "category": "content",
+                "field": "procedures.visit_schedule" if table_id == "schedule-of-assessments" else "statistics.sample_size_evidence",
+                "target_ids": [str(table_contract["section_id"])],
+                "issue": f"{table_contract['caption']} does not preserve the contracted headers, row order, column order, cell values, and allowed blanks.",
+            })
     stale_protocol_claims = {
         "an investigator-initiated clinical trial": "title-page",
         "all subjects will be monitored for adverse events": "quality-safety",
@@ -3277,7 +3315,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         match = re.search(r"(\d+)$", paragraph.style.name)
         return int(match.group(1)) if match else 1
 
-    def has_section_content(section: Any) -> bool | None:
+    def section_content(section: Any) -> str | None:
         expected = heading_key(f"{section.number} {section.title}")
         target_index = next((
             index for index, block in enumerate(blocks)
@@ -3288,6 +3326,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         target = blocks[target_index]
         assert isinstance(target, Paragraph)
         target_level = heading_level(target) or 1
+        values: list[str] = []
         for block in blocks[target_index + 1:]:
             if isinstance(block, Paragraph):
                 level = heading_level(block)
@@ -3295,22 +3334,51 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     if level <= target_level:
                         break
                     continue
-                if len(re.findall(r"\b\w+\b", block.text)) >= 3:
-                    return True
-            elif any(cell.text.strip() for row in block.rows for cell in row.cells):
-                return True
-        return False
+                if block.text.strip():
+                    values.append(block.text.strip())
+            else:
+                values.extend(cell.text.strip() for row in block.rows for cell in row.cells if cell.text.strip())
+        return "\n".join(values)
 
     for section in sections:
-        if section.role == "container":
+        if section.role == "container" or not section_applies(section):
             continue
-        populated = has_section_content(section)
-        if populated is False:
+        content = section_content(section)
+        if content is not None and len(re.findall(r"\b\w+\b", content)) < 3:
             findings.append({
                 "category": "content",
                 "field": section.section_id,
                 "target_ids": [section.section_id],
                 "issue": f"Protocol section has no substantive content after its heading: {section.number} {section.title}",
+            })
+            continue
+        if content is None:
+            continue
+        if section.role == "source":
+            approved = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), "")
+            if re.sub(r"\s+", " ", _text(approved)).strip().casefold() not in re.sub(r"\s+", " ", content).strip().casefold():
+                findings.append({
+                    "category": "content",
+                    "field": section.section_id,
+                    "target_ids": [section.section_id],
+                    "issue": f"Source-mode Protocol section does not preserve its approved source text exactly: {section.number} {section.title}",
+                })
+            continue
+        ungrounded_paths = [
+            path for path in section.fidelity_evidence
+            if meaningful(get_path(reference, path))
+            and not evidence_grounded(
+                content,
+                get_path(reference, path),
+                all_items=section.source_coverage == "all_material_items",
+            )
+        ]
+        if ungrounded_paths:
+            findings.append({
+                "category": "content",
+                "field": section.section_id,
+                "target_ids": [section.section_id],
+                "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
             })
     seen: dict[str, str] = {}
     current_section = ""

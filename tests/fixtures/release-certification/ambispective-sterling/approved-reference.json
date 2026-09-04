@@ -109,6 +109,13 @@
     "study_population": "Adults 18 to 80 years old with eligible historical records and ability to complete prospective Sentinel Patch follow-up.",
     "sample_size": "60 participants",
     "sample_justification": "The sample allows descriptive estimation across two sites while accounting for expected attrition and available historical records.",
+    "sample_size_evidence": [
+      {
+        "evidence": "Planned sample",
+        "value": "60 participants",
+        "source": "Approved synthetic source"
+      }
+    ],
     "minimum_age": "18 Years",
     "maximum_age": "80 Years",
     "inclusion_criteria": [
@@ -203,6 +210,13 @@
   },
   "statistics": {
     "analysis_plan": "Descriptive summaries for historical and prospective measures; paired summaries for participants with both baseline and Month 3 data.",
+    "sample_size_evidence": [
+      {
+        "evidence": "Planned sample",
+        "value": "60 participants",
+        "source": "Approved synthetic source"
+      }
+    ],
     "methodology": null,
     "analysis_populations": null,
     "missing_data_handling": null

@@ -159,6 +159,13 @@ Adults 18 to 80 years old with eligible historical records and ability to comple
 The sample allows descriptive estimation across two sites while accounting for expected attrition and available historical records.
 <!-- /field -->
 
+### Population / Sample Size Evidence
+<!-- field: population.sample_size_evidence -->
+| evidence | source | value |
+| --- | --- | --- |
+| Planned sample | Approved synthetic source | 60 participants |
+<!-- /field -->
+
 ### Population / Minimum Age
 <!-- field: population.minimum_age -->
 18 Years
@@ -283,6 +290,13 @@ Device
 ### Statistics / Analysis Plan
 <!-- field: statistics.analysis_plan -->
 Descriptive summaries for historical and prospective measures; paired summaries for participants with both baseline and Month 3 data.
+<!-- /field -->
+
+### Statistics / Sample Size Evidence
+<!-- field: statistics.sample_size_evidence -->
+| evidence | source | value |
+| --- | --- | --- |
+| Planned sample | Approved synthetic source | 60 participants |
 <!-- /field -->
 
 ### Statistics / Methodology

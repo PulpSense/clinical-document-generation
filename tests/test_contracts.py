@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts import ContractedTemplateBundleError, ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, contracted_template_bundle, icf_contract, input_findings, parse_source_truth, protocol_contract, source_contract, source_truth_markdown
+from contracts import ContractedTemplateBundleError, ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, contracted_template_bundle, icf_contract, input_findings, parse_source_truth, protocol_contract, protocol_table_contracts, source_contract, source_truth_markdown
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -282,7 +282,7 @@ def test_every_leaf_section_has_required_evidence_or_controlled_boilerplate():
         unsupported = [
             section.section_id
             for section in sections
-            if section.role != "container"
+            if section.role == "leaf"
             and not section.boilerplate_key
             and not required_paths.intersection(section.evidence)
         ]
@@ -443,6 +443,164 @@ def test_conflicting_sample_size_evidence_blocks_approval():
     findings = input_findings(reference)
     assert any(item["field"] == "population.sample_size_evidence" for item in findings)
     assert any(item["field"] == "statistics.sample_size_evidence" for item in findings)
+
+
+def test_outcome_statistics_in_sample_size_evidence_are_not_mistaken_for_planned_enrollment():
+    reference = fixture("prospective-acceptance-source.json")
+    evidence = [
+        {"study": "COMET-2", "timepoint": "Day 28", "mean_change_ods_vas": "-25.20", "se": "1.96", "estimated_sd": "30.0"},
+        {"study": "COMET-3", "timepoint": "Day 90", "mean_change_ods_vas": "-29.60", "se": "1.97", "estimated_sd": "30.0"},
+    ]
+    reference["population"]["sample_size"] = "60 participants"
+    reference["population"]["sample_size_evidence"] = evidence
+    reference["statistics"]["sample_size_evidence"] = evidence
+
+    findings = input_findings(reference)
+
+    assert not any(item["field"].endswith("sample_size_evidence") for item in findings)
+
+
+def test_schedule_table_preserves_distinct_visit_name_and_timing():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["procedures"]["visit_schedule"] = [{
+        "visit": "Telephone follow-up",
+        "timing": "Month 3",
+        "procedures": ["Safety call"],
+    }]
+
+    rows = protocol_table_contracts(reference)["schedule-of-assessments"]["rows"]
+
+    assert rows[0][1] == "Telephone follow-up\n(Month 3)"
+
+
+def test_sample_size_table_combines_unique_rows_from_both_approved_paths():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["statistics"]["sample_size_evidence"] = [{
+        "study": "COMET-2",
+        "timepoint": "Day 28",
+        "estimated_sd": "30.0",
+    }]
+    reference["population"]["sample_size_evidence"] = [{
+        "study": "COMET-3",
+        "timepoint": "Day 90",
+        "estimated_sd": "30.3",
+    }]
+
+    rows = protocol_table_contracts(reference)["sample-size-evidence"]["rows"]
+
+    assert rows == [
+        ["Study", "Timepoint", "Estimated SD"],
+        ["COMET-2", "Day 28", "30.0"],
+        ["COMET-3", "Day 90", "30.3"],
+    ]
+
+
+def test_sample_size_evidence_rejects_unrenderable_or_conflicting_columns():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["statistics"]["sample_size_evidence"] = [{
+        "study": "COMET-2",
+        "timepoint": "Day 28",
+        "time_point": "Day 90",
+        "unsupported_effect_size": "0.42",
+    }]
+
+    fields = {item["field"] for item in input_findings(reference)}
+
+    assert "statistics.sample_size_evidence.0" in fields
+    assert "statistics.sample_size_evidence.0.timepoint" in fields
+
+
+def test_prospective_sample_size_evidence_is_required_and_column_complete():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["statistics"]["sample_size_evidence"] = []
+    reference["population"]["sample_size_evidence"] = []
+
+    missing_fields = {item["field"] for item in input_findings(reference)}
+
+    assert "statistics.sample_size_evidence" in missing_fields
+
+    reference["statistics"]["sample_size_evidence"] = [{
+        "study": "COMET-2",
+        "timepoint": "Day 28",
+    }]
+    partial_findings = [
+        item for item in input_findings(reference)
+        if item["field"] == "statistics.sample_size_evidence"
+    ]
+
+    assert any("missing required table columns" in item["issue"] for item in partial_findings)
+
+
+def test_detailed_sample_size_evidence_validates_each_row_and_declared_blanks():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["population"]["sample_size_evidence"] = []
+    reference["statistics"]["sample_size_evidence"] = [
+        {
+            "study": "COMET-2",
+            "timepoint": "Day 28",
+            "mean_change_ods_vas": "-25.20",
+            "se": "1.96",
+            "estimated_sd": "30.0",
+        },
+        {
+            "study": "COMET-3",
+            "timepoint": "Day 90",
+            "mean_change_ods_vas": "-29.60",
+            "se": "",
+            "estimated_sd": "30.0",
+        },
+    ]
+
+    fields = {item["field"] for item in input_findings(reference)}
+
+    assert "statistics.sample_size_evidence.1" in fields
+
+    reference["statistics"]["sample_size_evidence"][1] = {
+        "study": "Average",
+        "timepoint": "",
+        "mean_change_ods_vas": "-27.40",
+        "se": "",
+        "estimated_sd": "30.0",
+    }
+
+    assert not any(
+        item["field"].startswith("statistics.sample_size_evidence")
+        for item in input_findings(reference)
+    )
+
+
+def test_sample_size_row_finding_preserves_population_source_path():
+    reference = fixture("prospective-acceptance-source.json")
+    reference["statistics"]["sample_size_evidence"] = []
+    reference["population"]["sample_size_evidence"] = [{
+        "study": "COMET-2",
+        "timepoint": "Day 28",
+        "mean_change_ods_vas": "-25.20",
+        "se": "",
+        "estimated_sd": "30.0",
+    }]
+
+    fields = {item["field"] for item in input_findings(reference)}
+
+    assert "population.sample_size_evidence.0" in fields
+    assert "statistics.sample_size_evidence.0" not in fields
+
+
+def test_protocol_contract_binds_the_detailed_source_fields_needed_by_the_reference_protocol():
+    protocol = {section.section_id: section for section in protocol_contract("Prospective")}
+
+    assert protocol["study-design.assignment"].role == "source"
+    assert protocol["study-design.assignment"].evidence == ("design.assignment_method",)
+    assert "endpoints.other" in protocol["objectives"].evidence
+    assert {"procedures.assessment_details", "procedures.intervention_management"} <= set(protocol["study-procedure.visits"].evidence)
+    assert "statistics.analysis_populations" in protocol["analysis-plan.datasets"].evidence
+    assert "endpoints.other" in protocol["analysis-plan.methodology"].evidence
+    assert "statistics.software" in protocol["analysis-plan.considerations"].evidence
+    assert {"population.sample_size_evidence", "statistics.sample_size_evidence"} <= set(protocol["sample-size"].evidence)
+    assert "confidentiality.retention" in protocol["confidentiality-publication"].evidence
+    assert protocol["study-procedure.discontinued"].evidence == ("procedures.discontinued_subjects",)
+    assert "procedures.replacement" in protocol["endpoint-criteria.discontinuation"].evidence
+    assert "risks_benefits.compensation_or_reimbursement" in protocol["risks-benefits.benefits"].evidence
 
 
 def test_schedule_cannot_extend_beyond_study_timeline():

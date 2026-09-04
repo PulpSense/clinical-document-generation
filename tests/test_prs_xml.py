@@ -7,6 +7,7 @@ from prs_xml import compare_structure, expected_counts, generate, repeated_count
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml"
+MANUAL_REFERENCE = ROOT / "assets/client-templates/reference/prs-manual-reference.xml"
 
 
 def fixture():
@@ -30,6 +31,59 @@ def test_generated_xml_preserves_client_template_structure(tmp_path):
     reference = fixture(); output = tmp_path / "study.xml"
     generate(TEMPLATE, output, reference, {"brief_summary": {"text": "This approved prospective study evaluates recovery outcomes."}, "detailed_description": {"text": "This approved study evaluates recovery and safety outcomes over the planned follow-up period."}})
     assert compare_structure(TEMPLATE, output) == []
+
+
+def test_interventional_xml_uses_its_template_branch_while_preserving_manual_outer_structure(tmp_path):
+    reference = fixture()
+    reference["regulatory"]["prs"].update({
+        "study_type": "Interventional",
+        "allocation": "Randomized",
+        "intervention_model": "Parallel Assignment",
+        "primary_purpose": "Treatment",
+    })
+    output = tmp_path / "study.xml"
+
+    report = generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+        structural_template=MANUAL_REFERENCE,
+    )
+
+    assert report["status"] == "passed"
+    study_design = next(ET.parse(output).getroot().iter("clinical_study")).find("study_design")
+    assert study_design.find("interventional_design") is not None
+    assert study_design.find("observational_design") is None
+
+
+def test_validation_rejects_missing_nested_node_in_selected_design_branch(tmp_path):
+    reference = fixture()
+    output = tmp_path / "study.xml"
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+        structural_template=MANUAL_REFERENCE,
+    )
+    tree = ET.parse(output)
+    study = next(tree.getroot().iter("clinical_study"))
+    description = study.find("study_design/observational_design/biospecimen_description")
+    description.remove(description.find("textblock"))
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+
+    findings = validate_output(
+        output,
+        reference,
+        MANUAL_REFERENCE,
+        generation_template=TEMPLATE,
+    )
+
+    assert any(
+        item["field"] == "structure" and "biospecimen_description" in item["issue"]
+        for item in findings
+    )
 
 
 def test_location_address_accepts_flat_facility_fields(tmp_path):
@@ -329,3 +383,97 @@ def test_xml_validation_rejects_a_missing_approved_study_uid(tmp_path):
     findings = validate_output(output, reference, TEMPLATE)
 
     assert any(item["field"] == "uid" for item in findings)
+
+
+def test_xml_validation_rejects_mutation_of_every_source_backed_repeated_block(tmp_path):
+    reference = fixture()
+    reference["design"]["interventions"] = [{
+        "type": "Device",
+        "name": "Sentinel Patch",
+        "description": "Approved device description",
+        "arm_group_label": "Sentinel cohort",
+    }]
+    reference["design"]["arms"] = [{
+        "label": "Sentinel cohort",
+        "type": "Experimental",
+        "description": "Approved arm description",
+    }]
+    reference["endpoints"]["primary"] = [{
+        "measure": "Approved pain measure",
+        "time_frame": "Month 3",
+        "description": "Approved primary outcome description",
+    }]
+    output = tmp_path / "study.xml"
+    generate(TEMPLATE, output, reference, {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}})
+    tree = ET.parse(output)
+    study = next(tree.getroot().iter("clinical_study"))
+    study.find("intervention/intervention_description/textblock").text = "Changed intervention"
+    study.find("arm_group/arm_group_description/textblock").text = "Changed arm"
+    study.find("primary_outcome/outcome_description/textblock").text = "Changed outcome"
+    study.find("location/facility/name").text = "Changed facility"
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+
+    findings = validate_output(output, reference, TEMPLATE)
+
+    fields = {item["field"] for item in findings}
+    assert "intervention[1].intervention_description" in fields
+    assert "arm_group[1].arm_group_description" in fields
+    assert "primary_outcome[1].outcome_description" in fields
+    assert "location[1].facility.name" in fields
+
+
+def test_xml_validation_rejects_source_scalar_mutation_and_preserves_structured_contact_aliases(tmp_path):
+    reference = fixture()
+    reference["sites"][0]["contact"] = {
+        "first_name": "Jordan",
+        "middle_name": "Lee",
+        "last_name": "Coordinator",
+        "degrees": "RN",
+        "phone": "+1 555 0100",
+        "phone_ext": "42",
+        "email": "jordan@example.org",
+    }
+    output = tmp_path / "study.xml"
+    generate(TEMPLATE, output, reference, {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}})
+
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+    assert study.findtext("location/contact/first_name") == "Jordan"
+    assert study.findtext("location/contact/middle_name") == "Lee"
+    assert study.findtext("location/contact/last_name") == "Coordinator"
+    assert study.findtext("location/contact/phone_ext") == "42"
+
+    tree = ET.parse(output)
+    next(tree.getroot().iter("clinical_study")).find("official_title").text = "WRONG"
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+    fields = {item["field"] for item in validate_output(output, reference, TEMPLATE)}
+    assert "official_title" in fields
+
+
+def test_manual_structural_authority_rejects_an_extra_top_level_element(tmp_path):
+    reference = fixture()
+    reference["regulatory"]["prs"].update({
+        "study_type": "Interventional",
+        "allocation": "Randomized",
+        "intervention_model": "Parallel Assignment",
+        "primary_purpose": "Treatment",
+    })
+    output = tmp_path / "study.xml"
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+        structural_template=MANUAL_REFERENCE,
+    )
+    tree = ET.parse(output)
+    ET.SubElement(next(tree.getroot().iter("clinical_study")), "unauthorized_extension").text = "wrong"
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+
+    findings = validate_output(
+        output,
+        reference,
+        MANUAL_REFERENCE,
+        generation_template=TEMPLATE,
+    )
+
+    assert any(item["field"] == "structure" for item in findings)

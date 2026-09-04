@@ -95,6 +95,49 @@ def test_drafting_request_is_scoped_and_hash_bound(tmp_path):
     assert accepted and not findings
 
 
+def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_missing_facts(tmp_path):
+    reference = fixture()
+    reference["study"]["background"] = " ".join(
+        f"approved-background-detail-{index}" for index in range(120)
+    )
+    batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations")
+    path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-depth",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(path.read_text(encoding="utf-8"))
+    introduction_contract = next(
+        item for item in request["section_contracts"] if item["section_id"] == "introduction"
+    )
+    assert introduction_contract["approved_source_word_count"] >= 120
+    assert introduction_contract["reference_detail_target_words"] >= 80
+
+    response = recorded_acceptance_response(request)
+    introduction = next(
+        item for item in response["section_results"] if item["section_id"] == "introduction"
+    )
+    introduction["paragraphs"] = [{
+        "text": "Approved background detail supports the stated study title hypothesis and primary endpoint.",
+        "evidence_refs": [f"source:{path}" for path in introduction_contract["minimum_evidence"]],
+        "boilerplate_refs": [],
+    }]
+    introduction["lists"] = []
+
+    _accepted, findings = validate_response(request, response)
+
+    assert not any("source-proportional detail" in item.get("issue", "") for item in findings)
+    assert any(
+        item.get("field") == "introduction"
+        and "material facts are not observable" in item.get("issue", "")
+        for item in findings
+    )
+
+
 def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")

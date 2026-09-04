@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, recovery_finding
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, protocol_table_contracts, recovery_finding
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -149,14 +149,25 @@ def _address(value: Any) -> str:
 
 
 def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primary", "secondary", "other")) -> str:
-    values = []
+    lines: list[str] = []
+    default_categories = {
+        "primary": "Primary endpoint(s)",
+        "secondary": "Secondary endpoint(s)",
+        "other": "Exploratory endpoint(s)",
+    }
     for kind in kinds:
+        active_category = ""
         for item in get_path(reference, f"endpoints.{kind}", []) or []:
             label = _text(item)
             timepoint = _text(item.get("time_point") or item.get("time_frame")) if isinstance(item, Mapping) else ""
             if label:
-                values.append(f"{label}{f' ({timepoint})' if timepoint else ''}")
-    return "\n".join(f"• {item}" for item in values)
+                category = _text(item.get("category")) if isinstance(item, Mapping) else ""
+                category = category or default_categories[kind]
+                if category != active_category:
+                    lines.append(f"{category}:")
+                    active_category = category
+                lines.append(f"• {label}{f' ({timepoint})' if timepoint else ''}")
+    return "\n".join(lines)
 
 
 def _document_control_date(reference: Mapping[str, Any]) -> str:
@@ -201,6 +212,12 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     facility_locality = ", ".join(filter(None, (facility_city, facility_state, facility_country)))
     visits = get_path(reference, "procedures.visit_schedule", []) or get_path(reference, "procedures.assessments", []) or []
     inclusion = _list(get_path(reference, "population.inclusion_criteria", []))
+    interventions = [
+        item for item in (get_path(reference, "design.interventions", []) or [])
+        if isinstance(item, Mapping)
+    ]
+    first_intervention = _text(interventions[0].get("name") or interventions[0].get("intervention_name")) if interventions else ""
+    second_intervention = _text(interventions[1].get("name") or interventions[1].get("intervention_name")) if len(interventions) > 1 else ""
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     icf_visits_overview, icf_visit_details = _icf_procedure_parts(model)
     protocol_visits_overview, protocol_visit_details = _overview_and_detail(_draft_text(model, "study-procedure.visits"))
@@ -228,7 +245,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "studyContactPhones": " / ".join(filter(None, [_text(coordinator.get("business_phone")), _text(coordinator.get("office_phone"))])),
         "sterlingSecondaryPhone": _text(coordinator.get("office_phone")),
         "objective": "; ".join(_list(get_path(reference, "objectives.primary", []))),
-        "studyDesignShort": _text(get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
+        "studyDesignShort": _text(get_path(reference, "design.study_design_summary") or get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
         "sampleSize": _text(get_path(reference, "population.sample_size")),
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
@@ -261,8 +278,8 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "references": _text(reference.get("references")),
         "fundingSourceName": _text(get_path(reference, "parties.funding_source.name")), "fundingSourceAdress": _address(get_path(reference, "parties.funding_source.address")),
         "fundingSourceClarification": _text(get_path(reference, "parties.funding_source.clarification")),
-        "testArticle(s)": _text(get_path(reference, "design.arms")) or _text(get_path(reference, "design.intervention_name")),
-        "controlArticle(s)": _text(get_path(reference, "design.control")),
+        "testArticle(s)": _text(get_path(reference, "design.test_articles") or get_path(reference, "design.intervention_name")) or first_intervention or _text(get_path(reference, "design.arms")),
+        "controlArticle(s)": _text(get_path(reference, "design.control_articles") or get_path(reference, "design.control")) or second_intervention,
     }
     if branch == "Retrospective":
         values["AI_inclusionCriteria"] = _draft_text(model, "subjects.eligibility", bullets=True)
@@ -333,6 +350,54 @@ def _ensure_contract_headings(document: Document, branch: str) -> None:
         if index is not None:
             target = paragraphs[index + 1] if index + 1 < len(paragraphs) else None
             if target is not None: _insert_before(target, "8.1. Informed Consent / Subject Enrollment", "Heading 2")
+
+
+def _insert_source_bound_sections(document: Document, reference: Mapping[str, Any], branch: str) -> None:
+    """Render every source-mode contract section directly from its approved evidence."""
+    sections = list(protocol_contract(branch))
+    for index, section in enumerate(sections):
+        if section.role != "source":
+            continue
+        value = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), None)
+        heading_key = _protocol_heading_key(f"{section.number} {section.title}")
+        heading = next((
+            paragraph for paragraph in document.paragraphs
+            if _heading_level(paragraph) is not None
+            and _protocol_heading_key(paragraph.text) == heading_key
+        ), None)
+        if heading is None and meaningful(value):
+            next_section = next((candidate for candidate in sections[index + 1:] if candidate.number), None)
+            if next_section is None:
+                continue
+            target_key = _protocol_heading_key(f"{next_section.number} {next_section.title}")
+            target = next((
+                paragraph for paragraph in document.paragraphs
+                if _heading_level(paragraph) is not None
+                and _protocol_heading_key(paragraph.text) == target_key
+            ), None)
+            if target is None:
+                continue
+            heading = document.add_paragraph(f"{section.number} {section.title}", style="Heading 2")
+            target._p.addprevious(heading._p)
+        if heading is None:
+            continue
+        level = _heading_level(heading) or 1
+        following = heading._p.getnext()
+        while following is not None and following.tag != qn("w:sectPr"):
+            next_element = following.getnext()
+            if following.tag == qn("w:p"):
+                paragraph = Paragraph(following, document)
+                next_level = _heading_level(paragraph)
+                if next_level is not None and next_level <= level:
+                    break
+            heading._p.getparent().remove(following)
+            following = next_element
+        if not meaningful(value):
+            heading._p.getparent().remove(heading._p)
+            continue
+        body = document.add_paragraph(_text(value), style="Normal")
+        heading._p.addnext(body._p)
+        heading.paragraph_format.keep_with_next = True
 
 
 def _split_heading_content(document: Document) -> None:
@@ -769,10 +834,25 @@ def _replace_protocol_leaf_bodies(
     """Use the client shell for design and accepted section drafts for clinical body content."""
     drafts = {str(item.get("section_id")): item for item in model.get("protocol", []) if isinstance(item, Mapping)}
     table_sections = {"study-procedure.visits", "quality-safety.reporting", "evaluation-procedures"}
+    table_caption_keys = {
+        "study-procedure.visits": {_layout_target_key("Table 9.2-1. Visit Schedule")},
+        "quality-safety.reporting": {_layout_target_key("Table 13.3.-1:")},
+        "evaluation-procedures": {_layout_target_key("Table 15.1. Proposed Visits and Study Assessments")},
+    }
     for section in protocol_contract(branch):
-        if section.role == "container":
+        if section.role != "leaf":
             continue
         blocks = _draft_blocks(drafts.get(section.section_id, {}))
+        if section.section_id in table_sections:
+            # The client template owns these captions. A model may echo one from
+            # the source document, but retaining that echo would duplicate both
+            # the caption and (when it shares a placeholder paragraph) the full
+            # section body around the governed table.
+            caption_keys = table_caption_keys.get(section.section_id, set())
+            blocks = [
+                block for block in blocks
+                if _layout_target_key(block[0]) not in caption_keys
+            ]
         if branch == "Retrospective" and section.section_id == "subjects.eligibility":
             blocks = _retrospective_eligibility_blocks(reference)
         if not blocks:
@@ -817,7 +897,11 @@ def _replace_protocol_leaf_bodies(
                         and _heading_level(Paragraph(following, document)) is not None
                     ):
                         break
-                if section.section_id in table_sections and paragraph.text.strip().casefold().startswith("table "):
+                if (
+                    section.section_id in table_sections
+                    and _layout_target_key(paragraph.text)
+                    in table_caption_keys.get(section.section_id, set())
+                ):
                     caption_open = True
                     continue
                 if section.section_id in table_sections and caption_open:
@@ -2324,58 +2408,15 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     placeholder = next((paragraph for paragraph in document.paragraphs if "{visitsTable}" in paragraph.text), None)
     if placeholder is None:
         return
-    schedule = get_path(reference, "procedures.visit_schedule", []) or []
-    visits: list[dict[str, Any]] = []
-    if isinstance(schedule, list):
-        for index, item in enumerate(schedule, 1):
-            if not isinstance(item, Mapping):
-                continue
-            visits.append({
-                "name": _text(item.get("visit") or item.get("visitName")) or f"Visit {index}",
-                "timing": _text(item.get("timing") or item.get("visitWindow")),
-                "procedures": _procedure_items(item.get("procedures")),
-            })
-    activities = list(dict.fromkeys(activity for visit in visits for activity in visit["procedures"]))
-    matrix_mode = bool(visits and activities)
+    table_contract = protocol_table_contracts(reference)["schedule-of-assessments"]
+    row_values = table_contract["rows"]
+    header_rows = int(table_contract["header_rows"])
+    if not row_values:
+        return
+    matrix_mode = header_rows == 2
     if matrix_mode:
-        def header_label(visit: Mapping[str, Any]) -> str:
-            name, timing = str(visit["name"]), str(visit["timing"])
-            if not timing:
-                return name
-            if re.fullmatch(r"day\s*[+-]?\d+", timing, re.I):
-                return f"{name}\n({timing})"
-            return timing
-
-        row_values = [
-            ["Activity", *[header_label(visit) for visit in visits]],
-            ["", *[f"Visit {index}" for index, _visit in enumerate(visits, 1)]],
-            *[
-                [activity, *["X" if activity in visit["procedures"] else "" for visit in visits]]
-                for activity in activities
-            ],
-        ]
-        header_rows = 2
-    else:
-        entries: list[tuple[str, str]] = []
-        schedule_table = get_path(reference, "procedures.visit_schedule_table", []) or []
-        if isinstance(schedule_table, list):
-            for item in schedule_table:
-                if isinstance(item, Mapping):
-                    label = _text(item.get("visitName") or item.get("visit"))
-                    timing = _text(item.get("visitWindow") or item.get("timing"))
-                    if label:
-                        entries.append((label, timing))
-        if not entries:
-            entries = [
-                (item, _assessment_timing(item))
-                for item in _plain_language_assessments(
-                    get_path(reference, "procedures.assessments", [])
-                )
-            ]
-        if not entries:
-            return
-        row_values = [["Approved visit or assessment", "Approved timing"], *[list(item) for item in entries]]
-        header_rows = 1
+        row_values = [list(row) for row in row_values]
+        row_values[1][0] = ""
 
     authority = Document(authority_path)
     design = authority.tables[-1]
@@ -2455,6 +2496,56 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     placeholder._element.getparent().remove(placeholder._element)
 
 
+def _sample_size_evidence_table(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
+    """Render every approved sample-size evidence row as an auditable Section 11 table."""
+    table_contract = protocol_table_contracts(reference)["sample-size-evidence"]
+    row_values = table_contract["rows"]
+    if not row_values:
+        return
+    target = next((
+        paragraph for paragraph in document.paragraphs
+        if _heading_level(paragraph) is not None
+        and _protocol_heading_key(paragraph.text) == _protocol_heading_key("12. CONFIDENTIALITY/PUBLICATION OF THE STUDY")
+    ), None)
+    if target is None:
+        return
+    authority = Document(authority_path)
+    design = authority.tables[-1]
+    table = document.add_table(rows=len(row_values), cols=len(row_values[0]))
+    destination_properties = table._tbl.tblPr
+    destination_properties.getparent().replace(destination_properties, copy.deepcopy(design._tbl.tblPr))
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = False
+    for row_index, values in enumerate(row_values):
+        source_row_index = min(row_index, len(design.rows) - 1)
+        for column_index, value in enumerate(values):
+            source_column_index = min(column_index, len(design.columns) - 1)
+            _copy_cell_design(
+                table.rows[row_index].cells[column_index],
+                design.rows[source_row_index].cells[source_column_index],
+                value,
+                compact=len(row_values[0]) > 5,
+            )
+        _prevent_row_split(table.rows[row_index])
+    _set_repeat_header(table.rows[0])
+    available_width = document.sections[0].page_width - document.sections[0].left_margin - document.sections[0].right_margin
+    widths = [int(available_width / len(row_values[0]))] * len(row_values[0])
+    for column, width in zip(table._tbl.tblGrid.gridCol_lst, widths):
+        column.w = width
+    for row in table.rows:
+        for cell, width in zip(row.cells, widths):
+            cell.width = width
+    caption = document.add_paragraph(str(table_contract["caption"]))
+    exemplar = next((
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.strip().casefold().startswith("table 9.2-1")
+    ), None)
+    _copy_paragraph_design(caption, exemplar)
+    caption.paragraph_format.keep_with_next = True
+    target._p.addprevious(caption._p)
+    target._p.addprevious(table._tbl)
+
+
 def _template_document(
     reference: Mapping[str, Any],
     model: Mapping[str, Any],
@@ -2507,8 +2598,10 @@ def _template_document(
         _normalize_protocol_running_header(document)
         _apply_protocol_visit_table_layout(document, authority)
         _ensure_contract_headings(document, branch)
+        _insert_source_bound_sections(document, reference, branch)
         _normalize_protocol_container_introductions(document, branch, boilerplate)
         _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
+        _sample_size_evidence_table(document, reference, authority_path)
         _normalize_protocol_title_controls(document, reference)
         _normalize_protocol_summary_table(document)
         _ensure_protocol_references(document, authority, reference)
