@@ -517,6 +517,18 @@ _GROUNDING_STOPWORDS = {
     "retrospective", "study", "subject", "subjects",
 }
 
+_GROUNDING_TOKEN_EQUIVALENTS = {
+    # A source may name the clinical state while client-facing prose describes
+    # the person who has it. Keep these equivalences explicit and narrow so
+    # all other clinical concepts and every numeric value remain observable.
+    "pregnancy": "pregnancy",
+    "pregnant": "pregnancy",
+}
+
+_NON_SUBSTANTIVE_LIST_ITEMS = {
+    "n/a", "na", "no", "none", "not applicable", "other", "same", "unknown", "yes",
+}
+
 
 def _leaf_texts(value: Any) -> list[str]:
     if isinstance(value, Mapping):
@@ -529,10 +541,24 @@ def _leaf_texts(value: Any) -> list[str]:
 
 def _grounding_tokens(value: str) -> set[str]:
     return {
-        token.rstrip("s")
+        _GROUNDING_TOKEN_EQUIVALENTS.get(token.rstrip("s"), token.rstrip("s"))
         for token in re.findall(r"[A-Za-z0-9]+", value.casefold())
         if (len(token) > 1 or token.isdigit()) and token not in _GROUNDING_STOPWORDS
     }
+
+
+def _substantive_list_item(value: str) -> bool:
+    """Accept concise clinical terms while continuing to reject non-content."""
+    text = re.sub(r"\s+", " ", value).strip()
+    lowered = text.casefold().strip(" .,:;!?()[]{}")
+    if (
+        not text
+        or PLACEHOLDER.search(text)
+        or lowered in _NON_SUBSTANTIVE_LIST_ITEMS
+        or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE)
+    ):
+        return False
+    return bool(_grounding_tokens(text))
 
 
 def _party_words(value: str) -> list[str]:
@@ -962,7 +988,7 @@ def _validate_list(group: Any, request: Mapping[str, Any], contract: Mapping[str
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
     evidence_refs = list(map(str, group.get("evidence_refs") or [])); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
     findings: list[dict[str, Any]] = []
-    if not items or any(PLACEHOLDER.search(item) or len(item.split()) < 2 for item in items):
+    if not items or any(not _substantive_list_item(item) for item in items):
         findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
     section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
     invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)

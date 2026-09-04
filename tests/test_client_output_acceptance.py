@@ -13,7 +13,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader, PdfWriter
 
 from contracts import batch_plan
-from drafting import create_drafting_request, recorded_acceptance_response, validate_response
+from drafting import create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
 from quality import deterministic_content_check, render_pages, sha256_file
 from rendering import _has_page_boundary_before, _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
 
@@ -160,6 +160,99 @@ def test_recorded_acceptance_coverage_sentences_are_section_specific(tmp_path):
     }
 
     assert duplicates == set()
+
+
+@pytest.mark.parametrize(
+    "exclusion_items",
+    [
+        [
+            "Type 1 diabetes or gestational diabetes.",
+            "Known allergy to medical-grade adhesive.",
+            "A skin condition at a proposed sensor site.",
+            "Dialysis.",
+            "Pregnancy.",
+            "Participation in another interventional study within 30 days before screening.",
+            "Missing historical source records.",
+            "An investigator-determined safety concern.",
+        ],
+        [
+            "Type 1 diabetes or gestational diabetes.",
+            "Known allergy to medical-grade adhesive.",
+            "A skin condition at a proposed sensor site.",
+            "Receiving dialysis.",
+            "Being pregnant.",
+            "Participation in another interventional study within 30 days before screening.",
+            "Missing historical source records.",
+            "An investigator-determined safety concern.",
+        ],
+    ],
+)
+def test_exclusion_drafts_accept_source_complete_clinical_wording(tmp_path, exclusion_items):
+    """Reproduce the exact accepted facts and wording returned by the Hermes run."""
+    reference = json.loads((
+        ROOT / "tests/fixtures/prospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["population"]["exclusion_criteria"] = [
+        "Type 1 or gestational diabetes",
+        "Known allergy to medical-grade adhesive",
+        "Skin condition at proposed sensor sites",
+        "Dialysis",
+        "Pregnancy",
+        "Participation in another interventional study within 30 days before screening",
+        "Missing historical source records",
+        "Investigator-determined safety concern",
+    ]
+    batch = next(
+        item for item in batch_plan("Ambispective")
+        if item.batch_id == "protocol-foundations"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-hermes-exclusion-regression",
+        reference=reference,
+        batch=batch,
+        attempts={section_id: 1 for section_id in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    exclusion = next(
+        item for item in response["section_results"]
+        if item["section_id"] == "subjects.exclusion"
+    )
+    exclusion["paragraphs"] = [{
+        "text": "An individual who meets any of the following criteria will be excluded from the study:",
+        "evidence_refs": ["source:population.exclusion_criteria"],
+        "boilerplate_refs": [],
+    }]
+    exclusion["lists"] = [{
+        "items": exclusion_items,
+        "evidence_refs": ["source:population.exclusion_criteria"],
+        "boilerplate_refs": [],
+    }]
+
+    accepted, findings = validate_response(request, response)
+
+    assert not [
+        finding for finding in findings
+        if finding.get("field") == "subjects.exclusion"
+    ]
+    assert any(
+        draft["section_id"] == "subjects.exclusion"
+        for draft in (accepted or {}).get("drafts", [])
+    )
+
+
+def test_clinical_wording_equivalence_does_not_weaken_fact_or_numeric_grounding():
+    assert evidence_grounded("Being pregnant.", "Pregnancy")
+    assert evidence_grounded("Pregnancy.", "Pregnancy")
+    assert not evidence_grounded("Being present.", "Pregnancy")
+    assert not evidence_grounded(
+        "Participation in another interventional study before screening.",
+        "Participation in another interventional study within 30 days before screening",
+    )
 
 
 def test_recorded_retrospective_schedule_uses_readable_visit_list(tmp_path):
