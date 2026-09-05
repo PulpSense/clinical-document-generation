@@ -5383,12 +5383,30 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         for path in sorted(destination.rglob("*"))
         if path.is_file()
     }
+    recovery_actions = []
+    for finding in findings:
+        item = dict(finding)
+        strategy_id = str(
+            item.get("strategy_id")
+            or item.get("recovery_strategy")
+            or f"{item.get('recovery_class', 'unknown')}:{item.get('check', item.get('field', 'attempt'))}"
+        )
+        recovery_actions.append({
+            "strategy_id": strategy_id,
+            "triggering_finding": item,
+            "target": item.get("target_ids") or item.get("artifact") or item.get("field"),
+            "predecessor_evidence_sha256": canonical_evidence_sha256(predecessors),
+            "prompt_evidence_changed": item.get("prompt_evidence_changed"),
+            "deterministic_structure_changed": item.get("deterministic_structure_changed"),
+            "candidate_bytes_changed": item.get("candidate_bytes_changed"),
+        })
     _write(destination / "attempt-manifest.json", {
         "revision_id": revision_dir.name,
         "stage": stage,
         "attempt": sequence,
         "archived_at": datetime.now(timezone.utc).isoformat(),
         "findings": [dict(item) for item in findings],
+        "recovery_actions": recovery_actions,
         "gate_ledger_sha256": failed_ledger["ledger_sha256"],
         "files": files,
     })
@@ -5396,6 +5414,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         "path": destination.relative_to(revision_dir).as_posix(),
         "attempt_manifest_sha256": sha256_file(destination / "attempt-manifest.json"),
         "gate_ledger_sha256": failed_ledger["ledger_sha256"],
+        "strategy_ids": [item["strategy_id"] for item in recovery_actions],
     })
     gate_journal = {
         "schema_version": "clinical-gate-attempt-journal/v1",
@@ -5593,16 +5612,20 @@ def _quality_retry(
         and target.target_id not in draftable_sections
     }
     has_layout_target = any(target.category == "layout" for target in targets)
-    if deterministic_targets and not section_targets:
-        path = run_dir / "reference/repair-report.md"
-        path.write_text(repair_report(normalized), encoding="utf-8")
-        return {
-            "status": "blocked",
-            "stage": "deterministic_repair",
-            "findings": normalized,
-            "repair_report": path.relative_to(run_dir).as_posix(),
-            "client_outputs": [],
-        }
+    deterministic_reconstruction = bool(deterministic_targets)
+    if deterministic_reconstruction:
+        # Structured artifacts are rebuilt from the immutable approved source
+        # and accepted drafts. They must not consume another free-form model
+        # attempt or be misreported as a missing-source terminal blocker.
+        generation = working_reference.setdefault("generation", {})
+        generation.setdefault("deterministic_reconstructions", []).extend({
+            "target": target,
+            "strategy_id": str(finding.get("strategy_id") or f"deterministic:{target}"),
+            "triggering_finding": dict(finding),
+            "candidate_bytes_changed": True,
+        } for finding in normalized for target in deterministic_targets)
+        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
+        _clear_verification_responses(revision_dir)
     layout_plan: dict[str, list[dict[str, str]]] = {}
     if has_layout_target:
         layout_plan, unsupported = _layout_repair_plan(
@@ -5616,7 +5639,14 @@ def _quality_retry(
                 unsupported,
                 candidate_outputs=_candidate_outputs(revision_dir),
             )
-    attempts, exhausted = retry_attempts(normalized, prior_attempts)
+    retry_findings = [
+        item for item in normalized
+        if not (
+            deterministic_reconstruction
+            and any(RetryTarget.parse(str(target)).target_id in deterministic_targets for target in item.get("target_ids", []))
+        )
+    ]
+    attempts, exhausted = retry_attempts(retry_findings, prior_attempts)
     if exhausted:
         working_reference.setdefault("generation", {})["attempts"] = attempts
         _write(reference_path, working_reference)
@@ -5625,7 +5655,20 @@ def _quality_retry(
     if stage == "quality" and (section_targets or has_layout_target):
         generation = working_reference.setdefault("generation", {})
         current_review_set = max(1, int(generation.get("review_set", 1)))
-        if current_review_set >= MAX_REVIEW_SETS:
+        # Three unchanged review sets are still a bounded no-progress loop.
+        # A distinct, explicitly governed strategy is useful progress and is
+        # therefore allowed to continue inside the original deadline.
+        strategy_ids = {
+            str(item.get("strategy_id") or item.get("recovery_strategy") or "")
+            for item in normalized
+            if item.get("strategy_id") or item.get("recovery_strategy")
+        }
+        historical_strategy_ids = {
+            str(strategy)
+            for entry in (generation.get("recovery_history") or [])
+            for strategy in (entry.get("strategy_ids") or [])
+        }
+        if current_review_set >= MAX_REVIEW_SETS and not strategy_ids.difference(historical_strategy_ids):
             exhausted_review = [{
                 **dict(item),
                 "field": "review_set",
@@ -5638,6 +5681,11 @@ def _quality_retry(
                 candidate_outputs=_candidate_outputs(revision_dir),
             )
         generation["review_set"] = current_review_set + 1
+        generation.setdefault("recovery_history", []).append({
+            "review_set": current_review_set,
+            "strategy_ids": sorted(strategy_ids),
+            "finding_sha256": canonical_evidence_sha256(normalized),
+        })
         _reset_verification_set(revision_dir)
     working_reference.setdefault("generation", {})["attempts"] = attempts
     _write(reference_path, working_reference)

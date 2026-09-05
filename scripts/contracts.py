@@ -1206,7 +1206,6 @@ def contract_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
         "retained_icf_sections": [dict(section_id=section_id, title=title) for section_id, title in icf_retained_sections(branch, icf_template)],
         "batches": [batch.public() for batch in batch_plan(branch, icf_template)],
         "boilerplate_version": BOILERPLATE_VERSION,
-        "source_evidence_coverage_map": source_evidence_coverage_map(reference),
     }
 
 
