@@ -60,6 +60,27 @@ LAYOUT_REPAIR_RULES = {
     "icf": ("heading_cohesion", "heading_whitespace_cohesion", "table_pagination"),
 }
 
+# Every mandatory visual check has a declared disposition.  A prevention
+# disposition is enforced by construction/audit; repair dispositions are
+# bounded Word-native repairs; fail-closed checks retain evidence for a
+# template-family onboarding change rather than silently guessing.
+VISUAL_CHECK_DISPOSITIONS = {
+    "clipping": "fail_closed",
+    "overlap": "fail_closed",
+    "overflow": "fail_closed",
+    "orphan_heading": "repair:heading_cohesion",
+    "bad_table_split": "repair:table_pagination",
+    "blank_page": "prevention:render_audit",
+    "footer_collision": "fail_closed",
+    "unreadable_text": "fail_closed",
+    "duplicate_section": "prevention:content_audit",
+    "inconsistent_style": "prevention:template_contract",
+    "missing_header_footer": "prevention:template_contract",
+    "toc_mismatch": "prevention:toc_refresh",
+    "excessive_whitespace": "repair:heading_cohesion",
+    "artificial_pagination": "repair:body_pagination_or_table_pagination",
+}
+
 BUNDLED_FONT_FILES = {
     "Liberation Sans": "LiberationSans-Regular.ttf",
     "Liberation Serif": "LiberationSerif-Regular.ttf",
@@ -1575,7 +1596,7 @@ def repair_report(findings: Iterable[Mapping[str, Any]]) -> str:
 
 __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES",
-    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS",
+    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth", "source_evidence_coverage_map",
