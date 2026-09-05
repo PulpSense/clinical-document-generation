@@ -3720,10 +3720,24 @@ def validate_verifications(
         try: response = _json(response_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
+        malformed_response = False
         for key, expected in (("schema_version", RESPONSE_SCHEMA), ("request_id", request["request_id"]), ("request_sha256", request["request_sha256"]), ("task", request["task"])):
-            if response.get(key) != expected: findings.append(recovery_finding({"category": "verification", "field": key, "issue": f"Verification response binding mismatch for {key}."}, "document_structure_defect"))
+            if response.get(key) != expected:
+                malformed_response = True
+                findings.append(recovery_finding({
+                    "category": "reviewer-transient",
+                    "field": key,
+                    "target_ids": [verification_target],
+                    "verification_request_id": request["request_id"],
+                    "issue": f"Verification response binding mismatch for {key}.",
+                }, "verifier_transient"))
         producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
-        if not _text(producer.get("model_id")): findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier identity is missing."}, "verifier_transient"))
+        if not _text(producer.get("model_id")):
+            malformed_response = True
+            findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier identity is missing."}, "verifier_transient"))
+        if malformed_response:
+            evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "malformed", "contracted_template_bundle": request.get("contracted_template_bundle")}
+            continue
         error = response.get("error") if isinstance(response.get("error"), Mapping) else {}
         error_type = _text(error.get("type")).casefold()
         transient = str(response.get("status") or "").casefold() in TRANSIENT_REVIEW_STATUSES or error_type in {
@@ -3859,7 +3873,13 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     findings = deterministic_content_check(revision_dir, reference)
     findings.extend(dict(item) for item in render_report.get("findings", []))
     if xml_report:
-        findings.extend(recovery_finding(item, "document_structure_defect") for item in xml_report.get("findings", []))
+        findings.extend(
+            recovery_finding(
+                {**dict(item), "target_ids": ["prs.structured"]},
+                "deterministic_structure_defect",
+            )
+            for item in xml_report.get("findings", [])
+        )
     verification_findings, evidence = validate_verifications(revision_dir)
     findings.extend(verification_findings)
     return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}

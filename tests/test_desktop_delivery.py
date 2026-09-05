@@ -1242,6 +1242,55 @@ def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
 
+def test_external_parent_visual_reviewer_binds_semantic_only_response(tmp_path):
+    revision = tmp_path / "revisions/r1"
+    request_path = revision / "hermes/verification-requests/visual.json"
+    response_path = revision / "hermes/verification-responses/visual.json"
+    request_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r1.verify.visual.protocol",
+        "task": "rendered_page_visual_verification",
+        "response_path": "hermes/verification-responses/visual.json",
+        "artifacts": [{"artifact": "protocol", "pages": []}],
+        "checks": list(VISUAL_CHECKS),
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    semantic_response = {
+        "producer": {"model_id": "client-selected-model"},
+        "status": "blocked",
+        "finding": {
+            "artifact": "protocol",
+            "page": 3,
+            "check": "bad_table_split",
+            "element": "3. GENERAL INFORMATION",
+            "issue": "The table split separates a label from its first item.",
+        },
+    }
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        "#!/bin/sh\nprintf '%s\\n' '" + json.dumps(semantic_response) + "'\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    workflow.command_parent_visual_reviewer(command)([{
+        "request_path": "hermes/verification-requests/visual.json",
+        "response_path": "hermes/verification-responses/visual.json",
+    }], 10.0, revision, {})
+
+    bound = json.loads(response_path.read_text(encoding="utf-8"))
+    assert bound["schema_version"] == RESPONSE_SCHEMA
+    assert bound["request_id"] == request["request_id"]
+    assert bound["request_sha256"] == request["request_sha256"]
+    assert bound["task"] == request["task"]
+    assert bound["findings"] == [semantic_response["finding"]]
+    assert set(bound["workflow_binding"]["added_fields"]) == {
+        "schema_version", "request_id", "request_sha256", "task",
+    }
+
+
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
         "package_fingerprint": "installed",

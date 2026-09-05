@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.20"
+CONTRACT_VERSION = "clinical-documents-v2.21"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -33,6 +33,7 @@ RECOVERY_POLICIES = {
     "adapter_fault": "advance_adapter",
     "font_capability_uncertainty": "bounded_smoke_render",
     "document_structure_defect": "preserve_and_stop",
+    "deterministic_structure_defect": "rebuild_deterministic_structure",
     "visual_defect": "targeted_layout_repair",
     "drafting_defect": "retry_drafting_target",
     "verifier_transient": "retry_verifier",
@@ -1206,7 +1207,6 @@ def contract_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
         "retained_icf_sections": [dict(section_id=section_id, title=title) for section_id, title in icf_retained_sections(branch, icf_template)],
         "batches": [batch.public() for batch in batch_plan(branch, icf_template)],
         "boilerplate_version": BOILERPLATE_VERSION,
-        "source_evidence_coverage_map": source_evidence_coverage_map(reference),
     }
 
 

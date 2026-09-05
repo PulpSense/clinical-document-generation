@@ -512,6 +512,17 @@ def create_drafting_request(
         "approved_input": _source_items(scoped),
         "approved_source": scoped,
         "source_evidence_coverage_map": source_evidence_coverage_map(reference),
+        "evidence_checklist": [
+            {
+                "section_id": str(section.get("section_id") or ""),
+                "required_source_paths": list(section.get("minimum_evidence") or []),
+                "approved_values": {
+                    str(path): get_path(reference, str(path))
+                    for path in section.get("minimum_evidence") or []
+                },
+            }
+            for section in sections
+        ],
         "section_contracts": sections,
         "accepted_context": accepted_context(revision_dir, batch, governing),
         "prior_target_drafts": [draft for target in targets if (draft := accepted_draft(revision_dir, target, governing))],
@@ -1514,10 +1525,6 @@ def schedule_requests(
             continue
         target_findings = [item for item in finding_list if item.get("field") in targets or item.get("field") == batch.batch_id or any(target in targets for target in item.get("target_ids", []) if isinstance(item.get("target_ids"), list))]
         target_attempts = {target: int(attempts.get(target, 1)) for target in targets}
-        targets = [target for target in targets if target_attempts[target] <= MAX_ATTEMPTS]
-        target_attempts = {target: target_attempts[target] for target in targets}
-        if not targets:
-            continue
         request_id = _request_id(revision_id, batch.batch_id, target_attempts, wave, sha256_value(expected))
         existing = revision_dir / "hermes/requests" / f"{request_id}.json"
         if existing.is_file():

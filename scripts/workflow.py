@@ -39,7 +39,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
 from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
-from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, retry_attempts, schedule_requests, sha256_file, sha256_value
+from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
@@ -2355,6 +2355,68 @@ class RetryTarget:
         return self.value if self.category == "section" else f"{self.category}:{self.value}"
 
 
+def _recovery_strategy_id(finding: Mapping[str, Any]) -> str:
+    """Return the workflow-owned identity for one governed recovery strategy."""
+    targets = finding.get("target_ids") if isinstance(finding.get("target_ids"), list) else []
+    normalized_targets = sorted({str(target).strip() for target in targets if str(target).strip()})
+    discriminator = str(finding.get("check") or finding.get("field") or "attempt").strip()
+    element = ""
+    if str(finding.get("recovery_class") or "") == "visual_defect":
+        element = re.sub(r"\s+", " ", str(finding.get("element") or "").strip()).casefold()
+    parts = [
+        str(finding.get("recovery_class") or "unknown").strip(),
+        str(finding.get("action") or "unknown").strip(),
+        discriminator,
+        ",".join(normalized_targets),
+    ]
+    if element:
+        parts.append(element)
+    return ":".join(part or "unknown" for part in parts)
+
+
+def _advance_recovery_attempts(
+    findings: Iterable[Mapping[str, Any]],
+    prior_attempts: Mapping[str, int],
+    prior_strategy_attempts: Mapping[str, Any],
+) -> tuple[dict[str, int], dict[str, dict[str, int]], list[dict[str, Any]]]:
+    """Bound repeated target/strategy pairs while allowing a distinct strategy."""
+    attempts = dict(prior_attempts)
+    strategy_attempts = {
+        str(target): {str(strategy): int(count) for strategy, count in dict(counts).items()}
+        for target, counts in prior_strategy_attempts.items()
+        if isinstance(counts, Mapping)
+    }
+    exhausted: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for finding in findings:
+        targets = (
+            finding.get("target_ids")
+            if isinstance(finding.get("target_ids"), list)
+            else [finding.get("field")]
+        )
+        strategy_id = _recovery_strategy_id(finding)
+        for raw_target in targets:
+            target = str(raw_target or "").strip()
+            if not target or (target, strategy_id) in seen:
+                continue
+            seen.add((target, strategy_id))
+            attempts[target] = int(attempts.get(target, 1)) + 1
+            target_strategies = strategy_attempts.setdefault(target, {})
+            next_attempt = int(target_strategies.get(strategy_id, 1)) + 1
+            target_strategies[strategy_id] = next_attempt
+            if next_attempt > MAX_ATTEMPTS:
+                exhausted.append({
+                    **dict(finding),
+                    "field": target,
+                    "strategy_id": strategy_id,
+                    "issue": (
+                        f"Recovery strategy {strategy_id} made no progress after "
+                        f"{MAX_ATTEMPTS} attempts. {finding.get('issue', '')}"
+                    ).strip(),
+                })
+    return attempts, strategy_attempts, exhausted
+
+
 VERIFICATION_TASK_BY_TARGET = {
     "content": "clinical_content_verification",
     "visual": "rendered_page_visual_verification",
@@ -2380,7 +2442,7 @@ def _read_corpus(path: Path) -> list[dict[str, Any]]:
 
 
 def _write(path: Path, value: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True); path.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    _write_atomic_installation_state(path, value)
 
 
 def _reference(run_dir: Path) -> tuple[Path, dict[str, Any]]:
@@ -4683,6 +4745,121 @@ def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
     return open_attachment
 
 
+_VERIFICATION_IDENTITY_FIELDS = ("schema_version", "request_id", "request_sha256", "task")
+
+
+def _bind_verification_response_payload(
+    request: Mapping[str, Any],
+    raw_response: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    """Bind a recognizable semantic judgment to its workflow-owned request identity."""
+    response = dict(raw_response)
+    if isinstance(response.get("response"), Mapping) and not any(
+        key in response for key in ("status", "findings", "finding", "page_assessments", "section_assessments")
+    ):
+        nested = dict(response["response"])
+        if "producer" not in nested and isinstance(response.get("producer"), Mapping):
+            nested["producer"] = dict(response["producer"])
+        response = nested
+    if isinstance(response.get("finding"), Mapping) and "findings" not in response:
+        response["findings"] = [dict(response.pop("finding"))]
+    elif (
+        "issue" in response
+        and "findings" not in response
+        and any(key in response for key in ("artifact", "check", "target_ids", "page", "element"))
+    ):
+        producer = response.pop("producer", None)
+        response = {
+            "status": "blocked",
+            "findings": [response],
+            **({"producer": dict(producer)} if isinstance(producer, Mapping) else {}),
+        }
+    if "status" not in response and isinstance(response.get("findings"), list):
+        response["status"] = "blocked" if response["findings"] else "passed"
+    semantic_keys = {
+        "status", "findings", "page_assessments", "section_assessments",
+        "cross_document_assessments", "error",
+    }
+    if not semantic_keys.intersection(response):
+        return None
+    expected_identity = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request.get("request_id"),
+        "request_sha256": request.get("request_sha256"),
+        "task": request.get("task"),
+    }
+    for key, expected in expected_identity.items():
+        if key in response and response.get(key) != expected:
+            return None
+    missing = [key for key in _VERIFICATION_IDENTITY_FIELDS if key not in response]
+    if not missing:
+        return response
+    source_sha256 = canonical_evidence_sha256(response)
+    bound = {**response, **expected_identity}
+    bound["workflow_binding"] = {
+        "schema_version": "workflow-verification-binding/v1",
+        "source_semantic_sha256": source_sha256,
+        "added_fields": missing,
+    }
+    return bound
+
+
+def _semantic_response_matches_request(
+    request: Mapping[str, Any],
+    response: Mapping[str, Any],
+) -> bool:
+    findings = [item for item in response.get("findings", []) if isinstance(item, Mapping)]
+    if request.get("task") == "rendered_page_visual_verification":
+        expected_artifacts = {
+            str(item.get("artifact"))
+            for item in request.get("artifacts", [])
+            if isinstance(item, Mapping)
+        }
+        supplied = {str(item.get("artifact")) for item in findings if item.get("artifact")}
+        supplied.update(
+            str(item.get("artifact"))
+            for item in response.get("page_assessments", [])
+            if isinstance(item, Mapping) and item.get("artifact")
+        )
+        return not supplied or supplied.issubset(expected_artifacts)
+    permitted = {
+        str(item.get("section_id"))
+        for item in request.get("sections", [])
+        if isinstance(item, Mapping)
+    }
+    if any(
+        str(item.get("path") or "").endswith("study.xml")
+        for item in request.get("artifacts", [])
+        if isinstance(item, Mapping)
+    ):
+        permitted.update(("prs.brief-summary", "prs.detailed-description"))
+    supplied_targets = {
+        str(target)
+        for item in findings
+        for target in (item.get("target_ids") or [])
+        if isinstance(item.get("target_ids"), list)
+    }
+    return not supplied_targets or supplied_targets.issubset(permitted)
+
+
+def _bind_available_verification_responses(revision_dir: Path) -> None:
+    """Atomically add only missing workflow identity to response-path-bound judgments."""
+    for request_path in sorted((revision_dir / "hermes/verification-requests").glob("*.json")):
+        try:
+            request = _read(request_path)
+            response_path = (revision_dir / str(request.get("response_path") or "")).resolve()
+            response_path.relative_to(revision_dir.resolve())
+            raw_response = _read(response_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        bound = _bind_verification_response_payload(request, raw_response)
+        if bound is None or bound == raw_response or not _semantic_response_matches_request(request, bound):
+            continue
+        temporary = response_path.with_name(f".{response_path.name}.binding-{os.getpid()}")
+        temporary.write_text(json.dumps(bound, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        os.replace(temporary, response_path)
+
+
 def command_parent_visual_reviewer(
     command_path: Path,
 ) -> Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None]:
@@ -4742,14 +4919,24 @@ def command_parent_visual_reviewer(
             if not candidates:
                 continue
             request = _read(bound_request_path)
-            matching = {
-                json.dumps(candidate, sort_keys=True, ensure_ascii=False): candidate
+            normalized = [
+                (candidate, bound)
                 for candidate in candidates
-                if candidate.get("schema_version") == RESPONSE_SCHEMA
-                and candidate.get("request_id") == request.get("request_id")
-                and candidate.get("request_sha256") == request.get("request_sha256")
-                and candidate.get("task") == request.get("task")
-            }
+                for bound in [_bind_verification_response_payload(request, candidate)]
+                if bound is not None and _semantic_response_matches_request(request, bound)
+            ]
+            if normalized:
+                best_score = max(
+                    sum(key in candidate for key in ("status", "findings", "page_assessments", "section_assessments", "cross_document_assessments"))
+                    for candidate, _ in normalized
+                )
+                matching = {
+                    json.dumps(bound, sort_keys=True, ensure_ascii=False): bound
+                    for candidate, bound in normalized
+                    if sum(key in candidate for key in ("status", "findings", "page_assessments", "section_assessments", "cross_document_assessments")) == best_score
+                }
+            else:
+                matching = {}
             if len(matching) != 1:
                 continue
             response_path = (revision_dir / str(request.get("response_path") or "")).resolve()
@@ -5237,6 +5424,8 @@ def _retained_gate_predecessors(revision_dir: Path) -> list[dict[str, Any]]:
 def _validate_expected_gate_attempts(
     revision_dir: Path,
     expected_attempts: Iterable[Mapping[str, Any]],
+    *,
+    require_measured: bool = True,
 ) -> None:
     expected = [dict(item) for item in expected_attempts]
     journal_path = revision_dir / "gate-attempt-journal.json"
@@ -5276,6 +5465,20 @@ def _validate_expected_gate_attempts(
             or _read(ledger_path).get("ledger_sha256") != entry.get("gate_ledger_sha256")
         ):
             raise ValueError(f"Retained gate attempt evidence is missing or stale: {relative_text}")
+        manifest = _read(manifest_path)
+        actions = manifest.get("recovery_actions")
+        if not isinstance(actions, list) or not actions:
+            raise ValueError(f"Retained recovery action evidence is missing: {relative_text}")
+        if require_measured and any(
+            not isinstance(action, Mapping)
+            or action.get("outcome_status") not in {
+                "measured",
+                "interrupted_no_action",
+                "terminal_measured",
+            }
+            for action in actions
+        ):
+            raise ValueError(f"Retained recovery action outcome is pending: {relative_text}")
 
 
 def _failed_gate_for_stage(stage: str, findings: Iterable[Mapping[str, Any]]) -> str:
@@ -5314,6 +5517,97 @@ def _ledger_findings(
     }]
 
 
+def _recovery_action_observation(
+    revision_dir: Path,
+    finding: Mapping[str, Any],
+) -> dict[str, dict[str, str]]:
+    """Snapshot only the candidate and prompt evidence owned by one action."""
+    targets = {
+        RetryTarget.parse(str(target)).target_id
+        for target in (finding.get("target_ids") or [])
+        if str(target).strip()
+    }
+    artifact = str(finding.get("artifact") or "").removesuffix(".docx")
+    artifacts = {artifact} if artifact in {"protocol", "icf"} else set()
+    for target in targets:
+        if target.startswith("prs."):
+            artifacts.add("study")
+        elif target.startswith("icf."):
+            artifacts.add("icf")
+        elif target.startswith("layout:"):
+            name = target.removeprefix("layout:").removesuffix(".docx")
+            if name in {"protocol", "icf"}:
+                artifacts.add(name)
+        elif not target.startswith("verification:"):
+            artifacts.add("protocol")
+    candidate_paths = [
+        revision_dir / "candidate" / ("study.xml" if name == "study" else f"{name}.docx")
+        for name in sorted(artifacts)
+    ]
+
+    prompt_paths: set[Path] = set()
+    request_id = str(finding.get("verification_request_id") or "")
+    verification_target = next(
+        (target.removeprefix("verification:") for target in targets if target.startswith("verification:")),
+        "",
+    )
+    expected_task = VERIFICATION_TASK_BY_TARGET.get(verification_target)
+    for root in (
+        revision_dir / "hermes/requests",
+        revision_dir / "hermes/verification-requests",
+    ):
+        for path in root.glob("*.json"):
+            try:
+                request = _read(path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            section_ids = {
+                str(item.get("section_id"))
+                for item in request.get("section_contracts", [])
+                if isinstance(item, Mapping)
+            }
+            request_artifacts = {
+                str(item.get("artifact"))
+                for item in request.get("artifacts", [])
+                if isinstance(item, Mapping)
+            }
+            relevant = (
+                (request_id and request.get("request_id") == request_id)
+                or (expected_task and request.get("task") == expected_task)
+                or bool(targets.intersection(section_ids))
+                or bool(artifacts.intersection(request_artifacts))
+            )
+            if not relevant:
+                continue
+            prompt_paths.add(path)
+            response_path = request.get("response_path")
+            if response_path:
+                prompt_paths.add(revision_dir / str(response_path))
+    for target in targets:
+        if target.startswith(("layout:", "verification:")):
+            continue
+        prompt_paths.add(revision_dir / "hermes/accepted" / f"{target.replace('/', '_')}.json")
+
+    def hashes(paths: Iterable[Path]) -> dict[str, str]:
+        return {
+            path.relative_to(revision_dir).as_posix(): sha256_file(path)
+            for path in sorted(set(paths))
+            if path.is_file() and not path.is_symlink()
+        }
+
+    structural_paths = []
+    if finding.get("recovery_class") in {"visual_defect", "deterministic_structure_defect"}:
+        structural_paths = [
+            revision_dir / "candidate-build.json",
+            revision_dir / "candidate-structure.json",
+        ]
+    return {
+        "candidate": hashes(candidate_paths),
+        "structure": hashes(structural_paths),
+        "prompt": hashes(prompt_paths),
+    }
+
+
 def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mapping[str, Any]]) -> Path:
     """Preserve the complete failed candidate and QA evidence before any retry mutation."""
     archive_root = revision_dir / "attempts"
@@ -5323,11 +5617,20 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
     while (archive_root / f"{safe_stage}-a{sequence:02d}").exists():
         sequence += 1
     destination = archive_root / f"{safe_stage}-a{sequence:02d}"
+    staging_root = revision_dir / ".attempt-staging"
+    staging_root.mkdir(parents=True, exist_ok=True)
+    staging = Path(tempfile.mkdtemp(prefix=f"{safe_stage}-a{sequence:02d}-", dir=staging_root))
     journal_path = revision_dir / "gate-attempt-journal.json"
-    journal_entries = list(_read(journal_path).get("entries") or []) if journal_path.is_file() else []
+    original_journal = _read(journal_path) if journal_path.is_file() else {
+        "schema_version": "clinical-gate-attempt-journal/v1",
+        "attempt_id": revision_dir.name,
+        "entries": [],
+    }
+    if "journal_sha256" not in original_journal:
+        original_journal["journal_sha256"] = canonical_evidence_sha256(original_journal)
+    journal_entries = list(original_journal.get("entries") or [])
     _validate_expected_gate_attempts(revision_dir, journal_entries)
     predecessors = _retained_gate_predecessors(revision_dir)
-    destination.mkdir()
     retained = (
         Path("candidate"),
         Path("rendered"),
@@ -5339,7 +5642,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
     )
     for relative in retained:
         source = revision_dir / relative
-        target = destination / relative
+        target = staging / relative
         if source.is_dir():
             shutil.copytree(source, target)
         elif source.is_file():
@@ -5377,25 +5680,42 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         statuses=statuses,
         findings_by_gate={failed_gate: ledger_findings},
     )
-    _write(destination / "gate-ledger.json", failed_ledger)
+    _write(staging / "gate-ledger.json", failed_ledger)
     files = {
-        path.relative_to(destination).as_posix(): sha256_file(path)
-        for path in sorted(destination.rglob("*"))
+        path.relative_to(staging).as_posix(): sha256_file(path)
+        for path in sorted(staging.rglob("*"))
         if path.is_file()
     }
-    _write(destination / "attempt-manifest.json", {
+    recovery_actions = []
+    for finding in findings:
+        item = dict(finding)
+        strategy_id = _recovery_strategy_id(item)
+        recovery_actions.append({
+            "strategy_id": strategy_id,
+            "triggering_finding": item,
+            "target": item.get("target_ids") or item.get("artifact") or item.get("field"),
+            "predecessor_evidence_sha256": canonical_evidence_sha256(predecessors),
+            "outcome_status": "pending",
+            "before": _recovery_action_observation(revision_dir, item),
+            "prompt_evidence_changed": None,
+            "deterministic_structure_changed": None,
+            "candidate_bytes_changed": None,
+        })
+    _write(staging / "attempt-manifest.json", {
         "revision_id": revision_dir.name,
         "stage": stage,
         "attempt": sequence,
         "archived_at": datetime.now(timezone.utc).isoformat(),
         "findings": [dict(item) for item in findings],
+        "recovery_actions": recovery_actions,
         "gate_ledger_sha256": failed_ledger["ledger_sha256"],
         "files": files,
     })
     journal_entries.append({
         "path": destination.relative_to(revision_dir).as_posix(),
-        "attempt_manifest_sha256": sha256_file(destination / "attempt-manifest.json"),
+        "attempt_manifest_sha256": sha256_file(staging / "attempt-manifest.json"),
         "gate_ledger_sha256": failed_ledger["ledger_sha256"],
+        "strategy_ids": [item["strategy_id"] for item in recovery_actions],
     })
     gate_journal = {
         "schema_version": "clinical-gate-attempt-journal/v1",
@@ -5403,8 +5723,405 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         "entries": journal_entries,
     }
     gate_journal["journal_sha256"] = canonical_evidence_sha256(gate_journal)
+    archive_transaction_path = revision_dir / "recovery-archive-transaction.json"
+    _write(archive_transaction_path, {
+        "schema_version": "clinical-recovery-archive-transaction/v1",
+        "revision_id": revision_dir.name,
+        "staging_path": staging.relative_to(revision_dir).as_posix(),
+        "attempt_path": destination.relative_to(revision_dir).as_posix(),
+        "attempt_manifest_sha256": sha256_file(staging / "attempt-manifest.json"),
+        "gate_ledger_sha256": failed_ledger["ledger_sha256"],
+        "original_journal": original_journal,
+        "final_journal": gate_journal,
+    })
+    os.replace(staging, destination)
+    _sync_directory(archive_root)
     _write(journal_path, gate_journal)
+    archive_transaction_path.unlink(missing_ok=True)
+    _sync_directory(revision_dir)
     return destination
+
+
+def _recover_recovery_archive(revision_dir: Path) -> None:
+    """Finish a staged attempt promotion without accepting arbitrary orphan evidence."""
+    transaction_path = revision_dir / "recovery-archive-transaction.json"
+    if not transaction_path.is_file():
+        return
+    transaction = _read(transaction_path)
+    staging_relative = PurePosixPath(str(transaction.get("staging_path") or ""))
+    attempt_relative = PurePosixPath(str(transaction.get("attempt_path") or ""))
+    if (
+        transaction.get("schema_version") != "clinical-recovery-archive-transaction/v1"
+        or transaction.get("revision_id") != revision_dir.name
+        or any(path.is_absolute() or ".." in path.parts for path in (staging_relative, attempt_relative))
+        or not str(attempt_relative).startswith("attempts/")
+    ):
+        raise ValueError("Recovery archive transaction is invalid.")
+    staging = revision_dir / staging_relative
+    attempt = revision_dir / attempt_relative
+    if staging.is_dir() and not attempt.exists():
+        attempt.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(staging, attempt)
+        _sync_directory(attempt.parent)
+    if not attempt.is_dir():
+        raise ValueError("Recovery archive transaction lost its staged attempt.")
+    manifest_path = attempt / "attempt-manifest.json"
+    ledger_path = attempt / "gate-ledger.json"
+    if (
+        not manifest_path.is_file()
+        or not ledger_path.is_file()
+        or sha256_file(manifest_path) != transaction.get("attempt_manifest_sha256")
+        or _read(ledger_path).get("ledger_sha256") != transaction.get("gate_ledger_sha256")
+    ):
+        raise ValueError("Recovery archive transaction evidence is invalid.")
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    original = transaction.get("original_journal")
+    final = transaction.get("final_journal")
+    if not isinstance(original, Mapping) or not isinstance(final, Mapping):
+        raise ValueError("Recovery archive transaction journal payload is invalid.")
+    current = _read(journal_path) if journal_path.is_file() else dict(original)
+    if current == dict(original):
+        _write(journal_path, dict(final))
+    elif current != dict(final):
+        raise ValueError("Recovery archive transaction conflicts with retained journal evidence.")
+    transaction_path.unlink(missing_ok=True)
+    _sync_directory(revision_dir)
+
+
+def _finalize_recovery_attempt(
+    revision_dir: Path,
+    attempt_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+    *,
+    outcome_status: str = "measured",
+) -> list[dict[str, Any]]:
+    """Measure a recovery action and rebind its immutable attempt-journal entry."""
+    manifest_path = attempt_dir / "attempt-manifest.json"
+    original_manifest = _read(manifest_path)
+    manifest = dict(original_manifest)
+    recovery_actions = []
+    for raw_action in manifest.get("recovery_actions", []):
+        action = dict(raw_action)
+        finding = dict(action.get("triggering_finding") or {})
+        before = dict(action.get("before") or {})
+        after = _recovery_action_observation(revision_dir, finding)
+        action_changed = {
+            "candidate_bytes_changed": bool(after["candidate"]) and (
+                dict(before.get("candidate") or {}) != after["candidate"]
+            ),
+            "deterministic_structure_changed": dict(before.get("structure") or {}) != after["structure"],
+            "prompt_evidence_changed": dict(before.get("prompt") or {}) != after["prompt"],
+        }
+        if finding.get("recovery_class") == "deterministic_structure_defect":
+            action_changed["deterministic_structure_changed"] = (
+                action_changed["deterministic_structure_changed"]
+                or action_changed["candidate_bytes_changed"]
+            )
+        recovery_actions.append({
+            **action,
+            "outcome_status": outcome_status,
+            "after": after,
+            **action_changed,
+        })
+    manifest["recovery_actions"] = recovery_actions
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    original_journal = _read(journal_path)
+    journal = copy.deepcopy(original_journal)
+    relative = attempt_dir.relative_to(revision_dir).as_posix()
+    for entry in journal.get("entries", []):
+        if entry.get("path") == relative:
+            entry["attempt_manifest_sha256"] = hashlib.sha256(
+                (json.dumps(manifest, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+            ).hexdigest()
+    unsigned = dict(journal)
+    unsigned.pop("journal_sha256", None)
+    journal["journal_sha256"] = canonical_evidence_sha256(unsigned)
+    transaction_path = revision_dir / "recovery-finalization-transaction.json"
+    _write(transaction_path, {
+        "schema_version": "clinical-recovery-finalization-transaction/v1",
+        "revision_id": revision_dir.name,
+        "attempt_path": relative,
+        "original_manifest": original_manifest,
+        "final_manifest": manifest,
+        "original_journal": original_journal,
+        "final_journal": journal,
+    })
+    _write(manifest_path, manifest)
+    _write(journal_path, journal)
+    working_reference.setdefault("generation", {})["gate_attempts"] = list(
+        journal.get("entries") or []
+    )
+    _write(reference_path, working_reference)
+    transaction_path.unlink(missing_ok=True)
+    _sync_directory(revision_dir)
+    return list(journal.get("entries") or [])
+
+
+def _recover_recovery_finalization(
+    revision_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+) -> None:
+    """Finish an atomically described recovery-finalization transaction."""
+    transaction_path = revision_dir / "recovery-finalization-transaction.json"
+    if not transaction_path.is_file():
+        return
+    transaction = _read(transaction_path)
+    relative = PurePosixPath(str(transaction.get("attempt_path") or ""))
+    if (
+        transaction.get("schema_version") != "clinical-recovery-finalization-transaction/v1"
+        or transaction.get("revision_id") != revision_dir.name
+        or relative.is_absolute()
+        or ".." in relative.parts
+        or relative.as_posix() != str(transaction.get("attempt_path") or "")
+    ):
+        raise ValueError("Recovery finalization transaction is invalid.")
+    manifest_path = revision_dir / relative / "attempt-manifest.json"
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    for path, original_key, final_key in (
+        (manifest_path, "original_manifest", "final_manifest"),
+        (journal_path, "original_journal", "final_journal"),
+    ):
+        original = transaction.get(original_key)
+        final = transaction.get(final_key)
+        if not isinstance(original, Mapping) or not isinstance(final, Mapping) or not path.is_file():
+            raise ValueError("Recovery finalization transaction payload is invalid.")
+        current = _read(path)
+        if current == dict(original):
+            _write(path, dict(final))
+        elif current != dict(final):
+            raise ValueError("Recovery finalization transaction conflicts with retained evidence.")
+    original_entries = list(dict(transaction["original_journal"]).get("entries") or [])
+    final_entries = list(dict(transaction["final_journal"]).get("entries") or [])
+    generation = working_reference.setdefault("generation", {})
+    reference_entries = list(generation.get("gate_attempts") or [])
+    if reference_entries == original_entries:
+        generation["gate_attempts"] = final_entries
+        _write(reference_path, working_reference)
+    elif reference_entries != final_entries:
+        raise ValueError("Recovery finalization transaction conflicts with reference history.")
+    transaction_path.unlink(missing_ok=True)
+    _sync_directory(revision_dir)
+
+
+def _reconcile_pending_recovery_attempts(
+    revision_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+) -> None:
+    """Measure crash-interrupted actions before a resumed run may continue."""
+    _recover_recovery_archive(revision_dir)
+    _recover_recovery_finalization(revision_dir, reference_path, working_reference)
+    generation = working_reference.setdefault("generation", {})
+    expected = list(generation.get("gate_attempts") or [])
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    journal_entries: list[dict[str, Any]] = []
+    if journal_path.is_file():
+        journal = _read(journal_path)
+        unsigned = dict(journal)
+        declared_sha256 = str(unsigned.pop("journal_sha256", ""))
+        if (
+            journal.get("schema_version") != "clinical-gate-attempt-journal/v1"
+            or journal.get("attempt_id") != revision_dir.name
+            or declared_sha256 != canonical_evidence_sha256(unsigned)
+            or not isinstance(journal.get("entries"), list)
+        ):
+            raise ValueError("Retained gate attempt journal is invalid.")
+        journal_entries = [dict(item) for item in journal["entries"]]
+    if expected != journal_entries[:len(expected)]:
+        raise ValueError("Retained gate attempt journal conflicts with approved recovery history.")
+    if len(journal_entries) > len(expected):
+        expected = journal_entries
+        generation["gate_attempts"] = expected
+        _write(reference_path, working_reference)
+    _validate_expected_gate_attempts(
+        revision_dir,
+        expected,
+        require_measured=False,
+    )
+    tracked_pending = {
+        str(item) for item in generation.get("pending_recovery_attempts", [])
+    }
+    entries = expected
+    for entry in expected:
+        attempt_dir = revision_dir / str(entry.get("path") or "")
+        manifest = _read(attempt_dir / "attempt-manifest.json")
+        actions = manifest.get("recovery_actions") or []
+        if any(
+            isinstance(action, Mapping) and action.get("outcome_status") == "pending"
+            for action in actions
+        ) and str(entry.get("path") or "") not in tracked_pending:
+            entries = _finalize_recovery_attempt(
+                revision_dir,
+                attempt_dir,
+                reference_path,
+                working_reference,
+                outcome_status="interrupted_no_action",
+            )
+    if entries != expected:
+        generation["gate_attempts"] = entries
+        _write(reference_path, working_reference)
+    _validate_expected_gate_attempts(
+        revision_dir,
+        entries,
+        require_measured=bool(not tracked_pending),
+    )
+
+
+def _complete_pending_recovery_attempts(
+    revision_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+    *,
+    require_candidate_change: bool,
+    outcome_status: str = "measured",
+) -> list[dict[str, Any]]:
+    """Bind recovery outcomes to rebuilt candidate bytes before another review set."""
+    generation = working_reference.setdefault("generation", {})
+    pending = [str(item) for item in generation.get("pending_recovery_attempts", [])]
+    no_progress: list[dict[str, Any]] = []
+    entries = list(generation.get("gate_attempts") or [])
+    for relative in pending:
+        attempt_dir = revision_dir / relative
+        entries = _finalize_recovery_attempt(
+            revision_dir,
+            attempt_dir,
+            reference_path,
+            working_reference,
+            outcome_status=outcome_status,
+        )
+        manifest = _read(attempt_dir / "attempt-manifest.json")
+        for action in manifest.get("recovery_actions", []):
+            finding = dict(action.get("triggering_finding") or {})
+            if (
+                require_candidate_change
+                and finding.get("recovery_class") in {
+                    "drafting_defect",
+                    "visual_defect",
+                    "deterministic_structure_defect",
+                }
+                and not action.get("candidate_bytes_changed")
+            ):
+                no_progress.append({
+                    **finding,
+                    "strategy_id": action.get("strategy_id"),
+                    "issue": (
+                        "The governed recovery strategy did not materially change "
+                        "the implicated candidate bytes; a new review set is not eligible."
+                    ),
+                })
+    generation["gate_attempts"] = entries
+    generation.pop("pending_recovery_attempts", None)
+    generation.pop("pending_recovery_plan", None)
+    if no_progress:
+        generation.pop("pending_review_set_advance", None)
+        generation["recovery_exhaustion"] = no_progress
+    _write(reference_path, working_reference)
+    _validate_expected_gate_attempts(revision_dir, entries)
+    return no_progress
+
+
+def _finalize_pending_recovery_for_terminal(
+    revision_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+) -> None:
+    """Measure pending actions without making a failed run eligible for review."""
+    _complete_pending_recovery_attempts(
+        revision_dir,
+        reference_path,
+        working_reference,
+        require_candidate_change=False,
+        outcome_status="terminal_measured",
+    )
+    working_reference.setdefault("generation", {}).pop(
+        "pending_review_set_advance", None
+    )
+    _write(reference_path, working_reference)
+
+
+def _advance_pending_review_set(
+    reference_path: Path,
+    working_reference: dict[str, Any],
+) -> None:
+    generation = working_reference.setdefault("generation", {})
+    pending = generation.pop("pending_review_set_advance", None)
+    if not isinstance(pending, Mapping):
+        return
+    current = max(1, int(pending.get("from_review_set", generation.get("review_set", 1))))
+    generation["review_set"] = current + 1
+    generation.setdefault("recovery_history", []).append({
+        "review_set": current,
+        "strategy_ids": sorted(str(item) for item in pending.get("strategy_ids", [])),
+        "finding_sha256": str(pending.get("finding_sha256") or ""),
+    })
+    _write(reference_path, working_reference)
+
+
+def _apply_pending_recovery_plan(
+    revision_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+    approved_reference: Mapping[str, Any],
+    *,
+    contracted_bundle: Mapping[str, Any] | None,
+) -> list[Path]:
+    """Replay one persisted recovery plan idempotently after any interruption."""
+    generation = working_reference.setdefault("generation", {})
+    raw_plan = generation.get("pending_recovery_plan")
+    if not isinstance(raw_plan, Mapping) or raw_plan.get("applied") is True:
+        return []
+    plan = dict(raw_plan)
+    findings = [dict(item) for item in plan.get("findings", []) if isinstance(item, Mapping)]
+    section_targets = {str(item) for item in plan.get("section_targets", [])}
+    layout_plan = {
+        str(artifact): [dict(item) for item in repairs if isinstance(item, Mapping)]
+        for artifact, repairs in dict(plan.get("layout_plan") or {}).items()
+        if isinstance(repairs, list)
+    }
+    deterministic_actions = [
+        dict(item) for item in plan.get("deterministic_actions", [])
+        if isinstance(item, Mapping)
+    ]
+    if plan.get("reset_verification_set"):
+        _reset_verification_set(revision_dir)
+    if deterministic_actions:
+        for action in deterministic_actions:
+            (revision_dir / str(action["candidate"])).unlink(missing_ok=True)
+        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
+        (revision_dir / "candidate-structure.json").unlink(missing_ok=True)
+        _clear_verification_responses(revision_dir)
+        existing = generation.setdefault("pending_deterministic_reconstructions", [])
+        for action in deterministic_actions:
+            if action not in existing:
+                existing.append(action)
+    created: list[Path] = []
+    if section_targets:
+        invalidate_accepted_targets(revision_dir, section_targets)
+        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
+        _clear_verification_responses(revision_dir)
+        created = schedule_requests(
+            repo_root=SCRIPT_DIR.parent,
+            revision_dir=revision_dir,
+            revision_id=revision_dir.name,
+            reference=approved_reference,
+            attempts=dict(generation.get("attempts") or {}),
+            wave=str(plan.get("wave") or "quality-retry"),
+            findings=findings,
+            contracted_bundle=contracted_bundle,
+        )
+    if layout_plan:
+        persisted_repairs = generation.setdefault("layout_repairs", {})
+        for artifact, repairs in layout_plan.items():
+            existing = persisted_repairs.get(artifact, ())
+            persisted_repairs[artifact] = _normalized_layout_repair_records([*existing, *repairs])
+            _invalidate_layout_artifact(revision_dir, artifact)
+        generation["pending_layout_artifacts"] = sorted(layout_plan)
+    plan["applied"] = True
+    generation["pending_recovery_plan"] = plan
+    _write(reference_path, working_reference)
+    return created
 
 
 def _quality_retry(
@@ -5424,24 +6141,33 @@ def _quality_retry(
     require_promoted_runtime: bool = True,
 ) -> dict[str, Any]:
     """Retry draftable targets; deterministic layout defects require an actual repair."""
-    invalid_recovery = [
-        {
-            "category": "recovery-classification",
-            "field": "recovery_class",
-            "issue": "Every recoverable finding must carry one governed Recovery Class and its lawful action.",
-            "finding": dict(item),
-        }
-        for item in findings
-        if item.get("recovery_class") not in RECOVERY_POLICIES
-        or item.get("action") != RECOVERY_POLICIES.get(str(item.get("recovery_class")))
-    ]
-    if invalid_recovery:
-        return _repair_block(
-            run_dir,
-            "recovery_classification",
-            invalid_recovery,
-            candidate_outputs=_candidate_outputs(revision_dir),
+    governed_findings: list[Mapping[str, Any]] = []
+    for raw in findings:
+        item = dict(raw)
+        recovery_class = str(item.get("recovery_class") or "")
+        if (
+            recovery_class in RECOVERY_POLICIES
+            and item.get("action") == RECOVERY_POLICIES[recovery_class]
+        ):
+            governed_findings.append(item)
+            continue
+        target = (
+            "verification:visual"
+            if str(item.get("category") or "").casefold() == "visual"
+            else "verification:content"
         )
+        governed_findings.append(recovery_finding({
+            "category": "reviewer-transient",
+            "field": item.get("field") or "recovery_routing",
+            "target_ids": [target],
+            "verification_request_id": item.get("verification_request_id"),
+            "issue": (
+                "The workflow could not derive governed recovery routing from the semantic "
+                f"finding and will retry only its reviewer request. {item.get('issue', '')}"
+            ).strip(),
+            "unrouted_finding": item,
+        }, "verifier_transient"))
+    findings = governed_findings
     structural = [item for item in findings if item.get("recovery_class") == "document_structure_defect"]
     if structural:
         return _repair_block(
@@ -5453,6 +6179,7 @@ def _quality_retry(
     expected_target_category = {
         "visual_defect": "layout",
         "drafting_defect": "section",
+        "deterministic_structure_defect": "section",
         "verifier_transient": "verification",
     }
     explicit_route_errors = [
@@ -5469,19 +6196,44 @@ def _quality_retry(
         and any(RetryTarget.parse(str(target)).category != expected for target in item["target_ids"])
     ]
     if explicit_route_errors:
-        return _repair_block(
-            run_dir,
-            "recovery_classification",
-            explicit_route_errors,
-            candidate_outputs=_candidate_outputs(revision_dir),
-        )
+        findings = [
+            recovery_finding({
+                "category": "reviewer-transient",
+                "field": "target_ids",
+                "target_ids": [
+                    "verification:visual"
+                    if error["finding"].get("recovery_class") == "visual_defect"
+                    else "verification:content"
+                ],
+                "verification_request_id": error["finding"].get("verification_request_id"),
+                "issue": error["issue"],
+                "unrouted_finding": error["finding"],
+            }, "verifier_transient")
+            for error in explicit_route_errors
+        ]
     generation_state = working_reference.setdefault("generation", {})
     expected_gate_attempts = list(generation_state.get("gate_attempts") or [])
     _validate_expected_gate_attempts(revision_dir, expected_gate_attempts)
-    _archive_failed_attempt(revision_dir, stage, findings)
+    recovery_attempt_dir = _archive_failed_attempt(revision_dir, stage, findings)
     gate_journal = _read(revision_dir / "gate-attempt-journal.json")
     generation_state["gate_attempts"] = list(gate_journal["entries"])
     _write(reference_path, working_reference)
+
+    def finish(result: dict[str, Any]) -> dict[str, Any]:
+        pending_path = recovery_attempt_dir.relative_to(revision_dir).as_posix()
+        pending = working_reference.setdefault("generation", {}).setdefault(
+            "pending_recovery_attempts", []
+        )
+        if pending_path not in pending:
+            pending.append(pending_path)
+            _write(reference_path, working_reference)
+        _complete_pending_recovery_attempts(
+            revision_dir,
+            reference_path,
+            working_reference,
+            require_candidate_change=False,
+        )
+        return result
     transient = [item for item in findings if item.get("recovery_class") == "verifier_transient"]
     if transient:
         verification_attempts = working_reference.setdefault("generation", {}).setdefault("verification_attempts", {})
@@ -5516,19 +6268,19 @@ def _quality_retry(
         if exhausted:
             path = run_dir / "reference/repair-report.md"
             path.write_text(repair_report(exhausted), encoding="utf-8")
-            return {"status": "blocked", "stage": "reviewer_retry_limit", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
+            return finish({"status": "blocked", "stage": "reviewer_retry_limit", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []})
         if request_ids:
             _clear_verification_responses(revision_dir, request_ids=request_ids)
         if fallback_tasks:
             _clear_verification_responses(revision_dir, fallback_tasks)
         remaining = [item for item in findings if item.get("recovery_class") != "verifier_transient"]
         if not remaining:
-            return _awaiting(
+            return finish(_awaiting(
                 revision_dir,
                 stage="independent_verification_retry",
                 paths=pending_verifications(revision_dir),
                 findings=transient,
-            )
+            ))
         findings = remaining
     known_sections = {section.section_id for section in protocol_contract(str(get_path(approved_reference, "meta.study_type", "")))}
     if canonical_study_type(get_path(approved_reference, "meta.study_type")) != "Retrospective":
@@ -5536,7 +6288,7 @@ def _quality_retry(
             str(get_path(approved_reference, "meta.study_type", "")),
             str(get_path(approved_reference, "meta.icf_template", "Advarra")),
         ))
-        known_sections.update(("prs.brief-summary", "prs.detailed-description"))
+        known_sections.update(("prs.brief-summary", "prs.detailed-description", "prs.structured"))
     draftable_sections = {
         section_id
         for batch in batch_plan(
@@ -5574,35 +6326,50 @@ def _quality_retry(
         and any(RetryTarget.parse(str(target)).category != expected for target in finding["target_ids"])
     ]
     if route_errors:
-        return _repair_block(
+        return finish(_repair_block(
             run_dir,
-            "recovery_classification",
+            "internal_recovery_routing",
             route_errors,
             candidate_outputs=_candidate_outputs(revision_dir),
-        )
+        ))
     section_targets = {
         target.target_id
         for target in targets
         if target.category == "section" and target.target_id in draftable_sections
     }
     deterministic_targets = {
-        target.target_id
-        for target in targets
-        if target.category == "section"
-        and target.target_id in known_sections
-        and target.target_id not in draftable_sections
+        RetryTarget.parse(str(target)).target_id
+        for finding in normalized
+        if finding.get("recovery_class") == "deterministic_structure_defect"
+        for target in finding.get("target_ids", [])
+        if RetryTarget.parse(str(target)).category == "section"
+        and RetryTarget.parse(str(target)).target_id in known_sections
     }
     has_layout_target = any(target.category == "layout" for target in targets)
-    if deterministic_targets and not section_targets:
-        path = run_dir / "reference/repair-report.md"
-        path.write_text(repair_report(normalized), encoding="utf-8")
-        return {
-            "status": "blocked",
-            "stage": "deterministic_repair",
-            "findings": normalized,
-            "repair_report": path.relative_to(run_dir).as_posix(),
-            "client_outputs": [],
-        }
+    deterministic_reconstruction = bool(deterministic_targets)
+    deterministic_actions: list[dict[str, Any]] = []
+    if deterministic_reconstruction:
+        # Structured artifacts are rebuilt from the immutable approved source
+        # and accepted drafts. They must not consume another free-form model
+        # attempt or be misreported as a missing-source terminal blocker.
+        for finding in normalized:
+            for raw_target in finding.get("target_ids", []):
+                target = RetryTarget.parse(str(raw_target)).target_id
+                if target not in deterministic_targets:
+                    continue
+                artifact = (
+                    "study.xml"
+                    if target.startswith("prs.")
+                    else f"{str(finding.get('artifact') or 'protocol').removesuffix('.docx')}.docx"
+                )
+                candidate_path = revision_dir / "candidate" / artifact
+                deterministic_actions.append({
+                    "target": target,
+                    "strategy_id": _recovery_strategy_id(finding),
+                    "triggering_finding": dict(finding),
+                    "candidate": candidate_path.relative_to(revision_dir).as_posix(),
+                    "before_sha256": sha256_file(candidate_path) if candidate_path.is_file() else None,
+                })
     layout_plan: dict[str, list[dict[str, str]]] = {}
     if has_layout_target:
         layout_plan, unsupported = _layout_repair_plan(
@@ -5610,52 +6377,81 @@ def _quality_retry(
             icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
         )
         if unsupported:
-            return _repair_block(
+            return finish(_repair_block(
                 run_dir,
                 "layout_repair_classification",
                 unsupported,
                 candidate_outputs=_candidate_outputs(revision_dir),
-            )
-    attempts, exhausted = retry_attempts(normalized, prior_attempts)
+            ))
+    generation = working_reference.setdefault("generation", {})
+    attempts, strategy_attempts, exhausted = _advance_recovery_attempts(
+        normalized,
+        prior_attempts,
+        generation.get("recovery_strategy_attempts") or {},
+    )
+    generation["recovery_strategy_attempts"] = strategy_attempts
     if exhausted:
-        working_reference.setdefault("generation", {})["attempts"] = attempts
+        generation["attempts"] = attempts
+        generation["recovery_exhaustion"] = exhausted
         _write(reference_path, working_reference)
         path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(exhausted), encoding="utf-8")
-        return {"status": "blocked", "stage": stage, "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-    if stage == "quality" and (section_targets or has_layout_target):
+        return finish({"status": "blocked", "stage": "recovery_no_progress", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []})
+    if stage == "quality" and (section_targets or has_layout_target or deterministic_reconstruction):
         generation = working_reference.setdefault("generation", {})
         current_review_set = max(1, int(generation.get("review_set", 1)))
-        if current_review_set >= MAX_REVIEW_SETS:
+        # Three unchanged review sets are still a bounded no-progress loop.
+        # A distinct, explicitly governed strategy is useful progress and is
+        # therefore allowed to continue inside the original deadline.
+        strategy_ids = {_recovery_strategy_id(item) for item in normalized}
+        historical_strategy_ids = {
+            str(strategy)
+            for entry in (generation.get("recovery_history") or [])
+            for strategy in (entry.get("strategy_ids") or [])
+        }
+        if current_review_set >= MAX_REVIEW_SETS and not strategy_ids.difference(historical_strategy_ids):
             exhausted_review = [{
                 **dict(item),
                 "field": "review_set",
                 "issue": f"Independent verification still found a defect after {MAX_REVIEW_SETS} complete review sets. {item.get('issue', '')}".strip(),
             } for item in normalized]
-            return _repair_block(
+            return finish(_repair_block(
                 run_dir,
                 "review_set_limit",
                 exhausted_review,
                 candidate_outputs=_candidate_outputs(revision_dir),
-            )
-        generation["review_set"] = current_review_set + 1
-        _reset_verification_set(revision_dir)
+            ))
+        generation["pending_review_set_advance"] = {
+            "from_review_set": current_review_set,
+            "strategy_ids": sorted(strategy_ids),
+            "finding_sha256": canonical_evidence_sha256(normalized),
+        }
     working_reference.setdefault("generation", {})["attempts"] = attempts
+    pending_path = recovery_attempt_dir.relative_to(revision_dir).as_posix()
+    generation["pending_recovery_attempts"] = [
+        *[str(item) for item in generation.get("pending_recovery_attempts", []) if str(item) != pending_path],
+        pending_path,
+    ]
+    generation["pending_recovery_plan"] = {
+        "schema_version": "clinical-recovery-plan/v1",
+        "attempt_path": pending_path,
+        "findings": normalized,
+        "section_targets": sorted(section_targets),
+        "layout_plan": layout_plan,
+        "deterministic_actions": deterministic_actions,
+        "reset_verification_set": bool(
+            stage == "quality" and (section_targets or has_layout_target or deterministic_reconstruction)
+        ),
+        "wave": "quality-retry",
+        "applied": False,
+    }
     _write(reference_path, working_reference)
-    created: list[Path] = []
-    if section_targets:
-        invalidate_accepted_targets(revision_dir, section_targets)
-        (revision_dir / "candidate-build.json").unlink(missing_ok=True)
-        _clear_verification_responses(revision_dir)
-        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_dir.name, reference=approved_reference, attempts=attempts, wave="quality-retry", findings=normalized, contracted_bundle=contracted_bundle)
-    if has_layout_target:
-        generation = working_reference.setdefault("generation", {})
-        persisted_repairs = generation.setdefault("layout_repairs", {})
-        for artifact, repairs in layout_plan.items():
-            existing = persisted_repairs.get(artifact, ())
-            persisted_repairs[artifact] = _normalized_layout_repair_records([*existing, *repairs])
-            _invalidate_layout_artifact(revision_dir, artifact)
-        generation["pending_layout_artifacts"] = sorted(layout_plan)
-        _write(reference_path, working_reference)
+    created = _apply_pending_recovery_plan(
+        revision_dir,
+        reference_path,
+        working_reference,
+        approved_reference,
+        contracted_bundle=contracted_bundle,
+    )
     if created:
         return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=normalized)
     if not has_layout_target:
@@ -5676,6 +6472,31 @@ def _quality_retry(
     if stage_observer is not None:
         retry_options["stage_observer"] = stage_observer
     return generate(run_dir, **retry_options)
+
+
+def _complete_pending_deterministic_reconstructions(
+    reference_path: Path,
+    working_reference: dict[str, Any],
+    revision_dir: Path,
+    *,
+    outcome: str,
+) -> None:
+    generation = working_reference.setdefault("generation", {})
+    pending = list(generation.pop("pending_deterministic_reconstructions", []) or [])
+    if not pending:
+        return
+    records = generation.setdefault("deterministic_reconstructions", [])
+    for raw_action in pending:
+        action = dict(raw_action)
+        candidate_path = revision_dir / str(action["candidate"])
+        after_sha256 = sha256_file(candidate_path) if candidate_path.is_file() else None
+        records.append({
+            **action,
+            "outcome": outcome,
+            "after_sha256": after_sha256,
+            "candidate_bytes_changed": action.get("before_sha256") != after_sha256,
+        })
+    _write(reference_path, working_reference)
 
 
 def generate(
@@ -5715,6 +6536,14 @@ def generate(
         return {"status": "blocked", "stage": "approval_gate", "findings": findings, "client_outputs": []}
     if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [{"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}], "client_outputs": []}
     state = working_reference.setdefault("generation", {})
+    try:
+        _reconcile_pending_recovery_attempts(revision_dir, reference_path, working_reference)
+    except ValueError as exc:
+        return _repair_block(run_dir, "integrity", [{
+            "category": "integrity",
+            "field": "gate_attempts",
+            "issue": str(exc),
+        }], candidate_outputs=_candidate_outputs(revision_dir))
     expected_governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     governing_sha256 = sha256_value(expected_governing)
     prior_governing_sha256 = state.get("governing_sha256")
@@ -5733,11 +6562,24 @@ def generate(
     elif prior_governing_sha256 is None:
         state["governing_sha256"] = governing_sha256
         _write(reference_path, working_reference)
+    resumed_requests = _apply_pending_recovery_plan(
+        revision_dir,
+        reference_path,
+        working_reference,
+        reference,
+        contracted_bundle=bundle,
+    )
+    if resumed_requests:
+        return _awaiting(
+            revision_dir,
+            stage="drafting_retry",
+            paths=resumed_requests,
+            findings=list(
+                dict(state.get("pending_recovery_plan") or {}).get("findings") or []
+            ),
+        )
     attempts = state.setdefault("attempts", {})
-    persisted_exhaustion = [
-        {"category": "retry", "field": str(target), "issue": f"Retry limit reached after {MAX_ATTEMPTS} attempts.", "required": "Reviewer intervention before a new approved revision."}
-        for target, count in attempts.items() if int(count) > MAX_ATTEMPTS
-    ]
+    persisted_exhaustion = list(state.get("recovery_exhaustion") or [])
     if persisted_exhaustion:
         path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(persisted_exhaustion), encoding="utf-8")
         return {"status": "blocked", "stage": "retry_limit", "findings": persisted_exhaustion, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
@@ -5747,18 +6589,50 @@ def generate(
         for finding in ingest_responses(revision_dir, expected_governing)
     ]
     if drafting_findings:
-        attempts, exhausted = retry_attempts(drafting_findings, attempts); state["attempts"] = attempts; _write(reference_path, working_reference)
         source_gaps = [item for item in drafting_findings if item.get("category") in {"source-evidence", "request-integrity"}]
-        if source_gaps or exhausted:
-            path = run_dir / "reference/repair-report.md"; path.write_text(repair_report([*source_gaps, *exhausted]), encoding="utf-8")
-            return {"status": "blocked", "stage": "drafting", "findings": [*source_gaps, *exhausted], "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
-        created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_id, reference=reference, attempts=attempts, wave="retry", findings=drafting_findings, contracted_bundle=bundle)
-        if created: return _awaiting(revision_dir, stage="drafting_retry", paths=created, findings=drafting_findings)
+        retryable = [item for item in drafting_findings if item not in source_gaps]
+        if source_gaps:
+            _finalize_pending_recovery_for_terminal(
+                revision_dir, reference_path, working_reference,
+            )
+            path = run_dir / "reference/repair-report.md"
+            path.write_text(repair_report(source_gaps), encoding="utf-8")
+            return {"status": "blocked", "stage": "source_integrity", "findings": source_gaps, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
+        if retryable:
+            return _quality_retry(
+                run_dir,
+                reference_path,
+                working_reference,
+                reference,
+                revision_dir,
+                attempts,
+                retryable,
+                "drafting",
+                contracted_bundle=bundle,
+                operation_deadline=operation_deadline,
+                clock=clock,
+                stage_observer=stage_observer,
+                require_promoted_runtime=require_promoted_runtime,
+            )
     created = schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=revision_dir, revision_id=revision_id, reference=reference, attempts=attempts, wave="initial", contracted_bundle=bundle)
     pending = pending_requests(revision_dir, expected_governing)
-    if created or pending: return _awaiting(revision_dir, stage="drafting", paths=pending or created)
+    if created or pending:
+        recovery_pending = isinstance(state.get("pending_recovery_plan"), Mapping)
+        return _awaiting(
+            revision_dir,
+            stage="drafting_retry" if recovery_pending else "drafting",
+            paths=pending or created,
+            findings=(
+                list(dict(state.get("pending_recovery_plan") or {}).get("findings") or [])
+                if recovery_pending else None
+            ),
+        )
     missing = missing_drafts(revision_dir, reference, SCRIPT_DIR.parent, contracted_bundle=bundle)
-    if missing: return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
+    if missing:
+        _finalize_pending_recovery_for_terminal(
+            revision_dir, reference_path, working_reference,
+        )
+        return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
     duplicate_findings = accepted_cross_section_duplicate_findings(
         revision_dir,
         reference,
@@ -5836,6 +6710,19 @@ def generate(
             if partial_repair:
                 document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
             if document_report["status"] != "passed":
+                no_progress = _complete_pending_recovery_attempts(
+                    revision_dir,
+                    reference_path,
+                    working_reference,
+                    require_candidate_change=True,
+                )
+                if no_progress:
+                    return _repair_block(
+                        run_dir,
+                        "recovery_no_progress",
+                        no_progress,
+                        candidate_outputs=_candidate_outputs(revision_dir),
+                    )
                 findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
                 if classification_block is not None:
                     return classification_block
@@ -5853,12 +6740,58 @@ def generate(
                         structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
                     )
                 if xml_report["status"] != "passed":
+                    _complete_pending_deterministic_reconstructions(
+                        reference_path,
+                        working_reference,
+                        revision_dir,
+                        outcome="blocked",
+                    )
+                    no_progress = _complete_pending_recovery_attempts(
+                        revision_dir,
+                        reference_path,
+                        working_reference,
+                        require_candidate_change=True,
+                    )
+                    if no_progress:
+                        return _repair_block(
+                            run_dir,
+                            "recovery_no_progress",
+                            no_progress,
+                            candidate_outputs=_candidate_outputs(revision_dir),
+                        )
                     findings = [
-                        {**finding, "category": "document-structure", "recovery_class": "document_structure_defect", "action": "preserve_and_stop"}
+                        recovery_finding(
+                            {
+                                **finding,
+                                "category": "xml",
+                                "target_ids": ["prs.structured"],
+                            },
+                            "deterministic_structure_defect",
+                        )
                         for finding in xml_report["findings"]
                     ]
-                    return _repair_block(run_dir, "xml", findings, candidate_outputs=_candidate_outputs(revision_dir))
+                    return _quality_retry(
+                        run_dir,
+                        reference_path,
+                        working_reference,
+                        reference,
+                        revision_dir,
+                        attempts,
+                        findings,
+                        "xml",
+                        contracted_bundle=bundle,
+                        operation_deadline=operation_deadline,
+                        clock=clock,
+                        stage_observer=stage_observer,
+                        require_promoted_runtime=require_promoted_runtime,
+                    )
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
+            _complete_pending_deterministic_reconstructions(
+                reference_path,
+                working_reference,
+                revision_dir,
+                outcome="rebuilt",
+            )
 
         observe_stage("candidate")
         remaining = (
@@ -5867,6 +6800,9 @@ def generate(
             else operation_deadline - clock()
         )
         if remaining <= 0:
+            _finalize_pending_recovery_for_terminal(
+                revision_dir, reference_path, working_reference,
+            )
             return {
                 "status": "timeout",
                 "stage": "render_assurance",
@@ -5928,6 +6864,19 @@ def generate(
         structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
         _write(reference_path, working_reference)
         if assurance_report.get("status") != "passed":
+            no_progress = _complete_pending_recovery_attempts(
+                revision_dir,
+                reference_path,
+                working_reference,
+                require_candidate_change=True,
+            )
+            if no_progress:
+                return _repair_block(
+                    run_dir,
+                    "recovery_no_progress",
+                    no_progress,
+                    candidate_outputs=_candidate_outputs(revision_dir),
+                )
             findings = [
                 {**finding, "target_ids": finding.get("target_ids") or [f"layout:{finding.get('artifact') or 'documents'}"]}
                 for finding in assurance_report.get("findings", [])
@@ -5959,9 +6908,23 @@ def generate(
             "render": render_report,
             "findings": [],
         }
+    no_progress = _complete_pending_recovery_attempts(
+        revision_dir,
+        reference_path,
+        working_reference,
+        require_candidate_change=True,
+    )
+    if no_progress:
+        return _repair_block(
+            run_dir,
+            "recovery_no_progress",
+            no_progress,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
     observe_stage("render_assurance")
     if state.pop("pending_layout_artifacts", None) is not None:
         _write(reference_path, working_reference)
+    _advance_pending_review_set(reference_path, working_reference)
     review_set = max(1, int(state.setdefault("review_set", 1)))
     _write(reference_path, working_reference)
     create_verification_requests(
@@ -5971,6 +6934,7 @@ def generate(
         contracted_bundle=bundle,
         review_set=review_set,
     )
+    _bind_available_verification_responses(revision_dir)
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)

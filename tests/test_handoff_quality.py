@@ -145,6 +145,9 @@ def test_drafting_request_is_scoped_and_hash_bound(tmp_path):
     assert (tmp_path / request["response_path"]).parent.is_dir()
     assert set(request["approved_source"]) <= set(batch.field_families)
     assert "template_fields" not in request["approved_source"]
+    assert {item["section_id"] for item in request["evidence_checklist"]} == set(batch.section_ids)
+    for item in request["evidence_checklist"]:
+        assert set(item["approved_values"]) == set(item["required_source_paths"])
     response = recorded_acceptance_response(request)
     accepted, findings = validate_response(request, response)
     assert accepted and not findings
@@ -1693,15 +1696,290 @@ def test_generation_rejects_study_input_mutation_after_approval(tmp_path):
     assert result["stage"] == "approval_gate"
 
 
-def test_generation_keeps_exhausted_retry_blocked_across_restart(tmp_path, monkeypatch):
+def test_generation_keeps_persisted_recovery_exhaustion_blocked_across_restart(tmp_path, monkeypatch):
     _require_renderer()
     run_dir = tmp_path / "run"; reference_path = run_dir / "reference/study.reference.json"; reference_path.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
     assert prepare(run_dir)["status"] == "awaiting_approval"
     assert approve(run_dir, approved_by="reviewer")["status"] == "passed"
     reference = json.loads(reference_path.read_text(encoding="utf-8"))
-    reference["generation"] = {"attempts": {"introduction": 4}}
+    reference["generation"] = {
+        "attempts": {"introduction": 4},
+        "recovery_exhaustion": [{
+            "category": "drafting",
+            "field": "introduction",
+            "strategy_id": "drafting_defect:retry_drafting_target:introduction:introduction",
+            "issue": "The same recovery strategy made no progress after 3 attempts.",
+        }],
+    }
     reference_path.write_text(json.dumps(reference), encoding="utf-8")
     first = generate(run_dir); second = generate(run_dir)
     assert first["status"] == second["status"] == "blocked"
     assert first["stage"] == second["stage"] == "retry_limit"
+
+
+def test_public_generation_recovers_a_visual_finding_without_changing_approval(tmp_path, monkeypatch):
+    _require_renderer()
+    reference = fixture()
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    approval = approve(run_dir, approved_by="reviewer")
+    revision_id = approval["revision_id"]
+    revision_dir = run_dir / "revisions" / revision_id
+    approved_sha256 = json.loads(reference_path.read_text(encoding="utf-8"))["approval"]["approved_reference_sha256"]
+
+    def deterministic_assurance(_repo_root, current_revision, *_args, **_kwargs):
+        rendered = current_revision / "rendered"
+        artifacts = []
+        for docx in sorted((current_revision / "candidate").glob("*.docx")):
+            name = docx.stem
+            page_dir = rendered / name
+            page_dir.mkdir(parents=True, exist_ok=True)
+            pdf = rendered / f"{name}.pdf"
+            writer = PdfWriter()
+            writer.add_blank_page(width=612, height=792)
+            with pdf.open("wb") as stream:
+                writer.write(stream)
+            page = page_dir / "page-1.png"
+            page.write_bytes(f"deterministic {name} page image".encode())
+            artifacts.append({
+                "artifact": name,
+                "docx": f"candidate/{name}.docx",
+                "docx_sha256": hashlib.sha256(docx.read_bytes()).hexdigest(),
+                "pdf": f"rendered/{name}.pdf",
+                "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+                "pages": [{
+                    "page": 1,
+                    "path": f"rendered/{name}/page-1.png",
+                    "sha256": hashlib.sha256(page.read_bytes()).hexdigest(),
+                }],
+                "renderer": {"kind": "test-office"},
+                "page_renderer": {"kind": "test-page-renderer"},
+                "status": "passed",
+            })
+        render = {
+            "status": "passed",
+            "renderer": {"kind": "test-office"},
+            "page_renderer": {"kind": "test-page-renderer"},
+            "artifacts": artifacts,
+            "findings": [],
+            "renderer_attempts": [],
+            "page_renderer_attempts": [],
+        }
+        return {
+            "schema_version": "render-assurance/v1",
+            "status": "passed",
+            "fonts": {},
+            "font_substitutions": {},
+            "candidate": {"files": []},
+            "render": render,
+            "findings": [],
+        }
+
+    monkeypatch.setattr(workflow, "render_assurance", deterministic_assurance)
+    real_render_documents = workflow.render_documents
+    forced_candidate = {"enabled": False, "bytes": b""}
+
+    def controlled_render(*args, **kwargs):
+        report = real_render_documents(*args, **kwargs)
+        if forced_candidate["enabled"]:
+            (revision_dir / "candidate/protocol.docx").write_bytes(forced_candidate["bytes"])
+        return report
+
+    monkeypatch.setattr(workflow, "render_documents", controlled_render)
+
+    result = generate(run_dir, require_promoted_runtime=False)
+    injected_drafting_failure = False
+    saw_drafting_retry = False
+    while result.get("stage") in {"drafting", "drafting_retry"}:
+        saw_drafting_retry = saw_drafting_retry or result.get("stage") == "drafting_retry"
+        for relative in result["requests"]:
+            request = json.loads((revision_dir / relative).read_text(encoding="utf-8"))
+            response_path = revision_dir / request["response_path"]
+            response_path.parent.mkdir(parents=True, exist_ok=True)
+            response = recorded_acceptance_response(request)
+            if not injected_drafting_failure and response.get("section_results"):
+                paragraph = next(
+                    (item
+                    for section in response["section_results"]
+                    for item in section.get("paragraphs", [])),
+                    None,
+                )
+                if paragraph is not None:
+                    paragraph["evidence_refs"] = []
+                    paragraph["boilerplate_refs"] = []
+                    injected_drafting_failure = True
+            response_path.write_text(
+                json.dumps(response), encoding="utf-8"
+            )
+        result = generate(run_dir, require_promoted_runtime=False)
+
+    assert result["stage"] == "independent_verification"
+    assert saw_drafting_retry is True
+    first_candidate = hashlib.sha256(
+        (revision_dir / "candidate/protocol.docx").read_bytes()
+    ).hexdigest()
+    for relative in result["requests"]:
+        request_path = revision_dir / relative
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        response = acceptance_verification(request)
+        if request["task"] == "rendered_page_visual_verification":
+            response["status"] = "failed"
+            response["page_assessments"][0]["status"] = "failed"
+            response["findings"] = [{
+                "artifact": "protocol",
+                "page": response["page_assessments"][0]["page"],
+                "check": "bad_table_split",
+                "element": "3. GENERAL INFORMATION",
+                "target_ids": ["layout:protocol"],
+                "issue": "The Section 3 summary table splits across a page boundary.",
+            }]
+        response_path = revision_dir / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    recovered = generate(run_dir, require_promoted_runtime=False)
+
+    assert recovered["status"] == "awaiting_hermes"
+    assert recovered["stage"] == "independent_verification"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["approval"]["revision_id"] == revision_id
+    assert state["approval"]["approved_reference_sha256"] == approved_sha256
+    assert state["generation"]["review_set"] == 2
+    assert state["generation"]["gate_attempts"]
+    attempts = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((revision_dir / "attempts").glob("*/attempt-manifest.json"))
+    ]
+    assert {item["stage"] for item in attempts} == {"drafting", "quality"}
+    assert all(
+        action["outcome_status"] == "measured"
+        for attempt in attempts
+        for action in attempt["recovery_actions"]
+    )
+    assert hashlib.sha256(
+        (revision_dir / "candidate/protocol.docx").read_bytes()
+    ).hexdigest() != first_candidate
+    forced_candidate["bytes"] = (revision_dir / "candidate/protocol.docx").read_bytes()
+    forced_candidate["enabled"] = True
+
+    for relative in recovered["requests"]:
+        request = json.loads((revision_dir / relative).read_text(encoding="utf-8"))
+        response = acceptance_verification(request)
+        if request["task"] == "rendered_page_visual_verification" and any(
+            item.get("artifact") == "protocol" for item in request.get("artifacts", [])
+        ):
+            response["status"] = "failed"
+            response["page_assessments"][0]["status"] = "failed"
+            response["findings"] = [{
+                "artifact": "protocol",
+                "page": response["page_assessments"][0]["page"],
+                "check": "bad_table_split",
+                "element": "3. GENERAL INFORMATION",
+                "target_ids": ["layout:protocol"],
+                "issue": "The same Section 3 split remains after repair.",
+            }]
+        response_path = revision_dir / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    no_progress = generate(run_dir, require_promoted_runtime=False)
+    repeated = generate(run_dir, require_promoted_runtime=False)
+
+    assert no_progress["status"] == "blocked"
+    assert no_progress["stage"] == "recovery_no_progress"
+    assert repeated["status"] == "blocked"
+    assert repeated["stage"] == "retry_limit"
+
+
+def test_public_generation_adopts_an_interrupted_attempt_and_preserves_approval(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    approval = approve(run_dir, approved_by="reviewer")
+    revision_id = approval["revision_id"]
+    revision_dir = run_dir / "revisions" / revision_id
+    approved_sha256 = json.loads(reference_path.read_text(encoding="utf-8"))["approval"]["approved_reference_sha256"]
+    workflow._archive_failed_attempt(
+        revision_dir,
+        "quality",
+        [{
+            "category": "visual",
+            "artifact": "protocol",
+            "check": "orphan_heading",
+            "element": "5. INTRODUCTION",
+            "target_ids": ["layout:protocol"],
+            "recovery_class": "visual_defect",
+            "action": "targeted_layout_repair",
+            "issue": "interrupted before recovery state commit",
+        }],
+    )
+
+    resumed = generate(run_dir, require_promoted_runtime=False)
+
+    assert resumed["status"] == "awaiting_hermes"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["approval"]["revision_id"] == revision_id
+    assert state["approval"]["approved_reference_sha256"] == approved_sha256
+    assert state["generation"]["gate_attempts"]
+    manifest = json.loads(next((revision_dir / "attempts").glob("*/attempt-manifest.json")).read_text(encoding="utf-8"))
+    assert manifest["recovery_actions"][0]["outcome_status"] == "interrupted_no_action"
+
+
+def test_public_generation_replays_a_committed_recovery_plan_after_interruption(tmp_path, monkeypatch):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    assert prepare(run_dir)["status"] == "awaiting_approval"
+    approval = approve(run_dir, approved_by="reviewer")
+    revision_dir = run_dir / "revisions" / approval["revision_id"]
+    approved = json.loads((revision_dir / "approved-reference.json").read_text(encoding="utf-8"))
+    working = json.loads(reference_path.read_text(encoding="utf-8"))
+    real_apply = workflow._apply_pending_recovery_plan
+    monkeypatch.setattr(
+        workflow,
+        "_apply_pending_recovery_plan",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("interrupted after plan commit")),
+    )
+    with pytest.raises(RuntimeError, match="interrupted after plan commit"):
+        workflow._quality_retry(
+            run_dir,
+            reference_path,
+            working,
+            approved,
+            revision_dir,
+            {},
+            [{
+                "category": "visual",
+                "artifact": "protocol",
+                "check": "orphan_heading",
+                "element": "5. INTRODUCTION",
+                "target_ids": ["layout:protocol"],
+                "recovery_class": "visual_defect",
+                "action": "targeted_layout_repair",
+                "issue": "orphan heading",
+            }],
+            "quality",
+        )
+    monkeypatch.setattr(workflow, "_apply_pending_recovery_plan", real_apply)
+
+    resumed = generate(run_dir, require_promoted_runtime=False)
+
+    assert resumed["status"] == "awaiting_hermes"
+    assert resumed["stage"] == "drafting_retry"
+    state = json.loads(reference_path.read_text(encoding="utf-8"))
+    assert state["approval"]["revision_id"] == approval["revision_id"]
+    assert state["generation"]["pending_recovery_plan"]["applied"] is True
+    assert state["generation"]["pending_recovery_attempts"]

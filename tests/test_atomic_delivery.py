@@ -149,6 +149,10 @@ def test_publish_swaps_the_complete_package_and_removes_obsolete_outputs(tmp_pat
 
 def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     revision_dir = tmp_path / "revisions/r-traceable"
+    reference_path = tmp_path / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    working_reference = {"generation": {}}
+    reference_path.write_text(json.dumps(working_reference), encoding="utf-8")
     (revision_dir / "candidate").mkdir(parents=True)
     (revision_dir / "rendered/protocol").mkdir(parents=True)
     (revision_dir / "hermes/verification-responses").mkdir(parents=True)
@@ -171,12 +175,24 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
     assert first_manifest["gate_ledger_sha256"] == first_ledger["ledger_sha256"]
     assert first_ledger["attempt_id"] == "r-traceable"
     assert first_ledger["records"][4]["terminal_status"] == "blocked"
+    working_reference["generation"]["gate_attempts"] = json.loads(
+        (revision_dir / "gate-attempt-journal.json").read_text(encoding="utf-8")
+    )["entries"]
+    workflow._finalize_recovery_attempt(
+        revision_dir, first, reference_path, working_reference,
+    )
 
     (revision_dir / "candidate/protocol.docx").write_bytes(b"failed candidate two")
     second = workflow._archive_failed_attempt(
         revision_dir,
         "quality",
         [{"category": "visual", "issue": "Second failed page"}],
+    )
+    working_reference["generation"]["gate_attempts"] = json.loads(
+        (revision_dir / "gate-attempt-journal.json").read_text(encoding="utf-8")
+    )["entries"]
+    workflow._finalize_recovery_attempt(
+        revision_dir, second, reference_path, working_reference,
     )
 
     assert second != first
@@ -188,6 +204,12 @@ def test_failed_quality_attempt_evidence_is_archived_immutably(tmp_path):
             "path": path.relative_to(revision_dir).as_posix(),
             "attempt_manifest_sha256": workflow.sha256_file(path / "attempt-manifest.json"),
             "gate_ledger_sha256": json.loads((path / "gate-ledger.json").read_text(encoding="utf-8"))["ledger_sha256"],
+            "strategy_ids": [
+                action["strategy_id"]
+                for action in json.loads(
+                    (path / "attempt-manifest.json").read_text(encoding="utf-8")
+                )["recovery_actions"]
+            ],
         }
         for path in (first, second)
     ]
