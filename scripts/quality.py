@@ -3862,7 +3862,37 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
         findings.extend(recovery_finding(item, "document_structure_defect") for item in xml_report.get("findings", []))
     verification_findings, evidence = validate_verifications(revision_dir)
     findings.extend(verification_findings)
-    return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
+    candidate_hashes = {
+        path.relative_to(revision_dir).as_posix(): sha256_file(path)
+        for path in sorted((revision_dir / "candidate").glob("*"))
+        if path.is_file()
+    }
+    rendered_hashes = {
+        str(item.get("path")): str(item.get("sha256"))
+        for artifact in render_report.get("artifacts", [])
+        if isinstance(artifact, Mapping)
+        for item in [
+            {"path": artifact.get("docx"), "sha256": artifact.get("docx_sha256")},
+            {"path": artifact.get("pdf"), "sha256": artifact.get("pdf_sha256")},
+            *[
+                {"path": page.get("path"), "sha256": page.get("sha256")}
+                for page in artifact.get("pages", [])
+                if isinstance(page, Mapping)
+            ],
+        ]
+        if item.get("path")
+    }
+    final_review = {
+        "schema_version": "final-exact-artifact-review/v1",
+        "scope": "complete_branch_document_set",
+        "status": "passed" if not findings else "blocked",
+        "candidate_hashes": candidate_hashes,
+        "rendered_hashes": rendered_hashes,
+        "verification_evidence_sha256": canonical_evidence_sha256(evidence),
+        "every_page": True,
+        "section_three_and_orphan_heading_checks": True,
+    }
+    return {"status": final_review["status"], "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
 __all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

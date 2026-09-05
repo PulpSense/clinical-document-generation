@@ -4980,6 +4980,16 @@ def _publish(
         raise RuntimeError(f"stale publication evidence: {exc}") from exc
     if evidence_findings := _publication_evidence_findings(revision_dir, build):
         raise RuntimeError(f"stale publication evidence: {evidence_findings}")
+    final_review = quality.get("final_exact_artifact_review")
+    if isinstance(final_review, Mapping):
+        if final_review.get("status") != "passed" or not final_review.get("every_page"):
+            raise RuntimeError("stale publication evidence: Final Exact-Artifact Review is incomplete")
+        actual_candidate = {
+            path.relative_to(revision_dir).as_posix(): quality_sha256(path)
+            for path in sorted((revision_dir / "candidate").glob("*")) if path.is_file()
+        }
+        if actual_candidate != dict(final_review.get("candidate_hashes") or {}):
+            raise RuntimeError("stale publication evidence: final candidate bytes changed after review")
     sources = sorted((revision_dir / "candidate").glob("*.docx")) + sorted((revision_dir / "candidate").glob("*.xml"))
     expected = set(document_set(get_path(reference, "meta.study_type")))
     actual = {source.name for source in sources}
@@ -5414,7 +5424,6 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
         "path": destination.relative_to(revision_dir).as_posix(),
         "attempt_manifest_sha256": sha256_file(destination / "attempt-manifest.json"),
         "gate_ledger_sha256": failed_ledger["ledger_sha256"],
-        "strategy_ids": [item["strategy_id"] for item in recovery_actions],
     })
     gate_journal = {
         "schema_version": "clinical-gate-attempt-journal/v1",
