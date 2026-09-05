@@ -60,13 +60,13 @@ def _section_geometry(document: Document) -> tuple[tuple[int | None, ...], ...]:
     ) for section in document.sections)
 
 
-def test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch, governed_pdfium):
+def test_all_ten_public_lifecycle_cases_pass_and_publish_exact_sets(monkeypatch, governed_pdfium):
     _require_renderer(governed_pdfium)
     report = run_release_gate(ROOT, verification_responder=acceptance_verification)
     assert report["status"] == "structural_passed"
     assert report["assurance"] == "synthetic-structural-only"
-    assert len(report["cases"]) == 6
-    assert report["distinct_source_count"] == 6
+    assert len(report["cases"]) == 10
+    assert report["distinct_source_count"] == 10
     assert {case["icf_template"] for case in report["cases"] if case["icf_template"]} == {"Advarra", "Sterling"}
     for case in report["cases"]:
         assert case["status"] == "passed"
