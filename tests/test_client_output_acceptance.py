@@ -11,11 +11,14 @@ from docx.shared import Pt
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 from pypdf import PdfReader, PdfWriter
+from lxml import etree as LET
 
 from contracts import batch_plan
 from drafting import create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
 from quality import deterministic_content_check, render_pages, sha256_file
 from rendering import _has_page_boundary_before, _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
+import rendering
+import workflow
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -101,6 +104,16 @@ def _page_boundary_before(paragraph) -> bool:
             break
         previous = previous.getprevious()
     return False
+
+
+def _docx_parts_without_pagination_controls(path: Path):
+    with zipfile.ZipFile(path) as package:
+        parts = {name: package.read(name) for name in package.namelist()}
+    document = LET.fromstring(parts.pop("word/document.xml"))
+    for tag in ("keepNext", "keepLines", "widowControl", "pageBreakBefore"):
+        for element in document.xpath(f"//w:{tag}", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}):
+            element.getparent().remove(element)
+    return parts, LET.tostring(document, method="c14n")
 
 
 def _numbering_level_signature(document: Document, paragraph):
@@ -2421,6 +2434,96 @@ def test_protocol_toc_boundaries_preserve_existing_template_breaks_without_dupli
     assert cosmetic_spacer_two._p.getparent() is None
 
 
+@pytest.mark.parametrize(
+    ("fixture_name", "icf_family", "artifact", "target"),
+    (
+        ("retrospective-acceptance-source.json", None, "protocol", "5. OBJECTIVE(S)"),
+        ("prospective-acceptance-source.json", None, "protocol", "6. OBJECTIVE(S)"),
+        ("ambispective-acceptance-source.json", None, "protocol", "6. OBJECTIVE(S)"),
+        ("prospective-acceptance-source.json", "Advarra", "icf", "INTRODUCTION"),
+        ("prospective-acceptance-source.json", "Sterling", "icf", "KEY INFORMATION"),
+    ),
+)
+def test_every_layout_family_repair_is_local_idempotent_and_renderer_verified(
+    tmp_path,
+    governed_pdfium,
+    fixture_name,
+    icf_family,
+    artifact,
+    target,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+    if icf_family is not None:
+        reference["meta"]["icf_template"] = icf_family
+    output = tmp_path / f"{reference['meta']['study_type']}-{icf_family or 'protocol'}"
+    document_report = render_documents(
+        ROOT,
+        output,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={artifact},
+    )
+    candidate = output / "candidate" / f"{artifact}.docx"
+    document = Document(candidate)
+    heading = rendering._target_heading(document, target, protocol=artifact == "protocol")
+    first_block = rendering._first_substantive_block(document, heading)
+    assert isinstance(first_block, (Paragraph, Table))
+    first_text = (
+        first_block.text
+        if isinstance(first_block, Paragraph)
+        else " ".join(cell.text for cell in first_block.rows[0].cells)
+    )
+
+    # Simulate the exact orphan-heading class while retaining the client's
+    # content and all non-pagination formatting as the metamorphic baseline.
+    heading.paragraph_format.keep_with_next = False
+    heading.paragraph_format.keep_together = False
+    heading.paragraph_format.widow_control = False
+    if isinstance(first_block, Paragraph):
+        first_block.paragraph_format.widow_control = False
+    document.save(candidate)
+    before_text = _visible_text(Document(candidate))
+    before_parts, before_document = _docx_parts_without_pagination_controls(candidate)
+
+    repaired = Document(candidate)
+    rendering._repair_heading_cohesion(
+        repaired,
+        target,
+        protocol=artifact == "protocol",
+    )
+    repaired.save(candidate)
+
+    after = Document(candidate)
+    repaired_heading = rendering._target_heading(after, target, protocol=artifact == "protocol")
+    after_parts, after_document = _docx_parts_without_pagination_controls(candidate)
+    assert document_report["status"] == "passed"
+    assert repaired_heading.paragraph_format.keep_with_next is True
+    assert repaired_heading.paragraph_format.keep_together is True
+    assert _visible_text(after) == before_text
+    assert after_parts == before_parts
+    assert after_document == before_document
+
+    with zipfile.ZipFile(candidate) as package:
+        first_repair_xml = package.read("word/document.xml")
+    rendering._repair_heading_cohesion(
+        after,
+        target,
+        protocol=artifact == "protocol",
+    )
+    after.save(candidate)
+    with zipfile.ZipFile(candidate) as package:
+        assert package.read("word/document.xml") == first_repair_xml
+
+    render_report = render_pages(output, page_renderer_identities=[governed_pdfium])
+    assert render_report["status"] == "passed", render_report
+    rendered = next(item for item in render_report["artifacts"] if item["artifact"] == artifact)
+    pages = [" ".join((page.extract_text() or "").split()) for page in PdfReader(output / rendered["pdf"]).pages]
+    target_marker = " ".join(target.split())
+    content_marker = " ".join(first_text.split()[:4])
+    assert any(target_marker in page and content_marker in page for page in pages)
+    assert all(page["sha256"] == sha256_file(output / page["path"]) for page in rendered["pages"])
+
+
 def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, governed_pdfium):
     cases = (
         ("prospective-acceptance-source.json", "Advarra"),
@@ -2684,18 +2787,41 @@ def test_section_three_table_repair_moves_the_complete_block_before_the_toc(
         ),
     })
 
+    shared_finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "element": "3. GENERAL INFORMATION – Variables / Secondary endpoint(s)",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+    }
+    layout_plan, unsupported = workflow._layout_repair_plan(
+        [
+            {
+                **shared_finding,
+                "check": "bad_table_split",
+                "issue": "The Section 3 row continues alone on the next page.",
+            },
+            {
+                **shared_finding,
+                "check": "artificial_pagination",
+                "issue": "The same continuation creates a nearly empty page before the TOC.",
+            },
+        ],
+        study_type="Prospective",
+    )
+    assert unsupported == []
+    assert layout_plan == {
+        "protocol": [{"rule": "table_pagination", "target": "3. GENERAL INFORMATION"}],
+    }
+
     document_report = render_documents(
         ROOT,
         tmp_path,
         reference,
         {"protocol": [], "icf": {}, "prs": {}},
         artifact_names={"protocol"},
-        layout_repairs={
-            "protocol": ({
-                "rule": "table_pagination",
-                "target": "3. GENERAL INFORMATION",
-            },),
-        },
+        layout_repairs=layout_plan,
     )
     render_report = render_pages(
         tmp_path,

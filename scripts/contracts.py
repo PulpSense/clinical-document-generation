@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.21"
+CONTRACT_VERSION = "clinical-documents-v2.22"
 BOILERPLATE_VERSION = "clinical-boilerplate-v8"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -59,6 +59,47 @@ def recovery_finding(
 LAYOUT_REPAIR_RULES = {
     "protocol": ("heading_cohesion", "table_pagination"),
     "icf": ("heading_cohesion", "heading_whitespace_cohesion", "table_pagination"),
+}
+
+LAYOUT_FAMILY_ARTIFACTS = {
+    "retrospective-protocol": "protocol",
+    "prospective-protocol": "protocol",
+    "ambispective-protocol": "protocol",
+    "advarra-icf": "icf",
+    "sterling-icf": "icf",
+}
+
+# This base policy is copied into each Contracted Template family below so the
+# runtime must select a family before it can select a visual disposition. A
+# shared disposition is intentional; family-specific exceptions remain exact-
+# target decisions in the deterministic planner.
+_VISUAL_CHECK_DISPOSITION_BASE = {
+    "clipping": "fail_closed",
+    "overlap": "fail_closed",
+    "overflow": "fail_closed",
+    "orphan_heading": "repair:heading_cohesion",
+    "bad_table_split": "repair:table_pagination",
+    "blank_page": "prevention:render_audit",
+    "footer_collision": "fail_closed",
+    "unreadable_text": "fail_closed",
+    "duplicate_section": "prevention:content_audit",
+    "inconsistent_style": "prevention:template_contract",
+    "missing_header_footer": "prevention:template_contract",
+    "toc_mismatch": "prevention:toc_refresh",
+    "excessive_whitespace": "repair:heading_cohesion",
+    # Standalone body pagination is unsafe to rewrite. When it is derivative
+    # evidence for the same exact split table, the planner lawfully coalesces
+    # it into that table's narrower repair.
+    "artificial_pagination": "fail_closed",
+}
+
+# Every mandatory visual check has a declared family-specific disposition. A
+# prevention disposition is enforced by construction/audit; repair
+# dispositions are bounded Word-native repairs; fail-closed checks retain
+# evidence for governed corpus expansion rather than silently guessing.
+VISUAL_CHECK_DISPOSITIONS = {
+    family: dict(_VISUAL_CHECK_DISPOSITION_BASE)
+    for family in LAYOUT_FAMILY_ARTIFACTS
 }
 
 BUNDLED_FONT_FILES = {
@@ -1576,7 +1617,7 @@ def repair_report(findings: Iterable[Mapping[str, Any]]) -> str:
 
 __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES",
-    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS",
+    "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
     "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth", "source_evidence_coverage_map",

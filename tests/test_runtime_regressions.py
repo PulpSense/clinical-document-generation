@@ -10,8 +10,8 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 
-from contracts import contracted_template_bundle
-from quality import RESPONSE_SCHEMA, deterministic_content_check, validate_verifications, verification_request_sha256
+from contracts import LAYOUT_FAMILY_ARTIFACTS, VISUAL_CHECK_DISPOSITIONS, contracted_template_bundle
+from quality import RESPONSE_SCHEMA, VISUAL_CHECKS, deterministic_content_check, validate_verifications, verification_request_sha256
 import quality
 from rendering import render_documents, render_fields
 import rendering
@@ -400,12 +400,113 @@ def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks(
         "issue": "A later template-owned heading starts on a new page.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding])
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+    )
 
     assert plan == {}
     assert unsupported == [{
         **finding,
-        "required": "Classify the visual defect with one supported artifact, Layout Contract check, and exact heading or table-caption element before deterministic repair.",
+        "contracted_layout_family": "prospective-protocol",
+        "disposition": "fail_closed",
+        "evidence_retained": True,
+        "required": "This recognized visual defect has no safe deterministic repair. Preserve its exact rendered evidence for governed corpus expansion.",
+    }]
+
+
+def test_visual_disposition_authority_covers_every_check_for_every_layout_family():
+    assert set(VISUAL_CHECK_DISPOSITIONS) == set(LAYOUT_FAMILY_ARTIFACTS)
+    assert set(LAYOUT_FAMILY_ARTIFACTS) == {
+        "retrospective-protocol",
+        "prospective-protocol",
+        "ambispective-protocol",
+        "advarra-icf",
+        "sterling-icf",
+    }
+    assert all(
+        set(dispositions) == set(VISUAL_CHECKS)
+        for dispositions in VISUAL_CHECK_DISPOSITIONS.values()
+    )
+
+
+@pytest.mark.parametrize(
+    ("study_type", "icf_template", "artifact", "family", "element"),
+    (
+        ("Retrospective", None, "protocol", "retrospective-protocol", "4. INTRODUCTION"),
+        ("Prospective", None, "protocol", "prospective-protocol", "5. INTRODUCTION"),
+        ("Ambispective", None, "protocol", "ambispective-protocol", "5. INTRODUCTION"),
+        ("Prospective", "Advarra", "icf", "advarra-icf", "INTRODUCTION"),
+        ("Prospective", "Sterling", "icf", "sterling-icf", "BACKGROUND"),
+    ),
+)
+def test_layout_repair_selection_is_explicit_for_all_five_contracted_families(
+    study_type,
+    icf_template,
+    artifact,
+    family,
+    element,
+):
+    finding = {
+        "category": "visual",
+        "artifact": artifact,
+        "check": "orphan_heading",
+        "element": element,
+        "target_ids": [f"layout:{artifact}"],
+        "issue": "A heading is separated from its first substantive block.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type=study_type,
+        icf_template=icf_template,
+    )
+
+    assert VISUAL_CHECK_DISPOSITIONS[family]["orphan_heading"] == "repair:heading_cohesion"
+    assert plan == {artifact: [{"rule": "heading_cohesion", "target": element}]}
+    assert unsupported == []
+
+
+@pytest.mark.parametrize(
+    ("check", "expected_disposition"),
+    (
+        ("blank_page", "prevention:render_audit"),
+        ("clipping", "fail_closed"),
+        ("not_a_mandatory_check", "fail_closed:unknown_visual_check"),
+    ),
+)
+def test_nonrepair_visual_dispositions_fail_closed_with_reproducible_evidence(
+    check,
+    expected_disposition,
+):
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": check,
+        "element": "5. INTRODUCTION",
+        "target_ids": ["layout:protocol"],
+        "issue": "Rendered evidence exposes the defect.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+    )
+
+    assert plan == {}
+    assert unsupported == [{
+        **finding,
+        "contracted_layout_family": "prospective-protocol",
+        "disposition": expected_disposition,
+        "evidence_retained": True,
+        "required": (
+            "The declared prevention invariant failed. Preserve its exact rendered evidence "
+            "and stop before publication."
+            if expected_disposition.startswith("prevention:")
+            else "This recognized visual defect has no safe deterministic repair. Preserve its exact rendered evidence for governed corpus expansion."
+            if expected_disposition == "fail_closed"
+            else "This visual check is not part of the governed Layout Contract. Preserve its exact rendered evidence for classification before retry."
+        ),
     }]
 
 
@@ -439,7 +540,10 @@ def test_section_three_table_repair_subsumes_its_artificial_pagination_symptom()
         },
     ]
 
-    plan, unsupported = workflow._layout_repair_plan(findings)
+    plan, unsupported = workflow._layout_repair_plan(
+        findings,
+        study_type="Prospective",
+    )
 
     assert plan == {
         "protocol": [
@@ -460,7 +564,17 @@ def test_section_three_endpoint_split_routes_to_the_exact_summary_table_heading(
         "issue": "The Secondary endpoint(s) label is separated from its first bullet.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding])
+    plan, unsupported = workflow._layout_repair_plan(
+        [
+            finding,
+            {
+                **finding,
+                "check": "artificial_pagination",
+                "issue": "The same split leaves a nearly empty continuation page before the TOC.",
+            },
+        ],
+        study_type="Prospective",
+    )
 
     assert plan == {
         "protocol": [{"rule": "table_pagination", "target": "3. GENERAL INFORMATION"}],
@@ -478,7 +592,11 @@ def test_excessive_whitespace_at_exact_heading_uses_scoped_cohesion_repair():
         "issue": "A large vertical gap separates DURATION from its first substantive paragraph.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Sterling")
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+        icf_template="Sterling",
+    )
 
     assert plan == {"icf": [{"rule": "heading_whitespace_cohesion", "target": "DURATION"}]}
     assert unsupported == []
@@ -494,7 +612,11 @@ def test_excessive_whitespace_at_other_sterling_heading_remains_non_destructive(
         "issue": "A large vertical gap follows an unrelated ICF heading.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Sterling")
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+        icf_template="Sterling",
+    )
 
     assert plan == {"icf": [{"rule": "heading_cohesion", "target": "RISKS"}]}
     assert unsupported == []
@@ -510,7 +632,11 @@ def test_excessive_whitespace_at_advarra_duration_remains_non_destructive():
         "issue": "A large vertical gap follows an Advarra ICF heading.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding], icf_template="Advarra")
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+        icf_template="Advarra",
+    )
 
     assert plan == {"icf": [{"rule": "heading_cohesion", "target": "DURATION"}]}
     assert unsupported == []
@@ -526,7 +652,10 @@ def test_protocol_excessive_whitespace_retains_non_destructive_heading_cohesion(
         "issue": "A heading is isolated above excessive remaining whitespace.",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding])
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+    )
 
     assert plan == {"protocol": [{"rule": "heading_cohesion", "target": "19.2 Study Completion"}]}
     assert unsupported == []
@@ -549,6 +678,43 @@ def test_heading_cohesion_removes_empty_template_paragraphs_before_its_first_blo
 
     duration = next(index for index, paragraph in enumerate(document.paragraphs) if paragraph.text == "DURATION")
     assert document.paragraphs[duration + 1].text == "The study lasts approximately 14 weeks."
+
+
+def test_layout_invalidation_removes_only_the_changed_artifacts_render_and_visual_evidence(tmp_path):
+    revision = tmp_path / "revision"
+    candidate = revision / "candidate"
+    rendered = revision / "rendered"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    for directory in (candidate, rendered / "protocol", rendered / "icf", requests, responses):
+        directory.mkdir(parents=True, exist_ok=True)
+    for name in ("protocol.docx", "icf.docx"):
+        (candidate / name).write_bytes(name.encode())
+    for name in ("protocol.pdf", "icf.pdf"):
+        (rendered / name).write_bytes(name.encode())
+    (rendered / "protocol/page-1.png").write_bytes(b"protocol page")
+    (rendered / "icf/page-1.png").write_bytes(b"icf page")
+    for artifact in ("protocol", "icf"):
+        response_path = responses / f"{artifact}.json"
+        response_path.write_text("{}", encoding="utf-8")
+        (requests / f"{artifact}.json").write_text(json.dumps({
+            "task": "rendered_page_visual_verification",
+            "artifacts": [{"artifact": artifact}],
+            "response_path": response_path.relative_to(revision).as_posix(),
+        }), encoding="utf-8")
+
+    workflow._invalidate_layout_artifact(revision, "protocol")
+
+    assert not (candidate / "protocol.docx").exists()
+    assert not (rendered / "protocol.pdf").exists()
+    assert not (rendered / "protocol").exists()
+    assert not (requests / "protocol.json").exists()
+    assert not (responses / "protocol.json").exists()
+    assert (candidate / "icf.docx").is_file()
+    assert (rendered / "icf.pdf").is_file()
+    assert (rendered / "icf/page-1.png").is_file()
+    assert (requests / "icf.json").is_file()
+    assert (responses / "icf.json").is_file()
 
 
 def test_heading_whitespace_cohesion_removes_contracted_keep_together_spacers():
@@ -860,7 +1026,10 @@ def test_layout_retry_requires_an_exact_repair_element(tmp_path):
         "issue": "orphan heading without a bound element",
     }
 
-    plan, unsupported = workflow._layout_repair_plan([finding])
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+    )
 
     assert plan == {}
     assert unsupported[0]["required"].endswith(
@@ -1151,6 +1320,67 @@ def test_real_visual_defect_does_not_switch_away_from_the_client_renderer(tmp_pa
     assert report["renderer"] == word
     assert rendered_by == ["Microsoft Word"]
     assert report["findings"][0]["category"] == "visual"
+
+
+def test_layout_rerender_is_pinned_to_the_exposing_renderer_and_cannot_fall_through(tmp_path, monkeypatch):
+    candidate = tmp_path / "candidate"
+    candidate.mkdir()
+    Document().save(candidate / "protocol.docx")
+    word = {"kind": "Microsoft Word", "path": "/test/word", "platform": "Darwin"}
+    fallback = {"kind": "LibreOffice", "path": "/test/soffice", "platform": "Darwin"}
+    page_identity = _page_identity()
+    prior_build = {
+        "render_report": {
+            "renderer": word,
+            "page_renderer": page_identity,
+            "artifacts": [{
+                "artifact": "protocol",
+                "renderer": word,
+                "page_renderer": page_identity,
+            }],
+        },
+    }
+    office_identities, page_identities = workflow._retained_layout_renderer_pair(
+        prior_build,
+        {"protocol"},
+    )
+    rendered_by = []
+
+    def fake_export(docx, output_dir, identity, **_kwargs):
+        rendered_by.append(identity["kind"])
+        if identity == word:
+            raise RuntimeError("The exposing renderer is now unavailable")
+        from pypdf import PdfWriter
+        output = output_dir / f"{docx.stem}.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        with output.open("wb") as handle:
+            writer.write(handle)
+        return output
+
+    monkeypatch.setattr(quality, "renderers", lambda **_: [word, fallback])
+    monkeypatch.setattr(
+        quality,
+        "_one_pdfium_renderer",
+        lambda identities, **_kwargs: list(identities),
+    )
+    report = quality.render_pages(
+        tmp_path,
+        renderer_identities=office_identities,
+        page_renderer_identities=page_identities,
+        office_exporter=fake_export,
+        require_promoted_runtime=False,
+    )
+
+    assert office_identities == [word]
+    assert page_identities == [page_identity]
+    assert report["status"] == "blocked"
+    assert rendered_by == ["Microsoft Word"]
+    assert report["renderer_attempts"] == [{
+        "renderer": word,
+        "status": "failed",
+        "issue": "The exposing renderer is now unavailable",
+    }]
 
 
 def test_render_pages_regenerates_only_the_selected_artifact(tmp_path, monkeypatch):
@@ -1609,7 +1839,7 @@ def test_reviewer_defect_starts_a_fresh_complete_review_set(tmp_path, monkeypatc
         run_dir,
         reference_path,
         {"generation": {"review_set": 1}},
-        {},
+        _source(),
         revision,
         {},
         [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
@@ -1640,7 +1870,7 @@ def test_third_failed_review_set_blocks_before_a_fourth_set(tmp_path, monkeypatc
         run_dir,
         reference_path,
         {"generation": generation},
-        {},
+        _source(),
         revision,
         {},
         [finding],
@@ -1682,7 +1912,7 @@ def test_third_review_set_continues_with_a_distinct_governed_strategy(tmp_path, 
     monkeypatch.setattr(workflow, "generate", rebuild)
 
     result = workflow._quality_retry(
-        run_dir, reference_path, {"generation": generation}, {}, revision, {}, [current], "quality",
+        run_dir, reference_path, {"generation": generation}, _source(), revision, {}, [current], "quality",
     )
 
     assert result == rerun
@@ -2318,7 +2548,7 @@ def test_layout_failure_rebuilds_and_reverifies_before_retry_limit(tmp_path, mon
         run_dir,
         reference_path,
         {"generation": {}},
-        {},
+        _source(),
         revision,
         {},
         [{"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}],
@@ -2350,7 +2580,7 @@ def test_layout_failure_blocks_only_after_three_attempts_of_the_same_strategy(tm
         run_dir,
         reference_path,
         {"generation": generation},
-        {},
+        _source(),
         revision,
         {"layout:protocol.docx": 3},
         [finding],

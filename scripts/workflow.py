@@ -38,7 +38,7 @@ from docx import Document
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
-from contracts import BUNDLED_FONT_FILES, RECOVERY_POLICIES, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
+from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
@@ -2422,12 +2422,15 @@ VERIFICATION_TASK_BY_TARGET = {
     "visual": "rendered_page_visual_verification",
 }
 
-LAYOUT_RULE_BY_VISUAL_CHECK = {
-    "orphan_heading": "heading_cohesion",
-    "excessive_whitespace": "heading_cohesion",
-    "artificial_pagination": "body_pagination",
-    "bad_table_split": "table_pagination",
-}
+if set(VISUAL_CHECK_DISPOSITIONS) != set(LAYOUT_FAMILY_ARTIFACTS) or any(
+    set(dispositions) != set(VISUAL_CHECKS)
+    for dispositions in VISUAL_CHECK_DISPOSITIONS.values()
+):
+    raise RuntimeError(
+        "Every mandatory visual check must have one disposition in every Contracted Template family."
+    )
+
+
 def _read(path: Path) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict): raise ValueError(f"Expected JSON object: {path}")
@@ -2948,6 +2951,38 @@ def _merge_partial_assurance(
         render_report = _merge_artifact_reports(prior_build.get("render_report", {}), render_report)
         complete["render"] = render_report
     return complete, render_report
+
+
+def _retained_layout_renderer_pair(
+    prior_build: Mapping[str, Any],
+    repaired_artifacts: set[str],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Return the exact renderer pair that exposed each repaired artifact."""
+    render_report = prior_build.get("render_report")
+    if not isinstance(render_report, Mapping):
+        return [], []
+    renderer = render_report.get("renderer")
+    page_renderer = render_report.get("page_renderer")
+    if not isinstance(renderer, Mapping) or not isinstance(page_renderer, Mapping):
+        return [], []
+    matched: set[str] = set()
+    for raw in render_report.get("artifacts", []):
+        if not isinstance(raw, Mapping):
+            continue
+        artifact = str(raw.get("artifact") or "")
+        if artifact not in repaired_artifacts:
+            continue
+        if (
+            not isinstance(raw.get("renderer"), Mapping)
+            or not isinstance(raw.get("page_renderer"), Mapping)
+            or dict(raw["renderer"]) != dict(renderer)
+            or dict(raw["page_renderer"]) != dict(page_renderer)
+        ):
+            return [], []
+        matched.add(artifact)
+    if matched != repaired_artifacts:
+        return [], []
+    return [dict(renderer)], [dict(page_renderer)]
 
 
 def _unaffected_build_is_valid(
@@ -5265,9 +5300,27 @@ def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> l
     return [normalized[key] for key in sorted(normalized)]
 
 
+def _canonical_layout_repair_target(artifact: str, check: str, target: str) -> str:
+    """Resolve one reviewer element label to its exact Word-native repair block."""
+    normalized = " ".join(target.split())
+    section_three = re.match(r"^3\.\s*GENERAL INFORMATION(?:\b|\s*[–—:-])", normalized, re.IGNORECASE)
+    if (
+        artifact == "protocol"
+        and check in {"bad_table_split", "artificial_pagination", "excessive_whitespace"}
+        and section_three
+        and (
+            normalized.casefold().rstrip(" .:") == "3. general information"
+            or any(token in normalized.casefold() for token in ("variables", "endpoint"))
+        )
+    ):
+        return "3. GENERAL INFORMATION"
+    return normalized
+
+
 def _layout_repair_plan(
     findings: Iterable[Mapping[str, Any]],
     *,
+    study_type: str | None = None,
     icf_template: str | None = None,
 ) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
     plan: dict[str, list[dict[str, str]]] = {}
@@ -5280,29 +5333,68 @@ def _layout_repair_plan(
             continue
         artifact = str(finding.get("artifact") or layout_targets[0]).removesuffix(".docx")
         check = str(finding.get("check") or "")
-        target = " ".join(str(finding.get("element") or "").split())
-        section_three_summary_split = (
-            check == "bad_table_split"
-            and artifact == "protocol"
-            and "general information" in target.casefold()
-            and any(token in target.casefold() for token in ("variables", "endpoint"))
+        target = _canonical_layout_repair_target(
+            artifact,
+            check,
+            str(finding.get("element") or ""),
         )
-        if section_three_summary_split:
-            target = "3. GENERAL INFORMATION"
+        branch = canonical_study_type(study_type) if study_type else None
+        family = (
+            f"{branch.casefold()}-protocol"
+            if artifact == "protocol" and branch
+            else f"{str(icf_template).strip().casefold()}-icf"
+            if artifact == "icf" and str(icf_template or "").strip()
+            else ""
+        )
+        dispositions = VISUAL_CHECK_DISPOSITIONS.get(family)
+        disposition = (
+            dispositions.get(check, "fail_closed:unknown_visual_check")
+            if dispositions is not None
+            else "fail_closed:unknown_template_family"
+        )
+        if disposition.startswith("prevention:"):
+            unsupported.append({
+                **finding,
+                "contracted_layout_family": family or None,
+                "disposition": disposition,
+                "evidence_retained": True,
+                "required": "The declared prevention invariant failed. Preserve its exact rendered evidence and stop before publication.",
+            })
+            continue
+        if disposition.startswith("fail_closed"):
+            required = (
+                "This visual check is not part of the governed Layout Contract. Preserve its exact rendered evidence for classification before retry."
+                if disposition == "fail_closed:unknown_visual_check"
+                else "The artifact does not resolve to one Contracted Template family. Preserve its exact rendered evidence and correct the source-bound family identity."
+                if disposition == "fail_closed:unknown_template_family"
+                else "This recognized visual defect has no safe deterministic repair. Preserve its exact rendered evidence for governed corpus expansion."
+            )
+            unsupported.append({
+                **finding,
+                "contracted_layout_family": family or None,
+                "disposition": disposition,
+                "evidence_retained": True,
+                "required": required,
+            })
+            continue
         exact_sterling_duration_gap = (
             check == "excessive_whitespace"
             and artifact == "icf"
             and target.casefold() == "duration"
             and str(icf_template or "").casefold() == "sterling"
         )
+        declared_rule = disposition.removeprefix("repair:") if disposition.startswith("repair:") else ""
         rule = (
             "heading_whitespace_cohesion"
             if exact_sterling_duration_gap
-            else LAYOUT_RULE_BY_VISUAL_CHECK.get(check)
+            else declared_rule
         )
         if rule not in LAYOUT_REPAIR_RULES.get(artifact, ()) or not target:
             unsupported.append({
                 **finding,
+                "contracted_layout_family": family or None,
+                "disposition": disposition,
+                "evidence_retained": True,
                 "required": "Classify the visual defect with one supported artifact, Layout Contract check, and exact heading or table-caption element before deterministic repair.",
             })
             continue
@@ -5328,7 +5420,11 @@ def _layout_repair_plan(
             finding.get("check") == "artificial_pagination"
             and (
                 str(finding.get("artifact") or "").removesuffix(".docx"),
-                " ".join(str(finding.get("element") or "").split()).casefold(),
+                _canonical_layout_repair_target(
+                    str(finding.get("artifact") or "").removesuffix(".docx"),
+                    str(finding.get("check") or ""),
+                    str(finding.get("element") or ""),
+                ).casefold(),
             ) in table_repair_targets
         )
     ]
@@ -6374,6 +6470,7 @@ def _quality_retry(
     if has_layout_target:
         layout_plan, unsupported = _layout_repair_plan(
             normalized,
+            study_type=str(get_path(approved_reference, "meta.study_type") or ""),
             icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
         )
         if unsupported:
@@ -6827,6 +6924,16 @@ def generate(
                 document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
             return document_report
 
+        renderer_pins: dict[str, Any] = {}
+        if partial_repair:
+            pinned_office, pinned_pages = _retained_layout_renderer_pair(
+                prior_build or {},
+                partial_repair,
+            )
+            renderer_pins = {
+                "renderer_identities": pinned_office,
+                "page_renderer_identities": pinned_pages,
+            }
         assurance_report = render_assurance(
             SCRIPT_DIR.parent,
             revision_dir,
@@ -6840,6 +6947,7 @@ def generate(
             deadline_monotonic=operation_deadline,
             clock=clock,
             require_promoted_runtime=require_promoted_runtime,
+            **renderer_pins,
         )
         resolved_substitutions = {
             str(source): str(target)
