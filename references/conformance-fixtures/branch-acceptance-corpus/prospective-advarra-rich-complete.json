@@ -1,0 +1,11 @@
+{
+  "fixture_id": "prospective-advarra-rich-complete",
+  "study_type": "Prospective",
+  "icf_template": "Advarra",
+  "profile": "rich-complete",
+  "evidence_density": "multiple operational tables and narrative details",
+  "study_title": "Prospective Evaluation of the NovaStep Activity Sensor in Adults Recovering From Total Knee Arthroplasty",
+  "study_short_title": "NovaStep Recovery Study",
+  "historical_regression": "novastep-section-3-continuation",
+  "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
+}

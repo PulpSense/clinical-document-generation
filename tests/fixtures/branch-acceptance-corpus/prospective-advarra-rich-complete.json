@@ -1,8 +1,0 @@
-{
-  "fixture_id": "prospective-advarra-rich-complete",
-  "study_type": "Prospective",
-  "icf_template": "Advarra",
-  "profile": "rich-complete",
-  "evidence_density": "multiple operational tables and narrative details",
-  "source_fixture": "tests/fixtures/prospective-acceptance-source.json"
-}

@@ -1,4 +1,5 @@
 import json
+import platform
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,32 @@ ROOT = Path(__file__).resolve().parents[1]
 def _gate_owner(gate_id):
     matrix = quality.load_format_conformance_matrix(ROOT)
     return next(item["retry_owner"] for item in matrix["gate_sequence"] if item["gate_id"] == gate_id)
+
+
+def test_five_family_outputs_pass_governed_format_conformance(
+    tmp_path, governed_pdfium, monkeypatch
+):
+    monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [governed_pdfium])
+    report = workflow.run_format_conformance(
+        ROOT,
+        evidence_root=tmp_path,
+        allow_source_tree=platform.system() == "Darwin",
+    )
+
+    assert report["status"] == "structural_passed", report
+    assert report["assurance"] == "deterministic-structural-only"
+    assert report["output_baseline_status"] == "passed"
+    assert set(report["covered_cases"]) == {
+        "retrospective-protocol",
+        "prospective-advarra",
+        "prospective-sterling",
+        "ambispective-advarra",
+        "ambispective-sterling",
+    }
+    assert all(
+        case["status"] == "passed"
+        for case in report["output_baseline_cases"]
+    )
 
 
 def test_format_conformance_matrix_is_complete_hash_addressed_and_ordered():

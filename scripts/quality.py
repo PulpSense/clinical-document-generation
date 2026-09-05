@@ -71,11 +71,61 @@ CERTIFICATION_CASE_ORDER = (
 )
 DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "prospective-advarra-sparse-complete", "prospective-advarra-rich-complete",
+    "ambispective-sterling-sparse-complete", "ambispective-sterling-rich-complete",
     "prospective-sterling-sparse-complete", "prospective-sterling-rich-complete",
     "ambispective-advarra-sparse-complete", "ambispective-advarra-rich-complete",
-    "ambispective-sterling-sparse-complete", "ambispective-sterling-rich-complete",
     "retrospective-sparse-complete", "retrospective-rich-complete",
 )
+
+
+def branch_acceptance_inventory(repo_root: Path) -> tuple[dict[str, Any], ...]:
+    """Load and bind the ten repository-confined corpus descriptors and sources."""
+    root = repo_root.resolve()
+    catalog_path = root / "references/conformance-fixtures/branch-acceptance-corpus.json"
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+    if not isinstance(catalog, list):
+        raise ValueError("Branch Acceptance Corpus catalog must be a JSON list.")
+    inventory = []
+    for entry in catalog:
+        if not isinstance(entry, Mapping):
+            raise ValueError("Branch Acceptance Corpus entries must be JSON objects.")
+        if entry.get("regression") is True:
+            continue
+        descriptor_path = (root / str(entry.get("path") or "")).resolve()
+        try:
+            descriptor_path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("Branch Acceptance Corpus descriptor escapes the repository.") from exc
+        if not descriptor_path.is_file():
+            raise ValueError(f"Branch Acceptance Corpus descriptor is missing: {descriptor_path}")
+        descriptor = json.loads(descriptor_path.read_text(encoding="utf-8"))
+        required = {"fixture_id", "study_type", "profile", "source_fixture"}
+        if (
+            not isinstance(descriptor, dict)
+            or not required.issubset(descriptor)
+            or not str(descriptor["profile"]).endswith("complete")
+        ):
+            raise ValueError(f"Invalid Branch Acceptance Corpus descriptor: {descriptor_path}")
+        if descriptor["study_type"] != "Retrospective" and not descriptor.get("icf_template"):
+            raise ValueError(f"ICF family is missing from corpus descriptor: {descriptor_path}")
+        source_path = (root / str(descriptor["source_fixture"])).resolve()
+        try:
+            source_path.relative_to(root)
+        except ValueError as exc:
+            raise ValueError("Branch Acceptance Corpus source escapes the repository.") from exc
+        if not source_path.is_file():
+            raise ValueError(f"Branch Acceptance Corpus source is missing: {source_path}")
+        inventory.append({
+            "descriptor": descriptor,
+            "descriptor_path": descriptor_path.relative_to(root).as_posix(),
+            "descriptor_sha256": hashlib.sha256(descriptor_path.read_bytes()).hexdigest(),
+            "source_path": source_path.relative_to(root).as_posix(),
+            "source_sha256": hashlib.sha256(source_path.read_bytes()).hexdigest(),
+        })
+    case_ids = tuple(str(item["descriptor"]["fixture_id"]) for item in inventory)
+    if case_ids != DETERMINISTIC_BRANCH_ACCEPTANCE_CASES:
+        raise ValueError("Branch Acceptance Corpus does not match the canonical ten-case inventory.")
+    return tuple(inventory)
 GOVERNED_GATE_SEQUENCE = (
     "clinical_fidelity",
     "content_completeness_consistency",
@@ -455,10 +505,10 @@ def audit_format_conformance_outputs(
     """Compare generated deterministic DOCX semantics with approved baselines."""
     selected_cases = {
         "retrospective-protocol": "retrospective-sparse-complete",
-        "prospective-advarra": "prospective-sparse-complete",
-        "prospective-sterling": "prospective-rich-complete",
-        "ambispective-advarra": "ambispective-sparse-complete",
-        "ambispective-sterling": "ambispective-rich-complete",
+        "prospective-advarra": "prospective-advarra-sparse-complete",
+        "prospective-sterling": "prospective-sterling-rich-complete",
+        "ambispective-advarra": "ambispective-advarra-sparse-complete",
+        "ambispective-sterling": "ambispective-sterling-rich-complete",
     }
     reported = {str(item.get("case")): item for item in release_gate_report.get("cases", []) if isinstance(item, Mapping)}
     results = []

@@ -4,5 +4,5 @@
   "icf_template": "Sterling",
   "profile": "rich-complete",
   "evidence_density": "multiple operational tables and narrative details",
-  "source_fixture": "tests/fixtures/prospective-acceptance-source.json"
+  "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
 }

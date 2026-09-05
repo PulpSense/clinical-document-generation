@@ -4,5 +4,5 @@
   "icf_template": "Advarra",
   "profile": "rich-complete",
   "evidence_density": "historical/prospective operational tables and narrative details",
-  "source_fixture": "tests/fixtures/ambispective-acceptance-source.json"
+  "source_fixture": "references/conformance-fixtures/ambispective-acceptance-source.json"
 }

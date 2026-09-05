@@ -41,7 +41,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
 
 
@@ -7104,8 +7104,9 @@ def run_release_gate(
     verification_responder: Callable[[Mapping[str, Any]], Mapping[str, Any]] | None = None,
     evidence_root: Path | None = None,
     require_promoted_runtime: bool = True,
+    case_ids: Iterable[str] | None = None,
 ) -> dict[str, Any]:
-    """Exercise all six lifecycle cases; genuine verifier responses remain external."""
+    """Exercise the selected public lifecycle cases; the default is all ten."""
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     if evidence_root is not None:
         root = evidence_root.resolve()
@@ -7118,14 +7119,25 @@ def run_release_gate(
             suffix += 1
     root.mkdir(parents=True, exist_ok=True)
     results = []
-    corpus = _read_corpus(repo_root / "references/conformance-fixtures/branch-acceptance-corpus.json")
-    for case in [item for item in corpus if str(item.get("profile", "")).endswith("complete")]:
-            branch = str(case["study_type"]); richness = str(case["profile"]).split("-", 1)[0]
+    inventory = branch_acceptance_inventory(repo_root)
+    if case_ids is not None:
+        selected = {str(case_id) for case_id in case_ids}
+        known = {str(item["descriptor"]["fixture_id"]) for item in inventory}
+        if not selected or not selected.issubset(known):
+            raise ValueError("Selected Branch Acceptance Corpus case IDs are invalid.")
+        inventory = tuple(
+            item for item in inventory
+            if str(item["descriptor"]["fixture_id"]) in selected
+        )
+    for corpus_item in inventory:
+            case = corpus_item["descriptor"]
+            descriptor_sha256 = corpus_item["descriptor_sha256"]
+            study_type = str(case["study_type"]); richness = str(case["profile"]).split("-", 1)[0]
             run_dir = root / str(case["fixture_id"])
             if not (run_dir / REFERENCE).is_file():
-                reference = _read(repo_root / str(case["source_fixture"]))
-                reference["meta"]["protocol_number"] = f"{branch[:3].upper()}-{richness}-26"; reference["study"]["title"] = f"{branch} {richness} acceptance study"; reference["study"]["short_title"] = f"{branch} {richness} acceptance"
-                if branch != "Retrospective":
+                reference = _read(repo_root / str(corpus_item["source_path"]))
+                reference["meta"]["protocol_number"] = f"{study_type[:3].upper()}-{richness}-26"; reference["study"]["title"] = str(case.get("study_title") or f"{study_type} {richness} acceptance study"); reference["study"]["short_title"] = str(case.get("study_short_title") or f"{study_type} {richness} acceptance")
+                if study_type != "Retrospective":
                     reference["meta"]["icf_template"] = str(case.get("icf_template") or reference["meta"].get("icf_template") or ("Sterling" if richness == "rich" else "Advarra"))
                 if richness == "rich":
                     reference["study"]["background"] = f"{reference['study']['background'].rstrip('.')} with extended follow-up."
@@ -7137,7 +7149,7 @@ def run_release_gate(
                         if isinstance(item, dict): item["value"] = "80 participants"
                     for item in reference.get("statistics", {}).get("sample_size_evidence", []):
                         if isinstance(item, dict): item["value"] = "80 participants"
-                    if branch != "Retrospective":
+                    if study_type != "Retrospective":
                         reference["endpoints"].setdefault("other", []).extend([{"label": "Extended follow-up outcome", "time_point": "Month 6"}, {"label": "Participant experience outcome", "time_point": "Month 6"}])
                         reference["design"]["interventions"] = [{"name": "Sentinel Patch", "type": "Device", "description": "Primary monitoring configuration.", "arm_group_label": "Primary cohort"}, {"name": "Sentinel Patch Extended", "type": "Device", "description": "Extended monitoring configuration.", "arm_group_label": "Extended cohort"}]
                         reference["design"]["arms"] = [{"name": "Primary cohort", "description": "Primary observational cohort."}, {"name": "Extended cohort", "description": "Extended observational cohort."}]
@@ -7150,6 +7162,8 @@ def run_release_gate(
                 if first.get("status") != "awaiting_approval": results.append({"case": run_dir.name, "status": "failed", "result": first}); continue
                 approval = approve(run_dir, approved_by="Recorded Acceptance")
                 if approval.get("status") != "passed": results.append({"case": run_dir.name, "status": "failed", "result": approval}); continue
+                readiness = validate(run_dir)
+                if readiness.get("status") != "passed": results.append({"case": run_dir.name, "status": "failed", "result": readiness}); continue
             reference = _read(run_dir / REFERENCE)
             case_bundle = contracted_template_bundle(repo_root, reference)
             result: dict[str, Any] = {}
@@ -7166,7 +7180,7 @@ def run_release_gate(
                         _save_recorded_handoff(revision_dir, request_path)
                 if result.get("stage") == "independent_verification" and verification_responder is None:
                     break
-            results.append({"case": run_dir.name, "corpus": case, "icf_template": get_path(reference, "meta.icf_template"), "source_sha256": sha256_value(_approved_payload(reference)), "contracted_template_bundle": case_bundle, "status": "passed" if result.get("status") == "passed" else "failed", "result": result})
+            results.append({"case": run_dir.name, "corpus": case, "descriptor_sha256": descriptor_sha256, "source_fixture_sha256": corpus_item["source_sha256"], "icf_template": get_path(reference, "meta.icf_template"), "source_sha256": sha256_value(_approved_payload(reference)), "contracted_template_bundle": case_bundle, "status": "passed" if result.get("status") == "passed" else "failed", "result": result})
     passed = all(item["status"] == "passed" for item in results)
     awaiting = any(item.get("result", {}).get("status") == "awaiting_hermes" for item in results)
     synthetic_verification = bool(verification_responder is not None and getattr(verification_responder, "synthetic", False))
@@ -7295,6 +7309,7 @@ def run_format_conformance(
     repo_root: Path,
     *,
     evidence_root: Path | None = None,
+    allow_source_tree: bool = False,
 ) -> dict[str, Any]:
     """Run all deterministic format cases without claiming live certification."""
     repo_root = repo_root.resolve()
@@ -7312,7 +7327,7 @@ def run_format_conformance(
         ).stdout.strip()).resolve()
     except (OSError, subprocess.CalledProcessError):
         git_root = None
-    if git_root == repo_root:
+    if git_root == repo_root and not allow_source_tree:
         return _run_format_conformance_in_disposable_candidate(
             repo_root,
             resolved_evidence_root,

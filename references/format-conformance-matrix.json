@@ -1,6 +1,5 @@
 {
   "schema_version": "clinical-format-conformance/v1",
-  "matrix_sha256": "5f8371cb74b960a37ae86b2983b7dbd96bd73bf507062c7c3f1a61b76905775b",
   "assurance": "deterministic-structural-only",
   "live_certification_required": true,
   "finding_contract": {
@@ -51,9 +50,19 @@
     }
   ],
   "invalidation": {
-    "docx_changed": ["exact_artifact_rendering", "every_page_visual_qa", "exact_byte_atomic_delivery"],
-    "pdf_changed": ["every_page_visual_qa", "exact_byte_atomic_delivery"],
-    "page_changed": ["every_page_visual_qa", "exact_byte_atomic_delivery"],
+    "docx_changed": [
+      "exact_artifact_rendering",
+      "every_page_visual_qa",
+      "exact_byte_atomic_delivery"
+    ],
+    "pdf_changed": [
+      "every_page_visual_qa",
+      "exact_byte_atomic_delivery"
+    ],
+    "page_changed": [
+      "every_page_visual_qa",
+      "exact_byte_atomic_delivery"
+    ],
     "failed_gate_is_monotonic": true
   },
   "cases": [
@@ -67,7 +76,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/retrospective-protocol.json",
-        "sha256": "cc76827821600431ad564f68b47b2094908d59f02065f6e9340878200f2aefef"
+        "sha256": "4cf6e4285cf639cc99c6ff70291ff9048be5ebf6f774f1dc1223052e7c67a470"
       },
       "baselines": [
         {
@@ -81,8 +90,27 @@
           "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
         }
       ],
-      "expected_outputs": ["protocol.docx"],
-      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+      "expected_outputs": [
+        "protocol.docx"
+      ],
+      "checks": [
+        "section_properties",
+        "margins",
+        "orientation",
+        "styles",
+        "numbering",
+        "headers",
+        "footers",
+        "fields_toc",
+        "page_furniture",
+        "table_geometry",
+        "signature_blocks",
+        "consent_legal_language",
+        "paragraph_rhythm",
+        "natural_section_3_flow",
+        "heading_cohesion",
+        "front_matter_boundaries"
+      ]
     },
     {
       "case_id": "prospective-advarra",
@@ -94,7 +122,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-advarra.json",
-        "sha256": "21e0c7288a2da7ffff7933938b43f3628a6a57984369d35f172c89531a4d464f"
+        "sha256": "ef98b1b71cbee697c0fae6880d283314c4fd8f035f1213aab972f243e2048bfa"
       },
       "baselines": [
         {
@@ -118,8 +146,29 @@
           "sha256": "2cb95691434958421997a4da8baee57ae8eca1626364aa6d11121cc9ce6b4534"
         }
       ],
-      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
-      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+      "expected_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "checks": [
+        "section_properties",
+        "margins",
+        "orientation",
+        "styles",
+        "numbering",
+        "headers",
+        "footers",
+        "fields_toc",
+        "page_furniture",
+        "table_geometry",
+        "signature_blocks",
+        "consent_legal_language",
+        "paragraph_rhythm",
+        "natural_section_3_flow",
+        "heading_cohesion",
+        "front_matter_boundaries"
+      ]
     },
     {
       "case_id": "prospective-sterling",
@@ -131,7 +180,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-sterling.json",
-        "sha256": "76bf7247ded9e310c88929660f1d900f28731b3bf56f929a90160f79a144d953"
+        "sha256": "41bafba146437a26bbef67ca4e219fe3bbdc7103ea1bf154a1d2762532b1d6bc"
       },
       "baselines": [
         {
@@ -155,8 +204,29 @@
           "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
         }
       ],
-      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
-      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+      "expected_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "checks": [
+        "section_properties",
+        "margins",
+        "orientation",
+        "styles",
+        "numbering",
+        "headers",
+        "footers",
+        "fields_toc",
+        "page_furniture",
+        "table_geometry",
+        "signature_blocks",
+        "consent_legal_language",
+        "paragraph_rhythm",
+        "natural_section_3_flow",
+        "heading_cohesion",
+        "front_matter_boundaries"
+      ]
     },
     {
       "case_id": "ambispective-advarra",
@@ -168,7 +238,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-advarra.json",
-        "sha256": "72284ebe1f5fec84f1e7abc3134d96497d87d176cc5a82031ae03a6fd69d271c"
+        "sha256": "60935b4ab27c4a4aa04aa362ef35f15507052ca354ec71c1aeacc07b3ec4f362"
       },
       "baselines": [
         {
@@ -192,8 +262,29 @@
           "sha256": "2cb95691434958421997a4da8baee57ae8eca1626364aa6d11121cc9ce6b4534"
         }
       ],
-      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
-      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+      "expected_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "checks": [
+        "section_properties",
+        "margins",
+        "orientation",
+        "styles",
+        "numbering",
+        "headers",
+        "footers",
+        "fields_toc",
+        "page_furniture",
+        "table_geometry",
+        "signature_blocks",
+        "consent_legal_language",
+        "paragraph_rhythm",
+        "natural_section_3_flow",
+        "heading_cohesion",
+        "front_matter_boundaries"
+      ]
     },
     {
       "case_id": "ambispective-sterling",
@@ -205,7 +296,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-sterling.json",
-        "sha256": "82fa790063b5983c45fb4fa106a84d5b5f5ae3f7437681f10f63232a513c5922"
+        "sha256": "b26b443f53e42442f1807de8e554d5320d6086d15c4111e4c840ac516e7fc9e6"
       },
       "baselines": [
         {
@@ -229,8 +320,30 @@
           "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
         }
       ],
-      "expected_outputs": ["icf.docx", "protocol.docx", "study.xml"],
-      "checks": ["section_properties", "margins", "orientation", "styles", "numbering", "headers", "footers", "fields_toc", "page_furniture", "table_geometry", "signature_blocks", "consent_legal_language", "paragraph_rhythm", "natural_section_3_flow", "heading_cohesion", "front_matter_boundaries"]
+      "expected_outputs": [
+        "icf.docx",
+        "protocol.docx",
+        "study.xml"
+      ],
+      "checks": [
+        "section_properties",
+        "margins",
+        "orientation",
+        "styles",
+        "numbering",
+        "headers",
+        "footers",
+        "fields_toc",
+        "page_furniture",
+        "table_geometry",
+        "signature_blocks",
+        "consent_legal_language",
+        "paragraph_rhythm",
+        "natural_section_3_flow",
+        "heading_cohesion",
+        "front_matter_boundaries"
+      ]
     }
-  ]
+  ],
+  "matrix_sha256": "14ead57b38f3bb0051ff7be517a0be2bace1cefb7d1d5ab1ea9f0c59f2ea3c90"
 }

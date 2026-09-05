@@ -4,6 +4,7 @@ import hashlib
 import inspect
 import json
 import shlex
+import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
@@ -17,12 +18,15 @@ from hermes_e2e import (
     CERTIFICATION_LAYOUT_COVERAGE,
     CERTIFICATION_VISUAL_CHECKS,
     DETERMINISTIC_BRANCH_ACCEPTANCE_CASES,
+    HISTORICAL_REGRESSION_CASES,
+    HISTORICAL_REGRESSION_TEST_NODES,
     EXPECTED_OUTPUTS,
     DiagnosticOutcome,
     _agent_prompt,
     _canonical_reviewed_fixture_reference,
     _certified_release,
     _reduce_release_certification_corpus,
+    _retain_failed_preflight_evidence,
     _response_is_bound,
     _run_handoff_wave,
     _wait_for_processes,
@@ -306,12 +310,14 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
         ],
         "layout_preservation_corpus": [
             "-m", "pytest",
-            "tests/test_runtime_regressions.py::test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatting",
-            "tests/test_client_output_acceptance.py::test_every_protocol_and_icf_family_uses_natural_body_pagination",
+            "tests/test_format_conformance.py::test_five_family_outputs_pass_governed_format_conformance",
             "-q",
         ],
         "deterministic_branch_acceptance_corpus": [
-            "-m", "pytest", "tests/test_release_gate.py::test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets", "-q",
+            "-m", "pytest",
+            "tests/test_release_gate.py::test_branch_acceptance_corpus_public_lifecycles_pass_and_publish_exact_sets",
+            *HISTORICAL_REGRESSION_TEST_NODES,
+            "-q",
         ],
         "repository_regression_suite": ["-m", "pytest", "-q"],
     }
@@ -335,6 +341,7 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
     checks["deterministic_branch_acceptance_corpus"].update({
         "assurance": "recorded-drafting-structural-only",
         "case_ids": list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES),
+        "regression_case_ids": list(HISTORICAL_REGRESSION_CASES),
     })
     checks["repository_regression_suite"]["test_count"] = 313
     path = tmp_path / "preflight.json"
@@ -374,6 +381,81 @@ def _write_corpus_preflight(tmp_path: Path) -> Path:
         "checks": checks,
     }), encoding="utf-8")
     return path
+
+
+def test_failed_deterministic_preflight_evidence_survives_worktree_cleanup(tmp_path):
+    snapshot_root = tmp_path / "detached-worktree"
+    failure_root = snapshot_root / ".scratch/release-gate/run-01"
+    candidate = failure_root / "novastep/revisions/r-test/candidate/protocol.docx"
+    report = failure_root / "release-gate-report.json"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_bytes(b"failed candidate evidence")
+    report.write_text(
+        json.dumps({"status": "blocked", "case": "novastep"}),
+        encoding="utf-8",
+    )
+    evidence_path = tmp_path / "certification/preflight.json"
+
+    retained = _retain_failed_preflight_evidence(
+        snapshot_root,
+        evidence_path,
+        "deterministic_branch_acceptance_corpus",
+    )
+    retained_again = _retain_failed_preflight_evidence(
+        snapshot_root,
+        evidence_path,
+        "deterministic_branch_acceptance_corpus",
+    )
+    shutil.rmtree(snapshot_root)
+
+    assert retained is not None
+    assert retained_again is not None
+    assert retained_again["path"] != retained["path"]
+    manifest_path = evidence_path.parent / retained["path"]
+    assert manifest_path.is_file()
+    assert hashlib.sha256(manifest_path.read_bytes()).hexdigest() == retained["sha256"]
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["status"] == "retained"
+    assert {item["path"] for item in manifest["files"]} == {
+        "run-01/novastep/revisions/r-test/candidate/protocol.docx",
+        "run-01/release-gate-report.json",
+    }
+    for item in manifest["files"]:
+        retained_path = manifest_path.parent / item["path"]
+        assert retained_path.is_file()
+        assert hashlib.sha256(retained_path.read_bytes()).hexdigest() == item["sha256"]
+
+
+def test_failed_preflight_evidence_rejects_source_symlinks(tmp_path):
+    snapshot_root = tmp_path / "detached-worktree"
+    failure_root = snapshot_root / ".scratch/release-gate/run-01"
+    failure_root.mkdir(parents=True)
+    external = tmp_path / "external-secret.txt"
+    external.write_text("must not be copied", encoding="utf-8")
+    (failure_root / "escaping-link").symlink_to(external)
+
+    with pytest.raises(ValueError, match="symbolic links"):
+        _retain_failed_preflight_evidence(
+            snapshot_root,
+            tmp_path / "certification/preflight.json",
+            "deterministic_branch_acceptance_corpus",
+        )
+
+    assert not (tmp_path / "certification/preflight-failure-evidence").exists()
+
+
+def test_empty_failed_preflight_evidence_uses_the_preflight_log(tmp_path):
+    snapshot_root = tmp_path / "detached-worktree"
+    (snapshot_root / ".scratch/release-gate").mkdir(parents=True)
+
+    retained = _retain_failed_preflight_evidence(
+        snapshot_root,
+        tmp_path / "certification/preflight.json",
+        "deterministic_branch_acceptance_corpus",
+    )
+
+    assert retained is None
+    assert not (tmp_path / "certification/preflight-failure-evidence").exists()
 
 
 def _write_passing_case_report(

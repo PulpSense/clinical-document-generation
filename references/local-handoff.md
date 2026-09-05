@@ -49,7 +49,7 @@ If the gate returns `awaiting_hermes`, complete every returned content and
 rendered-page verification request using real content/image inspection, then
 resume it with `python3 scripts/workflow.py --release-gate --release-gate-root
 <evidence_root>`. The gate never fabricates visual approval and must ultimately
-pass all six branch/richness cases. A missing renderer, unassessed page, invalid
+pass all ten branch/family/richness cases. A missing renderer, unassessed page, invalid
 response binding, missing section, unresolved token, XML mismatch, or
 approval/source-hash mismatch blocks all client outputs. Renderer and tool
 office failures may advance between Word and LibreOffice, but PDFium failure stops with one diagnostic; a complete candidate is

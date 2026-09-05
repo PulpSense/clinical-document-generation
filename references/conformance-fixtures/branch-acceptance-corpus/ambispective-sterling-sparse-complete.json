@@ -4,5 +4,5 @@
   "icf_template": "Sterling",
   "profile": "sparse-complete",
   "evidence_density": "minimum historical and prospective evidence",
-  "source_fixture": "tests/fixtures/ambispective-acceptance-source.json"
+  "source_fixture": "references/conformance-fixtures/ambispective-acceptance-source.json"
 }

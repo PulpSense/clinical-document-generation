@@ -3,5 +3,5 @@
   "study_type": "Retrospective",
   "profile": "sparse-complete",
   "evidence_density": "minimum retrospective evidence",
-  "source_fixture": "tests/fixtures/gp-26-01-approved.json"
+  "source_fixture": "references/conformance-fixtures/retrospective-acceptance-source.json"
 }

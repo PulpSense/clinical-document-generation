@@ -4,5 +4,5 @@
   "icf_template": "Sterling",
   "profile": "sparse-complete",
   "evidence_density": "minimum substantive evidence",
-  "source_fixture": "tests/fixtures/prospective-acceptance-source.json"
+  "source_fixture": "references/conformance-fixtures/prospective-acceptance-source.json"
 }

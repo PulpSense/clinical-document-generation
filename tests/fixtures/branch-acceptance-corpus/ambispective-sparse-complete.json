@@ -1,7 +1,0 @@
-{
-  "fixture_id": "ambispective-sparse-complete",
-  "study_type": "Ambispective",
-  "profile": "sparse-complete",
-  "evidence_density": "minimum historical and prospective evidence",
-  "source_fixture": "tests/fixtures/gp-26-01-approved.json"
-}

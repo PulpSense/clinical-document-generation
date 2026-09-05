@@ -1,7 +1,0 @@
-{
-  "fixture_id": "prospective-rich-complete",
-  "study_type": "Prospective",
-  "profile": "rich-complete",
-  "evidence_density": "multiple operational tables and narrative details",
-  "source_fixture": "tests/fixtures/gp-26-01-approved.json"
-}

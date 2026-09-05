@@ -3,10 +3,80 @@
   "provenance": "repository-owned synthetic/minimized reproductions; no client or patient data",
   "negative_outputs_are_golden": false,
   "cases": [
-    {"id": "glucolumen-complete-exclusion", "defects": ["complete exclusion evidence", "optional Section 8.3", "safety mitigations", "costs", "contact availability", "research-only device language", "ICF placement", "eligibility qualifiers", "reviewer binding"]},
-    {"id": "novastep-section-3-continuation", "defects": ["table continuation", "table-label cohesion", "artificial pagination", "class-based repair", "fresh rendering", "final exact-artifact review"]},
-    {"id": "timeline-grammar-connectors", "defects": ["ordinary grammatical connectors", "milestone and time-value preservation"]},
-    {"id": "malformed-review-envelope", "defects": ["workflow-owned request identity", "nested finding", "semantic finding recovery routing"]},
-    {"id": "deterministic-structured-reconstruction", "defects": ["structured table reconstruction", "PRS XML mapping correction"]}
+    {
+      "id": "glucolumen-complete-exclusion",
+      "defects": [
+        "complete exclusion evidence",
+        "optional Section 8.3",
+        "safety mitigations",
+        "costs",
+        "contact availability",
+        "research-only device language",
+        "ICF placement",
+        "eligibility qualifiers",
+        "reviewer binding"
+      ],
+      "test_nodes": [
+        "tests/test_client_output_acceptance.py::test_bundle04_operational_omissions_are_rejected_before_candidate_construction",
+        "tests/test_client_output_acceptance.py::test_exclusion_drafts_accept_source_complete_clinical_wording",
+        "tests/test_contracts.py::test_operational_safeguards_costs_and_device_role_are_bound_to_their_target_sections",
+        "tests/test_handoff_quality.py::test_content_verifier_scope_matches_optional_source_sections",
+        "tests/test_runtime_regressions.py::test_protocol_contact_table_does_not_invent_round_the_clock_availability",
+        "tests/test_prs_xml.py::test_screening_washout_preserves_approved_interventional_study_qualifier"
+      ]
+    },
+    {
+      "id": "novastep-section-3-continuation",
+      "defects": [
+        "table continuation",
+        "table-label cohesion",
+        "artificial pagination",
+        "class-based repair",
+        "fresh rendering",
+        "final exact-artifact review"
+      ],
+      "test_nodes": [
+        "tests/test_release_gate.py::test_novastep_regression_completes_public_repair_review_and_atomic_publication",
+        "tests/test_runtime_regressions.py::test_section_three_table_repair_subsumes_its_artificial_pagination_symptom",
+        "tests/test_runtime_regressions.py::test_section_three_endpoint_split_routes_to_the_exact_summary_table_heading",
+        "tests/test_client_output_acceptance.py::test_section_three_table_repair_moves_the_complete_block_before_the_toc",
+        "tests/test_runtime_regressions.py::test_layout_failure_repairs_only_the_affected_artifact_but_resets_all_review_evidence"
+      ]
+    },
+    {
+      "id": "timeline-grammar-connectors",
+      "defects": [
+        "ordinary grammatical connectors",
+        "milestone and time-value preservation"
+      ],
+      "test_nodes": [
+        "tests/test_runtime_regressions.py::test_timeline_coverage_allows_grammar_but_preserves_milestone_pairing"
+      ]
+    },
+    {
+      "id": "malformed-review-envelope",
+      "defects": [
+        "workflow-owned request identity",
+        "nested finding",
+        "semantic finding recovery routing"
+      ],
+      "test_nodes": [
+        "tests/test_desktop_delivery.py::test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested_finding",
+        "tests/test_runtime_regressions.py::test_content_finding_without_a_section_target_reprompts_the_reviewer",
+        "tests/test_runtime_regressions.py::test_reviewer_defect_starts_a_fresh_complete_review_set"
+      ]
+    },
+    {
+      "id": "deterministic-structured-reconstruction",
+      "defects": [
+        "structured table reconstruction",
+        "PRS XML mapping correction"
+      ],
+      "test_nodes": [
+        "tests/test_runtime_regressions.py::test_protocol_renders_assignment_endpoint_hierarchy_and_both_operational_tables",
+        "tests/test_prs_xml.py::test_validation_rejects_missing_nested_node_in_selected_design_branch",
+        "tests/test_prs_xml.py::test_xml_validation_rejects_source_scalar_mutation_and_preserves_structured_contact_aliases"
+      ]
+    }
   ]
 }

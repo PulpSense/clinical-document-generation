@@ -28,6 +28,12 @@ APPROVED_INPUT_NORMALIZATIONS = {
     "ebd829a5de29a10cd9a10b8618b97916bf324480979c1bea4456202cafa1e44f",
 }
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_ROOT = REPO_ROOT / "scripts"
+if str(SCRIPTS_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_ROOT))
+
+from quality import branch_acceptance_inventory
+
 CERTIFICATION_FIXTURE_ROOT = REPO_ROOT / "tests/fixtures/release-certification"
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
@@ -43,17 +49,57 @@ CERTIFICATION_CORPUS_COVERAGE = {
     "prospective-advarra": ("Prospective", "Advarra"),
     "retrospective": ("Retrospective", None),
 }
-DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
-    "prospective-advarra-sparse-complete",
-    "prospective-advarra-rich-complete",
-    "prospective-sterling-sparse-complete",
-    "prospective-sterling-rich-complete",
-    "ambispective-advarra-sparse-complete",
-    "ambispective-advarra-rich-complete",
-    "ambispective-sterling-sparse-complete",
-    "ambispective-sterling-rich-complete",
-    "retrospective-sparse-complete",
-    "retrospective-rich-complete",
+
+
+def _branch_acceptance_case_ids() -> tuple[str, ...]:
+    return tuple(
+        str(item["descriptor"]["fixture_id"])
+        for item in branch_acceptance_inventory(REPO_ROOT)
+    )
+
+
+DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = _branch_acceptance_case_ids()
+
+
+def _historical_regression_inventory() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    manifest = json.loads(
+        (REPO_ROOT / "references/conformance-fixtures/historical-reliability-regressions.json")
+        .read_text(encoding="utf-8")
+    )
+    if not isinstance(manifest, dict):
+        raise ValueError("Historical reliability regression manifest is invalid.")
+    cases = manifest.get("cases")
+    if (
+        manifest.get("negative_outputs_are_golden") is not False
+        or not isinstance(cases, list)
+        or len(cases) != 5
+    ):
+        raise ValueError("Historical reliability regression manifest is invalid.")
+    if any(
+        not isinstance(case, dict)
+        or not isinstance(case.get("test_nodes"), list)
+        or not case["test_nodes"]
+        for case in cases
+    ):
+        raise ValueError("Every historical regression case must declare test nodes.")
+    case_ids = tuple(str(case.get("id") or "") for case in cases)
+    test_nodes = tuple(
+        str(node)
+        for case in cases
+        for node in case.get("test_nodes", ())
+    )
+    if (
+        not all(case_ids)
+        or len(set(case_ids)) != len(case_ids)
+        or not test_nodes
+        or len(set(test_nodes)) != len(test_nodes)
+    ):
+        raise ValueError("Historical reliability regressions must have unique cases and test nodes.")
+    return case_ids, test_nodes
+
+
+HISTORICAL_REGRESSION_CASES, HISTORICAL_REGRESSION_TEST_NODES = (
+    _historical_regression_inventory()
 )
 CERTIFICATION_LAYOUT_COVERAGE = (
     "Prospective/Advarra",
@@ -1479,12 +1525,14 @@ def _preflight_evidence(
         ],
         "layout_preservation_corpus": [
             "-m", "pytest",
-            "tests/test_runtime_regressions.py::test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatting",
-            "tests/test_client_output_acceptance.py::test_every_protocol_and_icf_family_uses_natural_body_pagination",
+            "tests/test_format_conformance.py::test_five_family_outputs_pass_governed_format_conformance",
             "-q",
         ],
         "deterministic_branch_acceptance_corpus": [
-            "-m", "pytest", "tests/test_release_gate.py::test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets", "-q",
+            "-m", "pytest",
+            "tests/test_release_gate.py::test_branch_acceptance_corpus_public_lifecycles_pass_and_publish_exact_sets",
+            *HISTORICAL_REGRESSION_TEST_NODES,
+            "-q",
         ],
         "repository_regression_suite": ["-m", "pytest", "-q"],
     }
@@ -1529,6 +1577,8 @@ def _preflight_evidence(
     deterministic = checks.get("deterministic_branch_acceptance_corpus") or {}
     if tuple(deterministic.get("case_ids") or ()) != DETERMINISTIC_BRANCH_ACCEPTANCE_CASES:
         findings.append("Preflight evidence does not cover the complete deterministic ten-case corpus.")
+    if tuple(deterministic.get("regression_case_ids") or ()) != HISTORICAL_REGRESSION_CASES:
+        findings.append("Preflight evidence does not cover every historical reliability regression.")
     if deterministic.get("assurance") not in {
         "synthetic-structural-only",
         "recorded-drafting-structural-only",
@@ -1609,14 +1659,20 @@ def run_release_certification_preflight(
             "layout_preservation_corpus",
             [
                 sys.executable, "-m", "pytest",
-                "tests/test_runtime_regressions.py::test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatting",
-                "tests/test_client_output_acceptance.py::test_every_protocol_and_icf_family_uses_natural_body_pagination",
+                "tests/test_format_conformance.py::test_five_family_outputs_pass_governed_format_conformance",
                 "-q",
             ],
         ),
         (
             "deterministic_branch_acceptance_corpus",
-            [sys.executable, "-m", "pytest", "tests/test_release_gate.py::test_all_six_public_lifecycle_cases_pass_and_publish_exact_sets", "-q"],
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/test_release_gate.py::test_branch_acceptance_corpus_public_lifecycles_pass_and_publish_exact_sets",
+                *HISTORICAL_REGRESSION_TEST_NODES,
+                "-q",
+            ],
         ),
         (
             "repository_regression_suite",
@@ -1674,12 +1730,20 @@ def run_release_certification_preflight(
                 item["coverage"] = list(CERTIFICATION_LAYOUT_COVERAGE)
             elif name == "deterministic_branch_acceptance_corpus":
                 item["case_ids"] = list(DETERMINISTIC_BRANCH_ACCEPTANCE_CASES)
+                item["regression_case_ids"] = list(HISTORICAL_REGRESSION_CASES)
                 item["assurance"] = "recorded-drafting-structural-only"
             elif name == "repository_regression_suite":
                 matches = re.findall(r"(\d+) passed", completed.stdout)
                 item["test_count"] = int(matches[-1]) if matches else 0
             checks[name] = item
             if completed.returncode != 0:
+                retained = _retain_failed_preflight_evidence(
+                    snapshot_root,
+                    evidence_path,
+                    name,
+                )
+                if retained is not None:
+                    item["retained_evidence"] = retained
                 overall_status = "failed"
                 break
         final_archive = snapshot_parent / "candidate-after.zip"
@@ -1746,6 +1810,77 @@ def run_release_certification_preflight(
             cwd=repository_root, capture_output=True, text=True, check=False,
         )
         shutil.rmtree(snapshot_parent, ignore_errors=True)
+
+
+def _retain_failed_preflight_evidence(
+    snapshot_root: Path,
+    evidence_path: Path,
+    check_name: str,
+) -> dict[str, Any] | None:
+    """Copy actionable corpus evidence outside a disposable preflight worktree."""
+    source_roots = {
+        "deterministic_branch_acceptance_corpus": snapshot_root / ".scratch/release-gate",
+        "layout_preservation_corpus": snapshot_root / ".scratch/format-conformance",
+    }
+    source = source_roots.get(check_name)
+    if source is None or not source.is_dir():
+        return None
+    evidence_root = evidence_path.parent.resolve()
+    attempts_root = evidence_root / "preflight-failure-evidence" / check_name
+    attempts_root.mkdir(parents=True, exist_ok=True)
+    for attempt_number in range(1, 10_000):
+        destination = attempts_root / f"attempt-{attempt_number:03d}"
+        try:
+            # Preserve links as links so copytree never follows a link outside the
+            # disposable worktree. The copied tree is rejected below if any link
+            # is present.
+            shutil.copytree(source, destination, symlinks=True)
+        except FileExistsError:
+            continue
+        break
+    else:
+        raise ValueError("Preflight failure evidence attempt namespace is exhausted.")
+    retained_files = []
+    for path in sorted(destination.rglob("*")):
+        if path.is_symlink():
+            shutil.rmtree(destination)
+            for empty_parent in (attempts_root, attempts_root.parent):
+                try:
+                    empty_parent.rmdir()
+                except OSError:
+                    break
+            raise ValueError("Retained preflight evidence cannot contain symbolic links.")
+        if path.is_file():
+            retained_files.append({
+                "path": path.relative_to(destination).as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": _sha256(path),
+            })
+    if not retained_files:
+        shutil.rmtree(destination)
+        for empty_parent in (attempts_root, attempts_root.parent):
+            try:
+                empty_parent.rmdir()
+            except OSError:
+                break
+        return None
+    manifest = {
+        "schema_version": "preflight-failure-evidence/v1",
+        "check": check_name,
+        "status": "retained",
+        "root": destination.relative_to(evidence_root).as_posix(),
+        "files": retained_files,
+    }
+    manifest_path = destination / "evidence-manifest.json"
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    return {
+        "path": manifest_path.relative_to(evidence_root).as_posix(),
+        "sha256": _sha256(manifest_path),
+        "file_count": len(retained_files),
+    }
 
 
 def _contained_run_path(run_dir: Path, relative: Any) -> Path | None:
