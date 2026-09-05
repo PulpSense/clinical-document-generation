@@ -409,6 +409,47 @@ def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks(
     }]
 
 
+def test_section_three_table_repair_subsumes_its_artificial_pagination_symptom():
+    shared = {
+        "category": "visual",
+        "artifact": "protocol",
+        "element": "3. GENERAL INFORMATION",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+    }
+    findings = [
+        {
+            **shared,
+            "page": 2,
+            "check": "bad_table_split",
+            "issue": "The Duration / Follow-up row continues alone on page 3.",
+        },
+        {
+            **shared,
+            "page": 3,
+            "check": "excessive_whitespace",
+            "issue": "The continuation leaves nearly the entire page unused.",
+        },
+        {
+            **shared,
+            "page": 3,
+            "check": "artificial_pagination",
+            "issue": "The isolated continuation creates a standalone page before the TOC.",
+        },
+    ]
+
+    plan, unsupported = workflow._layout_repair_plan(findings)
+
+    assert plan == {
+        "protocol": [
+            {"rule": "heading_cohesion", "target": "3. GENERAL INFORMATION"},
+            {"rule": "table_pagination", "target": "3. GENERAL INFORMATION"},
+        ],
+    }
+    assert unsupported == []
+
+
 def test_section_three_endpoint_split_routes_to_the_exact_summary_table_heading():
     finding = {
         "category": "visual",

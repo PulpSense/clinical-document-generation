@@ -5124,6 +5124,27 @@ def _layout_repair_plan(
         artifact: _normalized_layout_repair_records(repairs)
         for artifact, repairs in plan.items()
     }
+    table_repair_targets = {
+        (artifact, repair["target"].casefold())
+        for artifact, repairs in plan.items()
+        for repair in repairs
+        if repair["rule"] == "table_pagination"
+    }
+    # A split table can create a second, derivative pagination finding for the
+    # same exact block. The narrower table repair resolves both observations;
+    # retaining the broad pagination symptom as unsupported would prevent that
+    # governed repair from ever running. Standalone artificial-pagination
+    # findings still fail closed.
+    unsupported = [
+        finding for finding in unsupported
+        if not (
+            finding.get("check") == "artificial_pagination"
+            and (
+                str(finding.get("artifact") or "").removesuffix(".docx"),
+                " ".join(str(finding.get("element") or "").split()).casefold(),
+            ) in table_repair_targets
+        )
+    ]
     return plan, unsupported
 
 
