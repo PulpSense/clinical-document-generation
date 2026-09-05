@@ -1,0 +1,8 @@
+{
+  "fixture_id": "ambispective-advarra-sparse-complete",
+  "study_type": "Ambispective",
+  "icf_template": "Advarra",
+  "profile": "sparse-complete",
+  "evidence_density": "minimum historical and prospective evidence",
+  "source_fixture": "tests/fixtures/ambispective-acceptance-source.json"
+}

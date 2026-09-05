@@ -70,8 +70,10 @@ CERTIFICATION_CASE_ORDER = (
     "retrospective", "ambispective-sterling", "prospective-advarra",
 )
 DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
-    "prospective-sparse-complete", "prospective-rich-complete",
-    "ambispective-sparse-complete", "ambispective-rich-complete",
+    "prospective-advarra-sparse-complete", "prospective-advarra-rich-complete",
+    "prospective-sterling-sparse-complete", "prospective-sterling-rich-complete",
+    "ambispective-advarra-sparse-complete", "ambispective-advarra-rich-complete",
+    "ambispective-sterling-sparse-complete", "ambispective-sterling-rich-complete",
     "retrospective-sparse-complete", "retrospective-rich-complete",
 )
 GOVERNED_GATE_SEQUENCE = (

@@ -44,10 +44,14 @@ CERTIFICATION_CORPUS_COVERAGE = {
     "retrospective": ("Retrospective", None),
 }
 DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
-    "prospective-sparse-complete",
-    "prospective-rich-complete",
-    "ambispective-sparse-complete",
-    "ambispective-rich-complete",
+    "prospective-advarra-sparse-complete",
+    "prospective-advarra-rich-complete",
+    "prospective-sterling-sparse-complete",
+    "prospective-sterling-rich-complete",
+    "ambispective-advarra-sparse-complete",
+    "ambispective-advarra-rich-complete",
+    "ambispective-sterling-sparse-complete",
+    "ambispective-sterling-rich-complete",
     "retrospective-sparse-complete",
     "retrospective-rich-complete",
 )
@@ -1524,7 +1528,7 @@ def _preflight_evidence(
         findings.append("Preflight completion timestamp is invalid.")
     deterministic = checks.get("deterministic_branch_acceptance_corpus") or {}
     if tuple(deterministic.get("case_ids") or ()) != DETERMINISTIC_BRANCH_ACCEPTANCE_CASES:
-        findings.append("Preflight evidence does not cover the complete deterministic six-case corpus.")
+        findings.append("Preflight evidence does not cover the complete deterministic ten-case corpus.")
     if deterministic.get("assurance") not in {
         "synthetic-structural-only",
         "recorded-drafting-structural-only",

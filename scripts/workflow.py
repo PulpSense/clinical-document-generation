@@ -7125,8 +7125,8 @@ def run_release_gate(
             if not (run_dir / REFERENCE).is_file():
                 reference = _read(repo_root / str(case["source_fixture"]))
                 reference["meta"]["protocol_number"] = f"{branch[:3].upper()}-{richness}-26"; reference["study"]["title"] = f"{branch} {richness} acceptance study"; reference["study"]["short_title"] = f"{branch} {richness} acceptance"
-                if richness == "rich" and branch != "Retrospective":
-                    reference["meta"]["icf_template"] = "Sterling"
+                if branch != "Retrospective":
+                    reference["meta"]["icf_template"] = str(case.get("icf_template") or reference["meta"].get("icf_template") or ("Sterling" if richness == "rich" else "Advarra"))
                 if richness == "rich":
                     reference["study"]["background"] = f"{reference['study']['background'].rstrip('.')} with extended follow-up."
                     reference["study"]["timeline"] = "6 months"
