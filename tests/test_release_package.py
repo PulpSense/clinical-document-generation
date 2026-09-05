@@ -1288,6 +1288,145 @@ def test_failed_installation_smoke_keeps_the_active_skill_unchanged(tmp_path):
     assert (active / "marker.txt").read_text(encoding="utf-8") == "previous verified release"
 
 
+def test_relocated_active_smoke_failure_restores_the_previous_release(
+    tmp_path, monkeypatch
+):
+    release_excluded = workflow._release_excluded
+    monkeypatch.setattr(
+        workflow,
+        "_release_excluded",
+        lambda path: path.as_posix() == "scripts/workflow.py"
+        or path.parts[:1] == ("test-inputs",)
+        or release_excluded(path),
+    )
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text(
+        "previous verified release", encoding="utf-8"
+    )
+    previous = skills_dir / ".clinical-document-generation.previous"
+    previous.mkdir()
+    (previous / "marker.txt").write_text(
+        "previous rollback release", encoding="utf-8"
+    )
+    (previous / "RELEASE-MANIFEST.json").write_text(json.dumps({
+        "git_commit": "rollback-commit",
+        "package_fingerprint": "rollback-fingerprint",
+    }), encoding="utf-8")
+    observed_roots = []
+
+    def staging_passes_but_relocated_active_fails(candidate):
+        observed_roots.append(candidate.resolve())
+        if candidate.resolve() == active.resolve():
+            return {
+                "status": "blocked",
+                "findings": [{
+                    "category": "installation",
+                    "field": "pdf_page_renderer",
+                    "issue": (
+                        "The release-owned pypdfium2 page renderer was not "
+                        "discovered."
+                    ),
+                }],
+            }
+        return {"status": "passed"}
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=staging_passes_but_relocated_active_fails,
+        provisioner=_passing_provisioner,
+    )
+
+    assert len(observed_roots) == 2
+    assert observed_roots[0] != active.resolve()
+    assert observed_roots[1] == active.resolve()
+    assert result["status"] == "blocked"
+    assert result["stage"] == "post_activation_smoke"
+    failed_candidate = Path(result["failed_candidate_retained"])
+    assert failed_candidate.parent == tmp_path / "clinical-document-release-failures"
+    assert (failed_candidate / "SKILL.md").is_file()
+    assert (
+        active / "marker.txt"
+    ).read_text(encoding="utf-8") == "previous verified release"
+    assert (
+        previous / "marker.txt"
+    ).read_text(encoding="utf-8") == "previous rollback release"
+
+
+def test_interrupted_active_smoke_restores_the_previous_release_before_retry(
+    tmp_path, monkeypatch
+):
+    release_excluded = workflow._release_excluded
+    monkeypatch.setattr(
+        workflow,
+        "_release_excluded",
+        lambda path: path.as_posix() == "scripts/workflow.py"
+        or path.parts[:1] == ("test-inputs",)
+        or release_excluded(path),
+    )
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text(
+        "previous verified release", encoding="utf-8"
+    )
+    calls = []
+
+    def interrupt_active_smoke(candidate):
+        calls.append(candidate.resolve())
+        if candidate.resolve() == active.resolve():
+            raise KeyboardInterrupt("injected active smoke interruption")
+        return {"status": "passed"}
+
+    with pytest.raises(KeyboardInterrupt, match="active smoke interruption"):
+        install_release(
+            archive_path,
+            skills_dir,
+            hermes_config_path=_hermes_config(skills_dir),
+            trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+            verifier=interrupt_active_smoke,
+            provisioner=_passing_provisioner,
+        )
+
+    assert len(calls) == 2
+    assert not (active / "marker.txt").exists()
+    assert (skills_dir / ".clinical-document-generation.activation.json").is_file()
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {
+            "status": "blocked",
+            "findings": [{"issue": "stop after recovery"}],
+        },
+    )
+
+    assert result["stage"] == "provision"
+    assert (
+        active / "marker.txt"
+    ).read_text(encoding="utf-8") == "previous verified release"
+    assert not (skills_dir / ".clinical-document-generation.previous").exists()
+    assert not (skills_dir / ".clinical-document-generation.activation.json").exists()
+    failed_releases = list(
+        (tmp_path / "clinical-document-release-failures").iterdir()
+    )
+    assert len(failed_releases) == 1
+    assert (failed_releases[0] / "SKILL.md").is_file()
+
+
 def test_installation_smoke_timeout_returns_terminal_finding(tmp_path, monkeypatch):
     candidate = tmp_path / "clinical-document-generation"
     candidate.mkdir()
@@ -2979,12 +3118,28 @@ def test_committed_activation_recovery_reports_displaced_cleanup_as_deferred(
     assert recovered["stage"] == "activated"
     assert recovered["cleanup"]["status"] == "deferred"
     assert displaced.is_dir()
-    assert (skills_dir / ".clinical-document-generation.activation.json").is_file()
+    assert not (skills_dir / ".clinical-document-generation.activation.json").exists()
+    assert (
+        skills_dir / "release-history/deferred-cleanup-historical-release.json"
+    ).is_file()
+    failed_releases = list(
+        (tmp_path / "clinical-document-release-failures").iterdir()
+    )
+    assert len(failed_releases) == 1
+    assert (failed_releases[0] / "SKILL.md").is_file()
 
 
 def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
     tmp_path, monkeypatch
 ):
+    release_excluded = workflow._release_excluded
+    monkeypatch.setattr(
+        workflow,
+        "_release_excluded",
+        lambda path: path.as_posix() == "scripts/workflow.py"
+        or path.parts[:1] == ("test-inputs",)
+        or release_excluded(path),
+    )
     archive_path = tmp_path / "release.zip"
     package_release(ROOT, archive_path)
     _certify_archive(archive_path)
@@ -2994,6 +3149,7 @@ def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
     (active / "marker.txt").write_text("active before attempt", encoding="utf-8")
     real_replace = workflow.os.replace
     injected = []
+    verified_roots = []
 
     def report_error_after_candidate_commit(source, destination):
         source = Path(source)
@@ -3006,12 +3162,16 @@ def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
 
     monkeypatch.setattr(workflow.os, "replace", report_error_after_candidate_commit)
 
+    def verified(candidate):
+        verified_roots.append(candidate.resolve())
+        return {"status": "passed"}
+
     result = install_release(
         archive_path,
         skills_dir,
         hermes_config_path=_hermes_config(skills_dir),
         trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
-        verifier=lambda _candidate: {"status": "passed"},
+        verifier=verified,
         provisioner=_passing_provisioner,
     )
 
@@ -3019,9 +3179,11 @@ def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
     assert result["status"] == "passed"
     assert result["stage"] == "activated"
     assert result["activation_commit_point"] == "candidate_to_active_atomic_swap"
-    assert result["cleanup"]["status"] == "deferred"
+    assert len(verified_roots) == 2
+    assert verified_roots[1] == active.resolve()
+    assert result["cleanup"]["status"] == "passed"
     assert not (active / "marker.txt").exists()
-    assert (skills_dir / ".clinical-document-generation.activation.json").is_file()
+    assert not (skills_dir / ".clinical-document-generation.activation.json").exists()
 
 
 @pytest.mark.parametrize("failure_boundary", ("active_to_previous", "candidate_to_active"))
@@ -3423,3 +3585,64 @@ def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_re
     assert observed["pages"] == [bundled]
     assert observed["candidate"] is True
     assert observed["fonts"] == {"Liberation Sans", "Liberation Serif", "Liberation Mono"}
+
+
+def test_installation_smoke_reports_the_exact_pdfium_integrity_failure(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(workflow, "_manifest_integrity", lambda _root: [])
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "source": "host prerequisite"
+    }])
+    monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [])
+    monkeypatch.setattr(
+        workflow,
+        "_pdfium_runtime_integrity",
+        lambda *_args, **_kwargs: {
+            "status": "blocked",
+            "finding": {
+                "category": "renderer",
+                "field": "page_renderer",
+                "code": "renderer.pdfium_runtime_file_missing",
+                "path": "pypdfium2_raw/libpdfium.so",
+                "issue": (
+                    "The installed PDFium file is missing: "
+                    "pypdfium2_raw/libpdfium.so."
+                ),
+            },
+        },
+    )
+    monkeypatch.setattr(
+        workflow,
+        "render_assurance",
+        lambda *_args, **_kwargs: {
+            "status": "passed",
+            "fonts": {},
+            "render": {
+                "status": "passed",
+                "renderer_attempts": [],
+                "findings": [],
+            },
+            "findings": [],
+        },
+    )
+    fallback_fonts = tmp_path / "assets/fallback-fonts"
+    fallback_fonts.mkdir(parents=True)
+    (fallback_fonts / "font.ttf").write_bytes(b"font")
+
+    result = verify_installation(tmp_path)
+
+    assert result["status"] == "blocked"
+    assert [
+        finding for finding in result["findings"]
+        if finding.get("field") == "pdf_page_renderer"
+    ] == [{
+        "category": "installation",
+        "field": "pdf_page_renderer",
+        "code": "renderer.pdfium_runtime_file_missing",
+        "path": "pypdfium2_raw/libpdfium.so",
+        "issue": (
+            "The installed PDFium file is missing: "
+            "pypdfium2_raw/libpdfium.so."
+        ),
+    }]
