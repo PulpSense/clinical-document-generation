@@ -1,0 +1,8 @@
+{
+  "fixture_id": "prospective-sterling-rich-complete",
+  "study_type": "Prospective",
+  "icf_template": "Sterling",
+  "profile": "rich-complete",
+  "evidence_density": "multiple operational tables and narrative details",
+  "source_fixture": "tests/fixtures/prospective-acceptance-source.json"
+}
