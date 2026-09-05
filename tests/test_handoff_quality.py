@@ -37,6 +37,60 @@ def test_single_artifact_retrospective_verification_omits_cross_document_checks(
     assert "assess every cross-document check" not in content_request["instructions"].casefold()
 
 
+def test_content_verification_response_path_is_unique_to_each_review_set(tmp_path):
+    first = create_verification_requests(
+        tmp_path,
+        {"meta": {"study_type": "Retrospective"}},
+        {"artifacts": []},
+        review_set=1,
+    )[0]
+    first_request = json.loads(first.read_text(encoding="utf-8"))
+    second = create_verification_requests(
+        tmp_path,
+        {"meta": {"study_type": "Retrospective"}},
+        {"artifacts": []},
+        review_set=2,
+    )[0]
+    second_request = json.loads(second.read_text(encoding="utf-8"))
+
+    assert first_request["response_path"] != second_request["response_path"]
+    assert "review-1.verify.content" in first_request["response_path"]
+    assert "review-2.verify.content" in second_request["response_path"]
+    assert "Set top-level status exactly `passed`" in second_request["instructions"]
+
+
+def test_failed_content_assessment_is_complete_negative_evidence_not_a_transient_gap(tmp_path):
+    request_path = create_verification_requests(
+        tmp_path,
+        {"meta": {"study_type": "Retrospective"}},
+        {"artifacts": []},
+        review_set=2,
+    )[0]
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = acceptance_verification(request)
+    failed_section = response["section_assessments"][0]["section_id"]
+    response["status"] = "failed"
+    response["section_assessments"][0]["status"] = "failed"
+    response["findings"] = [{
+        "target_ids": [failed_section],
+        "issue": "The section contains a source-fidelity defect.",
+    }]
+    response_path = tmp_path / request["response_path"]
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(
+        tmp_path,
+        request_paths=[request_path],
+    )
+
+    assert any(item["recovery_class"] == "drafting_defect" for item in findings)
+    assert not any(
+        item["recovery_class"] == "verifier_transient"
+        and "explicitly assessed" in item["issue"]
+        for item in findings
+    )
+
+
 def _require_renderer():
     assert workflow.renderer() is not None
 

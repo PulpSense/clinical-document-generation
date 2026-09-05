@@ -3857,7 +3857,9 @@ def _production_agent_prompt(
     elif task == "clinical_content_verification":
         task_rule = (
             "Act as an independent clinical-content verifier. Assess every bound section and "
-            "cross-document check directly from the request evidence."
+            "cross-document check directly from the request evidence. Use top-level status exactly "
+            "`passed` when there are no findings or exactly `blocked` when findings exist; never use "
+            "`failed` as the top-level status."
         )
     else:
         task_rule = "Draft only the requested sections from the closed approved evidence package."
@@ -3893,8 +3895,7 @@ def _production_agent_prompt(
         f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
         f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
-        f"Read the request completely. {task_rule}{layout_rule} Write exact JSON directly to the response "
-        f"path and bind every schema, request ID, request hash, task, target, and evidence "
+        f"Read the request completely. {task_rule}{layout_rule} Bind every schema, request ID, request hash, task, target, and evidence "
         "reference exactly. producer.model_id must record the actual model used for this response."
         f"{response_write_rule}{verification_rule} The validator interpreter is dependency-complete; do not search "
         "the filesystem for Python or dependency paths. Do not modify production code or "

@@ -1349,8 +1349,44 @@ def test_protocol_visit_schedule_has_rows_when_approved_source_has_assessments_o
 
     document = Document(tmp_path / "candidate/protocol.docx")
     schedule = next(table for table in document.tables if table.cell(0, 0).text.strip() == "Visit Number")
-    assert [cell.text for row in schedule.rows[1:] for cell in row.cells]
-    assert "Screening" in "\n".join(cell.text for row in schedule.rows for cell in row.cells)
+    rows = [[cell.text.strip() for cell in row.cells] for row in schedule.rows[1:]]
+    assert [row[1] for row in rows] == ["Screening", "Month 1", "Month 3"]
+    assert all(not row[0] for row in rows)
+
+
+def test_assessments_only_do_not_become_synthetic_numbered_visits(tmp_path):
+    reference = _source()
+    reference["procedures"].pop("visit_schedule", None)
+    reference["procedures"].pop("visit_schedule_table", None)
+    reference["procedures"]["assessments"] = [
+        "Screening, consent, and baseline visit",
+        "Sensor wear on Days 1 to 14, Weeks 6 to 8, and Weeks 10 to 12",
+        "Telephone contact at Week 3",
+        "Clinic visits at Weeks 6 and 12",
+        "Record abstraction",
+        "Sensor insertion and removal",
+        "Sensor data download",
+        "Medication review",
+        "Adverse-event assessment",
+        "Hemoglobin A1c at Week 12",
+        "Usability questionnaire",
+    ]
+
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    schedule = next(
+        table for table in document.tables
+        if table.rows and table.rows[0].cells[0].text.strip() == "Visit Number"
+    )
+    rows = [[cell.text.strip() for cell in row.cells] for row in schedule.rows[1:]]
+
+    assert [(row[0], row[1]) for row in rows] == [
+        ("", "Screening, consent, and baseline visit"),
+        ("", "Telephone contact at Week 3"),
+        ("", "Clinic visits at Weeks 6 and 12"),
+    ]
+    assert all("Record abstraction" not in row for row in rows)
 
 
 def test_advarra_icf_contact_and_withdrawal_are_source_bound(tmp_path):

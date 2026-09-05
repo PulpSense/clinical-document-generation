@@ -101,6 +101,28 @@ def _assessment_timing(label: str) -> str:
     return "Per approved schedule"
 
 
+def _assessment_visit_labels(value: Any) -> list[str]:
+    """Keep only explicitly named visits or contacts when no visit schedule exists."""
+    labels = _plain_language_assessments(value)
+    scheduled = [
+        label for label in labels
+        if (
+            re.search(
+                r"\b(?:visit|visits|contact|contacts|follow[- ]?up|screening|enrollment)\b",
+                label,
+                re.I,
+            )
+            or re.fullmatch(
+                r"\s*(?:(?:day|week|month|year)s?\s+\d+(?:\s*(?:to|[-–])\s*\d+)?|"
+                r"baseline|final|end(?:\s+of)?\s+study)\s*",
+                label,
+                re.I,
+            )
+        )
+    ]
+    return scheduled or labels
+
+
 def _draft_text(model: Mapping[str, Any], section_id: str, *, bullets: bool = False) -> str:
     section = next((item for item in model.get("protocol", []) if item.get("section_id") == section_id), {})
     values = [str(item.get("text") or "").strip() for item in section.get("paragraphs", []) if str(item.get("text") or "").strip()]
@@ -1943,7 +1965,10 @@ def _replace_static_toc(document: Document) -> None:
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
     rows = get_path(reference, "procedures.visit_schedule_table", []) or get_path(reference, "procedures.visit_schedule", []) or []
     if not rows:
-        rows = [{"visitName": item} for item in _list(get_path(reference, "procedures.assessments", []))]
+        rows = [
+            {"visitName": item}
+            for item in _assessment_visit_labels(get_path(reference, "procedures.assessments", []))
+        ]
     if not isinstance(rows, list) or not rows:
         return
     for table in document.tables:
@@ -1953,11 +1978,11 @@ def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
         template = table.rows[template_index]._tr
         table._tbl.remove(template)
         rendered_rows: list[tuple[str, str, str, str]] = []
-        for index, item in enumerate(rows, 1):
+        for item in rows:
             table._tbl.append(copy.deepcopy(template))
             record = item if isinstance(item, Mapping) else {"visitName": item}
             values = (
-                _text(record.get("visitNumber")) or str(index),
+                _text(record.get("visitNumber")),
                 _text(record.get("visitName") or record.get("visit")),
                 _text(record.get("visitWindow") or record.get("timing")),
                 _text(record.get("CRFnumber")),

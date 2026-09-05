@@ -317,6 +317,62 @@ def test_production_parent_publishes_bound_quiet_stdout_response(tmp_path):
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
 
+def test_production_parent_retains_failed_content_review_as_a_blocking_response(tmp_path):
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/verification-requests/review-2-content.json"
+    response_path = revision_dir / "hermes/verification-responses/review-2-content.json"
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r1.review-2.verify.content",
+        "task": "clinical_content_verification",
+        "revision_id": "r1",
+        "review_set": 2,
+        "artifacts": [],
+        "approved_source": {},
+        "authorized_boilerplate": {},
+        "sections": [],
+        "checks": [],
+        "cross_document_checks": [],
+        "instructions": "",
+        "response_path": response_path.relative_to(revision_dir).as_posix(),
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "test-model"},
+        "status": "failed",
+        "findings": [{
+            "target_ids": ["study-procedure.visits"],
+            "issue": "The visit table assigns unsupported visit numbers to procedures.",
+        }],
+        "section_assessments": [],
+        "cross_document_assessments": [],
+    }
+    stdout_log = tmp_path / "worker.stdout.log"
+    stdout_log.write_text(
+        "reasoning before the final object\n" + json.dumps(response, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    handoff = {
+        "request_path": request_path.relative_to(revision_dir).as_posix(),
+        "response_path": request["response_path"],
+        "task": request["task"],
+    }
+
+    assert workflow._production_publish_quiet_response(
+        revision_dir,
+        handoff,
+        stdout_log,
+    ) is True
+    assert json.loads(response_path.read_text(encoding="utf-8")) == response
+
+
 def test_production_verifier_prompt_includes_layout_preservation_notes(tmp_path):
     prompt = workflow._production_agent_prompt(
         tmp_path / "skill",
