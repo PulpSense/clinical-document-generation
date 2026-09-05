@@ -295,7 +295,7 @@ def test_production_parent_publishes_bound_quiet_stdout_response(tmp_path):
         "revision_id": "r1",
         "task": "section_drafting",
         "batch_id": "protocol-foundations",
-        "producer": {"model_id": "test-model"},
+        "producer": {"model_id": "test-model", "reviewer_id": "content-reviewer"},
         "section_results": [],
     }
     stdout_log = tmp_path / "worker.stdout.log"
@@ -345,7 +345,7 @@ def test_production_parent_retains_failed_content_review_as_a_blocking_response(
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "test-model"},
+        "producer": {"model_id": "test-model", "reviewer_id": "content-reviewer"},
         "status": "failed",
         "findings": [{
             "target_ids": ["study-procedure.visits"],
@@ -1593,7 +1593,7 @@ def _visual_handoff_fixture(tmp_path, artifact):
         "request_id": request_id,
         "request_sha256": request["request_sha256"],
         "task": handoff["task"],
-        "producer": {"model_id": "test-verifier"},
+        "producer": {"model_id": "test-verifier", "reviewer_id": f"{artifact}-visual-reviewer"},
         "status": "passed",
         "findings": [],
         "page_assessments": [{
@@ -1880,7 +1880,7 @@ def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(
     assert state["stage_timings"]["independent_verification"]["elapsed_seconds"] == 0.0
 
 
-def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_deadline(tmp_path):
+def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_deadline(tmp_path, monkeypatch):
     revision_dir = tmp_path / "revisions/r1"
     candidate = revision_dir / "candidate"
     candidate.mkdir(parents=True)
@@ -1891,7 +1891,7 @@ def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_de
     page.parent.mkdir(parents=True)
     pdf.write_bytes(b"approved pdf")
     page.write_bytes(b"approved page")
-    (revision_dir / "candidate-build.json").write_text(json.dumps({
+    build = {
         "candidate_files": [{
             "path": "candidate/protocol.docx",
             "sha256": workflow.quality_sha256(candidate / "protocol.docx"),
@@ -1911,11 +1911,13 @@ def test_atomic_publication_does_not_replace_outputs_when_staging_crosses_the_de
                 "sha256": workflow.quality_sha256(page),
             }],
         }]},
-    }), encoding="utf-8")
+    }
+    (revision_dir / "candidate-build.json").write_text(json.dumps(build), encoding="utf-8")
     output = tmp_path / "output"
     output.mkdir()
     (output / "protocol.docx").write_bytes(b"previous release")
     times = iter([9.0, 10.0])
+    monkeypatch.setattr(workflow, "final_exact_artifact_review_findings", lambda *_args: [])
 
     with pytest.raises(workflow.OperationDeadlineExpired):
         workflow._publish(

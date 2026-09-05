@@ -25,7 +25,10 @@ def acceptance_verification(request):
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "TestAcceptanceVerifier/v1"},
+        "producer": {
+            "model_id": "TestAcceptanceVerifier/v1",
+            "reviewer_id": request["task"],
+        },
         "status": "passed",
         "findings": [],
     }

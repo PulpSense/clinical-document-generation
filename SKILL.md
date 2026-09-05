@@ -411,6 +411,8 @@ concurrently so every-page image inspection stays off the serial critical path:
 
 The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery.
 
+Every independent verification response records both `producer.model_id` for the actual selected model and `producer.reviewer_id` for the independent reviewer role. These identities are mandatory, distinct bindings in Final Exact-Artifact Review; neither field selects or restricts which model the client may use.
+
 Each request records its one-based `review_set`. A genuine finding invalidates
 the entire prior verification set after its evidence is archived; all reviewers
 then run concurrently on the repaired candidate. Missing or invalid repair

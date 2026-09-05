@@ -32,13 +32,15 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, get_path, icf_contract, icf_retained_sections, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 from drafting import evidence_grounded
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
 VERIFY_SCHEMA = "hermes-verification/v1"
 RESPONSE_SCHEMA = "hermes-verification-response/v1"
+FINAL_REVIEW_SCHEMA = "final-exact-artifact-review/v1"
+FINAL_REVIEW_SCOPE = "complete_branch_document_set"
 CONTENT_CHECKS = ("substantive", "source_supported", "no_invention", "no_internal_language", "cross_document_consistent")
 CROSS_DOCUMENT_CHECKS = ("protocol_number", "study_title", "study_type", "population", "procedures", "risks_benefits")
 VISUAL_CHECKS = (
@@ -3499,6 +3501,30 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     return governed
 
 
+def _content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    sections = [
+        {
+            "artifact": "protocol",
+            "section_id": section.section_id,
+            "number": section.number,
+            "title": section.title,
+        }
+        for section in protocol_contract(branch)
+        if section_applies(reference, section)
+    ]
+    if branch != "Retrospective":
+        choice = str(get_path(reference, "meta.icf_template", "Advarra"))
+        sections.extend({"artifact": "icf", "section_id": section.section_id, "number": section.number, "title": section.title} for section in icf_contract(branch, choice))
+        sections.extend({"artifact": "icf", "section_id": section_id, "number": "", "title": title} for section_id, title in icf_retained_sections(branch, choice))
+        sections.extend((
+            {"artifact": "study.xml", "section_id": "prs.brief-summary", "number": "", "title": "Brief Summary"},
+            {"artifact": "study.xml", "section_id": "prs.detailed-description", "number": "", "title": "Detailed Description"},
+            {"artifact": "study.xml", "section_id": "prs.structured", "number": "", "title": "Structured PRS Fields"},
+        ))
+    return sections
+
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -3516,24 +3542,10 @@ def create_verification_requests(
         artifact = {"path": path.relative_to(revision_dir).as_posix()}
         if path.suffix.casefold() == ".docx":
             artifact["content_sha256"] = _content_sha256(path)
-        else:
-            artifact["sha256"] = sha256_file(path)
+        artifact["sha256"] = sha256_file(path)
         content_files.append(artifact)
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    sections = [
-        {
-            "artifact": "protocol",
-            "section_id": section.section_id,
-            "number": section.number,
-            "title": section.title,
-        }
-        for section in protocol_contract(branch)
-        if section_applies(reference, section)
-    ]
-    if branch != "Retrospective":
-        choice = str(get_path(reference, "meta.icf_template", "Advarra"))
-        sections.extend({"artifact": "icf", "section_id": section.section_id, "number": section.number, "title": section.title} for section in icf_contract(branch, choice))
-        sections.extend({"artifact": "icf", "section_id": section_id, "number": "", "title": title} for section_id, title in icf_retained_sections(branch, choice))
+    sections = _content_review_sections(reference)
     repo_root = Path(__file__).resolve().parents[1]
     bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
     boilerplate_path = repo_root / str(bundle["fixed_clinical_boilerplate"]["path"])
@@ -3568,6 +3580,10 @@ def create_verification_requests(
         "checks": list(CONTENT_CHECKS),
         "cross_document_checks": cross_document_checks,
         "instructions": content_instructions,
+        "reviewer_policy": {
+            "producer_reviewer_id_required": True,
+            "producer_model_id_required": True,
+        },
         "response_path": f"hermes/verification-responses/{content_request_id}.json",
     }]
     visual_artifacts = list(render_report.get("artifacts", []))
@@ -3595,6 +3611,8 @@ def create_verification_requests(
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",
                 "deterministic_checks_alone_can_pass": False,
+                "producer_reviewer_id_required": True,
+                "producer_model_id_required": True,
             },
             "response_path": f"hermes/verification-responses/{request_id}.json",
         })
@@ -3671,7 +3689,7 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
     ):
         return False
     producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
-    if not _text(producer.get("model_id")):
+    if not _text(producer.get("model_id")) or not _text(producer.get("reviewer_id")):
         return False
     status = str(response.get("status") or "").casefold()
     if status == "passed":
@@ -3734,7 +3752,10 @@ def validate_verifications(
         producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
         if not _text(producer.get("model_id")):
             malformed_response = True
-            findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier identity is missing."}, "verifier_transient"))
+            findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier model identity is missing."}, "verifier_transient"))
+        if not _text(producer.get("reviewer_id")):
+            malformed_response = True
+            findings.append(recovery_finding({"category": "verification", "field": "producer.reviewer_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier reviewer identity is missing."}, "verifier_transient"))
         if malformed_response:
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "malformed", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
@@ -3790,7 +3811,7 @@ def validate_verifications(
                         if isinstance(section, Mapping)
                     }
                     if any(str(artifact.get("path", "")).endswith("study.xml") for artifact in request.get("artifacts", []) if isinstance(artifact, Mapping)):
-                        permitted_targets.update(("prs.brief-summary", "prs.detailed-description"))
+                        permitted_targets.update(("prs.brief-summary", "prs.detailed-description", "prs.structured"))
                     if not supplied_targets or any(target not in permitted_targets for target in supplied_targets):
                         findings.append(recovery_finding({
                             **finding,
@@ -3800,15 +3821,22 @@ def validate_verifications(
                         }, "verifier_transient"))
                     else:
                         finding["target_ids"] = supplied_targets
-                        findings.append(recovery_finding(finding, "drafting_defect"))
+                        recovery_class = (
+                            "deterministic_structure_defect"
+                            if set(supplied_targets) == {"prs.structured"}
+                            else "drafting_defect"
+                        )
+                        findings.append(recovery_finding(finding, recovery_class))
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
-                expected = artifact.get("content_sha256") or artifact.get("sha256")
-                actual = None
-                if path.is_file():
-                    actual = _content_sha256(path) if artifact.get("content_sha256") else sha256_file(path)
-                if not path.is_file() or actual != expected:
+                exact_matches = path.is_file() and sha256_file(path) == artifact.get("sha256")
+                content_matches = (
+                    not artifact.get("content_sha256")
+                    or path.is_file()
+                    and _content_sha256(path) == artifact.get("content_sha256")
+                )
+                if not exact_matches or not content_matches:
                     findings.append(recovery_finding({"category": "verification", "field": request["task"], "issue": f"Verification request is stale for {artifact.get('path')}."}, "document_structure_defect"))
             else:
                 for key in ("docx", "pdf"):
@@ -3858,15 +3886,255 @@ def validate_verifications(
             ):
                 findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing visual response contains a non-passing page assessment."}, "verifier_transient"))
         evidence[evidence_key] = {
+            "task": request.get("task"),
+            "request_id": request.get("request_id"),
+            "review_set": request.get("review_set"),
             "request": request_path.relative_to(revision_dir).as_posix(),
             "request_sha256": sha256_file(request_path),
+            "request_body_sha256": request.get("request_sha256"),
             "response": response_path.relative_to(revision_dir).as_posix(),
             "response_sha256": sha256_file(response_path),
             "producer": producer,
+            "producer_model_id": producer.get("model_id"),
+            "producer_reviewer_id": producer.get("reviewer_id"),
+            "renderer": request.get("renderer"),
+            "page_renderer": request.get("page_renderer"),
             "artifacts": request.get("artifacts", []),
+            "sections": request.get("sections", []),
+            "checks": request.get("checks", []),
+            "cross_document_checks": request.get("cross_document_checks", []),
             "contracted_template_bundle": request.get("contracted_template_bundle"),
         }
     return findings, evidence
+
+
+def _final_verification_scope_findings(
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    render_report: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Require one fresh complete review set over the exact branch package."""
+    expected_names = set(document_set(get_path(reference, "meta.study_type")))
+    expected_paths = {f"candidate/{name}" for name in expected_names}
+    expected_visual = {Path(name).stem for name in expected_names if name.endswith(".docx")}
+    records = [dict(item) for item in evidence.values() if isinstance(item, Mapping)]
+    content = [item for item in records if item.get("task") == "clinical_content_verification"]
+    visual = [item for item in records if item.get("task") == "rendered_page_visual_verification"]
+    issues: list[str] = []
+    if len(content) != 1:
+        issues.append("Final review requires exactly one package-wide content review.")
+    else:
+        content_paths = {
+            str(artifact.get("path"))
+            for artifact in content[0].get("artifacts", [])
+            if isinstance(artifact, Mapping)
+        }
+        expected_sections = {
+            (str(item["artifact"]), str(item["section_id"]))
+            for item in _content_review_sections(reference)
+        }
+        content_sections = {
+            (str(item.get("artifact")), str(item.get("section_id")))
+            for item in content[0].get("sections", [])
+            if isinstance(item, Mapping)
+        }
+        expected_cross = set(CROSS_DOCUMENT_CHECKS) if len(expected_names) > 1 else set()
+        if (
+            content_paths != expected_paths
+            or content_sections != expected_sections
+            or set(content[0].get("checks") or []) != set(CONTENT_CHECKS)
+            or set(content[0].get("cross_document_checks") or []) != expected_cross
+        ):
+            issues.append("The final content review does not cover every section and cross-document check in the exact branch document set.")
+    expected_render_artifacts = {
+        str(artifact.get("artifact")): {
+            key: value
+            for key, value in artifact.items()
+            if key not in {"renderer", "page_renderer"}
+        }
+        for artifact in render_report.get("artifacts", [])
+        if isinstance(artifact, Mapping)
+    }
+    expected_renderers = {
+        str(artifact.get("artifact")): artifact.get("renderer", render_report.get("renderer"))
+        for artifact in render_report.get("artifacts", [])
+        if isinstance(artifact, Mapping)
+    }
+    expected_page_renderers = {
+        str(artifact.get("artifact")): artifact.get("page_renderer", render_report.get("page_renderer"))
+        for artifact in render_report.get("artifacts", [])
+        if isinstance(artifact, Mapping)
+    }
+    visual_artifacts = [
+        dict(artifact)
+        for item in visual
+        for artifact in item.get("artifacts", [])
+        if isinstance(artifact, Mapping)
+    ]
+    visual_names = [str(artifact.get("artifact")) for artifact in visual_artifacts]
+    if (
+        len(visual) != len(expected_visual)
+        or any(len(item.get("artifacts", [])) != 1 for item in visual)
+        or len(visual_artifacts) != len(expected_visual)
+        or set(visual_names) != expected_visual
+        or set(expected_render_artifacts) != expected_visual
+        or any(
+            artifact != expected_render_artifacts.get(str(artifact.get("artifact")))
+            for artifact in visual_artifacts
+        )
+    ):
+        issues.append("Final review requires one document-scoped visual review with the complete rendered page inventory for every final DOCX.")
+    review_sets = {item.get("review_set") for item in records}
+    if len(review_sets) != 1 or not all(isinstance(value, int) and value >= 1 for value in review_sets):
+        issues.append("All final review responses must belong to the same complete review set.")
+    if any(
+        not str(item.get("request_id") or "").strip()
+        or not str(item.get("producer_model_id") or "").strip()
+        or not str(item.get("producer_reviewer_id") or "").strip()
+        or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("request_sha256") or ""))
+        or not re.fullmatch(r"[0-9a-f]{64}", str(item.get("response_sha256") or ""))
+        for item in records
+    ):
+        issues.append("Every final response must bind request, reviewer, model, and response identity.")
+    for item in visual:
+        artifacts = item.get("artifacts", [])
+        artifact_name = str(artifacts[0].get("artifact")) if len(artifacts) == 1 and isinstance(artifacts[0], Mapping) else ""
+        renderer_identity = item.get("renderer")
+        page_renderer_identity = item.get("page_renderer")
+        if (
+            not artifact_name
+            or not isinstance(renderer_identity, Mapping)
+            or not str(renderer_identity.get("kind") or "").strip()
+            or renderer_identity != expected_renderers.get(artifact_name)
+            or not isinstance(page_renderer_identity, Mapping)
+            or not str(page_renderer_identity.get("kind") or "").strip()
+            or page_renderer_identity != expected_page_renderers.get(artifact_name)
+        ):
+            issues.append("Every final visual response must bind the exact renderer and page renderer identities that produced its artifact evidence.")
+            break
+    actual_names = {
+        path.name for path in (revision_dir / "candidate").glob("*") if path.is_file()
+    }
+    if actual_names != expected_names:
+        issues.append("The final candidate directory is not the exact branch document set.")
+    return [
+        recovery_finding({
+            "category": "verification",
+            "field": "final_exact_artifact_review",
+            "target_ids": ["verification:content"],
+            "issue": issue,
+        }, "document_structure_defect")
+        for issue in issues
+    ]
+
+
+def _exact_rendered_hashes(
+    revision_dir: Path,
+    render_report: Mapping[str, Any],
+) -> dict[str, str]:
+    paths = [
+        str(item.get("path"))
+        for artifact in render_report.get("artifacts", [])
+        if isinstance(artifact, Mapping)
+        for item in [
+            {"path": artifact.get("docx")},
+            {"path": artifact.get("pdf")},
+            *[
+                {"path": page.get("path")}
+                for page in artifact.get("pages", [])
+                if isinstance(page, Mapping)
+            ],
+        ]
+        if item.get("path")
+    ]
+    return {
+        path: sha256_file(revision_dir / path)
+        for path in paths
+        if (revision_dir / path).is_file()
+    }
+
+
+def _final_review_bindings(evidence: Mapping[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            "task": item.get("task"),
+            "request_id": item.get("request_id"),
+            "request_sha256": item.get("request_sha256"),
+            "request_body_sha256": item.get("request_body_sha256"),
+            "response_sha256": item.get("response_sha256"),
+            "review_set": item.get("review_set"),
+            "reviewer_identity": item.get("producer"),
+            "reviewer_id": item.get("producer_reviewer_id"),
+            "model_identity": item.get("producer_model_id"),
+            "renderer": item.get("renderer"),
+            "page_renderer": item.get("page_renderer"),
+        }
+        for item in sorted(
+            (dict(value) for value in evidence.values() if isinstance(value, Mapping)),
+            key=lambda value: str(value.get("request_id") or ""),
+        )
+    ]
+
+
+def final_exact_artifact_review_findings(
+    revision_dir: Path,
+    reference: Mapping[str, Any],
+    render_report: Mapping[str, Any],
+    quality: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Revalidate the non-bypassable final review against current exact bytes."""
+    final_review = quality.get("final_exact_artifact_review")
+    if not isinstance(final_review, Mapping):
+        return [recovery_finding({
+            "category": "verification",
+            "field": "final_exact_artifact_review",
+            "issue": "Final Exact-Artifact Review is required.",
+        }, "document_structure_defect")]
+    expected_values = {
+        "schema_version": FINAL_REVIEW_SCHEMA,
+        "scope": FINAL_REVIEW_SCOPE,
+        "status": "passed",
+        "branch_document_set": sorted(document_set(get_path(reference, "meta.study_type"))),
+        "mandatory_visual_checks": list(VISUAL_CHECKS),
+        "every_page": True,
+        "section_three_and_orphan_heading_checks": True,
+    }
+    issues = []
+    if quality.get("status") != "passed" or quality.get("findings"):
+        issues.append("Final Exact-Artifact Review is not attached to passing quality evidence.")
+    if any(final_review.get(key) != expected for key, expected in expected_values.items()):
+        issues.append("Final Exact-Artifact Review is incomplete.")
+    candidate_hashes = {
+        path.relative_to(revision_dir).as_posix(): sha256_file(path)
+        for path in sorted((revision_dir / "candidate").glob("*"))
+        if path.is_file()
+    }
+    if candidate_hashes != dict(final_review.get("candidate_hashes") or {}):
+        issues.append("Final candidate bytes changed after review.")
+    if _exact_rendered_hashes(revision_dir, render_report) != dict(final_review.get("rendered_hashes") or {}):
+        issues.append("Final rendered bytes changed after review.")
+    verification_findings, fresh_evidence = validate_verifications(revision_dir)
+    verification_findings.extend(
+        _final_verification_scope_findings(
+            revision_dir, reference, render_report, fresh_evidence
+        )
+    )
+    if (
+        canonical_evidence_sha256(fresh_evidence)
+        != final_review.get("verification_evidence_sha256")
+        or fresh_evidence != quality.get("verification_evidence")
+        or _final_review_bindings(fresh_evidence) != final_review.get("review_bindings")
+    ):
+        issues.append("Final request or reviewer evidence changed after review.")
+    return [
+        recovery_finding({
+            "category": "verification",
+            "field": "final_exact_artifact_review",
+            "issue": issue,
+        }, "document_structure_defect")
+        for issue in issues
+    ] + verification_findings
 
 
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -3882,7 +4150,28 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
         )
     verification_findings, evidence = validate_verifications(revision_dir)
     findings.extend(verification_findings)
-    return {"status": "passed" if not findings else "blocked", "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence}
+    findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
+    candidate_hashes = {
+        path.relative_to(revision_dir).as_posix(): sha256_file(path)
+        for path in sorted((revision_dir / "candidate").glob("*"))
+        if path.is_file()
+    }
+    rendered_hashes = _exact_rendered_hashes(revision_dir, render_report)
+    review_bindings = _final_review_bindings(evidence)
+    final_review = {
+        "schema_version": FINAL_REVIEW_SCHEMA,
+        "scope": FINAL_REVIEW_SCOPE,
+        "status": "passed" if not findings else "blocked",
+        "branch_document_set": sorted(document_set(get_path(reference, "meta.study_type"))),
+        "candidate_hashes": candidate_hashes,
+        "rendered_hashes": rendered_hashes,
+        "verification_evidence_sha256": canonical_evidence_sha256(evidence),
+        "review_bindings": review_bindings,
+        "mandatory_visual_checks": list(VISUAL_CHECKS),
+        "every_page": not findings,
+        "section_three_and_orphan_heading_checks": not findings,
+    }
+    return {"status": final_review["status"], "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
 __all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

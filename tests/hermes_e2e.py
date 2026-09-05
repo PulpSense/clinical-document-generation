@@ -833,7 +833,7 @@ Task: {task}
 
 Read {skill_root / 'SKILL.md'} and load the clinical-document-generation skill. Read the request completely. {verification_rule}
 {preservation_rule}
-Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must record the actual model used for this response. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
+Write exact JSON to the response path. Bind every schema, request ID, request hash, task, target, and evidence reference exactly. producer.model_id must record the actual model used for this response, and producer.reviewer_id must record the independent reviewer role. {validation_rule} Never use recorded_acceptance_response and never fabricate verifier approval. Do not modify production code or the approved source. Return only the absolute response path and SHA-256 after the validated file exists."""
 
 
 def _wait_for_processes(

@@ -1742,7 +1742,7 @@ def test_transient_verifier_failure_is_classified_for_retry_without_accepting_qa
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "Verifier"},
+        "producer": {"model_id": "Verifier", "reviewer_id": "content-reviewer"},
         "status": "retryable_error",
         "error": {"type": "api_unavailable", "message": "temporary connection failure"},
     }
@@ -1781,7 +1781,7 @@ def test_content_finding_without_a_section_target_reprompts_the_reviewer(tmp_pat
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "user-selected-local-model"},
+        "producer": {"model_id": "user-selected-local-model", "reviewer_id": "content-reviewer"},
         "status": "blocked",
         "findings": [{"issue": "A substantive source fact is missing."}],
         "section_assessments": [],
@@ -2159,7 +2159,7 @@ def test_workflow_binds_missing_identity_but_never_rewrites_mismatched_identity(
     request["request_sha256"] = verification_request_sha256(request)
     (requests / "content.json").write_text(json.dumps(request), encoding="utf-8")
     semantic = {
-        "producer": {"model_id": "client-selected-model"},
+        "producer": {"model_id": "client-selected-model", "reviewer_id": "content-reviewer"},
         "status": "passed",
         "section_assessments": [],
         "cross_document_assessments": [],

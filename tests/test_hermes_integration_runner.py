@@ -124,7 +124,10 @@ def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path,
         "task": request["task"],
         "status": "passed",
         "findings": [],
-        "producer": {"model_id": "gpt-5.6-sol"},
+        "producer": {
+            "model_id": "gpt-5.6-sol",
+            "reviewer_id": "protocol-visual-reviewer",
+        },
         "page_assessments": [{
             "artifact": "protocol",
             "page": 1,
@@ -1450,7 +1453,10 @@ def test_release_certification_adapter_uses_the_persisted_desktop_operation(tmp_
     (request_dir / "draft-1.json").write_text(json.dumps(request), encoding="utf-8")
     (response_dir / "draft-1.json").write_text(json.dumps({
         **request,
-        "producer": {"model_id": "gpt-5.6-sol"},
+        "producer": {
+            "model_id": "gpt-5.6-sol",
+            "reviewer_id": "content-reviewer",
+        },
     }), encoding="utf-8")
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
         "status": "passed",
@@ -1742,7 +1748,10 @@ def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Pat
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "gpt-5.6-sol"},
+        "producer": {
+            "model_id": "gpt-5.6-sol",
+            "reviewer_id": "content-reviewer",
+        },
         "status": "blocked",
         "findings": [{
             "target_ids": ["objectives"],

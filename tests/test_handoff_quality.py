@@ -16,6 +16,7 @@ from contracts import icf_retained_sections
 from rendering import audit_docx
 from workflow import approve, generate, prepare, validate
 import workflow
+import quality
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,26 @@ def test_single_artifact_retrospective_verification_omits_cross_document_checks(
     assert content_request["task"] == "clinical_content_verification"
     assert content_request["cross_document_checks"] == []
     assert "assess every cross-document check" not in content_request["instructions"].casefold()
+
+
+def test_prospective_content_verification_requires_all_prs_semantic_targets(tmp_path):
+    tmp_path.mkdir(exist_ok=True)
+    request_paths = create_verification_requests(
+        tmp_path,
+        fixture(),
+        {"artifacts": []},
+    )
+    content_request = json.loads(request_paths[0].read_text(encoding="utf-8"))
+
+    prs_sections = {
+        item["section_id"]
+        for item in content_request["sections"]
+        if item["artifact"] == "study.xml"
+    }
+    assert prs_sections == {
+        "prs.brief-summary", "prs.detailed-description", "prs.structured",
+    }
+    assert content_request["reviewer_policy"]["producer_reviewer_id_required"] is True
 
 
 def test_content_verification_response_path_is_unique_to_each_review_set(tmp_path):
@@ -91,6 +112,52 @@ def test_failed_content_assessment_is_complete_negative_evidence_not_a_transient
     )
 
 
+def test_verification_response_requires_distinct_reviewer_and_model_identities(tmp_path):
+    request_path = create_verification_requests(
+        tmp_path,
+        {"meta": {"study_type": "Retrospective"}},
+        {"artifacts": []},
+    )[0]
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = acceptance_verification(request)
+    response["producer"].pop("reviewer_id")
+    response_path = tmp_path / request["response_path"]
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(tmp_path, request_paths=[request_path])
+
+    assert any(item["field"] == "producer.reviewer_id" for item in findings)
+    assert all(item["recovery_class"] == "verifier_transient" for item in findings)
+
+
+def test_prs_structured_content_finding_routes_to_deterministic_rebuild(tmp_path):
+    request_path = create_verification_requests(
+        tmp_path,
+        fixture(),
+        {"artifacts": []},
+    )[0]
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = acceptance_verification(request)
+    structured = next(
+        item for item in response["section_assessments"]
+        if item["section_id"] == "prs.structured"
+    )
+    structured["status"] = "failed"
+    response["status"] = "blocked"
+    response["findings"] = [{
+        "target_ids": ["prs.structured"],
+        "issue": "The structured eligibility qualifier differs from the approved source.",
+    }]
+    response_path = tmp_path / request["response_path"]
+    response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(tmp_path, request_paths=[request_path])
+
+    routed = next(item for item in findings if item.get("target_ids") == ["prs.structured"])
+    assert routed["recovery_class"] == "deterministic_structure_defect"
+    assert routed["action"] == "rebuild_deterministic_structure"
+
+
 def _require_renderer():
     assert workflow.renderer() is not None
 
@@ -101,7 +168,10 @@ def acceptance_verification(request):
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "TestAcceptanceVerifier/v1"},
+        "producer": {
+            "model_id": "TestAcceptanceVerifier/v1",
+            "reviewer_id": request["task"],
+        },
         "status": "passed",
         "findings": [],
     }
@@ -1373,7 +1443,7 @@ def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path
     )
     assert not response_by_artifact["protocol"].exists()
     assert response_by_artifact["icf"].is_file()
-    assert content_response.is_file()
+    assert not content_response.exists()
 
     content_changed = Document(protocol_docx)
     content_changed.paragraphs[0].text = "Changed protocol content"
@@ -1546,13 +1616,181 @@ def test_visual_gate_rejects_unassessed_pages(tmp_path):
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
     request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": [{"page": 1, "sha256": "one"}, {"page": 2, "sha256": "two"}]}]}
     request["request_sha256"] = verification_request_sha256(request)
-    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test"}, "status": "passed", "findings": [], "page_assessments": [{"artifact": "protocol", "page": 1, "sha256": "one", "status": "passed", "checks": list(VISUAL_CHECKS)}]}
+    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test", "reviewer_id": "visual-reviewer"}, "status": "passed", "findings": [], "page_assessments": [{"artifact": "protocol", "page": 1, "sha256": "one", "status": "passed", "checks": list(VISUAL_CHECKS)}]}
     (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
     (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
     findings, _ = validate_verifications(tmp_path)
     incomplete = next(item for item in findings if item["field"] == "page_assessments")
     assert incomplete["recovery_class"] == "verifier_transient"
     assert incomplete["action"] == "retry_verifier"
+
+
+def test_final_exact_artifact_review_rejects_missing_or_partial_review_requests(tmp_path, monkeypatch):
+    revision = tmp_path / "revision"
+    candidate = revision / "candidate"
+    candidate.mkdir(parents=True)
+    for name, payload in (
+        ("protocol.docx", b"protocol"),
+        ("icf.docx", b"icf"),
+        ("study.xml", b"<clinical_study/>"),
+    ):
+        (candidate / name).write_bytes(payload)
+    reference = fixture()
+    monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [])
+    monkeypatch.setattr(quality, "validate_verifications", lambda *_args: ([], {}))
+
+    report = quality.quality_report(
+        revision,
+        reference,
+        {"status": "passed", "renderer": {"kind": "test"}, "artifacts": [], "findings": []},
+        {"status": "passed", "findings": []},
+    )
+
+    assert report["status"] == "blocked"
+    assert report["final_exact_artifact_review"]["status"] == "blocked"
+    assert report["final_exact_artifact_review"]["every_page"] is False
+    assert any("package-wide content review" in item["issue"] for item in report["findings"])
+    assert any("document-scoped visual review" in item["issue"] for item in report["findings"])
+
+
+def test_final_exact_artifact_review_rejects_grouped_or_empty_visual_requests(tmp_path, monkeypatch):
+    revision = tmp_path / "revision"
+    candidate = revision / "candidate"
+    candidate.mkdir(parents=True)
+    for name, payload in (
+        ("protocol.docx", b"protocol"),
+        ("icf.docx", b"icf"),
+        ("study.xml", b"<clinical_study/>"),
+    ):
+        (candidate / name).write_bytes(payload)
+    bound = {
+        "review_set": 1,
+        "request_sha256": "a" * 64,
+        "response_sha256": "b" * 64,
+        "producer_model_id": "client-selected-model",
+        "producer_reviewer_id": "independent-reviewer",
+    }
+    evidence = {
+        "content": {
+            **bound,
+            "task": "clinical_content_verification",
+            "request_id": "review.content",
+            "artifacts": [
+                {"path": f"candidate/{name}"}
+                for name in ("protocol.docx", "icf.docx", "study.xml")
+            ],
+        },
+        "visual-grouped": {
+            **bound,
+            "task": "rendered_page_visual_verification",
+            "request_id": "review.visual.grouped",
+            "renderer": {"kind": "test-office"},
+            "page_renderer": {"kind": "test-pages"},
+            "artifacts": [{"artifact": "protocol"}, {"artifact": "icf"}],
+        },
+        "visual-empty": {
+            **bound,
+            "task": "rendered_page_visual_verification",
+            "request_id": "review.visual.empty",
+            "renderer": {"kind": "test-office"},
+            "page_renderer": {"kind": "test-pages"},
+            "artifacts": [],
+        },
+    }
+    monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [])
+    monkeypatch.setattr(quality, "validate_verifications", lambda *_args: ([], evidence))
+
+    report = quality.quality_report(
+        revision,
+        fixture(),
+        {"status": "passed", "renderer": {"kind": "test"}, "artifacts": [], "findings": []},
+        {"status": "passed", "findings": []},
+    )
+
+    assert report["status"] == "blocked"
+    assert any("document-scoped visual review" in item["issue"] for item in report["findings"])
+
+
+def test_final_exact_artifact_review_rejects_sampled_page_inventory(tmp_path):
+    revision = tmp_path / "revision"
+    candidate = revision / "candidate"
+    rendered = revision / "rendered/protocol"
+    candidate.mkdir(parents=True)
+    rendered.mkdir(parents=True)
+    (candidate / "protocol.docx").write_bytes(b"protocol")
+    (revision / "rendered/protocol.pdf").write_bytes(b"pdf")
+    for page_number in (1, 2):
+        (rendered / f"page-{page_number}.png").write_bytes(f"page-{page_number}".encode())
+
+    def digest(relative):
+        return hashlib.sha256((revision / relative).read_bytes()).hexdigest()
+
+    complete_artifact = {
+        "artifact": "protocol",
+        "status": "passed",
+        "docx": "candidate/protocol.docx",
+        "docx_sha256": digest("candidate/protocol.docx"),
+        "pdf": "rendered/protocol.pdf",
+        "pdf_sha256": digest("rendered/protocol.pdf"),
+        "page_count": 2,
+        "pages": [
+            {
+                "page": page_number,
+                "path": f"rendered/protocol/page-{page_number}.png",
+                "sha256": digest(f"rendered/protocol/page-{page_number}.png"),
+            }
+            for page_number in (1, 2)
+        ],
+    }
+    bound = {
+        "review_set": 1,
+        "request_sha256": "a" * 64,
+        "response_sha256": "b" * 64,
+        "producer_model_id": "client-selected-model",
+        "producer_reviewer_id": "protocol-visual-reviewer",
+    }
+    evidence = {
+        "content": {
+            **bound,
+            "task": "clinical_content_verification",
+            "request_id": "review.content",
+            "artifacts": [{"path": "candidate/protocol.docx"}],
+        },
+        "visual": {
+            **bound,
+            "task": "rendered_page_visual_verification",
+            "request_id": "review.visual.protocol",
+            "renderer": {"kind": "test-office"},
+            "page_renderer": {"kind": "test-pages"},
+            "artifacts": [{**complete_artifact, "pages": complete_artifact["pages"][:1]}],
+        },
+    }
+
+    render_report = {
+        "status": "passed",
+        "renderer": {"kind": "test-office"},
+        "page_renderer": {"kind": "test-pages"},
+        "artifacts": [complete_artifact],
+    }
+    findings = quality._final_verification_scope_findings(
+        revision,
+        {"meta": {"study_type": "Retrospective"}},
+        render_report,
+        evidence,
+    )
+
+    assert any("complete rendered page inventory" in item["issue"] for item in findings)
+
+    evidence["visual"]["artifacts"] = [complete_artifact]
+    evidence["visual"]["renderer"] = {"kind": "different-office"}
+    findings = quality._final_verification_scope_findings(
+        revision,
+        {"meta": {"study_type": "Retrospective"}},
+        render_report,
+        evidence,
+    )
+
+    assert any("exact renderer and page renderer" in item["issue"] for item in findings)
 
 
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
@@ -1565,7 +1803,7 @@ def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "test"},
+        "producer": {"model_id": "test", "reviewer_id": "visual-reviewer"},
         "status": "failed",
         "findings": [{
             "artifact": "protocol",
@@ -1647,7 +1885,7 @@ def test_generic_content_pass_without_per_section_evidence_is_rejected(tmp_path)
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
     request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.content", "task": "clinical_content_verification", "response_path": "hermes/verification-responses/r.verify.content.json", "artifacts": [], "sections": [{"artifact": "protocol", "section_id": "introduction"}], "checks": list(CONTENT_CHECKS), "cross_document_checks": ["study_title"]}
     request["request_sha256"] = verification_request_sha256(request)
-    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test"}, "status": "passed", "findings": []}
+    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test", "reviewer_id": "content-reviewer"}, "status": "passed", "findings": []}
     (request_dir / "r.verify.content.json").write_text(json.dumps(request), encoding="utf-8")
     (response_dir / "r.verify.content.json").write_text(json.dumps(response), encoding="utf-8")
     findings, _ = validate_verifications(tmp_path)
@@ -1751,6 +1989,7 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
                 "docx_sha256": hashlib.sha256(docx.read_bytes()).hexdigest(),
                 "pdf": f"rendered/{name}.pdf",
                 "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+                "page_count": 1,
                 "pages": [{
                     "page": 1,
                     "path": f"rendered/{name}/page-1.png",
@@ -1791,6 +2030,37 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
 
     monkeypatch.setattr(workflow, "render_documents", controlled_render)
 
+    def accept_all(current_run, current_result):
+        current_revision = current_run / "revisions" / current_result["revision_id"]
+        for relative in current_result["requests"]:
+            request = json.loads((current_revision / relative).read_text(encoding="utf-8"))
+            response = (
+                recorded_acceptance_response(request)
+                if request["task"] in {"section_drafting", "prs_narrative_drafting"}
+                else acceptance_verification(request)
+            )
+            response_path = current_revision / request["response_path"]
+            response_path.parent.mkdir(parents=True, exist_ok=True)
+            response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    clean_run = tmp_path / "clean-run"
+    clean_reference = clean_run / "reference/study.reference.json"
+    clean_reference.parent.mkdir(parents=True)
+    clean_reference.write_text(json.dumps(fixture()), encoding="utf-8")
+    assert prepare(clean_run)["status"] == "awaiting_approval"
+    approve(clean_run, approved_by="reviewer")
+    clean_result = generate(clean_run, require_promoted_runtime=False)
+    while clean_result.get("stage") in {"drafting", "drafting_retry"}:
+        accept_all(clean_run, clean_result)
+        clean_result = generate(clean_run, require_promoted_runtime=False)
+    assert clean_result["stage"] == "independent_verification"
+    accept_all(clean_run, clean_result)
+    clean_result = generate(clean_run, require_promoted_runtime=False)
+    assert clean_result["status"] == "passed"
+    assert set(clean_result["client_outputs"]) == {
+        "output/icf.docx", "output/protocol.docx", "output/study.xml",
+    }
+
     result = generate(run_dir, require_promoted_runtime=False)
     injected_drafting_failure = False
     saw_drafting_retry = False
@@ -1822,6 +2092,53 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
     first_candidate = hashlib.sha256(
         (revision_dir / "candidate/protocol.docx").read_bytes()
     ).hexdigest()
+
+    content_repair_run = tmp_path / "successful-content-repair"
+    shutil.copytree(run_dir, content_repair_run)
+    content_revision = content_repair_run / "revisions" / revision_id
+    for relative in result["requests"]:
+        request = json.loads((content_revision / relative).read_text(encoding="utf-8"))
+        response = acceptance_verification(request)
+        if request["task"] == "clinical_content_verification":
+            failed_section = next(
+                item for item in response["section_assessments"]
+                if item["section_id"] == "introduction"
+            )
+            failed_section["status"] = "failed"
+            response["status"] = "blocked"
+            response["findings"] = [{
+                "target_ids": [failed_section["section_id"]],
+                "issue": "The section requires a source-grounded content repair.",
+            }]
+        response_path = content_revision / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+    content_result = generate(content_repair_run, require_promoted_runtime=False)
+    assert content_result["stage"] == "drafting_retry"
+    while content_result.get("stage") in {"drafting", "drafting_retry"}:
+        for relative in content_result["requests"]:
+            request = json.loads((content_revision / relative).read_text(encoding="utf-8"))
+            response = recorded_acceptance_response(request)
+            for section in response.get("section_results", []):
+                if section.get("section_id") == "introduction" and section.get("paragraphs"):
+                    section["paragraphs"][0]["text"] += (
+                        " A prospective evaluation of a wearable monitoring device is the approved study background."
+                    )
+            response_path = content_revision / request["response_path"]
+            response_path.parent.mkdir(parents=True, exist_ok=True)
+            response_path.write_text(json.dumps(response), encoding="utf-8")
+        content_result = generate(content_repair_run, require_promoted_runtime=False)
+    assert content_result["stage"] == "independent_verification"
+    assert hashlib.sha256(
+        (content_revision / "candidate/protocol.docx").read_bytes()
+    ).hexdigest() != first_candidate
+    accept_all(content_repair_run, content_result)
+    content_result = generate(content_repair_run, require_promoted_runtime=False)
+    assert content_result["status"] == "passed"
+    assert set(content_result["client_outputs"]) == {
+        "output/icf.docx", "output/protocol.docx", "output/study.xml",
+    }
+
     for relative in result["requests"]:
         request_path = revision_dir / relative
         request = json.loads(request_path.read_text(encoding="utf-8"))
@@ -1863,6 +2180,26 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
     assert hashlib.sha256(
         (revision_dir / "candidate/protocol.docx").read_bytes()
     ).hexdigest() != first_candidate
+
+    successful_repair_run = tmp_path / "successful-progressive-repair"
+    shutil.copytree(run_dir, successful_repair_run)
+    successful_revision = successful_repair_run / "revisions" / revision_id
+    for relative in recovered["requests"]:
+        request = json.loads((successful_revision / relative).read_text(encoding="utf-8"))
+        response_path = successful_revision / request["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
+    successful = generate(successful_repair_run, require_promoted_runtime=False)
+    assert successful["status"] == "passed"
+    assert set(successful["client_outputs"]) == {
+        "output/icf.docx", "output/protocol.docx", "output/study.xml",
+    }
+    successful_quality = json.loads(
+        (successful_revision / "delivery-manifest.json").read_text(encoding="utf-8")
+    )["quality"]
+    assert successful_quality["final_exact_artifact_review"]["status"] == "passed"
+    assert successful_quality["final_exact_artifact_review"]["every_page"] is True
+
     forced_candidate["bytes"] = (revision_dir / "candidate/protocol.docx").read_bytes()
     forced_candidate["enabled"] = True
 

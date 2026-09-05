@@ -41,7 +41,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
 
 
@@ -3993,7 +3993,8 @@ def _production_agent_prompt(
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
         f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
         f"Read the request completely. {task_rule}{layout_rule} Bind every schema, request ID, request hash, task, target, and evidence "
-        "reference exactly. producer.model_id must record the actual model used for this response."
+        "reference exactly. producer.model_id must record the actual model used for this response, and "
+        "producer.reviewer_id must record the independent reviewer role for this response."
         f"{response_write_rule}{verification_rule} The validator interpreter is dependency-complete; do not search "
         "the filesystem for Python or dependency paths. Do not modify production code or "
         "approved source material."
@@ -5202,6 +5203,13 @@ def _publish(
         raise RuntimeError(f"stale publication evidence: {exc}") from exc
     if evidence_findings := _publication_evidence_findings(revision_dir, build):
         raise RuntimeError(f"stale publication evidence: {evidence_findings}")
+    final_review_findings = final_exact_artifact_review_findings(
+        revision_dir, reference, build.get("render_report") or {}, quality
+    )
+    if final_review_findings:
+        raise RuntimeError(
+            f"stale publication evidence: final verification is incomplete: {final_review_findings}"
+        )
     sources = sorted((revision_dir / "candidate").glob("*.docx")) + sorted((revision_dir / "candidate").glob("*.xml"))
     expected = set(document_set(get_path(reference, "meta.study_type")))
     actual = {source.name for source in sources}
@@ -5223,6 +5231,13 @@ def _publish(
                 raise RuntimeError(f"stale publication evidence: staged bytes changed for {source.name}")
         if evidence_findings := _publication_evidence_findings(revision_dir, build):
             raise RuntimeError(f"stale publication evidence: {evidence_findings}")
+        final_review_findings = final_exact_artifact_review_findings(
+            revision_dir, reference, build.get("render_report") or {}, quality
+        )
+        if final_review_findings:
+            raise RuntimeError(
+                f"stale publication evidence: final verification is incomplete: {final_review_findings}"
+            )
         # The only client-visible mutation is the atomic swap below. Recheck
         # after staging so slow copies cannot publish after the hard ceiling.
         if operation_deadline is not None and clock() >= operation_deadline:
@@ -7174,7 +7189,10 @@ def _synthetic_format_verification(request: Mapping[str, Any]) -> dict[str, Any]
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "DeterministicFormatConformance/v1"},
+        "producer": {
+            "model_id": "DeterministicFormatConformance/v1",
+            "reviewer_id": "deterministic-format-conformance",
+        },
         "status": "passed",
         "findings": [],
     }
