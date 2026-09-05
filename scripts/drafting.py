@@ -32,6 +32,7 @@ from contracts import (
     icf_contract,
     meaningful,
     protocol_contract,
+    source_evidence_coverage_map,
 )
 
 
@@ -280,6 +281,7 @@ def governing_resources(
     implementation = [repo_root / "scripts" / name for name in IMPLEMENTATION_FILES]
     return {
         "approved_source_sha256": get_path(reference, "approval.source_sha256"),
+        "source_evidence_coverage_map": source_evidence_coverage_map(reference),
         "contracted_template_bundle": bundle,
         "implementation_sha256": {path.relative_to(repo_root).as_posix(): sha256_file(path) for path in implementation},
         "topology_version": TOPOLOGY_VERSION,
@@ -509,6 +511,7 @@ def create_drafting_request(
         "attempts": {target: int(attempts[target]) for target in targets},
         "approved_input": _source_items(scoped),
         "approved_source": scoped,
+        "source_evidence_coverage_map": source_evidence_coverage_map(reference),
         "section_contracts": sections,
         "accepted_context": accepted_context(revision_dir, batch, governing),
         "prior_target_drafts": [draft for target in targets if (draft := accepted_draft(revision_dir, target, governing))],

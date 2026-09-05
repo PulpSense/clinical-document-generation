@@ -151,8 +151,12 @@ The branch of the workflow that produces prospective-study protocol documents fr
 _Avoid_: protocol path, prospective generation, GP path
 
 **Layout Contract**:
-The client reference’s page geometry, branding, typography, styles, heading hierarchy, numbering, headers, footers, tables, signature structures, document-control layout, and general visual character as rendered by the Client Rendering Authority. Study-specific content may paginate naturally; exact reference page breaks and page numbers are not required, and known Presentation Defects are not preserved.
+The client reference’s page geometry, branding, fonts, typography, styles, spacing, margins, heading hierarchy, numbering, headers, footers, tables, signature structures, document-control layout, and general visual character as rendered by the Client Rendering Authority. Study-specific content may paginate naturally; exact reference page breaks and page numbers are not required, and known Presentation Defects are not preserved. Layout repair may change only pagination controls or the smallest necessary Word-native structure and must preserve this authority and the clinical content.
 _Avoid_: exact page clone, formatting preference, style goal, desired look
+
+**Template-Family Layout Repair**:
+A bounded, composable correction for a verified visual defect class in one Contracted Template family. It targets the smallest identified element, preserves the Layout Contract and clinical meaning, and requires a fresh exact-artifact render and review.
+_Avoid_: study-specific workaround, global reformat, content rewrite
 
 **Document Control Date**:
 The reviewer-editable date displayed in generated Protocol document-control surfaces using the client format `dd MMM yyyy`. When absent from the Source Intake Packet, it defaults to the Source-of-Truth preparation date and remains stable across approval, retries, and later rendering.
@@ -226,6 +230,18 @@ _Avoid_: empty section, duplicate introduction, missing content
 Structured candidate content for one Required Generated Section, identified by its stable section ID and carrying its approved evidence, selected Fixed Clinical Boilerplate, prose, lists, and tables as applicable.
 _Avoid_: AI response, document fragment, generated blob
 
+**Source Evidence Coverage Map**:
+The machine-readable mapping from each required approved source fact to the generated sections and artifacts that must preserve it. It catches missing required evidence before rendering while leaving semantic fidelity, contradiction, and invention judgments to independent review.
+_Avoid_: substring match, reviewer memory, word-count coverage
+
+**Source-Grounded Elaboration**:
+Drafting that reorganizes or paraphrases approved facts, states only conclusions that directly follow from them, and uses versioned Fixed Clinical Boilerplate only where the Document Section Contract permits it. It may improve clarity and flow but may not introduce a new number, date, procedure, risk, benefit, eligibility rule, role, commitment, or causal claim merely because that addition would be clinically plausible.
+_Avoid_: reasonable invention, creative completion, assumed standard practice
+
+**Evidence-Scaled Section Depth**:
+The rule that a generated section follows the Reference Protocol's relative emphasis while its actual length is supported by the richness of approved evidence. A concise complete section passes; filler, repetition, or invented detail used to reach a fixed word count fails.
+_Avoid_: minimum word count, length padding, verbosity target
+
 **Drafting Batch**:
 A contract-defined set of related Required Generated Sections assigned to one drafting subagent so narrative work can run concurrently and failed sections can be retried without regenerating accepted work. Batch size follows document complexity rather than a fixed number of agents per document.
 _Avoid_: one agent per document, three agents per document, arbitrary section split
@@ -235,8 +251,12 @@ A Delivery Gate that checks shared study facts across the Canonical Approved Sou
 _Avoid_: final rewrite, consistency cleanup, output merge
 
 **Branch Acceptance Corpus**:
-The versioned set of sparse-complete and rich-complete studies for every branch, plus the real inputs that previously produced known content and presentation defects, used to certify a replacement workflow without treating defective outputs as expected results.
+The versioned set of sparse-complete and rich-complete studies for all five supported document families, plus every real input that previously produced a known content or presentation defect, used to certify the workflow without treating defective outputs as expected results.
 _Avoid_: sample inputs, smoke fixtures, happy-path tests
+
+**Release Reliability Evidence**:
+The passing evidence bound to exact packaged bytes: the complete Branch Acceptance Corpus, one real Hermes generation for each supported document family, and installation, activation, delivery, and rollback smoke tests. A package without this complete evidence is a candidate, not a reliable release.
+_Avoid_: one successful run, local test pass, unbound certification
 
 **Presentation Defect**:
 An obvious non-substantive error in the Reference Protocol or template surface, such as a typo or malformed label, that should not become part of the Layout Contract.
@@ -267,16 +287,40 @@ A human- or system-supplied render from a client-like environment that can be us
 _Avoid_: screenshot, client PDF, manual proof
 
 **Source Completeness Gate**:
-The branch-aware pre-generation contract that validates document-control values, operational source facts, explicit approval, candidate conflicts, and Data-Driven Table schemas before final rendering.
-_Avoid_: metadata check, input cleanup, best-effort validation
+The branch-aware pre-generation contract that confirms every obligatory input for the selected branch was submitted, resolves conflicts, validates Data-Driven Table schemas, and binds explicit approval. It establishes completeness rather than prose quality: a modest but complete source passes, while an absent required fact does not.
+_Avoid_: quality score, metadata check, input cleanup, best-effort validation
 
 **Controlled Delivery Pipeline**:
 The auditable workflow that runs independent read-only content, structure, package, visual, and Word TOC review passes, regenerates failed documents through one controlled path, reruns affected gates, and filters client-facing outputs from Internal QA Artifacts.
 _Avoid_: post-processing, output cleanup, manual QA script
 
+**Deterministic Workflow Authority**:
+The code-owned boundary for mechanically enforceable values and structures, including section identifiers, required-fact checklists, tables, XML shape, verification envelopes, hashes, template placement, and repair routing. Models supply Source-Grounded Elaboration and independent review judgments, not protocol identity or control-plane data.
+_Avoid_: model-generated envelope, AI-owned XML structure, inferred repair target
+
+**Client Model Choice**:
+The model selected by the client at operation time for drafting and review. The skill does not require or pin a vendor, model family, or version, and records the model actually used so newer GPT, Anthropic, or other client-selected models do not require a skill change.
+_Avoid_: required model, pinned GPT version, model allowlist
+
+**Progress-Based Recovery Ladder**:
+The ordered set of governed recovery strategies for an Internal Reliability Defect. Each retry must be tied to a specific finding and make a material change in evidence, strategy, or candidate bytes; unchanged failing strategies are bounded, while distinct useful recovery continues within the original 30-minute ceiling.
+_Avoid_: three blind retries, identical rerun, global attempt exhaustion
+
+**Final Exact-Artifact Review**:
+The mandatory package-wide content and cross-document review plus every-page visual review of every exact document proposed for delivery. Intermediate repair checks may be limited to changed sections or artifacts, but no earlier or partial review can replace this final complete pass.
+_Avoid_: sampled pages, reused final pass, unchanged-file assumption
+
 **Readiness Contract**:
-The agreed evidence and scope boundary that determines when all three study branches are ready and whether a later report is a contract bug, a reference defect, or a new requirement.
+The agreed evidence and scope boundary that determines when all three study branches are ready and whether a later report is an Internal Reliability Defect, a reference defect, or a new requirement. Once an approved source passes the Source Completeness Gate for a supported branch and Contracted Template, unchanged clinical input may not be blamed for a later internal workflow failure.
 _Avoid_: done checklist, issue list, bug pile
+
+**Internal Reliability Defect**:
+A post-admission failure in drafting, document or XML construction, reviewer-response binding, repair routing, or repeatable Contracted Template layout behavior. The workflow must recover from it within the same Run Revision when possible; it never justifies requesting new source approval when the Canonical Approved Source is unchanged.
+_Avoid_: source deficiency, client blocker, reapproval trigger
+
+**Permitted Terminal Blocker**:
+A fail-closed condition outside the admitted generation contract: corrupt or changed integrity evidence, unavailable required host software, a persistent model/API/network outage, inaccessible delivery storage, a pre-generation unsupported branch or template, the fixed 30-minute ceiling, or a genuine unresolved visual defect. An unresolved visual defect remains unpublished and becomes regression evidence for a product fix.
+_Avoid_: drafting exhaustion, malformed reviewer response, unknown internal routing, known pagination defect
 
 **Document Renderer**:
 The generation capability that turns an approved Branch Document Set into rendered client documents and produces package, visual, Word TOC, and format-specific quality evidence for verification.

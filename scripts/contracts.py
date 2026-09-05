@@ -1125,6 +1125,70 @@ def evidence_available(reference: Mapping[str, Any], paths: Iterable[str]) -> li
     return [path for path in paths if meaningful(get_path(reference, path))]
 
 
+def source_evidence_coverage_map(reference: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the deterministic map from approved facts to required artifacts.
+
+    The map is deliberately derived from the Document Section Contracts rather
+    than from drafted prose.  That makes it useful before drafting and keeps a
+    later model response from changing which artifact owns a required fact.
+    Empty optional fields are retained as contract destinations, while the
+    ``approved`` flag tells callers whether there is an approved value to
+    preserve for this particular run.
+    """
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
+    destinations: dict[str, list[dict[str, Any]]] = {}
+
+    def add_sections(artifact: str, sections: Iterable[SectionSpec]) -> None:
+        for section in sections:
+            if not section_applies(reference, section):
+                continue
+            for source_path in section.evidence:
+                destinations.setdefault(source_path, []).append({
+                    "artifact": artifact,
+                    "section_id": section.section_id,
+                    "required": section.required,
+                    "approved": meaningful(get_path(reference, source_path)),
+                })
+
+    add_sections("protocol.docx", protocol_contract(branch))
+    if branch in {"Prospective", "Ambispective"}:
+        add_sections("icf.docx", icf_contract(branch, icf_template))
+        # PRS structured fields are deterministic destinations even when the
+        # narrative wording is supplied by a drafting request.
+        for source_path in (
+            "meta.study_title", "meta.protocol_number", "population.study_population",
+            "population.inclusion_criteria", "population.exclusion_criteria",
+            "endpoints.primary", "endpoints.secondary", "endpoints.other",
+            "procedures.assessments", "procedures.visit_schedule",
+            "design.study_design", "risks_benefits.risks",
+        ):
+            if meaningful(get_path(reference, source_path)):
+                destinations.setdefault(source_path, []).append({
+                    "artifact": "study.xml",
+                    "section_id": "prs.structured",
+                    "required": True,
+                    "approved": True,
+                })
+
+    entries = [
+        {
+            "source_path": source_path,
+            "approved_value_sha256": hashlib.sha256(
+                json.dumps(get_path(reference, source_path), sort_keys=True, ensure_ascii=False).encode("utf-8")
+            ).hexdigest(),
+            "destinations": sorted(items, key=lambda item: (item["artifact"], item["section_id"])),
+        }
+        for source_path, items in sorted(destinations.items())
+    ]
+    return {
+        "schema_version": "source-evidence-coverage-map/v1",
+        "study_type": branch,
+        "icf_template": icf_template if branch in {"Prospective", "Ambispective"} else None,
+        "entries": entries,
+    }
+
+
 def section_applies(reference: Mapping[str, Any], section: SectionSpec) -> bool:
     """Return the single contract decision used to scope a document section."""
     return section.required or bool(evidence_available(reference, section.evidence))
@@ -1142,6 +1206,7 @@ def contract_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
         "retained_icf_sections": [dict(section_id=section_id, title=title) for section_id, title in icf_retained_sections(branch, icf_template)],
         "batches": [batch.public() for batch in batch_plan(branch, icf_template)],
         "boilerplate_version": BOILERPLATE_VERSION,
+        "source_evidence_coverage_map": source_evidence_coverage_map(reference),
     }
 
 
@@ -1514,6 +1579,6 @@ __all__ = [
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
-    "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth",
+    "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth", "source_evidence_coverage_map",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown",
 ]
