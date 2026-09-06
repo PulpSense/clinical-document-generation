@@ -118,7 +118,7 @@ candidate; the candidate launches Hermes with its own files read-only and binds
 the operation to its independently verified release-manifest fingerprint. Its
 cleanup reserve remains inside the one 30-minute operation;
 there is no shorter certification timeout. A successful single fixture is
-case evidence only; it does not certify a release until the complete three-study
+case evidence only; it does not certify a release until the complete five-family
 corpus has passed.
 
 The complete live gate runs the declared cases sequentially against one package
@@ -159,8 +159,8 @@ those governed command results and logs, the clean commit and package fingerprin
 approved synthetic fixture, governed Hermes settings and observed model IDs,
 Contracted Template Bundle and Layout Preservation identities, exact delivered
 bytes, all quality gates, every rendered page and check, delivery confirmation,
-Retrospective timing below 15 minutes, and the explicitly approved Ambispective
-and Prospective ceiling of 18 minutes. Recorded drafting or synthetic verification remains
+runtime classifications below 15 minutes, through the 18-minute diagnostic window,
+or above 18 minutes within the unchanged 30-minute correctness ceiling. Recorded drafting or synthetic verification remains
 labelled structural-only in preflight evidence and cannot satisfy the live gate.
 
 Certification fixtures live under `tests/fixtures/release-certification/`.

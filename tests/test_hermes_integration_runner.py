@@ -268,8 +268,10 @@ def test_repository_certification_corpus_covers_every_live_release_branch() -> N
         (fixture["study_type"], fixture.get("icf_family"))
         for fixture in fixtures
     } == {
+        ("Ambispective", "Advarra"),
         ("Ambispective", "Sterling"),
         ("Prospective", "Advarra"),
+        ("Prospective", "Sterling"),
         ("Retrospective", None),
     }
     assert all(fixture["synthetic"] is True for fixture in fixtures)
@@ -280,8 +282,10 @@ def test_repository_certification_corpus_covers_every_live_release_branch() -> N
         fixture["fixture_id"]: fixture["expected_outputs"]
         for fixture in fixtures
     } == {
+        "ambispective-advarra": ["icf.docx", "protocol.docx", "study.xml"],
         "ambispective-sterling": ["icf.docx", "protocol.docx", "study.xml"],
         "prospective-advarra": ["icf.docx", "protocol.docx", "study.xml"],
+        "prospective-sterling": ["icf.docx", "protocol.docx", "study.xml"],
         "retrospective": ["protocol.docx"],
     }
     governed = {
@@ -849,7 +853,7 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
     result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
     assert result["status"] == "passed", json.dumps(result, indent=2)
-    assert result["certification_scope"] == "complete_three_case_corpus"
+    assert result["certification_scope"] == "complete_five_case_corpus"
     assert result["case_order"] == list(CERTIFICATION_CORPUS)
     assert all(case["status"] == "passed" for case in result["cases"])
     assert all(case["under_15_minutes"] is True for case in result["cases"])
@@ -1072,34 +1076,36 @@ def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Pat
         )
 
 
-def test_slow_real_case_fails_the_complete_candidate_without_erasing_evidence(tmp_path: Path, monkeypatch) -> None:
+def test_real_case_is_eligible_through_the_thirty_minute_ceiling(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
     reports = [
         _write_passing_case_report(
             tmp_path,
             fixture_id,
-            elapsed_seconds=1080.001 if fixture_id == "prospective-advarra" else 600.0,
+            elapsed_seconds=1739.999 if fixture_id == "prospective-advarra" else 600.0,
         )
         for fixture_id in CERTIFICATION_CORPUS
     ]
 
     result = _certify_fixture_corpus(reports, release_root=release_root, preflight_path=preflight)
 
-    assert result["status"] == "failed"
+    assert result["status"] == "passed", json.dumps(result, indent=2)
     assert [case["fixture_id"] for case in result["cases"]] == list(CERTIFICATION_CORPUS)
-    assert next(case for case in result["cases"] if case["fixture_id"] == "prospective-advarra")["status"] == "failed"
-    assert any("exceeds the approved 1080-second ceiling" in finding for finding in result["findings"])
+    prospective = next(case for case in result["cases"] if case["fixture_id"] == "prospective-advarra")
+    assert prospective["status"] == "passed"
+    assert prospective["under_15_minutes"] is False
+    assert prospective["within_approved_runtime"] is True
 
 
-def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: Path, monkeypatch) -> None:
+def test_real_case_beyond_thirty_minutes_fails_the_complete_candidate(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
     reports = [
         _write_passing_case_report(
             tmp_path,
             fixture_id,
-            elapsed_seconds=1080.001 if fixture_id == "ambispective-sterling" else 600.0,
+            elapsed_seconds=1740.001 if fixture_id == "ambispective-sterling" else 600.0,
         )
         for fixture_id in CERTIFICATION_CORPUS
     ]
@@ -1108,10 +1114,10 @@ def test_approval_to_retrieval_gap_counts_against_the_15_minute_gate(tmp_path: P
 
     first = next(case for case in result["cases"] if case["fixture_id"] == "ambispective-sterling")
     assert result["status"] == "failed"
-    assert first["desktop_operation_elapsed_seconds"] == 1080.001
-    assert first["elapsed_seconds"] == 1140.001
+    assert first["desktop_operation_elapsed_seconds"] == 1740.001
+    assert first["elapsed_seconds"] == 1800.001
     assert first["under_15_minutes"] is False
-    assert any("Approval-to-confirmed-retrieval" in finding for finding in first["findings"])
+    assert any("approved 1800-second ceiling" in finding for finding in first["findings"])
 
 
 def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_path: Path, monkeypatch) -> None:
@@ -1155,7 +1161,7 @@ def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_
     assert any("immutable revision" in finding for finding in first["findings"])
 
 
-def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_path: Path, monkeypatch) -> None:
+def test_sequential_corpus_continues_after_a_slow_pass_within_thirty_minutes(tmp_path: Path, monkeypatch) -> None:
     fixtures = [
         {"fixture_id": fixture_id, "hermes_configuration": {}}
         for fixture_id in CERTIFICATION_CORPUS
@@ -1177,8 +1183,8 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
         launched.append(f"run:{run_dir.name}")
         report = {
             "outcome": "passed",
-            "elapsed_seconds": 899.0,
-            "approval_to_confirmed_retrieval_evidence": {"elapsed_seconds": 900.0},
+            "elapsed_seconds": 1199.0,
+            "approval_to_confirmed_retrieval_evidence": {"elapsed_seconds": 1200.0},
         }
         report_path = run_dir / "logs/hermes-integration-report.json"
         report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1198,8 +1204,12 @@ def test_sequential_corpus_stops_before_later_fixtures_after_a_slow_pass(tmp_pat
         desktop_parent_reviewer=lambda *_args: None,
     )
 
-    assert launched == ["prepare:retrospective", "run:retrospective"]
-    assert result["attempted_reports"] == ["retrospective"]
+    assert launched == [
+        item
+        for fixture_id in CERTIFICATION_CORPUS
+        for item in (f"prepare:{fixture_id}", f"run:{fixture_id}")
+    ]
+    assert result["attempted_reports"] == list(CERTIFICATION_CORPUS)
 
 
 def test_corpus_reducer_rehashes_actual_outputs_and_rejects_unauthorized_gate_waivers(tmp_path: Path, monkeypatch) -> None:
@@ -2143,7 +2153,7 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
             "stage": "desktop_delivery",
             "delivery": {"confirmed": True},
         },
-        elapsed_seconds=900.0,
+        elapsed_seconds=1800.001,
         timed_out=False,
         child_returncode=0,
     )

@@ -110,6 +110,8 @@ def _certify_archive(
         "retrospective": ("Retrospective", None),
         "ambispective-sterling": ("Ambispective", "Sterling"),
         "prospective-advarra": ("Prospective", "Advarra"),
+        "prospective-sterling": ("Prospective", "Sterling"),
+        "ambispective-advarra": ("Ambispective", "Advarra"),
     }
     for fixture, selection in fixture_selections.items():
         bundle_by_fixture[fixture] = next(
@@ -140,6 +142,7 @@ def _certify_archive(
             "elapsed_seconds": 600.0,
             "desktop_operation_elapsed_seconds": 599.0,
             "under_15_minutes": True,
+            "runtime_classification": "under_15_minutes",
             "within_approved_runtime": True,
             "report_sha256": "d" * 64,
             "release_identity": identity,
@@ -176,7 +179,7 @@ def _certify_archive(
     report = {
         "schema_version": "release-certification-corpus/v1",
         "status": "passed",
-        "certification_scope": "complete_three_case_corpus",
+        "certification_scope": "complete_five_case_corpus",
         "release_identity": identity,
         "hermes_configurations": configurations,
         "preflight_evidence_sha256": "a" * 64,
@@ -192,7 +195,7 @@ def _certify_archive(
                 "Retrospective/Protocol",
             ],
         },
-        "case_order": ["retrospective", "ambispective-sterling", "prospective-advarra"],
+        "case_order": list(workflow.CERTIFICATION_CASE_ORDER),
         "cases": [passing_case(fixture) for fixture in workflow.CERTIFICATION_CASE_ORDER],
         "findings": [],
         "completed_at": "2026-08-28T00:02:00+00:00",
@@ -1358,6 +1361,96 @@ def test_relocated_active_smoke_failure_restores_the_previous_release(
     assert (
         previous / "marker.txt"
     ).read_text(encoding="utf-8") == "previous rollback release"
+    failure_record = Path(result["activation_failure_record"])
+    assert failure_record.is_file()
+    retained = json.loads(failure_record.read_text(encoding="utf-8"))
+    assert retained["status"] == "failed"
+    assert retained["failed_candidate"] == str(failed_candidate)
+    assert retained["release_identity"]["git_commit"] == workflow._read(
+        failed_candidate / workflow.RELEASE_MANIFEST
+    )["git_commit"]
+
+
+def test_active_manifest_loss_during_post_activation_check_still_restores_prior_release(
+    tmp_path, monkeypatch
+):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text("previous verified release", encoding="utf-8")
+    real_integrity = workflow._installation_candidate_integrity
+
+    def remove_live_manifest(candidate, **kwargs):
+        if candidate.resolve() == active.resolve() and not (active / "marker.txt").exists():
+            (active / workflow.RELEASE_MANIFEST).unlink(missing_ok=True)
+            return None, [{
+                "category": "installation",
+                "field": workflow.RELEASE_MANIFEST,
+                "issue": "Release manifest is missing.",
+            }]
+        return real_integrity(candidate, **kwargs)
+
+    monkeypatch.setattr(
+        workflow, "_installation_candidate_integrity", remove_live_manifest
+    )
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "post_activation_smoke"
+    assert (active / "marker.txt").read_text(encoding="utf-8") == (
+        "previous verified release"
+    )
+    failed_candidate = Path(result["failed_candidate_retained"])
+    assert failed_candidate.is_dir()
+    assert not (failed_candidate / workflow.RELEASE_MANIFEST).exists()
+    assert Path(result["activation_failure_record"]).is_file()
+
+
+def test_successful_activation_persists_bound_active_path_smoke_evidence(tmp_path):
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda candidate: {
+            "status": "passed",
+            "verified_root": str(candidate.resolve()),
+        },
+        provisioner=_passing_provisioner,
+    )
+
+    active = skills_dir / "clinical-document-generation"
+    assurance_path = active / workflow.INSTALLATION_ASSURANCE
+    promotion_path = active / workflow.PROMOTION_RECORD
+    assurance = json.loads(assurance_path.read_text(encoding="utf-8"))
+    promotion = json.loads(promotion_path.read_text(encoding="utf-8"))
+    assert result["status"] == "passed"
+    assert result["activation_commit_point"] == (
+        "post_activation_smoke_passed_journal_commit"
+    )
+    assert assurance["active_path_smoke"]["status"] == "passed"
+    assert assurance["active_path_smoke"]["assurance"]["verified_root"] == str(
+        active.resolve()
+    )
+    assert promotion["status"] == "active"
+    assert promotion["activation_commit_point"] == result["activation_commit_point"]
+    assert promotion["runtime_assurance_sha256"] == workflow.sha256_file(
+        assurance_path
+    )
 
 
 def test_interrupted_active_smoke_restores_the_previous_release_before_retry(
@@ -1818,7 +1911,7 @@ def test_skeletal_certification_and_normalized_zip_alias_are_rejected(tmp_path):
     skeletal.write_text(json.dumps({
         "schema_version": "release-certification-corpus/v1",
         "status": "passed",
-        "certification_scope": "complete_three_case_corpus",
+        "certification_scope": "complete_five_case_corpus",
         "release_identity": {
             "git_commit": manifest["git_commit"],
             "package_fingerprint": manifest["package_fingerprint"],
@@ -2841,7 +2934,7 @@ def test_immutable_package_install_rollback_and_reactivation(tmp_path):
     reactivated = install_release(archive_path, skills_dir, **install_kwargs)
 
     assert reactivated["status"] == "passed"
-    assert reactivated["activation_commit_point"] == "candidate_to_active_atomic_swap"
+    assert reactivated["activation_commit_point"] == "post_activation_smoke_passed_journal_commit"
     assert active.is_dir()
     assert previous.is_dir()
     assert quarantine.is_dir()
@@ -2956,7 +3049,7 @@ def test_post_commit_cleanup_failure_reports_activation_and_defers_cleanup(
     deferred_record = skills_dir / "release-history/deferred-cleanup-historical-release.json"
     assert result["status"] == "passed"
     assert result["stage"] == "activated"
-    assert result["activation_commit_point"] == "candidate_to_active_atomic_swap"
+    assert result["activation_commit_point"] == "post_activation_smoke_passed_journal_commit"
     assert result["cleanup"]["status"] == "deferred"
     cleanup_finding = {
         "category": "installation",
@@ -3178,7 +3271,7 @@ def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
     assert injected
     assert result["status"] == "passed"
     assert result["stage"] == "activated"
-    assert result["activation_commit_point"] == "candidate_to_active_atomic_swap"
+    assert result["activation_commit_point"] == "post_activation_smoke_passed_journal_commit"
     assert len(verified_roots) == 2
     assert verified_roots[1] == active.resolve()
     assert result["cleanup"]["status"] == "passed"

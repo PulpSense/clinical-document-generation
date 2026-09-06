@@ -1,0 +1,263 @@
+{
+  "meta": {
+    "document_set": [
+      "protocol_docx",
+      "icf_docx",
+      "xml"
+    ],
+    "icf_template": "Advarra",
+    "study_type": "Ambispective",
+    "protocol_number": "AS-SP-001",
+    "date": "25 Aug 2026",
+    "version": null
+  },
+  "source": {
+    "source_of_truth_file": "reference/source-of-truth.md",
+    "field_candidates": {}
+  },
+  "approval": {
+    "status": "approved",
+    "approved_by": "Repository Certification Fixture",
+    "review_file": "reference/source-of-truth.md"
+  },
+  "study": {
+    "title": "Ambispective Evaluation of the Sentinel Patch in Adults With Postoperative Pain",
+    "background": "Postoperative pain outcomes are captured inconsistently across historical records and prospective follow-up, limiting interpretation of recovery patterns.",
+    "hypothesis": "Combined historical records and prospective follow-up will show measurable improvement in pain tracking completeness by Month 3.",
+    "timeline": "Historical record review plus prospective baseline through Month 3 follow-up, with prospective participation lasting approximately 14 weeks.",
+    "condition": null
+  },
+  "parties": {
+    "sponsor": {
+      "name": "Sentinel Recovery Systems",
+      "address": "900 Recovery Road, Cambridge, MA 02139"
+    },
+    "principal_investigator": {
+      "name": "Alex Rivera",
+      "title": "MD",
+      "email": "alex.rivera@example.org"
+    },
+    "study_coordinator": {
+      "name": "Jamie Chen",
+      "title": "CRC",
+      "business_phone": "555-510-2000",
+      "office_phone": "555-510-2001",
+      "email": "jamie.chen@example.org"
+    },
+    "irb": {
+      "name": "PulpSense Central Review Board",
+      "affiliation": "Independent ethics review organization",
+      "phone": "555-210-1000",
+      "email": "reviewboard@example.org",
+      "address": "410 Review Avenue, Boston, MA 02118",
+      "approval_status": "Approved"
+    }
+  },
+  "sites": [
+    {
+      "contact": {
+        "email": "jamie.chen@example.org",
+        "name": "Jamie Chen",
+        "phone": "555-510-2000",
+        "role": "Research Coordinator"
+      },
+      "facility": {
+        "address": {
+          "city": "Boston",
+          "country": "United States",
+          "state": "MA",
+          "street": "220 Clinic Way"
+        },
+        "name": "North Surgical Research Center"
+      },
+      "investigators": [
+        {
+          "degrees": "MD",
+          "email": "alex.rivera@example.org",
+          "name": "Alex Rivera"
+        }
+      ],
+      "site_id": "01"
+    },
+    {
+      "contact": {
+        "email": "riley.morgan@example.org",
+        "name": "Riley Morgan",
+        "phone": "555-610-3000",
+        "role": "Site Coordinator"
+      },
+      "facility": {
+        "address": {
+          "city": "Worcester",
+          "country": "United States",
+          "state": "MA",
+          "street": "75 Lake Street"
+        },
+        "name": "Lakeside Recovery Institute"
+      },
+      "investigators": [
+        {
+          "degrees": "DO",
+          "email": "taylor.brooks@example.org",
+          "name": "Taylor Brooks"
+        }
+      ],
+      "site_id": "02"
+    }
+  ],
+  "population": {
+    "study_population": "Adults 18 to 80 years old with eligible historical records and ability to complete prospective Sentinel Patch follow-up.",
+    "sample_size": "60 participants",
+    "sample_justification": "The sample allows descriptive estimation across two sites while accounting for expected attrition and available historical records.",
+    "sample_size_evidence": [
+      {
+        "evidence": "Planned sample",
+        "value": "60 participants",
+        "source": "Approved synthetic source"
+      }
+    ],
+    "minimum_age": "18 Years",
+    "maximum_age": "80 Years",
+    "inclusion_criteria": [
+      "Adults 18 to 80 years old with eligible historical records and ability to complete prospective Sentinel Patch follow-up."
+    ],
+    "exclusion_criteria": [
+      "Concurrent interventional study participation",
+      "Incomplete historical records",
+      "Inability to complete follow-up",
+      "Investigator-determined safety concern"
+    ]
+  },
+  "design": {
+    "study_design": "Ambispective, multi-site, single-arm observational device study with historical chart review and prospective follow-up.",
+    "number_of_sites": "2",
+    "intervention_name": "Sentinel Patch",
+    "intervention_type": "Device",
+    "arms": [
+      {
+        "description": "Single observational study group using the Sentinel Patch monitoring workflow.",
+        "name": "Sentinel Patch"
+      }
+    ]
+  },
+  "objectives": {
+    "primary": [
+      "Evaluate historical and prospective postoperative pain scores among adults using the Sentinel Patch monitoring workflow."
+    ]
+  },
+  "endpoints": {
+    "primary": [
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Change in pain tracking completeness from historical baseline to Month 3 prospective follow-up",
+        "time_point": "Month 3"
+      }
+    ],
+    "secondary": [
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Device adherence",
+        "time_point": "Month 3"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Participant usability score",
+        "time_point": "Month 3"
+      }
+    ]
+  },
+  "procedures": {
+    "assessments": [
+      "Historical chart abstraction",
+      "Baseline prospective visit",
+      "Month 1 phone follow-up",
+      "Month 3 clinic follow-up",
+      "Pain score review",
+      "Device usage download",
+      "Usability questionnaire"
+    ],
+    "visit_schedule": [
+      {
+        "procedures": "Historical chart abstraction",
+        "timing": "Historical record review",
+        "visit": "Historical chart abstraction"
+      },
+      {
+        "procedures": "Pain score review; Device usage download",
+        "timing": "Baseline",
+        "visit": "Baseline prospective visit"
+      },
+      {
+        "procedures": "Pain score review",
+        "timing": "Month 1",
+        "visit": "Month 1 phone follow-up"
+      },
+      {
+        "procedures": "Pain score review; Device usage download; Usability questionnaire",
+        "timing": "Month 3",
+        "visit": "Month 3 clinic follow-up"
+      }
+    ],
+    "minimum_days_before_screening_without_participation": "30",
+    "methods": null,
+    "unscheduled_visits": null,
+    "discontinuation": null,
+    "termination": null,
+    "study_termination": null
+  },
+  "statistics": {
+    "analysis_plan": "Descriptive summaries for historical and prospective measures; paired summaries for participants with both baseline and Month 3 data.",
+    "sample_size_evidence": [
+      {
+        "evidence": "Planned sample",
+        "value": "60 participants",
+        "source": "Approved synthetic source"
+      }
+    ],
+    "methodology": null,
+    "analysis_populations": null,
+    "missing_data_handling": null
+  },
+  "safety": {
+    "general_information": null,
+    "monitoring": null,
+    "adverse_events": null,
+    "follow_up": null
+  },
+  "confidentiality": {
+    "data_handling": null,
+    "publication": null
+  },
+  "risks_benefits": {
+    "compensation_or_reimbursement": "None",
+    "risks": null,
+    "benefits": null,
+    "costs": null,
+    "alternatives": null,
+    "privacy": null,
+    "injury_handling": null
+  },
+  "regulatory": {
+    "prs": {
+      "organization_name": "Sentinel Recovery Systems",
+      "overall_status": "Recruiting",
+      "study_uid": "AS-SP-001-UID",
+      "study_type": "Observational",
+      "observational_study_design": null,
+      "time_perspective": null,
+      "verification_date": null,
+      "start_date": null,
+      "start_date_type": null,
+      "primary_completion_date": null,
+      "primary_completion_date_type": null,
+      "study_completion_date": null,
+      "study_completion_date_type": null,
+      "patient_registry": null,
+      "target_duration_quantity": null,
+      "target_duration_units": null
+    }
+  }
+}

@@ -41,7 +41,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
 
 
@@ -73,6 +73,7 @@ RELEASE_ARCHIVE_MAX_TOTAL_BYTES = CERTIFICATION_REPORT_MAX_BYTES + 128 * 1024 * 
 RELEASE_ARCHIVE_MAX_COMPRESSION_RATIO = 100
 INSTALLATION_ASSURANCE = "INSTALLATION-ASSURANCE.json"
 PROMOTION_RECORD = "PROMOTION-RECORD.json"
+ACTIVATION_COMMIT_POINT = "post_activation_smoke_passed_journal_commit"
 MINIMUM_PYTHON_VERSION = (3, 10)
 PDF_PAGE_RENDERER = {
     "kind": "pypdfium2",
@@ -706,7 +707,7 @@ def _certification_attestation(
     valid = (
         report.get("schema_version") == "release-certification-corpus/v1"
         and report.get("status") == "passed"
-        and report.get("certification_scope") == "complete_three_case_corpus"
+        and report.get("certification_scope") == "complete_five_case_corpus"
         and not report.get("findings")
         and identity.get("package_fingerprint") == manifest.get("package_fingerprint")
         and identity.get("git_commit") == manifest.get("git_commit")
@@ -752,11 +753,7 @@ def _certification_attestation(
             desktop_elapsed = float(case.get("desktop_operation_elapsed_seconds"))
         except (TypeError, ValueError):
             elapsed = desktop_elapsed = -1.0
-        runtime_valid = (
-            0.0 < elapsed < 900.0
-            if fixture_id == "retrospective"
-            else 0.0 < elapsed <= 1080.0
-        )
+        runtime_valid = 0.0 < elapsed <= CERTIFICATION_RUNTIME_CEILING_SECONDS
         output_valid = (
             set(output_by_path) == expected_outputs
             and all(
@@ -790,6 +787,8 @@ def _certification_attestation(
             "retrospective": ("Retrospective", None),
             "ambispective-sterling": ("Ambispective", "Sterling"),
             "prospective-advarra": ("Prospective", "Advarra"),
+            "prospective-sterling": ("Prospective", "Sterling"),
+            "ambispective-advarra": ("Ambispective", "Advarra"),
         }.get(fixture_id)
         expected_bundle = next((
             bundle for bundle in (manifest.get("inventory") or {}).get("contracted_template_bundles", [])
@@ -810,6 +809,8 @@ def _certification_attestation(
             all(isinstance(model, str) and model.strip() for model in case_models),
             _is_sha256(case.get("report_sha256")),
             runtime_valid,
+            case.get("runtime_classification")
+            == certification_runtime_classification(elapsed),
             desktop_elapsed > 0.0,
             case.get("within_approved_runtime") is True,
             output_valid,
@@ -1390,12 +1391,16 @@ def _remove_activation_journal(skills_dir: Path) -> None:
     _sync_directory(skills_dir)
 
 
-def _failed_active_release_path(skills_dir: Path, active: Path) -> Path:
+def _failed_active_release_path(
+    skills_dir: Path,
+    release_identity: Mapping[str, Any],
+) -> Path:
     """Reserve an organized sibling path for one failed active candidate."""
-    manifest = _read(active / RELEASE_MANIFEST)
-    commit = _safe_release_identity_key(manifest.get("git_commit") or "unknown")[:12]
+    commit = _safe_release_identity_key(
+        release_identity.get("git_commit") or "unknown"
+    )[:12]
     fingerprint = _safe_release_identity_key(
-        manifest.get("package_fingerprint") or "unknown"
+        release_identity.get("package_fingerprint") or "unknown"
     )[:12]
     failures = skills_dir.parent / "clinical-document-release-failures"
     failures.mkdir(parents=True, exist_ok=True)
@@ -1415,9 +1420,14 @@ def _restore_release_state_after_active_smoke_failure(
     retained_history_created: bool,
     active_had_release: bool,
     previous_had_release: bool,
-) -> Path:
+    candidate_release_identity: Mapping[str, Any],
+    candidate_manifest_sha256: str,
+    findings: Sequence[Mapping[str, Any]],
+) -> tuple[Path, Path]:
     """Preserve the failed candidate and restore both prior release slots."""
-    failed_candidate = _failed_active_release_path(skills_dir, active)
+    failed_candidate = _failed_active_release_path(
+        skills_dir, candidate_release_identity
+    )
     os.replace(active, failed_candidate)
     _sync_directory(skills_dir)
     _sync_directory(failed_candidate.parent)
@@ -1435,7 +1445,72 @@ def _restore_release_state_after_active_smoke_failure(
         retained_history.unlink(missing_ok=True)
         _sync_directory(retained_history.parent)
     _remove_activation_journal(skills_dir)
-    return failed_candidate
+    failure_record = failed_candidate.with_name(
+        f"{failed_candidate.name}.activation-failure.json"
+    )
+    failure_payload = {
+        "schema_version": "activation-failure/v1",
+        "status": "failed",
+        "failed_at": datetime.now(timezone.utc).isoformat(),
+        "failed_candidate": str(failed_candidate),
+        "release_identity": dict(candidate_release_identity),
+        "candidate_manifest_sha256": candidate_manifest_sha256,
+        "findings": [dict(item) for item in findings],
+    }
+    failure_payload["findings_sha256"] = sha256_value(
+        failure_payload["findings"]
+    )
+    _write_atomic_installation_state(failure_record, failure_payload)
+    promotion_path = failed_candidate / PROMOTION_RECORD
+    failed_promotion = {
+        "schema_version": "promoted-release/v1",
+        "status": "failed_post_activation_smoke",
+        "git_commit": candidate_release_identity.get("git_commit"),
+        "package_fingerprint": candidate_release_identity.get(
+            "package_fingerprint"
+        ),
+        "activation_failure_record_sha256": sha256_file(failure_record),
+    }
+    _write_atomic_installation_state(promotion_path, failed_promotion)
+    return failed_candidate, failure_record
+
+
+def _persist_active_path_smoke(
+    active: Path,
+    *,
+    release_identity: Mapping[str, Any],
+    assurance: Mapping[str, Any],
+) -> dict[str, str]:
+    """Bind the relocated active-path smoke into durable promoted state."""
+    verified_at = datetime.now(timezone.utc).isoformat()
+    installation_path = active / INSTALLATION_ASSURANCE
+    installation = _read(installation_path)
+    active_path_smoke = {
+        "status": "passed",
+        "verified_at": verified_at,
+        "active_root": str(active.resolve()),
+        "release_identity": dict(release_identity),
+        "assurance": dict(assurance),
+    }
+    installation.update({
+        "schema_version": "installation-assurance/v2",
+        "status": "passed",
+        "active_path_smoke": active_path_smoke,
+    })
+    _write_atomic_installation_state(installation_path, installation)
+    promotion_path = active / PROMOTION_RECORD
+    promotion = _read(promotion_path)
+    promotion.update({
+        "status": "active",
+        "activation_commit_point": ACTIVATION_COMMIT_POINT,
+        "active_path_smoke_sha256": sha256_value(active_path_smoke),
+        "runtime_assurance_sha256": sha256_file(installation_path),
+    })
+    _write_atomic_installation_state(promotion_path, promotion)
+    return {
+        "installation_assurance_sha256": sha256_file(installation_path),
+        "promotion_record_sha256": sha256_file(promotion_path),
+    }
 
 
 def _recover_interrupted_activation(
@@ -1486,6 +1561,17 @@ def _recover_interrupted_activation(
         candidate_committed = _filesystem_identity(active) == tuple(candidate_identity)
         if candidate_committed:
             if journal.get("post_activation_smoke_required") is True:
+                candidate_release_identity = journal.get(
+                    "candidate_release_identity"
+                )
+                candidate_manifest_sha256 = str(
+                    journal.get("candidate_manifest_sha256") or ""
+                )
+                if (
+                    not isinstance(candidate_release_identity, Mapping)
+                    or not candidate_manifest_sha256
+                ):
+                    raise ValueError("activation journal candidate identity is invalid")
                 _restore_release_state_after_active_smoke_failure(
                     skills_dir,
                     active=active,
@@ -1495,6 +1581,17 @@ def _recover_interrupted_activation(
                     retained_history_created=bool(journal.get("history_created")),
                     active_had_release=bool(journal.get("active_had_release")),
                     previous_had_release=bool(journal.get("previous_had_release")),
+                    candidate_release_identity=candidate_release_identity,
+                    candidate_manifest_sha256=candidate_manifest_sha256,
+                    findings=[{
+                        "category": "installation",
+                        "field": "post_activation_smoke",
+                        "code": "installation.active_smoke_interrupted",
+                        "issue": (
+                            "Activation was interrupted before the active-path "
+                            "smoke result was durably committed."
+                        ),
+                    }],
                 )
                 return None
             _, active_findings = _installation_candidate_integrity(
@@ -1518,7 +1615,7 @@ def _recover_interrupted_activation(
                 return {
                     "status": "passed",
                     "stage": "activated",
-                    "activation_commit_point": "candidate_to_active_atomic_swap",
+                    "activation_commit_point": ACTIVATION_COMMIT_POINT,
                     "active": str(active),
                     "previous": str(previous) if previous.exists() else None,
                     "cleanup": {
@@ -1733,8 +1830,9 @@ def install_release(
             }
         recorded_provision = _relocate_paths(provision, candidate, active)
         recorded_assurance = _relocate_paths(assurance, candidate, active)
-        _write(candidate / INSTALLATION_ASSURANCE, {
-            "status": "passed",
+        _write_atomic_installation_state(candidate / INSTALLATION_ASSURANCE, {
+            "schema_version": "installation-assurance/v2",
+            "status": "staging_passed",
             "verified_at": datetime.now(timezone.utc).isoformat(),
             "python_runtime": python_runtime,
             "provision": recorded_provision,
@@ -1743,6 +1841,11 @@ def install_release(
         assurance_sha256 = sha256_file(candidate / INSTALLATION_ASSURANCE)
         report_path = candidate / RELEASE_CERTIFICATION
         manifest = _read(candidate / RELEASE_MANIFEST)
+        candidate_release_identity = {
+            "git_commit": manifest.get("git_commit"),
+            "package_fingerprint": manifest.get("package_fingerprint"),
+        }
+        candidate_manifest_sha256 = sha256_file(candidate / RELEASE_MANIFEST)
         model_identifiers = sorted({
             str(model)
             for case in certification.get("cases", [])
@@ -1809,6 +1912,8 @@ def install_release(
                     and not (skills_dir / "release-history" / history_name).exists()
                 ),
                 "post_activation_smoke_required": True,
+                "candidate_release_identity": candidate_release_identity,
+                "candidate_manifest_sha256": candidate_manifest_sha256,
             }
             _write_atomic_installation_state(
                 _activation_journal_path(skills_dir), journal
@@ -1954,16 +2059,29 @@ def install_release(
             *post_smoke_integrity_findings,
         ]
         if not post_activation_findings:
-            journal = {
-                **journal,
-                "phase": "post_activation_smoke_passed",
-                "post_activation_smoke_required": False,
-            }
             try:
+                durable_active_smoke = _persist_active_path_smoke(
+                    active,
+                    release_identity=candidate_release_identity,
+                    assurance=post_activation_assurance,
+                )
+                _, durable_integrity_findings = _installation_candidate_integrity(
+                    active,
+                    trusted_certification_key_id=trusted_certification_key_id,
+                )
+                if durable_integrity_findings:
+                    post_activation_findings.extend(durable_integrity_findings)
+                    raise ValueError("durable active-path smoke state is invalid")
+                journal = {
+                    **journal,
+                    **durable_active_smoke,
+                    "phase": "post_activation_smoke_passed",
+                    "post_activation_smoke_required": False,
+                }
                 _write_atomic_installation_state(
                     _activation_journal_path(skills_dir), journal
                 )
-            except OSError:
+            except (OSError, ValueError, json.JSONDecodeError):
                 post_activation_findings.append({
                     "category": "installation",
                     "field": "activation_journal",
@@ -1975,8 +2093,10 @@ def install_release(
                 })
         if post_activation_findings:
             failed_candidate: Path | None = None
+            failure_record: Path | None = None
             try:
-                failed_candidate = _restore_release_state_after_active_smoke_failure(
+                failed_candidate, failure_record = (
+                    _restore_release_state_after_active_smoke_failure(
                     skills_dir,
                     active=active,
                     previous=previous,
@@ -1985,7 +2105,10 @@ def install_release(
                     retained_history_created=retained_history_created,
                     active_had_release=bool(journal["active_had_release"]),
                     previous_had_release=bool(journal["previous_had_release"]),
-                )
+                    candidate_release_identity=candidate_release_identity,
+                    candidate_manifest_sha256=candidate_manifest_sha256,
+                    findings=post_activation_findings,
+                ))
             except (OSError, ValueError, json.JSONDecodeError):
                 return {
                     "status": "blocked",
@@ -2005,6 +2128,9 @@ def install_release(
                     "failed_candidate_retained": (
                         str(failed_candidate) if failed_candidate else None
                     ),
+                    "activation_failure_record": (
+                        str(failure_record) if failure_record else None
+                    ),
                     "active_release_retained": active.is_dir(),
                     "previous_release_retained": previous.is_dir(),
                 }
@@ -2013,6 +2139,7 @@ def install_release(
                 "stage": "post_activation_smoke",
                 "findings": post_activation_findings,
                 "failed_candidate_retained": str(failed_candidate),
+                "activation_failure_record": str(failure_record),
                 "active_release_retained": active.is_dir(),
                 "previous_release_retained": previous.is_dir(),
             }
@@ -2083,7 +2210,7 @@ def install_release(
         return {
             "status": "passed",
             "stage": "activated",
-            "activation_commit_point": "candidate_to_active_atomic_swap",
+            "activation_commit_point": ACTIVATION_COMMIT_POINT,
             "active": str(active),
             "previous": str(previous) if previous.exists() else None,
             "retained_history": str(retained_history) if retained_history else None,

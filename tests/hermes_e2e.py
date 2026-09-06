@@ -32,21 +32,28 @@ SCRIPTS_ROOT = REPO_ROOT / "scripts"
 if str(SCRIPTS_ROOT) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_ROOT))
 
-from quality import branch_acceptance_inventory
+from quality import (
+    CERTIFICATION_DIAGNOSTIC_TARGET_SECONDS,
+    CERTIFICATION_RUNTIME_CEILING_SECONDS,
+    branch_acceptance_inventory,
+    certification_runtime_classification,
+)
 
 CERTIFICATION_FIXTURE_ROOT = REPO_ROOT / "tests/fixtures/release-certification"
 CLEANUP_RESERVE_SECONDS = 5.0
 PROGRESS_INTERVAL_SECONDS = 60.0
-CERTIFICATION_RUNTIME_CEILING_SECONDS = 900.0
-EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS = 1080.0
 CERTIFICATION_CORPUS = (
     "retrospective",
     "ambispective-sterling",
     "prospective-advarra",
+    "prospective-sterling",
+    "ambispective-advarra",
 )
 CERTIFICATION_CORPUS_COVERAGE = {
+    "ambispective-advarra": ("Ambispective", "Advarra"),
     "ambispective-sterling": ("Ambispective", "Sterling"),
     "prospective-advarra": ("Prospective", "Advarra"),
+    "prospective-sterling": ("Prospective", "Sterling"),
     "retrospective": ("Retrospective", None),
 }
 
@@ -144,16 +151,12 @@ FIRST_WAVE_BATCHES = frozenset(
 
 
 def _certification_runtime_ceiling(fixture_id: str) -> float:
-    return (
-        EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
-        if fixture_id in {"ambispective-sterling", "prospective-advarra"}
-        else CERTIFICATION_RUNTIME_CEILING_SECONDS
-    )
+    del fixture_id
+    return CERTIFICATION_RUNTIME_CEILING_SECONDS
 
 
 def _certification_runtime_exceeded(fixture_id: str, elapsed: float) -> bool:
-    ceiling = _certification_runtime_ceiling(fixture_id)
-    return elapsed > ceiling if ceiling == EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS else elapsed >= ceiling
+    return elapsed > _certification_runtime_ceiling(fixture_id)
 
 
 def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
@@ -286,7 +289,7 @@ def certification_corpus(
     *,
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> tuple[dict[str, Any], ...]:
-    """Load the complete reviewed three-case real-Hermes release corpus."""
+    """Load the complete reviewed five-family real-Hermes release corpus."""
     fixtures = tuple(
         certification_fixture(fixture_id, fixture_root=fixture_root)
         for fixture_id in CERTIFICATION_CORPUS
@@ -458,11 +461,7 @@ def inspect_run(
 ) -> dict[str, Any]:
     reference = _read_json(run_dir / "reference/study.reference.json") or {}
     study_type = str((reference.get("meta") or {}).get("study_type") or "").casefold()
-    certification_runtime_ceiling = (
-        EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
-        if study_type in {"ambispective", "prospective"}
-        else CERTIFICATION_RUNTIME_CEILING_SECONDS
-    )
+    certification_runtime_ceiling = CERTIFICATION_RUNTIME_CEILING_SECONDS
     required_outputs = expected_outputs(reference)
     revision_id = str((reference.get("approval") or {}).get("revision_id") or "")
     revision_dir = run_dir / "revisions" / revision_id
@@ -608,11 +607,7 @@ def inspect_run(
         outcome = DiagnosticOutcome.TIMEOUT
     elif retry_limit_violations:
         outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
-    elif valid_delivery and (
-        elapsed_seconds > certification_runtime_ceiling
-        if certification_runtime_ceiling == EXTENDED_CERTIFICATION_RUNTIME_CEILING_SECONDS
-        else elapsed_seconds >= certification_runtime_ceiling
-    ):
+    elif valid_delivery and elapsed_seconds > certification_runtime_ceiling:
         outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
     elif valid_delivery:
         outcome = DiagnosticOutcome.PASSED
@@ -2786,7 +2781,12 @@ def _reduce_release_certification_corpus(
             "findings": case_findings,
             "elapsed_seconds": elapsed,
             "desktop_operation_elapsed_seconds": operation_elapsed,
-            "under_15_minutes": math.isfinite(elapsed) and 0.0 < elapsed < CERTIFICATION_RUNTIME_CEILING_SECONDS,
+            "under_15_minutes": math.isfinite(elapsed) and 0.0 < elapsed < CERTIFICATION_DIAGNOSTIC_TARGET_SECONDS,
+            "runtime_classification": (
+                certification_runtime_classification(elapsed)
+                if math.isfinite(elapsed)
+                else "invalid"
+            ),
             "within_approved_runtime": math.isfinite(elapsed) and 0.0 < elapsed and not _certification_runtime_exceeded(str(fixture_id or ""), elapsed),
             "report_sha256": _sha256(path),
             "release_identity": identities[-1],
@@ -2821,7 +2821,7 @@ def _reduce_release_certification_corpus(
     result = {
         "schema_version": "release-certification-corpus/v1",
         "status": "passed" if not findings else "failed",
-        "certification_scope": "complete_three_case_corpus",
+        "certification_scope": "complete_five_case_corpus",
         "release_identity": release_identity,
         "hermes_configurations": {
             fixture_id: dict(fixtures[fixture_id]["hermes_configuration"])
@@ -2877,7 +2877,7 @@ def run_release_certification_corpus(
     operation_id: str = "release-corpus",
     fixture_root: Path = CERTIFICATION_FIXTURE_ROOT,
 ) -> dict[str, Any]:
-    """Run the three real cases sequentially, retaining every attempted result."""
+    """Run all five real document-family cases, retaining every attempted result."""
     release_root = release_root.resolve()
     run_root = run_root.resolve()
     _, release_identity = _certified_release(release_root)
@@ -2967,7 +2967,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--run-root", type=Path, default=Path("/tmp/clinical-hermes-real-e2e"))
     parser.add_argument("--release-root", type=Path, required=True)
     parser.add_argument("--operation-id", default="default")
-    parser.add_argument("--corpus", action="store_true", help="run the complete three-case Release Certification Corpus sequentially")
+    parser.add_argument("--corpus", action="store_true", help="run the complete five-case Release Certification Corpus sequentially")
     parser.add_argument("--run-preflight", action="store_true", help="execute and record the governed checks required before --corpus")
     parser.add_argument("--preflight-evidence", type=Path, help="bound passing deterministic/static/regression evidence required before --corpus")
     parser.add_argument("--desktop-opener-command", type=Path, help="absolute external Desktop opener command; receives one attachment path and emits exact retrieved bytes")

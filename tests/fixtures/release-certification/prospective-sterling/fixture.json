@@ -1,0 +1,43 @@
+{
+  "schema_version": "release-certification-fixture/v1",
+  "fixture_id": "prospective-sterling",
+  "synthetic": true,
+  "contains_private_data": false,
+  "privacy_statement": "Repository-owned synthetic study. Names, organizations, contacts, identifiers, and clinical facts are fictional and contain no client or patient data.",
+  "review_status": "approved for release certification",
+  "study_type": "Prospective",
+  "icf_family": "Sterling",
+  "expected_outputs": [
+    "icf.docx",
+    "protocol.docx",
+    "study.xml"
+  ],
+  "artifacts": {
+    "source_input": {
+      "path": "source-input.md",
+      "sha256": "1a2c5e4caf09f5d7fab22382d9be764efa48a89b742f7c83d2eee3e007601357"
+    },
+    "approved_source": {
+      "path": "approved-source.md",
+      "sha256": "7c3d7dfa7f04503ec2791337b5f326130e1a79f87d934be25a890b095cbf690f"
+    },
+    "approved_reference": {
+      "path": "approved-reference.json",
+      "sha256": "006908cc83b44270de67e4c10fbc16a0bb9b13b7f2284ae907f1d63c0b68cb65"
+    }
+  },
+  "approved_normalization": {
+    "source_input_sha256": "1a2c5e4caf09f5d7fab22382d9be764efa48a89b742f7c83d2eee3e007601357",
+    "approved_source_sha256": "7c3d7dfa7f04503ec2791337b5f326130e1a79f87d934be25a890b095cbf690f"
+  },
+  "hermes_configuration": {
+    "source": "clinical-release-certification",
+    "max_turns": 80,
+    "skill": "clinical-document-generation",
+    "safe_mode": true,
+    "reasoning_configuration": "Hermes Desktop governed default",
+    "layout_preservation_notes": [
+      "The Sterling ICF family retains its authority-derived headings, consent language, signature layout, typography, and table structure; those features are not style defects."
+    ]
+  }
+}

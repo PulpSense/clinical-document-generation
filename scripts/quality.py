@@ -67,8 +67,15 @@ CERTIFICATION_EVIDENCE_MAX_FILES = 512
 CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES = 32 * 1024 * 1024
 CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES = 128 * 1024 * 1024
 CERTIFICATION_CASE_ORDER = (
-    "retrospective", "ambispective-sterling", "prospective-advarra",
+    "retrospective",
+    "ambispective-sterling",
+    "prospective-advarra",
+    "prospective-sterling",
+    "ambispective-advarra",
 )
+CERTIFICATION_DIAGNOSTIC_TARGET_SECONDS = 900.0
+CERTIFICATION_EXTENDED_DIAGNOSTIC_SECONDS = 1080.0
+CERTIFICATION_RUNTIME_CEILING_SECONDS = 1800.0
 DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "prospective-advarra-sparse-complete", "prospective-advarra-rich-complete",
     "ambispective-sterling-sparse-complete", "ambispective-sterling-rich-complete",
@@ -76,6 +83,19 @@ DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "ambispective-advarra-sparse-complete", "ambispective-advarra-rich-complete",
     "retrospective-sparse-complete", "retrospective-rich-complete",
 )
+
+
+def certification_runtime_classification(elapsed_seconds: float) -> str:
+    """Classify certification runtime without shortening the correctness ceiling."""
+    if elapsed_seconds <= 0.0:
+        return "invalid"
+    if elapsed_seconds < CERTIFICATION_DIAGNOSTIC_TARGET_SECONDS:
+        return "under_15_minutes"
+    if elapsed_seconds <= CERTIFICATION_EXTENDED_DIAGNOSTIC_SECONDS:
+        return "within_18_minute_diagnostic_window"
+    if elapsed_seconds <= CERTIFICATION_RUNTIME_CEILING_SECONDS:
+        return "above_18_minutes_within_correctness_ceiling"
+    return "correctness_ceiling_exceeded"
 
 
 def branch_acceptance_inventory(repo_root: Path) -> tuple[dict[str, Any], ...]:
