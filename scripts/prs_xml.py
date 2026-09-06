@@ -346,6 +346,17 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "ipdTimeFrame": _source_value(reference, "regulatory.prs.ipd_time_frame"),
         "ipdAccessCriteria": _source_value(reference, "regulatory.prs.ipd_access_criteria"),
     })
+    # Local, explicit source-to-transport conversions. Unknowns survive so the
+    # independent validator can diagnose them; approved source is never edited.
+    transports = {
+        "eligibilityGender": {"all sexes": "All", "both": "All", "all": "All", "male": "Male", "female": "Female"},
+        "samplingMethod": {"probability sample": "Probability Sample", "non-probability sample": "Non-Probability Sample"},
+        "studyType": {"observational": "Observational", "interventional": "Interventional", "expanded access": "Expanded Access"},
+        "primaryCompletionDateType": {"actual": "Actual", "anticipated": "Anticipated"},
+        "lastFollowUpDateType": {"actual": "Actual", "anticipated": "Anticipated"},
+    }
+    for token, mapping in transports.items():
+        values[token] = mapping.get(" ".join(values[token].split()).casefold(), values[token])
     return values
 
 
@@ -477,6 +488,83 @@ def _scalar_template_bindings(template_path: Path) -> list[tuple[str, str]]:
     return bindings
 
 
+def _expected_transport_value(target: str, source: Any) -> str:
+    """Source-fidelity oracle independent of _fields and its mapping table."""
+    value = _text(source)
+    normalized = " ".join(value.split()).casefold()
+    if target == "eligibility/gender" and normalized in {"all sexes", "both"}:
+        return "All"
+    vocabulary = {
+        "eligibility/gender": ("All", "Female", "Male"),
+        "eligibility/sampling_method": ("Probability Sample", "Non-Probability Sample"),
+        "study_design/study_type": ("Interventional", "Observational", "Expanded Access"),
+        "primary_compl_date_type": ("Anticipated", "Actual"),
+        "last_follow_up_date_type": ("Anticipated", "Actual"),
+    }
+    return next((word for word in vocabulary.get(target, ()) if word.casefold() == normalized), value)
+
+
+def quality_report(path: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
+    """Audit queried scalars without claiming a complete registrable record.
+
+    This is advisory, separate from validate_output's existing blocking gate.
+    Upload XSD optionality is not registration requiredness. No intake fields,
+    calendar anchors, healthy-volunteer answers or condition terms are inferred.
+    """
+    study = _study(ET.parse(path).getroot())
+    bindings = {
+        "eligibility/gender": SOURCE_SCALAR_BINDINGS["eligibility/gender"],
+        "eligibility/healthy_volunteers": SOURCE_SCALAR_BINDINGS["eligibility/healthy_volunteers"],
+        "eligibility/sampling_method": SOURCE_SCALAR_BINDINGS["eligibility/sampling_method"],
+        "condition": ("study.condition",),
+        "start_date": ("regulatory.prs.start_date",),
+        "start_date_type": ("regulatory.prs.start_date_type",),
+        "primary_compl_date": ("regulatory.prs.primary_completion_date",),
+        "primary_compl_date_type": ("regulatory.prs.primary_completion_date_type",),
+        "last_follow_up_date": ("regulatory.prs.study_completion_date", "regulatory.prs.last_follow_up_date"),
+        "last_follow_up_date_type": ("regulatory.prs.study_completion_date_type", "regulatory.prs.last_follow_up_date_type"),
+        "verification_date": ("regulatory.prs.verification_date",),
+        "end_date": ("regulatory.prs.end_date",),
+    }
+    provenance = {}
+    for target, paths in bindings.items():
+        selected = next((key for key in paths if meaningful(get_path(reference, key))), None)
+        raw = get_path(reference, selected) if selected else None
+        expected = _expected_transport_value(target, raw)
+        actual = _text(study.findtext(target))
+        status = ("mapped" if actual == expected else "mapping_failure") if selected else (
+            "unsourced_output" if actual else "missing_source")
+        provenance[target] = {
+            "source_paths": list(paths), "source_path": selected,
+            "source_value": copy.deepcopy(raw), "expected_value": expected,
+            "output_value": actual, "status": status,
+        }
+    study_type = _source_value(reference, "regulatory.prs.study_type")
+    observational = study_type.casefold() == "observational"
+    interventional = study_type.casefold() == "interventional"
+    fields = {target: {"applicability": "review_registration_definitions",
+                       "source_status": item["status"]} for target, item in provenance.items()}
+    fields["end_date"]["applicability"] = "deprecated"
+    fields["eligibility/sampling_method"]["applicability"] = (
+        "observational_only" if observational else "not_applicable" if interventional else "review_study_type")
+    # Registration definitions distinguish observational optionality from
+    # interventional review. This is not a new mandatory intake requirement.
+    fields["eligibility/healthy_volunteers"]["applicability"] = (
+        "optional_observational" if observational else "review_interventional" if interventional else "review_study_type")
+    return {
+        "source_provenance": provenance,
+        "registration_readiness": {
+            "status": "not_assessed", "blocking": False,
+            "study_type": study_type,
+            "overall_status": _source_value(reference, "regulatory.prs.overall_status"),
+            "fields": fields,
+            "note": "Transport/source validation is not certification of registration completeness. Review current registration definitions and recruitment-status/date rules separately; missing optional upload values are not mapping failures. Deprecated end_date is not a readiness blocker.",
+            "upload_documentation": "https://cdn.clinicaltrials.gov/documents/xsd/prs/ProtocolRecordSchema.xsd",
+            "registration_definitions": "https://clinicaltrials.gov/policy/protocol-definitions",
+        },
+    }
+
+
 def generate(
     template_path: Path,
     output_path: Path,
@@ -508,7 +596,7 @@ def generate(
         structural_template or template_path,
         generation_template=template_path,
     )
-    return {"artifact": "xml", "path": output_path.name, "status": "passed" if not findings else "blocked", "findings": findings, "counts": repeated_counts(output_path)}
+    return {"artifact": "xml", "path": output_path.name, "status": "passed" if not findings else "blocked", "findings": findings, "counts": repeated_counts(output_path), **quality_report(output_path, reference)}
 
 
 def validate_output(
@@ -533,7 +621,7 @@ def validate_output(
             actual_study = _study(ET.parse(path).getroot())
             expected_design = expected_study.find("study_design")
             actual_design = actual_study.find("study_design")
-            actual_branch = next((node for node in list(actual_design or []) if node.tag in {"interventional_design", "observational_design"}), None)
+            actual_branch = next((node for node in (list(actual_design) if actual_design is not None else []) if node.tag in {"interventional_design", "observational_design"}), None)
             expected_branch = expected_design.find(actual_branch.tag) if expected_design is not None and actual_branch is not None else None
             if actual_branch is None or expected_branch is None:
                 structure_differences.append("clinical_study/study_design: selected design branch is missing from the governed generation template")
@@ -562,6 +650,27 @@ def validate_output(
             structure_differences.append(f"PRS XML branch-template parse error: {exc}")
     for difference in structure_differences: findings.append({"category": "xml", "field": "structure", "issue": difference})
     study = _study(ET.parse(path).getroot())
+    # Independent upload-documentation vocabulary oracle, NOT XSD enum
+    # validation. These are string elements in ProtocolRecordSchema.xsd
+    # (2018.05.08), https://cdn.clinicaltrials.gov/documents/xsd/prs/ProtocolRecordSchema.xsd
+    # lines 219, 222, 409, 545-553. Blank optional scalars remain permitted.
+    documented_values = {
+        "eligibility/gender": {"All", "Female", "Male"},
+        "eligibility/sampling_method": {"Probability Sample", "Non-Probability Sample"},
+        "eligibility/healthy_volunteers": {"yes", "no"},
+        "primary_compl_date_type": {"Anticipated", "Actual"},
+        "last_follow_up_date_type": {"Anticipated", "Actual"},
+        "study_design/study_type": {"Interventional", "Observational", "Expanded Access"},
+    }
+    for target_path, allowed in documented_values.items():
+        value = _text(study.findtext(target_path))
+        # Yes/No casing in governed templates is preserved; validate the token.
+        checked = value.casefold() if target_path == "eligibility/healthy_volunteers" else value
+        if value and checked not in allowed:
+            findings.append({
+                "category": "transport_vocabulary", "field": target_path,
+                "issue": f"Value {value!r} is outside the documented PRS upload vocabulary: {', '.join(sorted(allowed))}. This is not an XSD-enumeration check.",
+            })
     for tag in ("provider_study_id", "org_name", "brief_title", "official_title", "brief_summary", "detailed_description", "enrollment", "study_type"):
         node = study.find(f".//{tag}")
         if node is None or not _text("".join(node.itertext())): findings.append({"category": "xml", "field": tag, "issue": "Required PRS value is empty."})
@@ -606,10 +715,10 @@ def validate_output(
         if not meaningful(expected_value):
             continue
         actual_value = study.findtext(target_path)
-        if _text(actual_value) != _text(expected_value):
+        if _text(actual_value) != _expected_transport_value(target_path, expected_value):
             findings.append({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": "Generated PRS value does not match the approved source."})
     for target_path, source_paths in SOURCE_SCALAR_BINDINGS.items():
-        expected_value = _source_value(reference, *source_paths)
+        expected_value = _expected_transport_value(target_path, _source_value(reference, *source_paths))
         if expected_value and _text(study.findtext(target_path)) != expected_value:
             findings.append({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": f"Generated PRS value does not preserve approved source field {source_paths[0]}."})
     responsible = _merged_mapping(
