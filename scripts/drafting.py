@@ -39,7 +39,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v10-explicit-evidence-binding"
+PROMPT_VERSION = "section-drafting-v11-source-constrained-boilerplate"
 MAX_ATTEMPTS = 3
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
@@ -94,11 +94,11 @@ def _request_constraints() -> list[str]:
     return [
         "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
         "Use only supplied approved evidence and listed Fixed Clinical Boilerplate.",
-        "Listed Fixed Clinical Boilerplate is authorized non-study-specific content. It is not invention when reproduced accurately and kept consistent across documents.",
-        "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include the applicable boilerplate and all material source facts unless they are genuinely redundant.",
+        "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+        "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
         "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims.",
         "Return exactly one result for every requested section ID.",
-        "Use only the drafted or fixed_boilerplate outcome. Sparse sections must use their listed Fixed Clinical Boilerplate.",
+        "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
         "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
         "Use participant-facing language for ICF sections.",

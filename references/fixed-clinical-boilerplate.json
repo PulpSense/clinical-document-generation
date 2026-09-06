@@ -1,5 +1,5 @@
 {
-  "version": "clinical-boilerplate-v8",
+  "version": "clinical-boilerplate-v9",
   "sections": {
     "bias": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
     "consent": "Written informed consent will be obtained before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
@@ -17,10 +17,10 @@
     "confidentiality-cross-reference": "Confidentiality protections for study records and participant information are described in Section 16.",
     "confidentiality": "Study records will use appropriate identifiers and access controls. Identifiable information will be available only to authorized personnel and oversight bodies as permitted by the approved protocol and applicable law.",
     "injury": "If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. The study team will explain available care and any responsibility for related costs. Signing this form does not waive your legal rights.",
-    "completion": "Study participation is complete after the participant finishes the final required assessment or is discontinued and all required closeout documentation is complete.",
-    "study-completion": "The study is complete after all enrolled participants have completed or discontinued study participation and the required study closeout activities are finished.",
+    "completion": "Participant completion requires fulfillment of the approved participant-completion criteria. Discontinuation is a distinct participant disposition, not completion; closeout documentation does not change that disposition.",
+    "study-completion": "Study completion follows the approved study-completion criteria and applicable closeout requirements. Participant completion and discontinuation remain distinct dispositions in the study records.",
     "termination": "The investigator may end an individual participant's study participation when continued participation is unsafe, eligibility is no longer met, required follow-up cannot be completed, or the approved protocol otherwise requires termination.",
-    "study-termination": "The sponsor or investigator may stop the study when participant safety, feasibility, operational, ethical, or regulatory considerations make continuation inappropriate. Required notifications and closeout activities will then be completed.",
+    "study-termination": "Study termination follows the decision-making authority and grounds specified in the approved study-termination provisions. Applicable notification and closeout requirements remain in effect; closeout does not confer additional termination authority.",
     "retrospective-bias": "Bias will be limited through predefined record-selection criteria, consistent abstraction methods, prespecified variables, and the approved analysis plan.",
     "retrospective-consent": "This retrospective study uses existing records. Any consent or authorization waiver will be determined by the reviewing institutional review board before records are accessed for research.",
     "retrospective-confidentiality": "Only the approved existing-record data will be abstracted. Direct identifiers will be handled under the approved privacy plan, and reports will not identify individual patients.",
