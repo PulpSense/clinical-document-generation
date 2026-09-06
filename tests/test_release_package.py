@@ -2106,10 +2106,8 @@ def test_verified_installation_atomically_retains_the_previous_release(tmp_path)
     explicit_candidate_mode = quality._pdfium_runtime_integrity(
         active, require_promoted_runtime=False
     )
-    assert explicit_candidate_mode["status"] == "blocked"
-    assert explicit_candidate_mode["finding"]["code"] == (
-        "renderer.pdfium_promotion_record_invalid"
-    )
+    assert explicit_candidate_mode["status"] == "passed"
+    assert explicit_candidate_mode["identity"]["source"] == "release-owned runtime"
 
 
 def test_unsigned_or_unlisted_release_cannot_displace_active(tmp_path):

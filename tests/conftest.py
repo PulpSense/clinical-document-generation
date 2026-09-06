@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import hashlib
 import json
+import platform
 import shutil
 import zipfile
 from pathlib import Path
@@ -20,7 +21,25 @@ import quality
 @pytest.fixture
 def governed_pdfium(tmp_path, monkeypatch):
     """Provide the exact shape of a release-owned PDFium test runtime."""
-    source_wheel = ROOT / "tests/fixtures/runtime-wheels/pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
+    source_wheel = Path()
+    platform_tag = ""
+    machine = platform.machine().casefold()
+    if sys.platform.startswith("linux") and machine in {"x86_64", "amd64"}:
+        source_wheel = ROOT / (
+            "assets/runtime-wheels/"
+            "pypdfium2-5.13.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+        )
+        platform_tag = "manylinux_2_17_x86_64"
+    elif sys.platform == "darwin" and machine in {"arm64", "aarch64"}:
+        source_wheel = ROOT / (
+            "tests/fixtures/runtime-wheels/"
+            "pypdfium2-5.13.0-py3-none-macosx_13_0_arm64.whl"
+        )
+        platform_tag = "macosx_13_0_arm64"
+    else:
+        pytest.skip(
+            f"No governed PDFium fixture for {sys.platform} {platform.machine()}"
+        )
     wheel = tmp_path / "assets/runtime-wheels" / source_wheel.name
     wheel.parent.mkdir(parents=True)
     shutil.copy2(source_wheel, wheel)
@@ -42,7 +61,7 @@ def governed_pdfium(tmp_path, monkeypatch):
         "version": "5.13.0",
         "wheel": f"assets/runtime-wheels/{wheel.name}",
         "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
-        "platform": "macosx_13_0_arm64",
+        "platform": platform_tag,
         "runtime_inventory": runtime_inventory,
     }
     shutil.copytree(ROOT / "scripts", tmp_path / "scripts")
