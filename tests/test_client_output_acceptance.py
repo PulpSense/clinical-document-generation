@@ -1874,7 +1874,9 @@ def test_client_templates_normalize_visual_edge_cases(tmp_path):
         paragraph for paragraph in icf_reference.paragraphs
         if paragraph.text.strip() == "AGREEMENT TO BE IN THE STUDY"
     )
-    assert _paragraph_rhythm(agreement) == _paragraph_rhythm(reference_agreement)
+    expected_rhythm = _paragraph_rhythm(reference_agreement)
+    expected_rhythm.update(left_indent=0.0, first_line_indent=0.0)
+    assert _paragraph_rhythm(agreement) == expected_rhythm
     no_sign_index = next(
         index
         for index, paragraph in enumerate(icf.paragraphs)
@@ -2352,7 +2354,7 @@ def test_protocol_toc_boundaries_preserve_selected_client_template_without_packa
     "fixture_name",
     ("prospective-acceptance-source.json", "ambispective-acceptance-source.json"),
 )
-def test_leaf_body_replacement_preserves_template_break_before_section_15(
+def test_leaf_body_replacement_removes_obsolete_template_break_before_section_15(
     tmp_path, fixture_name,
 ):
     reference = json.loads(
@@ -2380,10 +2382,10 @@ def test_leaf_body_replacement_preserves_template_break_before_section_15(
         paragraph for paragraph in document.paragraphs
         if paragraph.text.strip() == "15. STANDARD EVALUATION PROCEDURES"
     )
-    assert _has_page_boundary_before(section_15) is True
+    assert _has_page_boundary_before(section_15) is False
     previous = section_15._p.getprevious()
     assert previous is not None
-    assert previous.xpath('.//w:br[@w:type="page"]')
+    assert not previous.xpath('.//w:br[@w:type="page"]')
 
 
 def test_protocol_toc_boundaries_are_added_once_when_template_has_none_and_toc_spans_pages():
@@ -2944,7 +2946,8 @@ def test_generated_documents_retain_client_typography_and_section_rhythm(tmp_pat
     assert output_heading.style.name == "Heading ICF Section"
     assert output_heading.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.LEFT
     assert _points(output_heading.paragraph_format.right_indent) in (None, 0)
-    assert _points(output_heading.paragraph_format.left_indent) == _points(reference_heading.paragraph_format.left_indent)
+    assert _points(output_heading.paragraph_format.left_indent) == 0.0
+    assert _points(output_heading.paragraph_format.first_line_indent) == 0.0
     assert _points(output_heading.paragraph_format.space_after) == _points(reference_heading.paragraph_format.space_after)
     assert _paragraph_rhythm(output_body) == _paragraph_rhythm(reference_body)
     assert output_body.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.LEFT
@@ -3068,9 +3071,9 @@ def test_protocol_cached_toc_uses_client_dot_leaders_and_subsection_indent(tmp_p
     heading_two = next(paragraph for paragraph in toc_rows if paragraph.text.strip().startswith("7.1."))
     assert _points(heading_one.paragraph_format.left_indent) == _points(authority.styles["toc 1"].paragraph_format.left_indent)
     assert _points(heading_two.paragraph_format.left_indent) == _points(authority.styles["toc 2"].paragraph_format.left_indent)
-    assert "\t" not in heading_one.text
-    assert "......" in heading_one.text
-    assert 'TOC \\o "1-2"' not in "\n".join(paragraph._p.xml for paragraph in toc_rows)
+    assert heading_one.text.endswith("\t")  # no invented page for blank PDF evidence
+    assert "......" not in heading_one.text
+    assert 'TOC \\o "1-2"' in "\n".join(paragraph._p.xml for paragraph in toc_rows)
     assert not any(
         [cell.text.strip() for cell in table.rows[0].cells] == ["Section", "Page"]
         for table in output.tables

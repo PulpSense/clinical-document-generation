@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -170,6 +170,28 @@ def _address(value: Any) -> str:
     return _text(value)
 
 
+def _facility_address(facility: Mapping[str, Any]) -> str:
+    """Assemble supplied street/locality without inventing absent components."""
+    address = facility.get("address")
+    nested = address if isinstance(address, Mapping) else {}
+    if nested:
+        parts = [nested.get("line1") or nested.get("address_line1") or nested.get("street") or nested.get("address"),
+                 nested.get("line2") or nested.get("address_line2")]
+        result = ", ".join(_text(part) for part in parts if _text(part))
+    else:
+        result = _address(address)
+    for key in ("city", "state", "country", "zip"):
+        component = _text(nested.get(key) or facility.get(key))
+        if key == "zip" and not component:
+            component = next((_text(source.get(alias)) for source in (nested, facility)
+                              for alias in ("postal_code", "postalCode", "postcode", "zip_code")
+                              if _text(source.get(alias))), "")
+        complete_components = {part.strip().casefold() for part in re.split(r"[,;\n]", result)}
+        if component and component.casefold() not in complete_components:
+            result = ", ".join(filter(None, (result, component)))
+    return result
+
+
 def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primary", "secondary", "other")) -> str:
     lines: list[str] = []
     default_categories = {
@@ -259,6 +281,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "ibrName": _text(irb.get("name")), "irbName": _text(irb.get("name")),
         "ibrAdress": _address(irb.get("address")), "irbAdress": _address(irb.get("address")),
         "irbPhone": _text(irb.get("phone")), "irbEmail": _text(irb.get("email")),
+        "studySiteAddress": _facility_address(facility),
         "facilityName": _text(facility.get("name")), "facilityLocation": facility_locality or _address(raw_facility_address),
         "facilityAddress": facility_street or _address(raw_facility_address), "facilityCity": facility_city,
         "studyCordinatorName": _text(coordinator.get("name")),
@@ -329,6 +352,23 @@ def _replace_paragraph(paragraph, fields: Mapping[str, str]) -> None:
     original = paragraph.text
     if "{" not in original:
         return
+    if "{sponsortAdress}" in original and "{fundingSourceName}" in original:
+        # The client shell concatenates these tokens without separators. Keep
+        # funding elsewhere untouched; compose only this combined role block.
+        fields = dict(fields)
+        sponsor_name = fields.get("sponsortName", "")
+        funder = fields.get("fundingSourceName", "")
+        same_entity = bool(funder) and funder.casefold() == sponsor_name.casefold()
+        details = [fields.get("fundingSourceClarification", "")]
+        if funder and not same_entity:
+            details.append(funder)
+        address = fields.get("fundingSourceAdress", "")
+        if address and address.casefold() != fields.get("sponsortAdress", "").casefold():
+            details.append(address)
+        funding = "; ".join(value for value in details if value)
+        fields["fundingSourceClarification"] = ""
+        fields["fundingSourceName"] = "\nFunding source: " + funding if funding else ""
+        fields["fundingSourceAdress"] = ""
     for run in paragraph.runs:
         rendered = run.text
         for token in sorted(set(TOKEN.findall(rendered)), key=len, reverse=True):
@@ -928,6 +968,9 @@ def _replace_protocol_leaf_bodies(
                 ):
                     caption_open = True
                     continue
+                if (section.section_id == "evaluation-procedures" and paragraph.text in
+                        protocol_table_contracts(reference)["schedule-of-assessments"].get("supplemental_notes", [])):
+                    continue
                 if section.section_id in table_sections and caption_open:
                     continue
             elif element.tag == qn("w:tbl") and section.section_id in table_sections:
@@ -1091,6 +1134,10 @@ def _normalize_icf_heading_styles(document: Document, *, sterling: bool = False)
     for index, paragraph in enumerate(document.paragraphs):
         if _is_icf_heading(paragraph):
             paragraph.style = heading_style
+            # Same-level headings share the family body left edge; retain all
+            # authority run typography and spacing, without new page rules.
+            paragraph.paragraph_format.left_indent = Inches(0)
+            paragraph.paragraph_format.first_line_indent = Inches(0)
             paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
             paragraph.paragraph_format.right_indent = Inches(0)
             paragraph.paragraph_format.keep_with_next = True
@@ -1757,7 +1804,7 @@ def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]
         coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
         replacements = {
             "Telephone:": ("Study Coordinator Telephone:", _text(coordinator.get("business_phone") or coordinator.get("phone"))),
-            "Address:": ("Study Site Address:", _address(facility.get("address"))),
+            "Address:": ("Study Site Address:", _facility_address(facility)),
         }
         for row in front.rows:
             label = row.cells[0].text.strip()
@@ -1902,10 +1949,10 @@ def _compact_icf_signature_end(document: Document) -> None:
 def _normalize_icf_preferences(document: Document) -> None:
     preference_paragraphs: list[Paragraph] = []
     for paragraph in document.paragraphs:
-        text = paragraph.text.strip()
+        text = paragraph.text.strip().removeprefix("☐ ")
         if not text.startswith(("Yes, inform my primary care physician", "No, do not inform my primary care physician")):
             continue
-        paragraph.text = f"☐ {text}"
+        _set_paragraph_text(paragraph, f"☐ {text}")
         properties = paragraph._p.get_or_add_pPr()
         numbering = properties.find(qn("w:numPr"))
         if numbering is not None:
@@ -1924,6 +1971,14 @@ def _normalize_icf_preferences(document: Document) -> None:
         block = paragraphs[start:end + 1]
     else:
         block = ([heading] if heading is not None else []) + preference_paragraphs
+    # Only empty, undecorated paragraphs inside the choice block are cosmetic;
+    # signing space, borders, fields and page/section boundaries remain intact.
+    for paragraph in list(block):
+        if not paragraph.text.strip() and not paragraph._p.xpath(
+            './/w:br | .//w:sectPr | .//w:pBdr | .//w:drawing | .//w:fldChar | .//w:tab'
+        ):
+            paragraph._p.getparent().remove(paragraph._p)
+            block.remove(paragraph)
     for paragraph in block:
         paragraph.paragraph_format.keep_together = True
     for paragraph in block[:-1]:
@@ -1963,13 +2018,8 @@ def _replace_static_toc(document: Document) -> None:
 
 
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
-    rows = get_path(reference, "procedures.visit_schedule_table", []) or get_path(reference, "procedures.visit_schedule", []) or []
+    rows = normalized_visit_records(reference)
     if not rows:
-        rows = [
-            {"visitName": item}
-            for item in _assessment_visit_labels(get_path(reference, "procedures.assessments", []))
-        ]
-    if not isinstance(rows, list) or not rows:
         return
     for table in document.tables:
         template_index = next((i for i, row in enumerate(table.rows) if any("{AI_visit" in cell.text or "{visitsTable}" in cell.text for cell in row.cells)), None)
@@ -2094,7 +2144,6 @@ def _copy_cell_design(
     source,
     text: str,
     *,
-    compact: bool = False,
     run_properties=None,
 ) -> None:
     destination_properties = destination._tc.get_or_add_tcPr()
@@ -2125,8 +2174,7 @@ def _copy_cell_design(
     )
     if resolved_run_properties is not None:
         run._r.insert(0, copy.deepcopy(resolved_run_properties))
-    if compact:
-        run.font.size = Pt(7)
+    # Column count must not override the client's declared type size.
     destination.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
 
@@ -2209,7 +2257,31 @@ def _has_page_boundary_before(paragraph: Paragraph) -> bool:
 
 
 def _normalize_protocol_section_pagination(document: Document) -> None:
-    """Preserve template breaks and guarantee only the two TOC boundaries."""
+    """Keep TOC boundaries; remove only the obsolete evaluation hard break."""
+    for heading in document.paragraphs:
+        if heading.text.strip() != "15. STANDARD EVALUATION PROCEDURES" or _heading_level(heading) is None:
+            continue
+        previous = heading._p.getprevious()
+        while previous is not None and previous.tag == qn("w:p"):
+            paragraph = Paragraph(previous, document)
+            if paragraph.text.strip() or previous.xpath('./w:pPr/w:sectPr'):
+                break
+            before = previous.getprevious()
+            for page_break in previous.xpath('.//w:br[@w:type="page"]'):
+                page_break.getparent().remove(page_break)
+            previous = before
+        # A short final cross-reference must travel with its preceding context,
+        # not with the entire next section. Never bind across a heading/table.
+        if previous is not None and previous.tag == qn("w:p"):
+            tail = Paragraph(previous, document)
+            context_element = previous.getprevious()
+            if (tail.text.strip() and len(tail.text.split()) <= 30
+                    and _heading_level(tail) is None and context_element is not None
+                    and context_element.tag == qn("w:p")):
+                context = Paragraph(context_element, document)
+                if context.text.strip() and _heading_level(context) is None:
+                    context.paragraph_format.keep_with_next = True
+                    tail.paragraph_format.keep_together = True
     headings = [
         paragraph for paragraph in document.paragraphs
         if _heading_level(paragraph) is not None
@@ -2467,7 +2539,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     destination_properties.getparent().replace(destination_properties, copy.deepcopy(design._tbl.tblPr))
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
-    compact = len(row_values[0]) > 6
     for row_index, values in enumerate(row_values):
         source_row_index = min(row_index, len(design.rows) - 1)
         for column_index, value in enumerate(values):
@@ -2476,7 +2547,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
                 table.rows[row_index].cells[column_index],
                 design.rows[source_row_index].cells[source_column_index],
                 value,
-                compact=compact or (row_index < header_rows and len(row_values[0]) > 4),
                 run_properties=body_run_properties if row_index >= header_rows else None,
             )
         _prevent_row_split(table.rows[row_index])
@@ -2496,24 +2566,30 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
             continuation_borders.append(continuation_top)
         continuation_top.set(qn("w:val"), "nil")
     available_width = document.sections[0].page_width - document.sections[0].left_margin - document.sections[0].right_margin
-    first_width = int(available_width * (0.40 if len(row_values[0]) > 3 else 0.55))
-    other_width = int((available_width - first_width) / max(1, len(row_values[0]) - 1))
-    for row in table.rows:
-        for index, cell in enumerate(row.cells):
-            cell.width = first_width if index == 0 else other_width
+    total_twips = round(available_width / 635)
+    column_count = len(row_values[0])
+    # Give contact labels room at authority type size, rather than reserving
+    # 40% for activities and compensating by shrinking the header font.
+    first_twips = round(total_twips * (0.25 if column_count > 4 else 0.40 if column_count > 3 else 0.55))
+    other_twips = (total_twips - first_twips) // max(1, column_count - 1)
+    widths = [first_twips] + [other_twips] * (column_count - 1)
+    widths[-1] += total_twips - sum(widths)
+    table_width = table._tbl.tblPr.find(qn("w:tblW"))
+    if table_width is None:
+        table_width = OxmlElement("w:tblW")
+        table._tbl.tblPr.append(table_width)
+    table_width.set(qn("w:w"), str(total_twips))
+    table_width.set(qn("w:type"), "dxa")
     for row in table._tbl.tr_lst:
         for index, cell in enumerate(row.tc_lst):
-            width = first_width if index == 0 else other_width
-            width_twips = round(width / 635)
-            properties = cell.get_or_add_tcPr()
-            cell_width = properties.find(qn("w:tcW"))
+            cell_width = cell.get_or_add_tcPr().find(qn("w:tcW"))
             if cell_width is None:
                 cell_width = OxmlElement("w:tcW")
-                properties.insert(0, cell_width)
-            cell_width.set(qn("w:w"), str(width_twips))
+                cell.get_or_add_tcPr().insert(0, cell_width)
+            cell_width.set(qn("w:w"), str(widths[index]))
             cell_width.set(qn("w:type"), "dxa")
     for index, grid_column in enumerate(table._tbl.tblGrid.gridCol_lst):
-        grid_column.w = first_width if index == 0 else other_width
+        grid_column.set(qn("w:w"), str(widths[index]))
     for cell in table._tbl.tr_lst[-1].tc_lst:
         properties = cell.get_or_add_tcPr()
         borders = properties.find(qn("w:tcBorders"))
@@ -2527,6 +2603,11 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
         for key, value in (("w:val", "double"), ("w:sz", "6"), ("w:space", "0"), ("w:color", "auto")):
             bottom.set(qn(key), value)
     placeholder._p.addprevious(table._tbl)
+    # Source-owned narrative requirements belong on the table's full-width
+    # surface, not compressed into Activity cells or assigned invented marks.
+    for note in table_contract.get("supplemental_notes", []):
+        paragraph = document.add_paragraph(str(note), style="Normal")
+        placeholder._p.addprevious(paragraph._p)
     placeholder._element.getparent().remove(placeholder._element)
 
 
@@ -2558,7 +2639,6 @@ def _sample_size_evidence_table(document: Document, reference: Mapping[str, Any]
                 table.rows[row_index].cells[column_index],
                 design.rows[source_row_index].cells[source_column_index],
                 value,
-                compact=len(row_values[0]) > 5,
             )
         _prevent_row_split(table.rows[row_index])
     _set_repeat_header(table.rows[0])
@@ -2566,6 +2646,12 @@ def _sample_size_evidence_table(document: Document, reference: Mapping[str, Any]
     widths = [int(available_width / len(row_values[0]))] * len(row_values[0])
     for column, width in zip(table._tbl.tblGrid.gridCol_lst, widths):
         column.w = width
+    table_width = table._tbl.tblPr.find(qn("w:tblW"))
+    if table_width is None:
+        table_width = OxmlElement("w:tblW")
+        table._tbl.tblPr.append(table_width)
+    table_width.set(qn("w:type"), "dxa")
+    table_width.set(qn("w:w"), str(sum(round(width / 635) for width in widths)))
     for row in table.rows:
         for cell, width in zip(row.cells, widths):
             cell.width = width
@@ -2733,19 +2819,54 @@ def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
 
     anchor = toc_title._p
     created: list[Paragraph] = []
+    bookmark_id = max((int(value) for value in document.element.body.xpath('.//w:bookmarkStart/@w:id')), default=0)
     for heading, style in headings:
+        source = next(p for p in document.paragraphs if p.text.strip() == heading and p.style.name == style)
+        existing = source._p.xpath('./w:bookmarkStart[starts-with(@w:name, "_ClinicalTOC")]')
+        if existing:
+            bookmark = existing[0].get(qn("w:name"))
+        else:
+            bookmark_id += 1
+            bookmark = f"_ClinicalTOC{bookmark_id}"
+            start = OxmlElement("w:bookmarkStart")
+            start.set(qn("w:id"), str(bookmark_id))
+            start.set(qn("w:name"), bookmark)
+            end = OxmlElement("w:bookmarkEnd")
+            end.set(qn("w:id"), str(bookmark_id))
+            source._p.insert(1 if source._p.pPr is not None else 0, start)
+            source._p.append(end)
         paragraph = document.add_paragraph(style="toc 2" if style == "Heading 2" else "toc 1")
         paragraph.paragraph_format.left_indent = paragraph.style.paragraph_format.left_indent
         paragraph.paragraph_format.tab_stops.add_tab_stop(
             Inches(5.75), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS
         )
         page_number = str(page_map.get(heading, ""))
-        paragraph.add_run(f"{heading}\t{page_number}" if page_number else f"{heading}......")
+        hyperlink = OxmlElement("w:hyperlink")
+        hyperlink.set(qn("w:anchor"), bookmark)
+        label_run = paragraph.add_run(heading)
+        hyperlink.append(label_run._r)
+        paragraph._p.append(hyperlink)
+        paragraph.add_run("\t")
+        field_runs = _complex_field_runs(f"PAGEREF {bookmark} \\h", OxmlElement("w:r"))
+        field_runs[3].find(qn("w:t")).text = page_number
+        for field_run in field_runs:
+            paragraph._p.append(field_run)
         anchor.addnext(paragraph._p)
         anchor = paragraph._p
         created.append(paragraph)
     if not created:
         return False
+    # The rows above are the cached result of one real, unlocked TOC field.
+    # Keep its delimiters inside the styled rows so refresh removes/rebuilds
+    # exactly one cache, while heading bookmarks survive every cycle.
+    field = _complex_field_runs('TOC \\o "1-2" \\h \\z \\u', OxmlElement("w:r"))
+    field[1].find(qn("w:instrText")).text = ' TOC \\o "1-2" \\h \\z \\u '
+    first = created[0]._p
+    insertion = 1 if first.pPr is not None else 0
+    for offset, run in enumerate(field[:3]):
+        first.insert(insertion + offset, run)
+    created[-1]._p.append(field[-1])
+    _set_update_fields(document)
     document.save(docx_path)
     return True
 
