@@ -1504,7 +1504,6 @@ def _pdfium_runtime_integrity(
         for path in (
             resolved_root / "PROMOTION-RECORD.json",
             resolved_root / "INSTALLATION-ASSURANCE.json",
-            resolved_root.parent / ".clinical-document-generation.previous",
             resolved_root.parent / ".clinical-document-generation.activation.json",
         )
     )

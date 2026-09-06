@@ -806,6 +806,45 @@ def test_direct_extracted_candidate_provisions_without_forging_promotion(tmp_pat
     assert copied_promoted["finding"]["code"] == "renderer.pdfium_promotion_record_invalid"
 
 
+def test_unsigned_dropin_runtime_remains_valid_beside_previous_rollback(
+    tmp_path, monkeypatch
+):
+    skill_root = tmp_path / "skills/clinical-document-generation"
+    wheel_dir = skill_root / "assets/runtime-wheels"
+    wheel_dir.mkdir(parents=True)
+    shutil.copy2(
+        ROOT / "assets/runtime-wheels" / PDFIUM_WHEEL,
+        wheel_dir / PDFIUM_WHEEL,
+    )
+    _write_release_manifest(skill_root, {
+        "git_commit": "unsigned-candidate",
+        "files": [{
+            "path": f"assets/runtime-wheels/{PDFIUM_WHEEL}",
+            "sha256": PDFIUM_SHA256,
+            "bytes": (wheel_dir / PDFIUM_WHEEL).stat().st_size,
+        }],
+        "inventory": {"pdf_page_renderer": _pdfium_manifest_identity()},
+    })
+    monkeypatch.setattr(workflow, "renderers", lambda **_kwargs: [{
+        "kind": "LibreOffice", "path": "/controlled/soffice",
+    }])
+    assert provision_render_assurance(skill_root)["status"] == "passed"
+
+    previous = skill_root.parent / ".clinical-document-generation.previous"
+    previous.mkdir()
+    (previous / "SKILL.md").write_text("previous rollback release\n", encoding="utf-8")
+
+    integrity = quality._pdfium_runtime_integrity(
+        skill_root,
+        require_promoted_runtime=False,
+    )
+
+    assert integrity["status"] == "passed"
+    assert integrity["identity"]["python_path"] == str(
+        skill_root.resolve() / "runtime/python"
+    )
+
+
 def test_direct_extracted_candidate_refuses_mutated_manifest_owned_bytes(tmp_path, monkeypatch):
     skill_root = tmp_path / "isolated-hermes-home/skills/clinical-document-generation"
     wheel_dir = skill_root / "assets/runtime-wheels"
