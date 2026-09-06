@@ -116,4 +116,3 @@ Use the Advarra ICF template family.
 | Overall status        | Recruiting                |
 | IRB approval status   | Approved                  |
 | Study UID             | AS-SP-001-UID             |
-

@@ -15,7 +15,7 @@
   "artifacts": {
     "source_input": {
       "path": "source-input.md",
-      "sha256": "ebbfcb14031dc40f8cc54568ac2606fd441e033af06ec0f0bd053b8473422d93"
+      "sha256": "1ebf06a865de424d01e3ea8ff0fa8e83340d61bde3fe742da61549579e0f23fb"
     },
     "approved_source": {
       "path": "approved-source.md",
@@ -27,7 +27,7 @@
     }
   },
   "approved_normalization": {
-    "source_input_sha256": "ebbfcb14031dc40f8cc54568ac2606fd441e033af06ec0f0bd053b8473422d93",
+    "source_input_sha256": "1ebf06a865de424d01e3ea8ff0fa8e83340d61bde3fe742da61549579e0f23fb",
     "approved_source_sha256": "5943216bd5861a8f96050fbbe745fc377a6da74c63284da4151b1aee2f2c0841"
   },
   "hermes_configuration": {
