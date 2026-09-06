@@ -730,7 +730,13 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     table_count = 0
     for path in ("procedures.visit_schedule_table", "procedures.visit_schedule"):
         raw = get_path(reference, path, [])
-        for row in raw if isinstance(raw, list) else []:
+        source_rows = [row for row in raw if isinstance(row, Mapping)] if isinstance(raw, list) else []
+        source_keys = [
+            (str(row.get("visit") or row.get("visitName") or "").strip(),
+             str(row.get("timing") or row.get("visitWindow") or "").strip())
+            for row in source_rows
+        ]
+        for row in source_rows:
             if not isinstance(row, Mapping) or not any(
                 meaningful(row.get(key)) for key in ("visit", "visitName", "visitNumber", "timing", "visitWindow")
             ):
@@ -753,7 +759,11 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
                                or candidate[key] == value
                                for key, value in record.items()
                                if key not in {"procedures", "visitName", "visitWindow"})]
-            if len(matches) == 1:
+            # A unique table candidate is insufficient when multiple contacts
+            # in the other source could match it. Retain ambiguous rows rather
+            # than silently collapsing separate approved contacts.
+            source_key = (record["visit"], record["timing"])
+            if len(matches) == 1 and source_keys.count(source_key) == 1:
                 candidate = matches[0]
                 for key, value in record.items():
                     if not meaningful(candidate.get(key)):
@@ -802,16 +812,9 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
                 ],
             ]
     if not assessment_rows:
-        entries = []
-        schedule_table = get_path(reference, "procedures.visit_schedule_table", [])
-        if isinstance(schedule_table, list):
-            for item in schedule_table:
-                if not isinstance(item, Mapping):
-                    continue
-                label = str(item.get("visitName") or item.get("visit") or "").strip()
-                timing = str(item.get("visitWindow") or item.get("timing") or "").strip()
-                if label:
-                    entries.append([label, timing])
+        # No procedure assignments does not make an approved contact disappear.
+        # Both matrix and inventory forms use the same normalized visit set.
+        entries = [[visit["visit"], visit["timing"]] for visit in visits]
         if entries:
             assessment_rows = [["Approved visit or assessment", "Approved timing"], *entries]
     # A structured matrix must not suppress supplied narrative assessments.
