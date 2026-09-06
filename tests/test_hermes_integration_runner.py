@@ -2148,6 +2148,44 @@ def test_sandbox_launch_denies_repository_writes_but_allows_run_workspace(tmp_pa
         profile.unlink(missing_ok=True)
 
 
+def test_linux_sandbox_launches_bubblewrap_with_a_read_only_host_and_writable_run_workspace(
+    tmp_path: Path, monkeypatch
+) -> None:
+    repo_root = tmp_path / "skills/clinical-document-generation"
+    repo_root.mkdir(parents=True)
+    run_dir = tmp_path / "runs/certification"
+    bubblewrap = tmp_path / "bwrap"
+    bubblewrap.write_text("#!/bin/sh\n", encoding="utf-8")
+    bubblewrap.chmod(0o755)
+    monkeypatch.setattr(hermes_e2e.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(
+        hermes_e2e.shutil,
+        "which",
+        lambda name: str(bubblewrap) if name == "bwrap" else None,
+    )
+
+    command, cleanup_path = sandbox_command(repo_root, run_dir, ["/usr/bin/hermes", "chat"])
+
+    assert cleanup_path is None
+    assert command[:3] == [str(bubblewrap), "--die-with-parent", "--new-session"]
+    assert ["--ro-bind", "/", "/"] == command[3:6]
+    assert ["--bind", str(run_dir.resolve()), str(run_dir.resolve())] == command[6:9]
+    cache_dir = run_dir / ".hermes-cache"
+    assert ["--bind", str(cache_dir.resolve()), str(cache_dir.resolve())] == command[9:12]
+    assert ["--setenv", "TMPDIR", str(cache_dir.resolve())] == command[12:15]
+    assert ["--setenv", "XDG_CACHE_HOME", str(cache_dir.resolve())] == command[15:18]
+    assert ["--setenv", "XDG_STATE_HOME", str(cache_dir.resolve())] == command[18:21]
+    assert ["--chdir", str(repo_root.resolve()), "--", "/usr/bin/hermes", "chat"] == command[21:]
+
+
+def test_linux_sandbox_fails_closed_without_bubblewrap(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(hermes_e2e.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(hermes_e2e.shutil, "which", lambda _name: None)
+
+    with pytest.raises(RuntimeError, match="requires bubblewrap"):
+        sandbox_command(tmp_path / "skill", tmp_path / "run", ["/usr/bin/hermes", "chat"])
+
+
 def test_input_provenance_requires_an_explicit_approved_normalization(tmp_path: Path) -> None:
     source_input = tmp_path / "required-input.md"
     approved_source = tmp_path / "source-of-truth.md"

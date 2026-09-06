@@ -95,6 +95,11 @@ state binds the release fingerprint and compatible runtimes to the original UTC
 deadline, exact pending handoffs, attempt counters, stage timing and soft-budget
 diagnostics, cleanup evidence, and immutable terminal result.
 
+The certification controller uses the host-native kernel boundary: macOS uses
+`sandbox-exec`; Linux requires a trusted `bwrap`/Bubblewrap executable. On Linux
+it mounts the host read-only, permits writes only to the certification run and
+its isolated cache, and fails closed when Bubblewrap is unavailable.
+
 One real certification tracer requires an extracted, hash-valid candidate rather than the
 editable checkout:
 

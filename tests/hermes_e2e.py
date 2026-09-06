@@ -9,6 +9,7 @@ import importlib.util
 import json
 import math
 import os
+import platform
 import re
 import shlex
 import shutil
@@ -167,17 +168,44 @@ def expected_outputs(reference: Mapping[str, Any]) -> frozenset[str]:
     return frozenset({"protocol.docx"}) if study_type == "retrospective" else EXPECTED_OUTPUTS
 
 
-def sandbox_command(repo_root: Path, run_dir: Path, command: Sequence[str]) -> tuple[list[str], Path]:
-    """Launch Hermes under a kernel-enforced read-only skill boundary on macOS."""
+def sandbox_command(repo_root: Path, run_dir: Path, command: Sequence[str]) -> tuple[list[str], Path | None]:
+    """Launch Hermes with a read-only skill boundary on the certification host."""
+    root = repo_root.resolve()
+    workspace = run_dir.resolve()
+    cache_dir = workspace / ".hermes-cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    if platform.system() == "Linux":
+        sandbox = shutil.which("bwrap") or shutil.which("bubblewrap")
+        if sandbox is None:
+            raise RuntimeError(
+                "Linux release certification requires bubblewrap for the governed read-only skill boundary."
+            )
+        sandbox_path = Path(sandbox)
+        if not sandbox_path.is_absolute() or sandbox_path.is_symlink() or not sandbox_path.is_file() or not os.access(sandbox_path, os.X_OK):
+            raise RuntimeError("The governed Linux bubblewrap executable is unavailable.")
+        return [
+            str(sandbox_path),
+            "--die-with-parent",
+            "--new-session",
+            "--ro-bind", "/", "/",
+            "--bind", str(workspace), str(workspace),
+            "--bind", str(cache_dir), str(cache_dir),
+            "--setenv", "TMPDIR", str(cache_dir),
+            "--setenv", "XDG_CACHE_HOME", str(cache_dir),
+            "--setenv", "XDG_STATE_HOME", str(cache_dir),
+            "--chdir", str(root),
+            "--",
+            *command,
+        ], None
+    if platform.system() != "Darwin":
+        raise RuntimeError("No supported OS sandbox enforcement mechanism is available")
     sandbox = shutil.which("sandbox-exec")
     if sandbox is None:
         raise RuntimeError("No supported OS sandbox enforcement mechanism is available")
-    cache_dir = run_dir / ".hermes-cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     profile = tempfile.NamedTemporaryFile("w", prefix="hermes-generation-", suffix=".sb", delete=False)
     profile.write("(version 1)\n(allow default)\n")
-    profile.write(f"(deny file-write* (subpath {json.dumps(str(repo_root.resolve()))}))\n")
-    profile.write(f"(allow file-write* (subpath {json.dumps(str(run_dir.resolve()))}))\n")
+    profile.write(f"(deny file-write* (subpath {json.dumps(str(root))}))\n")
+    profile.write(f"(allow file-write* (subpath {json.dumps(str(workspace))}))\n")
     profile.write(f"(allow file-write* (subpath {json.dumps(str(cache_dir.resolve()))}))\n")
     for executable in ("pytest", "py.test", "pip", "pip3"):
         profile.write(f"(deny process-exec (literal {json.dumps(executable)}))\n")
