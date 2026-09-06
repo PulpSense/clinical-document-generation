@@ -2885,17 +2885,37 @@ def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, A
                 matches.append(number)
         cached = cache.get(marker, [])
         rendered = matches[0] if len(matches) == 1 else None
-        status = "unknown" if rendered is None else (
-            "passed" if cached == [rendered] else "mismatch")
+        toc_values = []
+        in_toc = False
+        body_markers = {key(value) for value in headings if "TABLE OF CONTENTS" not in value.upper()}
+        for lines in page_lines:
+            for line in lines:
+                if line == key("TABLE OF CONTENTS"):
+                    in_toc = True
+                elif line in body_markers:
+                    in_toc = False
+                if in_toc:
+                    entry = re.fullmatch(re.escape(marker) + r" (\d+)", line)
+                    if entry:
+                        toc_values.append(int(entry[1]))
+        # The TOC title itself is a destination, not necessarily a displayed
+        # TOC row. All other destinations require independent visible evidence.
+        title_only = "TABLE OF CONTENTS" in heading.upper() and not toc_values
+        observed = [*cached, *toc_values, *([rendered] if rendered is not None else [])]
+        status = "mismatch" if len(set(observed)) > 1 else (
+            "passed" if rendered is not None and cached == [rendered]
+            and (toc_values == [rendered] or title_only) else "unknown")
         row = {"heading": heading, "cached_page": cached[0] if len(cached) == 1 else None,
-               "rendered_page": rendered, "rendered_candidates": matches, "status": status}
+               "rendered_page": rendered, "rendered_candidates": matches,
+               "rendered_toc_page": toc_values[0] if len(toc_values) == 1 else None,
+               "rendered_toc_candidates": toc_values, "status": status}
         destinations.append(row)
         if status == "mismatch":
             findings.append({"category": "visual", "field": docx_path.stem,
                              "artifact": docx_path.stem, "check": "toc_mismatch",
                              "element": heading, "page": rendered,
                              "target_ids": [f"layout:{docx_path.stem}"],
-                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, rendered page {rendered}."})
+                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, visible TOC {toc_values}, rendered page {rendered}."})
     status = "mismatch" if findings else ("passed" if destinations and all(
         row["status"] == "passed" for row in destinations) else "unknown")
     return {"status": status, "destinations": destinations, "findings": findings}
@@ -2931,15 +2951,18 @@ def _pdf_body_pages(path: Path, *, docx_path: Path | None = None) -> list[dict[s
 
             def operand(operator: bytes, operands: Any, cm: Any, tm: Any) -> None:
                 nonlocal graphics_in_body
-                if operator != b"Do":
+                if operator not in {b"Do", b"INLINE IMAGE"}:
                     return
-                objects = page.get("/Resources", {}).get("/XObject", {})
-                image = objects.get(operands[0])
-                if image is None or image.get_object().get("/Subtype") != "/Image":
-                    # Nested forms need their own coordinate evidence. Unknown
-                    # graphical content cannot prove a body-empty page.
-                    graphics_in_body = True
-                    return
+                if operator == b"Do":
+                    objects = page.get("/Resources", {}).get("/XObject", {})
+                    image = objects.get(operands[0])
+                    if image is None or image.get_object().get("/Subtype") != "/Image":
+                        # Nested forms need their own coordinate evidence. Unknown
+                        # graphical content cannot prove a body-empty page.
+                        graphics_in_body = True
+                        return
+                # pypdf exposes BI/ID/EI as INLINE IMAGE. Both image forms
+                # paint a unit square transformed by the current matrix.
                 ys = [float(cm[5]), float(cm[1] + cm[5]),
                       float(cm[3] + cm[5]), float(cm[1] + cm[3] + cm[5])]
                 if max(ys) >= bottom and min(ys) <= top:
