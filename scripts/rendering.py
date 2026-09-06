@@ -120,7 +120,7 @@ def _assessment_visit_labels(value: Any) -> list[str]:
             )
         )
     ]
-    return scheduled or labels
+    return scheduled
 
 
 def _draft_text(model: Mapping[str, Any], section_id: str, *, bullets: bool = False) -> str:
@@ -2023,6 +2023,10 @@ def _replace_static_toc(document: Document) -> None:
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
     rows = normalized_visit_records(reference)
     if not rows:
+        # Narrative contacts are labels only, never synthetic numbered visits.
+        rows = [{"visitName": label} for label in
+                _assessment_visit_labels(get_path(reference, "procedures.assessments", []))]
+    if not rows:
         return
     for table in document.tables:
         template_index = next((i for i, row in enumerate(table.rows) if any("{AI_visit" in cell.text or "{visitsTable}" in cell.text for cell in row.cells)), None)
@@ -2521,7 +2525,21 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     row_values = table_contract["rows"]
     header_rows = int(table_contract["header_rows"])
     if not row_values:
-        return
+        # Restore the readable, unnumbered source inventory when no explicit
+        # visit/procedure matrix exists. Keep the full verbatim notes below it
+        # as well: splitting a schedule for display must not lose qualifications.
+        labels = _plain_language_assessments(get_path(reference, "procedures.assessments", []))
+        if labels:
+            row_values = [["Approved visit or assessment", "Approved timing"],
+                          *[[label, _assessment_timing(label)] for label in labels]]
+        else:
+            # Supplemental evidence is still source-owned when there are no
+            # rows at all; the old early return silently discarded these notes.
+            for note in table_contract.get("supplemental_notes", []):
+                paragraph = document.add_paragraph(str(note), style="Normal")
+                placeholder._p.addprevious(paragraph._p)
+            placeholder._element.getparent().remove(placeholder._element)
+            return
     matrix_mode = header_rows == 2
     if matrix_mode:
         row_values = [list(row) for row in row_values]

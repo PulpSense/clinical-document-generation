@@ -720,41 +720,59 @@ def _sample_size_evidence_rows(reference: Mapping[str, Any]) -> list[Mapping[str
 
 
 def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Canonical ordered visits for both tables; never turn assessments into visits.
+    """Combine the approved visit inventory and procedure relationships.
 
-    Prefer structured visit_schedule, otherwise visit_schedule_table. Preserve
-    explicit identifiers and extra source fields; positional labels are generated
-    only for actual structured visits, without changing the approved reference.
+    The explicit schedule table owns row order; extra procedure-schedule visits
+    follow it. Merge only unambiguous equal name/timing rows with compatible
+    supplied IDs/fields. Never turn narrative assessments into numbered visits.
     """
-    for path in ("procedures.visit_schedule", "procedures.visit_schedule_table"):
+    visits: list[dict[str, Any]] = []
+    table_count = 0
+    for path in ("procedures.visit_schedule_table", "procedures.visit_schedule"):
         raw = get_path(reference, path, [])
-        visits = [row for row in raw if isinstance(row, Mapping) and any(
-            meaningful(row.get(key)) for key in ("visit", "visitName", "visitNumber", "timing", "visitWindow")
-        )] if isinstance(raw, list) else []
-        if not visits:
-            continue
-        result = []
-        used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
-        for index, row in enumerate(visits, 1):
+        for row in raw if isinstance(raw, list) else []:
+            if not isinstance(row, Mapping) or not any(
+                meaningful(row.get(key)) for key in ("visit", "visitName", "visitNumber", "timing", "visitWindow")
+            ):
+                continue
             record = copy.deepcopy(dict(row))
-            if meaningful(row.get("visitNumber")):
-                number = row["visitNumber"]
-            else:
-                while str(index) in used_numbers:
-                    index += 1
-                number = str(index)
-                used_numbers.add(number)
+            record["visit"] = str(row.get("visit") or row.get("visitName") or "").strip()
+            record["timing"] = str(row.get("timing") or row.get("visitWindow") or "").strip()
             raw_procedures = row.get("procedures", [])
-            procedures = ([str(item).strip() for item in raw_procedures if meaningful(item)]
-                          if isinstance(raw_procedures, list) else
-                          [item.strip() for item in re.split(r"[;\n]", str(raw_procedures or "")) if item.strip()])
-            record.update(visitNumber=number,
-                          visit=str(row.get("visit") or row.get("visitName") or f"Visit {number}").strip(),
-                          timing=str(row.get("timing") or row.get("visitWindow") or "").strip(),
-                          procedures=procedures)
-            result.append(record)
-        return result
-    return []
+            record["procedures"] = (
+                [str(item).strip() for item in raw_procedures if meaningful(item)]
+                if isinstance(raw_procedures, list) else
+                [item.strip() for item in re.split(r"[;\n]", str(raw_procedures or "")) if item.strip()]
+            )
+            # Do not collapse separate rows within either approved source, or
+            # guess that differently timed/named contacts are the same visit.
+            matches = [candidate for candidate in visits[:table_count]
+                       if record["visit"] and candidate["visit"] == record["visit"]
+                       and candidate["timing"] == record["timing"]
+                       and all(not meaningful(candidate.get(key)) or not meaningful(value)
+                               or candidate[key] == value
+                               for key, value in record.items()
+                               if key not in {"procedures", "visitName", "visitWindow"})]
+            if len(matches) == 1:
+                candidate = matches[0]
+                for key, value in record.items():
+                    if not meaningful(candidate.get(key)):
+                        candidate[key] = value
+                candidate["procedures"] = list(dict.fromkeys(candidate["procedures"] + record["procedures"]))
+            else:
+                visits.append(record)
+        if path.endswith("visit_schedule_table"):
+            table_count = len(visits)
+    used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
+    for index, record in enumerate(visits, 1):
+        if not meaningful(record.get("visitNumber")):
+            while str(index) in used_numbers:
+                index += 1
+            record["visitNumber"] = str(index)
+            used_numbers.add(str(index))
+        if not record["visit"]:
+            record["visit"] = f"Visit {record['visitNumber']}"
+    return visits
 
 
 def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
@@ -1010,10 +1028,14 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     for clause in re.split(r"[;!?]\s*|\.(?!\d)\s*", text):
         previous_end = 0
         for match in relative_pattern.finditer(clause):
-            # Bind a duration only to its own preceding event phrase. A later
-            # duration must not inherit the first event in a compound sentence.
-            relatives.append((clause[previous_end:match.start()], match))
-            previous_end = match.end()
+            # A directly trailing parenthetical labels this duration, not the
+            # next one. Consume it so compound schedules cannot inherit it.
+            trailing = re.match(r"\s*\([^()]*\)", clause[match.end():])
+            event_phrase = clause[previous_end:match.start()]
+            if trailing:
+                event_phrase += trailing.group(0)
+            relatives.append((event_phrase, match))
+            previous_end = match.end() + (trailing.end() if trailing else 0)
     for event_phrase, relative in relatives:
         stated = _duration_days(relative.group(1))
         points = []

@@ -269,6 +269,17 @@ def test_retry_guidance_identifies_the_uncited_paragraph_and_allowed_references(
         "boilerplate_refs": [],
     }]
 
+    # Evaluation now owns the explicit visit table as well as assessments.
+    # Supply that material evidence in the fixture; the uncited introductory
+    # paragraph remains the intentional rejection, not missing schedule facts.
+    result["lists"].append({
+        "items": [
+            f"Visit {visit['visitNumber']}: {visit['visitName']}, {visit['visitWindow']}, CRF {visit['CRFnumber']}."
+            for visit in reference["procedures"]["visit_schedule_table"]
+        ],
+        "evidence_refs": ["source:procedures.visit_schedule_table"],
+        "boilerplate_refs": [],
+    })
     accepted, findings = validate_response(request, response)
     finding = next(
         item for item in findings
