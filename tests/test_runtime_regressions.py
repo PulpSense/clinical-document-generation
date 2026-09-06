@@ -2735,6 +2735,10 @@ def test_protocol_renders_assignment_endpoint_hierarchy_and_both_operational_tab
     ]
     visit_names = ["Baseline", "Day 14", "Month 1", "Month 3", "Month 6", "Month 9", "Month 12"]
     activities = [f"Assessment {index}" for index in range(1, 20)]
+    # This synthetic case replaces the inherited three-visit study with seven
+    # visits. Remove its obsolete parallel table rather than supply two studies'
+    # schedules and expect the renderer to discard approved source rows.
+    reference["procedures"].pop("visit_schedule_table", None)
     reference["procedures"]["visit_schedule"] = [
         {"visit": visit, "timing": visit, "procedures": activities if index == 0 else activities[index::3]}
         for index, visit in enumerate(visit_names)
