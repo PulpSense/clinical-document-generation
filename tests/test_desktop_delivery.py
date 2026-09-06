@@ -1,5 +1,6 @@
 import json
 import os
+import platform
 from pathlib import Path
 import shutil
 import signal
@@ -583,7 +584,28 @@ def test_production_adapter_isolates_profile_environment_and_rejects_symlink(tmp
         )
 
 
-def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypatch):
+@pytest.fixture
+def darwin_sandbox(monkeypatch):
+    """Model Darwin discovery, not sandbox execution, on any test host."""
+    monkeypatch.setattr(workflow.platform, "system", lambda: "Darwin")
+    if sys.platform == "darwin":
+        return  # Native runs must discover the real executable.
+    sandbox = Path("/usr/bin/sandbox-exec")
+    is_file, is_symlink, access = Path.is_file, Path.is_symlink, os.access
+    monkeypatch.setattr(Path, "is_file", lambda path: True if path == sandbox else is_file(path))
+    monkeypatch.setattr(Path, "is_symlink", lambda path: False if path == sandbox else is_symlink(path))
+    monkeypatch.setattr(os, "access", lambda path, mode: True if Path(path) == sandbox else access(path, mode))
+
+
+DARWIN_EXECUTION_MODES = [
+    pytest.param(False, id="policy"),
+    pytest.param(True, id="native", marks=pytest.mark.skipif(
+        platform.system() != "Darwin", reason="Native sandbox-exec enforcement requires Darwin",
+    )),
+]
+
+
+def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypatch, darwin_sandbox):
     account_home = tmp_path / "account"
     launcher = account_home / ".hermes/hermes-agent/venv/bin/hermes"
     launcher.parent.mkdir(parents=True)
@@ -611,7 +633,47 @@ def test_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypat
     assert workflow._managed_hermes_identity() != identity
 
 
-def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
+def test_linux_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(workflow.platform, "system", lambda: "Linux")
+    launcher = Path("/opt/hermes/.venv/bin/hermes")
+    interpreter = launcher.parent / "python"
+    setpriv = Path("/usr/bin/setpriv")
+    managed = tmp_path / "managed"
+    managed.mkdir()
+    for name in ("hermes", "setpriv"):
+        executable = managed / name
+        executable.write_text("#!/bin/sh\n", encoding="utf-8")
+        executable.chmod(0o700)
+    (managed / "python").symlink_to(Path(sys.executable))
+    fixtures = {launcher: managed / "hermes", interpreter: managed / "python", setpriv: managed / "setpriv"}
+    is_file, is_symlink, access = Path.is_file, Path.is_symlink, os.access
+    monkeypatch.setattr(Path, "is_file", lambda path: is_file(fixtures.get(path, path)))
+    monkeypatch.setattr(Path, "is_symlink", lambda path: is_symlink(fixtures.get(path, path)))
+    monkeypatch.setattr(os, "access", lambda path, mode: access(fixtures.get(Path(path), path), mode))
+    attacker = tmp_path / "attacker"
+    attacker.mkdir()
+    for name in ("hermes", "python", "setpriv", "sandbox-exec"):
+        executable = attacker / name
+        executable.write_text("#!/bin/sh\nexit 99\n", encoding="utf-8")
+        executable.chmod(0o700)
+    monkeypatch.setenv("PATH", str(attacker))
+
+    assert workflow._managed_hermes_pair() == (launcher, interpreter)
+    assert workflow._production_sandbox_prefix(tmp_path / "profile.sb") == [
+        str(setpriv), "--no-new-privs", "--inh-caps=-all", "--ambient-caps=-all",
+    ]
+    (managed / "setpriv").unlink()
+    with pytest.raises(RuntimeError, match="privilege-isolation executable is unavailable"):
+        workflow._production_sandbox_prefix(tmp_path / "profile.sb")
+    (managed / "hermes").unlink()
+    with pytest.raises(RuntimeError, match="virtual-environment launcher is unavailable"):
+        workflow._managed_hermes_pair()
+
+
+@pytest.mark.parametrize("native_execution", DARWIN_EXECUTION_MODES)
+def test_production_sandbox_read_policy_is_allowlisted(
+    tmp_path, monkeypatch, darwin_sandbox, native_execution,
+):
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     run_dir = tmp_path / "run"
     unrelated = tmp_path / "unrelated-checkout"
@@ -681,6 +743,9 @@ def test_production_sandbox_read_policy_is_allowlisted(tmp_path, monkeypatch):
     assert captured["environment"]["NO_PROXY"] == ""
     assert f'(remote tcp "localhost:{proxy_url.rsplit(":", 1)[1]}")' in captured["profile"]
     monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
+    if not native_execution:
+        captured["profile_path"].unlink()
+        return
     completed = subprocess.run(
         ["/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/true"],
         capture_output=True, check=False,
@@ -1046,8 +1111,14 @@ def test_production_profile_write_failure_closes_proxy_and_removes_profile(tmp_p
     assert not profile_path.exists()
 
 
-def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, monkeypatch):
-    probe_root = Path("/private/tmp") / f"issue56-managed-sandbox-{os.getpid()}"
+@pytest.mark.parametrize("native_execution", DARWIN_EXECUTION_MODES)
+def test_production_sandbox_allows_bound_resolved_managed_interpreter(
+    tmp_path, monkeypatch, darwin_sandbox, native_execution,
+):
+    probe_root = (
+        Path("/private/tmp") / f"issue56-managed-sandbox-{os.getpid()}"
+        if native_execution else tmp_path / "managed-sandbox"
+    )
     shutil.rmtree(probe_root, ignore_errors=True)
     skill_root = probe_root / "profile/skills/clinical-document-generation"
     run_dir = probe_root / "run"
@@ -1086,6 +1157,13 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
             )
         monkeypatch.setattr(workflow.subprocess, "Popen", real_popen)
         assert captured["profile_path"].stat().st_size <= 65_535
+        profile = captured["profile_path"].read_text(encoding="utf-8")
+        allow_rules = "\n".join(line for line in profile.splitlines() if "allow file-read*" in line)
+        assert f'(subpath "{managed_python.resolve(strict=True).parent.parent}")' in allow_rules
+        assert f'(subpath "{launcher.parent.parent.parent.resolve()}")' in allow_rules
+        assert f'(subpath "{probe_root}")' not in allow_rules
+        if not native_execution:
+            return
         unrelated_home_file = Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt"
         unrelated_private_tmp = Path("/private/tmp") / f"issue56-sandbox-denied-{os.getpid()}.txt"
         unrelated_mac_tmp = tmp_path / "created-after-profile.txt"
@@ -1117,7 +1195,8 @@ def test_production_sandbox_allows_bound_resolved_managed_interpreter(tmp_path, 
             )
             assert denied.returncode != 0
     finally:
-        Path(captured.get("profile_path", "")).unlink(missing_ok=True)
+        if "profile_path" in captured:
+            captured["profile_path"].unlink(missing_ok=True)
         for sentinel in (
             Path.home() / f"issue56-sandbox-denied-{os.getpid()}.txt",
             Path("/private/tmp") / f"issue56-sandbox-denied-{os.getpid()}.txt",

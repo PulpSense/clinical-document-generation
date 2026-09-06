@@ -2137,15 +2137,35 @@ def test_workflow_subprocess_timeout_is_reported_explicitly(tmp_path: Path, monk
     assert result == {"status": "timeout", "stage": "generate"}
 
 
-def test_sandbox_launch_denies_repository_writes_but_allows_run_workspace(tmp_path: Path) -> None:
+@pytest.mark.parametrize("sandbox_platform", ["Darwin", None], ids=["darwin-policy", "native"])
+def test_sandbox_launch_denies_repository_writes_but_allows_run_workspace(
+    tmp_path: Path, monkeypatch, sandbox_platform,
+) -> None:
+    if sandbox_platform is not None:
+        monkeypatch.setattr(hermes_e2e.platform, "system", lambda: sandbox_platform)
+        which = hermes_e2e.shutil.which
+        monkeypatch.setattr(
+            hermes_e2e.shutil, "which",
+            lambda name: "/usr/bin/sandbox-exec" if name == "sandbox-exec" else which(name),
+        )
+    # The native case deliberately uses real discovery: missing Linux bubblewrap
+    # remains a hard prerequisite failure, not a skip or a mocked success.
     command, profile = sandbox_command(Path(__file__).resolve().parents[1], tmp_path / "run", ["/bin/sh", "-c", "true"])
     try:
-        text = profile.read_text(encoding="utf-8")
-        assert command[0].endswith("sandbox-exec")
-        assert "deny file-write*" in text
-        assert str((tmp_path / "run").resolve()) in text
+        if hermes_e2e.platform.system() == "Linux":
+            assert profile is None
+            assert command[3:6] == ["--ro-bind", "/", "/"]
+            workspace = str((tmp_path / "run").resolve())
+            assert command[6:9] == ["--bind", workspace, workspace]
+        else:
+            assert profile is not None
+            text = profile.read_text(encoding="utf-8")
+            assert command[0].endswith("sandbox-exec")
+            assert "deny file-write*" in text
+            assert str((tmp_path / "run").resolve()) in text
     finally:
-        profile.unlink(missing_ok=True)
+        if profile is not None:
+            profile.unlink(missing_ok=True)
 
 
 def test_linux_sandbox_launches_bubblewrap_with_a_read_only_host_and_writable_run_workspace(

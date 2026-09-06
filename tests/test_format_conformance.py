@@ -22,7 +22,15 @@ def _gate_owner(gate_id):
 def test_five_family_outputs_pass_governed_format_conformance(
     tmp_path, governed_pdfium, monkeypatch
 ):
-    monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [governed_pdfium])
+    # Source-tree Darwin rendering uses the fixture; disposable releases must
+    # discover and provision their own manifest-bound runtime.
+    page_renderers = workflow.page_renderers
+    monkeypatch.setattr(
+        workflow, "page_renderers",
+        lambda **kwargs: [governed_pdfium]
+        if platform.system() == "Darwin" and Path(kwargs.get("skill_root", "")).resolve() == ROOT
+        else page_renderers(**kwargs),
+    )
     report = workflow.run_format_conformance(
         ROOT,
         evidence_root=tmp_path,
