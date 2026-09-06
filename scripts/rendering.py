@@ -366,6 +366,8 @@ def _replace_paragraph(paragraph, fields: Mapping[str, str]) -> None:
         if address and address.casefold() != fields.get("sponsortAdress", "").casefold():
             details.append(address)
         funding = "; ".join(value for value in details if value)
+        if same_entity and not funding:
+            funding = "Sponsor"
         fields["fundingSourceClarification"] = ""
         fields["fundingSourceName"] = "\nFunding source: " + funding if funding else ""
         fields["fundingSourceAdress"] = ""
@@ -1976,6 +1978,7 @@ def _normalize_icf_preferences(document: Document) -> None:
     for paragraph in list(block):
         if not paragraph.text.strip() and not paragraph._p.xpath(
             './/w:br | .//w:sectPr | .//w:pBdr | .//w:drawing | .//w:fldChar | .//w:tab'
+            ' | .//w:fldSimple | .//w:u | .//w:pageBreakBefore'
         ):
             paragraph._p.getparent().remove(paragraph._p)
             block.remove(paragraph)
