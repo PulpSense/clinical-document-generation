@@ -3219,11 +3219,11 @@ def test_committed_activation_recovery_reports_displaced_cleanup_as_deferred(
     assert (
         skills_dir / "release-history/deferred-cleanup-historical-release.json"
     ).is_file()
-    failed_releases = list(
-        (tmp_path / "clinical-document-release-failures").iterdir()
-    )
+    failure_root = tmp_path / "clinical-document-release-failures"
+    failed_releases = [path for path in failure_root.iterdir() if path.is_dir()]
     assert len(failed_releases) == 1
     assert (failed_releases[0] / "SKILL.md").is_file()
+    assert len(list(failure_root.glob("*.activation-failure.json"))) == 1
 
 
 def test_candidate_swap_commit_is_truthful_when_replace_reports_error(
@@ -3318,7 +3318,7 @@ def test_pre_commit_rename_failures_restore_release_state(
     ).encode()
     preexisting_history.parent.mkdir()
     preexisting_history.write_bytes(preexisting_history_bytes)
-    real_write = workflow._write
+    real_write = workflow._write_atomic_installation_state
     assurance_created = []
 
     def observe_write(path, value):
@@ -3326,7 +3326,7 @@ def test_pre_commit_rename_failures_restore_release_state(
             assurance_created.append(Path(path))
         return real_write(path, value)
 
-    monkeypatch.setattr(workflow, "_write", observe_write)
+    monkeypatch.setattr(workflow, "_write_atomic_installation_state", observe_write)
     real_replace = workflow.os.replace
     injected = []
 
