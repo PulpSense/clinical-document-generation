@@ -66,17 +66,14 @@ def test_r7_duplicate_explicit_ids_are_findings_not_renumbered():
     assert reference == original
 
 
-def test_original_participant_followup_flags_ambiguous_nominal_interval():
+def test_original_participant_followup_does_not_invent_a_conflict_from_unknown_origin():
     text = 'Enrollment over 8 months; each participant followed for approximately 11 weeks after baseline.'
     reference = timeline_reference(text, [
         {'visit': 'Baseline device fitting', 'timing': 'Week 2 after surgery'},
         {'visit': 'Final clinic visit', 'timing': 'Week 12'}])
     original = copy.deepcopy(reference)
     findings = contracts.timeline_findings(reference)
-    assert len(findings) == 1
-    assert all(token in findings[0]['issue'].lower() for token in ('11', '10', 'ambiguous', 'baseline'))
-    assert 'if' in findings[0]['issue'].lower()
-    assert findings[0]['source_values']['study.timeline'] == text
+    assert findings == []
     assert reference == original
 
 
@@ -117,8 +114,7 @@ def test_exact_original_wording_and_explicit_completion_are_preserved():
     reference['procedures'].update(assessments=assessments, evaluation=None, completion=assessments[1])
     original = copy.deepcopy(reference)
     findings = contracts.timeline_findings(reference)
-    assert len(findings) == 1
-    assert all(token in findings[0]['issue'].lower() for token in ('11', '10', 'ambiguous', 'baseline'))
+    assert findings == []
     result = table(reference)
     assert result['supplemental_notes'] == [assessments[0]]
     assert result['assessment_inventory'] == [{'activity': assessments[0], 'source_path': 'procedures.assessments.0'}]

@@ -25,6 +25,11 @@ they are not permission to redesign the client documents during a run.
 - Compare timeline statements only after identifying their reference points.
   Enrollment duration must not mask contradictory participant follow-up. Report
   genuine source conflicts for clarification; do not silently rewrite them.
+  An unspecified timing origin is not a demonstrated contradiction or a missing
+  obligatory input. Do not request extra anchors or reject unchanged source on
+  the basis of a conditional subtraction. Preserve the supplied timing verbatim;
+  never invent a shared origin or rewrite a duration to make it agree. Conflicts
+  established by explicit comparable anchors remain findings.
 
 ## Authorized layout scope
 

@@ -1070,20 +1070,9 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
             durations.extend(days - baseline for visit, days, anchor in targets
                              if anchor == origin and days >= baseline and not re.search(r"\bbaseline\b", visit["visit"], re.I))
         # An unanchored final point beside an explicitly anchored baseline is
-        # not comparable. Flag only a mismatching conditional nominal interval;
-        # never present that subtraction as an established clinical duration.
-        ambiguous = [days - baseline for baseline, origin in baselines
-                     for visit, days, anchor in targets
-                     if origin != "schedule" and anchor == "schedule" and days >= baseline]
-        if not durations and len(ambiguous) == 1 and stated is not None:
-            nominal = ambiguous[0]
-            if abs(stated - nominal) > max(1.0, stated * 0.02):
-                return [{"category": "source-evidence", "field": "study.timeline",
-                         "issue": f"Ambiguous baseline-relative timeline ({relative.group(0)}): the nominal interval would be {nominal / 7:g} weeks if the final visit shares the baseline timing origin, but the final origin is unspecified.",
-                         "required": "Clarify the conflicting temporal anchors without changing either approved source value automatically.",
-                         "source_values": {"study.timeline": copy.deepcopy(timeline),
-                                           "procedures.visit_schedule": copy.deepcopy(get_path(reference, "procedures.visit_schedule")),
-                                           "procedures.visit_schedule_table": copy.deepcopy(get_path(reference, "procedures.visit_schedule_table"))}}]
+        # not comparable. A conditional subtraction is not a source conflict
+        # and must not turn an unspecified origin into an obligatory input.
+        # Preserve both supplied values; compare only established durations.
         if durations and stated is not None:
             scheduled = max(durations)
             tolerance = max(1.0, stated * 0.02)
