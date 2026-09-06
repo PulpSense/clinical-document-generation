@@ -47,10 +47,9 @@ def test_mixed_inventory_preserves_unallocated_assessments_and_contact_safety(br
     table = contracts.protocol_table_contracts(reference)["schedule-of-assessments"]
     rows = table["rows"]
     for label in ("0-to-10 knee-pain rating", "Data download", "Walking assessment"):
-        row = next((r for r in rows if label in r[0]), None)
-        assert row is not None, label
-        assert row[1:] == ["", "", ""]
-        assert "timing not specified" in row[0].lower()
+        assert any(label in note for note in table["supplemental_notes"]), label
+        assert not any(label in row[0] for row in rows)
+    assert "Timing not specified" not in str(table)
     ae = [r for r in rows if "adverse event" in r[0].lower()]
     if branch == "Retrospective":
         assert all("X" not in cell for row in ae for cell in row[1:])
@@ -62,9 +61,9 @@ def test_mixed_inventory_preserves_unallocated_assessments_and_contact_safety(br
 
 
 def test_evaluation_only_inventory_survives_no_structured_schedule():
-    rows = contracts.protocol_table_contracts({"procedures": {"evaluation": "Pain rating; Data download"}})["schedule-of-assessments"]["rows"]
-    assert any("Pain rating" in row[0] for row in rows)
-    assert any("Data download" in row[0] for row in rows)
+    table = contracts.protocol_table_contracts({"procedures": {"evaluation": "Pain rating; Data download"}})["schedule-of-assessments"]
+    assert table["supplemental_notes"] == ["Pain rating; Data download"]
+    assert table["rows"] == []
 
 
 @pytest.mark.parametrize("branch", ["Prospective", "Ambispective"])
@@ -129,8 +128,9 @@ def test_no_invented_contact_marks_or_fragmented_prose(branch):
     assert [row["visitNumber"] for row in visits] == ["2", "3"]
     table = contracts.protocol_table_contracts(reference)["schedule-of-assessments"]
     rows = table["rows"]
-    assert sum(prose in row[0] for row in rows) == 1
-    assert len(rows) == 6  # headers, two procedures, whole prose, AE
+    assert table["supplemental_notes"].count(prose) == 1
+    assert not any(prose in row[0] for row in rows)
+    assert len(rows) == 5  # headers, two procedures, AE; whole prose below table
     assert next(row for row in rows if "Adverse event" in row[0])[1:] == ["", "X"]
     assert "no visit assignment inferred" not in str(rows).lower()
     assert table["unallocated_assessments"] == [{"activity": prose, "source_path": "procedures.evaluation"}]

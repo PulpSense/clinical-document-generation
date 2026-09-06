@@ -796,49 +796,22 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
                     entries.append([label, timing])
         if entries:
             assessment_rows = [["Approved visit or assessment", "Approved timing"], *entries]
-        else:
-            assessments = get_path(reference, "procedures.assessments", [])
-            if isinstance(assessments, list):
-                labels = [str(item).strip() for item in assessments if meaningful(item)]
-            else:
-                labels = [
-                    item.strip()
-                    for item in re.split(r"[;\n]", str(assessments or ""))
-                    if item.strip()
-                ]
-            def assessment_timing(label: str) -> str:
-                match = re.search(r"\b(?:Month|Week|Day)\s+[+-]?\d+\b", label, re.I)
-                if match:
-                    return match.group(0)
-                lowered = label.casefold()
-                if "baseline" in lowered:
-                    return "Baseline"
-                if "historical" in lowered:
-                    return "Historical record review"
-                if "screening" in lowered:
-                    return "Screening"
-                return "Per approved schedule"
-            if labels:
-                assessment_rows = [
-                    ["Approved visit or assessment", "Approved timing"],
-                    *[[label, assessment_timing(label)] for label in labels],
-                ]
-
     # A structured matrix must not suppress supplied narrative assessments.
     # Preserve source clauses verbatim; no NLP guess assigns them to visits.
-    inventory: list[dict[str, str]] = []
+    inventory: list[dict[str, Any]] = []
+    supplemental_notes: list[str] = []
 
     def inventory_items(value: Any, path: str) -> None:
         if isinstance(value, Mapping):
-            for key, child in value.items():
-                inventory_items(child, f"{path}.{key}")
+            inventory.append({"record": copy.deepcopy(dict(value)), "source_path": path})
         elif isinstance(value, list):
             for index, child in enumerate(value):
                 inventory_items(child, f"{path}.{index}")
         elif meaningful(value):
-            for label in re.split(r"[;\n]", str(value)):
-                if label.strip():
-                    inventory.append({"activity": label.strip(), "source_path": path})
+            # An exact duplicate of the explicitly owned completion rule is not
+            # an assessment. Its source remains untouched for Section 18.
+            if value != get_path(reference, "procedures.completion"):
+                inventory.append({"activity": str(value), "source_path": path})
 
     for path in ("procedures.assessments", "procedures.evaluation"):
         inventory_items(get_path(reference, path), path)
@@ -847,18 +820,18 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
     represented.update(visit["visit"].casefold() for visit in visits)
     unallocated = []
     for item in inventory:
+        if "record" in item:
+            unallocated.append(item)
+            supplemental_notes.append("; ".join(
+                f"{key}: {json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value}"
+                for key, value in item["record"].items()))
+            continue
         key = re.sub(r"\s+", " ", item["activity"]).strip().casefold().rstrip(".")
         if key in represented:
             continue
         represented.add(key)
         unallocated.append(item)
-        label = item["activity"]
-        if matrix:
-            assessment_rows.append([f"{label} (Timing not specified)", *["" for _ in visits]])
-        else:
-            if not assessment_rows:
-                assessment_rows = [["Approved visit or assessment", "Approved timing"]]
-            assessment_rows.append([label, "Timing not specified"])
+        supplemental_notes.append(item["activity"])
 
     # Only an explicit positive each-contact relationship authorizes X marks.
     # Historical abstraction and pre-consent contacts are not research AE visits.
@@ -874,7 +847,9 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
             elif meaningful(value): leaves.append(str(value))
         safety_leaves(value)
         for leaf in leaves:
-            for clause in re.split(r"(?<=[.!?;])\s+", leaf):
+            if leaf not in supplemental_notes:
+                supplemental_notes.append(leaf)
+            for clause in re.split(r"(?<=[.!?;])\s+|,\s*|\b(?:while|whereas|but|and)\b", leaf, flags=re.I):
                 if (re.search(r"\b(?:adverse events?|AEs?)\b", clause, re.I)
                         and re.search(r"\b(?:each|every)\s+(?:study\s+)?contact\b", clause, re.I)
                         and not re.search(r"\b(?:not|no|never|without)\b", clause, re.I)):
@@ -884,14 +859,6 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         if matrix and canonical_study_type(get_path(reference, "meta.study_type")) in {"Prospective", "Ambispective"}:
             contacts = [not re.search(r"historical|abstraction|record review|chart review|pre[- ]consent|before consent", visit["visit"] + " " + visit["timing"], re.I) for visit in visits]
             assessment_rows.append([safety_label, *["X" if contact else "" for contact in contacts]])
-        else:
-            for item in safety_inventory:
-                if matrix:
-                    assessment_rows.append([item["activity"] + " (Timing not specified)", *["" for _ in visits]])
-                else:
-                    if not assessment_rows:
-                        assessment_rows = [["Approved visit or assessment", "Approved timing"]]
-                    assessment_rows.append([item["activity"], "Each applicable contact; study-specific review after consent"])
 
     evidence_rows = _sample_size_evidence_rows(reference)
     selected_columns = [
@@ -916,6 +883,7 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
             "caption": "Table 15.1. Proposed Visits and Study Assessments",
             "header_rows": 2 if assessment_rows and assessment_rows[0][0] == "Activity" else 1,
             "rows": assessment_rows,
+            "supplemental_notes": supplemental_notes,
             "assessment_inventory": inventory,
             "unallocated_assessments": unallocated,
             "each_contact_safety_evidence": safety_inventory,
@@ -1034,9 +1002,12 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """
     timeline = get_path(reference, "study.timeline")
     text = str(timeline or "")
-    relative = re.search(r"\b((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*[- ]?\s*(?:days?|weeks?|months?))\s+(?:after|from|following)\s+baseline\b", text, re.I)
+    relative_pattern = re.compile(r"\b((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*[- ]?\s*(?:days?|weeks?|months?))\s+(?:after|from|following)\s+(?:the\s+)?baseline\b", re.I)
     visits = normalized_visit_records(reference)
-    if relative:
+    relatives = [(clause, match) for clause in re.split(
+        r"[;!?]\s*|\.(?!\d)\s*|(?:,\s*|\s+and\s+)(?=(?:interim|final)\b)", text, flags=re.I)
+                 for match in relative_pattern.finditer(clause)]
+    for clause, relative in relatives:
         stated = _duration_days(relative.group(1))
         points = []
         for visit in visits:
@@ -1045,15 +1016,38 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
             if not point:
                 continue
             days = _duration_days(point.group(0))
-            anchor = ("baseline" if re.search(r"(?:after|from|following)\s+baseline", timing, re.I)
-                      else "postoperative" if re.search(r"post[- ]?operativ|post[- ]?op|after surgery|following surgery", timing, re.I)
+            explicit_origin = re.search(r"\b(?:after|from|following)\s+(.+)", timing, re.I)
+            anchor = ("postoperative" if re.search(r"post[- ]?operativ|post[- ]?op|(?:after|from|following) surgery", timing, re.I)
+                      else re.sub(r"\s+", " ", explicit_origin.group(1)).strip().casefold().rstrip(".") if explicit_origin
                       else "schedule")
             points.append((visit, days, anchor))
+        event = re.search(r"\b(interim|final)\b", clause, re.I)
+        # Optional visit lists need not include the named endpoint. General
+        # participant follow-up can match an explicitly final visit, never max().
+        event_name = event.group(1) if event else (
+            "final" if re.search(r"follow[- ]?up|followed|participa(?:nt|tion)", clause, re.I) else None)
+        targets = [point for point in points if event_name and re.search(
+            rf"\b{event_name}\b", point[0]["visit"], re.I)]
         baselines = [(days, anchor) for visit, days, anchor in points if re.search(r"\bbaseline\b", visit["visit"], re.I)]
-        durations = [days for visit, days, anchor in points if anchor == "baseline" and not re.search(r"\bbaseline\b", visit["visit"], re.I)]
+        durations = [days for visit, days, anchor in targets if anchor == "baseline" and not re.search(r"\bbaseline\b", visit["visit"], re.I)]
         for baseline, origin in baselines:
-            durations.extend(days - baseline for visit, days, anchor in points
+            durations.extend(days - baseline for visit, days, anchor in targets
                              if anchor == origin and days >= baseline and not re.search(r"\bbaseline\b", visit["visit"], re.I))
+        # An unanchored final point beside an explicitly anchored baseline is
+        # not comparable. Flag only a mismatching conditional nominal interval;
+        # never present that subtraction as an established clinical duration.
+        ambiguous = [days - baseline for baseline, origin in baselines
+                     for visit, days, anchor in targets
+                     if origin != "schedule" and anchor == "schedule" and days >= baseline]
+        if not durations and len(ambiguous) == 1 and stated is not None:
+            nominal = ambiguous[0]
+            if abs(stated - nominal) > max(1.0, stated * 0.02):
+                return [{"category": "source-evidence", "field": "study.timeline",
+                         "issue": f"Ambiguous baseline-relative timeline ({relative.group(0)}): the nominal interval would be {nominal / 7:g} weeks if the final visit shares the baseline timing origin, but the final origin is unspecified.",
+                         "required": "Clarify the conflicting temporal anchors without changing either approved source value automatically.",
+                         "source_values": {"study.timeline": copy.deepcopy(timeline),
+                                           "procedures.visit_schedule": copy.deepcopy(get_path(reference, "procedures.visit_schedule")),
+                                           "procedures.visit_schedule_table": copy.deepcopy(get_path(reference, "procedures.visit_schedule_table"))}}]
         if durations and stated is not None:
             scheduled = max(durations)
             tolerance = max(1.0, stated * 0.02)
@@ -1064,6 +1058,7 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                          "source_values": {"study.timeline": copy.deepcopy(timeline),
                                            "procedures.visit_schedule": copy.deepcopy(get_path(reference, "procedures.visit_schedule")),
                                            "procedures.visit_schedule_table": copy.deepcopy(get_path(reference, "procedures.visit_schedule_table"))}}]
+    if relatives:
         return []
     participant_clauses = [clause for clause in re.split(r"[;.!?]|,(?=\s*(?:follow|participant|final))", text, flags=re.I)
                            if not re.search(r"\benroll(?:ment|ing)?\b|\brecruit(?:ment|ing)?\b", clause, re.I)]
@@ -1222,6 +1217,19 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "issue": "Sample-size evidence row is missing required values: " + ", ".join(row_missing),
                     "required": "Populate every required cell; only aggregate rows may leave timepoint and SE blank.",
                 })
+    for path in ("procedures.visit_schedule", "procedures.visit_schedule_table"):
+        raw_visits = get_path(reference, path, [])
+        seen_ids: set[str] = set()
+        for index, visit in enumerate(raw_visits if isinstance(raw_visits, list) else []):
+            if not isinstance(visit, Mapping) or not meaningful(visit.get("visitNumber")):
+                continue
+            identifier = str(visit["visitNumber"])
+            if identifier in seen_ids:
+                findings.append({"category": "source-evidence", "field": f"{path}.{index}.visitNumber",
+                                 "issue": f"Duplicate supplied visitNumber: {identifier}.",
+                                 "required": "Reconcile duplicate approved visit identifiers; do not silently renumber.",
+                                 "source_values": {path: copy.deepcopy(raw_visits)}})
+            seen_ids.add(identifier)
     findings.extend(timeline_findings(reference))
     if branch != "Retrospective":
         choice = str(get_path(reference, "meta.icf_template", "")).strip().casefold()
