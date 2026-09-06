@@ -504,6 +504,7 @@ def test_recovery_classes_have_one_governed_action_each():
     assert RECOVERY_POLICIES == {
         "adapter_fault": "advance_adapter",
         "font_capability_uncertainty": "bounded_smoke_render",
+        "deterministic_structure_defect": "rebuild_deterministic_structure",
         "document_structure_defect": "preserve_and_stop",
         "visual_defect": "targeted_layout_repair",
         "drafting_defect": "retry_drafting_target",
