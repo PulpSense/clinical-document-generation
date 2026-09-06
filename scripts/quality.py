@@ -1796,13 +1796,16 @@ def page_renderers(
     home: Path | None = None,
     skill_root: Path | None = None,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> list[dict[str, Any]]:
     """Return the one release-owned PDFium page renderer, if verified."""
     del environment, home
     if skill_root is None:
         return []
     verification = _pdfium_runtime_integrity(
-        Path(skill_root), require_promoted_runtime=require_promoted_runtime
+        Path(skill_root),
+        require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     return [verification["identity"]] if verification["status"] == "passed" else []
 
@@ -1861,6 +1864,7 @@ def _one_pdfium_renderer(
     *,
     skill_root: Path | None = None,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> list[dict[str, Any]]:
     """Keep one identity verified against this release's manifest and runtime."""
     candidates = [dict(identity) for identity in identities if _is_release_owned_pdfium_identity(identity)]
@@ -1869,6 +1873,7 @@ def _one_pdfium_renderer(
     verified = page_renderers(
         skill_root=skill_root,
         require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     identity_fields = (
         "kind", "path", "module", "python_path", "version", "source", "wheel", "wheel_sha256",
@@ -1894,6 +1899,7 @@ def _rasterize_pdfium_worker_render(
     first_page_only: bool = False,
     dpi: int = 130,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> list[Path]:
     """Render inside the isolated worker after re-verifying its release."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1908,6 +1914,7 @@ def _rasterize_pdfium_worker_render(
         [identity],
         skill_root=release_root,
         require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     if not governed:
         raise RuntimeError(
@@ -2079,7 +2086,11 @@ def run_pdfium_worker(request_path: Path) -> dict[str, Any]:
         pdf = Path(str(request["pdf"])).resolve()
         output_dir = Path(str(request["output_dir"])).resolve()
         require_promoted_runtime = request.get("require_promoted_runtime", True)
-        if type(require_promoted_runtime) is not bool:
+        allow_pending_activation = request.get("allow_pending_activation", False)
+        if (
+            type(require_promoted_runtime) is not bool
+            or type(allow_pending_activation) is not bool
+        ):
             raise RuntimeError(
                 "renderer.pdfium_worker_protocol_invalid: Promotion mode must be boolean."
             )
@@ -2100,6 +2111,7 @@ def run_pdfium_worker(request_path: Path) -> dict[str, Any]:
             first_page_only=bool(request.get("first_page_only")),
             dpi=int(request.get("dpi", 130)),
             require_promoted_runtime=require_promoted_runtime,
+            allow_pending_activation=allow_pending_activation,
         )
         evidence = [
             {"name": page.name, "bytes": page.stat().st_size, "sha256": sha256_file(page)}
@@ -2160,6 +2172,7 @@ def rasterize_pdf(
     dpi: int = 130,
     timeout_seconds: float = PDFIUM_WORKER_TIMEOUT_SECONDS,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> list[Path]:
     """Render through one killable worker bound to the current immutable release."""
     output_dir = output_dir.resolve()
@@ -2169,6 +2182,7 @@ def rasterize_pdf(
         [identity],
         skill_root=release_root,
         require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     if not governed:
         raise RuntimeError(
@@ -2190,6 +2204,7 @@ def rasterize_pdf(
             "first_page_only": first_page_only,
             "dpi": dpi,
             "require_promoted_runtime": require_promoted_runtime,
+            "allow_pending_activation": allow_pending_activation,
         }), encoding="utf-8")
         process = subprocess.Popen(
             _pdfium_worker_command(request_path),
@@ -2859,6 +2874,7 @@ def render_pages(
     page_exporter: Any = None,
     blank_page_detector: Any = None,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> dict[str, Any]:
     repo_root = Path(__file__).resolve().parents[1]
     runtime_environment = _runtime_environment(repo_root, None, contracted_bundle)
@@ -2891,18 +2907,22 @@ def render_pages(
             environment=runtime_environment,
             skill_root=repo_root,
             require_promoted_runtime=require_promoted_runtime,
+            allow_pending_activation=allow_pending_activation,
         )
     page_candidates = _one_pdfium_renderer(
         page_candidates,
         skill_root=repo_root,
         require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     if not renderer_candidates:
         return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Microsoft Word or LibreOffice renderer is available."}]}
     if not page_candidates:
         if page_renderer_identities is None and page_renderer_identity is None:
             integrity = _pdfium_runtime_integrity(
-                repo_root, require_promoted_runtime=require_promoted_runtime
+                repo_root,
+                require_promoted_runtime=require_promoted_runtime,
+                allow_pending_activation=allow_pending_activation,
             )
             if integrity["status"] == "blocked":
                 return {
@@ -2958,6 +2978,9 @@ def render_pages(
                     }
                     if page_exporter is None:
                         page_kwargs["require_promoted_runtime"] = require_promoted_runtime
+                        page_kwargs["allow_pending_activation"] = (
+                            allow_pending_activation
+                        )
                     pages = export_pages(pdf, page_dir, candidate, **page_kwargs)
                     expected = len(PdfReader(pdf).pages)
                     if len(pages) != expected or expected == 0:
@@ -3070,6 +3093,7 @@ def render_assurance(
     page_exporter: Any = None,
     blank_page_detector: Any = None,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> dict[str, Any]:
     """Resolve fonts and render one complete candidate through one assurance seam."""
     started = clock()
@@ -3225,9 +3249,11 @@ def render_assurance(
             environment=runtime_environment,
             skill_root=repo_root,
             require_promoted_runtime=require_promoted_runtime,
+            allow_pending_activation=allow_pending_activation,
         ),
         skill_root=repo_root,
         require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     render_report = render_pages(
         revision_dir,
@@ -3247,6 +3273,7 @@ def render_assurance(
         page_exporter=page_exporter,
         blank_page_detector=blank_page_detector,
         require_promoted_runtime=require_promoted_runtime,
+        allow_pending_activation=allow_pending_activation,
     )
     render_report["renderer_attempts"] = _governed_adapter_attempts(render_report.get("renderer_attempts", []))
     render_report["page_renderer_attempts"] = _governed_adapter_attempts(

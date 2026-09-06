@@ -1529,6 +1529,52 @@ def test_pending_candidate_is_not_usable_through_active_skill_path(
     assert quality._pdfium_runtime_integrity(active)["status"] == "passed"
 
 
+def test_default_installer_smoke_uses_journal_bound_pending_mode(
+    tmp_path, monkeypatch
+):
+    _allow_production_files_under_test(monkeypatch)
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    observed_commands = []
+    real_run = workflow.subprocess.run
+
+    def smoke_subprocess(command, *args, **kwargs):
+        if "--verify-installation" not in command:
+            return real_run(command, *args, **kwargs)
+        observed_commands.append(list(command))
+        candidate = Path(command[1]).resolve().parents[1]
+        if "--internal-pending-activation-smoke" in command:
+            assert workflow._pending_activation_smoke_authorized(candidate)
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({
+                "status": "passed",
+                "verified_root": str(candidate),
+            }),
+            stderr="",
+        )
+
+    monkeypatch.setattr(workflow.subprocess, "run", smoke_subprocess)
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "passed"
+    assert len(observed_commands) == 2
+    assert "--internal-pending-activation-smoke" not in observed_commands[0]
+    assert "--internal-pending-activation-smoke" in observed_commands[1]
+    assert not workflow._pending_activation_smoke_authorized(
+        skills_dir / "clinical-document-generation"
+    )
+
+
 @pytest.mark.parametrize(
     ("mutation", "expected_code"),
     [
@@ -3158,6 +3204,155 @@ def test_immutable_package_install_rollback_and_reactivation(tmp_path):
     assert previous.is_dir()
     assert quarantine.is_dir()
     assert revision.read_bytes() == b'{"immutable":"historical-run-revision"}'
+
+
+def test_ticket_70_rolls_back_exact_pre_ticket_release_under_its_own_policy(
+    tmp_path,
+):
+    def certified_archive(checkout: Path, archive: Path) -> None:
+        certification = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                (
+                    "import pathlib,sys; "
+                    "root=pathlib.Path(sys.argv[1]); "
+                    "sys.path[:0]=[str(root/'scripts'),str(root/'tests')]; "
+                    "import test_release_package as tests; "
+                    "tests._certify_archive(pathlib.Path(sys.argv[2]))"
+                ),
+                str(checkout),
+                str(archive),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert certification.returncode == 0, certification.stderr
+
+    legacy_checkout = tmp_path / "pre-ticket-70"
+    legacy_archive = tmp_path / "pre-ticket-70.zip"
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--quiet",
+            "--shared",
+            str(ROOT),
+            str(legacy_checkout),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(legacy_checkout),
+            "checkout",
+            "--quiet",
+            "--detach",
+            "392c5a4e810c5a755538b53d3bac1b7e58891c06",
+        ],
+        check=True,
+    )
+    certified_archive(legacy_checkout, legacy_archive)
+
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    with zipfile.ZipFile(legacy_archive) as archive:
+        archive.extractall(skills_dir)
+    provision = workflow._provision_page_renderer(active)
+    assert provision["status"] == "passed"
+    legacy_assurance = {
+        "status": "passed",
+        "assurance": {"status": "passed"},
+    }
+    workflow._write_atomic_installation_state(
+        active / workflow.INSTALLATION_ASSURANCE,
+        legacy_assurance,
+    )
+    legacy_manifest = workflow._read(active / workflow.RELEASE_MANIFEST)
+    workflow._write_atomic_installation_state(
+        active / workflow.PROMOTION_RECORD,
+        {
+            "schema_version": "promoted-release/v1",
+            "status": "active",
+            "git_commit": legacy_manifest["git_commit"],
+            "package_fingerprint": legacy_manifest["package_fingerprint"],
+            "certification": {
+                "status": "passed",
+                "report_sha256": workflow.sha256_file(
+                    active / workflow.RELEASE_CERTIFICATION
+                ),
+            },
+            "runtime_assurance_sha256": workflow.sha256_file(
+                active / workflow.INSTALLATION_ASSURANCE
+            ),
+            "hermes_discovery": str(active),
+        },
+    )
+
+    current_checkout = tmp_path / "ticket-70"
+    current_archive = tmp_path / "ticket-70.zip"
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--quiet",
+            "--shared",
+            str(ROOT),
+            str(current_checkout),
+        ],
+        check=True,
+    )
+    certified_archive(current_checkout, current_archive)
+    install_kwargs = {
+        "hermes_config_path": _hermes_config(skills_dir),
+        "trusted_certification_key_id": TEST_CERTIFICATION_KEY_ID,
+        "verifier": lambda _candidate: {"status": "passed"},
+        "provisioner": _passing_provisioner,
+    }
+    installed = install_release(current_archive, skills_dir, **install_kwargs)
+
+    assert installed["status"] == "passed"
+    assert workflow._read(active / workflow.RELEASE_MANIFEST)["git_commit"] != (
+        legacy_manifest["git_commit"]
+    )
+    previous = skills_dir / ".clinical-document-generation.previous"
+    legacy_report_path = previous / workflow.RELEASE_CERTIFICATION
+    legacy_report_bytes = legacy_report_path.read_bytes()
+    legacy_report = json.loads(legacy_report_bytes)
+    legacy_report["status"] = "blocked"
+    legacy_report_path.write_text(json.dumps(legacy_report), encoding="utf-8")
+    smoke_reached = []
+    tampered = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda release: smoke_reached.append(release)
+        or {"status": "passed"},
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+    )
+
+    assert tampered["status"] == "blocked"
+    assert tampered["stage"] == "rollback_integrity"
+    assert smoke_reached == []
+    legacy_report_path.write_bytes(legacy_report_bytes)
+    rollback = workflow.rollback_release(
+        skills_dir,
+        verifier=lambda _release: {"status": "passed"},
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+    )
+
+    assert rollback["status"] == "passed"
+    assert workflow._read(active / workflow.RELEASE_MANIFEST)["git_commit"] == (
+        legacy_manifest["git_commit"]
+    )
+    reactivated = install_release(current_archive, skills_dir, **install_kwargs)
+
+    assert reactivated["status"] == "passed"
+    assert workflow._read(active / workflow.RELEASE_MANIFEST)["git_commit"] != (
+        legacy_manifest["git_commit"]
+    )
 
 
 def test_activation_reduces_displaced_release_to_lightweight_history(tmp_path):

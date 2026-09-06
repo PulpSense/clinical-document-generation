@@ -1064,7 +1064,12 @@ def _validate_hermes_discovery(config_path: Path, active: Path) -> list[dict[str
     return []
 
 
-def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) -> dict[str, Any]:
+def verify_installation(
+    skill_root: Path,
+    *,
+    deadline_seconds: float = 120.0,
+    allow_pending_activation: bool = False,
+) -> dict[str, Any]:
     """Prove that an extracted release owns a complete local assurance path."""
     skill_root = skill_root.resolve()
     findings = _manifest_integrity(skill_root)
@@ -1078,7 +1083,9 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     ]
     page_renderer_identities = [
         item for item in page_renderers(
-            skill_root=skill_root, require_promoted_runtime=False
+            skill_root=skill_root,
+            require_promoted_runtime=False,
+            allow_pending_activation=allow_pending_activation,
         )
         if item.get("kind") == "pypdfium2" and item.get("source") == "release-owned runtime"
     ]
@@ -1110,6 +1117,7 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
             page_renderer_identities=page_renderer_identities,
             rebuild_candidate=lambda _substitutions: {"status": "passed"},
             require_promoted_runtime=False,
+            allow_pending_activation=allow_pending_activation,
         )
     if assurance.get("status") != "passed":
         findings.extend(assurance.get("findings", []))
@@ -1118,7 +1126,9 @@ def verify_installation(skill_root: Path, *, deadline_seconds: float = 120.0) ->
     if not office_renderers:
         findings.append({"category": "installation", "field": "office_renderer", "issue": "Microsoft Word or LibreOffice is required on the host."})
     if not page_renderer_identities:
-        pdfium_findings = _installation_pdfium_findings(skill_root)
+        pdfium_findings = _installation_pdfium_findings(
+            skill_root, allow_pending_activation=allow_pending_activation
+        )
         findings.extend(pdfium_findings or [{
             "category": "installation",
             "field": "pdf_page_renderer",
@@ -1309,11 +1319,22 @@ def _relocate_paths(value: Any, source_root: Path, destination_root: Path) -> An
     return value
 
 
-def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
+def _installation_smoke_result(
+    candidate: Path,
+    *,
+    allow_pending_activation: bool = False,
+) -> dict[str, Any]:
     timeout_seconds = 180
+    command = [
+        sys.executable,
+        str(candidate / "scripts/workflow.py"),
+        "--verify-installation",
+    ]
+    if allow_pending_activation:
+        command.append("--internal-pending-activation-smoke")
     try:
         completed = subprocess.run(
-            [sys.executable, str(candidate / "scripts/workflow.py"), "--verify-installation"],
+            command,
             cwd=candidate,
             text=True,
             capture_output=True,
@@ -1351,6 +1372,42 @@ def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
             }],
         }
     return dict(assurance)
+
+
+def _pending_activation_smoke_authorized(skill_root: Path) -> bool:
+    """Bind the internal pending smoke to the candidate in the live journal."""
+    skill_root = skill_root.resolve()
+    journal_path = _activation_journal_path(skill_root.parent)
+    promotion_path = skill_root / PROMOTION_RECORD
+    manifest_path = skill_root / RELEASE_MANIFEST
+    try:
+        if (
+            skill_root.name != "clinical-document-generation"
+            or journal_path.is_symlink()
+            or not journal_path.is_file()
+            or promotion_path.is_symlink()
+            or not promotion_path.is_file()
+            or manifest_path.is_symlink()
+            or not manifest_path.is_file()
+        ):
+            return False
+        journal = _read(journal_path)
+        promotion = _read(promotion_path)
+        manifest = _read(manifest_path)
+        candidate_identity = journal.get("candidate_identity")
+        return bool(
+            journal.get("schema_version") == "activation-transaction/v1"
+            and journal.get("post_activation_smoke_required") is True
+            and isinstance(candidate_identity, list)
+            and len(candidate_identity) == 2
+            and _filesystem_identity(skill_root) == tuple(candidate_identity)
+            and promotion.get("schema_version") == "promoted-release/v1"
+            and promotion.get("status") == "activation_pending"
+            and promotion.get("package_fingerprint")
+            == manifest.get("package_fingerprint")
+        )
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return False
 
 
 def _installation_pdfium_findings(
@@ -1819,6 +1876,166 @@ def _installation_candidate_integrity(
     return certification or {}, integrity + certification_findings + runtime_findings
 
 
+def _has_manifest_era_release_state(release: Path) -> bool:
+    """Identify a complete retained release without trusting its policy version."""
+    return all(
+        path.is_file() and not path.is_symlink()
+        for path in (
+            release / RELEASE_MANIFEST,
+            release / RELEASE_CERTIFICATION,
+            release / INSTALLATION_ASSURANCE,
+            release / PROMOTION_RECORD,
+            release / "scripts/workflow.py",
+        )
+    )
+
+
+def _manifest_era_candidate_integrity(
+    release: Path,
+    *,
+    trusted_certification_key_id: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Verify a retained predecessor with its signed, manifest-bound policy."""
+    integrity = _manifest_integrity(release, allow_runtime_state=True)
+    try:
+        report_path = release / RELEASE_CERTIFICATION
+        if report_path.stat().st_size > CERTIFICATION_REPORT_MAX_BYTES:
+            raise ValueError("release certification exceeds the governed byte limit")
+        report = _read(report_path)
+        manifest = _read(release / RELEASE_MANIFEST)
+        promotion = _read(release / PROMOTION_RECORD)
+        assurance_path = release / INSTALLATION_ASSURANCE
+        certification_state = promotion.get("certification") or {}
+        report_sha256 = sha256_file(report_path)
+        assurance_sha256 = sha256_file(assurance_path)
+    except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
+        return {}, [*integrity, {
+            "category": "installation",
+            "field": RELEASE_CERTIFICATION,
+            "code": "installation.manifest_era_certification_invalid",
+            "issue": f"The retained release certification is unavailable: {exc}",
+        }]
+    signature_findings = release_certification_attestation_findings(
+        report,
+        manifest,
+        release,
+        trusted_key_id=trusted_certification_key_id,
+    )
+    identity = report.get("release_identity") or {}
+    if (
+        report.get("schema_version") != "release-certification-corpus/v1"
+        or report.get("status") != "passed"
+        or identity.get("git_commit") != manifest.get("git_commit")
+        or identity.get("package_fingerprint")
+        != manifest.get("package_fingerprint")
+        or promotion.get("schema_version") != "promoted-release/v1"
+        or promotion.get("status") != "active"
+        or promotion.get("git_commit") != manifest.get("git_commit")
+        or promotion.get("package_fingerprint")
+        != manifest.get("package_fingerprint")
+        or certification_state.get("status") != "passed"
+        or certification_state.get("report_sha256") != report_sha256
+        or promotion.get("runtime_assurance_sha256")
+        != assurance_sha256
+    ):
+        signature_findings.append(
+            "Release certification does not bind the retained manifest identity."
+        )
+    if integrity or signature_findings:
+        return {}, [*integrity, *({
+            "category": "installation",
+            "field": RELEASE_CERTIFICATION,
+            "code": "installation.manifest_era_certification_invalid",
+            "issue": finding,
+        } for finding in signature_findings)]
+
+    program = (
+        "import json,pathlib,sys; "
+        "root=pathlib.Path(sys.argv[1]); "
+        "sys.path.insert(0,str(root/'scripts')); "
+        "import workflow; "
+        "certification,findings=workflow._installation_candidate_integrity("
+        "root,trusted_certification_key_id=sys.argv[2]); "
+        "summary={'certification': {key: certification.get(key) for key in "
+        "('schema_version','status','certification_scope','release_identity')}, "
+        "'findings': findings}; "
+        "print(json.dumps(summary,sort_keys=True))"
+    )
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                program,
+                str(release),
+                trusted_certification_key_id,
+            ],
+            cwd=release,
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+            text=True,
+            capture_output=True,
+            timeout=60,
+        )
+        result = json.loads(completed.stdout)
+        certification = result.get("certification") or {}
+        findings = result.get("findings") or []
+        if (
+            completed.returncode
+            or not isinstance(certification, Mapping)
+            or not isinstance(findings, list)
+        ):
+            raise ValueError("manifest-era verifier returned an invalid result")
+    except (
+        OSError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+        subprocess.TimeoutExpired,
+    ) as exc:
+        return {}, [{
+            "category": "installation",
+            "field": "manifest_era_policy",
+            "code": "installation.manifest_era_verification_failed",
+            "issue": f"The retained release policy could not be verified: {exc}",
+        }]
+    if findings or certification.get("status") != "passed":
+        return dict(certification), [
+            dict(finding)
+            for finding in findings
+            if isinstance(finding, Mapping)
+        ] or [{
+            "category": "installation",
+            "field": "manifest_era_policy",
+            "code": "installation.manifest_era_verification_failed",
+            "issue": "The retained release does not pass its own signed policy.",
+        }]
+    return dict(certification), []
+
+
+def _rollback_candidate_integrity(
+    release: Path,
+    *,
+    trusted_certification_key_id: str,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Accept current policy or a complete predecessor's own signed policy."""
+    certification, findings = _installation_candidate_integrity(
+        release,
+        trusted_certification_key_id=trusted_certification_key_id,
+    )
+    if not findings or not _has_manifest_era_release_state(release):
+        return certification, findings
+    manifest_era_certification, manifest_era_findings = (
+        _manifest_era_candidate_integrity(
+            release,
+            trusted_certification_key_id=trusted_certification_key_id,
+        )
+    )
+    if not manifest_era_findings:
+        return manifest_era_certification, []
+    return certification, [*findings, *manifest_era_findings]
+
+
 def _accepted_installation_python_runtime() -> dict[str, Any]:
     """Return the exact supported interpreter identity before installation staging."""
     runtime = _current_python_runtime()
@@ -2134,7 +2351,9 @@ def install_release(
         post_smoke_integrity_findings: list[dict[str, Any]] = []
         if not active_integrity_findings:
             post_activation_assurance = (
-                _installation_smoke_result(active)
+                _installation_smoke_result(
+                    active, allow_pending_activation=True
+                )
                 if verifier is None
                 else dict(verifier(active))
             )
@@ -2344,7 +2563,7 @@ def _disposable_rollback_smoke(
     probe = probe_root / "release"
     try:
         shutil.copytree(release, probe, symlinks=True)
-        _, before_findings = _installation_candidate_integrity(
+        _, before_findings = _rollback_candidate_integrity(
             probe,
             trusted_certification_key_id=trusted_certification_key_id,
         )
@@ -2355,11 +2574,11 @@ def _disposable_rollback_smoke(
             if verifier is None
             else dict(verifier(probe))
         )
-        _, after_findings = _installation_candidate_integrity(
+        _, after_findings = _rollback_candidate_integrity(
             probe,
             trusted_certification_key_id=trusted_certification_key_id,
         )
-        _, retained_release_findings = _installation_candidate_integrity(
+        _, retained_release_findings = _rollback_candidate_integrity(
             release,
             trusted_certification_key_id=trusted_certification_key_id,
         )
@@ -2410,7 +2629,7 @@ def _recover_interrupted_rollback(
         ):
             raise ValueError("invalid rollback previous identity")
         if _filesystem_identity(active) == tuple(previous_identity):
-            _, recovery_findings = _installation_candidate_integrity(
+            _, recovery_findings = _rollback_candidate_integrity(
                 active,
                 trusted_certification_key_id=trusted_certification_key_id,
             )
@@ -2520,7 +2739,7 @@ def rollback_release(
             "active_release_retained": active.is_dir(),
             "previous_release_retained": previous.is_dir(),
         }
-    _, integrity_findings = _installation_candidate_integrity(
+    _, integrity_findings = _rollback_candidate_integrity(
         previous,
         trusted_certification_key_id=trusted_certification_key_id,
     )
@@ -7802,11 +8021,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--skills-dir", help="Hermes skills directory for install or rollback")
     parser.add_argument("--hermes-config", help="Hermes config.yaml whose discovery path must select only the Promoted Release")
     parser.add_argument("--internal-pdfium-worker", metavar="REQUEST", help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--internal-pending-activation-smoke",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     args = parser.parse_args(argv)
     if args.manual_review and not (
         args.desktop_operation or (args.stage == "generate" and args.run_dir)
     ):
         parser.error("--manual-review is supported only with --desktop-operation or --stage generate")
+    if args.internal_pending_activation_smoke and not args.verify_installation:
+        parser.error("internal pending activation smoke requires --verify-installation")
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.provision_candidate:
@@ -7815,7 +8041,25 @@ def main(argv: list[str] | None = None) -> int:
     elif args.bind_certification:
         if not args.release_archive: parser.error("--release-archive is required with --bind-certification")
         result = bind_release_certification(Path(args.release_archive), Path(args.bind_certification))
-    elif args.verify_installation: result = verify_installation(SCRIPT_DIR.parent)
+    elif args.verify_installation:
+        if (
+            args.internal_pending_activation_smoke
+            and not _pending_activation_smoke_authorized(SCRIPT_DIR.parent)
+        ):
+            result = {
+                "status": "blocked",
+                "findings": [{
+                    "category": "installation",
+                    "field": "pending_activation_smoke",
+                    "code": "installation.pending_smoke_unauthorized",
+                    "issue": "Pending activation smoke is not bound to a live activation journal.",
+                }],
+            }
+        else:
+            result = verify_installation(
+                SCRIPT_DIR.parent,
+                allow_pending_activation=args.internal_pending_activation_smoke,
+            )
     elif args.install_release:
         if not args.skills_dir or not args.hermes_config: parser.error("--skills-dir and --hermes-config are required with --install-release")
         result = install_release(Path(args.install_release), Path(args.skills_dir), hermes_config_path=Path(args.hermes_config))
