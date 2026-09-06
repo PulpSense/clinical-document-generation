@@ -849,10 +849,12 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         for leaf in leaves:
             if leaf not in supplemental_notes:
                 supplemental_notes.append(leaf)
-            for clause in re.split(r"(?<=[.!?;])\s+|,\s*|\b(?:while|whereas|but|and)\b", leaf, flags=re.I):
+            for clause in re.split(r"[;!?]\s*|\.(?!\d)\s*|,\s*|\b(?:while|whereas|but|and)\b", leaf, flags=re.I):
+                # Contrasts/restrictions are not positive each-contact evidence.
+                # Leave them intact as notes rather than guessing their scope.
                 if (re.search(r"\b(?:adverse events?|AEs?)\b", clause, re.I)
                         and re.search(r"\b(?:each|every)\s+(?:study\s+)?contact\b", clause, re.I)
-                        and not re.search(r"\b(?:not|no|never|without)\b", clause, re.I)):
+                        and not re.search(r"\b(?:not|no|never|without|only|rather\s+than|instead\s+of)\b", clause, re.I)):
                     safety_inventory.append({"activity": clause, "source_path": path})
     if safety_inventory:
         safety_label = "Adverse event review at each contact (study-specific review after consent)"
@@ -1004,10 +1006,15 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     text = str(timeline or "")
     relative_pattern = re.compile(r"\b((?:\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*[- ]?\s*(?:days?|weeks?|months?))\s+(?:after|from|following)\s+(?:the\s+)?baseline\b", re.I)
     visits = normalized_visit_records(reference)
-    relatives = [(clause, match) for clause in re.split(
-        r"[;!?]\s*|\.(?!\d)\s*|(?:,\s*|\s+and\s+)(?=(?:interim|final)\b)", text, flags=re.I)
-                 for match in relative_pattern.finditer(clause)]
-    for clause, relative in relatives:
+    relatives = []
+    for clause in re.split(r"[;!?]\s*|\.(?!\d)\s*", text):
+        previous_end = 0
+        for match in relative_pattern.finditer(clause):
+            # Bind a duration only to its own preceding event phrase. A later
+            # duration must not inherit the first event in a compound sentence.
+            relatives.append((clause[previous_end:match.start()], match))
+            previous_end = match.end()
+    for event_phrase, relative in relatives:
         stated = _duration_days(relative.group(1))
         points = []
         for visit in visits:
@@ -1021,13 +1028,17 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                       else re.sub(r"\s+", " ", explicit_origin.group(1)).strip().casefold().rstrip(".") if explicit_origin
                       else "schedule")
             points.append((visit, days, anchor))
-        event = re.search(r"\b(interim|final)\b", clause, re.I)
-        # Optional visit lists need not include the named endpoint. General
-        # participant follow-up can match an explicitly final visit, never max().
-        event_name = event.group(1) if event else (
-            "final" if re.search(r"follow[- ]?up|followed|participa(?:nt|tion)", clause, re.I) else None)
+        events = re.findall(r"\b(interim|final)\b", event_phrase, re.I)
+        # Optional visit lists need not include the named endpoint. Multiple
+        # event names or scheduled matches leave the relationship ambiguous.
+        if len(events) > 1:
+            continue
+        event_name = events[0] if events else (
+            "final" if re.search(r"follow[- ]?up|followed|participa(?:nt|tion)", event_phrase, re.I) else None)
         targets = [point for point in points if event_name and re.search(
             rf"\b{event_name}\b", point[0]["visit"], re.I)]
+        if len(targets) != 1:
+            continue
         baselines = [(days, anchor) for visit, days, anchor in points if re.search(r"\bbaseline\b", visit["visit"], re.I)]
         durations = [days for visit, days, anchor in targets if anchor == "baseline" and not re.search(r"\bbaseline\b", visit["visit"], re.I)]
         for baseline, origin in baselines:
