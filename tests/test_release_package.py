@@ -1513,11 +1513,15 @@ def test_interrupted_active_smoke_restores_the_previous_release_before_retry(
     ).read_text(encoding="utf-8") == "previous verified release"
     assert not (skills_dir / ".clinical-document-generation.previous").exists()
     assert not (skills_dir / ".clinical-document-generation.activation.json").exists()
-    failed_releases = list(
-        (tmp_path / "clinical-document-release-failures").iterdir()
-    )
+    failure_root = tmp_path / "clinical-document-release-failures"
+    failed_releases = [path for path in failure_root.iterdir() if path.is_dir()]
     assert len(failed_releases) == 1
     assert (failed_releases[0] / "SKILL.md").is_file()
+    failure_records = list(failure_root.glob("*.activation-failure.json"))
+    assert len(failure_records) == 1
+    assert json.loads(failure_records[0].read_text(encoding="utf-8"))[
+        "failed_candidate"
+    ] == str(failed_releases[0])
 
 
 def test_installation_smoke_timeout_returns_terminal_finding(tmp_path, monkeypatch):
