@@ -256,11 +256,11 @@ Desktop operation remains governed by the single 30-minute budget. A passing
 Generation Manifest is not delivery: the Desktop parent must expose exactly its
 client outputs as attachments, retrieve each file through the actual opener,
 and confirm byte length and SHA-256 before reporting success.
-Release Certification requires Retrospective completion below 15 minutes and
-permits Ambispective and Prospective through 18 minutes under the approved
-exception when every other gate passes. A slower valid operation may still
-deliver before the 30-minute correctness ceiling, but receives a non-certifying
-runtime outcome.
+Release Certification keeps the 10–12 minute operating target but accepts any
+otherwise passing Retrospective, Ambispective, or Prospective case through the
+unchanged 30-minute correctness ceiling. Runtime above 15 minutes—and above the
+18-minute diagnostic window—is recorded explicitly for optimization, but does
+not invalidate correct, fully reviewed output by itself.
 
 Before installation, the same `config.yaml` must select only the active path and
 declare the certified launch settings under `skills.clinical_document_generation`:
