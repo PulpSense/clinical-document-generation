@@ -2840,20 +2840,159 @@ def _windows_word_pdf(docx: Path, output_dir: Path, *, timeout_seconds: float = 
     return output
 
 
-def _blank_pdf_pages(path: Path) -> list[int]:
-    blank: list[int] = []
-    for index, page in enumerate(PdfReader(path).pages, 1):
-        lines = []
-        for line in (page.extract_text() or "").splitlines():
-            normalized = line.strip()
-            if re.search(r"\bpage\s+\d+\s+of\s+\d+\b", normalized, flags=re.I):
-                continue
-            if re.fullmatch(r"(?:v(?:ersion)?\s*)?\S*\s*\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}", normalized, flags=re.I):
-                continue
-            lines.append(normalized)
-        if len(re.findall(r"\b\w+\b", "\n".join(lines))) < 3:
-            blank.append(index)
-    return blank
+def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, Any]:
+    """Read final bytes independently of the renderer's TOC mapping algorithm.
+
+    A bounded refresh loop is not convergence evidence. Only observed destination
+    disagreements block here; unextractable/ambiguous text remains explicit
+    unknown evidence for the mandatory exact-artifact visual review.
+    """
+    document = Document(docx_path)
+    headings = [p.text.strip() for p in document.paragraphs
+                if p.style.name in {"Heading 1", "Heading 2"} and p.text.strip()]
+    if not any("TABLE OF CONTENTS" in heading.upper() for heading in headings):
+        return {"status": "not_applicable", "destinations": [], "findings": []}
+
+    def key(text: str) -> str:
+        return " ".join(re.findall(r"\w+", text.casefold()))
+
+    cache: dict[str, list[int]] = {}
+    # Read cached field results, including hyperlink/SDT descendants. Do not
+    # depend on Paragraph.text's treatment of hyperlink text in python-docx.
+    for paragraph in document.element.body.iter(qn("w:p")):
+        styles = paragraph.xpath("./w:pPr/w:pStyle")
+        if not styles or not re.fullmatch(r"toc[12]", styles[0].get(qn("w:val"), "").replace(" ", ""), re.I):
+            continue
+        text = "".join("\t" if node.tag == qn("w:tab") else (node.text or "")
+                       for node in paragraph.iter() if node.tag in {qn("w:t"), qn("w:tab")})
+        match = re.fullmatch(r"(.+?)[\s.]+(\d+)\s*", text)
+        if match:
+            cache.setdefault(key(match[1]), []).append(int(match[2]))
+    try:
+        page_lines = [[key(line) for line in (page.extract_text() or "").splitlines() if key(line)]
+                      for page in PdfReader(pdf_path).pages]
+    except (OSError, ValueError, TypeError, AttributeError, KeyError) as exc:
+        return {"status": "unknown", "destinations": [], "findings": [], "issue": str(exc)}
+    destinations, findings = [], []
+    for heading in headings:
+        marker = key(heading)
+        matches = []
+        for number, lines in enumerate(page_lines, 1):
+            # Whole lines distinguish a real heading from a TOC row or prose
+            # citation. Permit wrapped headings, never arbitrary substrings.
+            if any(" ".join(lines[start:start + size]) == marker
+                   for start in range(len(lines)) for size in range(1, 5)):
+                matches.append(number)
+        cached = cache.get(marker, [])
+        rendered = matches[0] if len(matches) == 1 else None
+        status = "unknown" if rendered is None else (
+            "passed" if cached == [rendered] else "mismatch")
+        row = {"heading": heading, "cached_page": cached[0] if len(cached) == 1 else None,
+               "rendered_page": rendered, "rendered_candidates": matches, "status": status}
+        destinations.append(row)
+        if status == "mismatch":
+            findings.append({"category": "visual", "field": docx_path.stem,
+                             "artifact": docx_path.stem, "check": "toc_mismatch",
+                             "element": heading, "page": rendered,
+                             "target_ids": [f"layout:{docx_path.stem}"],
+                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, rendered page {rendered}."})
+    status = "mismatch" if findings else ("passed" if destinations and all(
+        row["status"] == "passed" for row in destinations) else "unknown")
+    return {"status": status, "destinations": destinations, "findings": findings}
+
+
+def _pdf_body_pages(path: Path, *, docx_path: Path | None = None) -> list[dict[str, Any]]:
+    """Extract body text using source section margins, never guessed bands.
+
+    Without source geometry all extracted text is conservatively retained. For
+    render_pages' exact artifact layout, resolve the matching candidate DOCX.
+    """
+    if docx_path is None and path.parent.name == "rendered":
+        candidate = path.parent.parent / "candidate" / f"{path.stem}.docx"
+        if candidate.is_file():
+            docx_path = candidate
+    sections = list(Document(docx_path).sections) if docx_path is not None else []
+    margins_known = bool(sections) and all(section.top_margin is not None and section.bottom_margin is not None for section in sections)
+    # Union of section body areas: page-to-section assignment is not guessed.
+    top_margin = min(section.top_margin.pt for section in sections) if margins_known else 0.0
+    bottom_margin = min(section.bottom_margin.pt for section in sections) if margins_known else 0.0
+    result = []
+    for number, page in enumerate(PdfReader(path).pages, 1):
+        fragments: list[tuple[str, float, float]] = []
+        try:
+            bottom, top = float(page.mediabox.bottom) + bottom_margin, float(page.mediabox.top) - top_margin
+
+            def visitor(text: str, cm: Any, tm: Any, font: Any, size: float) -> None:
+                y = float(cm[1] * tm[4] + cm[3] * tm[5] + cm[5])
+                if text.strip() and bottom <= y <= top:
+                    fragments.append((text.strip(), y, abs(float(size))))
+
+            graphics_in_body = False
+
+            def operand(operator: bytes, operands: Any, cm: Any, tm: Any) -> None:
+                nonlocal graphics_in_body
+                if operator != b"Do":
+                    return
+                objects = page.get("/Resources", {}).get("/XObject", {})
+                image = objects.get(operands[0])
+                if image is None or image.get_object().get("/Subtype") != "/Image":
+                    # Nested forms need their own coordinate evidence. Unknown
+                    # graphical content cannot prove a body-empty page.
+                    graphics_in_body = True
+                    return
+                ys = [float(cm[5]), float(cm[1] + cm[5]),
+                      float(cm[3] + cm[5]), float(cm[1] + cm[3] + cm[5])]
+                if max(ys) >= bottom and min(ys) <= top:
+                    graphics_in_body = True
+
+            page.extract_text(visitor_text=visitor, visitor_operand_before=operand)
+            text = "\n".join(fragment[0] for fragment in fragments)
+            span = (max(y + size for _, y, size in fragments) - min(y for _, y, _ in fragments)) if fragments else 0.0
+            result.append({"page": number, "text": text, "geometry_known": True,
+                           "body_height_fraction": min(1.0, span / max(1.0, top - bottom)),
+                           "body_empty": not text.strip() and not graphics_in_body})
+        except (TypeError, AttributeError, KeyError):
+            # Compatibility with text-only adapters; no word-count heuristic.
+            text = page.extract_text() or ""
+            lines = [line for line in text.splitlines()
+                     if not re.search(r"\bpage\s+\d+\s+of\s+\d+\b", line, re.I)
+                     and not re.fullmatch(r"(?:v(?:ersion)?\s*)?\S*\s*\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}", line.strip(), re.I)]
+            result.append({"page": number, "text": "\n".join(lines), "geometry_known": False,
+                           "body_height_fraction": None, "body_empty": not text.strip()})
+    return result
+
+
+def _blank_pdf_pages(path: Path, *, docx_path: Path | None = None) -> list[int]:
+    return [item["page"] for item in _pdf_body_pages(path, docx_path=docx_path) if item["body_empty"]]
+
+
+def _sparse_pdf_pages(docx_path: Path, pdf_path: Path) -> list[dict[str, Any]]:
+    """Nonblocking visual context: short body spans and source hard-break links."""
+    endings = []
+    previous = ""
+    for paragraph in Document(docx_path).paragraphs:
+        before = paragraph.paragraph_format.page_break_before
+        breaks = paragraph._p.xpath('.//w:br[@w:type="page"]')
+        sections = paragraph._p.xpath('./w:pPr/w:sectPr')
+        section_break = any(not section.xpath('./w:type[@w:val="continuous"]') for section in sections)
+        if before and previous:
+            endings.append(previous)
+        if (breaks or section_break) and (paragraph.text.strip() or previous):
+            endings.append(paragraph.text.strip() or previous)
+        if paragraph.text.strip():
+            previous = paragraph.text.strip()
+    normalized_endings = [" ".join(text.casefold().split()) for text in endings]
+    rows = []
+    for item in _pdf_body_pages(pdf_path, docx_path=docx_path):
+        if not item["geometry_known"] or not item["text"] or item["body_height_fraction"] > 0.2:
+            continue
+        text = " ".join(item["text"].casefold().split())
+        rows.append({"page": item["page"], "blocking": False,
+                     "body_height_fraction": item["body_height_fraction"],
+                     "text": item["text"],
+                     "forced_break_after": any(text.endswith(ending) for ending in normalized_endings),
+                     "issue": "Small occupied body span; inspect context and any forced break, not a universal sparse-page failure."})
+    return rows
 
 
 def render_pages(
@@ -3040,9 +3179,13 @@ def render_pages(
                     "target_ids": [f"layout:{docx.stem}"],
                     "issue": f"Rendered {docx.stem} contains a textless page at page {page_number}.",
                 })
+            toc_destinations = audit_final_toc_destinations(docx, pdf)
+            findings.extend(toc_destinations["findings"])
             artifacts.append({
                 "artifact": docx.stem,
                 "status": "passed",
+                "toc_destinations": toc_destinations,
+                "sparse_body_context": _sparse_pdf_pages(docx, pdf),
                 "renderer": identity,
                 "page_renderer": selected_page_renderer,
                 "font_evidence": dict(font_evidence or {}),
@@ -3422,6 +3565,59 @@ def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
     )
 
 
+def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Conservative source-leaf checks, not a second renderer/mapping contract.
+
+    These catch literal front-matter loss/concatenation. Semantic coverage and
+    correct placement still require the independent field-by-field review.
+    """
+    document = Document(path)
+    findings: list[dict[str, Any]] = []
+    if path.stem == "icf":
+        # Inspect the address destination, never an unrelated later mention.
+        address_blocks = []
+        if document.tables:
+            for row in document.tables[0].rows:
+                if re.fullmatch(r"(?:study\s+site\s+)?address\s*:", row.cells[0].text.strip(), re.I):
+                    address_blocks.append("\n".join(cell.text for cell in row.cells[1:]))
+        if not address_blocks:
+            collecting = False
+            for paragraph in document.paragraphs:
+                text = paragraph.text
+                if re.match(r"^\s*(?:study\s+site|site\s+address)\s*:", text, re.I):
+                    address_blocks.append(text)
+                    collecting = True
+                elif collecting and text.startswith("\t"):
+                    address_blocks.append(text)
+                elif collecting and text.strip():
+                    break
+        normalized = " ".join(re.findall(r"\w+", "\n".join(address_blocks).casefold()))
+        for item in _source_field_inventory(reference):
+            field = item["source_path"]
+            if not re.fullmatch(
+                r"sites\[0\]\.facility\.(?:address(?:\.(?:line1|line2|address_line1|address_line2|street|city|state|country|zip|postal_code))?|city|state|country|zip|postal_code)", field
+            ):
+                continue
+            value = " ".join(re.findall(r"\w+", str(item["value"]).casefold()))
+            if value and not re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", normalized):
+                findings.append({"category": "content", "field": field,
+                                 "target_ids": ["layout:icf"],
+                                 "issue": f"ICF omits supplied site-address component {field}: {item['value']}"})
+    if path.stem == "protocol":
+        sponsor_name = str(get_path(reference, "parties.sponsor.name", "") or "").strip()
+        if sponsor_name:
+            for table in document.tables:
+                for row in table.rows:
+                    if not row.cells or not re.search(r"\bsponsor\b", row.cells[0].text, re.I):
+                        continue
+                    value = "\n".join(cell.text for cell in row.cells[1:])
+                    if re.search(r"\w" + re.escape(sponsor_name) + r"|" + re.escape(sponsor_name) + r"\w", value, re.I):
+                        findings.append({"category": "content", "field": "parties.sponsor.name",
+                                         "target_ids": ["title-page"],
+                                         "issue": "Sponsor name is concatenated with adjacent front-matter text without a separator."})
+    return findings
+
+
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -3433,6 +3629,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     }
     protocol = revision_dir / "candidate/protocol.docx"
     findings.extend(audit_docx(protocol, required_phrases=[str(get_path(reference, "study.title", ""))]))
+    findings.extend(audit_source_surfaces(protocol, reference))
+    icf_path = revision_dir / "candidate/icf.docx"
+    if branch != "Retrospective" and icf_path.is_file():
+        findings.extend(audit_source_surfaces(icf_path, reference))
     document = Document(protocol)
     table_text = "\n".join(
         cell.text for table in document.tables for row in table.rows for cell in row.cells
@@ -3718,6 +3918,24 @@ def _content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any
     return sections
 
 
+def _source_field_inventory(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Inventory supplied leaves directly, independent of drafting/table mappings."""
+    inventory: list[dict[str, Any]] = []
+
+    def visit(value: Any, path: str) -> None:
+        if isinstance(value, Mapping):
+            for key, child in value.items():
+                visit(child, f"{path}.{key}" if path else str(key))
+        elif isinstance(value, list):
+            for index, child in enumerate(value):
+                visit(child, f"{path}[{index}]")
+        elif meaningful(value):
+            inventory.append({"source_path": path, "value": value})
+
+    visit(reference, "")
+    return inventory
+
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -3751,8 +3969,16 @@ def create_verification_requests(
     if cross_document_checks:
         content_instructions += " Assess every cross-document check."
     content_instructions += (
-        " Findings must include target_ids for affected section IDs. Treat exact authorized Fixed Clinical "
-        "Boilerplate as approved non-study-specific content, not invention. Do not fail optional fields, dates, "
+        " Findings must include target_ids for affected section IDs. Approved source takes precedence over "
+        "applicable Fixed Clinical Boilerplate and retained template language; authorization is not a blanket "
+        "exemption from source fidelity. Fail expanded decision authority, added termination grounds, and "
+        "conflation of completion with withdrawal or discontinuation, even in verbatim boilerplate. "
+        "Audit each supplied source field in source_field_inventory against its applicable document surfaces, "
+        "not only accepted drafts or protocol_table_contracts. Check full site-address components and sponsor/funder "
+        "roles, duplication and concatenation on front matter. Independently reconcile narrative assessments, "
+        "safety duties and structured visit IDs, timing and procedures with both schedule tables. Preserve "
+        "unallocated assessment requirements as notes without inventing visit assignments. Cite the source path "
+        "and affected surface for omissions or contradictions. Do not fail optional fields, dates, "
         "instruments, scoring rules, denominators, or policies that are absent from the approved source; instead "
         "fail only an unsupported affirmative claim or an omission of supplied material evidence. A document-control "
         "date may default from approval, while an unknown version must remain blank and must not be failed merely for "
@@ -3768,6 +3994,7 @@ def create_verification_requests(
         "review_set": review_set,
         "artifacts": content_files,
         "approved_source": reference,
+        "source_field_inventory": _source_field_inventory(reference),
         "authorized_boilerplate": authorized_boilerplate,
         "sections": sections,
         "checks": list(CONTENT_CHECKS),
@@ -3799,7 +4026,7 @@ def create_verification_requests(
             "page_renderer": artifacts[0].get("page_renderer", render_report.get("page_renderer")) if artifacts else render_report.get("page_renderer"),
             "artifacts": request_artifacts,
             "checks": list(VISUAL_CHECKS),
-            "instructions": f"This is complete review set {review_set}. Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local. Route a split inside the Protocol Section 3 summary table with element exactly `3. GENERAL INFORMATION`.",
+            "instructions": f"This is complete review set {review_set}. Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local. Route a split inside the Protocol Section 3 summary table with element exactly `3. GENERAL INFORMATION`. Require whole-word readable table headers at normal review scale; merely decipherable broken words are not sufficient. Any purported approved layout exception must cite its originating approval artifact and exact rule; a prior reviewer assertion or repair note repeating it is not approval provenance. Inspect sparse-body diagnostics as visual context, including isolated prose before a forced break and mostly empty terminal choice pages. Resolve every unknown TOC destination in toc_destinations by inspecting the cached TOC and the actual heading page images; unknown is not a passing destination check. Do not universally fail short title, signature or consent surfaces, and never delete consent content or usable signing space to save a page. A sentence continuing completely across a page boundary is not a content error; assess its layout and surrounding context instead.",
             "reviewer_policy": {
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",
