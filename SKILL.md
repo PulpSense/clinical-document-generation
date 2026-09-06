@@ -451,7 +451,7 @@ only the final pending gate and is persisted in the Desktop operation result.
 Terminal replay revalidates both prepared and final ledgers and permits only that
 one delivery-gate transition.
 
-The deterministic render gate also rejects pages with no meaningful body content, even when a running header or page number is present. A signature or continuation sentence may not be stranded on an otherwise empty page.
+The deterministic render gate rejects pages with no meaningful body content, even when running headers or page numbers are present. Visual review must evaluate sparse continuation, signature, and consent pages according to their actual content and function. A sentence continuing across pages is not a content error; preserve meaningful choices and usable signature space rather than treating every sparse page as blank.
 
 Candidate construction does not depend on the render environment. Build the complete Protocol/ICF/XML candidate first, then resolve DOCX rendering through host Microsoft Word or LibreOffice. Tool failure may advance between those office renderers; a successfully rendered visual defect stays bound to that renderer and enters repair instead of switching to obtain an easier pass. Page rendering always uses the release-owned `pypdfium2` 5.13.0 runtime. If PDFium fails, stop with the governed diagnostic; never discover or use another PDF backend.
 
@@ -460,7 +460,7 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 ## Word template authorities
 
 - Every Protocol branch uses the bundled Protocol client authority for page geometry, typography, headers/footers, heading hierarchy, document-control surfaces, and table design.
-- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Preserve the template's page breaks; ensure the Table of Contents and its first following body section each begin at a page boundary without adding breaks before later body sections. Keep every heading with its first substantive paragraph, list, or table.
+- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Preserve the template's page breaks except the narrowly authorized Section 15 correction in `references/quality-corrections.md`; ensure the Table of Contents and its first following body section each begin at a page boundary without adding breaks before later body sections. Keep every heading with its first substantive paragraph, list, or table.
 - Advarra ICF output uses the bundled Advarra authority; Sterling output uses the bundled Sterling authority.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
