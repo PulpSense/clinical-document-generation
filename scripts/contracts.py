@@ -253,6 +253,9 @@ class ContractedTemplateBundleError(ValueError):
         super().__init__(self.finding["issue"])
 
 
+# Source-intake requirements mirror the documented starred fields exactly.
+# Optional supplied evidence and PRS values retain their technical validators;
+# downstream output requirements must not become extra missing-input gates.
 PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("study.title"),
     RequiredInput("study.background"),
@@ -269,11 +272,6 @@ PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("procedures.minimum_days_before_screening_without_participation"),
     RequiredInput("population.sample_size"),
     RequiredInput("population.sample_justification", ("statistics.sample_size_justification",)),
-    RequiredInput(
-        "statistics.sample_size_evidence",
-        ("population.sample_size_evidence",),
-        "sample-size evidence rows",
-    ),
     RequiredInput(
         "risks_benefits.compensation_or_reimbursement",
         ("risks_benefits.compensation", "risks_benefits.reimbursement", "risks_benefits.payment"),
@@ -297,8 +295,6 @@ PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
     RequiredInput("sites.facilities", kind="site_facilities"),
     RequiredInput("sites.contacts", kind="site_contacts"),
     RequiredInput("sites.investigators", kind="site_investigators"),
-    RequiredInput("regulatory.prs.provider_study_id", ("meta.protocol_number",), "PRS provider study ID"),
-    RequiredInput("regulatory.prs.study_type", label="PRS study type (Observational or Interventional)"),
 )
 
 RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (

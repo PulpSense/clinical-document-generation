@@ -71,6 +71,13 @@ this file.
   `meta.study_type`; during preparation, an unambiguous classification stated
   in `design.study_design` populates the PRS field before review.
 
+Schema support does not make a field obligatory for source intake. Sample-size
+evidence tables and PRS administration/classification values are optional at
+intake; their absence must not prompt missing-input questions. Supplied evidence
+still requires the approved typed table schema and consistency checks, and a
+supplied PRS classification must use the supported controlled vocabulary.
+Required PRS output values remain governed by downstream XML validation.
+
 ## Consistency rules
 
 - The planned sample count must agree with every populated sample-size evidence

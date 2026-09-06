@@ -338,33 +338,26 @@ def test_missing_obligatory_input_blocks_without_filler():
     assert any(item["field"] == "study.title" for item in findings)
 
 
-def test_prs_study_type_is_required_before_source_approval():
+def test_missing_optional_prs_study_type_does_not_block_source_approval():
     reference = fixture("ambispective-acceptance-source.json")
     reference["regulatory"]["prs"].pop("study_type")
     reference["design"]["study_design"] = "Ambispective, single-center, single-arm device study."
 
     contract = source_contract(reference)
 
-    assert contract["status"] == "blocked"
-    assert any(
-        item["field"] == "regulatory.prs.study_type"
-        and item["issue"] == "Required Source Input is missing."
-        for item in contract["blocking_findings"]
-    )
+    assert contract["status"] == "passed"
+    assert "study_type" not in contract["normalized_reference"]["regulatory"]["prs"]
 
 
-def test_prs_provider_study_id_is_required_before_source_approval():
+def test_missing_optional_prs_provider_study_id_does_not_block_source_approval():
     reference = fixture("prospective-acceptance-source.json")
     reference["regulatory"]["prs"].pop("provider_study_id", None)
     reference["meta"].pop("protocol_number")
 
     contract = source_contract(reference)
 
-    assert contract["status"] == "blocked"
-    assert any(
-        item["field"] == "regulatory.prs.provider_study_id"
-        for item in contract["blocking_findings"]
-    )
+    assert contract["status"] == "passed"
+    assert "provider_study_id" not in contract["normalized_reference"]["regulatory"]["prs"]
 
 
 def test_prs_study_type_must_be_a_supported_registry_classification():
@@ -444,11 +437,8 @@ def test_prs_study_type_does_not_infer_from_negated_or_uncertain_design(design):
 
     contract = source_contract(reference, derive_prs_study_type=True)
 
-    assert contract["status"] == "blocked"
-    assert any(
-        item["field"] == "regulatory.prs.study_type"
-        for item in contract["blocking_findings"]
-    )
+    assert contract["status"] == "passed"
+    assert "study_type" not in contract["normalized_reference"]["regulatory"]["prs"]
 
 
 def test_conflicting_sample_size_evidence_blocks_approval():
@@ -524,14 +514,14 @@ def test_sample_size_evidence_rejects_unrenderable_or_conflicting_columns():
     assert "statistics.sample_size_evidence.0.timepoint" in fields
 
 
-def test_prospective_sample_size_evidence_is_required_and_column_complete():
+def test_optional_prospective_sample_size_evidence_must_be_column_complete_when_supplied():
     reference = fixture("prospective-acceptance-source.json")
     reference["statistics"]["sample_size_evidence"] = []
     reference["population"]["sample_size_evidence"] = []
 
     missing_fields = {item["field"] for item in input_findings(reference)}
 
-    assert "statistics.sample_size_evidence" in missing_fields
+    assert "statistics.sample_size_evidence" not in missing_fields
 
     reference["statistics"]["sample_size_evidence"] = [{
         "study": "COMET-2",
