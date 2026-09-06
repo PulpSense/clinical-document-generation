@@ -63,7 +63,7 @@ RELEASE_CERTIFICATION_PUBLIC_KEY = "references/release-certification-public-key.
 RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM = "rsa-pkcs1-v1_5-sha256"
 RELEASE_CERTIFICATION_TRUSTED_KEY_ID = "50aa8bde2e3f31c7c24984078dbe1d236f118e0744c43a84d0e4c77ffcc1107c"
 _SHA256_DIGEST_INFO_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
-CERTIFICATION_EVIDENCE_MAX_FILES = 512
+CERTIFICATION_EVIDENCE_MAX_FILES = 1024
 CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES = 32 * 1024 * 1024
 CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES = 128 * 1024 * 1024
 CERTIFICATION_CASE_ORDER = (
@@ -76,6 +76,7 @@ CERTIFICATION_CASE_ORDER = (
 CERTIFICATION_DIAGNOSTIC_TARGET_SECONDS = 900.0
 CERTIFICATION_EXTENDED_DIAGNOSTIC_SECONDS = 1080.0
 CERTIFICATION_RUNTIME_CEILING_SECONDS = 1800.0
+PROMOTED_ACTIVATION_COMMIT_POINT = "post_activation_smoke_passed_journal_commit"
 DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "prospective-advarra-sparse-complete", "prospective-advarra-rich-complete",
     "ambispective-sterling-sparse-complete", "ambispective-sterling-rich-complete",
@@ -946,7 +947,8 @@ def _certification_evidence_findings(
         "output", "delivery_confirmation", "drafting_request", "drafting_response",
         "verification_request", "verification_response", "delegated_page_review",
         "parent_page_review", "parent_process_marker",
-        "fixture_manifest", "fixture_source", "approved_source", "approved_reference", "pdf", "page_image",
+        "fixture_manifest", "fixture_source", "approved_source", "approved_reference",
+        "content_artifact", "pdf", "page_image",
     }
     findings: list[str] = []
     indexed: dict[tuple[str | None, str], list[dict[str, Any]]] = {}
@@ -966,7 +968,9 @@ def _certification_evidence_findings(
         elif case_id not in CERTIFICATION_CASE_ORDER or not path.startswith(f"cases/{case_id}/"):
             findings.append(f"Case evidence is mis-scoped: {path}.")
         indexed.setdefault((case_id, kind), []).append(item)
-        if kind not in {"output", "pdf", "page_image", "release_manifest"}:
+        if kind not in {
+            "output", "content_artifact", "pdf", "page_image", "release_manifest"
+        }:
             try:
                 value = json.loads(item["content"])
                 parsed[identity_key] = value if isinstance(value, dict) else None
@@ -1197,11 +1201,25 @@ def _certification_evidence_findings(
         requests = [(item, payload(item)) for item in request_items]
         content_requests = [(item, value) for item, value in requests if value.get("task") == "clinical_content_verification"]
         content_responses = [(item, payload(item)) for item in response_items]
+        content_artifacts = items(fixture, "content_artifact")
+        consume(content_artifacts)
         if len(content_requests) != 1 or len(content_responses) != 1:
             findings.append(f"Content verification evidence is incomplete for {fixture}.")
         else:
             request = content_requests[0][1]
             response = content_responses[0][1]
+            requested_artifacts = {
+                str(item.get("path") or ""): item
+                for item in request.get("artifacts") or []
+                if isinstance(item, Mapping)
+            }
+            retained_artifacts = {
+                str(item.get("path") or "")[len(f"cases/{fixture}/content/"):]: item
+                for item in content_artifacts
+                if str(item.get("path") or "").startswith(
+                    f"cases/{fixture}/content/"
+                )
+            }
             if (
                 response.get("request_id") != request.get("request_id")
                 or response.get("request_sha256") != request.get("request_sha256")
@@ -1212,6 +1230,13 @@ def _certification_evidence_findings(
                 or any(item.get("status") != "passed" for item in response.get("section_assessments") or [])
                 or not response.get("cross_document_assessments")
                 or any(item.get("status") != "passed" for item in response.get("cross_document_assessments") or [])
+                or not requested_artifacts
+                or set(retained_artifacts) != set(requested_artifacts)
+                or any(
+                    retained_artifacts[path].get("sha256")
+                    != requested_artifacts[path].get("sha256")
+                    for path in requested_artifacts
+                )
             ):
                 findings.append(f"Content verification does not pass for {fixture}.")
         visual_requests = [(item, value) for item, value in requests if value.get("task") == "rendered_page_visual_verification"]
@@ -1470,6 +1495,7 @@ def _pdfium_runtime_integrity(
     skill_root: Path,
     *,
     require_promoted_runtime: bool = True,
+    allow_pending_activation: bool = False,
 ) -> dict[str, Any]:
     """Verify one installed runtime and explain the first exact mismatch."""
     resolved_root = Path(skill_root).resolve()
@@ -1546,13 +1572,22 @@ def _pdfium_runtime_integrity(
                 )
             if (
                 promotion.get("schema_version") != "promoted-release/v1"
-                or promotion.get("status") != "active"
                 or promotion.get("package_fingerprint") != recorded_fingerprint
             ):
                 return _pdfium_integrity_failure(
                     "renderer.pdfium_promotion_fingerprint_mismatch",
                     "PROMOTION-RECORD.json",
                     "The runtime manifest does not match the promoted release fingerprint.",
+                )
+            promotion_status = promotion.get("status")
+            if promotion_status not in {"active", "activation_pending"} or (
+                promotion_status == "activation_pending"
+                and not allow_pending_activation
+            ):
+                return _pdfium_integrity_failure(
+                    "renderer.pdfium_activation_pending",
+                    "PROMOTION-RECORD.json",
+                    "The release has not passed the active-path smoke commit point.",
                 )
             assurance_path = resolved_root / "INSTALLATION-ASSURANCE.json"
             expected_assurance_sha256 = promotion.get("runtime_assurance_sha256")
@@ -1577,6 +1612,66 @@ def _pdfium_runtime_integrity(
                     "INSTALLATION-ASSURANCE.json",
                     "The promoted release does not match its bound installation assurance.",
                 )
+            try:
+                assurance = _json(assurance_path)
+            except (OSError, ValueError, json.JSONDecodeError, TypeError):
+                return _pdfium_integrity_failure(
+                    "renderer.pdfium_installation_assurance_mismatch",
+                    "INSTALLATION-ASSURANCE.json",
+                    "The promoted release does not match its bound installation assurance.",
+                )
+            if promotion_status == "activation_pending":
+                if (
+                    assurance.get("schema_version") != "installation-assurance/v2"
+                    or assurance.get("status") != "staging_passed"
+                ):
+                    return _pdfium_integrity_failure(
+                        "renderer.pdfium_pending_assurance_invalid",
+                        "INSTALLATION-ASSURANCE.json",
+                        "The pending release does not match its staging assurance.",
+                    )
+            else:
+                if promotion.get("activation_commit_point") != (
+                    PROMOTED_ACTIVATION_COMMIT_POINT
+                ):
+                    return _pdfium_integrity_failure(
+                        "renderer.pdfium_activation_commit_point_invalid",
+                        "PROMOTION-RECORD.json",
+                        "The promoted release lacks the active-path smoke commit point.",
+                    )
+                active_smoke = assurance.get("active_path_smoke")
+                if (
+                    assurance.get("schema_version") != "installation-assurance/v2"
+                    or assurance.get("status") != "passed"
+                    or not isinstance(active_smoke, Mapping)
+                    or active_smoke.get("status") != "passed"
+                ):
+                    return _pdfium_integrity_failure(
+                        "renderer.pdfium_active_smoke_assurance_invalid",
+                        "INSTALLATION-ASSURANCE.json",
+                        "The promoted release lacks a passing active-path smoke assurance.",
+                    )
+                active_identity = active_smoke.get("release_identity")
+                expected_identity = {
+                    "git_commit": manifest.get("git_commit"),
+                    "package_fingerprint": recorded_fingerprint,
+                }
+                if not isinstance(active_identity, Mapping) or {
+                    key: active_identity.get(key) for key in expected_identity
+                } != expected_identity:
+                    return _pdfium_integrity_failure(
+                        "renderer.pdfium_active_smoke_identity_mismatch",
+                        "INSTALLATION-ASSURANCE.json",
+                        "The active-path smoke identity does not match the release manifest.",
+                    )
+                if promotion.get("active_path_smoke_sha256") != (
+                    canonical_evidence_sha256(active_smoke)
+                ):
+                    return _pdfium_integrity_failure(
+                        "renderer.pdfium_active_smoke_hash_mismatch",
+                        "PROMOTION-RECORD.json",
+                        "The active-path smoke evidence does not match its promotion binding.",
+                    )
         manifest_identity = manifest["inventory"]["pdf_page_renderer"]
     except (OSError, ValueError, json.JSONDecodeError, KeyError, TypeError):
         return _pdfium_integrity_failure(

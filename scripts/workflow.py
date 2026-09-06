@@ -248,6 +248,26 @@ def _active_release_identity(skill_root: Path) -> dict[str, Any]:
         fingerprint = str(manifest.get("package_fingerprint") or "")
         if not fingerprint:
             raise RuntimeError("The active release manifest has no package fingerprint.")
+        promotion_path = skill_root / PROMOTION_RECORD
+        if skill_root.name == "clinical-document-generation" and (
+            promotion_path.exists() or promotion_path.is_symlink()
+        ):
+            if promotion_path.is_symlink() or not promotion_path.is_file():
+                raise RuntimeError("The release activation record is invalid.")
+            promotion = _read(promotion_path)
+            if (
+                promotion.get("schema_version") != "promoted-release/v1"
+                or promotion.get("status") != "active"
+                or promotion.get("package_fingerprint") != fingerprint
+            ):
+                raise RuntimeError("The release activation is not committed.")
+        journal_path = _activation_journal_path(skill_root.parent)
+        if (
+            skill_root.name == "clinical-document-generation"
+            and journal_path.is_file()
+            and (_read(journal_path).get("post_activation_smoke_required") is True)
+        ):
+            raise RuntimeError("The release activation smoke is still pending.")
         return {
             "package_fingerprint": fingerprint,
             "git_commit": manifest.get("git_commit"),
@@ -1333,9 +1353,15 @@ def _installation_smoke_result(candidate: Path) -> dict[str, Any]:
     return dict(assurance)
 
 
-def _installation_pdfium_findings(candidate: Path) -> list[dict[str, Any]]:
+def _installation_pdfium_findings(
+    candidate: Path,
+    *,
+    allow_pending_activation: bool = False,
+) -> list[dict[str, Any]]:
     integrity = _pdfium_runtime_integrity(
-        candidate, require_promoted_runtime=False
+        candidate,
+        require_promoted_runtime=False,
+        allow_pending_activation=allow_pending_activation,
     )
     if integrity.get("status") == "passed":
         return []
@@ -1424,54 +1450,122 @@ def _restore_release_state_after_active_smoke_failure(
     candidate_manifest_sha256: str,
     findings: Sequence[Mapping[str, Any]],
 ) -> tuple[Path, Path]:
-    """Preserve the failed candidate and restore both prior release slots."""
+    """Journal a failed candidate, then restore and retain its evidence."""
     failed_candidate = _failed_active_release_path(
         skills_dir, candidate_release_identity
     )
-    os.replace(active, failed_candidate)
-    _sync_directory(skills_dir)
-    _sync_directory(failed_candidate.parent)
-    if active_had_release:
-        if not previous.exists():
-            raise OSError("the prior active release is unavailable")
-        os.replace(previous, active)
-        _sync_directory(skills_dir)
-    if previous_had_release:
-        if displaced_previous is None or not displaced_previous.exists():
-            raise OSError("the prior rollback release is unavailable")
-        os.replace(displaced_previous, previous)
-        _sync_directory(skills_dir)
-    if retained_history is not None and retained_history_created:
-        retained_history.unlink(missing_ok=True)
-        _sync_directory(retained_history.parent)
-    _remove_activation_journal(skills_dir)
     failure_record = failed_candidate.with_name(
         f"{failed_candidate.name}.activation-failure.json"
     )
+    journal_path = _activation_journal_path(skills_dir)
+    journal = _read(journal_path)
+    prepared = {
+        **journal,
+        "phase": "post_activation_failure_prepared",
+        "post_activation_smoke_required": True,
+        "failed_candidate_name": failed_candidate.name,
+        "failure_record_name": failure_record.name,
+        "failed_at": datetime.now(timezone.utc).isoformat(),
+        "candidate_release_identity": dict(candidate_release_identity),
+        "candidate_manifest_sha256": candidate_manifest_sha256,
+        "failure_findings": [dict(item) for item in findings],
+    }
+    prepared["failure_findings_sha256"] = sha256_value(
+        prepared["failure_findings"]
+    )
+    _write_atomic_installation_state(journal_path, prepared)
+    return _resume_failed_activation_recovery(skills_dir, prepared)
+
+
+def _resume_failed_activation_recovery(
+    skills_dir: Path,
+    journal: Mapping[str, Any],
+) -> tuple[Path, Path]:
+    """Idempotently finish rollback and evidence retention before journal removal."""
+    if journal.get("phase") != "post_activation_failure_prepared":
+        raise ValueError("activation failure recovery is not prepared")
+    failed_name = str(journal.get("failed_candidate_name") or "")
+    record_name = str(journal.get("failure_record_name") or "")
+    if (
+        not failed_name
+        or Path(failed_name).name != failed_name
+        or record_name != f"{failed_name}.activation-failure.json"
+    ):
+        raise ValueError("activation failure recovery paths are invalid")
+    failures = skills_dir.parent / "clinical-document-release-failures"
+    failures.mkdir(parents=True, exist_ok=True)
+    failed_candidate = failures / failed_name
+    failure_record = failures / record_name
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / ".clinical-document-generation.previous"
+    candidate_identity = journal.get("candidate_identity")
+    if not (
+        isinstance(candidate_identity, list)
+        and len(candidate_identity) == 2
+        and all(isinstance(part, int) for part in candidate_identity)
+    ):
+        raise ValueError("activation failure candidate identity is invalid")
+    if _filesystem_identity(active) == tuple(candidate_identity):
+        if failed_candidate.exists():
+            raise ValueError("activation failure candidate path is occupied")
+        os.replace(active, failed_candidate)
+        _sync_directory(skills_dir)
+        _sync_directory(failures)
+    elif not failed_candidate.is_dir():
+        raise OSError("the failed activation candidate is unavailable")
+
+    if bool(journal.get("active_had_release")):
+        if not active.exists():
+            if not previous.exists():
+                raise OSError("the prior active release is unavailable")
+            os.replace(previous, active)
+            _sync_directory(skills_dir)
+    elif active.exists():
+        raise OSError("an unexpected active release blocks failure recovery")
+
+    displaced_key = journal.get("displaced_key")
+    displaced = (
+        skills_dir / f".clinical-document-generation.displaced-{displaced_key}"
+        if isinstance(displaced_key, str) and displaced_key
+        else None
+    )
+    if bool(journal.get("previous_had_release")):
+        if not previous.exists():
+            if displaced is None or not displaced.exists():
+                raise OSError("the prior rollback release is unavailable")
+            os.replace(displaced, previous)
+            _sync_directory(skills_dir)
+    history_name = journal.get("history_name")
+    if bool(journal.get("history_created")) and isinstance(history_name, str):
+        history = skills_dir / "release-history" / history_name
+        history.unlink(missing_ok=True)
+        _sync_directory(history.parent)
+
+    release_identity = journal.get("candidate_release_identity")
+    findings = journal.get("failure_findings")
+    if not isinstance(release_identity, Mapping) or not isinstance(findings, list):
+        raise ValueError("activation failure evidence is invalid")
+    if sha256_value(findings) != journal.get("failure_findings_sha256"):
+        raise ValueError("activation failure findings are stale")
     failure_payload = {
         "schema_version": "activation-failure/v1",
         "status": "failed",
-        "failed_at": datetime.now(timezone.utc).isoformat(),
+        "failed_at": journal.get("failed_at"),
         "failed_candidate": str(failed_candidate),
-        "release_identity": dict(candidate_release_identity),
-        "candidate_manifest_sha256": candidate_manifest_sha256,
+        "release_identity": dict(release_identity),
+        "candidate_manifest_sha256": journal.get("candidate_manifest_sha256"),
         "findings": [dict(item) for item in findings],
+        "findings_sha256": journal.get("failure_findings_sha256"),
     }
-    failure_payload["findings_sha256"] = sha256_value(
-        failure_payload["findings"]
-    )
     _write_atomic_installation_state(failure_record, failure_payload)
-    promotion_path = failed_candidate / PROMOTION_RECORD
-    failed_promotion = {
+    _write_atomic_installation_state(failed_candidate / PROMOTION_RECORD, {
         "schema_version": "promoted-release/v1",
         "status": "failed_post_activation_smoke",
-        "git_commit": candidate_release_identity.get("git_commit"),
-        "package_fingerprint": candidate_release_identity.get(
-            "package_fingerprint"
-        ),
+        "git_commit": release_identity.get("git_commit"),
+        "package_fingerprint": release_identity.get("package_fingerprint"),
         "activation_failure_record_sha256": sha256_file(failure_record),
-    }
-    _write_atomic_installation_state(promotion_path, failed_promotion)
+    })
+    _remove_activation_journal(skills_dir)
     return failed_candidate, failure_record
 
 
@@ -1558,6 +1652,9 @@ def _recover_interrupted_activation(
             and all(isinstance(part, int) for part in candidate_identity)
         ):
             raise ValueError("invalid candidate identity")
+        if journal.get("phase") == "post_activation_failure_prepared":
+            _resume_failed_activation_recovery(skills_dir, journal)
+            return None
         candidate_committed = _filesystem_identity(active) == tuple(candidate_identity)
         if candidate_committed:
             if journal.get("post_activation_smoke_required") is True:
@@ -1709,13 +1806,16 @@ def _installation_candidate_integrity(
     candidate: Path,
     *,
     trusted_certification_key_id: str,
+    allow_pending_activation: bool = False,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Revalidate the complete candidate after one executable installer hook."""
     integrity = _manifest_integrity(candidate, allow_runtime_state=True)
     certification, certification_findings = _certification_attestation(
         candidate, trusted_key_id=trusted_certification_key_id,
     )
-    runtime_findings = _installation_pdfium_findings(candidate)
+    runtime_findings = _installation_pdfium_findings(
+        candidate, allow_pending_activation=allow_pending_activation
+    )
     return certification or {}, integrity + certification_findings + runtime_findings
 
 
@@ -1856,9 +1956,9 @@ def install_release(
             for case in certification.get("cases", [])
         })
         activated_at = datetime.now(timezone.utc).isoformat()
-        _write(candidate / PROMOTION_RECORD, {
+        _write_atomic_installation_state(candidate / PROMOTION_RECORD, {
             "schema_version": "promoted-release/v1",
-            "status": "active",
+            "status": "activation_pending",
             "git_commit": manifest.get("git_commit"),
             "package_fingerprint": manifest.get("package_fingerprint"),
             "certification": {
@@ -2028,6 +2128,7 @@ def install_release(
         _, active_integrity_findings = _installation_candidate_integrity(
             active,
             trusted_certification_key_id=trusted_certification_key_id,
+            allow_pending_activation=True,
         )
         post_activation_assurance: dict[str, Any] = {}
         post_smoke_integrity_findings: list[dict[str, Any]] = []
@@ -2040,6 +2141,7 @@ def install_release(
             _, post_smoke_integrity_findings = _installation_candidate_integrity(
                 active,
                 trusted_certification_key_id=trusted_certification_key_id,
+                allow_pending_activation=True,
             )
         assurance_findings = list(post_activation_assurance.get("findings", []))
         if (

@@ -541,15 +541,34 @@ def _write_passing_case_report(
             "bytes": output.stat().st_size,
         })
     outputs = [{**item, "confirmed": True} for item in manifest_outputs]
+    candidate_dir = revision / "candidate"
+    candidate_dir.mkdir(parents=True, exist_ok=True)
+    for output in manifest_outputs:
+        (candidate_dir / Path(output["path"]).name).write_bytes(
+            (run_dir / output["path"]).read_bytes()
+        )
     verification = {}
     content_request = revision / "hermes/verification-requests/content.json"
     content_response = revision / "hermes/verification-responses/content.json"
     content_response.parent.mkdir(parents=True)
     content_request.parent.mkdir(parents=True)
+    content_artifacts = [
+        {
+            "path": f"candidate/{Path(item['path']).name}",
+            "sha256": item["sha256"],
+            **(
+                {"content_sha256": item["sha256"]}
+                if str(item["path"]).endswith(".docx")
+                else {}
+            ),
+        }
+        for item in manifest_outputs
+    ]
     content_request.write_text(json.dumps({
         "request_id": "content",
         "request_sha256": "1" * 64,
         "task": "clinical_content_verification",
+        "artifacts": content_artifacts,
     }), encoding="utf-8")
     content_response.write_text(json.dumps({
         "request_id": "content",
@@ -565,6 +584,7 @@ def _write_passing_case_report(
         "request_sha256": hashlib.sha256(content_request.read_bytes()).hexdigest(),
         "response": content_response.relative_to(revision).as_posix(),
         "response_sha256": hashlib.sha256(content_response.read_bytes()).hexdigest(),
+        "artifacts": content_artifacts,
     }
     render_artifacts = []
     docx_artifacts = {}
@@ -579,8 +599,6 @@ def _write_passing_case_report(
         pdf = revision / f"rendered/{artifact}.pdf"
         page = revision / f"rendered/{artifact}/page-1.png"
         page.parent.mkdir(parents=True)
-        candidate.parent.mkdir(parents=True, exist_ok=True)
-        candidate.write_bytes((run_dir / output["path"]).read_bytes())
         pdf.write_bytes(f"pdf {artifact}\n".encode())
         page.write_bytes(f"page {artifact}\n".encode())
         pages = [{
@@ -875,6 +893,61 @@ def test_complete_real_corpus_report_binds_preflight_candidate_cases_and_gates(t
         manifest_bytes,
     )
     assert evidence_findings == [], json.dumps(evidence_findings, indent=2)
+
+
+def test_five_case_evidence_bundle_accepts_realistic_drafting_volume(
+    tmp_path: Path, monkeypatch
+) -> None:
+    release_root = _use_controlled_certified_release(monkeypatch)
+    preflight = _write_corpus_preflight(tmp_path)
+    reports = [
+        _write_passing_case_report(tmp_path, fixture_id)
+        for fixture_id in CERTIFICATION_CORPUS
+    ]
+    for report_path in reports:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+        run_dir = report_path.parent.parent
+        manifest_path = run_dir / report["bound_evidence"]["delivery_manifest"]["path"]
+        revision = manifest_path.parent
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        accepted = revision / "hermes/accepted"
+        requests = revision / "hermes/accepted-requests"
+        for index in range(2, 52):
+            request = requests / f"draft-{index}.json"
+            response = accepted / f"protocol.section-{index}.json"
+            request_payload = {
+                "request_id": f"draft-{index}",
+                "request_sha256": f"{index:064x}",
+                "task": "section_drafting",
+            }
+            request.write_text(json.dumps(request_payload), encoding="utf-8")
+            response.write_text(json.dumps({
+                **request_payload,
+                "status": "passed",
+                "producer": {"model_id": "gpt-5.6-sol"},
+            }), encoding="utf-8")
+            manifest["drafting_evidence"].append({
+                "path": response.relative_to(revision).as_posix(),
+                "sha256": hashlib.sha256(response.read_bytes()).hexdigest(),
+                "request_id": request_payload["request_id"],
+                "request_sha256": request_payload["request_sha256"],
+                "accepted_request_path": request.relative_to(revision).as_posix(),
+                "accepted_request_file_sha256": hashlib.sha256(request.read_bytes()).hexdigest(),
+                "producer": {"model_id": "gpt-5.6-sol"},
+            })
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        report["bound_evidence"]["delivery_manifest"].update({
+            "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+            "bytes": manifest_path.stat().st_size,
+        })
+        report_path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = _certify_fixture_corpus(
+        reports, release_root=release_root, preflight_path=preflight,
+    )
+
+    assert result["status"] == "passed", json.dumps(result["findings"], indent=2)
+    assert 512 < len(result["evidence_bundle"]["entries"]) <= 1024
 
 
 def test_complete_corpus_rejects_coherently_rehashed_incomplete_managed_identity(

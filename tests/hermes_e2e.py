@@ -34,6 +34,9 @@ if str(SCRIPTS_ROOT) not in sys.path:
 
 from quality import (
     CERTIFICATION_DIAGNOSTIC_TARGET_SECONDS,
+    CERTIFICATION_EVIDENCE_MAX_FILES,
+    CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES,
+    CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES,
     CERTIFICATION_RUNTIME_CEILING_SECONDS,
     branch_acceptance_inventory,
     certification_runtime_classification,
@@ -2425,7 +2428,10 @@ def _release_certification_evidence_bundle(
             raise ValueError("Certification evidence requires source bytes.")
         if path.casefold() in seen_paths:
             raise ValueError(f"Certification evidence path is duplicated: {path}")
-        if len(entries) >= 512 or len(content) > 32 * 1024 * 1024:
+        if (
+            len(entries) >= CERTIFICATION_EVIDENCE_MAX_FILES
+            or len(content) > CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES
+        ):
             raise ValueError("Certification evidence exceeds the governed item limit.")
         seen_paths.add(path.casefold())
         entry = {
@@ -2574,6 +2580,28 @@ def _release_certification_evidence_bundle(
                 f"{fixture_id}-{evidence_id}-response", response_kind, source=response,
                 case_id=fixture_id, path=f"{prefix}/verification/{evidence_id}-response.json",
             )
+            if evidence_id == "clinical_content_verification":
+                for index, artifact in enumerate(evidence.get("artifacts") or []):
+                    artifact_path = str(artifact.get("path") or "")
+                    source = _contained_run_path(
+                        manifest_run_path.parent, artifact_path
+                    )
+                    if (
+                        source is None
+                        or _sha256(source) != artifact.get("sha256")
+                    ):
+                        raise ValueError(
+                            "Certification content evidence is missing or stale: "
+                            f"{fixture_id}:{artifact_path}"
+                        )
+                    add(
+                        f"{fixture_id}-content-artifact-{index}",
+                        "content_artifact",
+                        source=source,
+                        case_id=fixture_id,
+                        path=f"{prefix}/content/{artifact_path}",
+                    )
+                continue
             for artifact in evidence.get("artifacts") or []:
                 artifact_name = str(artifact.get("artifact") or "")
                 pdf_path = next((
@@ -2603,7 +2631,7 @@ def _release_certification_evidence_bundle(
                 case_id=fixture_id, path=f"{prefix}/parent-process-review.json",
             )
     total_bytes = sum(item["bytes"] for item in entries)
-    if total_bytes > 128 * 1024 * 1024:
+    if total_bytes > CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES:
         raise ValueError("Certification evidence exceeds the governed bundle limit.")
     metadata = [{key: value for key, value in item.items() if key != "content_base64"} for item in entries]
     return {

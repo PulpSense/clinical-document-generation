@@ -66,6 +66,33 @@ def _write_release_manifest(skill_root: Path, payload: dict) -> None:
     )
 
 
+def _write_active_runtime_state(skill_root: Path, manifest: dict) -> None:
+    fingerprint = manifest["package_fingerprint"]
+    active_path_smoke = {
+        "status": "passed",
+        "release_identity": {
+            "git_commit": manifest.get("git_commit"),
+            "package_fingerprint": fingerprint,
+        },
+    }
+    assurance_path = skill_root / workflow.INSTALLATION_ASSURANCE
+    assurance_path.write_text(json.dumps({
+        "schema_version": "installation-assurance/v2",
+        "status": "passed",
+        "active_path_smoke": active_path_smoke,
+    }), encoding="utf-8")
+    (skill_root / workflow.PROMOTION_RECORD).write_text(json.dumps({
+        "schema_version": "promoted-release/v1",
+        "status": "active",
+        "package_fingerprint": fingerprint,
+        "activation_commit_point": quality.PROMOTED_ACTIVATION_COMMIT_POINT,
+        "active_path_smoke_sha256": quality.canonical_evidence_sha256(
+            active_path_smoke
+        ),
+        "runtime_assurance_sha256": workflow.sha256_file(assurance_path),
+    }), encoding="utf-8")
+
+
 def _passing_provisioner(candidate: Path) -> dict:
     result = workflow._provision_page_renderer(candidate)
     if result.get("status") != "passed":
@@ -74,6 +101,18 @@ def _passing_provisioner(candidate: Path) -> dict:
         **result,
         "renderer": {"kind": "LibreOffice", "path": "/controlled/soffice"},
     }
+
+
+def _allow_production_files_under_test(monkeypatch) -> None:
+    release_excluded = workflow._release_excluded
+    monkeypatch.setattr(
+        workflow,
+        "_release_excluded",
+        lambda path: path.as_posix() in {
+            "scripts/quality.py",
+            "scripts/workflow.py",
+        } or release_excluded(path),
+    )
 
 
 def _certify_archive(
@@ -399,10 +438,25 @@ def _certify_archive(
                 case_id=fixture,
                 path=f"cases/{fixture}/drafting-response.json",
             )
+            content_artifacts = []
+            for output in output_entries:
+                candidate_path = f"candidate/{Path(output['path']).name}"
+                retained = add(
+                    f"{fixture}-content-{Path(output['path']).name}",
+                    "content_artifact",
+                    f"synthetic certification output:{fixture}:{output['path']}".encode(),
+                    case_id=fixture,
+                    path=f"cases/{fixture}/content/{candidate_path}",
+                )
+                content_artifacts.append({
+                    "path": candidate_path,
+                    "sha256": retained["sha256"],
+                })
             content_request = {
                 "request_id": f"{fixture}-content",
                 "request_sha256": hashlib.sha256(f"{fixture}-content".encode()).hexdigest(),
                 "task": "clinical_content_verification",
+                "artifacts": content_artifacts,
             }
             add(
                 f"{fixture}-content-request",
@@ -921,18 +975,7 @@ def test_promoted_runtime_inventory_cannot_rebind_its_package_fingerprint(
 
     manifest_path = skill_root / "RELEASE-MANIFEST.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    promoted_fingerprint = manifest["package_fingerprint"]
-    assurance_path = skill_root / "INSTALLATION-ASSURANCE.json"
-    assurance_path.write_text(json.dumps({"status": "passed"}), encoding="utf-8")
-    (skill_root / "PROMOTION-RECORD.json").write_text(
-        json.dumps({
-            "schema_version": "promoted-release/v1",
-            "status": "active",
-            "package_fingerprint": promoted_fingerprint,
-            "runtime_assurance_sha256": workflow.sha256_file(assurance_path),
-        }),
-        encoding="utf-8",
-    )
+    _write_active_runtime_state(skill_root, manifest)
 
     entry = manifest["inventory"]["pdf_page_renderer"]["runtime_inventory"][0]
     target = skill_root / "runtime/python" / entry["path"]
@@ -1013,14 +1056,7 @@ def test_later_render_assurance_reports_exact_runtime_integrity_failure(
     manifest = json.loads(
         (skill_root / "RELEASE-MANIFEST.json").read_text(encoding="utf-8")
     )
-    assurance_path = skill_root / "INSTALLATION-ASSURANCE.json"
-    assurance_path.write_text(json.dumps({"status": "passed"}), encoding="utf-8")
-    (skill_root / "PROMOTION-RECORD.json").write_text(json.dumps({
-        "schema_version": "promoted-release/v1",
-        "status": "active",
-        "package_fingerprint": manifest["package_fingerprint"],
-        "runtime_assurance_sha256": workflow.sha256_file(assurance_path),
-    }), encoding="utf-8")
+    _write_active_runtime_state(skill_root, manifest)
     (skill_root / "runtime/python/pypdfium2/__init__.py").unlink()
     monkeypatch.setattr(quality, "__file__", str(skill_root / "scripts/quality.py"))
     monkeypatch.setattr(quality, "renderers", lambda **_kwargs: [office])
@@ -1450,6 +1486,185 @@ def test_successful_activation_persists_bound_active_path_smoke_evidence(tmp_pat
     assert promotion["activation_commit_point"] == result["activation_commit_point"]
     assert promotion["runtime_assurance_sha256"] == workflow.sha256_file(
         assurance_path
+    )
+    assert promotion["active_path_smoke_sha256"] == quality.canonical_evidence_sha256(
+        assurance["active_path_smoke"]
+    )
+
+
+def test_pending_candidate_is_not_usable_through_active_skill_path(
+    tmp_path, monkeypatch
+):
+    _allow_production_files_under_test(monkeypatch)
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    observed_pending = []
+
+    def verify(candidate):
+        if candidate.resolve() == active.resolve():
+            promotion = json.loads(
+                (candidate / workflow.PROMOTION_RECORD).read_text(encoding="utf-8")
+            )
+            observed_pending.append(promotion["status"])
+            integrity = quality._pdfium_runtime_integrity(candidate)
+            assert integrity["status"] == "blocked"
+            with pytest.raises(RuntimeError, match="activation"):
+                workflow._active_release_identity(candidate)
+        return {"status": "passed", "verified_root": str(candidate.resolve())}
+
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=verify,
+        provisioner=_passing_provisioner,
+    )
+
+    assert result["status"] == "passed"
+    assert observed_pending == ["activation_pending"]
+    assert quality._pdfium_runtime_integrity(active)["status"] == "passed"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        ("assurance_status", "renderer.pdfium_active_smoke_assurance_invalid"),
+        ("release_identity", "renderer.pdfium_active_smoke_identity_mismatch"),
+        ("smoke_hash", "renderer.pdfium_active_smoke_hash_mismatch"),
+        ("commit_point", "renderer.pdfium_activation_commit_point_invalid"),
+    ],
+)
+def test_promoted_runtime_requires_semantically_bound_active_smoke(
+    tmp_path, monkeypatch, mutation, expected_code
+):
+    _allow_production_files_under_test(monkeypatch)
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    result = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda candidate: {
+            "status": "passed",
+            "verified_root": str(candidate.resolve()),
+        },
+        provisioner=_passing_provisioner,
+    )
+    assert result["status"] == "passed"
+    active = skills_dir / "clinical-document-generation"
+    assurance_path = active / workflow.INSTALLATION_ASSURANCE
+    promotion_path = active / workflow.PROMOTION_RECORD
+    assurance = json.loads(assurance_path.read_text(encoding="utf-8"))
+    promotion = json.loads(promotion_path.read_text(encoding="utf-8"))
+
+    if mutation == "assurance_status":
+        assurance["status"] = "staging_passed"
+    elif mutation == "release_identity":
+        assurance["active_path_smoke"]["release_identity"][
+            "package_fingerprint"
+        ] = "0" * 64
+    elif mutation == "smoke_hash":
+        promotion["active_path_smoke_sha256"] = "0" * 64
+    elif mutation == "commit_point":
+        promotion["activation_commit_point"] = "pre_smoke"
+    assurance_path.write_text(json.dumps(assurance), encoding="utf-8")
+    if mutation != "smoke_hash":
+        promotion["active_path_smoke_sha256"] = quality.canonical_evidence_sha256(
+            assurance["active_path_smoke"]
+        )
+    promotion["runtime_assurance_sha256"] = workflow.sha256_file(assurance_path)
+    promotion_path.write_text(json.dumps(promotion), encoding="utf-8")
+
+    integrity = quality._pdfium_runtime_integrity(active)
+
+    assert integrity["status"] == "blocked"
+    assert integrity["finding"]["code"] == expected_code
+
+
+@pytest.mark.parametrize("failure_boundary", ["failure_record", "failed_promotion"])
+def test_failed_active_smoke_recovery_evidence_is_crash_safe(
+    tmp_path, monkeypatch, failure_boundary
+):
+    _allow_production_files_under_test(monkeypatch)
+    archive_path = tmp_path / "release.zip"
+    package_release(ROOT, archive_path)
+    _certify_archive(archive_path)
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    active.mkdir(parents=True)
+    (active / "marker.txt").write_text("previous verified release", encoding="utf-8")
+    real_write = workflow._write_atomic_installation_state
+    injected = []
+
+    def fail_at_boundary(path, value):
+        is_target = (
+            failure_boundary == "failure_record"
+            and path.name.endswith(".activation-failure.json")
+            or failure_boundary == "failed_promotion"
+            and path.name == workflow.PROMOTION_RECORD
+            and value.get("status") == "failed_post_activation_smoke"
+        )
+        if is_target and not injected:
+            injected.append(str(path))
+            raise OSError(f"injected {failure_boundary} interruption")
+        real_write(path, value)
+
+    monkeypatch.setattr(workflow, "_write_atomic_installation_state", fail_at_boundary)
+    first = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda candidate: (
+            {"status": "blocked", "findings": [{"issue": "active smoke failed"}]}
+            if candidate.resolve() == active.resolve()
+            else {"status": "passed"}
+        ),
+        provisioner=_passing_provisioner,
+    )
+
+    assert first["stage"] == "activation_recovery"
+    assert injected
+    assert (active / "marker.txt").read_text(encoding="utf-8") == (
+        "previous verified release"
+    )
+    journal = skills_dir / ".clinical-document-generation.activation.json"
+    assert journal.is_file()
+
+    monkeypatch.setattr(workflow, "_write_atomic_installation_state", real_write)
+    rerun = install_release(
+        archive_path,
+        skills_dir,
+        hermes_config_path=_hermes_config(skills_dir),
+        trusted_certification_key_id=TEST_CERTIFICATION_KEY_ID,
+        verifier=lambda _candidate: {"status": "passed"},
+        provisioner=lambda _candidate: {
+            "status": "blocked",
+            "findings": [{"issue": "stop after recovery"}],
+        },
+    )
+
+    assert rerun["stage"] == "provision"
+    assert not journal.exists()
+    failures = list((tmp_path / "clinical-document-release-failures").glob(
+        "*.activation-failure.json"
+    ))
+    assert len(failures) == 1
+    failure_record = json.loads(failures[0].read_text(encoding="utf-8"))
+    failed_candidate = Path(failure_record["failed_candidate"])
+    promotion = json.loads(
+        (failed_candidate / workflow.PROMOTION_RECORD).read_text(encoding="utf-8")
+    )
+    assert promotion["status"] == "failed_post_activation_smoke"
+    assert promotion["activation_failure_record_sha256"] == workflow.sha256_file(
+        failures[0]
     )
 
 

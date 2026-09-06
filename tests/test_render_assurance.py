@@ -51,12 +51,27 @@ def test_release_owned_pdfium_is_the_only_page_renderer(tmp_path):
     (tmp_path / "RELEASE-MANIFEST.json").write_text(
         json.dumps(manifest), encoding="utf-8",
     )
+    active_path_smoke = {
+        "status": "passed",
+        "release_identity": {
+            "git_commit": None,
+            "package_fingerprint": package_fingerprint,
+        },
+    }
     assurance_path = tmp_path / "INSTALLATION-ASSURANCE.json"
-    assurance_path.write_text(json.dumps({"status": "passed"}), encoding="utf-8")
+    assurance_path.write_text(json.dumps({
+        "schema_version": "installation-assurance/v2",
+        "status": "passed",
+        "active_path_smoke": active_path_smoke,
+    }), encoding="utf-8")
     (tmp_path / "PROMOTION-RECORD.json").write_text(json.dumps({
         "schema_version": "promoted-release/v1",
         "status": "active",
         "package_fingerprint": package_fingerprint,
+        "activation_commit_point": quality.PROMOTED_ACTIVATION_COMMIT_POINT,
+        "active_path_smoke_sha256": quality.canonical_evidence_sha256(
+            active_path_smoke
+        ),
         "runtime_assurance_sha256": hashlib.sha256(
             assurance_path.read_bytes()
         ).hexdigest(),
