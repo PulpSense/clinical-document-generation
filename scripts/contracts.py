@@ -719,42 +719,77 @@ def _sample_size_evidence_rows(reference: Mapping[str, Any]) -> list[Mapping[str
     return [row for _path, _index, row in _sample_size_evidence_records(reference)]
 
 
-def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Canonical ordered visits for both tables; never turn assessments into visits.
+def normalized_visit_records(
+    reference: Mapping[str, Any], *, conflicts: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Reconcile explicit ordered table visits with structured procedure records.
 
-    Prefer structured visit_schedule, otherwise visit_schedule_table. Preserve
-    explicit identifiers and extra source fields; positional labels are generated
-    only for actual structured visits, without changing the approved reference.
+    Enrich only unique, compatible source identities. Preserve unmatched visits
+    and supplied identifiers verbatim; never turn narrative assessments into visits.
     """
-    for path in ("procedures.visit_schedule", "procedures.visit_schedule_table"):
+    def label(row: Mapping[str, Any]) -> str:
+        return str(row.get("visit") or row.get("visitName") or "").strip().casefold()
+
+    def timing(row: Mapping[str, Any]) -> str:
+        return str(row.get("timing") or row.get("visitWindow") or "").strip()
+
+    def procedures(row: Mapping[str, Any]) -> list[str]:
+        raw = row.get("procedures", [])
+        return ([str(item).strip() for item in raw if meaningful(item)] if isinstance(raw, list)
+                else [item.strip() for item in re.split(r"[;\n]", str(raw or "")) if item.strip()])
+
+    groups = []
+    for path in ("procedures.visit_schedule_table", "procedures.visit_schedule"):
         raw = get_path(reference, path, [])
-        visits = [row for row in raw if isinstance(row, Mapping) and any(
+        groups.append([copy.deepcopy(dict(row)) for row in raw if isinstance(row, Mapping) and any(
             meaningful(row.get(key)) for key in ("visit", "visitName", "visitNumber", "timing", "visitWindow")
-        )] if isinstance(raw, list) else []
-        if not visits:
+        )] if isinstance(raw, list) else [])
+    visits = list(groups[0])
+    for row in groups[1]:
+        if conflicts is not None:
+            for item in groups[0]:
+                left, right = item.get("visitNumber"), row.get("visitNumber")
+                if not (meaningful(left) and meaningful(right) and label(item) and label(row)):
+                    continue
+                if (label(item) == label(row) and left != right) or (left == right and label(item) != label(row)):
+                    conflicts.append({"category": "source-evidence", "field": "procedures.visit_schedule.visitNumber",
+                                      "issue": f"Conflicting supplied visit identities across schedule sources: {left!r} ({label(item)}) and {right!r} ({label(row)}).",
+                                      "required": "Reconcile approved visit identifiers without normalizing or renumbering them.",
+                                      "source_values": {"procedures.visit_schedule_table": copy.deepcopy(get_path(reference, "procedures.visit_schedule_table")),
+                                                        "procedures.visit_schedule": copy.deepcopy(get_path(reference, "procedures.visit_schedule"))}})
+        candidates = [item for item in groups[0] if label(row) and label(item) == label(row)]
+        unique = sum(label(item) == label(row) for item in groups[1]) == 1
+        match = candidates[0] if unique and len(candidates) == 1 else None
+        if match is not None and (
+            (meaningful(row.get("visitNumber")) and meaningful(match.get("visitNumber"))
+             and row["visitNumber"] != match["visitNumber"])
+            or (timing(row) and timing(match) and timing(row) != timing(match))
+        ):
+            match = None
+        if match is None:
+            visits.append(row)
             continue
-        result = []
-        used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
-        for index, row in enumerate(visits, 1):
-            record = copy.deepcopy(dict(row))
-            if meaningful(row.get("visitNumber")):
-                number = row["visitNumber"]
-            else:
-                while str(index) in used_numbers:
-                    index += 1
-                number = str(index)
-                used_numbers.add(number)
-            raw_procedures = row.get("procedures", [])
-            procedures = ([str(item).strip() for item in raw_procedures if meaningful(item)]
-                          if isinstance(raw_procedures, list) else
-                          [item.strip() for item in re.split(r"[;\n]", str(raw_procedures or "")) if item.strip()])
-            record.update(visitNumber=number,
-                          visit=str(row.get("visit") or row.get("visitName") or f"Visit {number}").strip(),
-                          timing=str(row.get("timing") or row.get("visitWindow") or "").strip(),
-                          procedures=procedures)
-            result.append(record)
-        return result
-    return []
+        merged_procedures = list(dict.fromkeys([*procedures(match), *procedures(row)]))
+        for key, value in row.items():
+            if not meaningful(match.get(key)):
+                match[key] = copy.deepcopy(value)
+        match["procedures"] = merged_procedures
+    result = []
+    used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
+    for index, row in enumerate(visits, 1):
+        record = copy.deepcopy(row)
+        if meaningful(row.get("visitNumber")):
+            number = row["visitNumber"]
+        else:
+            while str(index) in used_numbers:
+                index += 1
+            number = str(index)
+            used_numbers.add(number)
+        record.update(visitNumber=number,
+                      visit=str(row.get("visit") or row.get("visitName") or f"Visit {number}").strip(),
+                      timing=timing(row), procedures=procedures(row))
+        result.append(record)
+    return result
 
 
 def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
@@ -849,10 +884,10 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         for leaf in leaves:
             if leaf not in supplemental_notes:
                 supplemental_notes.append(leaf)
-            for clause in re.split(r"(?<=[.!?;])\s+|,\s*|\b(?:while|whereas|but|and)\b", leaf, flags=re.I):
+            for clause in re.split(r";\s*|(?<=[.!?])\s+|,\s*|\b(?:while|whereas|but|and)\b", leaf, flags=re.I):
                 if (re.search(r"\b(?:adverse events?|AEs?)\b", clause, re.I)
                         and re.search(r"\b(?:each|every)\s+(?:study\s+)?contact\b", clause, re.I)
-                        and not re.search(r"\b(?:not|no|never|without)\b", clause, re.I)):
+                        and not re.search(r"\b(?:not|no|never|without|rather than|instead of)\b", clause, re.I)):
                     safety_inventory.append({"activity": clause, "source_path": path})
     if safety_inventory:
         safety_label = "Adverse event review at each contact (study-specific review after consent)"
@@ -1008,6 +1043,9 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         r"[;!?]\s*|\.(?!\d)\s*|(?:,\s*|\s+and\s+)(?=(?:interim|final)\b)", text, flags=re.I)
                  for match in relative_pattern.finditer(clause)]
     for clause, relative in relatives:
+        # Multiple relationships in unsplit prose cannot safely share one event.
+        if len(list(relative_pattern.finditer(clause))) != 1:
+            continue
         stated = _duration_days(relative.group(1))
         points = []
         for visit in visits:
@@ -1230,6 +1268,7 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                                  "required": "Reconcile duplicate approved visit identifiers; do not silently renumber.",
                                  "source_values": {path: copy.deepcopy(raw_visits)}})
             seen_ids.add(identifier)
+    normalized_visit_records(reference, conflicts=findings)
     findings.extend(timeline_findings(reference))
     if branch != "Retrospective":
         choice = str(get_path(reference, "meta.icf_template", "")).strip().casefold()

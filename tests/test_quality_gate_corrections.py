@@ -44,7 +44,7 @@ def toc_docx(path, cached_page=2):
 def test_final_toc_audit_uses_final_pdf_not_renderer_mapping(tmp_path):
     docx, pdf = tmp_path / "protocol.docx", tmp_path / "protocol.pdf"
     toc_docx(docx)
-    write_pdf(pdf, [[("TABLE OF CONTENTS", 72, 700), ("1. PURPOSE 2", 72, 670)],
+    write_pdf(pdf, [[("TABLE OF CONTENTS", 72, 700), ("TABLE OF CONTENTS 1", 72, 685), ("1. PURPOSE 2", 72, 670)],
                     [("1. PURPOSE", 72, 700), ("Study purpose body.", 72, 675)]])
     original = docx.read_bytes(), pdf.read_bytes()
     assert quality.audit_final_toc_destinations(docx, pdf)["status"] == "passed"

@@ -143,7 +143,7 @@ def test_sponsor_funding_composition_preserves_distinct_address_and_clarificatio
     separate = doc.add_paragraph('{fundingSourceName}')
     rendering._replace_paragraph(combined, fields)
     rendering._replace_paragraph(separate, fields)
-    assert combined.text == '1 Example Street\nFunding source: Grant support; 2 Example Street'
+    assert combined.text == '1 Example Street\nFunding source: Sponsor; Grant support; 2 Example Street'
     assert separate.text == 'Example Foundation'
 
 

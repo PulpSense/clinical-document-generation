@@ -2885,9 +2885,18 @@ def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, A
                 matches.append(number)
         cached = cache.get(marker, [])
         rendered = matches[0] if len(matches) == 1 else None
-        status = "unknown" if rendered is None else (
-            "passed" if cached == [rendered] else "mismatch")
+        # Independently read the page number readers actually see in the PDF
+        # TOC. Unextractable/wrapped rows remain unknown, never inferred from
+        # the DOCX cache or the destination heading alone.
+        visible = [int(match[1]) for lines in page_lines for line in lines
+                   if (match := re.fullmatch(re.escape(marker) + r" (\d+)", line))]
+        observed = [*cached, *visible, *([rendered] if rendered is not None else [])]
+        status = ("mismatch" if len(set(observed)) > 1 else
+                  "passed" if rendered is not None and cached == visible == [rendered]
+                  else "unknown")
         row = {"heading": heading, "cached_page": cached[0] if len(cached) == 1 else None,
+               "pdf_toc_page": visible[0] if len(visible) == 1 else None,
+               "pdf_toc_candidates": visible,
                "rendered_page": rendered, "rendered_candidates": matches, "status": status}
         destinations.append(row)
         if status == "mismatch":
@@ -2895,7 +2904,7 @@ def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, A
                              "artifact": docx_path.stem, "check": "toc_mismatch",
                              "element": heading, "page": rendered,
                              "target_ids": [f"layout:{docx_path.stem}"],
-                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, rendered page {rendered}."})
+                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, visible PDF TOC {visible}, rendered page {rendered}."})
     status = "mismatch" if findings else ("passed" if destinations and all(
         row["status"] == "passed" for row in destinations) else "unknown")
     return {"status": status, "destinations": destinations, "findings": findings}
@@ -2931,6 +2940,11 @@ def _pdf_body_pages(path: Path, *, docx_path: Path | None = None) -> list[dict[s
 
             def operand(operator: bytes, operands: Any, cm: Any, tm: Any) -> None:
                 nonlocal graphics_in_body
+                if operator == b"INLINE IMAGE":
+                    # Retain graphical uncertainty rather than declaring an
+                    # image-only page blank (inline image adapters vary).
+                    graphics_in_body = True
+                    return
                 if operator != b"Do":
                     return
                 objects = page.get("/Resources", {}).get("/XObject", {})

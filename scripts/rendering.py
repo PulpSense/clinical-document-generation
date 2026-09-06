@@ -360,7 +360,9 @@ def _replace_paragraph(paragraph, fields: Mapping[str, str]) -> None:
         funder = fields.get("fundingSourceName", "")
         same_entity = bool(funder) and funder.casefold() == sponsor_name.casefold()
         details = [fields.get("fundingSourceClarification", "")]
-        if funder and not same_entity:
+        if same_entity:
+            details.insert(0, "Sponsor")
+        elif funder:
             details.append(funder)
         address = fields.get("fundingSourceAdress", "")
         if address and address.casefold() != fields.get("sponsortAdress", "").casefold():
@@ -1976,6 +1978,8 @@ def _normalize_icf_preferences(document: Document) -> None:
     for paragraph in list(block):
         if not paragraph.text.strip() and not paragraph._p.xpath(
             './/w:br | .//w:sectPr | .//w:pBdr | .//w:drawing | .//w:fldChar | .//w:tab'
+            ' | .//w:fldSimple | .//w:u | .//w:pageBreakBefore | .//w:pict | .//w:object'
+            ' | .//w:sym | .//w:footnoteReference | .//w:endnoteReference | .//w:instrText'
         ):
             paragraph._p.getparent().remove(paragraph._p)
             block.remove(paragraph)
@@ -2032,7 +2036,7 @@ def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
             table._tbl.append(copy.deepcopy(template))
             record = item if isinstance(item, Mapping) else {"visitName": item}
             values = (
-                _text(record.get("visitNumber")),
+                str(record["visitNumber"]),
                 _text(record.get("visitName") or record.get("visit")),
                 _text(record.get("visitWindow") or record.get("timing")),
                 _text(record.get("CRFnumber")),
