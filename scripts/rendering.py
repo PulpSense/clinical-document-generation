@@ -177,17 +177,44 @@ def _facility_address(facility: Mapping[str, Any]) -> str:
     if nested:
         parts = [nested.get("line1") or nested.get("address_line1") or nested.get("street") or nested.get("address"),
                  nested.get("line2") or nested.get("address_line2")]
-        result = ", ".join(_text(part) for part in parts if _text(part))
+        street_parts = [_text(part) for part in parts if _text(part)]
+        result = ", ".join(street_parts)
+        street_segment_count = len(street_parts)
     else:
         result = _address(address)
+        street_segment_count = 1 if result else 0
     for key in ("city", "state", "country", "zip"):
         component = _text(nested.get(key) or facility.get(key))
         if key == "zip" and not component:
             component = next((_text(source.get(alias)) for source in (nested, facility)
                               for alias in ("postal_code", "postalCode", "postcode", "zip_code")
                               if _text(source.get(alias))), "")
-        complete_components = {part.strip().casefold() for part in re.split(r"[,;\n]", result)}
-        if component and component.casefold() not in complete_components:
+        def normalize_component(value: str) -> str:
+            return " ".join(
+                "".join(character.casefold() if character.isalnum() else " " for character in value).split()
+            )
+
+        normalized_segments = [
+            normalize_component(part)
+            for part in re.split(r"[,;\n]", result)
+            if part.strip()
+        ]
+        normalized_component = normalize_component(component)
+        present = bool(normalized_component) and normalized_component in normalized_segments
+        if (
+            normalized_component
+            and not present
+            and key in {"state", "zip"}
+            and len(normalized_segments) > street_segment_count
+        ):
+            present = any(
+                re.search(
+                    rf"(?<!\w){re.escape(normalized_component)}(?!\w)",
+                    segment,
+                )
+                for segment in normalized_segments[street_segment_count:]
+            )
+        if component and not present:
             result = ", ".join(filter(None, (result, component)))
     return result
 
@@ -491,7 +518,7 @@ def _normalize_protocol_heading_spacing(document: Document) -> None:
             paragraph.paragraph_format.space_after = Pt(6)
 
 
-def _normalize_protocol_summary_table(document: Document) -> None:
+def _normalize_protocol_summary_table(document: Document, reference: Mapping[str, Any]) -> None:
     labels = {
         "objective": "Objective",
         "test article(s)": "Test Article(s)",
@@ -499,6 +526,7 @@ def _normalize_protocol_summary_table(document: Document) -> None:
         "sample size": "Sample size",
         "study population": "Study Population",
         "number of sites": "Number of sites",
+        "study sites": "Study sites",
         "study design": "Study Design",
         "masking": "Masking",
         "variables": "Variables",
@@ -512,6 +540,28 @@ def _normalize_protocol_summary_table(document: Document) -> None:
     ), None)
     if table is None:
         return
+    sites_value = reference.get("sites")
+    sites = sites_value if isinstance(sites_value, list) else []
+    site_lines = []
+    for site in sites:
+        if not isinstance(site, Mapping):
+            continue
+        facility_value = site.get("facility")
+        if not isinstance(facility_value, Mapping):
+            continue
+        line = ", ".join(filter(None, (_text(facility_value.get("name")), _facility_address(facility_value))))
+        if line:
+            site_lines.append(line)
+    site_row = next((row for row in table.rows if row.cells[0].text.strip().casefold() == "study sites"), None)
+    if site_lines and site_row is None:
+        number_row = next((row for row in table.rows if row.cells[0].text.strip().casefold() == "number of sites"), None)
+        if number_row is not None:
+            clone = copy.deepcopy(number_row._tr)
+            number_row._tr.addnext(clone)
+            site_row = table.rows[list(table._tbl.tr_lst).index(clone)]
+    if site_row is not None:
+        _set_paragraph_text(site_row.cells[0].paragraphs[0], "Study sites")
+        _set_paragraph_text(site_row.cells[1].paragraphs[0], "\n".join(site_lines))
     optional_labels = {"control article(s)", "masking"}
     for row in list(table.rows):
         paragraph = row.cells[0].paragraphs[0]
@@ -1728,6 +1778,18 @@ def _replace_icf_section_body(
     _insert_icf_blocks(document, heading._p, blocks, exemplar)
 
 
+def _study_doctor_contact(reference: Mapping[str, Any]) -> str:
+    investigator = get_path(reference, "parties.principal_investigator", {}) or {}
+    if not isinstance(investigator, Mapping):
+        return ""
+    phone = _text(investigator.get("phone"))
+    if not phone:
+        return ""
+    name = _text(investigator.get("name"))
+    doctor = f"the study doctor, {name}," if name else "the study doctor"
+    return f"For medical concerns, contact {doctor} at {phone}."
+
+
 def _normalize_advarra_contact_sections(document: Document, reference: Mapping[str, Any], boilerplate: Mapping[str, str]) -> None:
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
@@ -1735,6 +1797,7 @@ def _normalize_advarra_contact_sections(document: Document, reference: Mapping[s
     irb_details = ", ".join(filter(None, (_text(irb.get("name")), _text(irb.get("phone")), _text(irb.get("email")))))
     contact = "For questions about this study, contact the study coordinator or study staff"
     contact += f" at {coordinator_phone}." if coordinator_phone else "."
+    doctor_contact = _study_doctor_contact(reference)
     rights = "For questions about your rights as a research participant, contact"
     rights += f" {irb_details}." if irb_details else " the reviewing institutional review board."
     _replace_icf_section_body(
@@ -1746,7 +1809,7 @@ def _normalize_advarra_contact_sections(document: Document, reference: Mapping[s
     _replace_icf_section_body(
         document,
         "WHOM TO CONTACT ABOUT THIS STUDY",
-        [(contact, False), (rights, False)],
+        [(text, False) for text in (contact, doctor_contact, rights) if text],
         sterling=False,
     )
     _replace_icf_section_body(
@@ -1791,10 +1854,11 @@ def _normalize_sterling_retained_sections(
     irb_contact = "If you have questions about your rights as a research participant, contact"
     irb_details = ", ".join(filter(None, [_text(irb.get("name")), _text(irb.get("phone")), _text(irb.get("email"))]))
     irb_contact += f" {irb_details}." if irb_details else " the reviewing institutional review board."
+    doctor_contact = _study_doctor_contact(reference)
     _replace_sterling_section_body(
         document,
         "QUESTIONS",
-        [(research_contact, False), (irb_contact, False)],
+        [(text, False) for text in (research_contact, doctor_contact, irb_contact) if text],
     )
 
 
@@ -2744,7 +2808,7 @@ def _template_document(
         _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
         _sample_size_evidence_table(document, reference, authority_path)
         _normalize_protocol_title_controls(document, reference)
-        _normalize_protocol_summary_table(document)
+        _normalize_protocol_summary_table(document, reference)
         _ensure_protocol_references(document, authority, reference)
         _split_heading_content(document)
         _replace_static_toc(document)

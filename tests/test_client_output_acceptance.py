@@ -536,6 +536,140 @@ def test_sterling_icf_does_not_duplicate_flat_site_address(tmp_path):
     assert "Boston, MA, United States" in visible
 
 
+def test_protocol_general_information_preserves_every_supplied_site_and_full_address(tmp_path):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+    reference["sites"] = [
+        {
+            "site_id": "01",
+            "facility": {
+                "name": "Triangle Orthopedic Research Center",
+                "address": "1010 Recovery Drive",
+                "city": "Raleigh",
+                "state": "NC",
+                "country": "United States",
+            },
+        },
+        {
+            "site_id": "02",
+            "facility": {
+                "name": "Piedmont Joint Health Institute",
+                "address": "880 Clinical Avenue",
+                "city": "Greensboro",
+                "state": "NC",
+                "country": "United States",
+            },
+        },
+        {
+            "site_id": "03",
+            "facility": {
+                "name": "Complete Address Clinic",
+                "address": "101 Main St, Raleigh, NC 27601, United States",
+                "city": "Raleigh",
+                "state": "NC",
+                "zip": "27601",
+                "country": "United States",
+            },
+        },
+        {
+            "site_id": "04",
+            "facility": {
+                "name": "Orange Recovery Center",
+                "address": "100 Orange Street",
+                "city": "Orange",
+                "state": "CA",
+                "zip": "92868",
+                "country": "United States",
+            },
+        },
+        {
+            "site_id": "05",
+            "facility": {
+                "name": "国际康复中心",
+                "address": "100 Main Street",
+                "city": "北京",
+                "state": "北京市",
+                "country": "中国",
+            },
+        },
+        {
+            "site_id": "06",
+            "facility": {
+                "name": "Capital Recovery Center",
+                "address": {"line1": "200 Main Street", "line2": "Suite CA"},
+                "city": "Sacramento",
+                "state": "CA",
+                "zip": "95814",
+                "country": "United States",
+            },
+        },
+    ]
+    reference["design"]["number_of_sites"] = 6
+    original = json.loads(json.dumps(reference))
+
+    render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+    )
+
+    document = Document(tmp_path / "candidate/protocol.docx")
+    summary = next(
+        table for table in document.tables
+        if table.rows and table.rows[0].cells[0].text.strip() == "Objective"
+    )
+    visible_summary = "\n".join(cell.text for row in summary.rows for cell in row.cells)
+    assert "Triangle Orthopedic Research Center, 1010 Recovery Drive, Raleigh, NC, United States" in visible_summary
+    assert "Piedmont Joint Health Institute, 880 Clinical Avenue, Greensboro, NC, United States" in visible_summary
+    complete = "Complete Address Clinic, 101 Main St, Raleigh, NC 27601, United States"
+    site_row = next(row for row in summary.rows if row.cells[0].text.strip() == "Study sites")
+    assert site_row.cells[1].text.splitlines() == [
+        "Triangle Orthopedic Research Center, 1010 Recovery Drive, Raleigh, NC, United States",
+        "Piedmont Joint Health Institute, 880 Clinical Avenue, Greensboro, NC, United States",
+        complete,
+        "Orange Recovery Center, 100 Orange Street, Orange, CA, United States, 92868",
+        "国际康复中心, 100 Main Street, 北京, 北京市, 中国",
+        "Capital Recovery Center, 200 Main Street, Suite CA, Sacramento, CA, United States, 95814",
+    ]
+    assert reference == original
+
+
+@pytest.mark.parametrize("icf_template", ["Advarra", "Sterling"])
+def test_icf_contacts_preserve_supplied_study_doctor_phone_with_coordinator_and_irb(tmp_path, icf_template):
+    reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = icf_template
+    reference["parties"]["principal_investigator"] = {
+        "name": "Elena Marquez",
+        "title": "MD",
+        "phone": "919-555-0140",
+    }
+    reference["parties"]["study_coordinator"]["business_phone"] = "919-555-0141"
+    reference["parties"]["irb"]["phone"] = "800-555-0188"
+    reference["risks_benefits"]["injury_handling"] = (
+        "For an immediate medical concern, participants should seek appropriate clinical care "
+        "and contact the study doctor."
+    )
+    original = json.loads(json.dumps(reference))
+
+    render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"icf"},
+    )
+
+    visible = " ".join(_visible_text(Document(tmp_path / "candidate/icf.docx")).split())
+    assert "Elena Marquez" in visible
+    assert "919-555-0140" in visible
+    assert "919-555-0141" in visible
+    assert "800-555-0188" in visible
+    assert "24-hour" not in visible.casefold()
+    assert "around-the-clock" not in visible.casefold()
+    assert reference == original
+
+
 def test_sterling_icf_uses_real_page_and_page_count_fields_in_every_footer(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["meta"]["icf_template"] = "Sterling"

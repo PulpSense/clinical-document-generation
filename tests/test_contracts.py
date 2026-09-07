@@ -466,6 +466,7 @@ def test_outcome_statistics_in_sample_size_evidence_are_not_mistaken_for_planned
 
 def test_schedule_table_preserves_distinct_visit_name_and_timing():
     reference = fixture("prospective-acceptance-source.json")
+    reference["procedures"].pop("visit_schedule_table", None)
     reference["procedures"]["visit_schedule"] = [{
         "visit": "Telephone follow-up",
         "timing": "Month 3",
