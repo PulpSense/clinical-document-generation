@@ -6503,7 +6503,26 @@ def _finalize_recovery_attempt(
 ) -> list[dict[str, Any]]:
     """Measure a recovery action and rebind its immutable attempt-journal entry."""
     manifest_path = attempt_dir / "attempt-manifest.json"
-    original_manifest = _read(manifest_path)
+    journal_path = revision_dir / "gate-attempt-journal.json"
+    original_journal = _read(journal_path)
+    _validate_expected_gate_attempts(
+        revision_dir,
+        original_journal.get("entries") or [],
+        require_measured=False,
+    )
+    relative = attempt_dir.relative_to(revision_dir).as_posix()
+    matching_entries = [
+        entry for entry in original_journal.get("entries", [])
+        if entry.get("path") == relative
+    ]
+    manifest_bytes = manifest_path.read_bytes()
+    if (
+        len(matching_entries) != 1
+        or hashlib.sha256(manifest_bytes).hexdigest()
+        != matching_entries[0].get("attempt_manifest_sha256")
+    ):
+        raise ValueError("Recovery attempt manifest is untracked or stale.")
+    original_manifest = json.loads(manifest_bytes)
     manifest = dict(original_manifest)
     recovery_actions = []
     for raw_action in manifest.get("recovery_actions", []):
@@ -6530,10 +6549,7 @@ def _finalize_recovery_attempt(
             **action_changed,
         })
     manifest["recovery_actions"] = recovery_actions
-    journal_path = revision_dir / "gate-attempt-journal.json"
-    original_journal = _read(journal_path)
     journal = copy.deepcopy(original_journal)
-    relative = attempt_dir.relative_to(revision_dir).as_posix()
     for entry in journal.get("entries", []):
         if entry.get("path") == relative:
             entry["attempt_manifest_sha256"] = hashlib.sha256(
@@ -6873,6 +6889,46 @@ def _quality_retry(
             "unrouted_finding": item,
         }, "verifier_transient"))
     findings = governed_findings
+    generation_state = working_reference.setdefault("generation", {})
+    # Findings returned after a persisted recovery plan are the measured outcome
+    # of that plan. Finalize its actions before any terminal return or a later
+    # archive, while the newly archived attempt (if any) remains pending.
+    if generation_state.get("pending_recovery_attempts"):
+        pending_entries = list(generation_state.get("gate_attempts") or [])
+        _validate_expected_gate_attempts(
+            revision_dir,
+            pending_entries,
+            require_measured=False,
+        )
+        listed_pending = {str(item) for item in generation_state.get("pending_recovery_attempts") or []}
+        actual_pending: set[str] = set()
+        expected_paths = {str(entry.get("path") or "") for entry in pending_entries}
+        for entry in pending_entries:
+            relative_text = str(entry.get("path") or "")
+            manifest = _read(revision_dir / relative_text / "attempt-manifest.json")
+            actions = manifest.get("recovery_actions")
+            if isinstance(actions, list) and any(
+                isinstance(action, Mapping) and action.get("outcome_status") == "pending"
+                for action in actions
+            ):
+                actual_pending.add(relative_text)
+        if listed_pending != actual_pending:
+            raise ValueError("Pending recovery attempt inventory is incomplete or stale.")
+        for relative_text in listed_pending:
+            relative = PurePosixPath(relative_text)
+            if (
+                relative.is_absolute()
+                or ".." in relative.parts
+                or relative.as_posix() != relative_text
+                or relative_text not in expected_paths
+            ):
+                raise ValueError("Pending recovery attempt path is invalid or untracked.")
+        _complete_pending_recovery_attempts(
+            revision_dir,
+            reference_path,
+            working_reference,
+            require_candidate_change=False,
+        )
     structural = [item for item in findings if item.get("recovery_class") == "document_structure_defect"]
     if structural:
         return _repair_block(
@@ -6916,7 +6972,6 @@ def _quality_retry(
             }, "verifier_transient")
             for error in explicit_route_errors
         ]
-    generation_state = working_reference.setdefault("generation", {})
     expected_gate_attempts = list(generation_state.get("gate_attempts") or [])
     _validate_expected_gate_attempts(revision_dir, expected_gate_attempts)
     recovery_attempt_dir = _archive_failed_attempt(revision_dir, stage, findings)
