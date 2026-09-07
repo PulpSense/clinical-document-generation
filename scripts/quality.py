@@ -4096,6 +4096,52 @@ def pending_verifications(revision_dir: Path) -> list[Path]:
     return pending
 
 
+def _is_publication_warning(finding: Mapping[str, Any]) -> bool:
+    return finding.get("publication_disposition") == "warning"
+
+
+def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return [dict(finding) for finding in findings if not _is_publication_warning(finding)]
+
+
+def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return [dict(finding) for finding in findings if _is_publication_warning(finding)]
+
+
+def _safety_critical_content_target(target: str) -> bool:
+    return any(
+        token in re.split(r"[^a-z0-9]+", target.casefold())
+        for token in (
+            "adverse", "contraindication", "emergency", "harm", "injury",
+            "pregnancy", "risk", "risks", "safety", "sideeffect", "sideeffects",
+        )
+    )
+
+
+def _governed_content_omission(
+    finding: Mapping[str, Any],
+    targets: Iterable[str],
+) -> bool:
+    normalized_targets = [str(target) for target in targets]
+    return (
+        _text(finding.get("category")).casefold() == "content"
+        and _text(finding.get("check")).casefold() == "substantive"
+        and bool(normalized_targets)
+        and not any(_safety_critical_content_target(target) for target in normalized_targets)
+    )
+
+
+def _notes_cite_finding(notes: Any, finding_id: str) -> bool:
+    if not re.fullmatch(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*", finding_id):
+        return False
+    return bool(
+        re.search(
+            rf"(?<![A-Za-z0-9_-]){re.escape(finding_id)}(?![A-Za-z0-9_-])",
+            _text(notes),
+        )
+    )
+
+
 def verification_response_is_complete(revision_dir: Path, request_path: Path) -> bool:
     """Return whether one current, bound verifier response satisfies its full pass contract."""
     try:
@@ -4105,7 +4151,7 @@ def verification_response_is_complete(revision_dir: Path, request_path: Path) ->
     if not verification_request_hash_valid(request):
         return False
     findings, _ = validate_verifications(revision_dir, request_paths=[request_path])
-    return not findings
+    return not _blocking_findings(findings)
 
 
 def verification_response_is_terminal(revision_dir: Path, request_path: Path) -> bool:
@@ -4264,12 +4310,38 @@ def validate_verifications(
                         }, "verifier_transient"))
                     else:
                         finding["target_ids"] = supplied_targets
-                        recovery_class = (
-                            "deterministic_structure_defect"
-                            if set(supplied_targets) == {"prs.structured"}
-                            else "drafting_defect"
-                        )
-                        findings.append(recovery_finding(finding, recovery_class))
+                        source_category = _text(source.get("category")).casefold()
+                        source_check = _text(source.get("check")).casefold()
+                        if _governed_content_omission(source, supplied_targets):
+                            findings.append({
+                                **finding,
+                                "category": source_category,
+                                "check": source_check,
+                                "verification_request_id": request["request_id"],
+                                **(
+                                    {"recommended_action": source.get("recommended_action")}
+                                    if _text(source.get("recommended_action")) else {}
+                                ),
+                                "severity": "warning",
+                                "publication_disposition": "warning",
+                                "action": "manual_review",
+                            })
+                        else:
+                            recovery_class = (
+                                "deterministic_structure_defect"
+                                if set(supplied_targets) == {"prs.structured"}
+                                else "drafting_defect"
+                            )
+                            findings.append(recovery_finding({
+                                **finding,
+                                **({"category": source_category} if source_category else {}),
+                                **({"check": source_check} if source_check else {}),
+                                "verification_request_id": request["request_id"],
+                                **(
+                                    {"recommended_action": source.get("recommended_action")}
+                                    if _text(source.get("recommended_action")) else {}
+                                ),
+                            }, recovery_class))
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
@@ -4310,6 +4382,50 @@ def validate_verifications(
             assessed_cross = {item.get("check") for item in valid_cross_rows}
             if expected_cross != assessed_cross or len(valid_cross_rows) != len(expected_cross):
                 findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, "verifier_transient"))
+            reported_findings = [item for item in issues if isinstance(item, Mapping)]
+            reported_targets: set[str] = set()
+            for reported in reported_findings:
+                raw_targets = reported.get("target_ids")
+                if isinstance(raw_targets, list):
+                    reported_targets.update(
+                        str(target) for target in raw_targets if str(target).strip()
+                    )
+            warning_ids: set[str] = set()
+            for reported in reported_findings:
+                raw_targets = reported.get("target_ids")
+                targets = [str(target) for target in raw_targets] if isinstance(raw_targets, list) else []
+                finding_id = _text(reported.get("finding_id"))
+                if finding_id and _governed_content_omission(reported, targets):
+                    warning_ids.add(finding_id)
+            uncovered_sections = [
+                str(item.get("section_id") or "")
+                for item in valid_section_rows
+                if item.get("status") != "passed"
+                and str(item.get("section_id") or "") not in reported_targets
+            ]
+            uncovered_cross = [
+                str(item.get("check") or "")
+                for item in valid_cross_rows
+                if item.get("status") != "passed"
+                and (
+                    str(item.get("check") or "") != "procedures"
+                    or not any(
+                        _notes_cite_finding(item.get("notes"), finding_id)
+                        for finding_id in warning_ids
+                    )
+                )
+            ]
+            if uncovered_sections or uncovered_cross:
+                findings.append(recovery_finding({
+                    "category": "verification",
+                    "field": request["task"],
+                    "target_ids": [verification_target],
+                    "verification_request_id": request["request_id"],
+                    "issue": (
+                        "Every non-passing assessment must be covered by a reported finding; "
+                        f"uncovered sections={uncovered_sections}, uncovered cross-document checks={uncovered_cross}."
+                    ),
+                }, "verifier_transient"))
             if response.get("status") == "passed" and any(
                 item.get("status") != "passed" for item in [*valid_section_rows, *valid_cross_rows]
             ):
@@ -4558,6 +4674,8 @@ def final_exact_artifact_review_findings(
     if _exact_rendered_hashes(revision_dir, render_report) != dict(final_review.get("rendered_hashes") or {}):
         issues.append("Final rendered bytes changed after review.")
     verification_findings, fresh_evidence = validate_verifications(revision_dir)
+    fresh_warnings = _warning_findings(verification_findings)
+    verification_findings = _blocking_findings(verification_findings)
     verification_findings.extend(
         _final_verification_scope_findings(
             revision_dir, reference, render_report, fresh_evidence
@@ -4570,6 +4688,8 @@ def final_exact_artifact_review_findings(
         or _final_review_bindings(fresh_evidence) != final_review.get("review_bindings")
     ):
         issues.append("Final request or reviewer evidence changed after review.")
+    if fresh_warnings != list(quality.get("warnings") or []):
+        issues.append("Final verification warnings changed after review.")
     return [
         recovery_finding({
             "category": "verification",
@@ -4592,7 +4712,8 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
             for item in xml_report.get("findings", [])
         )
     verification_findings, evidence = validate_verifications(revision_dir)
-    findings.extend(verification_findings)
+    warnings = _warning_findings(verification_findings)
+    findings.extend(_blocking_findings(verification_findings))
     findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
     candidate_hashes = {
         path.relative_to(revision_dir).as_posix(): sha256_file(path)
@@ -4614,7 +4735,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
         "every_page": not findings,
         "section_three_and_orphan_heading_checks": not findings,
     }
-    return {"status": final_review["status"], "findings": findings, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
+    return {"status": final_review["status"], "findings": findings, "warnings": warnings, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
 __all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

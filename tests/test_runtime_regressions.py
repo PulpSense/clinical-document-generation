@@ -1797,6 +1797,389 @@ def test_content_finding_without_a_section_target_reprompts_the_reviewer(tmp_pat
     assert routing["action"] == "retry_verifier"
 
 
+def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_warning(
+    tmp_path,
+    monkeypatch,
+):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+        "sections": [{"artifact": "icf", "section_id": "icf.leaving-study"}],
+        "cross_document_checks": ["procedures"],
+        "artifacts": [],
+        "checks": list(quality.CONTENT_CHECKS),
+        "review_set": 1,
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path = requests / "content.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "manual-review-model", "reviewer_id": "content-reviewer"},
+        "status": "blocked",
+        "findings": [{
+            "finding_id": "content-001",
+            "category": "content",
+            "check": "substantive",
+            "target_ids": ["icf.leaving-study"],
+            "issue": "The ICF omits the optional leaving-study explanation.",
+            "recommended_action": "Add a source-grounded leaving-study explanation at manual review.",
+        }],
+        "section_assessments": [{
+            "artifact": "icf",
+            "section_id": "icf.leaving-study",
+            "status": "blocked",
+            "checks": list(quality.CONTENT_CHECKS),
+        }],
+        "cross_document_assessments": [{
+            "check": "procedures",
+            "status": "failed",
+            "notes": "The same ordinary omission affects procedures; see content-001.",
+        }],
+    }
+    (responses / "content.json").write_text(json.dumps(response), encoding="utf-8")
+    monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [])
+    monkeypatch.setattr(quality, "_final_verification_scope_findings", lambda *_args: [])
+
+    report = quality.quality_report(
+        revision,
+        _source(),
+        {"status": "passed", "findings": [], "artifacts": []},
+        None,
+    )
+
+    assert report["status"] == "passed"
+    assert report["findings"] == []
+    assert report["warnings"] == [{
+        "category": "content",
+        "field": "clinical_content_verification",
+        "check": "substantive",
+        "target_ids": ["icf.leaving-study"],
+        "verification_request_id": request["request_id"],
+        "issue": "The ICF omits the optional leaving-study explanation.",
+        "recommended_action": "Add a source-grounded leaving-study explanation at manual review.",
+        "severity": "warning",
+        "publication_disposition": "warning",
+        "action": "manual_review",
+    }]
+    assert quality.verification_response_is_complete(revision, request_path) is True
+    assert quality.final_exact_artifact_review_findings(
+        revision,
+        _source(),
+        {"status": "passed", "findings": [], "artifacts": []},
+        report,
+    ) == []
+    tampered = copy.deepcopy(report)
+    tampered["warnings"][0]["issue"] = "tampered warning"
+    assert any(
+        finding["issue"] == "Final verification warnings changed after review."
+        for finding in quality.final_exact_artifact_review_findings(
+            revision,
+            _source(),
+            {"status": "passed", "findings": [], "artifacts": []},
+            tampered,
+        )
+    )
+    forged_response = copy.deepcopy(response)
+    forged_response["findings"][0]["finding_id"] = "."
+    forged_response["cross_document_assessments"][0]["notes"] = "."
+    (responses / "content.json").write_text(json.dumps(forged_response), encoding="utf-8")
+    forged_findings, _evidence = validate_verifications(revision)
+    assert any(
+        finding.get("recovery_class") == "verifier_transient"
+        and "cross-document" in finding["issue"]
+        for finding in forged_findings
+    )
+
+
+def test_unreported_blocked_section_assessment_cannot_hide_behind_content_warning(tmp_path):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+        "sections": [
+            {"artifact": "icf", "section_id": "icf.leaving-study"},
+            {"artifact": "icf", "section_id": "icf.risks"},
+        ],
+        "cross_document_checks": [],
+        "artifacts": [],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path = requests / "content.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    (responses / "content.json").write_text(json.dumps({
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "manual-review-model", "reviewer_id": "content-reviewer"},
+        "status": "blocked",
+        "findings": [{
+            "finding_id": "content-001",
+            "category": "content",
+            "check": "substantive",
+            "target_ids": ["icf.leaving-study"],
+            "issue": "The leaving-study explanation is incomplete.",
+            "recommended_action": "Add the source-grounded explanation at manual review.",
+        }],
+        "section_assessments": [
+            {
+                "artifact": "icf",
+                "section_id": "icf.leaving-study",
+                "status": "blocked",
+                "checks": list(quality.CONTENT_CHECKS),
+                "notes": "See content-001.",
+            },
+            {
+                "artifact": "icf",
+                "section_id": "icf.risks",
+                "status": "blocked",
+                "checks": list(quality.CONTENT_CHECKS),
+                "notes": "A separate safety problem was not reported as a finding.",
+            },
+        ],
+        "cross_document_assessments": [],
+    }), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(revision)
+
+    assert any(
+        finding.get("recovery_class") == "verifier_transient"
+        and "non-passing assessment" in finding["issue"]
+        for finding in findings
+    )
+    assert quality.verification_response_is_complete(revision, request_path) is False
+
+
+def test_safety_cross_assessment_cannot_be_covered_by_ordinary_content_warning(tmp_path):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+        "sections": [{"artifact": "icf", "section_id": "icf.leaving-study"}],
+        "cross_document_checks": ["risks_benefits"],
+        "artifacts": [],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path = requests / "content.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    (responses / "content.json").write_text(json.dumps({
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "manual-review-model", "reviewer_id": "content-reviewer"},
+        "status": "blocked",
+        "findings": [{
+            "finding_id": "content-001",
+            "category": "content",
+            "check": "substantive",
+            "target_ids": ["icf.leaving-study"],
+            "issue": "The leaving-study explanation is incomplete.",
+            "recommended_action": "Add the source-grounded explanation at manual review.",
+        }],
+        "section_assessments": [{
+            "artifact": "icf",
+            "section_id": "icf.leaving-study",
+            "status": "blocked",
+            "checks": list(quality.CONTENT_CHECKS),
+            "notes": "See content-001.",
+        }],
+        "cross_document_assessments": [{
+            "check": "risks_benefits",
+            "status": "failed",
+            "notes": "Safety mismatch; see content-001.",
+        }],
+    }), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(revision)
+
+    assert any(
+        finding.get("recovery_class") == "verifier_transient"
+        and "cross-document" in finding["issue"]
+        for finding in findings
+    )
+    assert quality.verification_response_is_complete(revision, request_path) is False
+
+
+@pytest.mark.parametrize(
+    ("source_category", "source_check", "target"),
+    [
+        ("content", "substantive", "icf.risks"),
+        ("content", "source_supported", "icf.leaving-study"),
+        ("content", "no_invention", "icf.leaving-study"),
+        ("content", "no_internal_language", "icf.leaving-study"),
+        ("content", "cross_document_consistent", "icf.leaving-study"),
+        ("safety", "substantive", "icf.leaving-study"),
+        ("integrity", "substantive", "icf.leaving-study"),
+    ],
+)
+def test_safety_and_policy_correction_content_findings_remain_blocking(
+    tmp_path,
+    source_category,
+    source_check,
+    target,
+):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+        "sections": [{"artifact": "icf", "section_id": target}],
+        "cross_document_checks": [],
+        "artifacts": [],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path = requests / "content.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    (responses / "content.json").write_text(json.dumps({
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "manual-review-model", "reviewer_id": "content-reviewer"},
+        "status": "blocked",
+        "findings": [{
+            "category": source_category,
+            "check": source_check,
+            "target_ids": [target],
+            "issue": "The ICF omits a known study risk.",
+            "recommended_action": "Correct the safety content before publication.",
+        }],
+        "section_assessments": [{
+            "artifact": "icf",
+            "section_id": target,
+            "status": "blocked",
+            "checks": list(quality.CONTENT_CHECKS),
+        }],
+        "cross_document_assessments": [],
+    }), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(revision)
+
+    assert len(findings) == 1
+    assert findings[0]["category"] == source_category
+    assert findings[0]["check"] == source_check
+    assert findings[0]["recovery_class"] == "drafting_defect"
+    assert findings[0]["action"] == "retry_drafting_target"
+    assert quality.verification_response_is_complete(revision, request_path) is False
+
+
+@pytest.mark.parametrize("failure", ["malformed", "stale"])
+def test_verification_integrity_failure_remains_blocking(tmp_path, failure):
+    revision = tmp_path / "revision"
+    requests = revision / "hermes/verification-requests"
+    responses = revision / "hermes/verification-responses"
+    candidate = revision / "candidate/icf.docx"
+    requests.mkdir(parents=True)
+    responses.mkdir()
+    candidate.parent.mkdir()
+    candidate.write_bytes(b"current candidate")
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.content",
+        "task": "clinical_content_verification",
+        "response_path": "hermes/verification-responses/content.json",
+        "sections": [],
+        "cross_document_checks": [],
+        "artifacts": ([{
+            "path": "candidate/icf.docx",
+            "sha256": "0" * 64,
+        }] if failure == "stale" else []),
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path = requests / "content.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "manual-review-model", "reviewer_id": "content-reviewer"},
+        "status": "passed",
+        "section_assessments": [],
+        "cross_document_assessments": [],
+    }
+    if failure == "malformed":
+        response["producer"] = {}
+    (responses / "content.json").write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _evidence = validate_verifications(revision)
+
+    assert findings
+    assert all(item.get("publication_disposition") != "warning" for item in findings)
+    assert quality.verification_response_is_complete(revision, request_path) is False
+
+
+@pytest.mark.parametrize("category", ["rendering", "delivery"])
+def test_rendering_and_delivery_findings_remain_blocking(tmp_path, monkeypatch, category):
+    finding = {"category": category, "field": category, "issue": f"{category} failed"}
+    monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [finding])
+    monkeypatch.setattr(quality, "validate_verifications", lambda *_args, **_kwargs: ([], {}))
+    monkeypatch.setattr(quality, "_final_verification_scope_findings", lambda *_args: [])
+
+    report = quality.quality_report(
+        tmp_path,
+        _source(),
+        {"status": "passed", "findings": [], "artifacts": []},
+        None,
+    )
+
+    assert report["status"] == "blocked"
+    assert report["findings"] == [finding]
+    assert report["warnings"] == []
+
+
+def test_non_verifier_finding_cannot_self_label_as_publication_warning(tmp_path, monkeypatch):
+    forged = {
+        "category": "integrity",
+        "field": "source",
+        "issue": "Source integrity failed.",
+        "publication_disposition": "warning",
+    }
+    monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [forged])
+    monkeypatch.setattr(quality, "validate_verifications", lambda *_args, **_kwargs: ([], {}))
+    monkeypatch.setattr(quality, "_final_verification_scope_findings", lambda *_args: [])
+
+    report = quality.quality_report(
+        tmp_path,
+        _source(),
+        {"status": "passed", "findings": [], "artifacts": []},
+        None,
+    )
+
+    assert report["status"] == "blocked"
+    assert report["findings"] == [forged]
+    assert report["warnings"] == []
+
+
 def test_reviewer_defect_starts_a_fresh_complete_review_set(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
