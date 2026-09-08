@@ -413,8 +413,9 @@ def _replace_paragraph(paragraph, fields: Mapping[str, str]) -> None:
             run.text = ""
 
 
-def _normalize_generated_placeholder_layout(document: Document) -> None:
+def _normalize_generated_placeholder_layout(document: Document) -> set[Any]:
     intentionally_indented = {"{AI_inclusionCriteria}", "{AI_exclusionCriteria}"}
+    plain_paragraphs: set[Any] = set()
     for paragraph in document.paragraphs:
         tokens = set(TOKEN.findall(paragraph.text))
         if not any(token.startswith("{AI_") for token in tokens):
@@ -422,10 +423,12 @@ def _normalize_generated_placeholder_layout(document: Document) -> None:
         if tokens & intentionally_indented:
             paragraph.paragraph_format.right_indent = None
             continue
+        plain_paragraphs.add(paragraph._p)
         paragraph.paragraph_format.left_indent = None
         paragraph.paragraph_format.right_indent = None
         paragraph.paragraph_format.first_line_indent = None
         paragraph.paragraph_format.alignment = None
+    return plain_paragraphs
 
 
 def _insert_before(target, text: str, style: str) -> None:
@@ -518,6 +521,31 @@ def _normalize_protocol_heading_spacing(document: Document) -> None:
             paragraph.paragraph_format.space_after = Pt(6)
 
 
+def _protocol_table_after_heading(
+    document: Document,
+    heading_text: str,
+) -> Table | None:
+    heading = next(
+        (
+            paragraph for paragraph in document.paragraphs
+            if _protocol_heading_key(paragraph.text) == _protocol_heading_key(heading_text)
+        ),
+        None,
+    )
+    if heading is None:
+        return None
+    element = heading._p.getnext()
+    while element is not None and element.tag != qn("w:sectPr"):
+        if element.tag == qn("w:tbl"):
+            return Table(element, document)
+        if element.tag == qn("w:p"):
+            paragraph = Paragraph(element, document)
+            if paragraph.style.name.casefold().startswith("heading"):
+                return None
+        element = element.getnext()
+    return None
+
+
 def _normalize_protocol_summary_table(document: Document, reference: Mapping[str, Any]) -> None:
     labels = {
         "objective": "Objective",
@@ -533,11 +561,7 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
         "duration/follw-up": "Duration / Follow-up",
         "duration / follow-up": "Duration / Follow-up",
     }
-    table = next((
-        item for item in document.tables
-        if item.rows and item.rows[0].cells[0].text.strip().casefold() == "objective"
-        and any(row.cells[0].text.strip().casefold() == "masking" for row in item.rows)
-    ), None)
+    table = _protocol_table_after_heading(document, "3. GENERAL INFORMATION")
     if table is None:
         return
     sites_value = reference.get("sites")
@@ -591,7 +615,7 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
                 if margin is None:
                     margin = OxmlElement(f"w:{side}")
                     cell_margins.append(margin)
-                margin.set(qn("w:w"), "0")
+                margin.set(qn("w:w"), "40")
                 margin.set(qn("w:type"), "dxa")
         for cell in row.cells:
             for cell_paragraph in cell.paragraphs:
@@ -804,6 +828,8 @@ def _replace_protocol_investigator_agreement(
         _copy_run_design(run, _first_visible_run(exemplar))
         if index:
             _apply_bullet_numbering(document, paragraph)
+        if index == len(statements) - 1:
+            paragraph.paragraph_format.space_after = Pt(12)
         anchor.addnext(paragraph._p)
         anchor = paragraph._p
 
@@ -1172,6 +1198,58 @@ def _is_icf_heading(paragraph: Paragraph) -> bool:
         return False
     letters = "".join(character for character in text if character.isalpha())
     return bool(letters) and letters == letters.upper() and len(text.split()) <= 16
+
+
+def _paragraph_has_numbering(paragraph: Paragraph) -> bool:
+    properties = paragraph._p.pPr
+    if properties is not None and properties.find(qn("w:numPr")) is not None:
+        return True
+    style = paragraph.style
+    while style is not None:
+        properties = style.element.pPr
+        if properties is not None and properties.find(qn("w:numPr")) is not None:
+            return True
+        style = style.base_style
+    return False
+
+
+def _trim_leading_paragraph_whitespace(paragraph: Paragraph) -> None:
+    """Remove only leading spaces/tabs while preserving run properties."""
+    for run in paragraph._p.xpath('.//w:r'):
+        for child in list(run):
+            if child.tag == qn("w:rPr"):
+                continue
+            if child.tag == qn("w:tab"):
+                run.remove(child)
+                continue
+            if child.tag == qn("w:t"):
+                child.text = (child.text or "").lstrip()
+                if child.text:
+                    return
+                continue
+            return
+
+
+def _normalize_icf_plain_body_paragraph(paragraph: Paragraph) -> None:
+    """Apply the approved geometry only to known plain ICF prose."""
+    _trim_leading_paragraph_whitespace(paragraph)
+    paragraph.paragraph_format.left_indent = Inches(0)
+    paragraph.paragraph_format.right_indent = Inches(0)
+    paragraph.paragraph_format.first_line_indent = Inches(0)
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+
+
+def _normalize_known_icf_plain_paragraphs(
+    document: Document,
+    paragraph_elements: set[Any],
+) -> None:
+    for paragraph in document.paragraphs:
+        if (
+            paragraph._p in paragraph_elements
+            and paragraph.text.strip()
+            and not _paragraph_has_numbering(paragraph)
+        ):
+            _normalize_icf_plain_body_paragraph(paragraph)
 
 
 def _normalize_icf_heading_styles(document: Document, *, sterling: bool = False) -> None:
@@ -1562,17 +1640,23 @@ def _apply_icf_authority_layout(
         source_body = next((paragraph for paragraph in source_section if paragraph.text.strip()), None)
         if source_body is not None:
             source_run = _first_visible_run(source_body)
+            plain_texts = [text for text, is_list in blocks if not is_list]
             generated_texts = [text for text, _is_list in blocks]
             for paragraph in _section_paragraphs(document, output_heading, heading_keys):
                 if not any(text in paragraph.text for text in generated_texts):
                     continue
+                plain_body = any(text in paragraph.text for text in plain_texts)
+                numbered = _paragraph_has_numbering(paragraph)
                 numbering = None if paragraph._p.pPr is None else paragraph._p.pPr.find(qn("w:numPr"))
                 numbering = None if numbering is None else copy.deepcopy(numbering)
                 _copy_paragraph_design(paragraph, source_body)
                 if numbering is not None:
                     paragraph._p.get_or_add_pPr().append(numbering)
-                paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                paragraph.paragraph_format.right_indent = Inches(0)
+                if plain_body and not numbered:
+                    _normalize_icf_plain_body_paragraph(paragraph)
+                else:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    paragraph.paragraph_format.right_indent = Inches(0)
                 for run in paragraph.runs:
                     _copy_run_design(run, source_run)
         _replace_edge_spacers(
@@ -1595,10 +1679,10 @@ def _insert_icf_blocks(document: Document, anchor, blocks: list[tuple[str, bool]
         if is_list:
             _apply_bullet_numbering(document, paragraph)
         else:
-            paragraph.paragraph_format.left_indent = Inches(0)
-            paragraph.paragraph_format.first_line_indent = Inches(0)
-        paragraph.paragraph_format.right_indent = Inches(0)
-        paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            _normalize_icf_plain_body_paragraph(paragraph)
+        if is_list:
+            paragraph.paragraph_format.right_indent = Inches(0)
+            paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
         anchor.addnext(paragraph._p)
         anchor = paragraph._p
 
@@ -2768,7 +2852,7 @@ def _template_document(
     _apply_authority_styles(document, authority)
     _apply_authority_bullet_numbering(document, authority)
     fields = render_fields(reference, model)
-    _normalize_generated_placeholder_layout(document)
+    generated_plain_paragraphs = _normalize_generated_placeholder_layout(document)
     if not icf:
         _assessment_matrix(document, reference, authority_path)
     _visit_rows(document, reference)
@@ -2794,6 +2878,7 @@ def _template_document(
         _normalize_icf_preferences(document)
         _compact_icf_signature_end(document)
         _normalize_icf_heading_styles(document, sterling=sterling)
+        _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
         _normalize_source_bound_shell(document, reference, icf=False)

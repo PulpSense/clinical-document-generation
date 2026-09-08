@@ -1948,6 +1948,89 @@ def test_table_specific_break_requires_a_classified_table_repair(tmp_path):
     assert visits_caption.paragraph_format.page_break_before is not True
 
 
+def test_known_plain_icf_normalization_preserves_static_tabs_and_style_lists():
+    document = Document()
+    ordinary = document.add_paragraph()
+    ordinary.add_run().add_tab()
+    ordinary.add_run("   Ordinary generated body prose.")
+    static_tabbed = document.add_paragraph()
+    static_tabbed.add_run().add_tab()
+    static_tabbed.add_run("Intentionally tab-aligned template content.")
+    styled_list = document.add_paragraph("Style-inherited list item.", style="List Bullet")
+    static_xml = static_tabbed._p.xml
+    list_xml = styled_list._p.xml
+
+    rendering._normalize_known_icf_plain_paragraphs(
+        document,
+        {ordinary._p, styled_list._p},
+    )
+
+    assert ordinary.text == "Ordinary generated body prose."
+    assert _points(ordinary.paragraph_format.left_indent) == 0.0
+    assert _points(ordinary.paragraph_format.right_indent) == 0.0
+    assert _points(ordinary.paragraph_format.first_line_indent) == 0.0
+    assert ordinary.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+    assert static_tabbed._p.xml == static_xml
+    assert styled_list._p.xml == list_xml
+
+
+def test_icf_ordinary_body_paragraphs_are_flush_and_justified_across_families(tmp_path):
+    cases = (
+        ("prospective-acceptance-source.json", "Advarra"),
+        ("prospective-acceptance-source.json", "Sterling"),
+        ("ambispective-acceptance-source.json", "Advarra"),
+        ("ambispective-acceptance-source.json", "Sterling"),
+    )
+    for index, (fixture, family) in enumerate(cases):
+        reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+        reference["meta"]["icf_template"] = family
+        markers = {
+            "icf.risks": f"Ordinary risk paragraph {index}.",
+            "icf.benefits": f"Ordinary benefit paragraph {index}.",
+            "icf.payment": f"Ordinary payment paragraph {index}.",
+            "icf.costs": f"Ordinary cost paragraph {index}.",
+        }
+        bullet_text = f"Intentional risk bullet {index}."
+        model = {
+            "protocol": [],
+            "prs": {},
+            "icf": {
+                section_id: {
+                    "paragraphs": [{"text": text, "evidence_refs": [], "boilerplate_refs": []}],
+                    "lists": ([{"items": [bullet_text]}] if section_id == "icf.risks" else []),
+                }
+                for section_id, text in markers.items()
+            },
+        }
+        case_root = tmp_path / f"{index}-{family.casefold()}"
+        render_documents(ROOT, case_root, reference, model)
+        output_path = case_root / "candidate/icf.docx"
+        document = Document(output_path)
+        authority_name = "sterling-icf-reference.docx" if family == "Sterling" else "advarra-icf-reference.docx"
+        authority_path = ROOT / "assets/client-templates/reference" / authority_name
+
+        assert _doc_default_font(output_path) == _doc_default_font(authority_path)
+        for text in markers.values():
+            paragraph = next(
+                item for item in document.paragraphs
+                if item.text == text
+                and (item._p.pPr is None or item._p.pPr.find(qn("w:numPr")) is None)
+            )
+            assert _points(paragraph.paragraph_format.left_indent) == 0.0
+            assert _points(paragraph.paragraph_format.right_indent) == 0.0
+            assert _points(paragraph.paragraph_format.first_line_indent) == 0.0
+            assert paragraph.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+            assert not paragraph.text[:1].isspace()
+            assert not paragraph._p.xpath('./w:r[1]/w:tab')
+
+        bullet = next(item for item in document.paragraphs if item.text == bullet_text)
+        assert bullet._p.get_or_add_pPr().find(qn("w:numPr")) is not None
+        assert bullet.paragraph_format.alignment != WD_ALIGN_PARAGRAPH.JUSTIFY
+        tab_aligned = [paragraph for paragraph in document.paragraphs if paragraph._p.xpath('.//w:tab')]
+        assert tab_aligned
+        assert any(paragraph.text.strip().casefold().startswith("signature of") for paragraph in tab_aligned)
+
+
 def test_client_templates_normalize_visual_edge_cases(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     model = {
@@ -1979,7 +2062,10 @@ def test_client_templates_normalize_visual_edge_cases(tmp_path):
         paragraph for paragraph in icf_reference.paragraphs[reference_risk_heading_index + 1:]
         if paragraph.text.strip()
     )
-    assert _paragraph_rhythm(risk) == _paragraph_rhythm(reference_risk)
+    expected_risk_rhythm = _paragraph_rhythm(reference_risk)
+    expected_risk_rhythm.update(left_indent=0.0, first_line_indent=0.0)
+    assert _paragraph_rhythm(risk) == expected_risk_rhythm
+    assert risk.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
     preferences = [paragraph for paragraph in icf.paragraphs if paragraph.text.strip().startswith(("☐ Yes,", "☐ No,"))]
     assert len(preferences) == 2
     assert all(paragraph._p.pPr is None or paragraph._p.pPr.find(qn("w:numPr")) is None for paragraph in preferences)
@@ -3083,8 +3169,10 @@ def test_generated_documents_retain_client_typography_and_section_rhythm(tmp_pat
     assert _points(output_heading.paragraph_format.left_indent) == 0.0
     assert _points(output_heading.paragraph_format.first_line_indent) == 0.0
     assert _points(output_heading.paragraph_format.space_after) == _points(reference_heading.paragraph_format.space_after)
-    assert _paragraph_rhythm(output_body) == _paragraph_rhythm(reference_body)
-    assert output_body.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.LEFT
+    expected_body_rhythm = _paragraph_rhythm(reference_body)
+    expected_body_rhythm.update(left_indent=0.0, first_line_indent=0.0)
+    assert _paragraph_rhythm(output_body) == expected_body_rhythm
+    assert output_body.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
     assert _run_typography(output_heading) == _run_typography(reference_heading)
     assert _run_typography(output_body) == _run_typography(reference_body)
 
@@ -3116,6 +3204,95 @@ def test_protocol_investigator_agreement_uses_client_intro_and_bullet_designs(tm
         == _numbering_level_signature(authority, authority_body[index])
         for index in range(1, 4)
     )
+
+
+def test_general_information_table_targeting_uses_section_structure_not_optional_labels():
+    document = Document()
+    document.add_heading("3. GENERAL INFORMATION", level=1)
+    table = document.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "Overview"
+    table.cell(0, 1).text = "Study summary"
+    table.cell(1, 0).text = "Duration"
+    table.cell(1, 1).text = "Twelve weeks"
+    document.add_heading("4. TABLE OF CONTENTS", level=1)
+
+    rendering._normalize_protocol_summary_table(document, {"sites": []})
+
+    for row in table.rows:
+        assert row._tr.get_or_add_trPr().find(qn("w:cantSplit")) is not None
+        for cell in row.cells:
+            margins = cell._tc.get_or_add_tcPr().find(qn("w:tcMar"))
+            assert margins.find(qn("w:top")).get(qn("w:w")) == "40"
+            assert margins.find(qn("w:bottom")).get(qn("w:w")) == "40"
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        "prospective-acceptance-source.json",
+        "ambispective-acceptance-source.json",
+    ],
+)
+def test_protocol_general_information_rows_have_small_uniform_vertical_padding(
+    tmp_path,
+    fixture,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    case_root = tmp_path / fixture.removesuffix(".json")
+    render_documents(ROOT, case_root, reference, {"protocol": [], "icf": {}, "prs": {}})
+    document = Document(case_root / "candidate/protocol.docx")
+    table = next(
+        item for item in document.tables
+        if item.rows
+        and item.rows[0].cells[0].text.strip() == "Objective"
+        and any(row.cells[0].text.strip() == "Variables" for row in item.rows)
+    )
+
+    assert table.style is not None
+    for row in table.rows:
+        assert row.height is None
+        assert row._tr.get_or_add_trPr().find(qn("w:cantSplit")) is not None
+        for cell in row.cells:
+            margins = cell._tc.get_or_add_tcPr().find(qn("w:tcMar"))
+            assert margins is not None
+            for side in ("top", "bottom"):
+                margin = margins.find(qn(f"w:{side}"))
+                assert margin is not None
+                assert margin.get(qn("w:w")) == "40"
+                assert margin.get(qn("w:type")) == "dxa"
+            for paragraph in cell.paragraphs:
+                assert paragraph.paragraph_format.space_before in (None, Pt(0))
+                assert paragraph.paragraph_format.space_after is None
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        "prospective-acceptance-source.json",
+        "ambispective-acceptance-source.json",
+        "retrospective-acceptance-source.json",
+    ],
+)
+def test_protocol_investigator_obligations_have_paragraph_spacing_before_signature_table(
+    tmp_path,
+    fixture,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    case_root = tmp_path / fixture.removesuffix(".json")
+    render_documents(ROOT, case_root, reference, {"protocol": [], "icf": {}, "prs": {}})
+    document = Document(case_root / "candidate/protocol.docx")
+    table = next(
+        item for item in document.tables
+        if any("Signature of Investigator" in cell.text for row in item.rows for cell in row.cells)
+    )
+    previous = table._tbl.getprevious()
+
+    assert previous is not None and previous.tag == qn("w:p")
+    final_obligation = Paragraph(previous, document)
+    assert final_obligation.text.strip()
+    assert final_obligation._p.get_or_add_pPr().find(qn("w:numPr")) is not None
+    assert _points(final_obligation.paragraph_format.space_after) == 12.0
+    assert not final_obligation._p.xpath('.//w:br | .//w:tab')
 
 
 def test_protocol_signature_block_retains_client_completion_lines(tmp_path):

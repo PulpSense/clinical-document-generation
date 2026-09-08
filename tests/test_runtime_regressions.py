@@ -1560,7 +1560,7 @@ def test_protocol_summary_rows_keep_together(tmp_path):
         for paragraph in cell.paragraphs
     )
     assert all(
-        cell._tc.tcPr.find(qn("w:tcMar")).find(qn(side)).get(qn("w:w")) == "0"
+        cell._tc.tcPr.find(qn("w:tcMar")).find(qn(side)).get(qn("w:w")) == "40"
         for row in summary.rows
         for cell in row.cells
         for side in ("w:top", "w:bottom")

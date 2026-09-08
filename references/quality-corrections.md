@@ -41,6 +41,20 @@ they are not permission to redesign the client documents during a run.
 - Equivalent ICF section headings have one family-consistent left alignment,
   retaining bold/underline and typography. This never requires every heading to
   start a new page.
+- Ordinary ICF body prose uses the family authority's existing typography and
+  paragraph rhythm with zero left, right, first-line, and hanging indentation,
+  no leading spaces or tabs, and normal justified alignment whose final line
+  remains naturally left-aligned. Do not apply this rule to headings, native
+  lists, tables, headers/footers, checkboxes, fields, signature structures, or
+  other intentionally indented or tab-aligned elements.
+- Separate the Protocol investigator obligations from the retained client
+  signature table with exactly 12 points of space after the final native bullet.
+  Use paragraph spacing only; never add blank paragraphs, manual breaks, tabs,
+  spaces, or empty table rows.
+- Give each cell in the applicable Prospective and Ambispective Protocol
+  Section 3 General Information table 2 points of top and bottom padding.
+  Preserve automatic row heights, row-split protection, table grids, column
+  widths, borders, fonts, and all horizontal geometry.
 - The legacy hard break before Protocol Section 15 may be normalized to natural
   flow. Preserve required TOC and first-body boundaries; do not remove arbitrary
   breaks or join entire large sections merely to force a page-count target.
