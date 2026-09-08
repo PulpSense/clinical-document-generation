@@ -1974,6 +1974,54 @@ def test_known_plain_icf_normalization_preserves_static_tabs_and_style_lists():
     assert styled_list._p.xml == list_xml
 
 
+def test_icf_multi_paragraph_generated_prose_uses_native_paragraphs_across_families(tmp_path):
+    cases = (
+        ("prospective-acceptance-source.json", "Advarra"),
+        ("prospective-acceptance-source.json", "Sterling"),
+        ("ambispective-acceptance-source.json", "Advarra"),
+        ("ambispective-acceptance-source.json", "Sterling"),
+    )
+    for index, (fixture, family) in enumerate(cases):
+        reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+        reference["meta"]["icf_template"] = family
+        first = f"First generated benefit paragraph {index}."
+        second = f"Second generated benefit paragraph {index}."
+        model = {
+            "protocol": [],
+            "prs": {},
+            "icf": {
+                "icf.benefits": {
+                    "paragraphs": [
+                        {"text": first, "evidence_refs": [], "boilerplate_refs": []},
+                        {"text": second, "evidence_refs": [], "boilerplate_refs": []},
+                    ],
+                    "lists": [],
+                },
+            },
+        }
+        case_root = tmp_path / f"multi-{index}-{family.casefold()}"
+
+        render_documents(ROOT, case_root, reference, model)
+
+        document = Document(case_root / "candidate/icf.docx")
+        first_paragraph = next(item for item in document.paragraphs if item.text == first)
+        second_paragraph = next(item for item in document.paragraphs if item.text == second)
+        assert first_paragraph._p is not second_paragraph._p
+        assert not first_paragraph._p.xpath('.//w:br')
+        assert not second_paragraph._p.xpath('.//w:br')
+        for paragraph in (first_paragraph, second_paragraph):
+            assert _points(paragraph.paragraph_format.left_indent) == 0.0
+            assert _points(paragraph.paragraph_format.right_indent) == 0.0
+            assert _points(paragraph.paragraph_format.first_line_indent) == 0.0
+            assert paragraph.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+        assert not any(
+            first in paragraph.text
+            and second in paragraph.text
+            and not rendering._paragraph_has_numbering(paragraph)
+            for paragraph in document.paragraphs
+        )
+
+
 def test_icf_ordinary_body_paragraphs_are_flush_and_justified_across_families(tmp_path):
     cases = (
         ("prospective-acceptance-source.json", "Advarra"),

@@ -1239,17 +1239,37 @@ def _normalize_icf_plain_body_paragraph(paragraph: Paragraph) -> None:
     paragraph.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
 
+def _split_generated_icf_plain_paragraph(paragraph: Paragraph) -> list[Paragraph]:
+    """Promote generated double-break prose blocks to native Word paragraphs."""
+    parts = [part.strip() for part in re.split(r"\n{2,}", paragraph.text) if part.strip()]
+    if len(parts) <= 1:
+        return [paragraph]
+    source_run = _first_visible_run(paragraph)
+    _set_paragraph_text(paragraph, parts[0])
+    paragraphs = [paragraph]
+    anchor = paragraph._p
+    for text in parts[1:]:
+        following = paragraph._parent.add_paragraph()
+        _copy_paragraph_design(following, paragraph)
+        run = following.add_run(text)
+        _copy_run_design(run, source_run)
+        anchor.addnext(following._p)
+        anchor = following._p
+        paragraphs.append(following)
+    return paragraphs
+
+
 def _normalize_known_icf_plain_paragraphs(
     document: Document,
     paragraph_elements: set[Any],
 ) -> None:
-    for paragraph in document.paragraphs:
-        if (
-            paragraph._p in paragraph_elements
-            and paragraph.text.strip()
-            and not _paragraph_has_numbering(paragraph)
-        ):
-            _normalize_icf_plain_body_paragraph(paragraph)
+    for element in tuple(paragraph_elements):
+        if element.getparent() is None:
+            continue
+        paragraph = Paragraph(element, document)
+        if paragraph.text.strip() and not _paragraph_has_numbering(paragraph):
+            for native_paragraph in _split_generated_icf_plain_paragraph(paragraph):
+                _normalize_icf_plain_body_paragraph(native_paragraph)
 
 
 def _normalize_icf_heading_styles(document: Document, *, sterling: bool = False) -> None:

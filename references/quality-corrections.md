@@ -44,7 +44,10 @@ they are not permission to redesign the client documents during a run.
 - Ordinary ICF body prose uses the family authority's existing typography and
   paragraph rhythm with zero left, right, first-line, and hanging indentation,
   no leading spaces or tabs, and normal justified alignment whose final line
-  remains naturally left-aligned. Do not apply this rule to headings, native
+  remains naturally left-aligned. Render each accepted logical prose block as
+  its own native Word paragraph; never encode paragraph boundaries as doubled
+  manual line breaks inside justified prose. Preserve intentional single line
+  breaks within one logical block. Do not apply this rule to headings, native
   lists, tables, headers/footers, checkboxes, fields, signature structures, or
   other intentionally indented or tab-aligned elements.
 - Separate the Protocol investigator obligations from the retained client
