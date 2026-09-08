@@ -58,6 +58,24 @@ they are not permission to redesign the client documents during a run.
   Section 3 General Information table 2 points of top and bottom padding.
   Preserve automatic row heights, row-split protection, table grids, column
   widths, borders, fonts, and all horizontal geometry.
+- Start the applicable Prospective and Ambispective Protocol Section 3 General
+  Information heading on a new page with direct `pageBreakBefore`. Do not rely
+  on a blank break-carrier paragraph, add this break to unrelated numbered body
+  headings, or make the complete summary table indivisible; rows may flow only
+  between complete `cantSplit` rows.
+- In the retained Advarra agreement block, apply ordinary ICF body-prose
+  justification and zero indents only after `AGREEMENT TO BE IN THE STUDY` and
+  before the uppercase refusal warning and signature structures. Preserve blank
+  spacers, warnings, checkboxes, signature lines, and the already-correct
+  Sterling participant-statement structure.
+- Add direct widow control only to generated `icf.privacy` prose. Keep privacy
+  paragraphs otherwise naturally splittable; do not apply global keep-lines or
+  keep-together controls.
+- Restore the Advarra authority-derived injury heading immediately before
+  `LEGAL RIGHTS`, with the unchanged approved injury-handling source prose
+  beneath it. Keep the heading and prose exactly once, preserve the Legal Rights
+  and Whom-to-Contact order, and leave Sterling's family-specific injury
+  structure unchanged.
 - The legacy hard break before Protocol Section 15 may be normalized to natural
   flow. Preserve required TOC and first-body boundaries; do not remove arbitrary
   breaks or join entire large sections merely to force a page-count target.

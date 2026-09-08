@@ -743,7 +743,7 @@ def test_sterling_icf_keeps_withdrawal_heading_with_body_and_avoids_forced_signa
     assert all(paragraph.paragraph_format.keep_together is True for paragraph in signature_tail)
 
 
-def test_prospective_advarra_repairs_legal_rights_without_inventing_injury_section(tmp_path):
+def test_prospective_advarra_restores_source_bound_injury_section_before_legal_rights(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     model = {
         "protocol": [],
@@ -759,21 +759,44 @@ def test_prospective_advarra_repairs_legal_rights_without_inventing_injury_secti
     render_documents(ROOT, tmp_path, reference, model)
     visible = _visible_text(Document(tmp_path / "candidate/icf.docx"))
 
-    assert "IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY" not in visible
+    assert visible.count("IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY") == 1
     assert "This draft must not create a template section." not in visible
     assert "The above statement" not in visible
     assert "You do not lose any legal rights by signing and dating this consent document." in visible
-    assert reference["risks_benefits"]["injury_handling"] in visible
+    injury = reference["risks_benefits"]["injury_handling"]
+    assert visible.count(injury) == 1
+    assert visible.index("IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY") < visible.index(injury)
+    assert visible.index(injury) < visible.index("LEGAL RIGHTS")
+    assert visible.index("LEGAL RIGHTS") < visible.index(
+        "You do not lose any legal rights by signing and dating this consent document."
+    )
+    assert visible.index(
+        "You do not lose any legal rights by signing and dating this consent document."
+    ) < visible.index("WHOM TO CONTACT ABOUT THIS STUDY")
+    output = Document(tmp_path / "candidate/icf.docx")
+    authority = Document(ROOT / "assets/client-templates/reference/advarra-icf-reference.docx")
+    output_heading = next(
+        paragraph for paragraph in output.paragraphs
+        if " ".join(paragraph.text.split()) == "IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY"
+    )
+    authority_heading = next(
+        paragraph for paragraph in authority.paragraphs
+        if " ".join(paragraph.text.split()) == "IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY"
+    )
+    assert _run_typography(output_heading) == _run_typography(authority_heading)
 
 
-def test_ambispective_advarra_carries_approved_injury_handling_in_legal_rights(tmp_path):
+def test_ambispective_advarra_places_approved_injury_handling_before_legal_rights(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
 
     render_documents(ROOT, tmp_path, reference, {"protocol": [], "prs": {}, "icf": {}})
     visible = _visible_text(Document(tmp_path / "candidate/icf.docx"))
 
-    assert "LEGAL RIGHTS" in visible
-    assert reference["risks_benefits"]["injury_handling"] in visible
+    injury = reference["risks_benefits"]["injury_handling"]
+    assert visible.count("IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY") == 1
+    assert visible.count(injury) == 1
+    assert visible.index("IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY") < visible.index(injury)
+    assert visible.index(injury) < visible.index("LEGAL RIGHTS")
 
 
 def test_shallow_section_draft_cannot_pass_content_depth_gate(tmp_path):
@@ -1974,6 +1997,40 @@ def test_known_plain_icf_normalization_preserves_static_tabs_and_style_lists():
     assert styled_list._p.xml == list_xml
 
 
+def test_retained_agreement_role_excludes_warning_signature_and_sterling_xml():
+    advarra = Document()
+    advarra.add_heading("AGREEMENT TO BE IN THE STUDY", level=1)
+    ordinary = advarra.add_paragraph("  Ordinary retained agreement prose.")
+    warning = advarra.add_paragraph(
+        "IF YOU DO NOT AGREE WITH THE STATEMENT ABOVE, YOU SHOULD NOT SIGN THIS INFORMED CONSENT DOCUMENT."
+    )
+    warning.paragraph_format.right_indent = Pt(2.8)
+    signature = advarra.add_paragraph()
+    signature.add_run().add_tab()
+    signature.add_run("Signature of Participant")
+    warning_xml = warning._p.xml
+    signature_xml = signature._p.xml
+
+    rendering._normalize_retained_icf_agreement_prose(advarra, sterling=False)
+
+    assert ordinary.text == "Ordinary retained agreement prose."
+    assert ordinary.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+    assert _points(ordinary.paragraph_format.left_indent) == 0.0
+    assert _points(ordinary.paragraph_format.right_indent) == 0.0
+    assert _points(ordinary.paragraph_format.first_line_indent) == 0.0
+    assert warning._p.xml == warning_xml
+    assert signature._p.xml == signature_xml
+
+    sterling = Document()
+    sterling.add_heading("PARTICIPANT STATEMENT AUTHORIZATION", level=1)
+    sterling.add_paragraph("I have read and agree to participate.")
+    sterling_xml = sterling.element.xml
+
+    rendering._normalize_retained_icf_agreement_prose(sterling, sterling=True)
+
+    assert sterling.element.xml == sterling_xml
+
+
 def test_icf_multi_paragraph_generated_prose_uses_native_paragraphs_across_families(tmp_path):
     cases = (
         ("prospective-acceptance-source.json", "Advarra"),
@@ -2077,6 +2134,196 @@ def test_icf_ordinary_body_paragraphs_are_flush_and_justified_across_families(tm
         tab_aligned = [paragraph for paragraph in document.paragraphs if paragraph._p.xpath('.//w:tab')]
         assert tab_aligned
         assert any(paragraph.text.strip().casefold().startswith("signature of") for paragraph in tab_aligned)
+
+
+@pytest.mark.parametrize(
+    ("fixture", "family", "agreement_prefix"),
+    [
+        ("prospective-acceptance-source.json", "Advarra", "By signing and dating this consent document"),
+        ("prospective-acceptance-source.json", "Sterling", "I have read or have had read to me"),
+        ("ambispective-acceptance-source.json", "Advarra", "By signing and dating this consent document"),
+        ("ambispective-acceptance-source.json", "Sterling", "I have read or have had read to me"),
+    ],
+)
+def test_retained_icf_agreement_prose_is_flush_and_justified_without_changing_warnings_or_signatures(
+    tmp_path,
+    fixture,
+    family,
+    agreement_prefix,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = family
+    case_root = tmp_path / f"{fixture.removesuffix('.json')}-{family.casefold()}"
+    render_documents(ROOT, case_root, reference, {"protocol": [], "icf": {}, "prs": {}})
+    document = Document(case_root / "candidate/icf.docx")
+    agreement = next(
+        paragraph for paragraph in document.paragraphs
+        if " ".join(paragraph.text.split()).startswith(agreement_prefix)
+    )
+
+    assert _points(agreement.paragraph_format.left_indent) in (None, 0.0)
+    assert _points(agreement.paragraph_format.right_indent) in (None, 0.0)
+    assert _points(agreement.paragraph_format.first_line_indent) in (None, 0.0)
+    assert agreement.paragraph_format.alignment == WD_ALIGN_PARAGRAPH.JUSTIFY
+    if family == "Advarra":
+        warning = next(
+            paragraph for paragraph in document.paragraphs
+            if paragraph.text.strip().startswith("IF YOU DO NOT AGREE WITH THE STATEMENT ABOVE")
+        )
+        assert _points(warning.paragraph_format.right_indent) not in (None, 0.0)
+        assert warning.paragraph_format.alignment != WD_ALIGN_PARAGRAPH.JUSTIFY
+        signature = next(
+            paragraph for paragraph in document.paragraphs
+            if paragraph.text.strip().startswith("Signature of Participant")
+        )
+        assert signature._p.xpath('.//w:tab')
+        assert signature.paragraph_format.alignment != WD_ALIGN_PARAGRAPH.JUSTIFY
+
+
+@pytest.mark.parametrize(
+    ("fixture", "family"),
+    [
+        ("prospective-acceptance-source.json", "Advarra"),
+        ("prospective-acceptance-source.json", "Sterling"),
+        ("ambispective-acceptance-source.json", "Advarra"),
+        ("ambispective-acceptance-source.json", "Sterling"),
+    ],
+)
+def test_generated_icf_privacy_prose_has_direct_widow_control(tmp_path, fixture, family):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = family
+    privacy_text = (
+        "Your study information will be handled according to the approved privacy terms. "
+        "Study results may be published, but you will not be identified."
+    )
+    privacy_list_item = "A privacy list item remains a native list without direct widow control."
+    benefit_text = "Unrelated generated benefit prose keeps its existing pagination properties."
+    model = {
+        "protocol": [],
+        "prs": {},
+        "icf": {
+            "icf.privacy": {
+                "paragraphs": [{"text": privacy_text, "evidence_refs": [], "boilerplate_refs": []}],
+                "lists": [{"items": [privacy_list_item]}],
+            },
+            "icf.benefits": {
+                "paragraphs": [{"text": benefit_text, "evidence_refs": [], "boilerplate_refs": []}],
+                "lists": [],
+            },
+        },
+    }
+    case_root = tmp_path / f"{fixture.removesuffix('.json')}-{family.casefold()}"
+    render_documents(ROOT, case_root, reference, model)
+    document = Document(case_root / "candidate/icf.docx")
+    privacy = next(paragraph for paragraph in document.paragraphs if paragraph.text == privacy_text)
+    widow_control = privacy._p.get_or_add_pPr().find(qn("w:widowControl"))
+
+    assert widow_control is not None
+    assert widow_control.get(qn("w:val")) == "true"
+    assert privacy.paragraph_format.keep_together is not True
+    assert privacy.paragraph_format.keep_with_next is not True
+    privacy_list = next(paragraph for paragraph in document.paragraphs if paragraph.text == privacy_list_item)
+    unrelated = next(paragraph for paragraph in document.paragraphs if paragraph.text == benefit_text)
+    assert privacy_list._p.get_or_add_pPr().find(qn("w:widowControl")) is None
+    assert unrelated._p.get_or_add_pPr().find(qn("w:widowControl")) is None
+
+
+def test_generated_privacy_enables_an_explicitly_disabled_widow_control():
+    document = Document()
+    document.add_heading("RELEASE OF MEDICAL RECORDS AND PRIVACY", level=1)
+    privacy = document.add_paragraph("Generated privacy prose.")
+    disabled = privacy._p.get_or_add_pPr().makeelement(
+        qn("w:widowControl"),
+        {qn("w:val"): "0"},
+    )
+    privacy._p.get_or_add_pPr().append(disabled)
+    document.add_heading("LEGAL RIGHTS", level=1)
+    model = {
+        "icf": {
+            "icf.privacy": {
+                "paragraphs": [{"text": privacy.text}],
+                "lists": [],
+            },
+        },
+    }
+
+    rendering._normalize_generated_icf_privacy_prose(document, model, sterling=False)
+
+    widow_control = privacy._p.get_or_add_pPr().find(qn("w:widowControl"))
+    assert widow_control is not None
+    assert widow_control.get(qn("w:val")) == "true"
+
+
+def test_long_generated_privacy_remains_splittable_without_a_large_blank(
+    tmp_path,
+    governed_pdfium,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    sentence = (
+        "Authorized reviewers may inspect coded study records under the approved privacy terms "
+        "without publicly identifying the participant. "
+    )
+    privacy_text = sentence * 90
+    model = {
+        "protocol": [],
+        "prs": {},
+        "icf": {
+            "icf.privacy": {
+                "paragraphs": [{"text": privacy_text, "evidence_refs": [], "boilerplate_refs": []}],
+                "lists": [],
+            },
+        },
+    }
+    render_documents(ROOT, tmp_path, reference, model, artifact_names={"icf"})
+    report = render_pages(tmp_path, page_renderer_identities=[governed_pdfium])
+
+    assert report["status"] == "passed"
+    artifact = next(item for item in report["artifacts"] if item["artifact"] == "icf")
+    pages = [
+        " ".join((page.extract_text() or "").split())
+        for page in PdfReader(tmp_path / artifact["pdf"]).pages
+    ]
+    privacy_pages = [
+        index
+        for index, page in enumerate(pages)
+        if "Authorized reviewers may inspect coded study records" in page
+    ]
+    assert len(privacy_pages) >= 2
+    assert privacy_pages == list(range(privacy_pages[0], privacy_pages[-1] + 1))
+    assert all(len(pages[index].split()) >= 80 for index in privacy_pages[:-1])
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        "prospective-acceptance-source.json",
+        "ambispective-acceptance-source.json",
+    ],
+)
+def test_sterling_injury_structure_remains_family_specific(tmp_path, fixture):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = "Sterling"
+    injury = reference["risks_benefits"]["injury_handling"]
+    model = {
+        "protocol": [],
+        "prs": {},
+        "icf": {
+            "icf.injury": {
+                "paragraphs": [{"text": injury, "evidence_refs": [], "boilerplate_refs": []}],
+                "lists": [],
+            },
+        },
+    }
+    case_root = tmp_path / fixture.removesuffix(".json")
+    render_documents(ROOT, case_root, reference, model)
+    visible = " ".join(_visible_text(Document(case_root / "candidate/icf.docx")).split())
+
+    assert visible.count("STUDY COMPLICATIONS COMPENSATION") == 1
+    assert visible.count(injury) == 1
+    assert visible.index("STUDY COMPLICATIONS COMPENSATION") < visible.index(injury)
+    assert "IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY" not in visible
 
 
 def test_client_templates_normalize_visual_edge_cases(tmp_path):
@@ -2265,7 +2512,13 @@ def test_advarra_icf_uses_every_accepted_study_section_and_removes_example_study
     output = Document(tmp_path / "candidate/icf.docx")
     visible = _visible_text(output)
 
-    assert all(marker in visible for marker in markers.values())
+    assert all(
+        marker in visible
+        for section_id, marker in markers.items()
+        if section_id != "icf.injury"
+    )
+    assert markers["icf.injury"] not in visible
+    assert reference["risks_benefits"]["injury_handling"] in visible
     assert "eye tests and procedures" not in visible.casefold()
     assert "no additional side effects or risks expected" not in visible.casefold()
     assert 'w:type="column"' not in output.element.xml
@@ -2559,7 +2812,10 @@ def test_ambispective_body_sections_follow_template_pagination_and_spacing(tmp_p
             paragraph for paragraph in authority.paragraphs
             if " ".join(paragraph.text.split()) == title
         )
-        assert heading.paragraph_format.page_break_before is not True
+        if title == "3. GENERAL INFORMATION":
+            assert heading.paragraph_format.page_break_before is True
+        else:
+            assert heading.paragraph_format.page_break_before is not True
         assert _paragraph_rhythm(heading) == _paragraph_rhythm(authority_heading)
     toc_index = next(
         index for index, paragraph in enumerate(protocol.paragraphs)
@@ -2870,8 +3126,9 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
                 page for page in protocol_pages
                 if general_information in page and toc_heading not in page
             )
-            assert "2. INVESTIGATOR AGREEMENT" in section_three_page
-            assert len(section_three_page.split()) >= 100
+            assert "2. INVESTIGATOR AGREEMENT" not in section_three_page
+            assert "Objective" in section_three_page
+            assert re.search(r"Duration / Follow- ?up", section_three_page)
         numbered_body_headings = [
             paragraph
             for paragraph in protocol.paragraphs
@@ -2914,6 +3171,7 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
             paragraph.paragraph_format.page_break_before is not True
             for paragraph in numbered_body_headings
             if paragraph is not first_body_heading
+            and paragraph.text.strip() != "3. GENERAL INFORMATION"
         )
         assert all(
             paragraph.paragraph_format.keep_with_next is True
@@ -2987,31 +3245,45 @@ def test_protocol_headings_keep_their_first_content_and_front_matter_boundaries(
     assert all(paragraph.paragraph_format.keep_with_next is True for paragraph in protected_chain)
 
 
-def test_rendered_ambispective_section_three_flows_after_investigator_agreement(tmp_path, governed_pdfium):
-    reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
-    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        "prospective-acceptance-source.json",
+        "ambispective-acceptance-source.json",
+    ],
+)
+def test_rendered_section_three_starts_after_investigator_agreement(
+    tmp_path,
+    governed_pdfium,
+    fixture,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    case_root = tmp_path / fixture.removesuffix(".json")
+    render_documents(ROOT, case_root, reference, {"protocol": [], "icf": {}, "prs": {}})
 
-    report = render_pages(tmp_path, page_renderer_identities=[governed_pdfium])
+    report = render_pages(case_root, page_renderer_identities=[governed_pdfium])
 
     assert report["status"] == "passed"
     protocol = next(item for item in report["artifacts"] if item["artifact"] == "protocol")
-    assert protocol["docx_sha256"] == sha256_file(tmp_path / protocol["docx"])
-    assert protocol["pdf_sha256"] == sha256_file(tmp_path / protocol["pdf"])
-    assert all(page["sha256"] == sha256_file(tmp_path / page["path"]) for page in protocol["pages"])
-    pages = [" ".join((page.extract_text() or "").split()) for page in PdfReader(tmp_path / protocol["pdf"]).pages]
-    section_three_page = next(text for text in pages if "3. GENERAL INFORMATION" in text)
+    assert protocol["docx_sha256"] == sha256_file(case_root / protocol["docx"])
+    assert protocol["pdf_sha256"] == sha256_file(case_root / protocol["pdf"])
+    assert all(page["sha256"] == sha256_file(case_root / page["path"]) for page in protocol["pages"])
+    pages = [" ".join((page.extract_text() or "").split()) for page in PdfReader(case_root / protocol["pdf"]).pages]
+    agreement_page_index = next(index for index, text in enumerate(pages) if "2. INVESTIGATOR AGREEMENT" in text)
+    section_three_page_index = next(index for index, text in enumerate(pages) if "3. GENERAL INFORMATION" in text)
+    toc_page_index = next(index for index, text in enumerate(pages) if "4. TABLE OF CONTENTS" in text)
+    section_three_page = pages[section_three_page_index]
     section_sixteen_page = next(text for text in pages if "16. CONFIDENTIALITY" in text)
     visits_heading_page = next(
         text for text in pages
         if "9.2. Visits and Examinations" in text and "4. TABLE OF CONTENTS" not in text
     )
-    title_page = next(text for text in pages if "1. TITLE PAGE" in text)
-    toc_page = next(text for text in pages if "4. TABLE OF CONTENTS" in text)
-    assert "2. INVESTIGATOR AGREEMENT" not in title_page
-    assert "Sample size 40 participants" not in toc_page
-    assert "2. INVESTIGATOR AGREEMENT" in section_three_page
+    assert section_three_page_index == agreement_page_index + 1
+    assert "3. GENERAL INFORMATION" not in pages[agreement_page_index]
+    assert "2. INVESTIGATOR AGREEMENT" not in section_three_page
+    assert toc_page_index > section_three_page_index
     assert "Objective" in section_three_page
-    assert len(section_three_page.split()) >= 120
+    assert re.search(r"Duration / Follow- ?up", section_three_page)
     assert "15. STANDARD EVALUATION PROCEDURES" in section_sixteen_page
     assert "Table 9.2-1. Visit Schedule" in visits_heading_page
 
@@ -3251,6 +3523,38 @@ def test_protocol_investigator_agreement_uses_client_intro_and_bullet_designs(tm
         _numbering_level_signature(output, output_body[index])
         == _numbering_level_signature(authority, authority_body[index])
         for index in range(1, 4)
+    )
+
+
+@pytest.mark.parametrize(
+    "fixture",
+    [
+        "prospective-acceptance-source.json",
+        "ambispective-acceptance-source.json",
+    ],
+)
+def test_protocol_section_three_has_the_only_new_body_heading_page_break(tmp_path, fixture):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture).read_text(encoding="utf-8"))
+    case_root = tmp_path / fixture.removesuffix(".json")
+    render_documents(ROOT, case_root, reference, {"protocol": [], "icf": {}, "prs": {}})
+    document = Document(case_root / "candidate/protocol.docx")
+    numbered_headings = [
+        paragraph
+        for paragraph in document.paragraphs
+        if paragraph.style.name.casefold().startswith("heading")
+        and re.match(r"^\d+(?:\.\d+)*\.?\s+", paragraph.text.strip())
+    ]
+    section_three = next(
+        paragraph for paragraph in numbered_headings
+        if paragraph.text.strip() == "3. GENERAL INFORMATION"
+    )
+
+    assert section_three.paragraph_format.page_break_before is True
+    assert all(
+        paragraph.paragraph_format.page_break_before is not True
+        for paragraph in numbered_headings
+        if paragraph is not section_three
+        and paragraph.text.strip() not in {"1. TITLE PAGE", "4. TABLE OF CONTENTS"}
     )
 
 

@@ -1272,6 +1272,75 @@ def _normalize_known_icf_plain_paragraphs(
                 _normalize_icf_plain_body_paragraph(native_paragraph)
 
 
+def _normalize_retained_icf_agreement_prose(
+    document: Document,
+    *,
+    sterling: bool,
+) -> None:
+    """Normalize only ordinary retained Advarra agreement prose."""
+    if sterling:
+        return
+    heading = next(
+        (
+            paragraph
+            for paragraph in document.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key("AGREEMENT TO BE IN THE STUDY")
+        ),
+        None,
+    )
+    if heading is None:
+        return
+    element = heading._p.getnext()
+    while element is not None and element.tag == qn("w:p"):
+        paragraph = Paragraph(element, document)
+        text = paragraph.text.strip()
+        if text.startswith("IF YOU DO NOT AGREE WITH THE STATEMENT ABOVE"):
+            break
+        if text and not _paragraph_has_numbering(paragraph):
+            _normalize_icf_plain_body_paragraph(paragraph)
+        element = element.getnext()
+
+
+def _normalize_generated_icf_privacy_prose(
+    document: Document,
+    model: Mapping[str, Any],
+    *,
+    sterling: bool,
+) -> None:
+    """Enable direct widow control only on generated privacy prose."""
+    if not _icf_blocks(model, "icf.privacy"):
+        return
+    headings = _STERLING_ICF_HEADINGS if sterling else _ADVARRA_ICF_HEADINGS
+    heading = next(
+        (
+            paragraph
+            for paragraph in document.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key(headings["icf.privacy"])
+        ),
+        None,
+    )
+    if heading is None:
+        return
+    heading_texts = {
+        _icf_heading_key(title)
+        for title in set(headings.values())
+        | (_STERLING_RETAINED_HEADINGS if sterling else _ADVARRA_RETAINED_HEADINGS)
+    }
+    elements, _exemplar = _icf_section_elements(document, heading, heading_texts)
+    for element in elements:
+        if element.tag != qn("w:p"):
+            continue
+        paragraph = Paragraph(element, document)
+        if not paragraph.text.strip() or _paragraph_has_numbering(paragraph):
+            continue
+        properties = paragraph._p.get_or_add_pPr()
+        widow_control = properties.find(qn("w:widowControl"))
+        if widow_control is None:
+            widow_control = OxmlElement("w:widowControl")
+            properties.append(widow_control)
+        widow_control.set(qn("w:val"), "true")
+
+
 def _normalize_icf_heading_styles(document: Document, *, sterling: bool = False) -> None:
     try:
         heading_style = document.styles["Heading ICF Section"]
@@ -1782,30 +1851,74 @@ def _remove_advarra_example_study_prose(document: Document) -> None:
             paragraph._element.getparent().remove(paragraph._element)
 
 
-def _normalize_advarra_legal_rights(document: Document, reference: Mapping[str, Any]) -> None:
-    """Retain the Advarra Legal Rights shell while carrying supplied injury handling."""
+def _restore_advarra_injury_section(
+    document: Document,
+    authority: Document,
+    reference: Mapping[str, Any],
+) -> None:
+    """Restore the authority-derived injury section before Legal Rights."""
     injury_handling = _text(get_path(reference, "risks_benefits.injury_handling"))
     if not injury_handling:
         return
-    heading = next((
+    legal_heading = next((
         paragraph for paragraph in document.paragraphs
         if _icf_heading_key(paragraph.text) == _icf_heading_key("LEGAL RIGHTS")
     ), None)
-    if heading is None:
+    if legal_heading is None:
         return
+    injury_title = _ADVARRA_ICF_HEADINGS["icf.injury"]
     heading_texts = {
         _icf_heading_key(title)
         for title in set(_ADVARRA_ICF_HEADINGS.values()) | _ADVARRA_RETAINED_HEADINGS
     }
-    elements, exemplar = _icf_section_elements(document, heading, heading_texts)
-    if any(
-        element.tag == qn("w:p")
-        and " ".join(Paragraph(element, document).text.split()) == " ".join(injury_handling.split())
-        for element in elements
-    ):
+    injury_heading = next(
+        (
+            paragraph
+            for paragraph in document.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key(injury_title)
+        ),
+        None,
+    )
+    authority_heading = next(
+        (
+            paragraph
+            for paragraph in authority.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key(injury_title)
+        ),
+        None,
+    )
+    if authority_heading is None:
         return
-    anchor = elements[-1] if elements else heading._p
-    _insert_icf_blocks(document, anchor, [(injury_handling, False)], exemplar)
+    if injury_heading is None:
+        injury_heading = document.add_paragraph()
+        _copy_paragraph_design(injury_heading, authority_heading)
+        heading_run = injury_heading.add_run(injury_title)
+        _copy_run_design(heading_run, _first_visible_run(authority_heading))
+    else:
+        elements, _exemplar = _icf_section_elements(document, injury_heading, heading_texts)
+        for element in elements:
+            element.getparent().remove(element)
+        injury_heading._p.getparent().remove(injury_heading._p)
+    legal_heading._p.addprevious(injury_heading._p)
+    authority_elements, authority_exemplar = _icf_section_elements(
+        authority,
+        authority_heading,
+        heading_texts,
+    )
+    authority_body = next(
+        (
+            Paragraph(element, authority)
+            for element in authority_elements
+            if element.tag == qn("w:p") and Paragraph(element, authority).text.strip()
+        ),
+        None,
+    )
+    _insert_icf_blocks(
+        document,
+        injury_heading._p,
+        [(injury_handling, False)],
+        authority_body or authority_exemplar,
+    )
 
 
 def _normalize_icf_withdrawal(document: Document, boilerplate: Mapping[str, str]) -> None:
@@ -2431,8 +2544,21 @@ def _has_page_boundary_before(paragraph: Paragraph) -> bool:
     return False
 
 
-def _normalize_protocol_section_pagination(document: Document) -> None:
-    """Keep TOC boundaries; remove only the obsolete evaluation hard break."""
+def _normalize_protocol_section_pagination(document: Document, branch: str = "") -> None:
+    """Own the approved Section 3, TOC, first-body, and Section 15 boundaries."""
+    if branch in {"Prospective", "Ambispective"}:
+        section_three = next(
+            (
+                paragraph
+                for paragraph in document.paragraphs
+                if _heading_level(paragraph) is not None
+                and _protocol_heading_key(paragraph.text)
+                == _protocol_heading_key("3. GENERAL INFORMATION")
+            ),
+            None,
+        )
+        if section_three is not None:
+            section_three.paragraph_format.page_break_before = True
     for heading in document.paragraphs:
         if heading.text.strip() != "15. STANDARD EVALUATION PROCEDURES" or _heading_level(heading) is None:
             continue
@@ -2893,11 +3019,13 @@ def _template_document(
         _normalize_icf_front_matter(document, reference)
         _normalize_source_bound_shell(document, reference, icf=True)
         if not sterling:
-            _normalize_advarra_legal_rights(document, reference)
+            _restore_advarra_injury_section(document, authority, reference)
         _apply_icf_authority_layout(document, authority, model, sterling=sterling)
         _normalize_icf_preferences(document)
         _compact_icf_signature_end(document)
         _normalize_icf_heading_styles(document, sterling=sterling)
+        _normalize_retained_icf_agreement_prose(document, sterling=sterling)
+        _normalize_generated_icf_privacy_prose(document, model, sterling=sterling)
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -2918,7 +3046,7 @@ def _template_document(
         _split_heading_content(document)
         _replace_static_toc(document)
         _apply_protocol_authority_layout(document, authority)
-        _normalize_protocol_section_pagination(document)
+        _normalize_protocol_section_pagination(document, branch)
         _normalize_protocol_contact_table(document)
         _normalize_protocol_table_pagination(document)
         _protect_protocol_heading_content(document)
