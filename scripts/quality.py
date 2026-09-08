@@ -3992,7 +3992,14 @@ def create_verification_requests(
     if cross_document_checks:
         content_instructions += " Assess every cross-document check."
     content_instructions += (
-        " Findings must include target_ids for affected section IDs. Approved source takes precedence over "
+        " Findings must include target_ids for affected section IDs. Every finding must include a unique finding_id "
+        "made from ASCII letters or digits separated only by single hyphens or underscores. An ordinary substantive "
+        "content omission is a finding with category `content`, check `substantive`, and no safety-critical target. "
+        "It remains a finding with top-level status `blocked`, but the workflow may publish it as a manual-review "
+        "warning. When a failed `procedures` cross-document assessment is caused solely by the same ordinary "
+        "substantive content omission, its notes must cite that finding_id as an exact token. Safety, invention, "
+        "contradiction, source-integrity, rendering, security, package, ledger, and delivery findings are never "
+        "eligible for this warning treatment. Approved source takes precedence over "
         "applicable Fixed Clinical Boilerplate and retained template language; authorization is not a blanket "
         "exemption from source fidelity. Fail expanded decision authority, added termination grounds, and "
         "conflation of completion with withdrawal or discontinuation, even in verbatim boilerplate. "
@@ -4131,8 +4138,12 @@ def _governed_content_omission(
     )
 
 
+def _valid_finding_id(finding_id: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*", finding_id))
+
+
 def _notes_cite_finding(notes: Any, finding_id: str) -> bool:
-    if not re.fullmatch(r"[A-Za-z0-9]+(?:[-_][A-Za-z0-9]+)*", finding_id):
+    if not _valid_finding_id(finding_id):
         return False
     return bool(
         re.search(
@@ -4263,7 +4274,8 @@ def validate_verifications(
             }, "verifier_transient"))
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
-        issues = response.get("findings") if isinstance(response.get("findings"), list) else []
+        raw_issues = response.get("findings")
+        issues: list[Any] = list(raw_issues) if isinstance(raw_issues, list) else []
         if response.get("status") != "passed" or issues:
             for item in issues or [{"issue": "Verifier did not pass the artifact."}]:
                 source = item if isinstance(item, Mapping) else {"issue": item}
@@ -4383,6 +4395,19 @@ def validate_verifications(
             if expected_cross != assessed_cross or len(valid_cross_rows) != len(expected_cross):
                 findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, "verifier_transient"))
             reported_findings = [item for item in issues if isinstance(item, Mapping)]
+            reported_ids = [_text(item.get("finding_id")) for item in reported_findings]
+            if (
+                len(reported_findings) != len(issues)
+                or any(not _valid_finding_id(finding_id) for finding_id in reported_ids)
+                or len(set(reported_ids)) != len(reported_ids)
+            ):
+                findings.append(recovery_finding({
+                    "category": "verification",
+                    "field": request["task"],
+                    "target_ids": [verification_target],
+                    "verification_request_id": request["request_id"],
+                    "issue": "Every content finding must have a unique valid finding_id.",
+                }, "verifier_transient"))
             reported_targets: set[str] = set()
             for reported in reported_findings:
                 raw_targets = reported.get("target_ids")

@@ -1797,6 +1797,26 @@ def test_content_finding_without_a_section_target_reprompts_the_reviewer(tmp_pat
     assert routing["action"] == "retry_verifier"
 
 
+def test_content_verification_request_documents_warning_identity_contract(tmp_path):
+    (tmp_path / "candidate").mkdir()
+
+    paths = quality.create_verification_requests(
+        tmp_path,
+        _source(),
+        {"status": "passed", "artifacts": []},
+    )
+    request_path = next(path for path in paths if path.name.endswith("verify.content.json"))
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    instructions = request["instructions"]
+
+    assert "Every finding must include a unique finding_id" in instructions
+    assert "ASCII letters or digits separated only by single hyphens or underscores" in instructions
+    assert "ordinary substantive content omission" in instructions
+    assert "failed `procedures` cross-document assessment" in instructions
+    assert "notes must cite that finding_id as an exact token" in instructions
+    assert "Safety, invention, contradiction, source-integrity" in instructions
+
+
 def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_warning(
     tmp_path,
     monkeypatch,
@@ -1900,6 +1920,11 @@ def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_wa
         and "cross-document" in finding["issue"]
         for finding in forged_findings
     )
+
+    duplicate_response = copy.deepcopy(response)
+    duplicate_response["findings"].append(dict(duplicate_response["findings"][0]))
+    (responses / "content.json").write_text(json.dumps(duplicate_response), encoding="utf-8")
+    assert quality.verification_response_is_complete(revision, request_path) is False
 
 
 def test_unreported_blocked_section_assessment_cannot_hide_behind_content_warning(tmp_path):
@@ -2067,6 +2092,7 @@ def test_safety_and_policy_correction_content_findings_remain_blocking(
         "producer": {"model_id": "manual-review-model", "reviewer_id": "content-reviewer"},
         "status": "blocked",
         "findings": [{
+            "finding_id": f"{source_category}-{source_check}",
             "category": source_category,
             "check": source_check,
             "target_ids": [target],
