@@ -708,8 +708,8 @@ def _write_passing_case_report(
     state.write_text(json.dumps({
         "status": "passed",
         "started_at": "2026-08-28T00:01:00+00:00",
-        "deadline_at": "2026-08-28T00:31:00+00:00",
-        "budget_seconds": 1800.0,
+        "deadline_at": "2026-08-28T00:46:00+00:00",
+        "budget_seconds": 2700.0,
         "release_identity": identity,
         "approval_identity": {
             key: approved_reference["approval"].get(key)
@@ -759,7 +759,7 @@ def _write_passing_case_report(
         "output_evidence": outputs,
         "desktop_operation_evidence": {
             "started_at": "2026-08-28T00:01:00+00:00",
-            "deadline_at": "2026-08-28T00:31:00+00:00",
+            "deadline_at": "2026-08-28T00:46:00+00:00",
         },
         "approval_to_confirmed_retrieval_evidence": {
             "status": "approved",
@@ -1149,14 +1149,14 @@ def test_certification_evidence_producer_rejects_symlinked_sources(tmp_path: Pat
         )
 
 
-def test_real_case_is_eligible_through_the_thirty_minute_ceiling(tmp_path: Path, monkeypatch) -> None:
+def test_real_case_is_eligible_through_the_forty_five_minute_ceiling(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
     reports = [
         _write_passing_case_report(
             tmp_path,
             fixture_id,
-            elapsed_seconds=1739.999 if fixture_id == "prospective-advarra" else 600.0,
+            elapsed_seconds=2639.999 if fixture_id == "prospective-advarra" else 600.0,
         )
         for fixture_id in CERTIFICATION_CORPUS
     ]
@@ -1171,14 +1171,14 @@ def test_real_case_is_eligible_through_the_thirty_minute_ceiling(tmp_path: Path,
     assert prospective["within_approved_runtime"] is True
 
 
-def test_real_case_beyond_thirty_minutes_fails_the_complete_candidate(tmp_path: Path, monkeypatch) -> None:
+def test_real_case_beyond_forty_five_minutes_fails_the_complete_candidate(tmp_path: Path, monkeypatch) -> None:
     release_root = _use_controlled_certified_release(monkeypatch)
     preflight = _write_corpus_preflight(tmp_path)
     reports = [
         _write_passing_case_report(
             tmp_path,
             fixture_id,
-            elapsed_seconds=1740.001 if fixture_id == "ambispective-sterling" else 600.0,
+            elapsed_seconds=2640.001 if fixture_id == "ambispective-sterling" else 600.0,
         )
         for fixture_id in CERTIFICATION_CORPUS
     ]
@@ -1187,10 +1187,10 @@ def test_real_case_beyond_thirty_minutes_fails_the_complete_candidate(tmp_path: 
 
     first = next(case for case in result["cases"] if case["fixture_id"] == "ambispective-sterling")
     assert result["status"] == "failed"
-    assert first["desktop_operation_elapsed_seconds"] == 1740.001
-    assert first["elapsed_seconds"] == 1800.001
+    assert first["desktop_operation_elapsed_seconds"] == 2640.001
+    assert first["elapsed_seconds"] == 2700.001
     assert first["under_15_minutes"] is False
-    assert any("approved 1800-second ceiling" in finding for finding in first["findings"])
+    assert any("approved 2700-second ceiling" in finding for finding in first["findings"])
 
 
 def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_path: Path, monkeypatch) -> None:
@@ -1234,7 +1234,7 @@ def test_forged_snapshot_approval_time_cannot_shorten_certification_elapsed(tmp_
     assert any("immutable revision" in finding for finding in first["findings"])
 
 
-def test_sequential_corpus_continues_after_a_slow_pass_within_thirty_minutes(tmp_path: Path, monkeypatch) -> None:
+def test_sequential_corpus_continues_after_a_slow_pass_within_forty_five_minutes(tmp_path: Path, monkeypatch) -> None:
     fixtures = [
         {"fixture_id": fixture_id, "hermes_configuration": {}}
         for fixture_id in CERTIFICATION_CORPUS
@@ -2284,7 +2284,7 @@ def test_diagnostic_uses_the_retrospective_branch_output_set_and_requires_delive
             "stage": "desktop_delivery",
             "delivery": {"confirmed": True},
         },
-        elapsed_seconds=1800.001,
+        elapsed_seconds=2700.001,
         timed_out=False,
         child_returncode=0,
     )

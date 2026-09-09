@@ -382,7 +382,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 ### Performance and cost behavior
 
 - Measure normal runs by branch, including drafting waves, deterministic assembly, render passes, verification, and delivery.
-- The performance target is 10–12 minutes in normal conditions, not a correctness timeout; the hard operation ceiling is 30 minutes.
+- The performance target is 10–20 minutes in normal conditions, not a correctness timeout; the hard operation ceiling is 45 minutes.
 - Prospective and Ambispective normal runs use five drafting tasks, one content-verification task, and two concurrent document-scoped visual-verification tasks before retries; Retrospective uses three drafting tasks, one content-verification task, and one visual-verification task.
 - Tests detect accidental extra agent calls, regeneration of accepted batches, or serial execution of independent first-wave batches.
 - Correctness and atomic delivery are never weakened to satisfy a latency or model-cost target.

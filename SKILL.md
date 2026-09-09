@@ -18,7 +18,7 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 - Do not expose drafts, PDFs, page images, logs, or repair artifacts as client outputs.
 - Publish nothing unless the complete branch package passes.
 - Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect. Apply only the narrowly authorized quality corrections in `references/quality-corrections.md`; they do not permit font shrinking, deletion of consent text, or arbitrary page-count targets.
-- After approval, use one persistent Desktop operation. Aim for 10–12 minutes; 12 minutes remains successful, while 30 minutes is the hard correctness ceiling. Ten or twelve minutes is not a cutoff.
+- After approval, use one persistent Desktop operation. Aim for 10–20 minutes; 20 minutes remains successful, while 45 minutes is the hard correctness ceiling. Twenty minutes is not a cutoff.
 - Normal generation is not software maintenance. During ordinary client generation, the installed skill and its templates, contracts, tests, and implementation remain read-only; only the run workspace and isolated runtime caches may be written. When the owner explicitly requests development maintenance, Hermes may edit the Git-managed development checkout and push committed changes directly to the authorized Git/GitHub branch. Do not build a ZIP merely because a development edit was committed or pushed. Repackage and re-certify only when the owner explicitly requests a distributable or installable release, or before the change is installed or activated; Hermes must never edit the active certified release in place.
 - For ordinary client document generation, use `--manual-review`. This complete unsigned client workflow does not require a certification key or `PROMOTION-RECORD.json`. Run certification, signing, `--bind-certification`, or `--install-release` only when the user explicitly requests a formally certified release; a missing signing key is never a generation blocker.
 
@@ -325,7 +325,7 @@ extracted, hash-verified candidate release built from the exact commit recorded
 in its manifest and binds its fingerprint. The corpus controller may prepare
 fixtures and reduce evidence but must not inject a test-only worker launcher. It must not
 import or launch the editable checkout, and it does not replace the operation's
-30-minute deadline with a harness timeout. The certification adapter must wire
+45-minute deadline with a harness timeout. The certification adapter must wire
 visual fallback to a Desktop-parent review callback; it must never redispatch
 that fallback through the worker launcher. A valid operation above 15 minutes
 may deliver but receives a non-certifying runtime outcome.
@@ -491,8 +491,8 @@ openable Desktop files, not inline-code paths, and must not include QA artifacts
 
 `status: passed` at `stage: desktop_delivery` with
 `delivery.confirmed: true` is the only completed delivery state. Record elapsed
-time and its runtime classification. A 10–12 minute result meets the normal
-target; a successful result above 12 minutes is diagnostic evidence but remains
-within the operation until the 30-minute correctness ceiling.
+time and its runtime classification. A 10–20 minute result meets the normal
+target; a successful result above 20 minutes is diagnostic evidence but remains
+within the operation until the 45-minute correctness ceiling.
 
 If `status: blocked` after all internal retries, return one consolidated technical blocker and repair report; do not ask supplemental clinical questions or present partial documents as usable. A complete candidate retained under `revisions/<revision-id>/candidate/` is internal evidence only until Render Assurance passes.

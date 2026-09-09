@@ -10,7 +10,7 @@ The user needs one reliable clinical study document-generation skill that is aut
 
 The workflow must support prospective, ambispective, and retrospective studies. It must preserve the existing approval boundary: source material is evidence, the Source-of-Truth Markdown is reviewable input, and final documents are not generated until the reviewer explicitly approves the current Markdown or uploads an edited approved version.
 
-The end-to-end workflow should be optimized to complete in 10–12 minutes in normal conditions, but that target is not a correctness timeout. The workflow must continue making progress until the output is correct, up to the 30-minute operation ceiling. It must not deliver a known-incomplete or known-invalid document merely to meet a time target.
+The end-to-end workflow should be optimized to complete in 10–20 minutes in normal conditions, but that target is not a correctness timeout. The workflow must continue making progress until the output is correct, up to the 45-minute operation ceiling. It must not deliver a known-incomplete or known-invalid document merely to meet a time target.
 
 ## Solution
 
@@ -84,10 +84,10 @@ The Reference Protocol is the visual and structural authority. The generated doc
 43. As a reviewer, I want the workflow to fail when placeholders remain unresolved, so that incomplete template substitution cannot be mistaken for a finished document.
 44. As a reviewer, I want visual QA to inspect rendered page images or PDF output, so that clipping, overflow, blank sections, malformed tables, and header/footer defects are detected.
 45. As a reviewer, I want the workflow to support a client-like renderer as stronger External Render Evidence when available, so that local-only rendering differences do not hide defects.
-46. As a reviewer, I want content, DOCX structure, and document-scoped visual layout checks to run concurrently, so that quality review does not unnecessarily exceed the 10–12 minute performance target.
+46. As a reviewer, I want content, DOCX structure, and document-scoped visual layout checks to run concurrently, so that quality review does not unnecessarily exceed the 10–20 minute performance target.
 47. As a reviewer, I want review sub-agents to report findings rather than independently rewrite the document, so that competing edits do not create inconsistent output.
 48. As a reviewer, I want one controlled repair path to apply fixes and rerun every relevant gate, so that repairs are reproducible and auditable.
-49. As a reviewer, I want the workflow to continue working toward a correct output when a run takes longer than twelve minutes, up to the 30-minute correctness ceiling, so that correctness is not sacrificed for the performance target.
+49. As a reviewer, I want the workflow to continue working toward a correct output when a run takes longer than twenty minutes, up to the 45-minute correctness ceiling, so that correctness is not sacrificed for the performance target.
 50. As a reviewer, I want repeated or irreducible failures to produce a precise Repair Report, so that the workflow never silently delivers a known-incomplete document.
 51. As a study team member, I want only validated final artifacts delivered by default, so that internal renders, audit JSON, PDFs, and reports do not clutter the client handoff.
 52. As a study team member, I want internal QA artifacts retained in the run directory, so that failures and output decisions remain auditable.
@@ -189,7 +189,7 @@ The Reference Protocol is the visual and structural authority. The generated doc
 - Use deterministic local scripts for mapping, validation, DOCX structure checks, rendering orchestration, and package inspection.
 - Avoid unnecessary model calls after the Source-of-Truth Markdown is approved.
 - Reuse structured extraction and table data across protocol, ICF, summary, and XML generation where branch contracts permit.
-- Treat 10–12 minutes as the optimization objective and 30 minutes as the hard correctness ceiling, never as permission to ship a deficient artifact.
+- Treat 10–20 minutes as the optimization objective and 45 minutes as the hard correctness ceiling, never as permission to ship a deficient artifact.
 
 ## Testing Decisions
 

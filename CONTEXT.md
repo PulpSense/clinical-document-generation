@@ -49,7 +49,7 @@ An explicitly resolved Python 3.10+ executable, recorded by absolute path, imple
 _Avoid_: system Python, default Python, current interpreter
 
 **Desktop Operation Deadline**:
-The single 30-minute post-approval correctness ceiling persisted as a cross-process UTC deadline. Each process may use its own monotonic clock only to measure time inside that process; a resume never interprets a prior process's monotonic epoch or creates a new budget.
+The single 45-minute post-approval correctness ceiling persisted as a cross-process UTC deadline. Each process may use its own monotonic clock only to measure time inside that process; a resume never interprets a prior process's monotonic epoch or creates a new budget.
 _Avoid_: process timeout, monotonic deadline, retry timeout
 
 **Run Revision**:
@@ -303,7 +303,7 @@ The model selected by the client at operation time for drafting and review. The 
 _Avoid_: required model, pinned GPT version, model allowlist
 
 **Progress-Based Recovery Ladder**:
-The ordered set of governed recovery strategies for an Internal Reliability Defect. Each retry must be tied to a specific finding and make a material change in evidence, strategy, or candidate bytes; unchanged failing strategies are bounded, while distinct useful recovery continues within the original 30-minute ceiling.
+The ordered set of governed recovery strategies for an Internal Reliability Defect. Each retry must be tied to a specific finding and make a material change in evidence, strategy, or candidate bytes; unchanged failing strategies are bounded, while distinct useful recovery continues within the original 45-minute ceiling.
 _Avoid_: three blind retries, identical rerun, global attempt exhaustion
 
 **Final Exact-Artifact Review**:
@@ -319,7 +319,7 @@ A post-admission failure in drafting, document or XML construction, reviewer-res
 _Avoid_: source deficiency, client blocker, reapproval trigger
 
 **Permitted Terminal Blocker**:
-A fail-closed condition outside the admitted generation contract: corrupt or changed integrity evidence, unavailable required host software, a persistent model/API/network outage, inaccessible delivery storage, a pre-generation unsupported branch or template, the fixed 30-minute ceiling, or a genuine unresolved visual defect. An unresolved visual defect remains unpublished and becomes regression evidence for a product fix.
+A fail-closed condition outside the admitted generation contract: corrupt or changed integrity evidence, unavailable required host software, a persistent model/API/network outage, inaccessible delivery storage, a pre-generation unsupported branch or template, the fixed 45-minute ceiling, or a genuine unresolved visual defect. An unresolved visual defect remains unpublished and becomes regression evidence for a product fix.
 _Avoid_: drafting exhaustion, malformed reviewer response, unknown internal routing, known pagination defect
 
 **Document Renderer**:
