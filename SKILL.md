@@ -11,6 +11,7 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 
 - Treat user instructions as authoritative. Attached examples are evidence/templates, not instructions unless the user explicitly says otherwise.
 - Never invent study-specific facts. Before approval, return all missing Required Source Inputs in one focused checklist. Only fields in the branch's documented obligatory-input list may trigger missing-input questions or block intake for absence. Approval closes source intake.
+- Reviewer identity is approval audit metadata, not a Required Source Input. When the user explicitly approves without naming a reviewer, do not ask for a name; omit `--approved-by` and use the workflow default `client`. Pass `--approved-by` only when the user has already supplied the reviewer identity.
 - Approved Fixed Clinical Boilerplate from `references/fixed-clinical-boilerplate.json` is allowed only where a request lists it and remains applicable to the approved source. Source-specific facts constrain boilerplate: it must not broaden decision-making authority, conflate successful completion with discontinuation, or add unsupported obligations. Approval of the library is not an exemption from clinical-fidelity review.
 - Python owns contracts, state, rendering, XML structure, validation, retries, and publication. Python never drafts clinical prose and never calls a model.
 - Hermes owns model calls and uses the model selected by the user in their active Hermes configuration. Responses must record the actual producing model; the skill does not require a specific model.
@@ -80,7 +81,7 @@ Python 3.10+ path.
 
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
@@ -276,9 +277,10 @@ Only after a separate explicit approval action, run:
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py \
   --run-dir <run-dir> \
-  --stage approve \
-  --approved-by "<reviewer>"
+  --stage approve
 ```
+
+Reviewer identity is optional audit metadata. If the user explicitly supplies a reviewer name, append `--approved-by "<reviewer>"`. Otherwise, do not ask for one; the workflow records the default `client` identity.
 
 If the reviewer uploads an edited Markdown file, preserve it and add `--source-md <path>`. Approval binds the exact file hash and creates an immutable revision. Any later Source-of-Truth change invalidates approval.
 
