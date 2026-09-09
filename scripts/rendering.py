@@ -558,8 +558,8 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
         "study design": "Study Design",
         "masking": "Masking",
         "variables": "Variables",
-        "duration/follw-up": "Duration / Follow-up",
-        "duration / follow-up": "Duration / Follow-up",
+        "duration/follw-up": "Duration / Follow‑up",
+        "duration / follow-up": "Duration / Follow‑up",
     }
     table = _protocol_table_after_heading(document, "3. GENERAL INFORMATION")
     if table is None:

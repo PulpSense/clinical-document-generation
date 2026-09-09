@@ -1973,6 +1973,62 @@ def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monk
     assert fallback_calls == [[handoff]]
 
 
+def test_empty_parent_visual_fallback_retries_parent_not_half_second_workers(
+    tmp_path, monkeypatch,
+):
+    now = [0.0]
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
+    generate_calls = []
+    primary_timeouts = []
+    fallback_calls = []
+
+    def generate(_run_dir, **_kwargs):
+        generate_calls.append(True)
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        if response_path.is_file():
+            return {
+                "status": "blocked",
+                "stage": "quality",
+                "findings": [],
+                "client_outputs": [],
+            }
+        return {
+            "status": "awaiting_hermes",
+            "stage": "independent_verification",
+            "revision_id": "r1",
+            "handoffs": [handoff],
+        }
+
+    def primary(_handoffs, timeout_seconds):
+        primary_timeouts.append(timeout_seconds)
+        now[0] += timeout_seconds
+
+    def parent(pending, _remaining):
+        fallback_calls.append(list(pending))
+        if len(fallback_calls) == 2:
+            response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+            response_path.parent.mkdir(parents=True, exist_ok=True)
+            response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    monkeypatch.setattr(workflow, "generate", generate)
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=primary,
+        fallback_handoff_runner=parent,
+        opener=lambda path: b"1234" if path.endswith("Protocol final.docx") else b"567",
+        budget_seconds=30.0,
+        stage_soft_budgets={"independent_verification": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "quality"
+    assert primary_timeouts == [5.0]
+    assert fallback_calls == [[handoff], [handoff]]
+    assert len(generate_calls) == 3
+
+
 def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):
     now = [0.0]
     handoff = {

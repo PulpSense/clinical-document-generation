@@ -4295,7 +4295,6 @@ def run_desktop_operation(
                                 handoff_runner, non_fallback, remaining,
                             )
                             for delegated, timeout in (
-                                (replayed_fallback_owned, 0.0),
                                 (fresh_fallback_owned, soft_timeout),
                             ):
                                 if not delegated:
@@ -4307,7 +4306,6 @@ def run_desktop_operation(
                             hard_future.result()
                     elif supports_parent_fallback and fallback_owned:
                         for delegated, timeout in (
-                            (replayed_fallback_owned, 0.0),
                             (fresh_fallback_owned, soft_timeout),
                         ):
                             if not delegated:

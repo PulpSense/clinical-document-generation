@@ -3791,6 +3791,12 @@ def test_protocol_general_information_rows_have_small_uniform_vertical_padding(
     )
 
     assert table.style is not None
+    duration_label = next(
+        row.cells[0].text.strip()
+        for row in table.rows
+        if "duration" in row.cells[0].text.casefold()
+    )
+    assert duration_label == "Duration / Follow‑up"
     for row in table.rows:
         assert row.height is None
         assert row._tr.get_or_add_trPr().find(qn("w:cantSplit")) is not None
