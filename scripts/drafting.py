@@ -587,6 +587,14 @@ _GROUNDING_TOKEN_EQUIVALENTS = {
     "pregnant": "pregnancy",
 }
 
+_GROUNDING_PHRASE_EQUIVALENTS = (
+    # Participant-facing consent prose commonly explains adverse events using
+    # these plain-language phrases. Canonicalize only the complete phrases so
+    # generic uses of "health" or "effect" do not satisfy the clinical term.
+    (r"\bhealth problems?\b", "adverse events"),
+    (r"\bunwanted effects?\b", "adverse events"),
+)
+
 _NON_SUBSTANTIVE_LIST_ITEMS = {
     "n/a", "na", "no", "none", "not applicable", "other", "same", "unknown", "yes",
 }
@@ -602,9 +610,12 @@ def _leaf_texts(value: Any) -> list[str]:
 
 
 def _grounding_tokens(value: str) -> set[str]:
+    normalized = value.casefold()
+    for phrase, replacement in _GROUNDING_PHRASE_EQUIVALENTS:
+        normalized = re.sub(phrase, replacement, normalized)
     return {
         _GROUNDING_TOKEN_EQUIVALENTS.get(token.rstrip("s"), token.rstrip("s"))
-        for token in re.findall(r"[A-Za-z0-9]+", value.casefold())
+        for token in re.findall(r"[A-Za-z0-9]+", normalized)
         if (len(token) > 1 or token.isdigit()) and token not in _GROUNDING_STOPWORDS
     }
 

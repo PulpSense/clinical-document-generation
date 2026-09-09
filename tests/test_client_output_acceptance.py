@@ -349,6 +349,34 @@ def test_clinical_wording_equivalence_does_not_weaken_fact_or_numeric_grounding(
     )
 
 
+def test_participant_facing_adverse_event_assessment_is_grounded():
+    assert evidence_grounded(
+        "The study team will assess any health problem.",
+        "Adverse-event assessment",
+        all_items=True,
+    )
+    assert evidence_grounded(
+        "The study team will assess any health problems.",
+        "Adverse-event assessment",
+        all_items=True,
+    )
+    assert evidence_grounded(
+        "The study team will assess any unwanted effect.",
+        "Adverse-event assessment",
+        all_items=True,
+    )
+    assert evidence_grounded(
+        "The study team will assess any unwanted effects.",
+        "Adverse-event assessment",
+        all_items=True,
+    )
+    assert not evidence_grounded(
+        "The study team will review your health information.",
+        "Adverse-event assessment",
+        all_items=True,
+    )
+
+
 def test_recorded_retrospective_schedule_uses_readable_visit_list(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["procedures"]["visit_schedule_table"].append({
