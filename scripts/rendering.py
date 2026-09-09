@@ -2784,6 +2784,18 @@ def _repair_heading_cohesion(
                 paragraph.paragraph_format.widow_control = True
 
 
+def _repair_heading_page_boundary(
+    document: Document,
+    target: str,
+    *,
+    protocol: bool,
+) -> None:
+    """Move only one evidenced heading block to a fresh page."""
+    _repair_heading_cohesion(document, target, protocol=protocol)
+    heading = _target_heading(document, target, protocol=protocol)
+    heading.paragraph_format.page_break_before = True
+
+
 def _table_caption_paragraphs(document: Document, table: Table) -> list[Paragraph]:
     paragraphs: list[Paragraph] = []
     previous = table._tbl.getprevious()
@@ -2835,6 +2847,17 @@ def _repair_table_pagination(document: Document, target: str) -> None:
             or not re.match(r"^\d+(?:\.\d+)*\.?\s+", caption.text.strip())
         ):
             caption.paragraph_format.page_break_before = True
+
+
+def _repair_table_page_boundary(document: Document, target: str) -> None:
+    """Move one evidenced caption/table block to a fresh page."""
+    _repair_table_pagination(document, target)
+    _table, caption = _target_table(document, target)
+    if caption is None:
+        raise LayoutRepairTargetError(
+            f"A targeted table page boundary requires one exact caption: {target}"
+        )
+    caption.paragraph_format.page_break_before = True
 
 
 def _assessment_matrix(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
@@ -3089,8 +3112,12 @@ def _template_document(
                 protocol=not icf,
                 remove_empty_intervening_paragraphs=True,
             )
+        elif rule == "heading_page_boundary":
+            _repair_heading_page_boundary(document, target, protocol=not icf)
         elif rule == "table_pagination":
             _repair_table_pagination(document, target)
+        elif rule == "table_page_boundary":
+            _repair_table_page_boundary(document, target)
     _set_update_fields(document)
     return document
 

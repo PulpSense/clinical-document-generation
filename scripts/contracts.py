@@ -59,11 +59,11 @@ def recovery_finding(
 LAYOUT_REPAIR_RULES = {
     "protocol": (
         "heading_cohesion", "heading_whitespace_cohesion",
-        "table_pagination",
+        "heading_page_boundary", "table_pagination", "table_page_boundary",
     ),
     "icf": (
         "heading_cohesion", "heading_whitespace_cohesion",
-        "table_pagination",
+        "heading_page_boundary", "table_pagination", "table_page_boundary",
     ),
 }
 

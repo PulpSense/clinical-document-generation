@@ -413,13 +413,10 @@ timing, and values before release.
   target; apply the narrowest untried safe Word-native strategy; rebuild the
   affected artifact; and rerun rendered-page verification.
 - Reuse unaffected accepted drafts.
-- Every attempted layout repair records the actual strategy. A repeated visual
-  finding must select a stronger untried governed strategy; identical raw DOCX ZIP bytes or
+- Every attempted repair records the actual strategy. A repeated finding must
+  select a stronger untried governed strategy; identical raw DOCX ZIP bytes or
   ZIP-metadata churn never establish meaningful progress. Valid DOCX progress is
   measured from normalized member names and content hashes.
-- Drafting retries remain bound to their exact failed section IDs and latest
-  clinical findings, reuse unaffected accepted drafts, and continue within the
-  same deadline without fabricated strategy labels.
 - When all safe deterministic strategies for one exact localized target are
   already present, re-prompt only the exact visual reviewer to reinspect and
   localize the unchanged artifact. Do not mutate the document blindly or consume

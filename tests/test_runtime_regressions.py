@@ -565,6 +565,36 @@ def test_section_three_table_repair_subsumes_its_artificial_pagination_symptom()
     assert unsupported == []
 
 
+def test_escalated_table_boundary_subsumes_the_same_artificial_pagination_symptom():
+    shared = {
+        "category": "visual",
+        "artifact": "protocol",
+        "element": "3. GENERAL INFORMATION",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+    }
+    plan, unsupported = workflow._layout_repair_plan(
+        [
+            {**shared, "check": "bad_table_split", "issue": "split summary table"},
+            {**shared, "check": "artificial_pagination", "issue": "isolated continuation"},
+        ],
+        study_type="Prospective",
+        existing_repairs={
+            "protocol": [
+                {"rule": "table_pagination", "target": "3. GENERAL INFORMATION"},
+            ],
+        },
+    )
+
+    assert plan == {
+        "protocol": [
+            {"rule": "table_page_boundary", "target": "3. GENERAL INFORMATION"},
+        ],
+    }
+    assert unsupported == []
+
+
 def test_section_three_endpoint_split_routes_to_the_exact_summary_table_heading():
     finding = {
         "category": "visual",
@@ -2417,7 +2447,7 @@ def test_recovery_attempt_accounting_does_not_exhaust_after_three_attempts():
     assert strategies["layout:protocol"]
 
 
-def test_repeated_orphan_heading_escalates_to_safe_spacer_cleanup():
+def test_repeated_orphan_heading_escalates_to_an_untried_page_boundary():
     finding = {
         "category": "visual",
         "field": "protocol",
@@ -2443,12 +2473,12 @@ def test_repeated_orphan_heading_escalates_to_safe_spacer_cleanup():
     assert unsupported == []
     assert plan == {
         "protocol": [
-            {"rule": "heading_whitespace_cohesion", "target": "6.2. Inclusion/Exclusion Criteria"},
+            {"rule": "heading_page_boundary", "target": "6.2. Inclusion/Exclusion Criteria"},
         ],
     }
 
 
-def test_repeated_split_table_exhausts_safe_deterministic_repairs():
+def test_repeated_split_table_escalates_to_an_untried_table_boundary():
     finding = {
         "category": "visual",
         "field": "protocol",
@@ -2471,8 +2501,12 @@ def test_repeated_split_table_exhausts_safe_deterministic_repairs():
         },
     )
 
-    assert plan == {}
-    assert unsupported[0]["disposition"] == "fail_closed:safe_repair_ladder_exhausted"
+    assert unsupported == []
+    assert plan == {
+        "protocol": [
+            {"rule": "table_page_boundary", "target": "Table 13.3.-1"},
+        ],
+    }
 
 
 def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
@@ -2499,7 +2533,7 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
         "layout_repairs": {
             "protocol": [
                 {"rule": "heading_cohesion", "target": finding["element"]},
-                {"rule": "heading_whitespace_cohesion", "target": finding["element"]},
+                {"rule": "heading_page_boundary", "target": finding["element"]},
             ],
         },
     }
@@ -2646,7 +2680,7 @@ def test_deterministic_reconstruction_records_exact_target_and_measured_bytes(tm
     attempt_manifest = json.loads(next((revision / "attempts").glob("*/attempt-manifest.json")).read_text(encoding="utf-8"))
     action = attempt_manifest["recovery_actions"][0]
     assert action["target"] == ["prs.structured"]
-    assert action["candidate_semantic_content_changed"] is True
+    assert action["candidate_bytes_changed"] is True
     assert action["deterministic_structure_changed"] is True
     assert isinstance(action["prompt_evidence_changed"], bool)
 
@@ -2990,9 +3024,9 @@ def test_mixed_content_and_visual_findings_queue_both_repairs(tmp_path, monkeypa
     drafting_action = next(item for item in actions if item["triggering_finding"]["recovery_class"] == "drafting_defect")
     visual_action = next(item for item in actions if item["triggering_finding"]["recovery_class"] == "visual_defect")
     assert drafting_action["prompt_evidence_changed"] is True
-    assert drafting_action["candidate_semantic_content_changed"] is True
+    assert drafting_action["candidate_bytes_changed"] is True
     assert drafting_action["deterministic_structure_changed"] is False
-    assert visual_action["candidate_semantic_content_changed"] is True
+    assert visual_action["candidate_bytes_changed"] is True
     assert visual_action["deterministic_structure_changed"] is True
     assert json.loads(reference_path.read_text(encoding="utf-8"))["generation"]["review_set"] == 2
 
@@ -3081,7 +3115,7 @@ def test_terminal_timeout_measures_pending_recovery_without_advancing_review(tmp
     action = json.loads((attempt / "attempt-manifest.json").read_text(encoding="utf-8"))["recovery_actions"][0]
     state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
     assert action["outcome_status"] == "terminal_measured"
-    assert isinstance(action["candidate_semantic_content_changed"], bool)
+    assert isinstance(action["candidate_bytes_changed"], bool)
     assert isinstance(action["deterministic_structure_changed"], bool)
     assert isinstance(action["prompt_evidence_changed"], bool)
     assert state["review_set"] == 1

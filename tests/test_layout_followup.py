@@ -30,6 +30,23 @@ def test_heading_cohesion_keeps_a_short_lead_in_with_its_first_list_item():
     assert first_item.paragraph_format.keep_with_next is not True
 
 
+def test_heading_page_boundary_is_a_targeted_stronger_repair():
+    document = Document()
+    heading = document.add_paragraph('6.2. Inclusion/Exclusion Criteria', style='Heading 2')
+    label = document.add_paragraph('Inclusion criteria:')
+    document.add_paragraph('Age 18 years or older.', style='List Bullet')
+
+    rendering._repair_heading_page_boundary(
+        document,
+        heading.text,
+        protocol=True,
+    )
+
+    assert heading.paragraph_format.page_break_before is True
+    assert heading.paragraph_format.keep_with_next is True
+    assert label.paragraph_format.keep_with_next is True
+
+
 @pytest.mark.parametrize('funding_address', [None, '10 Main St, Country'])
 def test_same_entity_sponsor_retains_funding_role(funding_address):
     funder = {'name': 'Sponsor Foundation'}

@@ -5998,11 +5998,11 @@ def _layout_repair_plan(
             else declared_rule
         )
         ladder = (
-            ("heading_whitespace_cohesion",)
+            ("heading_whitespace_cohesion", "heading_page_boundary")
             if exact_sterling_duration_gap
-            else ("heading_cohesion", "heading_whitespace_cohesion")
+            else ("heading_cohesion", "heading_page_boundary")
             if check == "orphan_heading"
-            else ("table_pagination",)
+            else ("table_pagination", "table_page_boundary")
             if check == "bad_table_split"
             else (initial_rule,)
         )
@@ -6044,7 +6044,7 @@ def _layout_repair_plan(
         (artifact, repair["target"].casefold())
         for artifact, repairs in plan.items()
         for repair in repairs
-        if repair["rule"] == "table_pagination"
+        if repair["rule"] in {"table_pagination", "table_page_boundary"}
     }
     # A split table can create a second, derivative pagination finding for the
     # same exact block. The narrower table repair resolves both observations;
@@ -6477,7 +6477,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: Sequence[M
             "before": _recovery_action_observation(revision_dir, item),
             "prompt_evidence_changed": None,
             "deterministic_structure_changed": None,
-            "candidate_semantic_content_changed": None,
+            "candidate_bytes_changed": None,
         })
     _write(staging / "attempt-manifest.json", {
         "revision_id": revision_dir.name,
@@ -6604,7 +6604,7 @@ def _finalize_recovery_attempt(
         before = dict(action.get("before") or {})
         after = _recovery_action_observation(revision_dir, finding)
         action_changed = {
-            "candidate_semantic_content_changed": bool(after["candidate"]) and (
+            "candidate_bytes_changed": bool(after["candidate"]) and (
                 dict(before.get("candidate") or {}) != after["candidate"]
             ),
             "deterministic_structure_changed": dict(before.get("structure") or {}) != after["structure"],
@@ -6613,7 +6613,7 @@ def _finalize_recovery_attempt(
         if finding.get("recovery_class") == "deterministic_structure_defect":
             action_changed["deterministic_structure_changed"] = (
                 action_changed["deterministic_structure_changed"]
-                or action_changed["candidate_semantic_content_changed"]
+                or action_changed["candidate_bytes_changed"]
             )
         recovery_actions.append({
             **action,
@@ -6788,11 +6788,6 @@ def _complete_pending_recovery_attempts(
         manifest = _read(attempt_dir / "attempt-manifest.json")
         for action in manifest.get("recovery_actions", []):
             finding = dict(action.get("triggering_finding") or {})
-            semantic_changed = action.get("candidate_semantic_content_changed")
-            if semantic_changed is None:
-                # Backward-compatible replay of immutable attempts produced
-                # before semantic DOCX package hashing was introduced.
-                semantic_changed = action.get("candidate_bytes_changed")
             if (
                 require_candidate_change
                 and finding.get("recovery_class") in {
@@ -6800,7 +6795,7 @@ def _complete_pending_recovery_attempts(
                     "visual_defect",
                     "deterministic_structure_defect",
                 }
-                and not semantic_changed
+                and not action.get("candidate_bytes_changed")
             ):
                 no_progress.append({
                     **finding,

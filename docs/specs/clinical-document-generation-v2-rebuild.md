@@ -114,7 +114,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 80. As a reviewer, I want verifier agents to return findings and retry targets without rewriting, so that repair remains controlled.
 81. As a reviewer, I want shared facts compared across the Canonical Approved Source, Protocol, ICF, and PRS XML, so that document contradictions block release.
 82. As a reviewer, I want each repairable failed target retried within one persisted 45-minute deadline, so ordinary internal formatting and drafting defects do not become client blockers because of an arbitrary counter.
-83. As a reviewer, I want every layout retry to identify its exact target and materially distinct safe strategy, so semantic no-progress causes escalation or exact-artifact reinspection rather than blind document mutation; drafting retries remain exact-section and latest-finding driven.
+83. As a reviewer, I want every retry to identify its exact target and materially distinct strategy, so semantic no-progress causes escalation or exact-artifact reinspection rather than blind repetition.
 84. As a reviewer, I want Repair Report findings classified as source evidence, drafting, contradiction, structure, renderer, or visual failures, so that remediation is routed correctly.
 85. As a client, I want standards-compliant DOCX output, so that files can be opened and edited in Microsoft Word.
 86. As a client, I want Microsoft Word treated as the compatibility target, so that local fallback rendering is not mistaken for the client's environment.
