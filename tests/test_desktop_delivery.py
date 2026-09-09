@@ -1686,6 +1686,60 @@ def _visual_handoff_fixture(tmp_path, artifact):
     return handoff, request, response
 
 
+def test_terminal_visual_finding_is_consumed_without_parent_fallback(tmp_path, monkeypatch):
+    now = [0.0]
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
+    response["status"] = "failed"
+    response["findings"] = [{
+        "finding_id": "protocol-section3-split",
+        "artifact": "protocol",
+        "page": 1,
+        "check": "bad_table_split",
+        "target_ids": ["layout:protocol"],
+        "issue": "A complete summary-table row split across pages.",
+        "recommended_action": "Apply the governed local row-split repair and re-review.",
+    }]
+    response["page_assessments"][0]["status"] = "failed"
+    results = iter([
+        {
+            "status": "awaiting_hermes",
+            "stage": "independent_verification",
+            "revision_id": "r1",
+            "handoffs": [handoff],
+        },
+        {
+            "status": "blocked",
+            "stage": "quality",
+            "findings": response["findings"],
+            "client_outputs": [],
+        },
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    parent_reviews = []
+
+    def complete_with_finding(received_handoffs, timeout_seconds):
+        assert received_handoffs == [handoff]
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+        now[0] += timeout_seconds
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=complete_with_finding,
+        fallback_handoff_runner=lambda handoffs, _remaining: parent_reviews.extend(handoffs),
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+        stage_soft_budgets={"independent_verification": 5.0},
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "quality"
+    assert parent_reviews == []
+
+
 def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only_the_stall(tmp_path, monkeypatch):
     now = [0.0]
     protocol_handoff, protocol_request, protocol_response = _visual_handoff_fixture(tmp_path, "protocol")

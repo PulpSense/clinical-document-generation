@@ -3775,7 +3775,7 @@ def _handoff_response_is_bound(
         and request.get("request_sha256") == handoff.get("request_sha256")
         and request.get("response_path") == handoff.get("response_path")
         and request.get("task") == handoff.get("task")
-        and verification_response_is_complete(revision_dir, request_path)
+        and verification_response_is_terminal(revision_dir, request_path)
     )
 
 
