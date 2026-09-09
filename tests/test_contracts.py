@@ -220,6 +220,17 @@ def test_screening_washout_is_contractually_bound_to_protocol_and_icf():
 
     assert "procedures.minimum_days_before_screening_without_participation" in protocol["subjects.inclusion"].evidence
     assert "procedures.minimum_days_before_screening_without_participation" in icf["icf.procedures"].evidence
+    assert {"population.minimum_age", "population.maximum_age"} <= set(
+        protocol["subjects.inclusion"].evidence
+    )
+    assert {
+        "population.inclusion_criteria",
+        "population.exclusion_criteria",
+        "population.minimum_age",
+        "population.maximum_age",
+    } <= set(
+        icf["icf.procedures"].evidence
+    )
 
 
 def test_operational_safeguards_costs_and_device_role_are_bound_to_their_target_sections():

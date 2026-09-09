@@ -39,6 +39,13 @@ def _visible_text(document: Document) -> str:
     return "\n".join(values)
 
 
+def _minimal_source_bound_icf_procedures():
+    return {
+        "paragraphs": [{"text": "You will complete the approved study visits and procedures."}],
+        "lists": [],
+    }
+
+
 def _points(value):
     return None if value is None else round(value.pt, 2)
 
@@ -427,7 +434,11 @@ def test_sterling_icf_removes_review_metadata_and_uses_heading_styles(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["meta"]["icf_template"] = "Sterling"
 
-    report = render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    report = render_documents(ROOT, tmp_path, reference, {
+        "protocol": [],
+        "icf": {"icf.procedures": _minimal_source_bound_icf_procedures()},
+        "prs": {},
+    })
     assert report["status"] == "passed"
 
     output_path = tmp_path / "candidate/icf.docx"
@@ -463,7 +474,11 @@ def test_rendering_uses_prs_provider_study_id_when_protocol_number_is_absent(tmp
     reference.setdefault("regulatory", {}).setdefault("prs", {})["provider_study_id"] = "AS-SP-001"
     reference["meta"]["icf_template"] = "Sterling"
 
-    report = render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    report = render_documents(ROOT, tmp_path, reference, {
+        "protocol": [],
+        "icf": {"icf.procedures": _minimal_source_bound_icf_procedures()},
+        "prs": {},
+    })
 
     assert report["status"] == "passed"
     assert "AS-SP-001" in _visible_text(Document(tmp_path / "candidate/protocol.docx"))
@@ -2335,6 +2350,7 @@ def test_client_templates_normalize_visual_edge_cases(tmp_path):
             "lists": [],
         }],
         "icf": {
+            "icf.procedures": _minimal_source_bound_icf_procedures(),
             "icf.risks": {
                 "paragraphs": [{"text": "Taking part may involve inconvenience or discomfort from the approved procedures."}],
                 "lists": [],
@@ -2659,6 +2675,7 @@ def test_observational_outputs_remove_unapproved_template_study_claims(tmp_path)
     model = {
         "protocol": [],
         "icf": {
+            "icf.procedures": _minimal_source_bound_icf_procedures(),
             "icf.injury": {"paragraphs": [{"text": "Study personnel will evaluate and document research-related medical concerns."}], "lists": []},
             "icf.costs": {"paragraphs": [{"text": "No study-related cost terms are specified in the approved study information."}], "lists": []},
         },
@@ -2699,6 +2716,7 @@ def test_protocol_agreement_and_icf_shell_are_source_bound(tmp_path):
     model = {
         "protocol": [],
         "icf": {
+            "icf.procedures": {"paragraphs": [{"text": "You will complete the approved study visits and procedures."}], "lists": []},
             "icf.privacy": {"paragraphs": [{"text": "Your records will use coded identifiers and may be reviewed only by authorized study and oversight personnel."}], "lists": []},
             "icf.injury": {"paragraphs": [{"text": "Contact the study doctor promptly if you believe a study activity caused an injury."}], "lists": []},
             "icf.costs": {"paragraphs": [{"text": "Before you sign, the study team will explain whether any research costs are your responsibility."}], "lists": []},
@@ -2742,6 +2760,140 @@ def test_protocol_agreement_and_icf_shell_are_source_bound(tmp_path):
     summary_values = {row.cells[0].text.strip(): row.cells[1].text.strip() for row in summary.rows}
     assert "Hypothesis" not in summary_values
     assert summary_values["Test Article(s)"]
+
+
+@pytest.mark.parametrize(
+    "fixture_name",
+    (
+        "prospective-acceptance-source.json",
+        "ambispective-acceptance-source.json",
+        "retrospective-acceptance-source.json",
+    ),
+)
+def test_protocol_version_uses_its_own_title_control(tmp_path, fixture_name):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+    reference["meta"]["version"] = "1.0"
+
+    render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+    )
+
+    protocol = Document(tmp_path / "candidate/protocol.docx")
+    title = next(
+        table for table in protocol.tables
+        if table.rows[0].cells[0].text.strip() == "Protocol Number"
+    )
+    title_values = {
+        row.cells[0].text.strip(): row.cells[1].text.strip()
+        for row in title.rows
+    }
+    assert title_values["Amendment Number"] == ""
+    assert title_values["Protocol Version"] == "1.0"
+
+
+@pytest.mark.parametrize(
+    "template_name",
+    (
+        "prospective-protocol.template.docx",
+        "ambispective-protocol.template.docx",
+        "retrospective-protocol.template.docx",
+    ),
+)
+def test_protocol_amendment_number_is_blank_when_date_and_version_are_blank(
+    template_name,
+):
+    protocol = Document(ROOT / "assets/client-templates/docx" / template_name)
+
+    rendering._normalize_protocol_title_controls(
+        protocol,
+        {"meta": {"date": "", "version": ""}},
+    )
+
+    title = next(
+        table for table in protocol.tables
+        if table.rows[0].cells[0].text.strip() == "Protocol Number"
+    )
+    title_values = {
+        row.cells[0].text.strip(): row.cells[1].text.strip()
+        for row in title.rows
+    }
+    assert title_values["Amendment Number"] == ""
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "icf_template"),
+    (
+        ("prospective-acceptance-source.json", "Advarra"),
+        ("prospective-acceptance-source.json", "Sterling"),
+        ("ambispective-acceptance-source.json", "Advarra"),
+        ("ambispective-acceptance-source.json", "Sterling"),
+    ),
+)
+def test_icf_procedures_replace_open_ended_template_eligibility(
+    tmp_path, fixture_name, icf_template,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = icf_template
+    procedures = (
+        "You may participate if you are 18 through 80 years old and have the target condition. "
+        "Before screening, you must have gone at least 30 days without participating in another study. "
+        "You cannot participate if you are unable to complete follow-up. At Baseline on Day 0, you will "
+        "provide consent and begin use of the study device. Assessments occur at Baseline, Month 1, and Month 3."
+    )
+    model = {
+        "protocol": [],
+        "icf": {"icf.procedures": {"paragraphs": [{"text": procedures}], "lists": []}},
+        "prs": {},
+    }
+
+    render_documents(ROOT, tmp_path, reference, model)
+
+    visible = _visible_text(Document(tmp_path / "candidate/icf.docx"))
+    assert procedures in visible
+    assert "include but are not limited to" not in visible.casefold()
+    assert "there may be other reasons why you cannot participate" not in visible.casefold()
+
+
+@pytest.mark.parametrize(
+    ("fixture_name", "icf_template"),
+    (
+        ("prospective-acceptance-source.json", "Advarra"),
+        ("prospective-acceptance-source.json", "Sterling"),
+        ("ambispective-acceptance-source.json", "Advarra"),
+        ("ambispective-acceptance-source.json", "Sterling"),
+    ),
+)
+@pytest.mark.parametrize("procedures_draft", (None, {"paragraphs": [], "lists": []}))
+def test_icf_rendering_blocks_when_source_bound_procedures_are_missing_or_empty(
+    tmp_path, fixture_name, icf_template, procedures_draft,
+):
+    reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = icf_template
+    icf = {} if procedures_draft is None else {"icf.procedures": procedures_draft}
+
+    report = render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": icf, "prs": {}},
+    )
+
+    assert report["status"] == "blocked"
+    icf_artifact = next(item for item in report["artifacts"] if item["artifact"] == "icf")
+    assert icf_artifact["status"] == "blocked"
+    assert icf_artifact["path"] == "candidate/icf.docx"
+    assert any(
+        finding["field"] == "icf.procedures"
+        and "source-bound" in finding["issue"]
+        for finding in icf_artifact["findings"]
+    )
+    visible = _visible_text(Document(tmp_path / icf_artifact["path"])).casefold()
+    assert "include but are not limited to" not in visible
+    assert "there may be other reasons why you cannot participate" not in visible
 
 
 def test_retrospective_enrollment_body_is_inserted_after_template_heading_normalization(tmp_path):
@@ -2986,7 +3138,11 @@ def test_every_layout_family_repair_is_local_idempotent_and_renderer_verified(
         ROOT,
         output,
         reference,
-        {"protocol": [], "icf": {}, "prs": {}},
+        {
+            "protocol": [],
+            "icf": {"icf.procedures": _minimal_source_bound_icf_procedures()},
+            "prs": {},
+        },
         artifact_names={artifact},
     )
     candidate = output / "candidate" / f"{artifact}.docx"
@@ -3064,7 +3220,13 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
             reference["meta"]["icf_template"] = icf_family
         output = tmp_path / f"{reference['meta']['study_type']}-{icf_family or 'none'}"
 
-        document_report = render_documents(ROOT, output, reference, {"protocol": [], "icf": {}, "prs": {}})
+        icf = (
+            {"icf.procedures": _minimal_source_bound_icf_procedures()}
+            if icf_family is not None else {}
+        )
+        document_report = render_documents(
+            ROOT, output, reference, {"protocol": [], "icf": icf, "prs": {}}
+        )
         render_report = render_pages(output, page_renderer_identities=[governed_pdfium])
 
         assert document_report["status"] == "passed"

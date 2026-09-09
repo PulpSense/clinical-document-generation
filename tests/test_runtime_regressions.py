@@ -31,6 +31,13 @@ def _source():
     )
 
 
+def _minimal_source_bound_icf_procedures():
+    return {
+        "paragraphs": [{"text": "You will complete the approved study visits and procedures."}],
+        "lists": [],
+    }
+
+
 def _visible(document):
     paragraphs = [paragraph.text for paragraph in document.paragraphs]
     cells = [cell.text for table in document.tables for row in table.rows for cell in row.cells]
@@ -347,7 +354,11 @@ def test_macos_renderer_honors_the_callers_remaining_deadline(tmp_path, monkeypa
 
 def test_layout_repair_is_scoped_to_one_artifact_and_rule(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
-    model = {"protocol": [], "icf": {}, "prs": {}}
+    model = {
+        "protocol": [],
+        "icf": {"icf.procedures": _minimal_source_bound_icf_procedures()},
+        "prs": {},
+    }
 
     baseline = render_documents(ROOT, tmp_path, reference, model)
     icf_before = (tmp_path / "candidate/icf.docx").read_bytes()
@@ -743,7 +754,11 @@ def test_sterling_duration_whitespace_repair_removes_contracted_template_spacers
         (ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8")
     )
     reference["meta"]["icf_template"] = "Sterling"
-    model = {"protocol": [], "icf": {}, "prs": {}}
+    model = {
+        "protocol": [],
+        "icf": {"icf.procedures": _minimal_source_bound_icf_procedures()},
+        "prs": {},
+    }
     baseline_dir = tmp_path / "baseline"
     repaired_dir = tmp_path / "repaired"
 
@@ -922,7 +937,15 @@ def test_parallel_bundle_identity_preserves_candidate_bytes_and_visible_formatti
     reference = json.loads((ROOT / "tests/fixtures" / fixture_name).read_text(encoding="utf-8"))
     if icf_family is not None:
         reference["meta"]["icf_template"] = icf_family
-    model = {"protocol": [], "icf": {}, "prs": {}}
+    model = {
+        "protocol": [],
+        "icf": (
+            {"icf.procedures": _minimal_source_bound_icf_procedures()}
+            if icf_family is not None
+            else {}
+        ),
+        "prs": {},
+    }
     baseline_dir = tmp_path / "baseline"
     parallel_identity_dir = tmp_path / "parallel-identity"
     monkeypatch.setattr(zipfile.time, "time", lambda: 1_800_000_000.0)
@@ -2507,7 +2530,7 @@ def test_recovery_archive_transaction_recovers_before_journal_commit(tmp_path, m
     )
 
 
-def test_recovery_attempt_limit_is_scoped_to_target_and_strategy():
+def test_recovery_attempt_limit_is_hard_bounded_per_stable_target():
     prior = {
         "category": "visual",
         "field": "protocol",
@@ -2524,12 +2547,49 @@ def test_recovery_attempt_limit_is_scoped_to_target_and_strategy():
 
     attempts, strategies, exhausted = workflow._advance_recovery_attempts(
         [current],
-        {"layout:protocol": 4},
-        {"layout:protocol": {prior_strategy: 4}},
+        {"layout:protocol": 3},
+        {"layout:protocol": {prior_strategy: 2}},
     )
 
-    assert attempts["layout:protocol"] == 5
+    assert attempts["layout:protocol"] == 4
     assert strategies["layout:protocol"][workflow._recovery_strategy_id(current)] == 2
+    assert len(exhausted) == 1
+    assert exhausted[0]["field"] == "layout:protocol"
+    assert "after 3 attempts" in exhausted[0]["issue"]
+
+
+def test_recovery_wave_increments_stable_target_once_across_multiple_strategies():
+    base = {
+        "category": "visual",
+        "artifact": "protocol",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+    }
+    orphan_heading = {
+        **base,
+        "check": "orphan_heading",
+        "element": "5. INTRODUCTION",
+        "issue": "orphan heading",
+    }
+    split_table = {
+        **base,
+        "check": "bad_table_split",
+        "element": "3. GENERAL INFORMATION",
+        "issue": "split table",
+    }
+
+    attempts, strategies, exhausted = workflow._advance_recovery_attempts(
+        [orphan_heading, split_table],
+        {"layout:protocol": 1},
+        {},
+    )
+
+    assert attempts["layout:protocol"] == 2
+    assert strategies["layout:protocol"] == {
+        workflow._recovery_strategy_id(orphan_heading): 2,
+        workflow._recovery_strategy_id(split_table): 2,
+    }
     assert exhausted == []
 
 

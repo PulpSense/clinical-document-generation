@@ -355,7 +355,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "or missing-data methods from a broader analysis-plan field."
         ),
         "icf.study-purpose": "Explain the study purpose, hypothesis, primary endpoint, and background in clear participant-facing language.",
-        "icf.procedures": "Explain every approved visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
+        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
         "icf.duration": "State the approved participation duration and relevant time points.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
@@ -445,7 +445,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
-    _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design",)),
@@ -518,7 +518,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
 
 ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.background", "study.hypothesis", "endpoints.primary")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline", "population.sample_size")),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),

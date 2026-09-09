@@ -2973,7 +2973,7 @@ def _advance_recovery_attempts(
     prior_attempts: Mapping[str, int],
     prior_strategy_attempts: Mapping[str, Any],
 ) -> tuple[dict[str, int], dict[str, dict[str, int]], list[dict[str, Any]]]:
-    """Bound repeated target/strategy pairs while allowing a distinct strategy."""
+    """Enforce the hard attempt cap per stable target across all strategies."""
     attempts = dict(prior_attempts)
     strategy_attempts = {
         str(target): {str(strategy): int(count) for strategy, count in dict(counts).items()}
@@ -2982,6 +2982,7 @@ def _advance_recovery_attempts(
     }
     exhausted: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
+    seen_targets: set[str] = set()
     for finding in findings:
         targets = (
             finding.get("target_ids")
@@ -2994,17 +2995,20 @@ def _advance_recovery_attempts(
             if not target or (target, strategy_id) in seen:
                 continue
             seen.add((target, strategy_id))
-            attempts[target] = int(attempts.get(target, 1)) + 1
+            if target not in seen_targets:
+                attempts[target] = int(attempts.get(target, 1)) + 1
+                seen_targets.add(target)
             target_strategies = strategy_attempts.setdefault(target, {})
             next_attempt = int(target_strategies.get(strategy_id, 1)) + 1
             target_strategies[strategy_id] = next_attempt
-            if next_attempt > MAX_ATTEMPTS:
+            if attempts[target] > MAX_ATTEMPTS:
                 exhausted.append({
                     **dict(finding),
                     "field": target,
                     "strategy_id": strategy_id,
                     "issue": (
-                        f"Recovery strategy {strategy_id} made no progress after "
+                        f"Retry limit reached after {MAX_ATTEMPTS} attempts for stable target "
+                        f"{target}; recovery strategy {strategy_id} made no progress after "
                         f"{MAX_ATTEMPTS} attempts. {finding.get('issue', '')}"
                     ).strip(),
                 })

@@ -629,29 +629,39 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
 
 
 def _normalize_protocol_title_controls(document: Document, reference: Mapping[str, Any]) -> None:
-    """Expose the approved/default Protocol date without inventing a version."""
+    """Expose approved Protocol controls without conflating version and amendment."""
     protocol_date = _document_control_date(reference)
-    if not protocol_date:
-        return
+    protocol_version = _text(get_path(reference, "meta.version"))
     table = next((
         item for item in document.tables
         if item.rows and item.rows[0].cells[0].text.strip().casefold() == "protocol number"
     ), None)
     if table is None:
         return
-    existing = next((
+    amendment = next((
         row for row in table.rows
-        if row.cells[0].text.strip().casefold() == "protocol date"
-    ), None)
-    if existing is not None:
-        _set_paragraph_text(existing.cells[1].paragraphs[0], protocol_date)
-        return
-    anchor = table.rows[1] if len(table.rows) > 1 else table.rows[0]
-    clone = copy.deepcopy(anchor._tr)
-    anchor._tr.addnext(clone)
-    inserted = table.rows[list(table._tbl.tr_lst).index(clone)]
-    _set_paragraph_text(inserted.cells[0].paragraphs[0], "Protocol Date")
-    _set_paragraph_text(inserted.cells[1].paragraphs[0], protocol_date)
+        if row.cells[0].text.strip().casefold() == "amendment number"
+    ), table.rows[1] if len(table.rows) > 1 else table.rows[0])
+    _set_paragraph_text(amendment.cells[1].paragraphs[0], "")
+
+    def set_control(label: str, value: str, anchor) -> Any:
+        existing = next((
+            row for row in table.rows
+            if row.cells[0].text.strip().casefold() == label.casefold()
+        ), None)
+        if existing is None:
+            clone = copy.deepcopy(anchor._tr)
+            anchor._tr.addnext(clone)
+            existing = table.rows[list(table._tbl.tr_lst).index(clone)]
+            _set_paragraph_text(existing.cells[0].paragraphs[0], label)
+        _set_paragraph_text(existing.cells[1].paragraphs[0], value)
+        return existing
+
+    anchor = amendment
+    if protocol_version:
+        anchor = set_control("Protocol Version", protocol_version, anchor)
+    if protocol_date:
+        set_control("Protocol Date", protocol_date, anchor)
 
 
 def _protocol_heading_key(value: str) -> str:
@@ -1808,15 +1818,19 @@ def _populate_icf_sections(document: Document, model: Mapping[str, Any], *, ster
 
     # These sections contain example-study prose in the client authorities.
     # Their accepted source-bound drafts are the body; the heading design is retained.
-    source_bound_sections = ("icf.costs", "icf.alternatives", "icf.risks")
+    source_bound_sections = (
+        "icf.procedures", "icf.costs", "icf.alternatives", "icf.risks",
+    )
     for section_id in source_bound_sections:
         heading = heading_by_id.get(section_id)
         blocks = _icf_blocks(model, section_id)
-        if heading is None or not blocks:
+        if heading is None:
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)
         for element in elements:
             element.getparent().remove(element)
+        if not blocks:
+            continue
         _insert_icf_blocks(document, heading._p, blocks, exemplar)
 
     # Privacy and injury retain the client's heading design, but their body is
@@ -3352,6 +3366,12 @@ def render_documents(
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
         phrases = [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
         findings = audit_docx(path, required_phrases=phrases)
+        if kind == "icf" and not _icf_blocks(model, "icf.procedures"):
+            findings.insert(0, {
+                "category": "rendering",
+                "field": "icf.procedures",
+                "issue": "Required source-bound section icf.procedures is missing or empty.",
+            })
         results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not findings else "blocked", "findings": findings})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
