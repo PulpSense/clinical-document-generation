@@ -303,7 +303,7 @@ The model selected by the client at operation time for drafting and review. The 
 _Avoid_: required model, pinned GPT version, model allowlist
 
 **Progress-Based Recovery Ladder**:
-The ordered set of governed recovery strategies for an Internal Reliability Defect. Each retry must be tied to a specific finding and make a material change in evidence, strategy, or candidate bytes; unchanged failing strategies are bounded, while distinct useful recovery continues within the original 45-minute ceiling.
+The ordered set of governed recovery strategies for an Internal Reliability Defect. Each retry must be tied to a specific finding and make a material semantic change in evidence, strategy, or normalized candidate content. Raw package churn is not progress. When all safe deterministic strategies are present, the exact reviewer is re-prompted for reinspection and finer localization; repairable work continues within the original 45-minute ceiling.
 _Avoid_: three blind retries, identical rerun, global attempt exhaustion
 
 **Final Exact-Artifact Review**:

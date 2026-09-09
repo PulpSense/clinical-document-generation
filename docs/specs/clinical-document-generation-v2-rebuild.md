@@ -26,7 +26,7 @@ After approval, Hermes will launch versioned Drafting Batches rather than one ag
 
 Every generated DOCX context will use one Document Section Contract as the authority for hierarchy, section roles, minimum evidence, allowed content modes, Fixed Clinical Boilerplate, drafting instructions, and completeness checks. Every required leaf section must be substantive; a Container Section may group complete children without duplicating their prose.
 
-After deterministic assembly, one package-wide read-only verifier will check content and Cross-Document Consistency, and another will inspect every rendered Protocol and ICF page. Failed section IDs or layout stages will receive targeted retries, with three total attempts per target. Accepted Section Drafts will be reused when their inputs and governing resources have not changed.
+After deterministic assembly, one package-wide read-only verifier will check content and Cross-Document Consistency, and another will inspect every rendered Protocol and ICF page. Failed section IDs or layout stages receive targeted, progress-sensitive retries inside the one persisted 45-minute Desktop operation deadline. Accepted Section Drafts are reused when their inputs and governing resources have not changed.
 
 The workflow will deliver the Branch Document Set atomically. Prospective and Ambispective require Protocol DOCX, ICF DOCX, and PRS XML. Retrospective requires Protocol DOCX. If any required artifact or Delivery Gate fails after retries, no partial package will be released and the workflow will produce a classified Repair Report.
 
@@ -113,8 +113,8 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 79. As a reviewer, I want a package-wide read-only visual verifier, so that every rendered Protocol and ICF page receives independent inspection.
 80. As a reviewer, I want verifier agents to return findings and retry targets without rewriting, so that repair remains controlled.
 81. As a reviewer, I want shared facts compared across the Canonical Approved Source, Protocol, ICF, and PRS XML, so that document contradictions block release.
-82. As a reviewer, I want each failed target limited to three total attempts, so that retries are bounded and understandable.
-83. As a reviewer, I want a failure after the retry limit classified in a Repair Report, so that the next required action is clear.
+82. As a reviewer, I want each repairable failed target retried within one persisted 45-minute deadline, so ordinary internal formatting and drafting defects do not become client blockers because of an arbitrary counter.
+83. As a reviewer, I want every layout retry to identify its exact target and materially distinct safe strategy, so semantic no-progress causes escalation or exact-artifact reinspection rather than blind document mutation; drafting retries remain exact-section and latest-finding driven.
 84. As a reviewer, I want Repair Report findings classified as source evidence, drafting, contradiction, structure, renderer, or visual failures, so that remediation is routed correctly.
 85. As a client, I want standards-compliant DOCX output, so that files can be opened and edited in Microsoft Word.
 86. As a client, I want Microsoft Word treated as the compatibility target, so that local fallback rendering is not mistaken for the client's environment.
@@ -198,13 +198,15 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 
 ### Retry and reuse behavior
 
-- A failed Required Generated Section or formatting target receives at most three total attempts, including the initial attempt.
+- A failed Required Generated Section or formatting target receives targeted retries inside the one persisted 45-minute Desktop operation deadline; no fixed attempt or review-set count terminates repairable work.
 - Retry requests contain the failed stable section IDs or layout target, applicable findings, and the same governing contract.
 - Accepted Section Drafts are reused when the Canonical Approved Source, Document Section Contract, Fixed Clinical Boilerplate, Contracted Template, and model identity are unchanged.
 - Ordinary retries do not regenerate unrelated accepted sections.
+- Valid DOCX repair progress is measured from normalized package-member names and content hashes, not ZIP timestamps, compression metadata, or raw archive-byte churn.
+- Repeated visual findings advance through untried safe Word-native strategies. Once those strategies are present, only the exact visual reviewer is re-prompted to reinspect and refine localization; the document is never mutated blindly.
 - Runtime retries do not split or create new Drafting Batches. A persistent pattern found by acceptance testing can justify a later versioned topology change.
 - An explicit redraft is a separate operation and creates new evidence rather than silently replacing accepted content.
-- Exhausted retries block atomic delivery and produce a classified Repair Report.
+- The persisted deadline or a non-repairable integrity, source, renderer, safety, unsupported-template, or atomic-delivery failure blocks delivery and produces a classified Repair Report.
 
 ### Protocol contracts and rendering
 
@@ -313,7 +315,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 - Section Draft responses with unknown section IDs, missing required structures, placeholders, or unsupported claims fail before merge.
 - Deterministic merge follows Document Section Contract order regardless of subagent completion order.
 - A single failed section retries only its owning batch and reuses all unaffected accepted Section Drafts.
-- Retry attempt counts include the initial attempt and stop at three.
+- Retry attempt counts include the initial attempt for audit evidence but do not terminate repairable work; the one persisted 45-minute Desktop operation deadline is the governing cap.
 - Runtime failures do not change the versioned Drafting Batch topology.
 - Unchanged approved inputs and governing resources reuse accepted drafts; explicit redraft behavior is tested separately.
 
@@ -354,7 +356,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 - Content-verifier findings route to exact stable section IDs or a source-evidence blocker without rewriting.
 - Visual-verifier findings route to exact artifacts and pages or layout targets without rewriting.
 - One failing required output blocks the complete Branch Document Set.
-- Exhausted retries produce a classified Repair Report and no partial client outputs.
+- Deadline or non-repairable terminal failures produce a classified Repair Report and no partial client outputs.
 - A passing handoff contains only the active Branch Document Set while Internal QA Artifacts remain internal.
 - Generation Manifest hashes match the exact source, resources, evidence, and delivered artifacts.
 - Any post-certification mutation invalidates the passing evidence.
@@ -367,7 +369,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 - Installation tests prove failed smoke leaves the active release unchanged and successful activation retains the previous verified release.
 - Every page of representative Protocol and ICF outputs is rendered and inspected.
 - Visual assertions cover title pages, document control, TOC, dense sections, long lists, signatures, tables, page boundaries, headers, footers, and final pages.
-- Layout retry tests rebuild from the clean Contracted Template and stop after three total attempts.
+- Layout retry tests rebuild from the clean Contracted Template, prove semantic progress, escalate untried safe strategies, and remain bounded by the persisted Desktop operation deadline.
 - TOC tests verify a real field, update-on-open behavior, cached display accuracy, and invalidation after content mutation.
 
 ### Prior art

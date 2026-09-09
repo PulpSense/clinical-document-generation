@@ -1038,6 +1038,14 @@ def test_layout_retry_persists_scoped_rule_and_the_original_operation_deadline(t
     assert persisted["generation"]["pending_layout_artifacts"] == ["protocol"]
     assert "layout_repair_level" not in persisted["generation"]
     assert observed == {"path": run_dir, "operation_deadline": 99.0, "clock": clock}
+    attempt_manifest = json.loads(
+        next((revision_dir / "attempts").glob("*/attempt-manifest.json")).read_text(
+            encoding="utf-8"
+        )
+    )
+    action = attempt_manifest["recovery_actions"][0]
+    assert action["triggering_finding"]["repair_rule"] == "heading_cohesion"
+    assert action["strategy_id"].endswith(":heading_cohesion")
 
 
 def test_layout_retry_requires_an_exact_repair_element(tmp_path):
@@ -2285,7 +2293,66 @@ def test_reviewer_defect_starts_a_fresh_complete_review_set(tmp_path, monkeypatc
     assert list(response_dir.glob("*.json")) == []
 
 
-def test_third_failed_review_set_blocks_before_a_fourth_set(tmp_path, monkeypatch):
+def test_generate_stops_at_expired_operation_deadline_before_creating_requests(tmp_path):
+    run_dir = tmp_path / "run"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(_source()), encoding="utf-8")
+    assert workflow.prepare(run_dir)["status"] == "awaiting_approval"
+    approval = workflow.approve(run_dir, approved_by="reviewer")
+    revision = run_dir / "revisions" / approval["revision_id"]
+
+    result = workflow.generate(
+        run_dir,
+        operation_deadline=10.0,
+        clock=lambda: 10.0,
+        require_promoted_runtime=False,
+    )
+
+    assert result["status"] == "timeout"
+    assert result["stage"] == "generation"
+    assert not (revision / "hermes/requests").exists()
+
+
+def test_quality_retry_stops_at_expired_deadline_before_archiving(tmp_path):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    working = {"generation": {}}
+    reference_path.write_text(json.dumps(working), encoding="utf-8")
+    finding = {
+        "category": "visual",
+        "field": "protocol",
+        "artifact": "protocol",
+        "check": "orphan_heading",
+        "element": "6.2. Inclusion/Exclusion Criteria",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+        "issue": "orphan heading",
+    }
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        working,
+        _source(),
+        revision,
+        {},
+        [finding],
+        "quality",
+        operation_deadline=10.0,
+        clock=lambda: 10.0,
+        require_promoted_runtime=False,
+    )
+
+    assert result["status"] == "timeout"
+    assert result["stage"] == "quality"
+    assert not (revision / "attempts").exists()
+
+
+def test_repairable_third_review_set_continues_within_the_operation_deadline(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
     reference_path = run_dir / "reference/study.reference.json"
@@ -2296,7 +2363,20 @@ def test_third_failed_review_set_blocks_before_a_fourth_set(tmp_path, monkeypatc
         "recovery_history": [{"review_set": 2, "strategy_ids": [workflow._recovery_strategy_id(finding)]}],
     }
     reference_path.write_text(json.dumps({"generation": generation}), encoding="utf-8")
-    monkeypatch.setattr(workflow, "generate", lambda *_args, **_kwargs: pytest.fail("must not start a fourth review set"))
+    rerun = {"status": "awaiting_hermes", "stage": "independent_verification"}
+
+    def rebuild(*_args, **_kwargs):
+        candidate = revision / "candidate/protocol.docx"
+        candidate.parent.mkdir(parents=True, exist_ok=True)
+        candidate.write_bytes(b"repaired protocol")
+        latest = json.loads(reference_path.read_text(encoding="utf-8"))
+        assert workflow._complete_pending_recovery_attempts(
+            revision, reference_path, latest, require_candidate_change=True,
+        ) == []
+        workflow._advance_pending_review_set(reference_path, latest)
+        return rerun
+
+    monkeypatch.setattr(workflow, "generate", rebuild)
 
     result = workflow._quality_retry(
         run_dir,
@@ -2309,11 +2389,173 @@ def test_third_failed_review_set_blocks_before_a_fourth_set(tmp_path, monkeypatc
         "quality",
     )
 
-    assert result["status"] == "blocked"
-    assert result["stage"] == "review_set_limit"
-    assert "3 complete review sets" in result["findings"][0]["issue"]
-    state = json.loads(reference_path.read_text(encoding="utf-8"))
-    assert "attempts" not in state["generation"]
+    assert result == rerun
+    state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
+    assert state["review_set"] == 4
+
+
+def test_recovery_attempt_accounting_does_not_exhaust_after_three_attempts():
+    finding = {
+        "category": "visual",
+        "field": "protocol",
+        "artifact": "protocol",
+        "check": "orphan_heading",
+        "element": "6.2. Inclusion/Exclusion Criteria",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+        "issue": "orphan heading",
+    }
+
+    attempts, strategies = workflow._advance_recovery_attempts(
+        [finding],
+        {"layout:protocol": 12},
+        {},
+    )
+
+    assert attempts["layout:protocol"] == 13
+    assert strategies["layout:protocol"]
+
+
+def test_repeated_orphan_heading_escalates_to_safe_spacer_cleanup():
+    finding = {
+        "category": "visual",
+        "field": "protocol",
+        "artifact": "protocol",
+        "check": "orphan_heading",
+        "element": "6.2. Inclusion/Exclusion Criteria",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+        "issue": "orphan heading",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Retrospective",
+        existing_repairs={
+            "protocol": [
+                {"rule": "heading_cohesion", "target": "6.2. Inclusion/Exclusion Criteria"},
+            ],
+        },
+    )
+
+    assert unsupported == []
+    assert plan == {
+        "protocol": [
+            {"rule": "heading_whitespace_cohesion", "target": "6.2. Inclusion/Exclusion Criteria"},
+        ],
+    }
+
+
+def test_repeated_split_table_exhausts_safe_deterministic_repairs():
+    finding = {
+        "category": "visual",
+        "field": "protocol",
+        "artifact": "protocol",
+        "check": "bad_table_split",
+        "element": "Table 13.3.-1",
+        "target_ids": ["layout:protocol"],
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+        "issue": "split table",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan(
+        [finding],
+        study_type="Prospective",
+        existing_repairs={
+            "protocol": [
+                {"rule": "table_pagination", "target": "Table 13.3.-1"},
+            ],
+        },
+    )
+
+    assert plan == {}
+    assert unsupported[0]["disposition"] == "fail_closed:safe_repair_ladder_exhausted"
+
+
+def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
+    tmp_path, monkeypatch,
+):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    finding = {
+        "category": "visual",
+        "field": "protocol",
+        "artifact": "protocol",
+        "check": "orphan_heading",
+        "element": "6.2. Inclusion/Exclusion Criteria",
+        "target_ids": ["layout:protocol"],
+        "verification_request_id": "r-test.review-7.verify.visual.protocol",
+        "recovery_class": "visual_defect",
+        "action": "targeted_layout_repair",
+        "issue": "orphan heading",
+    }
+    generation = {
+        "review_set": 7,
+        "layout_repairs": {
+            "protocol": [
+                {"rule": "heading_cohesion", "target": finding["element"]},
+                {"rule": "heading_whitespace_cohesion", "target": finding["element"]},
+            ],
+        },
+    }
+    reference_path.write_text(json.dumps({"generation": generation}), encoding="utf-8")
+    expected = {"status": "awaiting_hermes", "stage": "independent_verification_retry"}
+    monkeypatch.setattr(workflow, "_awaiting", lambda *_args, **_kwargs: expected)
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": generation},
+        _source(),
+        revision,
+        {},
+        [finding],
+        "quality",
+    )
+
+    assert result == expected
+    state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
+    assert state["verification_attempts"][finding["verification_request_id"]] == 1
+    assert "recovery_exhaustion" not in state
+
+
+def test_verifier_transient_remains_retryable_after_three_attempts(tmp_path, monkeypatch):
+    run_dir = tmp_path / "run"
+    revision = run_dir / "revisions/r-test"
+    reference_path = run_dir / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    generation = {"verification_attempts": {"verification:content": 3}}
+    reference_path.write_text(json.dumps({"generation": generation}), encoding="utf-8")
+    finding = {
+        "category": "reviewer-transient",
+        "field": "verification:content",
+        "target_ids": ["verification:content"],
+        "recovery_class": "verifier_transient",
+        "action": "retry_verifier",
+        "issue": "malformed reviewer response",
+    }
+    expected = {"status": "awaiting_hermes", "stage": "independent_verification_retry"}
+    monkeypatch.setattr(workflow, "_awaiting", lambda *_args, **_kwargs: expected)
+
+    result = workflow._quality_retry(
+        run_dir,
+        reference_path,
+        {"generation": generation},
+        _source(),
+        revision,
+        {},
+        [finding],
+        "quality",
+    )
+
+    assert result == expected
+    state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
+    assert state["verification_attempts"]["verification:content"] == 4
 
 
 def test_third_review_set_continues_with_a_distinct_governed_strategy(tmp_path, monkeypatch):
@@ -2350,7 +2592,8 @@ def test_third_review_set_continues_with_a_distinct_governed_strategy(tmp_path, 
     assert result == rerun
     state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
     assert state["review_set"] == 4
-    assert workflow._recovery_strategy_id(current) in state["recovery_history"][-1]["strategy_ids"]
+    selected = {**current, "repair_rule": "table_pagination"}
+    assert workflow._recovery_strategy_id(selected) in state["recovery_history"][-1]["strategy_ids"]
 
 
 def test_deterministic_reconstruction_records_exact_target_and_measured_bytes(tmp_path, monkeypatch):
@@ -2403,7 +2646,7 @@ def test_deterministic_reconstruction_records_exact_target_and_measured_bytes(tm
     attempt_manifest = json.loads(next((revision / "attempts").glob("*/attempt-manifest.json")).read_text(encoding="utf-8"))
     action = attempt_manifest["recovery_actions"][0]
     assert action["target"] == ["prs.structured"]
-    assert action["candidate_bytes_changed"] is True
+    assert action["candidate_semantic_content_changed"] is True
     assert action["deterministic_structure_changed"] is True
     assert isinstance(action["prompt_evidence_changed"], bool)
 
@@ -2530,7 +2773,7 @@ def test_recovery_archive_transaction_recovers_before_journal_commit(tmp_path, m
     )
 
 
-def test_recovery_attempt_limit_is_hard_bounded_per_stable_target():
+def test_recovery_attempts_are_recorded_without_a_stable_target_cap():
     prior = {
         "category": "visual",
         "field": "protocol",
@@ -2545,7 +2788,7 @@ def test_recovery_attempt_limit_is_hard_bounded_per_stable_target():
     current = {**prior, "check": "bad_table_split", "element": "3. GENERAL INFORMATION"}
     prior_strategy = workflow._recovery_strategy_id(prior)
 
-    attempts, strategies, exhausted = workflow._advance_recovery_attempts(
+    attempts, strategies = workflow._advance_recovery_attempts(
         [current],
         {"layout:protocol": 3},
         {"layout:protocol": {prior_strategy: 2}},
@@ -2553,9 +2796,6 @@ def test_recovery_attempt_limit_is_hard_bounded_per_stable_target():
 
     assert attempts["layout:protocol"] == 4
     assert strategies["layout:protocol"][workflow._recovery_strategy_id(current)] == 2
-    assert len(exhausted) == 1
-    assert exhausted[0]["field"] == "layout:protocol"
-    assert "after 3 attempts" in exhausted[0]["issue"]
 
 
 def test_recovery_wave_increments_stable_target_once_across_multiple_strategies():
@@ -2579,7 +2819,7 @@ def test_recovery_wave_increments_stable_target_once_across_multiple_strategies(
         "issue": "split table",
     }
 
-    attempts, strategies, exhausted = workflow._advance_recovery_attempts(
+    attempts, strategies = workflow._advance_recovery_attempts(
         [orphan_heading, split_table],
         {"layout:protocol": 1},
         {},
@@ -2590,7 +2830,6 @@ def test_recovery_wave_increments_stable_target_once_across_multiple_strategies(
         workflow._recovery_strategy_id(orphan_heading): 2,
         workflow._recovery_strategy_id(split_table): 2,
     }
-    assert exhausted == []
 
 
 def test_visual_strategy_identity_includes_the_exact_repair_element():
@@ -2751,9 +2990,9 @@ def test_mixed_content_and_visual_findings_queue_both_repairs(tmp_path, monkeypa
     drafting_action = next(item for item in actions if item["triggering_finding"]["recovery_class"] == "drafting_defect")
     visual_action = next(item for item in actions if item["triggering_finding"]["recovery_class"] == "visual_defect")
     assert drafting_action["prompt_evidence_changed"] is True
-    assert drafting_action["candidate_bytes_changed"] is True
+    assert drafting_action["candidate_semantic_content_changed"] is True
     assert drafting_action["deterministic_structure_changed"] is False
-    assert visual_action["candidate_bytes_changed"] is True
+    assert visual_action["candidate_semantic_content_changed"] is True
     assert visual_action["deterministic_structure_changed"] is True
     assert json.loads(reference_path.read_text(encoding="utf-8"))["generation"]["review_set"] == 2
 
@@ -2842,7 +3081,7 @@ def test_terminal_timeout_measures_pending_recovery_without_advancing_review(tmp
     action = json.loads((attempt / "attempt-manifest.json").read_text(encoding="utf-8"))["recovery_actions"][0]
     state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
     assert action["outcome_status"] == "terminal_measured"
-    assert isinstance(action["candidate_bytes_changed"], bool)
+    assert isinstance(action["candidate_semantic_content_changed"], bool)
     assert isinstance(action["deterministic_structure_changed"], bool)
     assert isinstance(action["prompt_evidence_changed"], bool)
     assert state["review_set"] == 1
@@ -3032,36 +3271,18 @@ def test_layout_failure_rebuilds_and_reverifies_before_retry_limit(tmp_path, mon
     assert not verification_response.exists()
 
 
-def test_layout_failure_blocks_only_after_three_attempts_of_the_same_strategy(tmp_path):
-    run_dir = tmp_path / "run"
-    revision = run_dir / "revisions/r-test"
-    reference_path = run_dir / "reference/study.reference.json"
-    reference_path.parent.mkdir(parents=True)
+def test_layout_failure_does_not_exhaust_the_same_strategy_after_three_attempts():
     finding = {"category": "visual", "field": "protocol.docx:10", "artifact": "protocol", "check": "orphan_heading", "element": "5. INTRODUCTION", "target_ids": ["layout:protocol.docx"], "recovery_class": "visual_defect", "action": "targeted_layout_repair", "issue": "orphan heading"}
-    generation = {
-        "recovery_strategy_attempts": {
-            "layout:protocol.docx": {workflow._recovery_strategy_id(finding): 3},
-        },
-    }
-    reference_path.write_text(json.dumps({"generation": generation}), encoding="utf-8")
+    strategy_id = workflow._recovery_strategy_id(finding)
 
-    result = workflow._quality_retry(
-        run_dir,
-        reference_path,
-        {"generation": generation},
-        _source(),
-        revision,
-        {"layout:protocol.docx": 3},
+    attempts, strategies = workflow._advance_recovery_attempts(
         [finding],
-        "quality",
+        {"layout:protocol.docx": 3},
+        {"layout:protocol.docx": {strategy_id: 3}},
     )
 
-    assert result["status"] == "blocked"
-    assert result["stage"] == "recovery_no_progress"
-    assert result["findings"][0]["field"] == "layout:protocol.docx"
-    assert "made no progress after 3 attempts" in result["findings"][0]["issue"]
-    state = json.loads(reference_path.read_text(encoding="utf-8"))
-    assert "review_set" not in state["generation"]
+    assert attempts["layout:protocol.docx"] == 4
+    assert strategies["layout:protocol.docx"][strategy_id] == 4
 
 
 def test_prs_generation_validates_against_the_retained_client_manual_authority(tmp_path):

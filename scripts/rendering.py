@@ -10,7 +10,7 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, cast
 
 from docx import Document
 from docx.enum.style import WD_STYLE_TYPE
@@ -2761,9 +2761,22 @@ def _repair_heading_cohesion(
         _remove_empty_intervening_paragraphs(heading)
     block = _first_substantive_block(document, heading)
     if isinstance(block, Paragraph):
+        paragraph_block = cast(Paragraph, block)
         # Widow control preserves a visible first fragment without making a long
         # section indivisible.
-        block.paragraph_format.widow_control = True
+        paragraph_block.paragraph_format.widow_control = True
+        next_element = paragraph_block._p.getnext()
+        if (
+            paragraph_block.text.strip().endswith((':', '：'))
+            and next_element is not None
+            and next_element.tag in {qn("w:p"), qn("w:tbl")}
+        ):
+            # A short generated lead-in such as ``Inclusion criteria:`` is part
+            # of the heading's opening block.  Keep it with the first list item
+            # or table row, but leave the substantive content naturally
+            # splittable so long sections do not become indivisible.
+            paragraph_block.paragraph_format.keep_with_next = True
+            paragraph_block.paragraph_format.keep_together = True
     elif isinstance(block, Table) and block.rows:
         _prevent_row_split(block.rows[0])
         for cell in block.rows[0].cells:

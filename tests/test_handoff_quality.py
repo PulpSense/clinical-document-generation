@@ -1794,7 +1794,7 @@ def test_final_exact_artifact_review_rejects_sampled_page_inventory(tmp_path):
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
     request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
     request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": []}]}
+    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": [{"page": 7, "path": "rendered/protocol/page-7.png", "sha256": "7" * 64}]}]}
     request["request_sha256"] = verification_request_sha256(request)
     response = {
         "schema_version": RESPONSE_SCHEMA,
@@ -1820,6 +1820,50 @@ def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
     failed_table = next(item for item in findings if item.get("check") == "bad_table_split")
     assert failed_table["element"] == "Table 13.3.-1"
     assert failed_table["target_ids"] == ["layout:protocol"]
+    assert failed_table["page"] == 7
+    assert failed_table["verification_request_id"] == request["request_id"]
+
+
+def test_visual_gate_reprompts_when_the_failed_page_is_not_in_the_request(tmp_path):
+    request_dir = tmp_path / "hermes/verification-requests"
+    response_dir = tmp_path / "hermes/verification-responses"
+    request_dir.mkdir(parents=True)
+    response_dir.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r.verify.visual",
+        "task": "rendered_page_visual_verification",
+        "response_path": "hermes/verification-responses/r.verify.visual.json",
+        "artifacts": [{
+            "artifact": "protocol",
+            "pages": [{"page": 7, "path": "rendered/protocol/page-7.png", "sha256": "7" * 64}],
+        }],
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "producer": {"model_id": "test", "reviewer_id": "visual-reviewer"},
+        "status": "failed",
+        "findings": [{
+            "artifact": "protocol",
+            "page": 8,
+            "check": "orphan_heading",
+            "element": "6.2. Inclusion/Exclusion Criteria",
+            "issue": "The heading is orphaned.",
+        }],
+        "page_assessments": [],
+    }
+    (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
+    (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
+
+    findings, _ = validate_verifications(tmp_path)
+
+    routing = next(item for item in findings if "governed visual repair routing" in item["issue"])
+    assert routing["recovery_class"] == "verifier_transient"
+    assert routing["verification_request_id"] == request["request_id"]
 
 
 def test_render_gate_detects_a_textless_pdf_page(tmp_path):
@@ -1917,6 +1961,20 @@ def test_visual_response_is_rejected_after_any_bound_artifact_changes(tmp_path):
 def test_visual_review_contract_rejects_artificial_pagination_defects():
     assert "excessive_whitespace" in VISUAL_CHECKS
     assert "artificial_pagination" in VISUAL_CHECKS
+
+
+def test_drafting_retry_remains_available_after_three_attempts():
+    finding = {
+        "category": "drafting",
+        "field": "introduction",
+        "target_ids": ["introduction"],
+        "issue": "section needs another source-grounded revision",
+    }
+
+    attempts, exhausted = retry_attempts([finding], {"introduction": 3})
+
+    assert attempts["introduction"] == 4
+    assert exhausted == []
 
 
 def test_generation_rejects_study_input_mutation_after_approval(tmp_path):
@@ -2159,17 +2217,17 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
     recovered = generate(run_dir, require_promoted_runtime=False)
 
     assert recovered["status"] == "awaiting_hermes"
-    assert recovered["stage"] == "independent_verification"
+    assert recovered["stage"] == "independent_verification_retry"
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["approval"]["revision_id"] == revision_id
     assert state["approval"]["approved_reference_sha256"] == approved_sha256
-    assert state["generation"]["review_set"] == 2
+    assert state["generation"]["review_set"] == 1
     assert state["generation"]["gate_attempts"]
     attempts = [
         json.loads(path.read_text(encoding="utf-8"))
         for path in sorted((revision_dir / "attempts").glob("*/attempt-manifest.json"))
     ]
-    assert {item["stage"] for item in attempts} == {"drafting", "quality"}
+    assert {"drafting", "quality"} <= {item["stage"] for item in attempts}
     assert all(
         action["outcome_status"] == "measured"
         for attempt in attempts
@@ -2188,6 +2246,11 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
         response_path.parent.mkdir(parents=True, exist_ok=True)
         response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
     successful = generate(successful_repair_run, require_promoted_runtime=False)
+    for _ in range(5):
+        if successful["status"] != "awaiting_hermes":
+            break
+        accept_all(successful_repair_run, successful)
+        successful = generate(successful_repair_run, require_promoted_runtime=False)
     assert successful["status"] == "passed"
     assert set(successful["client_outputs"]) == {
         "output/icf.docx", "output/protocol.docx", "output/study.xml",
@@ -2224,10 +2287,12 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
     no_progress = generate(run_dir, require_promoted_runtime=False)
     repeated = generate(run_dir, require_promoted_runtime=False)
 
-    assert no_progress["status"] == "blocked"
-    assert no_progress["stage"] == "recovery_no_progress"
-    assert repeated["status"] == "blocked"
-    assert repeated["stage"] == "retry_limit"
+    assert no_progress["status"] == "awaiting_hermes"
+    assert no_progress["stage"] in {
+        "independent_verification", "independent_verification_retry",
+    }
+    assert repeated["status"] == "awaiting_hermes"
+    assert repeated["stage"] == no_progress["stage"]
 
 
 def test_public_generation_adopts_an_interrupted_attempt_and_preserves_approval(tmp_path):

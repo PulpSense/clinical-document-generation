@@ -221,7 +221,7 @@ class DiagnosticOutcome(str, Enum):
     NON_CERTIFYING_RUNTIME = "non-certifying-runtime"
     BLOCKED = "blocked"
     TIMEOUT = "timeout"
-    RETRY_LIMIT_VIOLATED = "retry-limit-violated"
+
     INVALID_HERMES_RESPONSE = "invalid-Hermes-response"
 
 
@@ -545,11 +545,6 @@ def inspect_run(
     output_files = {
         path.name for path in output_dir.glob("*") if path.is_file()
     } if output_dir.is_dir() else set()
-    retry_limit_violations = {
-        target: attempts
-        for target, attempts in stable_target_attempts.items()
-        if attempts and max(attempts) > 3
-    }
     events = _read_json_lines(run_dir / "logs/hermes-integration-events.jsonl")
     status_stage_history = [
         {
@@ -636,8 +631,6 @@ def inspect_run(
     )
     if timed_out:
         outcome = DiagnosticOutcome.TIMEOUT
-    elif retry_limit_violations:
-        outcome = DiagnosticOutcome.RETRY_LIMIT_VIOLATED
     elif valid_delivery and elapsed_seconds > certification_runtime_ceiling:
         outcome = DiagnosticOutcome.NON_CERTIFYING_RUNTIME
     elif valid_delivery:
@@ -676,7 +669,6 @@ def inspect_run(
         "output_files": sorted(output_files),
         "required_outputs": sorted(required_outputs),
         "delivery": final_result.get("delivery"),
-        "retry_limit_violations": retry_limit_violations,
         "model_identifiers": sorted(model_identifiers),
         "expected_model_identifier": expected_model_identifier or None,
         "noncanonical_model_identifiers": noncanonical_model_identifiers,

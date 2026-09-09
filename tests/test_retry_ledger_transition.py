@@ -1,12 +1,85 @@
 """Recovery attempts are measured before a subsequent retry is archived."""
 import json
 from pathlib import Path
+import zipfile
 
 import pytest
 
 import workflow
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_docx_like(path: Path, timestamp: tuple[int, int, int, int, int, int], document: bytes) -> None:
+    with zipfile.ZipFile(path, 'w') as package:
+        for name, payload in (
+            ('[Content_Types].xml', b'<Types/>'),
+            ('word/document.xml', document),
+        ):
+            info = zipfile.ZipInfo(name, timestamp)
+            package.writestr(info, payload)
+
+
+def test_candidate_evidence_hash_ignores_docx_container_metadata(tmp_path):
+    first = tmp_path / 'first.docx'
+    second = tmp_path / 'second.docx'
+    _write_docx_like(first, (2025, 1, 1, 0, 0, 0), b'<document>same</document>')
+    _write_docx_like(second, (2026, 1, 1, 0, 0, 0), b'<document>same</document>')
+
+    assert first.read_bytes() != second.read_bytes()
+    assert workflow._candidate_evidence_sha256(first) == workflow._candidate_evidence_sha256(second)
+
+
+def test_candidate_evidence_hash_detects_changed_docx_content(tmp_path):
+    first = tmp_path / 'first.docx'
+    second = tmp_path / 'second.docx'
+    _write_docx_like(first, (2025, 1, 1, 0, 0, 0), b'<document>before</document>')
+    _write_docx_like(second, (2026, 1, 1, 0, 0, 0), b'<document>after</document>')
+
+    assert workflow._candidate_evidence_sha256(first) != workflow._candidate_evidence_sha256(second)
+
+
+def test_semantic_no_progress_is_retained_without_terminal_exhaustion(tmp_path):
+    run_dir = tmp_path / 'run'
+    revision = run_dir / 'revisions/r-test'
+    candidate = revision / 'candidate/protocol.docx'
+    candidate.parent.mkdir(parents=True)
+    _write_docx_like(candidate, (2025, 1, 1, 0, 0, 0), b'<document>same</document>')
+    finding = {
+        'category': 'visual',
+        'field': 'protocol',
+        'artifact': 'protocol',
+        'check': 'orphan_heading',
+        'element': '6.2. Inclusion/Exclusion Criteria',
+        'target_ids': ['layout:protocol'],
+        'recovery_class': 'visual_defect',
+        'action': 'targeted_layout_repair',
+        'issue': 'orphan heading',
+    }
+    attempt = workflow._archive_failed_attempt(revision, 'quality', [finding])
+    journal = json.loads((revision / 'gate-attempt-journal.json').read_text(encoding='utf-8'))
+    reference_path = run_dir / 'reference/study.reference.json'
+    reference_path.parent.mkdir(parents=True)
+    working = {
+        'generation': {
+            'gate_attempts': journal['entries'],
+            'pending_recovery_attempts': [attempt.relative_to(revision).as_posix()],
+        },
+    }
+    reference_path.write_text(json.dumps(working), encoding='utf-8')
+    _write_docx_like(candidate, (2026, 1, 1, 0, 0, 0), b'<document>same</document>')
+
+    no_progress = workflow._complete_pending_recovery_attempts(
+        revision,
+        reference_path,
+        working,
+        require_candidate_change=True,
+    )
+
+    assert len(no_progress) == 1
+    state = json.loads(reference_path.read_text(encoding='utf-8'))['generation']
+    assert 'recovery_exhaustion' not in state
+    assert state['no_progress_history']
 
 
 def _finding(issue: str) -> dict[str, object]:

@@ -12,6 +12,24 @@ import rendering
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_heading_cohesion_keeps_a_short_lead_in_with_its_first_list_item():
+    document = Document()
+    heading = document.add_paragraph('6.2. Inclusion/Exclusion Criteria', style='Heading 2')
+    label = document.add_paragraph('Inclusion criteria:')
+    first_item = document.add_paragraph('Age 18 years or older.', style='List Bullet')
+
+    rendering._repair_heading_cohesion(
+        document,
+        heading.text,
+        protocol=True,
+    )
+
+    assert heading.paragraph_format.keep_with_next is True
+    assert label.paragraph_format.keep_with_next is True
+    assert label.paragraph_format.keep_together is True
+    assert first_item.paragraph_format.keep_with_next is not True
+
+
 @pytest.mark.parametrize('funding_address', [None, '10 Main St, Country'])
 def test_same_entity_sponsor_retains_funding_role(funding_address):
     funder = {'name': 'Sponsor Foundation'}

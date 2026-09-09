@@ -4280,7 +4280,12 @@ def validate_verifications(
             for item in issues or [{"issue": "Verifier did not pass the artifact."}]:
                 source = item if isinstance(item, Mapping) else {"issue": item}
                 category = "visual" if request["task"] == "rendered_page_visual_verification" else "verification"
-                finding = {"category": category, "field": request["task"], "issue": _text(source.get("issue"))}
+                finding = {
+                    "category": category,
+                    "field": request["task"],
+                    "verification_request_id": request["request_id"],
+                    "issue": _text(source.get("issue")),
+                }
                 for key in ("target_ids", "artifact", "page", "check", "element"):
                     if key in source: finding[key] = source[key]
                 if category == "visual":
@@ -4290,9 +4295,32 @@ def validate_verifications(
                         if isinstance(artifact, Mapping)
                     }
                     artifact = _text(source.get("artifact"))
+                    artifact_record = next((
+                        item for item in request.get("artifacts", [])
+                        if isinstance(item, Mapping)
+                        and _text(item.get("artifact")) == artifact
+                    ), {})
+                    expected_pages = {
+                        item.get("page")
+                        for item in artifact_record.get("pages", [])
+                        if isinstance(item, Mapping)
+                        and isinstance(item.get("page"), int)
+                        and not isinstance(item.get("page"), bool)
+                    }
+                    page = source.get("page")
+                    page_is_bound = (
+                        isinstance(page, int)
+                        and not isinstance(page, bool)
+                        and page in expected_pages
+                    )
                     check = _text(source.get("check"))
                     element = _text(source.get("element"))
-                    if artifact not in expected_artifacts or check not in VISUAL_CHECKS or not element:
+                    if (
+                        artifact not in expected_artifacts
+                        or not page_is_bound
+                        or check not in VISUAL_CHECKS
+                        or not element
+                    ):
                         findings.append(recovery_finding({
                             **finding,
                             "target_ids": [verification_target],

@@ -39,15 +39,13 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
-from drafting import MAX_ATTEMPTS, accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
+from drafting import accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
 
 
 REFERENCE = Path("reference/study.reference.json")
-MAX_VERIFICATION_ATTEMPTS = 3
-MAX_REVIEW_SETS = 3
 DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1200.0
@@ -2965,6 +2963,9 @@ def _recovery_strategy_id(finding: Mapping[str, Any]) -> str:
     ]
     if element:
         parts.append(element)
+    repair_rule = str(finding.get("repair_rule") or "").strip()
+    if repair_rule:
+        parts.append(repair_rule)
     return ":".join(part or "unknown" for part in parts)
 
 
@@ -2972,15 +2973,14 @@ def _advance_recovery_attempts(
     findings: Iterable[Mapping[str, Any]],
     prior_attempts: Mapping[str, int],
     prior_strategy_attempts: Mapping[str, Any],
-) -> tuple[dict[str, int], dict[str, dict[str, int]], list[dict[str, Any]]]:
-    """Enforce the hard attempt cap per stable target across all strategies."""
+) -> tuple[dict[str, int], dict[str, dict[str, int]]]:
+    """Record recovery attempts; the persisted operation deadline is the cap."""
     attempts = dict(prior_attempts)
     strategy_attempts = {
         str(target): {str(strategy): int(count) for strategy, count in dict(counts).items()}
         for target, counts in prior_strategy_attempts.items()
         if isinstance(counts, Mapping)
     }
-    exhausted: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
     seen_targets: set[str] = set()
     for finding in findings:
@@ -3001,18 +3001,7 @@ def _advance_recovery_attempts(
             target_strategies = strategy_attempts.setdefault(target, {})
             next_attempt = int(target_strategies.get(strategy_id, 1)) + 1
             target_strategies[strategy_id] = next_attempt
-            if attempts[target] > MAX_ATTEMPTS:
-                exhausted.append({
-                    **dict(finding),
-                    "field": target,
-                    "strategy_id": strategy_id,
-                    "issue": (
-                        f"Retry limit reached after {MAX_ATTEMPTS} attempts for stable target "
-                        f"{target}; recovery strategy {strategy_id} made no progress after "
-                        f"{MAX_ATTEMPTS} attempts. {finding.get('issue', '')}"
-                    ).strip(),
-                })
-    return attempts, strategy_attempts, exhausted
+    return attempts, strategy_attempts
 
 
 VERIFICATION_TASK_BY_TARGET = {
@@ -3322,7 +3311,7 @@ def validate(run_dir: Path, **_: Any) -> dict[str, Any]:
     return {"status": "passed" if not findings else "blocked", "stage": "readiness", "study_type": contract.get("study_type"), "findings": findings, "client_outputs": []}
 
 
-def _awaiting(revision_dir: Path, *, stage: str, paths: list[Path], findings: list[Mapping[str, Any]] | None = None) -> dict[str, Any]:
+def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
     handoffs = []
     for path in paths:
         request = _read(path)
@@ -3352,7 +3341,7 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: list[Path], findings: li
 def _repair_block(
     run_dir: Path,
     stage: str,
-    findings: list[Mapping[str, Any]],
+    findings: Sequence[Mapping[str, Any]],
     *,
     candidate_outputs: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
@@ -5933,9 +5922,17 @@ def _layout_repair_plan(
     *,
     study_type: str | None = None,
     icf_template: str | None = None,
+    existing_repairs: Mapping[str, Iterable[Mapping[str, Any]]] | None = None,
 ) -> tuple[dict[str, list[dict[str, str]]], list[dict[str, Any]]]:
     plan: dict[str, list[dict[str, str]]] = {}
     unsupported: list[dict[str, Any]] = []
+    existing = {
+        str(artifact): {
+            (record["rule"], record["target"].casefold())
+            for record in _normalized_layout_repair_records(repairs)
+        }
+        for artifact, repairs in dict(existing_repairs or {}).items()
+    }
     for raw in findings:
         finding = dict(raw)
         parsed_targets = [RetryTarget.parse(str(target)) for target in finding.get("target_ids", [])]
@@ -5995,11 +5992,40 @@ def _layout_repair_plan(
             and str(icf_template or "").casefold() == "sterling"
         )
         declared_rule = disposition.removeprefix("repair:") if disposition.startswith("repair:") else ""
-        rule = (
+        initial_rule = (
             "heading_whitespace_cohesion"
             if exact_sterling_duration_gap
             else declared_rule
         )
+        ladder = (
+            ("heading_whitespace_cohesion",)
+            if exact_sterling_duration_gap
+            else ("heading_cohesion", "heading_whitespace_cohesion")
+            if check == "orphan_heading"
+            else ("table_pagination",)
+            if check == "bad_table_split"
+            else (initial_rule,)
+        )
+        used = existing.get(artifact, set()) | {
+            (item["rule"], item["target"].casefold())
+            for item in plan.get(artifact, [])
+        }
+        rule = next(
+            (candidate for candidate in ladder if (candidate, target.casefold()) not in used),
+            "",
+        )
+        if not rule:
+            unsupported.append({
+                **finding,
+                "contracted_layout_family": family or None,
+                "disposition": "fail_closed:safe_repair_ladder_exhausted",
+                "evidence_retained": True,
+                "required": (
+                    "Every safe Word-native repair for this exact localized target was already applied. "
+                    "Preserve the unresolved rendered evidence for a new template-family repair strategy."
+                ),
+            })
+            continue
         if rule not in LAYOUT_REPAIR_RULES.get(artifact, ()) or not target:
             unsupported.append({
                 **finding,
@@ -6040,6 +6066,28 @@ def _layout_repair_plan(
         )
     ]
     return plan, unsupported
+
+
+def _annotate_layout_repair_rules(
+    findings: Iterable[dict[str, Any]],
+    plan: Mapping[str, Iterable[Mapping[str, str]]],
+) -> None:
+    """Bind the selected deterministic rule to its exact visual finding."""
+    for finding in findings:
+        if finding.get("recovery_class") != "visual_defect":
+            continue
+        artifact = str(finding.get("artifact") or "").removesuffix(".docx")
+        target = _canonical_layout_repair_target(
+            artifact,
+            str(finding.get("check") or ""),
+            str(finding.get("element") or ""),
+        )
+        selected = next(
+            (repair for repair in plan.get(artifact, []) if repair["target"] == target),
+            None,
+        )
+        if selected is not None:
+            finding["repair_rule"] = selected["rule"]
 
 
 def _invalidate_layout_artifact(revision_dir: Path, artifact: str) -> None:
@@ -6224,6 +6272,27 @@ def _ledger_findings(
     }]
 
 
+def _candidate_evidence_sha256(path: Path) -> str:
+    """Hash DOCX package meaning without ZIP timestamps or compression churn."""
+    if path.suffix.casefold() != ".docx":
+        return sha256_file(path)
+    try:
+        with zipfile.ZipFile(path) as package:
+            names = [item.filename for item in package.infolist()]
+            if len(names) != len(set(names)):
+                raise ValueError(f"DOCX contains duplicate package members: {path}")
+            members = {
+                name: hashlib.sha256(package.read(name)).hexdigest()
+                for name in sorted(names)
+            }
+    except zipfile.BadZipFile:
+        # Recovery evidence may retain a malformed artifact from a failed
+        # construction attempt. Preserve a stable raw identity for that failure;
+        # normal document/package validation still rejects it.
+        return sha256_file(path)
+    return sha256_value(members)
+
+
 def _recovery_action_observation(
     revision_dir: Path,
     finding: Mapping[str, Any],
@@ -6295,9 +6364,11 @@ def _recovery_action_observation(
             continue
         prompt_paths.add(revision_dir / "hermes/accepted" / f"{target.replace('/', '_')}.json")
 
-    def hashes(paths: Iterable[Path]) -> dict[str, str]:
+    def hashes(paths: Iterable[Path], *, candidate: bool = False) -> dict[str, str]:
         return {
-            path.relative_to(revision_dir).as_posix(): sha256_file(path)
+            path.relative_to(revision_dir).as_posix(): (
+                _candidate_evidence_sha256(path) if candidate else sha256_file(path)
+            )
             for path in sorted(set(paths))
             if path.is_file() and not path.is_symlink()
         }
@@ -6309,13 +6380,13 @@ def _recovery_action_observation(
             revision_dir / "candidate-structure.json",
         ]
     return {
-        "candidate": hashes(candidate_paths),
+        "candidate": hashes(candidate_paths, candidate=True),
         "structure": hashes(structural_paths),
         "prompt": hashes(prompt_paths),
     }
 
 
-def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mapping[str, Any]]) -> Path:
+def _archive_failed_attempt(revision_dir: Path, stage: str, findings: Sequence[Mapping[str, Any]]) -> Path:
     """Preserve the complete failed candidate and QA evidence before any retry mutation."""
     archive_root = revision_dir / "attempts"
     archive_root.mkdir(parents=True, exist_ok=True)
@@ -6406,7 +6477,7 @@ def _archive_failed_attempt(revision_dir: Path, stage: str, findings: list[Mappi
             "before": _recovery_action_observation(revision_dir, item),
             "prompt_evidence_changed": None,
             "deterministic_structure_changed": None,
-            "candidate_bytes_changed": None,
+            "candidate_semantic_content_changed": None,
         })
     _write(staging / "attempt-manifest.json", {
         "revision_id": revision_dir.name,
@@ -6533,7 +6604,7 @@ def _finalize_recovery_attempt(
         before = dict(action.get("before") or {})
         after = _recovery_action_observation(revision_dir, finding)
         action_changed = {
-            "candidate_bytes_changed": bool(after["candidate"]) and (
+            "candidate_semantic_content_changed": bool(after["candidate"]) and (
                 dict(before.get("candidate") or {}) != after["candidate"]
             ),
             "deterministic_structure_changed": dict(before.get("structure") or {}) != after["structure"],
@@ -6542,7 +6613,7 @@ def _finalize_recovery_attempt(
         if finding.get("recovery_class") == "deterministic_structure_defect":
             action_changed["deterministic_structure_changed"] = (
                 action_changed["deterministic_structure_changed"]
-                or action_changed["candidate_bytes_changed"]
+                or action_changed["candidate_semantic_content_changed"]
             )
         recovery_actions.append({
             **action,
@@ -6717,6 +6788,11 @@ def _complete_pending_recovery_attempts(
         manifest = _read(attempt_dir / "attempt-manifest.json")
         for action in manifest.get("recovery_actions", []):
             finding = dict(action.get("triggering_finding") or {})
+            semantic_changed = action.get("candidate_semantic_content_changed")
+            if semantic_changed is None:
+                # Backward-compatible replay of immutable attempts produced
+                # before semantic DOCX package hashing was introduced.
+                semantic_changed = action.get("candidate_bytes_changed")
             if (
                 require_candidate_change
                 and finding.get("recovery_class") in {
@@ -6724,7 +6800,7 @@ def _complete_pending_recovery_attempts(
                     "visual_defect",
                     "deterministic_structure_defect",
                 }
-                and not action.get("candidate_bytes_changed")
+                and not semantic_changed
             ):
                 no_progress.append({
                     **finding,
@@ -6739,7 +6815,8 @@ def _complete_pending_recovery_attempts(
     generation.pop("pending_recovery_plan", None)
     if no_progress:
         generation.pop("pending_review_set_advance", None)
-        generation["recovery_exhaustion"] = no_progress
+        generation.pop("recovery_exhaustion", None)
+        generation.setdefault("no_progress_history", []).extend(no_progress)
     _write(reference_path, working_reference)
     _validate_expected_gate_attempts(revision_dir, entries)
     return no_progress
@@ -6854,7 +6931,7 @@ def _quality_retry(
     approved_reference: Mapping[str, Any],
     revision_dir: Path,
     prior_attempts: Mapping[str, int],
-    findings: list[Mapping[str, Any]],
+    findings: Sequence[Mapping[str, Any]],
     stage: str,
     *,
     contracted_bundle: Mapping[str, Any] | None = None,
@@ -6864,6 +6941,18 @@ def _quality_retry(
     require_promoted_runtime: bool = True,
 ) -> dict[str, Any]:
     """Retry draftable targets; deterministic layout defects require an actual repair."""
+    if operation_deadline is not None and clock() >= operation_deadline:
+        return {
+            "status": "timeout",
+            "stage": stage,
+            "findings": [{
+                "category": "timeout",
+                "field": "operation",
+                "issue": "The persisted Desktop operation deadline expired before recovery mutation.",
+            }],
+            "candidate_outputs": _candidate_outputs(revision_dir),
+            "client_outputs": [],
+        }
     governed_findings: list[Mapping[str, Any]] = []
     for raw in findings:
         item = dict(raw)
@@ -6974,6 +7063,15 @@ def _quality_retry(
             }, "verifier_transient")
             for error in explicit_route_errors
         ]
+    findings = [dict(item) for item in findings]
+    if any(item.get("recovery_class") == "visual_defect" for item in findings):
+        preview_plan, _preview_unsupported = _layout_repair_plan(
+            findings,
+            study_type=str(get_path(approved_reference, "meta.study_type") or ""),
+            icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
+            existing_repairs=generation_state.get("layout_repairs") or {},
+        )
+        _annotate_layout_repair_rules(findings, preview_plan)
     expected_gate_attempts = list(generation_state.get("gate_attempts") or [])
     _validate_expected_gate_attempts(revision_dir, expected_gate_attempts)
     recovery_attempt_dir = _archive_failed_attempt(revision_dir, stage, findings)
@@ -6999,7 +7097,6 @@ def _quality_retry(
     transient = [item for item in findings if item.get("recovery_class") == "verifier_transient"]
     if transient:
         verification_attempts = working_reference.setdefault("generation", {}).setdefault("verification_attempts", {})
-        exhausted = []
         request_ids: set[str] = set()
         fallback_tasks: set[str] = set()
         transient_by_reviewer: dict[str, dict[str, Any]] = {}
@@ -7020,17 +7117,7 @@ def _quality_retry(
                 request_ids.add(request_id)
             elif task:
                 fallback_tasks.add(task)
-            if next_attempt > MAX_VERIFICATION_ATTEMPTS:
-                exhausted.append({
-                    **dict(item),
-                    "field": retry_key,
-                    "issue": f"Reviewer retry limit reached after {MAX_VERIFICATION_ATTEMPTS} attempts. {item.get('issue', '')}".strip(),
-                })
         _write(reference_path, working_reference)
-        if exhausted:
-            path = run_dir / "reference/repair-report.md"
-            path.write_text(repair_report(exhausted), encoding="utf-8")
-            return finish({"status": "blocked", "stage": "reviewer_retry_limit", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []})
         if request_ids:
             _clear_verification_responses(revision_dir, request_ids=request_ids)
         if fallback_tasks:
@@ -7132,57 +7219,72 @@ def _quality_retry(
                     "candidate": candidate_path.relative_to(revision_dir).as_posix(),
                     "before_sha256": sha256_file(candidate_path) if candidate_path.is_file() else None,
                 })
+    generation = working_reference.setdefault("generation", {})
     layout_plan: dict[str, list[dict[str, str]]] = {}
     if has_layout_target:
         layout_plan, unsupported = _layout_repair_plan(
             normalized,
             study_type=str(get_path(approved_reference, "meta.study_type") or ""),
             icf_template=str(get_path(approved_reference, "meta.icf_template") or ""),
+            existing_repairs=generation.get("layout_repairs") or {},
         )
         if unsupported:
+            ladder_exhausted = [
+                item for item in unsupported
+                if item.get("disposition") == "fail_closed:safe_repair_ladder_exhausted"
+            ]
+            if len(ladder_exhausted) == len(unsupported):
+                verification_attempts = generation.setdefault("verification_attempts", {})
+                request_ids: set[str] = set()
+                transient_findings = []
+                for item in ladder_exhausted:
+                    request_id = str(item.get("verification_request_id") or "").strip()
+                    retry_key = request_id or "verification:visual"
+                    verification_attempts[retry_key] = int(verification_attempts.get(retry_key, 0)) + 1
+                    if request_id:
+                        request_ids.add(request_id)
+                    transient_findings.append(recovery_finding({
+                        **dict(item),
+                        "category": "reviewer-transient",
+                        "field": retry_key,
+                        "target_ids": ["verification:visual"],
+                        "issue": (
+                            "The exact artifact still has a reported visual defect after every "
+                            "safe Word-native repair for the localized target. Reinspect the exact "
+                            "rendered pages and return a more precise localized finding if it remains."
+                        ),
+                    }, "verifier_transient"))
+                _write(reference_path, working_reference)
+                if request_ids:
+                    _clear_verification_responses(revision_dir, request_ids=request_ids)
+                else:
+                    _clear_verification_responses(
+                        revision_dir,
+                        {"rendered_page_visual_verification"},
+                    )
+                return finish(_awaiting(
+                    revision_dir,
+                    stage="independent_verification_retry",
+                    paths=pending_verifications(revision_dir),
+                    findings=transient_findings,
+                ))
             return finish(_repair_block(
                 run_dir,
                 "layout_repair_classification",
                 unsupported,
                 candidate_outputs=_candidate_outputs(revision_dir),
             ))
-    generation = working_reference.setdefault("generation", {})
-    attempts, strategy_attempts, exhausted = _advance_recovery_attempts(
+        _annotate_layout_repair_rules(normalized, layout_plan)
+    attempts, strategy_attempts = _advance_recovery_attempts(
         normalized,
         prior_attempts,
         generation.get("recovery_strategy_attempts") or {},
     )
     generation["recovery_strategy_attempts"] = strategy_attempts
-    if exhausted:
-        generation["attempts"] = attempts
-        generation["recovery_exhaustion"] = exhausted
-        _write(reference_path, working_reference)
-        path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(exhausted), encoding="utf-8")
-        return finish({"status": "blocked", "stage": "recovery_no_progress", "findings": exhausted, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []})
     if stage == "quality" and (section_targets or has_layout_target or deterministic_reconstruction):
         generation = working_reference.setdefault("generation", {})
         current_review_set = max(1, int(generation.get("review_set", 1)))
-        # Three unchanged review sets are still a bounded no-progress loop.
-        # A distinct, explicitly governed strategy is useful progress and is
-        # therefore allowed to continue inside the original deadline.
         strategy_ids = {_recovery_strategy_id(item) for item in normalized}
-        historical_strategy_ids = {
-            str(strategy)
-            for entry in (generation.get("recovery_history") or [])
-            for strategy in (entry.get("strategy_ids") or [])
-        }
-        if current_review_set >= MAX_REVIEW_SETS and not strategy_ids.difference(historical_strategy_ids):
-            exhausted_review = [{
-                **dict(item),
-                "field": "review_set",
-                "issue": f"Independent verification still found a defect after {MAX_REVIEW_SETS} complete review sets. {item.get('issue', '')}".strip(),
-            } for item in normalized]
-            return finish(_repair_block(
-                run_dir,
-                "review_set_limit",
-                exhausted_review,
-                candidate_outputs=_candidate_outputs(revision_dir),
-            ))
         generation["pending_review_set_advance"] = {
             "from_review_set": current_review_set,
             "strategy_ids": sorted(strategy_ids),
@@ -7237,6 +7339,38 @@ def _quality_retry(
     return generate(run_dir, **retry_options)
 
 
+def _continue_repairable_no_progress(
+    run_dir: Path,
+    reference_path: Path,
+    working_reference: dict[str, Any],
+    reference: Mapping[str, Any],
+    revision_dir: Path,
+    attempts: Mapping[str, int],
+    findings: Sequence[Mapping[str, Any]],
+    *,
+    contracted_bundle: Mapping[str, Any],
+    operation_deadline: float | None,
+    clock: Callable[[], float],
+    stage_observer: Callable[[str, float], Any] | None,
+    require_promoted_runtime: bool,
+) -> dict[str, Any] | None:
+    """Continue semantic no-progress only for repairable model/layout targets."""
+    if not findings or not all(
+        item.get("recovery_class") in {"visual_defect", "drafting_defect"}
+        for item in findings
+    ):
+        return None
+    return _quality_retry(
+        run_dir, reference_path, working_reference, reference,
+        revision_dir, attempts, findings, "recovery_no_progress",
+        contracted_bundle=contracted_bundle,
+        operation_deadline=operation_deadline,
+        clock=clock,
+        stage_observer=stage_observer,
+        require_promoted_runtime=require_promoted_runtime,
+    )
+
+
 def _complete_pending_deterministic_reconstructions(
     reference_path: Path,
     working_reference: dict[str, Any],
@@ -7282,13 +7416,25 @@ def generate(
         observed_at = now
 
     run_dir = run_dir.resolve(); reference_path, working_reference = _reference(run_dir)
+    revision_id = str(working_reference.get("approval", {}).get("revision_id") or "")
+    revision_dir = run_dir / "revisions" / revision_id
+    if operation_deadline is not None and clock() >= operation_deadline:
+        return {
+            "status": "timeout",
+            "stage": "generation",
+            "findings": [{
+                "category": "timeout",
+                "field": "operation",
+                "issue": "The persisted Desktop operation deadline expired before generation mutation.",
+            }],
+            "candidate_outputs": _candidate_outputs(revision_dir),
+            "client_outputs": [],
+        }
     try:
         bundle = contracted_template_bundle(SCRIPT_DIR.parent, working_reference)
     except ContractedTemplateBundleError as exc:
         return _repair_block(run_dir, "contracted_template_bundle", [exc.finding])
     approved, approval_issue = _approval_valid(run_dir, working_reference, contracted_bundle=bundle)
-    revision_id = str(working_reference.get("approval", {}).get("revision_id") or "")
-    revision_dir = run_dir / "revisions" / revision_id
     reference = _read(revision_dir / "approved-reference.json") if approved else working_reference
     contract = source_contract(reference)
     if contract["status"] != "passed" or not approved:
@@ -7480,10 +7626,19 @@ def generate(
                     require_candidate_change=True,
                 )
                 if no_progress:
+                    continuation = _continue_repairable_no_progress(
+                        run_dir, reference_path, working_reference, reference,
+                        revision_dir, attempts, no_progress,
+                        contracted_bundle=bundle,
+                        operation_deadline=operation_deadline,
+                        clock=clock,
+                        stage_observer=stage_observer,
+                        require_promoted_runtime=require_promoted_runtime,
+                    )
+                    if continuation is not None:
+                        return continuation
                     return _repair_block(
-                        run_dir,
-                        "recovery_no_progress",
-                        no_progress,
+                        run_dir, "recovery_no_progress", no_progress,
                         candidate_outputs=_candidate_outputs(revision_dir),
                     )
                 findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
@@ -7645,10 +7800,19 @@ def generate(
                 require_candidate_change=True,
             )
             if no_progress:
+                continuation = _continue_repairable_no_progress(
+                    run_dir, reference_path, working_reference, reference,
+                    revision_dir, attempts, no_progress,
+                    contracted_bundle=bundle,
+                    operation_deadline=operation_deadline,
+                    clock=clock,
+                    stage_observer=stage_observer,
+                    require_promoted_runtime=require_promoted_runtime,
+                )
+                if continuation is not None:
+                    return continuation
                 return _repair_block(
-                    run_dir,
-                    "recovery_no_progress",
-                    no_progress,
+                    run_dir, "recovery_no_progress", no_progress,
                     candidate_outputs=_candidate_outputs(revision_dir),
                 )
             findings = [
@@ -7689,10 +7853,19 @@ def generate(
         require_candidate_change=True,
     )
     if no_progress:
+        continuation = _continue_repairable_no_progress(
+            run_dir, reference_path, working_reference, reference,
+            revision_dir, attempts, no_progress,
+            contracted_bundle=bundle,
+            operation_deadline=operation_deadline,
+            clock=clock,
+            stage_observer=stage_observer,
+            require_promoted_runtime=require_promoted_runtime,
+        )
+        if continuation is not None:
+            return continuation
         return _repair_block(
-            run_dir,
-            "recovery_no_progress",
-            no_progress,
+            run_dir, "recovery_no_progress", no_progress,
             candidate_outputs=_candidate_outputs(revision_dir),
         )
     observe_stage("render_assurance")

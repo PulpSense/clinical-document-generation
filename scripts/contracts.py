@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.23"
+CONTRACT_VERSION = "clinical-documents-v2.24"
 BOILERPLATE_VERSION = "clinical-boilerplate-v9"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -57,8 +57,14 @@ def recovery_finding(
     }
 
 LAYOUT_REPAIR_RULES = {
-    "protocol": ("heading_cohesion", "table_pagination"),
-    "icf": ("heading_cohesion", "heading_whitespace_cohesion", "table_pagination"),
+    "protocol": (
+        "heading_cohesion", "heading_whitespace_cohesion",
+        "table_pagination",
+    ),
+    "icf": (
+        "heading_cohesion", "heading_whitespace_cohesion",
+        "table_pagination",
+    ),
 }
 
 LAYOUT_FAMILY_ARTIFACTS = {

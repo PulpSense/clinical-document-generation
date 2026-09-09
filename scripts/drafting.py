@@ -40,7 +40,6 @@ REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
 PROMPT_VERSION = "section-drafting-v11-source-constrained-boilerplate"
-MAX_ATTEMPTS = 3
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -228,7 +227,7 @@ def _request_matches_approved_reference(
             request.get("constraints") == _request_constraints(),
             request.get("response_path") == f"hermes/responses/{request_id}.json",
             set(targets) <= set(batch.section_ids),
-            all(1 <= attempt <= MAX_ATTEMPTS for attempt in normalized_attempts.values()),
+            all(attempt >= 1 for attempt in normalized_attempts.values()),
         ))
     except (OSError, ValueError, KeyError, StopIteration, TypeError, json.JSONDecodeError):
         return False
@@ -1614,7 +1613,7 @@ def accepted_cross_section_duplicate_findings(
 
 
 def retry_attempts(findings: Iterable[Mapping[str, Any]], prior: Mapping[str, int]) -> tuple[dict[str, int], list[dict[str, Any]]]:
-    """Increment only retryable targets; source intake is closed after approval."""
+    """Increment retryable targets; the Desktop operation deadline is the cap."""
     attempts = dict(prior)
     exhausted: list[dict[str, Any]] = []
     retry_targets: dict[str, Mapping[str, Any]] = {}
@@ -1625,8 +1624,6 @@ def retry_attempts(findings: Iterable[Mapping[str, Any]], prior: Mapping[str, in
             if target: retry_targets.setdefault(str(target), finding)
     for target, finding in retry_targets.items():
         next_attempt = int(attempts.get(target, 1)) + 1; attempts[target] = next_attempt
-        if next_attempt > MAX_ATTEMPTS:
-            exhausted.append({**dict(finding), "field": target, "issue": f"Retry limit reached after {MAX_ATTEMPTS} attempts. {finding.get('issue', '')}".strip()})
     return attempts, exhausted
 
 
@@ -1898,7 +1895,7 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
 
 
 __all__ = [
-    "MAX_ATTEMPTS", "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
+    "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
     "evidence_grounded", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
     "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
 ]

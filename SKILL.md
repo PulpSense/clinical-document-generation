@@ -403,15 +403,36 @@ timing, and values before release.
 
 ## Retry behavior
 
-- Maximum: three attempts per stable section target.
+- Repairable post-approval drafting, deterministic construction, layout, and
+  reviewer-response failures retry within the one persisted 45-minute Desktop
+  operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap.
 - Invalid draft: retry only failed section IDs in their existing batch.
 - Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
 - Content contradiction: retry only implicated sections unless the approved source conflicts.
-- Visual defect: repair/rebuild the affected layout artifact and rerun rendered-page verification.
+- Visual defect: localize the exact document, page, element, check, and layout
+  target; apply the narrowest untried safe Word-native strategy; rebuild the
+  affected artifact; and rerun rendered-page verification.
 - Reuse unaffected accepted drafts.
-- A fourth attempt is never created. After three failed attempts, block with `reference/repair-report.md` and no client outputs.
-- Independent verification runs in at most three complete review sets. If any content or visual reviewer finds a governed repairable defect, preserve the failed evidence, repair only the implicated draft/layout target, then rerun the package-wide content review and every document-scoped visual review against the repaired candidate. Never reuse a pass from an earlier set.
-- A transient API or malformed-routing response retries only that reviewer within the current set and does not consume a new complete review set. If the third complete set still finds a defect, preserve the candidate and block with `reference/repair-report.md`.
+- Every attempted layout repair records the actual strategy. A repeated visual
+  finding must select a stronger untried governed strategy; identical raw DOCX ZIP bytes or
+  ZIP-metadata churn never establish meaningful progress. Valid DOCX progress is
+  measured from normalized member names and content hashes.
+- Drafting retries remain bound to their exact failed section IDs and latest
+  clinical findings, reuse unaffected accepted drafts, and continue within the
+  same deadline without fabricated strategy labels.
+- When all safe deterministic strategies for one exact localized target are
+  already present, re-prompt only the exact visual reviewer to reinspect and
+  localize the unchanged artifact. Do not mutate the document blindly or consume
+  a new complete review set.
+- If any content or visual reviewer finds a governed repairable defect, preserve
+  the failed evidence, repair only the implicated draft/layout target, then rerun
+  the package-wide content review and every document-scoped visual review against
+  the repaired candidate. Never reuse a pass from an earlier set.
+- A transient API or malformed-routing response retries only that reviewer within
+  the current set and does not consume a new complete review set.
+- Only the persisted 45-minute deadline or a non-repairable integrity, source,
+  renderer, safety, unsupported-template, or atomic-delivery failure terminates
+  the post-approval operation without client outputs.
 
 ## Independent verification
 
