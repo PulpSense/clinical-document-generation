@@ -1973,10 +1973,10 @@ def _case_artifact_findings(
         or report_deadline is None
         or state_deadline != report_deadline
         or state_started is None
-        or (state_deadline - state_started).total_seconds() != 2700.0
-        or float(state.get("budget_seconds") or 0.0) != 2700.0
+        or (state_deadline - state_started).total_seconds() != 1800.0
+        or float(state.get("budget_seconds") or 0.0) != 1800.0
     ):
-        findings.append("Persisted Desktop operation does not retain the 45-minute correctness ceiling.")
+        findings.append("Persisted Desktop operation does not retain the 30-minute correctness ceiling.")
     if (state.get("result") or {}).get("manifest") != manifest_path.relative_to(run_dir).as_posix():
         findings.append("Persisted Desktop operation is not bound to the delivery manifest.")
     if not bool(((state.get("result") or {}).get("delivery") or {}).get("confirmed")):

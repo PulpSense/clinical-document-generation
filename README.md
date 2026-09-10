@@ -121,7 +121,7 @@ unzip -q "$candidate_dir/release.zip" -d "$candidate_dir/hermes-home/skills"
 The corpus controller loads `run_production_desktop_operation` from that
 candidate; the candidate launches Hermes with its own files read-only and binds
 the operation to its independently verified release-manifest fingerprint. Its
-cleanup reserve remains inside the one 45-minute operation;
+cleanup reserve remains inside the one 30-minute operation;
 there is no shorter certification timeout. A successful single fixture is
 case evidence only; it does not certify a release until the complete five-family
 corpus has passed.
@@ -165,7 +165,7 @@ approved synthetic fixture, governed Hermes settings and observed model IDs,
 Contracted Template Bundle and Layout Preservation identities, exact delivered
 bytes, all quality gates, every rendered page and check, delivery confirmation,
 runtime classifications below 15 minutes, through the 18-minute diagnostic window,
-or above 18 minutes within the unchanged 45-minute correctness ceiling. Recorded drafting or synthetic verification remains
+or above 18 minutes within the unchanged 30-minute correctness ceiling. Recorded drafting or synthetic verification remains
 labelled structural-only in preflight evidence and cannot satisfy the live gate.
 
 Certification fixtures live under `tests/fixtures/release-certification/`.
@@ -187,7 +187,7 @@ bound to the request schema, ID, hash, and task.
 
 The normal approval-to-accessible-files target is 10–20 minutes. The target is
 not a cutoff. The complete operation, including retries, verification,
-attachment retrieval, and owned-process cleanup, has a 45-minute ceiling.
+attachment retrieval, and owned-process cleanup, has a 30-minute ceiling.
 Normal generation runs with the installed skill read-only and may write only to
 the run workspace and isolated runtime caches. It never patches code or
 templates, installs packages, runs the development suite, or starts a recovery
@@ -257,13 +257,13 @@ fingerprint, embedded certification report, model/configuration hashes, runtime
 assurance, activation time, and sole promoted discovery path.
 `INSTALLATION-ASSURANCE.json` records the verified renderer,
 page renderer, fonts, and smoke result. Installation is setup; the post-approval
-Desktop operation remains governed by the single 45-minute budget. A passing
+Desktop operation remains governed by the single 30-minute budget. A passing
 Generation Manifest is not delivery: the Desktop parent must expose exactly its
 client outputs as attachments, retrieve each file through the actual opener,
 and confirm byte length and SHA-256 before reporting success.
 Release Certification keeps the 10–20 minute operating target but accepts any
 otherwise passing Retrospective, Ambispective, or Prospective case through the
-unchanged 45-minute correctness ceiling. Runtime above 15 minutes—and above the
+unchanged 30-minute correctness ceiling. Runtime above 15 minutes—and above the
 18-minute diagnostic window—is recorded explicitly for optimization, but does
 not invalidate correct, fully reviewed output by itself.
 

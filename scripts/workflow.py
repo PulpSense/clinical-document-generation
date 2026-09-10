@@ -49,7 +49,7 @@ REFERENCE = Path("reference/study.reference.json")
 DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1200.0
-DESKTOP_OPERATION_BUDGET_SECONDS = 2700.0
+DESKTOP_OPERATION_BUDGET_SECONDS = 1800.0
 FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
     "drafting": 480.0,
@@ -198,6 +198,12 @@ def _desktop_deadline_state(
             raise ValueError("Desktop deadline state contains a non-finite value.")
         if deadline_at_epoch < started_at_epoch or persisted_budget <= 0:
             raise ValueError("Desktop deadline state has an invalid interval.")
+        if started_at_epoch > epoch_now:
+            raise ValueError("Desktop deadline state starts in the future.")
+        # A persisted legacy or caller-supplied value can never extend the
+        # client Desktop ceiling. Preserve the original start and shorten only.
+        persisted_budget = min(persisted_budget, budget_seconds)
+        deadline_at_epoch = min(deadline_at_epoch, started_at_epoch + persisted_budget)
         raw_runtime_history = persisted.get("runtime_history", [])
         if not isinstance(raw_runtime_history, list) or any(
             not isinstance(item, Mapping) for item in raw_runtime_history
@@ -3070,61 +3076,14 @@ def _approved_payload(reference: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
-def _approval_governing_compatible(
-    skill_root: Path,
-    current_governing: Mapping[str, Any],
-    approved_governing_sha256: str,
-) -> bool:
-    """Accept one manifest-bound Linux adapter-only predecessor hash."""
-    if platform.system() != "Linux":
-        return False
-    try:
-        manifest = _read(skill_root / RELEASE_MANIFEST)
-        compatibility = manifest.get("approval_compatibility")
-        if not isinstance(compatibility, Mapping) or set(compatibility) != {
-            "schema_version", "scope", "implementation_path",
-            "predecessor_sha256", "current_sha256",
-        }:
-            return False
-        if (
-            compatibility.get("schema_version") != "approval-compatibility/v1"
-            or compatibility.get("scope") != "linux-desktop-adapter-only"
-            or compatibility.get("implementation_path") != "scripts/workflow.py"
-        ):
-            return False
-        implementation = current_governing.get("implementation_sha256")
-        if not isinstance(implementation, Mapping):
-            return False
-        workflow_path = skill_root / "scripts/workflow.py"
-        current_sha256 = sha256_file(workflow_path)
-        rows = [
-            row for row in manifest.get("files", [])
-            if isinstance(row, Mapping) and row.get("path") == "scripts/workflow.py"
-        ]
-        if (
-            len(rows) != 1
-            or rows[0].get("sha256") != current_sha256
-            or implementation.get("scripts/workflow.py") != current_sha256
-            or compatibility.get("current_sha256") != current_sha256
-        ):
-            return False
-        predecessor_sha256 = str(compatibility.get("predecessor_sha256") or "")
-        if not re.fullmatch(r"[0-9a-f]{64}", predecessor_sha256):
-            return False
-        predecessor = copy.deepcopy(dict(current_governing))
-        predecessor["implementation_sha256"]["scripts/workflow.py"] = predecessor_sha256
-        return sha256_value(predecessor) == approved_governing_sha256
-    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
-        return False
-
-
 def _approval_valid(
     run_dir: Path,
     reference: Mapping[str, Any],
     *,
     contracted_bundle: Mapping[str, Any] | None = None,
 ) -> tuple[bool, str]:
-    approval = reference.get("approval") if isinstance(reference.get("approval"), Mapping) else {}
+    approval_value = reference.get("approval")
+    approval: Mapping[str, Any] = approval_value if isinstance(approval_value, Mapping) else {}
     source = _source_path(run_dir, reference)
     if str(approval.get("status", "")).casefold() != "approved": return False, "The Source-of-Truth Markdown has not been explicitly approved."
     if not source.is_file(): return False, "The approved Source-of-Truth Markdown is missing."
@@ -3141,22 +3100,182 @@ def _approval_valid(
     snapshot = _read(snapshot_path)
     if _approved_payload(reference) != _approved_payload(snapshot):
         return False, "Study inputs changed after approval; prepare and approve a new Source-of-Truth revision."
-    current_governing = governing_resources(
-        SCRIPT_DIR.parent,
-        snapshot,
-        contracted_bundle=contracted_bundle,
-    )
-    expected_governing = sha256_value(current_governing)
-    if (
-        approval.get("governing_sha256") != expected_governing
-        and not _approval_governing_compatible(
-            SCRIPT_DIR.parent,
-            current_governing,
-            str(approval.get("governing_sha256") or ""),
-        )
-    ):
-        return False, "Generation contracts, templates, or implementation changed after approval; approve the unchanged Source-of-Truth again to create a new immutable revision."
+    snapshot_approval_value = snapshot.get("approval")
+    snapshot_approval: Mapping[str, Any] = snapshot_approval_value if isinstance(snapshot_approval_value, Mapping) else {}
+    recorded_source_identity = str(approval.get("source_approval_identity") or "")
+    snapshot_source_identity = str(snapshot_approval.get("source_approval_identity") or "")
+    if recorded_source_identity or snapshot_source_identity:
+        expected_source_identity = sha256_value({
+            "approved_source_sha256": approval.get("source_sha256"),
+            "approved_reference": _approved_payload(snapshot),
+        })
+        if (
+            recorded_source_identity != expected_source_identity
+            or snapshot_source_identity != expected_source_identity
+        ):
+            return False, "The Source approval identity does not match the immutable approved source."
+    # Approval is bound to reviewer-controlled source identity. Generation
+    # authority is rebound by candidate fingerprints and the immutable gate
+    # ledger, so an internal code/template repair does not demand reapproval.
     return True, ""
+
+
+_GENERATION_AUTHORITY_PATHS = (
+    "candidate",
+    "rendered",
+    "hermes",
+    "request-ledger",
+    "attempts",
+    "candidate-build.json",
+    "candidate-structure.json",
+    "delivery-manifest.json",
+)
+
+
+_GENERATION_AUTHORITY_JOURNAL = "generation-authority-transition.json"
+
+
+def _generation_authority_inventory(root: Path) -> list[dict[str, Any]]:
+    rows = []
+    for path in sorted(root.rglob("*")):
+        if path.is_symlink():
+            raise ValueError("Generation-authority archive contains a symbolic link.")
+        if path.is_file() and path.name != "authority-attempt-manifest.json":
+            rows.append({
+                "path": path.relative_to(root).as_posix(),
+                "sha256": sha256_file(path),
+                "bytes": path.stat().st_size,
+            })
+    return rows
+
+
+def _rebind_generation_authority(
+    revision_dir: Path,
+    working_reference: dict[str, Any],
+    governing_sha256: str,
+) -> bool:
+    """Journal, archive, and atomically bind one new generation authority."""
+    generation = working_reference.setdefault("generation", {})
+    prior = str(generation.get("governing_sha256") or "")
+    if not prior:
+        generation["governing_sha256"] = governing_sha256
+        return True
+    journal_path = revision_dir / _GENERATION_AUTHORITY_JOURNAL
+    journal = _read(journal_path) if journal_path.is_file() else None
+    if prior == governing_sha256 and journal is None:
+        return False
+
+    archive_root = revision_dir / "generation-authority-attempts"
+    archive_root.mkdir(parents=True, exist_ok=True)
+    if journal is None:
+        base = prior[:12] or "unknown"
+        final = archive_root / base
+        suffix = 2
+        while final.exists():
+            final = archive_root / f"{base}__{suffix:02d}"
+            suffix += 1
+        staging = Path(tempfile.mkdtemp(prefix=f".{final.name}.staging-", dir=archive_root))
+        journal = {
+            "schema_version": "generation-authority-transition/v1",
+            "phase": "prepared",
+            "prior_governing_sha256": prior,
+            "current_governing_sha256": governing_sha256,
+            "staging": staging.relative_to(revision_dir).as_posix(),
+            "final": final.relative_to(revision_dir).as_posix(),
+            "generation_state": copy.deepcopy(generation),
+        }
+        _write(journal_path, journal)
+    elif journal.get("current_governing_sha256") != governing_sha256:
+        raise ValueError("Pending generation-authority transition targets a different authority.")
+
+    resolved_paths = {}
+    for field in ("staging", "final"):
+        relative = PurePosixPath(str(journal.get(field) or ""))
+        if (
+            relative.is_absolute()
+            or ".." in relative.parts
+            or relative.parts[:1] != ("generation-authority-attempts",)
+        ):
+            raise ValueError(f"Generation-authority transition {field} path is invalid.")
+        resolved_paths[field] = revision_dir / relative
+    staging = resolved_paths["staging"]
+    final = resolved_paths["final"]
+    if not final.exists():
+        staging.mkdir(parents=True, exist_ok=True)
+        state_path = staging / "generation-state.json"
+        if not state_path.exists():
+            _write(state_path, dict(journal.get("generation_state") or {}))
+        for relative in _GENERATION_AUTHORITY_PATHS:
+            source = revision_dir / relative
+            target = staging / relative
+            if source.exists() and target.exists():
+                raise ValueError(f"Generation-authority transition has duplicate state: {relative}")
+            if source.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(source, target)
+        inventory = _generation_authority_inventory(staging)
+        manifest = {
+            "schema_version": "generation-authority-attempt/v1",
+            "prior_governing_sha256": journal["prior_governing_sha256"],
+            "current_governing_sha256": journal["current_governing_sha256"],
+            "files": inventory,
+        }
+        _write(staging / "authority-attempt-manifest.json", manifest)
+        os.replace(staging, final)
+        _sync_directory(archive_root)
+    manifest_path = final / "authority-attempt-manifest.json"
+    manifest_sha256 = sha256_file(manifest_path)
+    prior_records = list(dict(journal.get("generation_state") or {}).get("generation_authority_attempts") or [])
+    working_reference["generation"] = {
+        "governing_sha256": governing_sha256,
+        "generation_authority_attempts": [*prior_records, {
+            "prior_governing_sha256": journal["prior_governing_sha256"],
+            "current_governing_sha256": governing_sha256,
+            "archive": final.relative_to(revision_dir).as_posix(),
+            "manifest_sha256": manifest_sha256,
+        }],
+    }
+    journal["phase"] = "committed"
+    journal["manifest_sha256"] = manifest_sha256
+    _write(journal_path, journal)
+    return True
+
+
+def _complete_generation_authority_rebind(revision_dir: Path) -> None:
+    journal_path = revision_dir / _GENERATION_AUTHORITY_JOURNAL
+    if not journal_path.is_file():
+        return
+    journal = _read(journal_path)
+    if journal.get("phase") != "committed":
+        raise ValueError("Generation-authority transition is not committed.")
+    journal_path.unlink()
+    _sync_directory(revision_dir)
+
+
+def _validate_generation_authority_attempts(
+    revision_dir: Path,
+    generation: Mapping[str, Any],
+) -> None:
+    records = generation.get("generation_authority_attempts") or []
+    if not isinstance(records, list):
+        raise ValueError("Generation-authority attempt history must be a list.")
+    for record in records:
+        if not isinstance(record, Mapping):
+            raise ValueError("Generation-authority attempt record is invalid.")
+        relative = PurePosixPath(str(record.get("archive") or ""))
+        if relative.is_absolute() or ".." in relative.parts or relative.parts[:1] != ("generation-authority-attempts",):
+            raise ValueError("Generation-authority archive path is invalid.")
+        archive = revision_dir / relative
+        manifest_path = archive / "authority-attempt-manifest.json"
+        if not manifest_path.is_file() or sha256_file(manifest_path) != record.get("manifest_sha256"):
+            raise ValueError("Generation-authority archive manifest is missing or stale.")
+        manifest = _read(manifest_path)
+        declared = manifest.get("files") or []
+        if not isinstance(declared, list) or any(not isinstance(item, Mapping) for item in declared):
+            raise ValueError("Generation-authority archive inventory is invalid.")
+        actual = _generation_authority_inventory(archive)
+        if declared != actual:
+            raise ValueError("Generation-authority archive bytes changed after commit.")
 
 
 _OPTIONAL_REVIEW_FIELDS = (
@@ -3221,9 +3340,30 @@ def prepare(run_dir: Path, *, today: date | None = None, **_: Any) -> dict[str, 
     run_dir = run_dir.resolve(); reference_path, reference = _reference(run_dir)
     contract = source_contract(reference, derive_prs_study_type=True)
     if contract["status"] != "passed":
-        path = run_dir / "reference/missing-inputs.md"; path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(repair_report(contract["blocking_findings"]), encoding="utf-8")
-        return {"status": "blocked", "stage": "input_collection", "study_type": contract.get("study_type"), "missing": contract["blocking_findings"], "missing_inputs": path.relative_to(run_dir).as_posix(), "client_outputs": []}
+        reference_dir = run_dir / "reference"
+        reference_dir.mkdir(parents=True, exist_ok=True)
+        source_report = reference_dir / "missing-inputs.md"
+        technical_report = reference_dir / "technical-validation-report.md"
+        if contract["source_gaps"]:
+            source_report.write_text(repair_report(contract["source_gaps"]), encoding="utf-8")
+        else:
+            source_report.unlink(missing_ok=True)
+        if contract["technical_findings"]:
+            technical_report.write_text(repair_report(contract["technical_findings"]), encoding="utf-8")
+        else:
+            technical_report.unlink(missing_ok=True)
+        return {
+            "status": "blocked",
+            "stage": "input_collection" if contract["source_gaps"] else "technical_validation",
+            "study_type": contract.get("study_type"),
+            "missing": contract["source_gaps"],
+            "source_gaps": contract["source_gaps"],
+            "technical_findings": contract["technical_findings"],
+            "findings": contract["blocking_findings"],
+            "missing_inputs": source_report.relative_to(run_dir).as_posix() if contract["source_gaps"] else None,
+            "technical_report": technical_report.relative_to(run_dir).as_posix() if contract["technical_findings"] else None,
+            "client_outputs": [],
+        }
     reference = contract["normalized_reference"]
     _ensure_optional_review_fields(reference, contract.get("study_type"))
     meta = reference.setdefault("meta", {})
@@ -3276,13 +3416,16 @@ def approve(run_dir: Path, *, approved_by: str = "client", source_md: Path | Non
     bundle = contracted_template_bundle(SCRIPT_DIR.parent, reference)
     governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     governing_sha256 = sha256_value(governing)
-    revision_identity = sha256_value({
+    source_approval_identity = sha256_value({
         "approved_source_sha256": digest,
         "approved_reference": _approved_payload(reference),
-        "governing_resources": governing,
     })
+    revision_identity = source_approval_identity
     revision_id = f"r-{revision_identity[:12]}"
     approval["revision_id"] = revision_id
+    approval["source_approval_identity"] = source_approval_identity
+    approval["generation_authority_sha256"] = governing_sha256
+    # Retain the legacy audit key without using it as source-approval identity.
     approval["governing_sha256"] = governing_sha256
     revision_dir = run_dir / "revisions" / revision_id
     snapshot_path = revision_dir / "approved-reference.json"
@@ -3690,7 +3833,7 @@ def confirm_desktop_delivery(
         attempts = 0
         last_issue = ""
         opened_current = False
-        while attempts <= retries:
+        while deadline is not None or attempts <= retries:
             attempts += 1
             total_attempts += 1
             if deadline is not None and clock() >= deadline:
@@ -3708,8 +3851,18 @@ def confirm_desktop_delivery(
                 opened.append({"filename": item["filename"], "sha256": digest, "bytes": len(payload), "attempts": attempts})
                 opened_current = True
                 break
-            except Exception as exc:  # transport failures are reported, never certified
+            except (TypeError, ValueError) as exc:
+                # Malformed payloads and byte/hash mismatches are integrity
+                # failures, not transient transport conditions.
                 last_issue = str(exc)
+                break
+            except Exception as exc:  # transient transport failures retry until deadline
+                last_issue = str(exc)
+                if deadline is not None:
+                    remaining = deadline - clock()
+                    if remaining <= 0:
+                        break
+                    time.sleep(min(0.05 * (2 ** min(attempts - 1, 5)), remaining))
         else:
             last_issue = last_issue or "Desktop file transfer failed."
         if not opened_current:
@@ -3798,6 +3951,8 @@ def run_desktop_operation(
     wall_clock = wall_clock or time.time
     if budget_seconds <= 0:
         raise ValueError("Desktop operation budget must be positive.")
+    requested_budget_seconds = float(budget_seconds)
+    budget_seconds = min(requested_budget_seconds, DESKTOP_OPERATION_BUDGET_SECONDS)
     current_runtime = dict(runtime_identity or _current_python_runtime())
     if _runtime_version(current_runtime) < (*MINIMUM_PYTHON_VERSION, 0):
         raise RuntimeError("The Desktop operation requires an explicitly resolved Python 3.10+ runtime.")
@@ -3814,7 +3969,7 @@ def run_desktop_operation(
             key: operation_approval.get(key)
             for key in (
                 "status", "approved_by", "approved_at", "revision_id", "source_sha256",
-                "approved_reference_sha256", "governing_sha256",
+                "approved_reference_sha256", "source_approval_identity",
             )
         }
         if operation_approval
@@ -3843,19 +3998,53 @@ def run_desktop_operation(
     if persisted.get("operation_id") not in {None, operation_id}:
         raise ValueError("Desktop operation state belongs to a different operation.")
     recorded_release_identity = persisted.get("release_identity")
-    if isinstance(recorded_release_identity, Mapping) and dict(recorded_release_identity) != current_release_identity:
-        return {
-            "status": "blocked",
-            "stage": "release_identity",
-            "findings": [{
-                "category": "release",
-                "field": "release_identity",
-                "issue": "Desktop operation evidence belongs to a different Promoted Release or governed configuration identity.",
-            }],
-            "client_outputs": [],
-        }
     recorded_approval_identity = persisted.get("approval_identity")
-    if isinstance(recorded_approval_identity, Mapping) and dict(recorded_approval_identity) != current_approval_identity:
+
+    def same_source_approval(left: Any, right: Any) -> bool:
+        if not isinstance(left, Mapping) or not isinstance(right, Mapping):
+            return left is None and right is None
+        core = (
+            "status", "approved_by", "approved_at", "revision_id",
+            "source_sha256", "approved_reference_sha256",
+        )
+        if any(left.get(key) != right.get(key) for key in core):
+            return False
+        left_source_id = str(left.get("source_approval_identity") or "")
+        right_source_id = str(right.get("source_approval_identity") or "")
+        return not (left_source_id and right_source_id) or left_source_id == right_source_id
+
+    approval_matches = same_source_approval(recorded_approval_identity, current_approval_identity)
+    if isinstance(recorded_release_identity, Mapping) and dict(recorded_release_identity) != current_release_identity:
+        if (
+            persisted.get("status") == "blocked"
+            and isinstance(recorded_approval_identity, Mapping)
+            and isinstance(current_approval_identity, Mapping)
+            and approval_matches
+        ):
+            transition = {
+                "prior_release_identity": dict(recorded_release_identity),
+                "current_release_identity": current_release_identity,
+                "prior_stage": persisted.get("stage"),
+                "prior_result": copy.deepcopy(persisted.get("result")),
+            }
+            persisted.setdefault("release_transitions", []).append(transition)
+            persisted["release_identity"] = current_release_identity
+            persisted["status"] = "running"
+            persisted["stage"] = "generation_authority_rebind"
+            persisted.pop("result", None)
+            _write(state_path, persisted)
+        else:
+            return {
+                "status": "blocked",
+                "stage": "release_identity",
+                "findings": [{
+                    "category": "release",
+                    "field": "release_identity",
+                    "issue": "Desktop operation evidence belongs to a different Promoted Release or governed configuration identity.",
+                }],
+                "client_outputs": [],
+            }
+    if isinstance(recorded_approval_identity, Mapping) and not approval_matches:
         return {
             "status": "blocked",
             "stage": "approval_identity",
@@ -4002,6 +4191,12 @@ def run_desktop_operation(
         for item in raw_soft_budget_events
         if isinstance(item, Mapping)
     ]
+    raw_release_transitions = persisted.get("release_transitions")
+    release_transitions = [
+        dict(item)
+        for item in raw_release_transitions
+        if isinstance(item, Mapping)
+    ] if isinstance(raw_release_transitions, list) else []
     raw_cleanup = persisted.get("cleanup")
     cleanup_evidence = dict(raw_cleanup) if isinstance(raw_cleanup, Mapping) else {}
     raw_pending_handoffs = persisted.get("pending_handoffs")
@@ -4012,6 +4207,7 @@ def run_desktop_operation(
         for item in raw_pending_handoffs
         if isinstance(item, Mapping)
     ]
+    fallback_attempted_responses: set[str] = set()
     last_result: dict[str, Any] = {}
     process_deadline_monotonic = process_monotonic_anchor + max(0.0, deadline_at_epoch - process_epoch_anchor)
 
@@ -4032,6 +4228,8 @@ def run_desktop_operation(
             "started_at": datetime.fromtimestamp(started_at_epoch, timezone.utc).isoformat(),
             "deadline_at": datetime.fromtimestamp(deadline_at_epoch, timezone.utc).isoformat(),
             "budget_seconds": persisted_budget,
+            "actual_budget_seconds": persisted_budget,
+            "requested_budget_seconds": requested_budget_seconds,
             "runtime": current_runtime,
             "runtime_history": runtime_history,
             "release_identity": current_release_identity,
@@ -4044,6 +4242,7 @@ def run_desktop_operation(
             "pending_handoffs": pending_handoffs,
             "soft_budgets": soft_budgets,
             "soft_budget_events": soft_budget_events,
+            "release_transitions": release_transitions,
         }
         if cleanup_evidence:
             payload["cleanup"] = cleanup_evidence
@@ -4055,6 +4254,8 @@ def run_desktop_operation(
     def finish(result: Mapping[str, Any]) -> dict[str, Any]:
         nonlocal current_stage, cleanup_evidence
         current_stage = str(result.get("pending_stage") or result.get("stage") or current_stage)
+        if cleanup is not None and not cleanup_evidence:
+            cleanup_evidence = dict(cleanup(str(result.get("status", "blocked")), max(0.0, remaining_seconds())) or {})
         elapsed = max(0.0, epoch_now() - started_at_epoch)
         measured = {
             **result,
@@ -4064,14 +4265,25 @@ def run_desktop_operation(
                 NORMAL_RUNTIME_TARGET_MIN_SECONDS,
                 NORMAL_RUNTIME_TARGET_MAX_SECONDS,
             ],
-            "operation_deadline_seconds": DESKTOP_OPERATION_BUDGET_SECONDS,
+            "operation_deadline_seconds": persisted_budget,
             "started_at_epoch": started_at_epoch,
             "deadline_at_epoch": deadline_at_epoch,
             "runtime": current_runtime,
             "release_identity": current_release_identity,
         }
-        if cleanup is not None and not cleanup_evidence:
-            cleanup_evidence = dict(cleanup(str(measured.get("status", "blocked")), max(0.0, remaining_seconds())) or {})
+        if elapsed > persisted_budget and measured.get("status") == "passed":
+            current_stage = "cleanup"
+            measured.update({
+                "status": "timeout",
+                "stage": "cleanup",
+                "findings": [{
+                    "category": "timeout",
+                    "field": "cleanup",
+                    "issue": "The persisted Desktop operation deadline expired during cleanup.",
+                }],
+                "client_outputs": [],
+            })
+            measured.pop("desktop_reply", None)
         return save(str(measured.get("status", "blocked")), measured)
 
     def record_timing(stage: str, elapsed: float) -> None:
@@ -4211,7 +4423,7 @@ def run_desktop_operation(
             remaining = remaining_seconds()
             if remaining <= 0:
                 continue
-            fallback_attempted: set[str] = set()
+            fallback_attempted = fallback_attempted_responses
             try:
                 for handoff in handoffs:
                     if not isinstance(handoff, Mapping):
@@ -4360,12 +4572,26 @@ def run_desktop_operation(
                             exc = RuntimeError(f"Delegated reviewer failed ({exc}); parent reviewer fallback failed ({fallback_exc})")
                         else:
                             continue
+                remaining = remaining_seconds()
+                if remaining > 0:
+                    pending_handoffs = [dict(item) for item in handoffs]
+                    time.sleep(min(0.1, remaining))
+                    continue
                 return finish({
-                    "status": "blocked",
+                    "status": "timeout",
                     "stage": "hermes_handoff",
-                    "findings": [{"category": "hermes", "field": "handoff", "issue": str(exc)}],
+                    "findings": [{"category": "timeout", "field": "handoff", "issue": str(exc)}],
                     "client_outputs": [],
                 })
+            unresolved_handoffs = [
+                item for item in handoffs
+                if revision_id and not _handoff_response_is_bound(run_dir, revision_id, item)
+            ]
+            if unresolved_handoffs:
+                remaining = remaining_seconds()
+                if remaining > 0:
+                    pending_handoffs = [dict(item) for item in unresolved_handoffs]
+                    time.sleep(min(0.1, remaining))
             continue
         pending_handoffs = []
         if result.get("status") != "passed":
@@ -4411,6 +4637,7 @@ def run_desktop_operation(
                 ) if result.get("revision_id") else [],
                 "client_outputs": [],
             }
+            last_result.pop("desktop_reply", None)
             continue
         final = {
             **result,
@@ -4446,6 +4673,7 @@ def run_desktop_operation(
             )
         if not delivery["confirmed"]:
             final["client_outputs"] = []
+            final.pop("desktop_reply", None)
         return finish(final)
 
 
@@ -5960,6 +6188,13 @@ def _layout_repair_plan(
             if dispositions is not None
             else "fail_closed:unknown_template_family"
         )
+        sterling_site_reconstruction = (
+            family == "sterling-icf"
+            and check == "inconsistent_style"
+            and target.casefold().rstrip(" .:") == "study site"
+        )
+        if sterling_site_reconstruction:
+            disposition = "repair:sterling_study_site_alignment"
         if disposition.startswith("prevention:"):
             unsupported.append({
                 **finding,
@@ -7349,11 +7584,28 @@ def _continue_repairable_no_progress(
     stage_observer: Callable[[str, float], Any] | None,
     require_promoted_runtime: bool,
 ) -> dict[str, Any] | None:
-    """Continue semantic no-progress only for repairable model/layout targets."""
-    if not findings or not all(
-        item.get("recovery_class") in {"visual_defect", "drafting_defect"}
-        for item in findings
-    ):
+    """Continue safe ladders; classify exhausted deterministic work precisely."""
+    if not findings:
+        return None
+    if all(item.get("recovery_class") == "deterministic_structure_defect" for item in findings):
+        capability_findings = [
+            recovery_finding({
+                **dict(item),
+                "category": "capability-gap",
+                "issue": (
+                    "The deterministic reconstruction completed without a semantic candidate change. "
+                    "No stronger governed construction strategy is registered for this exact target."
+                ),
+            }, "capability_gap")
+            for item in findings
+        ]
+        return _repair_block(
+            run_dir,
+            "capability_gap",
+            capability_findings,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
+    if not all(item.get("recovery_class") in {"visual_defect", "drafting_defect"} for item in findings):
         return None
     return _quality_retry(
         run_dir, reference_path, working_reference, reference,
@@ -7438,9 +7690,11 @@ def generate(
         if approved:
             return _repair_block(run_dir, "approval_gate", findings)
         return {"status": "blocked", "stage": "approval_gate", "findings": findings, "client_outputs": []}
+    reference = contract["normalized_reference"]
     if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [{"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}], "client_outputs": []}
     state = working_reference.setdefault("generation", {})
     try:
+        _validate_generation_authority_attempts(revision_dir, state)
         _reconcile_pending_recovery_attempts(revision_dir, reference_path, working_reference)
     except ValueError as exc:
         return _repair_block(run_dir, "integrity", [{
@@ -7450,22 +7704,10 @@ def generate(
         }], candidate_outputs=_candidate_outputs(revision_dir))
     expected_governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     governing_sha256 = sha256_value(expected_governing)
-    prior_governing_sha256 = state.get("governing_sha256")
-    if prior_governing_sha256 is not None and prior_governing_sha256 != governing_sha256:
-        return {
-            "status": "blocked",
-            "stage": "revision",
-            "findings": [{
-                "category": "revision",
-                "field": revision_id,
-                "issue": "Generation resources changed inside an immutable revision.",
-                "required": "Approve the unchanged Source-of-Truth again to create a new revision.",
-            }],
-            "client_outputs": [],
-        }
-    elif prior_governing_sha256 is None:
-        state["governing_sha256"] = governing_sha256
+    if _rebind_generation_authority(revision_dir, working_reference, governing_sha256):
         _write(reference_path, working_reference)
+        _complete_generation_authority_rebind(revision_dir)
+    state = working_reference.setdefault("generation", {})
     resumed_requests = _apply_pending_recovery_plan(
         revision_dir,
         reference_path,
@@ -7483,10 +7725,11 @@ def generate(
             ),
         )
     attempts = state.setdefault("attempts", {})
-    persisted_exhaustion = list(state.get("recovery_exhaustion") or [])
-    if persisted_exhaustion:
-        path = run_dir / "reference/repair-report.md"; path.write_text(repair_report(persisted_exhaustion), encoding="utf-8")
-        return {"status": "blocked", "stage": "retry_limit", "findings": persisted_exhaustion, "repair_report": path.relative_to(run_dir).as_posix(), "client_outputs": []}
+    # Count-only exhaustion from earlier runtimes is non-authoritative. Progress
+    # and the persisted deadline govern recovery; retain history but do not stop.
+    if state.pop("recovery_exhaustion", None) is not None:
+        state.setdefault("legacy_state_migrations", []).append("recovery_exhaustion_ignored")
+        _write(reference_path, working_reference)
     drafting_findings = [
         finding if finding.get("category") in {"source-evidence", "request-integrity"}
         else recovery_finding(finding, "drafting_defect")
@@ -7666,6 +7909,17 @@ def generate(
                         require_candidate_change=True,
                     )
                     if no_progress:
+                        continuation = _continue_repairable_no_progress(
+                            run_dir, reference_path, working_reference, reference,
+                            revision_dir, attempts, no_progress,
+                            contracted_bundle=bundle,
+                            operation_deadline=operation_deadline,
+                            clock=clock,
+                            stage_observer=stage_observer,
+                            require_promoted_runtime=require_promoted_runtime,
+                        )
+                        if continuation is not None:
+                            return continuation
                         return _repair_block(
                             run_dir,
                             "recovery_no_progress",

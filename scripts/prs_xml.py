@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
-from contracts import get_path, meaningful
+from contracts import facility_projection, get_path, meaningful
 
 
 TOKEN = re.compile(r"\{[#/^]?([A-Za-z_][A-Za-z0-9_.\-\[\]()&]*)\}")
@@ -398,17 +398,14 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
             _set(node, "uid", shared_uid); _set(node, "outcome_description/textblock", item.get("description"))
     sites = [item for item in get_path(reference, "sites", []) or [] if isinstance(item, Mapping)]
     for node, site in zip(_resize(study, "location", len(sites)), sites):
-        facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
-        address = facility.get("address") if isinstance(facility.get("address"), Mapping) else {}
-        city = address.get("city") or facility.get("city")
-        state = address.get("state") or facility.get("state")
-        country = address.get("country") or facility.get("country")
-        postal_code = address.get("zip") or facility.get("zip") or facility.get("postal_code")
+        facility_value = site.get("facility")
+        facility: Mapping[str, Any] = facility_value if isinstance(facility_value, Mapping) else {}
+        facility_fields = facility_projection(facility)
         contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}; investigator = (site.get("investigators") or [{}])[0]
         contact_fields = _contact_fields(contact)
         backup_fields = _contact_fields(_site_backup_contact(site))
         investigator_fields = _contact_fields(investigator)
-        _set(node, "status", site.get("status")); _set(node, "facility/name", facility.get("name")); _set(node, "facility/address/city", city); _set(node, "facility/address/state", state); _set(node, "facility/address/country", country); _set(node, "facility/address/zip", postal_code)
+        _set(node, "status", site.get("status")); _set(node, "facility/name", facility_fields["name"]); _set(node, "facility/address/city", facility_fields["city"]); _set(node, "facility/address/state", facility_fields["state"]); _set(node, "facility/address/country", facility_fields["country"]); _set(node, "facility/address/zip", facility_fields["postal_code"])
         for field, value in contact_fields.items():
             _set(node, f"contact/{field}", value)
         for field, value in backup_fields.items():

@@ -105,7 +105,7 @@ def test_desktop_confirmation_blocks_mismatch_and_does_not_certify_quality(tmp_p
     assert result["findings"][0]["category"] == "delivery"
     assert result["findings"][0]["recovery_class"] == "transport_fault"
     assert result["findings"][0]["action"] == "retry_exact_bytes"
-    assert result["attempts"] == 3
+    assert result["attempts"] == 1
 
 
 def test_desktop_confirmation_blocks_missing_attachment_without_opening_anything(tmp_path):
@@ -1953,6 +1953,7 @@ def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monk
         "handoffs": [handoff],
     })
     fallback_calls = []
+    now = [0.0]
 
     def failed_fallback(pending, _remaining):
         fallback_calls.append(list(pending))
@@ -1961,15 +1962,18 @@ def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monk
     def failed_worker(*_args):
         raise RuntimeError("worker failed")
 
+    monkeypatch.setattr(workflow.time, "sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))
     result = workflow.run_desktop_operation(
         tmp_path,
         handoff_runner=failed_worker,
         fallback_handoff_runner=failed_fallback,
         opener=lambda _path: b"unused",
-        budget_seconds=30.0,
+        budget_seconds=0.2,
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
     )
 
-    assert result["status"] == "blocked"
+    assert result["status"] == "timeout"
     assert fallback_calls == [[handoff]]
 
 
@@ -2653,6 +2657,7 @@ def test_malformed_persisted_deadline_fails_closed_instead_of_starting_again(
 
 def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fails(tmp_path, monkeypatch):
     manifest = _manifest()
+    reply = workflow.desktop_attachment_reply(manifest, run_dir=tmp_path)
     manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
     manifest_path.parent.mkdir(parents=True)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
@@ -2660,6 +2665,8 @@ def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fa
         "status": "passed",
         "stage": "delivery",
         "manifest": "revisions/r1/delivery-manifest.json",
+        "client_outputs": ["output/Protocol final.docx", "output/study.xml"],
+        "desktop_reply": reply,
     })
 
     result = workflow.run_desktop_operation(
@@ -2672,8 +2679,10 @@ def test_desktop_operation_does_not_report_delivery_when_attachment_retrieval_fa
     assert result["status"] == "blocked"
     assert result["stage"] == "desktop_delivery"
     assert result["delivery"]["confirmed"] is False
+    assert result["client_outputs"] == []
+    assert "desktop_reply" not in result
     state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
-    assert state["attempt_counters"]["delivery"] == 3
+    assert state["attempt_counters"]["delivery"] == 1
 
 
 def test_desktop_operation_requires_the_exact_branch_output_set_before_opening_files(tmp_path, monkeypatch):
@@ -2710,16 +2719,16 @@ def test_desktop_operation_requires_the_exact_branch_output_set_before_opening_f
     assert opened == []
 
 
-def test_runtime_target_is_ten_to_twenty_minutes_with_a_forty_five_minute_ceiling():
+def test_runtime_target_is_ten_to_twenty_minutes_with_a_thirty_minute_ceiling():
     assert workflow.NORMAL_RUNTIME_TARGET_MIN_SECONDS == 600.0
     assert workflow.NORMAL_RUNTIME_TARGET_MAX_SECONDS == 1200.0
-    assert workflow.DESKTOP_OPERATION_BUDGET_SECONDS == 2700.0
+    assert workflow.DESKTOP_OPERATION_BUDGET_SECONDS == 1800.0
     assert workflow.performance_classification(599.0) == "below_target_window"
     assert workflow.performance_classification(600.0) == "target_window"
     assert workflow.performance_classification(1200.0) == "target_window"
     assert workflow.performance_classification(1200.001) == "above_target_within_deadline"
-    assert workflow.performance_classification(2700.0) == "above_target_within_deadline"
-    assert workflow.performance_classification(2700.001) == "deadline_exceeded"
+    assert workflow.performance_classification(1800.0) == "above_target_within_deadline"
+    assert workflow.performance_classification(1800.001) == "deadline_exceeded"
 
 
 def test_desktop_operation_continues_after_fifteen_minutes(tmp_path, monkeypatch):
@@ -2747,4 +2756,4 @@ def test_desktop_operation_continues_after_fifteen_minutes(tmp_path, monkeypatch
 
     assert result["status"] == "passed"
     assert result["elapsed_seconds"] == 901.0
-    assert result["performance_classification"] == "above_target_within_deadline"
+    assert result["performance_classification"] == "target_window"

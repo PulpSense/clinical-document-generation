@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -171,52 +171,7 @@ def _address(value: Any) -> str:
 
 
 def _facility_address(facility: Mapping[str, Any]) -> str:
-    """Assemble supplied street/locality without inventing absent components."""
-    address = facility.get("address")
-    nested = address if isinstance(address, Mapping) else {}
-    if nested:
-        parts = [nested.get("line1") or nested.get("address_line1") or nested.get("street") or nested.get("address"),
-                 nested.get("line2") or nested.get("address_line2")]
-        street_parts = [_text(part) for part in parts if _text(part)]
-        result = ", ".join(street_parts)
-        street_segment_count = len(street_parts)
-    else:
-        result = _address(address)
-        street_segment_count = 1 if result else 0
-    for key in ("city", "state", "country", "zip"):
-        component = _text(nested.get(key) or facility.get(key))
-        if key == "zip" and not component:
-            component = next((_text(source.get(alias)) for source in (nested, facility)
-                              for alias in ("postal_code", "postalCode", "postcode", "zip_code")
-                              if _text(source.get(alias))), "")
-        def normalize_component(value: str) -> str:
-            return " ".join(
-                "".join(character.casefold() if character.isalnum() else " " for character in value).split()
-            )
-
-        normalized_segments = [
-            normalize_component(part)
-            for part in re.split(r"[,;\n]", result)
-            if part.strip()
-        ]
-        normalized_component = normalize_component(component)
-        present = bool(normalized_component) and normalized_component in normalized_segments
-        if (
-            normalized_component
-            and not present
-            and key in {"state", "zip"}
-            and len(normalized_segments) > street_segment_count
-        ):
-            present = any(
-                re.search(
-                    rf"(?<!\w){re.escape(normalized_component)}(?!\w)",
-                    segment,
-                )
-                for segment in normalized_segments[street_segment_count:]
-            )
-        if component and not present:
-            result = ", ".join(filter(None, (result, component)))
-    return result
+    return facility_projection(facility)["address"]
 
 
 def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primary", "secondary", "other")) -> str:
@@ -264,23 +219,19 @@ def _protocol_number(reference: Mapping[str, Any]) -> str:
 
 def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dict[str, str]:
     site = _first_site(reference)
-    facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
+    facility_value = site.get("facility")
+    facility: Mapping[str, Any] = facility_value if isinstance(facility_value, Mapping) else {}
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     investigator = get_path(reference, "parties.principal_investigator", {}) or {}
     sponsor = get_path(reference, "parties.sponsor", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
+    facility_fields = facility_projection(facility)
     raw_facility_address = facility.get("address")
-    if isinstance(raw_facility_address, Mapping):
-        facility_street = _text(raw_facility_address.get("street") or raw_facility_address.get("address"))
-        facility_city = _text(raw_facility_address.get("city") or facility.get("city"))
-        facility_state = _text(raw_facility_address.get("state") or facility.get("state"))
-        facility_country = _text(raw_facility_address.get("country") or facility.get("country"))
-    else:
-        facility_street = _text(raw_facility_address)
-        facility_city = _text(facility.get("city"))
-        facility_state = _text(facility.get("state"))
-        facility_country = _text(facility.get("country"))
-    facility_locality = ", ".join(filter(None, (facility_city, facility_state, facility_country)))
+    address_mapping = raw_facility_address if isinstance(raw_facility_address, Mapping) else {}
+    facility_city = _text(
+        address_mapping.get("city") or address_mapping.get("locality")
+        or facility.get("city") or facility.get("locality")
+    )
     visits = get_path(reference, "procedures.visit_schedule", []) or get_path(reference, "procedures.assessments", []) or []
     inclusion = _list(get_path(reference, "population.inclusion_criteria", []))
     interventions = [
@@ -308,9 +259,9 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "ibrName": _text(irb.get("name")), "irbName": _text(irb.get("name")),
         "ibrAdress": _address(irb.get("address")), "irbAdress": _address(irb.get("address")),
         "irbPhone": _text(irb.get("phone")), "irbEmail": _text(irb.get("email")),
-        "studySiteAddress": _facility_address(facility),
-        "facilityName": _text(facility.get("name")), "facilityLocation": facility_locality or _address(raw_facility_address),
-        "facilityAddress": facility_street or _address(raw_facility_address), "facilityCity": facility_city,
+        "studySiteAddress": facility_fields["address"],
+        "facilityName": facility_fields["name"], "facilityLocation": facility_fields["locality"],
+        "facilityAddress": facility_fields["street"], "facilityCity": facility_city,
         "studyCordinatorName": _text(coordinator.get("name")),
         "studyCordinatorPhone": _text(coordinator.get("business_phone") or coordinator.get("phone")),
         "studyCordinator24Phone": _text(coordinator.get("office_phone")), "studyCordinatorEmail": _text(coordinator.get("email")),
@@ -2051,6 +2002,47 @@ def _normalize_advarra_contact_sections(document: Document, reference: Mapping[s
     )
 
 
+def _align_sterling_study_site_continuations(
+    document: Document,
+    reference: Mapping[str, Any] | None = None,
+) -> None:
+    """Align only the two contracted Sterling study-site value paragraphs."""
+    site = _first_site(reference or {})
+    facility_value = site.get("facility") if isinstance(site, Mapping) else None
+    facility: Mapping[str, Any] = facility_value if isinstance(facility_value, Mapping) else {}
+    projection = facility_projection(facility)
+    expected = [projection["street"], projection["locality"]]
+    matched = False
+    for paragraph in document.paragraphs:
+        if not paragraph.text.strip().casefold().startswith("study site:"):
+            continue
+        continuations: list[Paragraph] = []
+        sibling = paragraph._p.getnext()
+        while sibling is not None and len(continuations) < 2:
+            if sibling.tag != qn("w:p"):
+                break
+            candidate = Paragraph(sibling, paragraph._parent)
+            if candidate.text.strip():
+                continuations.append(candidate)
+            sibling = sibling.getnext()
+        actual = [item.text.strip().lstrip("\t").strip() for item in continuations]
+        placeholder_roles = actual == ["{facilityAddress}", "{facilityLocation}"]
+        populated_roles = bool(reference) and actual == expected
+        if len(continuations) != 2 or not (placeholder_roles or populated_roles):
+            raise LayoutRepairTargetError(
+                "Sterling STUDY SITE repair did not resolve its two contracted value paragraphs."
+            )
+        for continuation in continuations:
+            continuation.paragraph_format.left_indent = Inches(1.5)
+            continuation.paragraph_format.first_line_indent = Inches(0)
+            continuation.paragraph_format.right_indent = Inches(0)
+            continuation.paragraph_format.keep_together = True
+        matched = True
+        break
+    if not matched:
+        raise LayoutRepairTargetError("Sterling STUDY SITE repair target is missing.")
+
+
 def _normalize_sterling_retained_sections(
     document: Document,
     reference: Mapping[str, Any],
@@ -3077,6 +3069,7 @@ def _template_document(
         _normalize_retained_icf_agreement_prose(document, sterling=sterling)
         _normalize_generated_icf_privacy_prose(document, model, sterling=sterling)
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
+
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
         _normalize_source_bound_shell(document, reference, icf=False)
@@ -3118,6 +3111,8 @@ def _template_document(
             _repair_table_pagination(document, target)
         elif rule == "table_page_boundary":
             _repair_table_page_boundary(document, target)
+        elif rule == "sterling_study_site_alignment":
+            _align_sterling_study_site_continuations(document, reference)
     _set_update_fields(document)
     return document
 

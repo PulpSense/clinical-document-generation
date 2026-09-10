@@ -38,6 +38,18 @@ RECOVERY_POLICIES = {
     "drafting_defect": "retry_drafting_target",
     "verifier_transient": "retry_verifier",
     "transport_fault": "retry_exact_bytes",
+    "capability_gap": "preserve_and_stop",
+}
+RECOVERY_OWNERS = {
+    "adapter_fault": "capability_gap",
+    "font_capability_uncertainty": "capability_gap",
+    "document_structure_defect": "construction",
+    "deterministic_structure_defect": "construction",
+    "visual_defect": "layout",
+    "drafting_defect": "drafting",
+    "verifier_transient": "reviewer",
+    "transport_fault": "transport",
+    "capability_gap": "capability_gap",
 }
 
 
@@ -54,6 +66,7 @@ def recovery_finding(
         **dict(finding),
         "recovery_class": recovery_class,
         "action": action or RECOVERY_POLICIES[recovery_class],
+        "owner": RECOVERY_OWNERS[recovery_class],
     }
 
 LAYOUT_REPAIR_RULES = {
@@ -64,6 +77,7 @@ LAYOUT_REPAIR_RULES = {
     "icf": (
         "heading_cohesion", "heading_whitespace_cohesion",
         "heading_page_boundary", "table_pagination", "table_page_boundary",
+        "sterling_study_site_alignment",
     ),
 }
 
@@ -674,6 +688,192 @@ def meaningful(value: Any) -> bool:
     return True
 
 
+def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
+    """Project flat or nested facility aliases into one artifact-neutral model."""
+    def text(value: Any) -> str:
+        return "" if value is None else " ".join(str(value).split())
+
+    address = facility.get("address")
+    nested = address if isinstance(address, Mapping) else {}
+    sources = (nested, facility)
+
+    def first(*aliases: str) -> str:
+        for source in sources:
+            for alias in aliases:
+                value = source.get(alias)
+                if isinstance(value, (Mapping, list, tuple, set)):
+                    continue
+                if text(value):
+                    return text(value)
+        return ""
+
+    def identity(value: str) -> str:
+        return " ".join("".join(c.casefold() if c.isalnum() else " " for c in value).split())
+
+    name = text(facility.get("name") or facility.get("facility_name"))
+    city = first("city", "locality", "town")
+    state = first("state", "region", "province")
+    postal_code = first("zip", "postal_code", "postalCode", "postcode", "zip_code")
+    country = first("country", "country_name")
+    locality_parts = [city, state, postal_code, country]
+    raw_segments: list[str] = []
+    if nested:
+        street_parts = [
+            first("line1", "address_line1", "street", "address"),
+            first("line2", "address_line2", "street2"),
+        ]
+    else:
+        raw_segments = [part.strip() for part in re.split(r"[,;\n]", text(address)) if part.strip()]
+        known_components = [name, *locality_parts]
+        known_identities = {identity(part) for part in known_components if part}
+        known_tokens = {token for part in known_components for token in identity(part).split()}
+        street_parts = []
+        for segment in raw_segments:
+            marker = identity(segment)
+            tokens = set(marker.split())
+            if marker in known_identities or (tokens and known_tokens and tokens <= known_tokens):
+                continue
+            street_parts.append(segment)
+    street = ", ".join(part for part in street_parts if part)
+    seen = {identity(part) for part in re.split(r"[,;\n]", street) if part.strip()}
+    locality = []
+    for part in locality_parts:
+        marker = identity(part)
+        if part and marker not in seen:
+            locality.append(part)
+            seen.add(marker)
+    locality_text = ", ".join(locality)
+    display_locality = ", ".join(part for part in (city, state, country, postal_code) if part)
+    display_address = ", ".join(filter(None, (street, display_locality)))
+    if raw_segments:
+        supplied_segments = list(raw_segments)
+        if supplied_segments and identity(supplied_segments[0]) == identity(name):
+            supplied_segments = supplied_segments[1:]
+        supplied_tokens = set(identity(" ".join(supplied_segments)).split())
+        required_tokens = {
+            token
+            for part in locality_parts
+            if part
+            for token in identity(part).split()
+        }
+        if supplied_segments and required_tokens and required_tokens <= supplied_tokens:
+            display_address = ", ".join(supplied_segments)
+    return {
+        "name": name,
+        "street": street,
+        "city": city,
+        "state": state,
+        "postal_code": postal_code,
+        "country": country,
+        "locality": locality_text,
+        "address": display_address,
+    }
+
+
+_UNRESOLVED_SOURCE_TEXT = {"tbd", "todo", "unknown", "not provided", "pending"}
+
+
+def _valid_required_value(field: str, value: Any) -> bool:
+    """Apply presence semantics for the required field, not generic truthiness."""
+    if not meaningful(value) or isinstance(value, (bool, bytes)):
+        return False
+    if isinstance(value, str):
+        text = value.strip()
+        if text.casefold().rstrip(".:") in _UNRESOLVED_SOURCE_TEXT:
+            return False
+        if field == "risks_benefits.compensation_or_reimbursement":
+            return bool(text)  # an explicit "None" is a complete source answer
+        return bool(text)
+    if field in {"population.inclusion_criteria", "population.exclusion_criteria"}:
+        return isinstance(value, list) and bool(value) and all(
+            isinstance(item, str) and _valid_required_value(field, item) for item in value
+        )
+    if field == "endpoints.primary":
+        return isinstance(value, list) and bool(value)
+    if isinstance(value, Mapping):
+        return False
+    return isinstance(value, (int, float, list, tuple))
+
+
+def _canonicalize_declared_aliases(reference: dict[str, Any]) -> list[dict[str, Any]]:
+    """Project declared intake aliases while retaining their exact provenance."""
+    findings: list[dict[str, Any]] = []
+    declared: dict[str, tuple[str, ...]] = {
+        requirement.field: requirement.aliases
+        for requirement in (*PROSPECTIVE_REQUIRED, *RETROSPECTIVE_REQUIRED)
+        if requirement.aliases
+    }
+    provenance: dict[str, list[str]] = {}
+    missing = object()
+    for canonical, aliases in declared.items():
+        canonical_value = get_path(reference, canonical, missing)
+        supplied = [
+            (path, get_path(reference, path, missing))
+            for path in (canonical, *aliases)
+            if get_path(reference, path, missing) is not missing
+            and _valid_required_value(canonical, get_path(reference, path))
+        ]
+        if canonical == "procedures.assessments" and _valid_required_value(canonical, canonical_value):
+            # A structured visit schedule may coexist with a higher-level
+            # assessment list; it is a fallback source, not a competing scalar.
+            continue
+        signatures = {_candidate_signature(value) for _path, value in supplied}
+        signatures.discard(None)
+        if len(signatures) > 1:
+            findings.append({
+                "category": "source-evidence",
+                "field": canonical,
+                "issue": "Required Source Input has conflicting declared aliases.",
+                "required": "Select one source-supported value.",
+                "source_values": {path: copy.deepcopy(value) for path, value in supplied},
+            })
+            continue
+        alias_values = [(path, value) for path, value in supplied if path != canonical]
+        if (canonical_value is missing or not _valid_required_value(canonical, canonical_value)) and alias_values:
+            set_path(reference, canonical, copy.deepcopy(alias_values[0][1]))
+            provenance[canonical] = [path for path, _value in alias_values]
+    if provenance:
+        source = reference.setdefault("source", {})
+        if not isinstance(source, dict):
+            findings.append({"category": "technical", "field": "source", "issue": "Source metadata must be an object."})
+        else:
+            existing = source.get("alias_provenance")
+            source["alias_provenance"] = {**(existing if isinstance(existing, dict) else {}), **provenance}
+    return findings
+
+
+def _ensure_administrative_identifier(reference: dict[str, Any]) -> None:
+    """Close optional identifier gaps from stable source identity only."""
+    protocol_number = get_path(reference, "meta.protocol_number")
+    provider_id = get_path(reference, "regulatory.prs.provider_study_id")
+    if meaningful(protocol_number) or meaningful(provider_id):
+        identifier = str(protocol_number or provider_id).strip()
+        if not meaningful(protocol_number):
+            set_path(reference, "meta.protocol_number", identifier)
+        if not meaningful(provider_id):
+            set_path(reference, "regulatory.prs.provider_study_id", identifier)
+        return
+    identity = {
+        "study_type": canonical_study_type(get_path(reference, "meta.study_type")),
+        "title": get_path(reference, "study.title"),
+        "sponsor": get_path(reference, "parties.sponsor.name"),
+        "principal_investigator": get_path(reference, "parties.principal_investigator.name"),
+    }
+    digest = hashlib.sha256(json.dumps(
+        identity, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str,
+    ).encode("utf-8")).hexdigest()[:12].upper()
+    identifier = f"ADM-{digest}"
+    set_path(reference, "meta.protocol_number", identifier)
+    set_path(reference, "regulatory.prs.provider_study_id", identifier)
+    source = reference.setdefault("source", {})
+    if isinstance(source, dict):
+        source["administrative_identifier"] = {
+            "authority": "deterministic_workflow",
+            "value": identifier,
+            "source_fields": sorted(identity),
+        }
+
+
 SAMPLE_SIZE_EVIDENCE_COLUMNS: tuple[tuple[str, str, tuple[str, ...]], ...] = (
     ("study", "Study", ()),
     ("timepoint", "Timepoint", ("time_point",)),
@@ -949,7 +1149,7 @@ def required_input_value(reference: Mapping[str, Any], requirement: RequiredInpu
         return _site_group(reference, requirement.kind)
     for path in (requirement.field, *requirement.aliases):
         value = get_path(reference, path)
-        if meaningful(value):
+        if _valid_required_value(requirement.field, value):
             return value
     return None
 
@@ -1134,7 +1334,7 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     candidates = get_path(reference, "source.field_candidates", {})
     candidates = candidates if isinstance(candidates, Mapping) else {}
     for requirement in requirements:
-        if not meaningful(required_input_value(reference, requirement)):
+        if not _valid_required_value(requirement.field, required_input_value(reference, requirement)):
             findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input is missing.", "required": requirement.label or requirement.field})
         signatures = {_candidate_signature(value) for value in candidates.get(requirement.field, []) if _candidate_signature(value)}
         if len(signatures) > 1:
@@ -1325,22 +1525,50 @@ def source_contract(
     normalized = copy.deepcopy(dict(reference))
     for legacy_key in ("template_fields", "generated", "needs_review"):
         normalized.pop(legacy_key, None)
+    alias_findings = _canonicalize_declared_aliases(normalized)
     branch = canonical_study_type(get_path(normalized, "meta.study_type"))
     if branch:
         normalized.setdefault("meta", {})["study_type"] = branch
         normalized["meta"]["document_set"] = [name.replace(".docx", "_docx").replace("study.xml", "xml") for name in DOCUMENT_SETS[branch]]
+    if branch in {"Prospective", "Ambispective"}:
+        _ensure_administrative_identifier(normalized)
     raw_prs_study_type = get_path(normalized, "regulatory.prs.study_type")
     if derive_prs_study_type and branch != "Retrospective" and not meaningful(raw_prs_study_type):
         if prs_study_type := _prs_study_type_from_design(normalized):
             set_path(normalized, "regulatory.prs.study_type", prs_study_type)
-    findings = input_findings(normalized)
+    findings = [*alias_findings, *input_findings(normalized)]
     if require_approval:
         if str(get_path(normalized, "approval.status", "")).casefold() != "approved":
             findings.append({"category": "approval", "field": "approval.status", "issue": "The current Source-of-Truth Markdown has not been explicitly approved.", "required": "Explicit approval of the current file."})
         review_file = get_path(normalized, "approval.review_file")
         if not review_file or (run_dir is not None and not (run_dir / str(review_file)).is_file()):
             findings.append({"category": "approval", "field": "approval.review_file", "issue": "The approved Source-of-Truth Markdown file is unavailable.", "required": "An existing reviewer-facing Markdown file."})
-    return {"status": "passed" if not findings else "blocked", "study_type": branch, "blocking_findings": findings, "normalized_reference": normalized}
+    source_gap_issues = {
+        "Required Source Input is missing.",
+        "Required Source Input has conflicting source candidates.",
+        "Required Source Input has conflicting declared aliases.",
+    }
+    source_gaps = [
+        finding for finding in findings
+        if finding.get("category") != "approval"
+        and (
+            finding.get("issue") in source_gap_issues
+            or finding.get("field") == "meta.icf_template"
+            and "unresolved" in str(finding.get("issue", "")).casefold()
+        )
+    ]
+    technical_findings = [
+        finding for finding in findings
+        if finding.get("category") != "approval" and finding not in source_gaps
+    ]
+    return {
+        "status": "passed" if not findings else "blocked",
+        "study_type": branch,
+        "blocking_findings": findings,
+        "source_gaps": source_gaps,
+        "technical_findings": technical_findings,
+        "normalized_reference": normalized,
+    }
 
 
 def evidence_available(reference: Mapping[str, Any], paths: Iterable[str]) -> list[str]:
@@ -1800,6 +2028,6 @@ __all__ = [
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
-    "evidence_available", "get_path", "input_findings", "meaningful", "parse_source_truth", "source_evidence_coverage_map",
+    "evidence_available", "facility_projection", "get_path", "input_findings", "meaningful", "parse_source_truth", "source_evidence_coverage_map",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown",
 ]

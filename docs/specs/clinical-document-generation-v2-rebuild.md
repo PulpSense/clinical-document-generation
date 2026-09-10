@@ -26,7 +26,7 @@ After approval, Hermes will launch versioned Drafting Batches rather than one ag
 
 Every generated DOCX context will use one Document Section Contract as the authority for hierarchy, section roles, minimum evidence, allowed content modes, Fixed Clinical Boilerplate, drafting instructions, and completeness checks. Every required leaf section must be substantive; a Container Section may group complete children without duplicating their prose.
 
-After deterministic assembly, one package-wide read-only verifier will check content and Cross-Document Consistency, and another will inspect every rendered Protocol and ICF page. Failed section IDs or layout stages receive targeted, progress-sensitive retries inside the one persisted 45-minute Desktop operation deadline. Accepted Section Drafts are reused when their inputs and governing resources have not changed.
+After deterministic assembly, one package-wide read-only verifier will check content and Cross-Document Consistency, and another will inspect every rendered Protocol and ICF page. Failed section IDs or layout stages receive targeted, progress-sensitive retries inside the one persisted 30-minute Desktop operation deadline. Accepted Section Drafts are reused when their inputs and governing resources have not changed.
 
 The workflow will deliver the Branch Document Set atomically. Prospective and Ambispective require Protocol DOCX, ICF DOCX, and PRS XML. Retrospective requires Protocol DOCX. If any required artifact or Delivery Gate fails after retries, no partial package will be released and the workflow will produce a classified Repair Report.
 
@@ -113,7 +113,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 79. As a reviewer, I want a package-wide read-only visual verifier, so that every rendered Protocol and ICF page receives independent inspection.
 80. As a reviewer, I want verifier agents to return findings and retry targets without rewriting, so that repair remains controlled.
 81. As a reviewer, I want shared facts compared across the Canonical Approved Source, Protocol, ICF, and PRS XML, so that document contradictions block release.
-82. As a reviewer, I want each repairable failed target retried within one persisted 45-minute deadline, so ordinary internal formatting and drafting defects do not become client blockers because of an arbitrary counter.
+82. As a reviewer, I want each repairable failed target retried within one persisted 30-minute deadline, so ordinary internal formatting and drafting defects do not become client blockers because of an arbitrary counter.
 83. As a reviewer, I want every retry to identify its exact target and materially distinct strategy, so semantic no-progress causes escalation or exact-artifact reinspection rather than blind repetition.
 84. As a reviewer, I want Repair Report findings classified as source evidence, drafting, contradiction, structure, renderer, or visual failures, so that remediation is routed correctly.
 85. As a client, I want standards-compliant DOCX output, so that files can be opened and edited in Microsoft Word.
@@ -198,7 +198,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 
 ### Retry and reuse behavior
 
-- A failed Required Generated Section or formatting target receives targeted retries inside the one persisted 45-minute Desktop operation deadline; no fixed attempt or review-set count terminates repairable work.
+- A failed Required Generated Section or formatting target receives targeted retries inside the one persisted 30-minute Desktop operation deadline; no fixed attempt or review-set count terminates repairable work.
 - Retry requests contain the failed stable section IDs or layout target, applicable findings, and the same governing contract.
 - Accepted Section Drafts are reused when the Canonical Approved Source, Document Section Contract, Fixed Clinical Boilerplate, Contracted Template, and model identity are unchanged.
 - Ordinary retries do not regenerate unrelated accepted sections.
@@ -315,7 +315,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 - Section Draft responses with unknown section IDs, missing required structures, placeholders, or unsupported claims fail before merge.
 - Deterministic merge follows Document Section Contract order regardless of subagent completion order.
 - A single failed section retries only its owning batch and reuses all unaffected accepted Section Drafts.
-- Retry attempt counts include the initial attempt for audit evidence but do not terminate repairable work; the one persisted 45-minute Desktop operation deadline is the governing cap.
+- Retry attempt counts include the initial attempt for audit evidence but do not terminate repairable work; the one persisted 30-minute Desktop operation deadline is the governing cap.
 - Runtime failures do not change the versioned Drafting Batch topology.
 - Unchanged approved inputs and governing resources reuse accepted drafts; explicit redraft behavior is tested separately.
 
@@ -384,7 +384,7 @@ The workflow will deliver the Branch Document Set atomically. Prospective and Am
 ### Performance and cost behavior
 
 - Measure normal runs by branch, including drafting waves, deterministic assembly, render passes, verification, and delivery.
-- The performance target is 10–20 minutes in normal conditions, not a correctness timeout; the hard operation ceiling is 45 minutes.
+- The performance target is 10–20 minutes in normal conditions, not a correctness timeout; the hard operation ceiling is 30 minutes.
 - Prospective and Ambispective normal runs use five drafting tasks, one content-verification task, and two concurrent document-scoped visual-verification tasks before retries; Retrospective uses three drafting tasks, one content-verification task, and one visual-verification task.
 - Tests detect accidental extra agent calls, regeneration of accepted batches, or serial execution of independent first-wave batches.
 - Correctness and atomic delivery are never weakened to satisfy a latency or model-cost target.

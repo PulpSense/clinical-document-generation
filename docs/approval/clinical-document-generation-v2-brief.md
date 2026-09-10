@@ -31,7 +31,7 @@ PASS
 
 FAIL
 -> retry only the failed section or formatting stage
--> continue targeted, progress-sensitive repair inside the original 45-minute deadline
+-> continue targeted, progress-sensitive repair inside the original 30-minute deadline
 -> if the deadline or a non-repairable safety/integrity condition stops the run, release nothing and produce a Repair Report
 
 APPROVED SOURCE CHANGES
@@ -104,6 +104,6 @@ After assembly, two additional read-only subagents review the complete package: 
 - Ambispective: Protocol DOCX, ICF DOCX, and PRS XML.
 - Retrospective: Protocol DOCX.
 
-The skill will reuse sections that already passed and retry only failed parts inside the one persisted 45-minute Desktop operation deadline. It will not stop repairable work because of a fixed attempt count. The full branch package will be released together; partial document packages will never be delivered.
+The skill will reuse sections that already passed and retry only failed parts inside the one persisted 30-minute Desktop operation deadline. It will not stop repairable work because of a fixed attempt count. The full branch package will be released together; partial document packages will never be delivered.
 
 The DOCX files will be built for Microsoft Word. Visual checks will use the best compatible renderer available on the computer and record which renderer was used.

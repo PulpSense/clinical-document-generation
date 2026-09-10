@@ -64,12 +64,19 @@ this file.
 - `safety`, `ethics`, and `confidentiality`: study-specific oversight facts.
 - `risks_benefits`: risks, benefits, privacy, costs, alternatives, payment or
   reimbursement, and research-injury handling.
-- `regulatory.prs`: reviewer-controlled ClinicalTrials.gov values, including
+- `regulatory.prs`: ClinicalTrials.gov values, including
   `provider_study_id` (or `meta.protocol_number`), `study_type`
   (`Observational` or `Interventional`), and the stable study UID used for
   repeated PRS records. This registry classification is distinct from
   `meta.study_type`; during preparation, an unambiguous classification stated
   in `design.study_design` populates the PRS field before review.
+
+When both `provider_study_id` and `meta.protocol_number` are absent for a
+Prospective or Ambispective study, preparation assigns one stable `ADM-...`
+workflow-owned administrative identifier derived only from the approved study
+type, title, sponsor, and principal-investigator identity. The generated value,
+its authority, and its source fields appear in the editable Source-of-Truth
+before approval. It is control-plane identity, not an inferred clinical fact.
 
 Schema support does not make a field obligatory for source intake. Sample-size
 evidence tables and PRS administration/classification values are optional at

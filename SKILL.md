@@ -18,7 +18,7 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 - Do not expose drafts, PDFs, page images, logs, or repair artifacts as client outputs.
 - Publish nothing unless the complete branch package passes.
 - Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect. Apply only the narrowly authorized quality corrections in `references/quality-corrections.md`; they do not permit font shrinking, deletion of consent text, or arbitrary page-count targets.
-- After approval, use one persistent Desktop operation. Aim for 10–20 minutes; 20 minutes remains successful, while 45 minutes is the hard correctness ceiling. Twenty minutes is not a cutoff.
+- After approval, use one persistent Desktop operation. Aim for 10–20 minutes; 20 minutes remains successful, while 30 minutes is the hard correctness ceiling. Twenty minutes is not a cutoff.
 - Normal generation is not software maintenance. During ordinary client generation, the installed skill and its templates, contracts, tests, and implementation remain read-only; only the run workspace and isolated runtime caches may be written. When the owner explicitly requests development maintenance, Hermes may edit the Git-managed development checkout and push committed changes directly to the authorized Git/GitHub branch. Do not build a ZIP merely because a development edit was committed or pushed. Repackage and re-certify only when the owner explicitly requests a distributable or installable release, or before the change is installed or activated; Hermes must never edit the active certified release in place.
 - For ordinary client document generation, use `--manual-review`. This complete unsigned client workflow does not require a certification key or `PROMOTION-RECORD.json`. Run certification, signing, `--bind-certification`, or `--install-release` only when the user explicitly requests a formally certified release; a missing signing key is never a generation blocker.
 
@@ -42,6 +42,12 @@ required. Preserve supplied optional data and validate its types, consistency,
 and controlled vocabulary. Parser, branch/template selection, approval,
 rendering, XML, and clinical-quality failures remain technical blockers; they
 are not permission to request missing optional clinical inputs.
+
+If both optional Provider Study ID and protocol number are absent for a
+Prospective/Ambispective source, `prepare` assigns one stable `ADM-...`
+workflow-owned administrative identifier from approved identity fields and
+shows it in the editable Source-of-Truth. This closes PRS constructability
+without asking for optional data or inventing a clinical fact.
 
 ## Public interface
 
@@ -325,7 +331,7 @@ extracted, hash-verified candidate release built from the exact commit recorded
 in its manifest and binds its fingerprint. The corpus controller may prepare
 fixtures and reduce evidence but must not inject a test-only worker launcher. It must not
 import or launch the editable checkout, and it does not replace the operation's
-45-minute deadline with a harness timeout. The certification adapter must wire
+30-minute deadline with a harness timeout. The certification adapter must wire
 visual fallback to a Desktop-parent review callback; it must never redispatch
 that fallback through the worker launcher. A valid operation above 15 minutes
 may deliver but receives a non-certifying runtime outcome.
@@ -404,7 +410,7 @@ timing, and values before release.
 ## Retry behavior
 
 - Repairable post-approval drafting, deterministic construction, layout, and
-  reviewer-response failures retry within the one persisted 45-minute Desktop
+  reviewer-response failures retry within the one persisted 30-minute Desktop
   operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap.
 - Invalid draft: retry only failed section IDs in their existing batch.
 - Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
@@ -427,7 +433,7 @@ timing, and values before release.
   the repaired candidate. Never reuse a pass from an earlier set.
 - A transient API or malformed-routing response retries only that reviewer within
   the current set and does not consume a new complete review set.
-- Only the persisted 45-minute deadline or a non-repairable integrity, source,
+- Only the persisted 30-minute deadline or a non-repairable integrity, source,
   renderer, safety, unsupported-template, or atomic-delivery failure terminates
   the post-approval operation without client outputs.
 
@@ -511,8 +517,8 @@ openable Desktop files, not inline-code paths, and must not include QA artifacts
 `delivery.confirmed: true` is the only completed delivery state. Record elapsed
 time and its runtime classification. A 10–20 minute result meets the normal
 target; a successful result above 20 minutes is diagnostic evidence but remains
-within the operation until the 45-minute correctness ceiling.
+within the operation until the 30-minute correctness ceiling.
 
 If `status: blocked` after all internal retries, return one consolidated technical blocker and repair report; do not ask supplemental clinical questions or present partial documents as usable. A complete candidate retained under `revisions/<revision-id>/candidate/` is internal evidence only until Render Assurance passes.
 
-If the persisted 45-minute operation deadline is reached, stop and preserve the failed run unchanged. Explain concisely which stage did not complete, what blocker or pending work remained, and that no partial documents are approved for delivery. If the deadline is the only terminal cause and the remaining work appears safely retryable, ask whether the user wants to start a fresh generation attempt using the exact same approved Source-of-Truth. Do not continue automatically, reset or extend the terminated operation, reuse stale verification results, or request new clinical inputs. If the findings indicate an implementation, integrity, security, renderer, unsupported-template, atomic-delivery, or environmental problem, explain the required correction instead of recommending a blind retry.
+If the persisted 30-minute operation deadline is reached, stop and preserve the failed run unchanged. Explain concisely which stage did not complete, what blocker or pending work remained, and that no partial documents are approved for delivery. If the deadline is the only terminal cause and the remaining work appears safely retryable, ask whether the user wants to start a fresh generation attempt using the exact same approved Source-of-Truth. Do not continue automatically, reset or extend the terminated operation, reuse stale verification results, or request new clinical inputs. If the findings indicate an implementation, integrity, security, renderer, unsupported-template, atomic-delivery, or environmental problem, explain the required correction instead of recommending a blind retry.

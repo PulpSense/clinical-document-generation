@@ -91,7 +91,7 @@ def test_invalid_optional_supplied_evidence_still_blocks(tmp_path, branch, famil
     reference[family]["sample_size_evidence"] = evidence
     result = prepare_reference(tmp_path, reference)
     assert result["status"] == "blocked"
-    assert any("sample_size_evidence" in row["field"] and row["issue"] != "Required Source Input is missing." for row in result["missing"])
+    assert any("sample_size_evidence" in row["field"] and row["issue"] != "Required Source Input is missing." for row in result["technical_findings"])
 
 
 @pytest.mark.parametrize("field", ["provider_study_id", "study_type"])

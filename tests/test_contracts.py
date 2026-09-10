@@ -368,7 +368,9 @@ def test_missing_optional_prs_provider_study_id_does_not_block_source_approval()
     contract = source_contract(reference)
 
     assert contract["status"] == "passed"
-    assert "provider_study_id" not in contract["normalized_reference"]["regulatory"]["prs"]
+    generated = contract["normalized_reference"]["regulatory"]["prs"]["provider_study_id"]
+    assert generated.startswith("ADM-")
+    assert contract["normalized_reference"]["meta"]["protocol_number"] == generated
 
 
 def test_prs_study_type_must_be_a_supported_registry_classification():
