@@ -3121,6 +3121,7 @@ def _approval_valid(
 
 
 _GENERATION_AUTHORITY_PATHS = (
+    ".attempt-staging",
     "candidate",
     "rendered",
     "hermes",
@@ -3129,6 +3130,9 @@ _GENERATION_AUTHORITY_PATHS = (
     "candidate-build.json",
     "candidate-structure.json",
     "delivery-manifest.json",
+    "gate-attempt-journal.json",
+    "recovery-archive-transaction.json",
+    "recovery-finalization-transaction.json",
 )
 
 
@@ -3140,7 +3144,7 @@ def _generation_authority_inventory(root: Path) -> list[dict[str, Any]]:
     for path in sorted(root.rglob("*")):
         if path.is_symlink():
             raise ValueError("Generation-authority archive contains a symbolic link.")
-        if path.is_file() and path.name != "authority-attempt-manifest.json":
+        if path.is_file() and path != root / "authority-attempt-manifest.json":
             rows.append({
                 "path": path.relative_to(root).as_posix(),
                 "sha256": sha256_file(path),

@@ -2587,6 +2587,46 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
     assert "recovery_exhaustion" not in state
 
 
+def test_generation_authority_rebind_archives_complete_recovery_state(tmp_path):
+    revision = tmp_path / "revisions/r-source"
+    attempt = revision / "attempts/quality-a01"
+    staging = revision / ".attempt-staging/interrupted"
+    attempt.mkdir(parents=True)
+    staging.mkdir(parents=True)
+    (attempt / "attempt-manifest.json").write_text("{}", encoding="utf-8")
+    (staging / "partial.json").write_text("{}", encoding="utf-8")
+    (revision / "gate-attempt-journal.json").write_text('{"entries": []}', encoding="utf-8")
+    (revision / "recovery-archive-transaction.json").write_text("{}", encoding="utf-8")
+    (revision / "recovery-finalization-transaction.json").write_text("{}", encoding="utf-8")
+    working = {"generation": {"governing_sha256": "a" * 64, "gate_attempts": []}}
+
+    assert workflow._rebind_generation_authority(revision, working, "b" * 64) is True
+    workflow._complete_generation_authority_rebind(revision)
+
+    archive = revision / "generation-authority-attempts" / ("a" * 12)
+    for relative in (
+        "attempts/quality-a01/attempt-manifest.json",
+        ".attempt-staging/interrupted/partial.json",
+        "gate-attempt-journal.json",
+        "recovery-archive-transaction.json",
+        "recovery-finalization-transaction.json",
+    ):
+        assert (archive / relative).is_file()
+        assert not (revision / relative).exists()
+    workflow._validate_generation_authority_attempts(revision, working["generation"])
+
+
+def test_generation_authority_inventory_includes_nested_manifest_named_files(tmp_path):
+    nested = tmp_path / "nested"
+    nested.mkdir(parents=True)
+    (tmp_path / "authority-attempt-manifest.json").write_text("root", encoding="utf-8")
+    (nested / "authority-attempt-manifest.json").write_text("nested", encoding="utf-8")
+
+    inventory = workflow._generation_authority_inventory(tmp_path)
+
+    assert [item["path"] for item in inventory] == ["nested/authority-attempt-manifest.json"]
+
+
 def test_verifier_transient_remains_retryable_after_three_attempts(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
