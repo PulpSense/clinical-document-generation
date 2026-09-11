@@ -2538,8 +2538,33 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
         },
     }
     reference_path.write_text(json.dumps({"generation": generation}), encoding="utf-8")
-    expected = {"status": "awaiting_hermes", "stage": "independent_verification_retry"}
-    monkeypatch.setattr(workflow, "_awaiting", lambda *_args, **_kwargs: expected)
+    request_dir = revision / "hermes/verification-requests"
+    response_dir = revision / "hermes/verification-responses"
+    request_dir.mkdir(parents=True)
+    response_dir.mkdir(parents=True)
+    request_path = request_dir / f"{finding['verification_request_id']}.json"
+    response_path = response_dir / f"{finding['verification_request_id']}.json"
+    request = {
+        "request_id": finding["verification_request_id"],
+        "request_sha256": "a" * 64,
+        "task": "rendered_page_visual_verification",
+        "response_path": response_path.relative_to(revision).as_posix(),
+    }
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.write_text("{}", encoding="utf-8")
+
+    def archive_then_remove_current(*_args, **_kwargs):
+        archive = revision / "attempts/quality-a01"
+        archived_request = archive / request_path.relative_to(revision)
+        archived_request.parent.mkdir(parents=True)
+        archived_request.write_text(json.dumps(request), encoding="utf-8")
+        request_path.unlink()
+        response_path.unlink()
+        (revision / "gate-attempt-journal.json").write_text(json.dumps({"entries": []}), encoding="utf-8")
+        return archive
+
+    monkeypatch.setattr(workflow, "_archive_failed_attempt", archive_then_remove_current)
+    monkeypatch.setattr(workflow, "_complete_pending_recovery_attempts", lambda *_args, **_kwargs: [])
 
     result = workflow._quality_retry(
         run_dir,
@@ -2552,7 +2577,11 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
         "quality",
     )
 
-    assert result == expected
+    assert result["status"] == "awaiting_hermes"
+    assert result["stage"] == "independent_verification_retry"
+    assert [item["request_id"] for item in result["handoffs"]] == [finding["verification_request_id"]]
+    assert request_path.is_file()
+    assert not response_path.exists()
     state = json.loads(reference_path.read_text(encoding="utf-8"))["generation"]
     assert state["verification_attempts"][finding["verification_request_id"]] == 1
     assert "recovery_exhaustion" not in state

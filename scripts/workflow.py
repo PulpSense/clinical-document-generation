@@ -6099,6 +6099,42 @@ def _clear_verification_responses(
             (revision_dir / str(request.get("response_path", ""))).unlink(missing_ok=True)
 
 
+def _restore_verification_requests_for_retry(
+    revision_dir: Path,
+    archived_attempt: Path,
+    *,
+    request_ids: set[str] | None = None,
+    tasks: set[str] | None = None,
+) -> None:
+    """Restore exact archived requests before clearing their stale responses."""
+    request_root = revision_dir / "hermes/verification-requests"
+    request_root.mkdir(parents=True, exist_ok=True)
+    archived_root = archived_attempt / "hermes/verification-requests"
+    for archived_path in archived_root.glob("*.json"):
+        request = _read(archived_path)
+        selected = (
+            request_ids is not None
+            and str(request.get("request_id")) in request_ids
+        ) or (
+            request_ids is None
+            and tasks is not None
+            and str(request.get("task")) in tasks
+        )
+        if not selected:
+            continue
+        current_path = request_root / archived_path.name
+        if current_path.is_file():
+            if current_path.read_bytes() != archived_path.read_bytes():
+                raise ValueError("Archived verification request conflicts with current retry request bytes.")
+        else:
+            shutil.copy2(archived_path, current_path)
+    _clear_verification_responses(
+        revision_dir,
+        tasks,
+        request_ids=request_ids,
+    )
+
+
 def _reset_verification_set(revision_dir: Path) -> None:
     """Remove the current bound set so every reviewer assesses the repaired candidate."""
     request_root = revision_dir / "hermes/verification-requests"
@@ -7349,9 +7385,17 @@ def _quality_retry(
                 fallback_tasks.add(task)
         _write(reference_path, working_reference)
         if request_ids:
-            _clear_verification_responses(revision_dir, request_ids=request_ids)
+            _restore_verification_requests_for_retry(
+                revision_dir,
+                recovery_attempt_dir,
+                request_ids=request_ids,
+            )
         if fallback_tasks:
-            _clear_verification_responses(revision_dir, fallback_tasks)
+            _restore_verification_requests_for_retry(
+                revision_dir,
+                recovery_attempt_dir,
+                tasks=fallback_tasks,
+            )
         remaining = [item for item in findings if item.get("recovery_class") != "verifier_transient"]
         if not remaining:
             return finish(_awaiting(
@@ -7486,11 +7530,16 @@ def _quality_retry(
                     }, "verifier_transient"))
                 _write(reference_path, working_reference)
                 if request_ids:
-                    _clear_verification_responses(revision_dir, request_ids=request_ids)
-                else:
-                    _clear_verification_responses(
+                    _restore_verification_requests_for_retry(
                         revision_dir,
-                        {"rendered_page_visual_verification"},
+                        recovery_attempt_dir,
+                        request_ids=request_ids,
+                    )
+                else:
+                    _restore_verification_requests_for_retry(
+                        revision_dir,
+                        recovery_attempt_dir,
+                        tasks={"rendered_page_visual_verification"},
                     )
                 return finish(_awaiting(
                     revision_dir,
