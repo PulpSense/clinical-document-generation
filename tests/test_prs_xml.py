@@ -198,6 +198,25 @@ def test_optional_prs_roles_are_not_inferred_and_official_affiliation_uses_the_a
     assert study.findtext("overall_official/affiliation") == reference["sites"][0]["facility"]["name"]
 
 
+def test_study_coordinator_role_is_not_emitted_as_a_prs_degree(tmp_path):
+    reference = fixture()
+    reference["parties"]["study_coordinator"].pop("degree", None)
+    reference["parties"]["study_coordinator"].pop("degrees", None)
+    reference["parties"]["study_coordinator"]["title"] = "Study Coordinator"
+    output = tmp_path / "study.xml"
+
+    report = generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+    )
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+
+    assert report["status"] == "passed"
+    assert not (study.findtext("overall_contact/degrees") or "").strip()
+
+
 def test_explicit_responsible_party_type_enables_source_bound_role_mapping(tmp_path):
     reference = fixture()
     reference["regulatory"]["prs"]["responsible_party_type"] = "Principal Investigator"

@@ -256,7 +256,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "responsiblePartyInvestigatorTitle": _mapping_value(responsible, "investigator_title", "title") or _text(pi.get("title") if responsible_is_investigator else ""),
         "responsiblePartyInvestigatorAffiliation": _mapping_value(responsible, "investigator_affiliation") or _text(investigator_affiliation if responsible_is_investigator else ""),
         "overallContactFirstName": contact_first, "overallContactMiddleName": contact_middle, "overallContactLastName": contact_last,
-        "overallContactDegrees": _text(coordinator.get("title")), "overallContactPhone": _text(coordinator.get("business_phone")), "overallContactEmail": _text(coordinator.get("email")),
+        "overallContactDegrees": _text(coordinator.get("degrees") or coordinator.get("degree")), "overallContactPhone": _text(coordinator.get("business_phone")), "overallContactEmail": _text(coordinator.get("email")),
         "overallContactBackupFirstName": overall_backup_fields["first_name"],
         "overallContactBackupMiddleName": overall_backup_fields["middle_name"],
         "overallContactBackupLastName": overall_backup_fields["last_name"],
