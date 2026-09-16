@@ -111,6 +111,40 @@ def test_sterling_render_keeps_duration_and_procedures_body_adjacent(tmp_path):
         assert paragraphs[heading_index + 1].text.strip() == body_text
 
 
+def test_sterling_questions_deduplicate_equal_phone_aliases(tmp_path):
+    import json
+
+    reference = json.loads(
+        (ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text()
+    )
+    reference['meta']['icf_template'] = 'Sterling'
+    phone = reference['parties']['study_coordinator']['business_phone']
+    reference['parties']['study_coordinator']['office_phone'] = phone
+
+    rendering.render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {'protocol': [], 'icf': {}, 'prs': {}},
+        artifact_names={'icf'},
+    )
+
+    document = Document(tmp_path / 'candidate/icf.docx')
+    paragraphs = document.paragraphs
+    questions_index = next(
+        index for index, paragraph in enumerate(paragraphs)
+        if paragraph.text.strip() == 'QUESTIONS'
+    )
+    authorization_index = next(
+        index for index, paragraph in enumerate(paragraphs[questions_index + 1:], questions_index + 1)
+        if paragraph.text.strip().startswith('PARTICIPANT STATEMENT')
+    )
+    questions_text = '\n'.join(
+        paragraph.text for paragraph in paragraphs[questions_index:authorization_index]
+    )
+    assert questions_text.count(phone) == 1
+
+
 def test_assessment_supplemental_notes_are_full_width_body_paragraphs(monkeypatch, tmp_path):
     real_contracts = rendering.protocol_table_contracts
     note = 'Synthetic source note: review the measure at the approved final contact.'

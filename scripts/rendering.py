@@ -281,7 +281,10 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "studyCordinatorName": _text(coordinator.get("name")),
         "studyCordinatorPhone": _text(coordinator.get("business_phone") or coordinator.get("phone")),
         "studyCordinator24Phone": _text(coordinator.get("office_phone")), "studyCordinatorEmail": _text(coordinator.get("email")),
-        "studyContactPhones": " / ".join(filter(None, [_text(coordinator.get("business_phone")), _text(coordinator.get("office_phone"))])),
+        "studyContactPhones": " / ".join(dict.fromkeys(filter(None, [
+            _text(coordinator.get("business_phone")),
+            _text(coordinator.get("office_phone")),
+        ]))),
         "sterlingSecondaryPhone": _text(coordinator.get("office_phone")),
         "objective": "; ".join(_list(get_path(reference, "objectives.primary", []))),
         "studyDesignShort": _text(get_path(reference, "design.study_design_summary") or get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
@@ -2079,9 +2082,10 @@ def _normalize_sterling_retained_sections(
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     investigator = get_path(reference, "parties.principal_investigator", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
-    phones = " / ".join(
-        filter(None, [_text(coordinator.get("business_phone")), _text(coordinator.get("office_phone"))])
-    )
+    phones = " / ".join(dict.fromkeys(filter(None, [
+        _text(coordinator.get("business_phone")),
+        _text(coordinator.get("office_phone")),
+    ])))
     investigator_name = _text(investigator.get("name"))
     research_contact = "If you have questions, concerns, or complaints about the research study"
     if investigator_name and phones:
