@@ -5,11 +5,67 @@ import pytest
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt
+from docx.shared import Inches, Pt
 
 import rendering
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_sterling_front_matter_phone_is_single_and_tab_aligned():
+    document = Document()
+    phone = document.add_paragraph('TELEPHONE:\t770-532-4444')
+    duplicate = document.add_paragraph('770-532-4444')
+    document.add_paragraph()
+    sponsor = document.add_paragraph('SPONSOR: North Georgia Eye Associates')
+
+    rendering._normalize_sterling_front_matter_phone(
+        document,
+        {
+            'parties': {
+                'study_coordinator': {
+                    'business_phone': '770-532-4444',
+                    'office_phone': '770-532-4444',
+                }
+            }
+        },
+    )
+
+    paragraphs = document.paragraphs
+    phone_index = next(index for index, paragraph in enumerate(paragraphs) if paragraph._p is phone._p)
+    sponsor_index = next(index for index, paragraph in enumerate(paragraphs) if paragraph._p is sponsor._p)
+    block = paragraphs[phone_index:sponsor_index]
+    assert sum(paragraph.text.count('770-532-4444') for paragraph in block) == 1
+    assert phone.text == 'TELEPHONE:\t770-532-4444'
+    assert phone.paragraph_format.tab_stops[0].position == Inches(1.5)
+    assert duplicate._p.getparent() is None
+
+
+def test_sterling_duration_and_procedures_collapse_redundant_blank_runs():
+    document = Document()
+    duration = document.add_paragraph('DURATION')
+    for _ in range(3):
+        document.add_paragraph()
+    duration_body = document.add_paragraph('Approved duration text.')
+    for _ in range(3):
+        document.add_paragraph()
+    procedures = document.add_paragraph('PROCEDURES')
+    document.add_paragraph()
+    procedures_body = document.add_paragraph('Approved procedure text.')
+    document.add_paragraph()
+    document.add_paragraph('POTENTIAL RISKS, EFFECTS, DISCOMFORTS, INCONVENIENCES')
+
+    rendering._normalize_sterling_generated_section_spacing(document)
+
+    paragraphs = document.paragraphs
+    index_by_element = {id(paragraph._p): index for index, paragraph in enumerate(paragraphs)}
+    duration_index = index_by_element[id(duration._p)]
+    duration_body_index = index_by_element[id(duration_body._p)]
+    procedures_index = index_by_element[id(procedures._p)]
+    procedures_body_index = index_by_element[id(procedures_body._p)]
+    assert duration_body_index - duration_index == 2
+    assert procedures_index - duration_body_index == 2
+    assert procedures_body_index - procedures_index == 2
 
 
 def test_assessment_supplemental_notes_are_full_width_body_paragraphs(monkeypatch, tmp_path):

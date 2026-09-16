@@ -2122,6 +2122,85 @@ def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]
             _set_paragraph_text(row.cells[1].paragraphs[0], value)
 
 
+def _normalize_sterling_front_matter_phone(
+    document: Document,
+    reference: Mapping[str, Any],
+) -> None:
+    """Render one aligned Sterling phone value without duplicate aliases."""
+    coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
+    if not isinstance(coordinator, Mapping):
+        return
+    phones = list(dict.fromkeys(
+        value
+        for value in (
+            _text(coordinator.get("business_phone") or coordinator.get("phone")),
+            _text(coordinator.get("office_phone")),
+        )
+        if value
+    ))
+    if not phones:
+        return
+    phone = next((
+        paragraph for paragraph in document.paragraphs
+        if paragraph.text.strip().casefold().startswith("telephone:")
+    ), None)
+    if phone is None:
+        return
+    _set_paragraph_text(phone, f"TELEPHONE:\t{' / '.join(phones)}")
+    phone.paragraph_format.tab_stops.clear_all()
+    phone.paragraph_format.tab_stops.add_tab_stop(Inches(1.5))
+    sibling = phone._p.getnext()
+    while sibling is not None and sibling.tag == qn("w:p"):
+        paragraph = Paragraph(sibling, document)
+        value = paragraph.text.strip()
+        if value.casefold().startswith("sponsor:"):
+            break
+        following = sibling.getnext()
+        if value in phones:
+            sibling.getparent().remove(sibling)
+        sibling = following
+
+
+def _normalize_sterling_generated_section_spacing(document: Document) -> None:
+    """Collapse redundant plain blank runs around generated Sterling sections."""
+    headings = {
+        _icf_heading_key("DURATION"),
+        _icf_heading_key("PROCEDURES"),
+    }
+
+    def plain_blank(paragraph: Paragraph) -> bool:
+        return (
+            not paragraph.text.strip()
+            and not paragraph._p.xpath(
+                ".//w:fldSimple | .//w:instrText | .//w:br | .//w:tab | "
+                ".//w:drawing | .//w:pict"
+            )
+        )
+
+    for heading in list(document.paragraphs):
+        if _icf_heading_key(heading.text) not in headings:
+            continue
+        sibling = heading._p.getnext()
+        retained_blank = False
+        while sibling is not None and sibling.tag != qn("w:sectPr"):
+            following = sibling.getnext()
+            if sibling.tag != qn("w:p"):
+                retained_blank = False
+                sibling = following
+                continue
+            paragraph = Paragraph(sibling, document)
+            if _is_icf_heading(paragraph):
+                break
+            if plain_blank(paragraph):
+                if retained_blank:
+                    sibling.getparent().remove(sibling)
+                else:
+                    retained_blank = True
+            else:
+                retained_blank = False
+            sibling = following
+
+
 def _complex_field_runs(field_name: str, source_run) -> list[Any]:
     """Build a Word field while retaining the legacy footer run's typography."""
     properties = source_run.find(qn("w:rPr"))
@@ -3077,6 +3156,9 @@ def _template_document(
             _normalize_icf_withdrawal(document, boilerplate)
             _normalize_advarra_contact_sections(document, reference, boilerplate)
         _normalize_icf_front_matter(document, reference)
+        if sterling:
+            _normalize_sterling_front_matter_phone(document, reference)
+            _normalize_sterling_generated_section_spacing(document)
         _normalize_source_bound_shell(document, reference, icf=True)
         if not sterling:
             _restore_advarra_injury_section(document, authority, reference)
