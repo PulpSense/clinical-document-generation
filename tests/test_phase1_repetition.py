@@ -586,6 +586,34 @@ def test_key_information_rejects_alternatives_without_voluntary_participation(tm
     )
 
 
+def test_draft_time_icf_duplicate_targets_summary_and_preserves_detail(tmp_path):
+    reference = fixture()
+    reference["meta"]["icf_template"] = "Sterling"
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-icf-duplicate-routing",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    summary = next(item for item in response["section_results"] if item["section_id"] == "icf.key-information-summary")
+    detail = next(item for item in response["section_results"] if item["section_id"] == "icf.study-purpose")
+    summary["paragraphs"][0]["text"] = detail["paragraphs"][0]["text"]
+
+    accepted, findings = validate_response(request, response)
+
+    duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
+    accepted_ids = {item["section_id"] for item in (accepted or {}).get("drafts", [])}
+    assert duplicate["target_ids"] == ["icf.key-information-summary"]
+    assert "icf.study-purpose" in accepted_ids
+    assert "icf.key-information-summary" not in accepted_ids
+
+
 def test_protocol_operational_design_contract_preserves_eye_specific_assignment():
     protocol = {item.section_id: item for item in contracts.protocol_contract("Prospective")}
     assert "design.intervention_description" in protocol["study-design.design"].evidence
