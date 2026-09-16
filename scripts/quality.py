@@ -3646,6 +3646,7 @@ def _normalized_substantive_text(value: str) -> str:
 
 
 def _sterling_clause_sections(document: Document) -> dict[str, list[str]]:
+    """Read governed sections in body order, including table-contained text."""
     contract = sterling_clause_contract()
     headings = {
         _normalized_substantive_text(str(item["section"])): str(item["section"])
@@ -3653,14 +3654,45 @@ def _sterling_clause_sections(document: Document) -> dict[str, list[str]]:
     }
     sections: dict[str, list[str]] = {title: [] for title in headings.values()}
     current = ""
-    for paragraph in document.paragraphs:
-        text = re.sub(r"\s+", " ", paragraph.text).strip()
+    front_matter_nonsections = {
+        "participant informed consent form and", "protocol no", "study",
+        "investigator", "telephone",
+    }
+
+    def consume(text: str, *, heading_style: bool = False) -> None:
+        nonlocal current
+        text = re.sub(r"\s+", " ", text).strip()
+        if not text:
+            return
         key = _normalized_substantive_text(text)
         if key in headings:
             current = headings[key]
-            continue
-        if current and text:
+            return
+        if heading_style and not any(
+            key == marker or key.startswith(f"{marker} ")
+            for marker in front_matter_nonsections
+        ):
+            current = ""
+            return
+        if current:
             sections[current].append(text)
+
+    for child in document.element.body.iterchildren():
+        if child.tag == qn("w:p"):
+            paragraph = Paragraph(child, document)
+            consume(
+                paragraph.text,
+                heading_style=paragraph.style.name.casefold().startswith("heading"),
+            )
+        elif child.tag == qn("w:tbl"):
+            table = Table(child, document)
+            for row in table.rows:
+                for cell in row.cells:
+                    for paragraph in cell.paragraphs:
+                        consume(
+                            paragraph.text,
+                            heading_style=paragraph.style.name.casefold().startswith("heading"),
+                        )
     return sections
 
 

@@ -187,7 +187,7 @@
       "section_id": "icf.voluntary-participation",
       "fidelity": "meaning_preserving",
       "permitted_substitutions": ["approved termination authority and grounds"],
-      "validation": {"prohibit_when_untriggered": true},
+      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["participation may be stopped without your consent", "study doctor or the fda", "fail to respond to the study drug", "disease worsens", "fail to follow instructions"]},
       "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
       "repeatable": false
     },

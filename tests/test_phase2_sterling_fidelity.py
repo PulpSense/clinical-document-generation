@@ -155,6 +155,49 @@ def test_materially_weakened_voluntariness_and_participant_rights_are_blocking()
     assert rights["safety_critical"] is True
 
 
+def test_contradictory_safety_language_cannot_satisfy_keyword_validation():
+    document = document_with_sections([
+        ("POTENTIAL RISKS, EFFECTS, DISCOMFORTS, INCONVENIENCES", [
+            "There are no foreseeable risks or discomforts because this study is perfectly safe for everyone forever."
+        ]),
+    ])
+
+    report = quality.validate_sterling_clause_contract(document, source())
+
+    finding = clause(report, "sterling.risks.foreseeable")
+    assert finding["code"] == "sterling-clause-weakened"
+    assert finding["contradiction"] is True
+
+
+def test_unrelated_heading_cannot_lend_body_text_to_governed_section():
+    voluntary = contracts.sterling_clause_text("sterling.voluntary.core")
+    document = document_with_sections([
+        ("VOLUNTARY PARTICIPATION/WITHDRAWAL", []),
+        ("UNRELATED SECTION", [voluntary]),
+    ])
+
+    report = quality.validate_sterling_clause_contract(document, source())
+
+    finding = clause(report, "sterling.voluntary.core")
+    assert finding["code"] == "sterling-clause-missing"
+
+
+def test_governed_body_language_inside_a_table_is_visible_to_validation():
+    document = Document()
+    document.add_heading("INFORMATION", level=1)
+    table = document.add_table(rows=1, cols=1)
+    table.cell(0, 0).text = contracts.sterling_clause_text(
+        "sterling.information.new-findings"
+    )
+
+    report = quality.validate_sterling_clause_contract(document, source())
+
+    assert not any(
+        item.get("clause_id") == "sterling.information.new-findings"
+        for item in report["findings"]
+    )
+
+
 def test_sterling_validation_checks_required_body_not_only_headings_and_signatures():
     document = document_with_sections([
         ("INFORMATION", []),
