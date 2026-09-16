@@ -68,6 +68,49 @@ def test_sterling_duration_and_procedures_collapse_redundant_blank_runs():
     assert procedures_body_index - procedures_index == 1
 
 
+def test_sterling_render_keeps_duration_and_procedures_body_adjacent(tmp_path):
+    import json
+
+    reference = json.loads(
+        (ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text()
+    )
+    reference['meta']['icf_template'] = 'Sterling'
+    model = {
+        'protocol': [],
+        'prs': {},
+        'icf': {
+            'icf.duration': {
+                'paragraphs': [{'text': 'Approved duration text.'}],
+                'lists': [],
+            },
+            'icf.procedures': {
+                'paragraphs': [{'text': 'Approved procedure text.'}],
+                'lists': [],
+            },
+        },
+    }
+
+    rendering.render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        model,
+        artifact_names={'icf'},
+    )
+
+    document = Document(tmp_path / 'candidate/icf.docx')
+    paragraphs = document.paragraphs
+    for heading_text, body_text in (
+        ('DURATION', 'Approved duration text.'),
+        ('PROCEDURES', 'Approved procedure text.'),
+    ):
+        heading_index = next(
+            index for index, paragraph in enumerate(paragraphs)
+            if paragraph.text.strip() == heading_text
+        )
+        assert paragraphs[heading_index + 1].text.strip() == body_text
+
+
 def test_assessment_supplemental_notes_are_full_width_body_paragraphs(monkeypatch, tmp_path):
     real_contracts = rendering.protocol_table_contracts
     note = 'Synthetic source note: review the measure at the approved final contact.'

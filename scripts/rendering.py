@@ -3151,11 +3151,12 @@ def _template_document(
         _normalize_icf_front_matter(document, reference)
         if sterling:
             _normalize_sterling_front_matter_phone(document, reference)
-            _normalize_sterling_generated_section_spacing(document)
         _normalize_source_bound_shell(document, reference, icf=True)
         if not sterling:
             _restore_advarra_injury_section(document, authority, reference)
         _apply_icf_authority_layout(document, authority, model, sterling=sterling)
+        if sterling:
+            _normalize_sterling_generated_section_spacing(document)
         _normalize_icf_preferences(document)
         _compact_icf_signature_end(document)
         _normalize_icf_heading_styles(document, sterling=sterling)
