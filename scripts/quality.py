@@ -4093,8 +4093,26 @@ def assess_protocol_concept_repetition(
                     / max(1, len(secondary_tokens | set(_normalized_substantive_text(item).split())))
                     for item in primary_paragraphs
                 ), default=0.0)
+                role_specific_reference = (
+                    concept == "endpoint-inventory"
+                    and secondary == "study-procedure.measurements"
+                    and any(term in normalized for term in ("measure", "measured", "measurement"))
+                    and not ("defocus" in normalized and "questionnaire" in normalized)
+                ) or (
+                    concept == "endpoint-inventory"
+                    and secondary == "analysis-plan.datasets"
+                    and any(term in normalized for term in ("analysis data set", "observations enter", "analysis population"))
+                    and matched <= minimum_markers
+                ) or (
+                    concept == "endpoint-inventory"
+                    and secondary == "analysis-plan.methodology"
+                    and any(term in normalized for term in ("summarized", "analysed", "analyzed"))
+                    and overlap < 0.45
+                )
+                if role_specific_reference:
+                    continue
                 material = concept == "endpoint-inventory" and (
-                    overlap >= 0.45 or len(normalized.split()) >= 55
+                    overlap >= 0.45 or (matched >= 5 and len(normalized.split()) >= 90)
                 )
                 findings.append({
                     "code": "protocol-concept-repetition",
