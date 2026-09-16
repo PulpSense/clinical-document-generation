@@ -2181,23 +2181,16 @@ def _normalize_sterling_generated_section_spacing(document: Document) -> None:
         if _icf_heading_key(heading.text) not in headings:
             continue
         sibling = heading._p.getnext()
-        retained_blank = False
         while sibling is not None and sibling.tag != qn("w:sectPr"):
             following = sibling.getnext()
             if sibling.tag != qn("w:p"):
-                retained_blank = False
                 sibling = following
                 continue
             paragraph = Paragraph(sibling, document)
             if _is_icf_heading(paragraph):
                 break
             if plain_blank(paragraph):
-                if retained_blank:
-                    sibling.getparent().remove(sibling)
-                else:
-                    retained_blank = True
-            else:
-                retained_blank = False
+                sibling.getparent().remove(sibling)
             sibling = following
 
 

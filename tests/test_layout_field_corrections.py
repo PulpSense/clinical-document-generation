@@ -63,9 +63,9 @@ def test_sterling_duration_and_procedures_collapse_redundant_blank_runs():
     duration_body_index = index_by_element[id(duration_body._p)]
     procedures_index = index_by_element[id(procedures._p)]
     procedures_body_index = index_by_element[id(procedures_body._p)]
-    assert duration_body_index - duration_index == 2
-    assert procedures_index - duration_body_index == 2
-    assert procedures_body_index - procedures_index == 2
+    assert duration_body_index - duration_index == 1
+    assert procedures_index - duration_body_index == 1
+    assert procedures_body_index - procedures_index == 1
 
 
 def test_assessment_supplemental_notes_are_full_width_body_paragraphs(monkeypatch, tmp_path):
