@@ -1370,13 +1370,19 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
     )
     duplicate_target_ids: set[str] = set()
     for prior_section, section_id in _cross_section_duplicate_pairs(duplicate_records):
-        duplicate_target_ids.add(section_id)
+        target_section = (
+            "icf.key-information-summary"
+            if "icf.key-information-summary" in {prior_section, section_id}
+            else section_id
+        )
+        preserved_section = section_id if target_section == prior_section else prior_section
+        duplicate_target_ids.add(target_section)
         findings.append({
             "category": "drafting",
-            "field": section_id,
-            "target_ids": [section_id],
+            "field": target_section,
+            "target_ids": [target_section],
             "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
-            "next_action": f"Rewrite only {section_id} with independent source-grounded prose; preserve {prior_section}.",
+            "next_action": f"Rewrite only {target_section} with independent source-grounded prose; preserve {preserved_section}.",
         })
     if has_blocking_contract_findings:
         return None, findings

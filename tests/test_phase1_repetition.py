@@ -188,6 +188,40 @@ def test_rendered_icf_duplication_uses_governed_summary_drafting_recovery(tmp_pa
     assert finding["action"] == contracts.RECOVERY_POLICIES["drafting_defect"]
 
 
+def test_draft_time_icf_duplication_retries_summary_and_preserves_detail(tmp_path):
+    reference = fixture()
+    reference["meta"]["icf_template"] = "Sterling"
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-draft-duplicate-routing",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    summary = next(
+        item for item in response["section_results"]
+        if item["section_id"] == "icf.key-information-summary"
+    )
+    risks = next(
+        item for item in response["section_results"]
+        if item["section_id"] == "icf.risks"
+    )
+    summary["paragraphs"][2]["text"] = risks["paragraphs"][0]["text"]
+
+    accepted, findings = validate_response(request, response)
+
+    accepted_ids = {item["section_id"] for item in (accepted or {}).get("drafts", [])}
+    assert "icf.risks" in accepted_ids
+    assert "icf.key-information-summary" not in accepted_ids
+    duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
+    assert duplicate["target_ids"] == ["icf.key-information-summary"]
+
+
 def test_rendered_icf_assessment_detects_long_generated_span_inside_distinct_paragraphs(tmp_path):
     shared = (
         "you will attend four research visits over twelve months and complete vision and symptom "
