@@ -20,7 +20,7 @@ from xml.etree import ElementTree as ET
 
 
 CONTRACT_VERSION = "clinical-documents-v2.25"
-BOILERPLATE_VERSION = "clinical-boilerplate-v10"
+BOILERPLATE_VERSION = "clinical-boilerplate-v11"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
 APPROVED_FONT_PLAN_VERSION = "approved-font-plan/v1"

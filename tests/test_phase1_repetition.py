@@ -511,6 +511,15 @@ def test_protocol_secondary_sections_do_not_own_complete_schedule_or_methods():
     assert "statistical-methods" in protocol["analysis-plan.considerations"].do_not_restate_concepts
 
 
+def test_analysis_cross_reference_contains_no_source_gap_commentary():
+    boilerplate = json.loads(
+        (ROOT / "references/fixed-clinical-boilerplate.json").read_text(encoding="utf-8")
+    )["sections"]["analysis-considerations-cross-reference"]
+
+    assert "approved source" not in boilerplate.casefold()
+    assert "when specified" not in boilerplate.casefold()
+
+
 def test_key_information_rejects_generic_blocks_with_unearned_source_refs(tmp_path):
     reference = fixture()
     reference["meta"]["icf_template"] = "Sterling"
