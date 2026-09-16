@@ -184,6 +184,7 @@ def test_recorded_acceptance_coverage_sentences_are_section_specific(tmp_path):
 
 def test_bundle04_operational_omissions_are_rejected_before_candidate_construction(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/ambispective-acceptance-source.json").read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = "Sterling"
     reference["design"]["intervention_description"] = (
         "An upper-arm wearable sensor used for research measurement that does not direct treatment."
     )
@@ -513,13 +514,14 @@ def test_rendering_uses_prs_provider_study_id_when_protocol_number_is_absent(tmp
     assert "AS-SP-001" in _visible_text(Document(tmp_path / "candidate/icf.docx"))
 
 
-def test_sterling_icf_replaces_example_shell_policies_with_authorized_content(tmp_path):
+def test_sterling_icf_uses_concise_key_risk_summary_and_complete_detailed_risk(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["meta"]["icf_template"] = "Sterling"
     risk_text = (
         "Taking part may involve inconvenience or discomfort from the study procedures described in this consent form. "
         "There is also a risk that private information could be disclosed, although safeguards will be used to protect it."
     )
+    risk_summary = "The main risks are procedure discomfort and possible loss of privacy."
     privacy_text = (
         "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information "
         "described in this form for this research. Records will use appropriate identifiers and access controls."
@@ -528,6 +530,16 @@ def test_sterling_icf_replaces_example_shell_policies_with_authorized_content(tm
         "protocol": [],
         "prs": {},
         "icf": {
+            "icf.key-information-summary": {
+                "paragraphs": [
+                    {"text": "Researchers are evaluating the approved study intervention."},
+                    {"text": "You will complete the approved visits during the study period."},
+                    {"text": risk_summary},
+                    {"text": "You may receive no direct benefit."},
+                    {"text": "Taking part is voluntary and other care options may be available."},
+                ],
+                "lists": [],
+            },
             "icf.risks": {"paragraphs": [{"text": risk_text}], "lists": []},
             "icf.privacy": {"paragraphs": [{"text": privacy_text}], "lists": []},
         },
@@ -536,7 +548,11 @@ def test_sterling_icf_replaces_example_shell_policies_with_authorized_content(tm
     render_documents(ROOT, tmp_path, reference, model)
     visible = _visible_text(Document(tmp_path / "candidate/icf.docx"))
 
-    assert visible.count(risk_text) == 2  # key information and the full risks section
+    assert visible.count(risk_summary) == 1
+    assert visible.count(risk_text) == 1
+    assert "procedure discomfort" in visible
+    assert "private information could be disclosed" in visible
+    assert "safeguards will be used to protect it" in visible
     assert "risks or inconveniences that are currently unknown" not in visible
     assert "in a timely manner" not in visible
     assert "Sterling Institutional Review Board" not in visible
@@ -910,7 +926,7 @@ def test_completion_drafts_omitting_approved_follow_up_visits_are_rejected(tmp_p
     assert not completion_ids & accepted_ids
     assert completion_ids <= {item["field"] for item in findings}
     assert all(
-        any("material facts are not observable" in item["issue"] for item in findings if item["field"] == section_id)
+        any("omits approved visit or time-point" in item["issue"] for item in findings if item["field"] == section_id)
         for section_id in completion_ids
     )
 

@@ -191,7 +191,7 @@
         {
           "role": "contracted_icf_template",
           "path": "assets/client-templates/docx/sterling-icf.template.docx",
-          "sha256": "6801dd7bb5467505f65f0e413148e4d0f705c928f9291d303987c7b3db4f2260"
+          "sha256": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347"
         },
         {
           "role": "protocol_client_authority",
@@ -307,7 +307,7 @@
         {
           "role": "contracted_icf_template",
           "path": "assets/client-templates/docx/sterling-icf.template.docx",
-          "sha256": "6801dd7bb5467505f65f0e413148e4d0f705c928f9291d303987c7b3db4f2260"
+          "sha256": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347"
         },
         {
           "role": "protocol_client_authority",
@@ -345,5 +345,5 @@
       ]
     }
   ],
-  "matrix_sha256": "14ead57b38f3bb0051ff7be517a0be2bace1cefb7d1d5ab1ea9f0c59f2ea3c90"
+  "matrix_sha256": "30d276db77614fd8618d5c6f877a643ba366de3cbcfeb7656776afb7542094c8"
 }

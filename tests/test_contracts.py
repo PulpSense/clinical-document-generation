@@ -260,15 +260,16 @@ def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     assert {"study.hypothesis", "endpoints.primary"} <= set(icf["icf.study-purpose"].evidence)
 
 
-def test_completion_sections_require_every_approved_visit_and_time_point():
+def test_completion_sections_require_every_approved_visit_and_time_point_without_repeating_full_inventory():
     protocol = {section.section_id: section for section in protocol_contract("Prospective")}
 
     for section_id in ("endpoint-criteria.completion", "endpoint-criteria.study-completion"):
         section = protocol[section_id]
         assert "procedures.assessments" in section.evidence
-        assert section.source_coverage == "all_material_items"
+        assert section.source_coverage == "concept_reference"
         assert any("every approved visit" in item for item in section.content_expectations)
         assert any("time point" in item for item in section.content_expectations)
+        assert "complete-visit-schedule" in section.do_not_restate_concepts
 
 
 def test_protocol_ethics_and_confidentiality_use_substantive_boilerplate():

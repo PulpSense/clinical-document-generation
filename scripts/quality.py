@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
 from drafting import evidence_grounded
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -3641,6 +3641,221 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
     return findings
 
 
+def _normalized_substantive_text(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+
+def assess_icf_output(
+    rendered_document: Path | Document,
+    normalized_source: Mapping[str, Any],
+    family_contract: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Assess exact material duplication introduced in the completed ICF.
+
+    The interface deliberately accepts only the rendered document plus its two
+    governing inputs.  Detection is conservative: only KEY INFORMATION is
+    compared with detailed generated sections, and repair always targets the
+    summary rather than deleting a complete disclosure.
+    """
+    document: Any = rendered_document if hasattr(rendered_document, "paragraphs") else Document(rendered_document)
+    heading_map = {
+        "BACKGROUND": "icf.background",
+        "PURPOSE": "icf.study-purpose",
+        "DURATION": "icf.duration",
+        "PROCEDURES": "icf.procedures",
+        "POTENTIAL RISKS SIDE EFFECTS DISCOMFORTS INCONVENIENCES": "icf.risks",
+        "POTENTIAL RISKS EFFECTS DISCOMFORTS INCONVENIENCES": "icf.risks",
+        "POTENTIAL BENEFITS": "icf.benefits",
+        "ALTERNATIVE TREATMENTS": "icf.alternatives",
+        "COMPENSATION TO YOU": "icf.payment",
+        "COSTS TO YOU": "icf.costs",
+        "STUDY COMPLICATIONS AND COMPENSATION": "icf.injury",
+        "STUDY COMPLICATIONS COMPENSATION": "icf.injury",
+        "CONFIDENTIALITY AND AUTHORIZATION TO COLLECT USE AND DISCLOSE YOUR MEDICAL INFORMATION": "icf.privacy",
+        "CONFIDENTIALITY AUTHORIZATION TO COLLECT USE DISCLOSE YOUR MEDICAL INFORMATION": "icf.privacy",
+    }
+    retained_heading_keys = {
+        re.sub(r"[^A-Z0-9]+", " ", title.upper()).strip()
+        for _section_id, title in ICF_RETAINED_SHELL_SECTIONS.get("sterling", ())
+    }
+    retained_heading_keys.update({
+        "NEW INFORMATION", "PARTICIPANT STATEMENT AND AUTHORIZATION",
+        "PARTICIPANT STATEMENT AUTHORIZATION",
+    })
+    current = ""
+    summary_blocks: list[str] = []
+    detail_blocks: dict[str, list[str]] = {}
+    for paragraph in document.paragraphs:
+        text = re.sub(r"\s+", " ", paragraph.text).strip()
+        key = re.sub(r"[^A-Z0-9]+", " ", text.upper()).strip()
+        if key == "KEY INFORMATION":
+            current = "icf.key-information-summary"
+            continue
+        if key in heading_map:
+            current = heading_map[key]
+            continue
+        if key in retained_heading_keys:
+            current = ""
+            continue
+        if not text or text.casefold() == "things you should know":
+            continue
+        if current == "icf.key-information-summary":
+            summary_blocks.append(text)
+        elif current.startswith("icf."):
+            detail_blocks.setdefault(current, []).append(text)
+
+    repeatable_markers = (
+        "signature of participant", "signature of principal investigator",
+        "participant statement", "printed name", "date",
+    )
+    classified_repeatable_values = [
+        value
+        for key in ("repeatable_text", "required_static_text", "legal_clauses")
+        for value in family_contract.get(key, [])
+    ]
+    repeatable_text = {
+        _normalized_substantive_text(str(value))
+        for value in classified_repeatable_values
+        if _normalized_substantive_text(str(value))
+    }
+
+    def explicitly_repeatable(value: str) -> bool:
+        return any(value == allowed or value in allowed or allowed in value for allowed in repeatable_text)
+
+    def candidates(text: str) -> set[str]:
+        normalized = _normalized_substantive_text(text)
+        values = {normalized}
+        values.update(
+            _normalized_substantive_text(sentence)
+            for sentence in re.split(r"(?<=[.!?])\s+", text)
+        )
+        words = normalized.split()
+        span_words = 16
+        values.update(
+            " ".join(words[index:index + span_words])
+            for index in range(max(0, len(words) - span_words + 1))
+        )
+        return {
+            value for value in values
+            if len(value) >= 80 and len(value.split()) >= 12
+            and not explicitly_repeatable(value)
+            and not any(marker in value for marker in repeatable_markers)
+        }
+
+    details: dict[str, set[str]] = {}
+    for section_id, blocks in detail_blocks.items():
+        for block in blocks:
+            for value in candidates(block):
+                details.setdefault(value, set()).add(section_id)
+    findings = []
+    seen_sections: set[str] = set()
+    for block in summary_blocks:
+        for value in sorted(candidates(block), key=lambda item: (-len(item.split()), item)):
+            for section_id in sorted(details.get(value, set())):
+                if section_id in seen_sections:
+                    continue
+                seen_sections.add(section_id)
+                findings.append(recovery_finding({
+                    "code": "icf-exact-generated-duplication",
+                    "category": "content",
+                    "check": "exact_rendered_duplication",
+                    "target_ids": ["icf.key-information-summary"],
+                    "summary_section": "icf.key-information-summary",
+                    "detail_section": section_id,
+                    "normalized_text": value,
+                    "repair_action": "redraft_summary",
+                }, "drafting_defect"))
+    return {
+        "schema_version": "icf-output-assessment/v1",
+        "status": "repairable" if findings else "passed",
+        "family": str(family_contract.get("family") or get_path(normalized_source, "meta.icf_template") or ""),
+        "findings": findings,
+    }
+
+
+def assess_protocol_concept_repetition(
+    section_paragraphs: Mapping[str, Iterable[str]],
+    ownership: Mapping[str, Mapping[str, Iterable[str]]],
+) -> list[dict[str, Any]]:
+    """Return explainable manual-review findings from explicit concept rules."""
+    concept_markers = {
+        "clinical-rationale": (
+            ("unmet need", "evidence gap", "remaining gap"),
+            ("current care", "existing treatment", "current treatment"),
+            ("variable", "inconsistent", "limited"),
+            ("recovery", "outcome"),
+            ("new approach", "different approach", "evaluates", "investigation"),
+        ),
+        "complete-visit-schedule": (
+            ("screening",), ("baseline",), ("follow up", "follow-up"),
+            ("visit", "appointment"), ("week", "month", "day"),
+        ),
+        "ae-sae-definitions": (
+            ("adverse event",), ("serious adverse event",),
+            ("hospitalization", "life threatening", "death", "disability"),
+        ),
+        "statistical-methods": (
+            ("mean", "median"), ("standard deviation",),
+            ("percentage", "frequency"), ("confidence interval",),
+        ),
+        "endpoint-inventory": (
+            ("primary endpoint",), ("secondary endpoint", "secondary endpoints"),
+            ("visual acuity", "symptom score", "questionnaire"),
+            ("distance", "intermediate", "near"), ("week", "month", "day"),
+        ),
+    }
+    thresholds = {
+        "clinical-rationale": (20, 3),
+        "complete-visit-schedule": (90, 4),
+        "ae-sae-definitions": (35, 3),
+        "statistical-methods": (30, 3),
+        "endpoint-inventory": (55, 4),
+    }
+    owners = {
+        concept: section_id
+        for section_id, policy in ownership.items()
+        for concept in policy.get("owns", ())
+    }
+    findings: list[dict[str, Any]] = []
+    for secondary, policy in ownership.items():
+        prohibited = set(policy.get("do_not_restate", ()))
+        for concept in sorted(prohibited):
+            primary = owners.get(concept)
+            if not primary or primary == secondary:
+                continue
+            markers = concept_markers.get(concept, ())
+            for paragraph in section_paragraphs.get(secondary, ()):
+                normalized = _normalized_substantive_text(str(paragraph))
+                matched = sum(any(_normalized_substantive_text(term) in normalized for term in group) for group in markers)
+                minimum_words, minimum_markers = thresholds.get(concept, (30, 3))
+                if len(normalized.split()) < minimum_words or matched < minimum_markers:
+                    continue
+                primary_paragraphs = [str(item) for item in section_paragraphs.get(primary, ())]
+                findings.append({
+                    "code": "protocol-concept-repetition",
+                    "concept_id": concept,
+                    "primary_section": primary,
+                    "secondary_section": secondary,
+                    "primary_paragraphs": primary_paragraphs,
+                    "secondary_paragraphs": [str(paragraph)],
+                    "treatment": "excessive",
+                    "necessary": False,
+                    "concise": False,
+                    "material": False,
+                    "contradiction": False,
+                    "obscures_required_information": False,
+                    "materially_unusable": False,
+                    "target_ids": [secondary],
+                    "repair_action": "redraft_secondary_section",
+                    "disposition": "manual_review",
+                    "severity": "warning",
+                    "publication_disposition": "warning",
+                    "action": "manual_review",
+                })
+                break
+    return findings
+
+
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -3755,6 +3970,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 values.extend(cell.text.strip() for row in block.rows for cell in row.cells if cell.text.strip())
         return "\n".join(values)
 
+    section_paragraphs: dict[str, list[str]] = {}
     for section in sections:
         if section.role == "container" or not section_applies(reference, section):
             continue
@@ -3769,6 +3985,9 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             continue
         if content is None:
             continue
+        section_paragraphs[section.section_id] = [
+            paragraph.strip() for paragraph in content.splitlines() if paragraph.strip()
+        ]
         if section.role == "source":
             approved = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), "")
             if re.sub(r"\s+", " ", _text(approved)).strip().casefold() not in re.sub(r"\s+", " ", content).strip().casefold():
@@ -3795,6 +4014,11 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 "target_ids": [section.section_id],
                 "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
             })
+    concept_findings = assess_protocol_concept_repetition(
+        section_paragraphs,
+        protocol_concept_ownership(branch),
+    )
+    findings.extend(concept_findings)
     seen: dict[str, str] = {}
     current_section = ""
     heading_to_id = {heading_key(f"{section.number} {section.title}"): section.section_id for section in sections}
@@ -3808,7 +4032,21 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             if seen[key] == current_section:
                 findings.append({"category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."})
             else:
-                findings.append({"category": "content", "field": current_section or "protocol", "target_ids": sorted({seen[key], current_section}), "issue": f"Exact paragraph is duplicated across protocol sections {seen[key]} and {current_section}."})
+                findings.append(recovery_finding({
+                    "code": "protocol-exact-repetition",
+                    "category": "content",
+                    "check": "concept_repetition",
+                    "field": current_section or "protocol",
+                    "target_ids": [current_section or "protocol"],
+                    "primary_section": seen[key],
+                    "secondary_section": current_section,
+                    "primary_paragraphs": [text],
+                    "secondary_paragraphs": [text],
+                    "treatment": "excessive",
+                    "necessary": False,
+                    "concise": False,
+                    "issue": f"Exact paragraph is repeated from Protocol section {seen[key]} in secondary section {current_section}.",
+                }, "drafting_defect"))
         elif len(text.split()) >= 8:
             seen[key] = current_section
     if branch == "Retrospective":
@@ -3838,6 +4076,19 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     if branch != "Retrospective":
         icf = revision_dir / "candidate/icf.docx"
         findings.extend(audit_docx(icf, required_phrases=[str(get_path(reference, "study.title", ""))]))
+        repo_root = Path(__file__).resolve().parents[1]
+        bundle = contracted_template_bundle(repo_root, reference)
+        boilerplate = _json(repo_root / str(bundle["fixed_clinical_boilerplate"]["path"]))
+        boilerplate_sections = dict(boilerplate.get("sections") or {})
+        required_static_text = [
+            str(boilerplate_sections["icf-voluntary"])
+        ] if str(boilerplate_sections.get("icf-voluntary") or "").strip() else []
+        icf_assessment = assess_icf_output(
+            icf,
+            reference,
+            {"family": icf_template, "required_static_text": required_static_text},
+        )
+        findings.extend(icf_assessment["findings"])
         icf_document = Document(icf)
         icf_visible = re.sub(r"\s+", " ", " ".join(paragraph.text for paragraph in icf_document.paragraphs)).casefold()
         for section_id, title in icf_retained_sections(branch, icf_template):
@@ -3901,6 +4152,12 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             findings.append(recovery_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, "document_structure_defect"))
     governed = []
     for item in findings:
+        if (
+            item.get("publication_disposition") == "warning"
+            and item.get("action") == "manual_review"
+        ):
+            governed.append(item)
+            continue
         if item.get("recovery_class") in RECOVERY_POLICIES:
             governed.append(item)
             continue
@@ -4014,7 +4271,14 @@ def create_verification_requests(
         "date may default from approval, while an unknown version must remain blank and must not be failed merely for "
         "being unknown. Set top-level status exactly `passed` when there are no findings or exactly `blocked` when "
         "there is one or more findings; do not use `failed` as the top-level status. Every section and cross-document "
-        "assessment must still be present, using `passed` or `failed` for its individual status."
+        "assessment must still be present, using `passed` or `failed` for its individual status. For Protocol "
+        "concept repetition, use protocol_concept_ownership rather than a generic similarity percentage. A finding "
+        "must identify concept_id, primary_section, secondary_section, relevant primary_paragraphs and "
+        "secondary_paragraphs, classify the secondary treatment as necessary, concise, or excessive, and set "
+        "necessary and concise to explicit booleans. Route a confirmed excessive repetition only to the secondary "
+        "section unless the primary section is incomplete. For manual review, explicitly set material, contradiction, "
+        "obscures_required_information, and materially_unusable to false. Treat ordinary noncontradictory concept "
+        "repetition as manual review; omitted or true material-harm flags remain blocking."
     )
     payloads = [{
         "schema_version": VERIFY_SCHEMA,
@@ -4025,6 +4289,7 @@ def create_verification_requests(
         "artifacts": content_files,
         "approved_source": reference,
         "source_field_inventory": _source_field_inventory(reference),
+        "protocol_concept_ownership": protocol_concept_ownership(branch),
         "authorized_boilerplate": authorized_boilerplate,
         "sections": sections,
         "checks": list(CONTENT_CHECKS),
@@ -4113,6 +4378,15 @@ def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, 
 
 def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [dict(finding) for finding in findings if _is_publication_warning(finding)]
+
+
+def _deterministic_warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        dict(item) for item in findings
+        if item.get("code") == "protocol-concept-repetition"
+        and item.get("publication_disposition") == "warning"
+        and item.get("action") == "manual_review"
+    ]
 
 
 def _safety_critical_content_target(target: str) -> bool:
@@ -4286,7 +4560,14 @@ def validate_verifications(
                     "verification_request_id": request["request_id"],
                     "issue": _text(source.get("issue")),
                 }
-                for key in ("target_ids", "artifact", "page", "check", "element"):
+                for key in (
+                    "target_ids", "artifact", "page", "check", "element", "code",
+                    "concept_id", "primary_section", "secondary_section",
+                    "primary_paragraphs", "secondary_paragraphs", "treatment",
+                    "necessary", "concise", "material", "resolved", "repair_attempt",
+                    "contradiction", "obscures_required_information", "materially_unusable",
+                    "disposition",
+                ):
                     if key in source: finding[key] = source[key]
                 if category == "visual":
                     expected_artifacts = {
@@ -4352,7 +4633,69 @@ def validate_verifications(
                         finding["target_ids"] = supplied_targets
                         source_category = _text(source.get("category")).casefold()
                         source_check = _text(source.get("check")).casefold()
-                        if _governed_content_omission(source, supplied_targets):
+                        protocol_repetition = (
+                            _text(source.get("code")) == "protocol-concept-repetition"
+                            and _text(source.get("disposition")).casefold() == "manual_review"
+                        )
+                        if protocol_repetition:
+                            required = (
+                                "concept_id", "primary_section", "secondary_section",
+                                "primary_paragraphs", "secondary_paragraphs", "treatment",
+                            )
+                            concept_id = _text(source.get("concept_id"))
+                            primary_section = _text(source.get("primary_section"))
+                            secondary_section = _text(source.get("secondary_section"))
+                            ownership = request.get("protocol_concept_ownership", {})
+                            primary_rules = ownership.get(primary_section, {}) if isinstance(ownership, Mapping) else {}
+                            secondary_rules = ownership.get(secondary_section, {}) if isinstance(ownership, Mapping) else {}
+                            governed_pair = (
+                                concept_id in primary_rules.get("owns", [])
+                                and concept_id in (
+                                    list(secondary_rules.get("brief_reference_only", []))
+                                    + list(secondary_rules.get("do_not_restate", []))
+                                )
+                            )
+                            structured_routing_valid = (
+                                supplied_targets == [secondary_section]
+                                and source_category == "content"
+                                and source_check == "concept_repetition"
+                                and _text(source.get("treatment")).casefold() == "excessive"
+                                and source.get("necessary") is False
+                                and source.get("concise") is False
+                            )
+                            material_flags = (
+                                "material", "contradiction",
+                                "obscures_required_information", "materially_unusable",
+                            )
+                            explicitly_nonmaterial = all(source.get(key) is False for key in material_flags)
+                            if (
+                                any(not source.get(key) for key in required)
+                                or not governed_pair
+                                or not structured_routing_valid
+                            ):
+                                findings.append(recovery_finding({
+                                    **finding,
+                                    "target_ids": [verification_target],
+                                    "issue": f"Protocol repetition finding has invalid structured evidence or warning routing. {finding['issue']}".strip(),
+                                }, "verifier_transient"))
+                            elif not explicitly_nonmaterial:
+                                findings.append(recovery_finding({
+                                    **finding,
+                                    "category": source_category,
+                                    "check": source_check,
+                                    "verification_request_id": request["request_id"],
+                                }, "drafting_defect"))
+                            else:
+                                findings.append({
+                                    **finding,
+                                    "category": source_category or "content",
+                                    "check": source_check or "concept_repetition",
+                                    "verification_request_id": request["request_id"],
+                                    "severity": "warning",
+                                    "publication_disposition": "warning",
+                                    "action": "manual_review",
+                                })
+                        elif _governed_content_omission(source, supplied_targets):
                             findings.append({
                                 **finding,
                                 "category": source_category,
@@ -4443,6 +4786,25 @@ def validate_verifications(
                     reported_targets.update(
                         str(target) for target in raw_targets if str(target).strip()
                     )
+            section_status = {
+                str(item.get("section_id") or ""): str(item.get("status") or "")
+                for item in valid_section_rows
+            }
+            passing_finding_targets = sorted(
+                target for target in reported_targets
+                if section_status.get(target) == "passed"
+            )
+            if passing_finding_targets:
+                findings.append(recovery_finding({
+                    "category": "verification",
+                    "field": request["task"],
+                    "target_ids": [verification_target],
+                    "verification_request_id": request["request_id"],
+                    "issue": (
+                        "Reported findings contradict passing section assessments; "
+                        f"passing section assessment targets={passing_finding_targets}."
+                    ),
+                }, "verifier_transient"))
             warning_ids: set[str] = set()
             for reported in reported_findings:
                 raw_targets = reported.get("target_ids")
@@ -4726,9 +5088,13 @@ def final_exact_artifact_review_findings(
         issues.append("Final candidate bytes changed after review.")
     if _exact_rendered_hashes(revision_dir, render_report) != dict(final_review.get("rendered_hashes") or {}):
         issues.append("Final rendered bytes changed after review.")
+    deterministic_findings = deterministic_content_check(revision_dir, reference)
+    deterministic_warnings = _deterministic_warning_findings(deterministic_findings)
     verification_findings, fresh_evidence = validate_verifications(revision_dir)
-    fresh_warnings = _warning_findings(verification_findings)
-    verification_findings = _blocking_findings(verification_findings)
+    fresh_warnings = deterministic_warnings + _warning_findings(verification_findings)
+    verification_findings = [
+        dict(item) for item in deterministic_findings if item not in deterministic_warnings
+    ] + _blocking_findings(verification_findings)
     verification_findings.extend(
         _final_verification_scope_findings(
             revision_dir, reference, render_report, fresh_evidence
@@ -4754,7 +5120,9 @@ def final_exact_artifact_review_findings(
 
 
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
-    findings = deterministic_content_check(revision_dir, reference)
+    deterministic_findings = deterministic_content_check(revision_dir, reference)
+    warnings = _deterministic_warning_findings(deterministic_findings)
+    findings = [dict(item) for item in deterministic_findings if item not in warnings]
     findings.extend(dict(item) for item in render_report.get("findings", []))
     if xml_report:
         findings.extend(
@@ -4765,7 +5133,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
             for item in xml_report.get("findings", [])
         )
     verification_findings, evidence = validate_verifications(revision_dir)
-    warnings = _warning_findings(verification_findings)
+    warnings.extend(_warning_findings(verification_findings))
     findings.extend(_blocking_findings(verification_findings))
     findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
     candidate_hashes = {

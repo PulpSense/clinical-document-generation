@@ -19,8 +19,8 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.24"
-BOILERPLATE_VERSION = "clinical-boilerplate-v9"
+CONTRACT_VERSION = "clinical-documents-v2.25"
+BOILERPLATE_VERSION = "clinical-boilerplate-v10"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
 APPROVED_FONT_PLAN_VERSION = "approved-font-plan/v1"
@@ -242,6 +242,11 @@ class SectionSpec:
     source_coverage: str = "all_material_evidence"
     fidelity_evidence: tuple[str, ...] = ()
     evidence_scopes: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    summary_concepts: tuple[str, ...] = ()
+    owned_concepts: tuple[str, ...] = ()
+    brief_reference_concepts: tuple[str, ...] = ()
+    do_not_restate_concepts: tuple[str, ...] = ()
+    boilerplate_keys: tuple[str, ...] = ()
 
     def public(self) -> dict[str, Any]:
         return asdict(self)
@@ -353,14 +358,14 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied.",
         "study-design.bias": "Explain applicable bias controls and use only the listed boilerplate when source detail is sparse.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
-        "study-procedure.measurements": "Account for every approved assessment and endpoint in operational language, including the supplied time points; do not invent an instrument, scoring rule, denominator, or definition that is absent from the source.",
+        "study-procedure.measurements": "Account for every approved endpoint and measurement in operational language, including supplied time points, without repeating the complete visit schedule; do not invent an instrument, scoring rule, denominator, or definition that is absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
         "evaluation-procedures": "Account for every approved assessment and visit in the Schedule of Assessments narrative.",
-        "endpoint-criteria.completion": "Name every approved visit and time point, then state the participant-completion rule without omitting supplied follow-up.",
-        "endpoint-criteria.study-completion": "Name every approved visit and time point, then state the study-completion rule without omitting supplied follow-up.",
+        "endpoint-criteria.completion": "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
+        "endpoint-criteria.study-completion": "Reference every approved visit and time point concisely when stating the study-level timeline and completion rule, without repeating the complete participant visit or assessment inventory.",
         "analysis-plan.datasets": "Identify the analysis populations or data sets supported by the approved analysis plan.",
         "analysis-plan.methodology": "Explain the approved statistical methods and map them explicitly to every supplied primary and secondary endpoint.",
-        "analysis-plan.considerations": "Explain the approved analysis conventions, software/version, and interpretation considerations, including only source-supported handling of paired or missing observations.",
+        "analysis-plan.considerations": "State only source-supported cross-cutting analysis conventions or software/version details, and otherwise cross-reference Section 10.2 without repeating its methods or endpoint inventory.",
         "sample-size": "State the approved sample size and explain its approved justification.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
         "study-procedure.discontinued": "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
@@ -375,6 +380,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "or missing-data methods from a broader analysis-plan field."
         ),
         "icf.study-purpose": "Explain the study purpose, hypothesis, primary endpoint, and background in clear participant-facing language.",
+        "icf.key-information-summary": "Give five concise participant-facing summary blocks covering the study purpose, expected participation and duration, principal risks, possible benefit or absence of direct benefit, and alternatives plus voluntary participation. Do not copy detailed-section prose.",
         "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
         "icf.duration": "State the approved participation duration and relevant time points.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
@@ -389,6 +395,14 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
 
 
 def _source_coverage(section_id: str) -> str:
+    if section_id in {
+        "analysis-plan.considerations",
+        "endpoint-criteria.completion",
+        "endpoint-criteria.study-completion",
+    }:
+        # These sections must cite approved evidence but should reference—not
+        # reproduce—the complete methods or visit/assessment inventory owned elsewhere.
+        return "concept_reference"
     item_complete_sections = {
         "objectives",
         "subjects.inclusion", "subjects.exclusion", "subjects.eligibility",
@@ -439,6 +453,12 @@ def _section_spec(
     boilerplate: str | None = None,
     role: str = "leaf",
     required: bool = True,
+    *,
+    summary_concepts: Iterable[str] = (),
+    owned_concepts: Iterable[str] = (),
+    brief_reference_concepts: Iterable[str] = (),
+    do_not_restate_concepts: Iterable[str] = (),
+    boilerplate_keys: Iterable[str] = (),
 ) -> SectionSpec:
     return SectionSpec(
         section_id,
@@ -453,6 +473,11 @@ def _section_spec(
         source_coverage=_source_coverage(section_id),
         fidelity_evidence=_fidelity_evidence(section_id),
         evidence_scopes=_evidence_scopes(section_id),
+        summary_concepts=tuple(summary_concepts),
+        owned_concepts=tuple(owned_concepts),
+        brief_reference_concepts=tuple(brief_reference_concepts),
+        do_not_restate_concepts=tuple(do_not_restate_concepts),
+        boilerplate_keys=tuple(boilerplate_keys),
     )
 
 
@@ -461,14 +486,14 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("investigator-agreement", "2.", "INVESTIGATOR AGREEMENT", role="container"),
     _section_spec("general-information", "3.", "GENERAL INFORMATION", role="container"),
     _section_spec("table-of-contents", "4.", "TABLE OF CONTENTS", role="container"),
-    _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.title", "study.hypothesis", "endpoints.primary")),
-    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
+    _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.title", "study.hypothesis", "endpoints.primary"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
+    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("study-objectives", "endpoint-inventory"), brief_reference_concepts=("clinical-rationale", "primary-endpoint"), do_not_restate_concepts=("clinical-rationale",)),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
-    _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design",)),
+    _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.intervention_description"), owned_concepts=("study-design", "intervention-assignment")),
     _section_spec("study-design.bias", "8.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design",), "bias"),
     _section_spec(
         "study-design.assignment",
@@ -480,18 +505,18 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     ),
     _section_spec("study-procedure", "9.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.consent", "9.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent",), "consent"),
-    _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "procedures.intervention_management")),
-    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
+    _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "procedures.intervention_management"), owned_concepts=("complete-visit-schedule",)),
+    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessment_details", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other"), brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("study-procedure.unscheduled", "9.4.", "Unscheduled Visits", "protocol-operations", ("procedures.unscheduled_visits",), "unscheduled"),
     _section_spec("study-procedure.discontinued", "9.5.", "Discontinued Subjects", "protocol-operations", ("procedures.discontinued_subjects",), "discontinued-subjects"),
     _section_spec("analysis-plan", "10.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "10.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.analysis_populations", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
-    _section_spec("analysis-plan.methodology", "10.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan", "endpoints.primary", "endpoints.secondary", "endpoints.other")),
-    _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.software", "endpoints.primary", "endpoints.secondary")),
+    _section_spec("analysis-plan.methodology", "10.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("statistical-methods",), brief_reference_concepts=("primary-endpoint", "secondary-endpoints")),
+    _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.software",), "analysis-considerations-cross-reference", brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
     _section_spec("sample-size", "11.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification", "population.sample_size_evidence", "statistics.sample_size_evidence")),
     _section_spec("confidentiality-publication", "12.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("confidentiality.publication", "confidentiality.retention"), "publication"),
     _section_spec("quality-safety", "13.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", role="container"),
-    _section_spec("quality-safety.general", "13.1.", "General Information", "protocol-analysis-and-oversight", ("safety.general_information", "risks_benefits.risks"), "safety-general"),
+    _section_spec("quality-safety.general", "13.1.", "General Information", "protocol-analysis-and-oversight", ("safety.general_information", "risks_benefits.risks"), "safety-general", owned_concepts=("ae-sae-definitions",)),
     _section_spec("quality-safety.monitoring", "13.2.", "Monitoring for Adverse Events", "protocol-analysis-and-oversight", ("safety.monitoring",), "safety-monitoring"),
     _section_spec("quality-safety.reporting", "13.3.", "Procedures for Recording and Reporting AEs and SAEs", "protocol-analysis-and-oversight", ("safety.adverse_events",), "safety-reporting"),
     _section_spec("quality-safety.follow-up", "13.4.", "Follow-Up of Adverse Events and Quality Complaints", "protocol-analysis-and-oversight", ("safety.follow_up",), "safety-followup"),
@@ -502,11 +527,11 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),
     _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.costs", "risks_benefits.injury_handling"), "injury"),
     _section_spec("endpoint-criteria", "18.", "STUDY ENDPOINT CRITERIA", role="container"),
-    _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("procedures.completion", "study.timeline", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.assessments"), "completion"),
+    _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("procedures.completion", "study.timeline", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.assessments"), "completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation", "procedures.replacement"), "discontinuation"),
     _section_spec("endpoint-criteria.termination", "18.3.", "Patient Termination", "protocol-operations", ("procedures.termination", "risks_benefits.risks"), "termination"),
     _section_spec("endpoint-criteria.study-termination", "18.4.", "Study Termination", "protocol-operations", ("procedures.study_termination",), "study-termination"),
-    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion"),
+    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "protocol-sparse-risks"),
     _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"), "protocol-sparse-benefits"),
@@ -516,8 +541,8 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("title-page", "1.", "TITLE PAGE", role="container"),
     _section_spec("investigator-agreement", "2.", "INVESTIGATOR AGREEMENT", role="container"),
     _section_spec("table-of-contents", "3.", "TABLE OF CONTENTS", role="container"),
-    _section_spec("introduction", "4.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.unmet_need", "study.title", "study.hypothesis", "endpoints.primary")),
-    _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary")),
+    _section_spec("introduction", "4.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.unmet_need", "study.title", "study.hypothesis", "endpoints.primary"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
+    _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary"), owned_concepts=("study-objectives", "endpoint-inventory"), brief_reference_concepts=("clinical-rationale", "primary-endpoint"), do_not_restate_concepts=("clinical-rationale",)),
     _section_spec("subjects", "6.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria")),
@@ -528,8 +553,8 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline"), "retrospective-consent"),
     _section_spec("analysis-plan", "9.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "9.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
-    _section_spec("analysis-plan.methodology", "9.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan")),
-    _section_spec("analysis-plan.considerations", "9.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
+    _section_spec("analysis-plan.methodology", "9.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan"), owned_concepts=("statistical-methods",)),
+    _section_spec("analysis-plan.considerations", "9.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.software",), "analysis-considerations-cross-reference", brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
     _section_spec("sample-size", "10.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification")),
     _section_spec("confidentiality", "11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("risks_benefits.privacy", "confidentiality.data_handling"), "retrospective-confidentiality"),
     _section_spec("quality-safety", "12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", "protocol-analysis-and-oversight", ("risks_benefits.risks", "safety.roles"), "retrospective-safety"),
@@ -537,6 +562,21 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
 )
 
 ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
+    _section_spec(
+        "icf.key-information-summary", "", "KEY INFORMATION summary", "icf-narrative",
+        (
+            "objectives.primary", "study.background", "study.hypothesis", "endpoints.primary",
+            "design.intervention_description", "design.interventions", "design.arms", "design.intervention_name",
+            "procedures.assessments", "procedures.visit_schedule", "study.timeline", "population.sample_size",
+            "risks_benefits.risks", "risks_benefits.risk_mitigation", "risks_benefits.benefits",
+            "risks_benefits.alternatives",
+        ),
+        summary_concepts=(
+            "study-purpose", "participation-duration", "principal-risks",
+            "possible-benefit", "alternatives-voluntariness",
+        ),
+        boilerplate_keys=("icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"),
+    ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.background", "study.hypothesis", "endpoints.primary")),
     _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline", "population.sample_size")),
@@ -548,6 +588,55 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
     _section_spec("icf.privacy", "", "Privacy", "icf-narrative", ("risks_benefits.privacy", "confidentiality.data_handling"), "icf-privacy-authorization"),
     _section_spec("icf.injury", "", "Research injury", "icf-narrative", ("risks_benefits.injury_handling",), "injury"),
 )
+
+
+def icf_summary_obligations(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return representation-neutral evidence obligations for KEY INFORMATION."""
+    candidates = {
+        "study-purpose": (
+            "objectives.primary", "study.background", "study.hypothesis", "endpoints.primary",
+            "design.intervention_description", "design.interventions", "design.arms", "design.intervention_name",
+        ),
+        "participation-duration": ("procedures.assessments", "procedures.visit_schedule", "study.timeline", "population.sample_size"),
+        "principal-risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
+        "possible-benefit": ("risks_benefits.benefits",),
+        "alternatives-voluntariness": ("risks_benefits.alternatives",),
+    }
+    boilerplate_fallbacks = {
+        "principal-risks": ("boilerplate:icf-sparse-risks",),
+        "possible-benefit": ("boilerplate:icf-sparse-benefits",),
+        "alternatives-voluntariness": ("boilerplate:alternatives",),
+    }
+    required_boilerplate = {
+        "alternatives-voluntariness": ("icf-voluntary",),
+    }
+    result = {}
+    for concept, paths in candidates.items():
+        source_refs = [f"source:{path}" for path in paths if meaningful(get_path(reference, path))]
+        boilerplate_refs = [] if source_refs else list(boilerplate_fallbacks.get(concept, ()))
+        result[concept] = {
+            "source_refs": source_refs,
+            "boilerplate_refs": [ref.removeprefix("boilerplate:") for ref in boilerplate_refs],
+            "required_boilerplate_refs": list(required_boilerplate.get(concept, ())),
+            "evidence_refs": source_refs + boilerplate_refs + [
+                f"boilerplate:{ref}" for ref in required_boilerplate.get(concept, ())
+            ],
+        }
+    return result
+
+
+def protocol_concept_ownership(study_type: str) -> dict[str, dict[str, list[str]]]:
+    """Expose section-specific concept ownership without similarity scores."""
+    return {
+        section.section_id: {
+            "owns": list(section.owned_concepts),
+            "brief_reference_only": list(section.brief_reference_concepts),
+            "do_not_restate": list(section.do_not_restate_concepts),
+        }
+        for section in protocol_contract(study_type)
+        if section.owned_concepts or section.brief_reference_concepts or section.do_not_restate_concepts
+    }
+
 
 ICF_RETAINED_SHELL_SECTIONS = {
     "advarra-prospective": (
@@ -585,9 +674,16 @@ def icf_contract(study_type: str, icf_template: str = "Advarra") -> tuple[Sectio
     branch = canonical_study_type(study_type)
     if branch == "Retrospective":
         return ()
-    if branch == "Prospective" and str(icf_template).strip().casefold() != "sterling":
-        return tuple(section for section in ICF_STUDY_SECTIONS if section.section_id != "icf.injury")
-    return ICF_STUDY_SECTIONS
+    sterling = str(icf_template).strip().casefold() == "sterling"
+    sections = ICF_STUDY_SECTIONS
+    if not sterling:
+        sections = tuple(
+            section for section in sections
+            if section.section_id != "icf.key-information-summary"
+        )
+    if branch == "Prospective" and not sterling:
+        sections = tuple(section for section in sections if section.section_id != "icf.injury")
+    return sections
 
 
 def icf_retained_sections(study_type: str, icf_template: str = "Advarra") -> tuple[tuple[str, str], ...]:
@@ -2028,6 +2124,6 @@ __all__ = [
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
-    "evidence_available", "facility_projection", "get_path", "input_findings", "meaningful", "parse_source_truth", "source_evidence_coverage_map",
+    "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown",
 ]

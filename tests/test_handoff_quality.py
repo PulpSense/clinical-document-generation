@@ -464,16 +464,13 @@ def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp
     assert accepted is not None
     assert {
         item["section_id"] for item in accepted["drafts"]
-    }.isdisjoint({"evaluation-procedures", "study-procedure.visits"})
-    assert {
-        item["section_id"] for item in accepted["drafts"]
-    } == set(batch.section_ids) - {"evaluation-procedures", "study-procedure.visits"}
+    } == set(batch.section_ids) - {"evaluation-procedures"}
     duplicate_findings = [item for item in findings if "duplicated across separately contracted" in item["issue"]]
     assert duplicate_findings
-    assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures", "study-procedure.visits"]
+    assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures"]
 
 
-def test_duplicate_ingestion_preserves_both_retry_targets_and_accepts_the_rest(tmp_path):
+def test_duplicate_ingestion_preserves_primary_and_retries_secondary_only(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
     request_path = create_drafting_request(
@@ -498,12 +495,12 @@ def test_duplicate_ingestion_preserves_both_retry_targets_and_accepts_the_rest(t
     governing = governing_resources(ROOT, reference)
     findings = ingest_responses(tmp_path, governing)
 
-    assert findings[0]["target_ids"] == ["evaluation-procedures", "study-procedure.visits"]
+    assert findings[0]["target_ids"] == ["evaluation-procedures"]
     accepted_ids = {
         section_id for section_id in batch.section_ids
         if accepted_draft(tmp_path, section_id, governing) is not None
     }
-    assert accepted_ids == set(batch.section_ids) - {"evaluation-procedures", "study-procedure.visits"}
+    assert accepted_ids == set(batch.section_ids) - {"evaluation-procedures"}
     attempts, exhausted = retry_attempts(findings, {})
     assert exhausted == []
     created = schedule_requests(
@@ -520,10 +517,7 @@ def test_duplicate_ingestion_preserves_both_retry_targets_and_accepts_the_rest(t
         for path in created
         if json.loads(path.read_text(encoding="utf-8"))["batch_id"] == batch.batch_id
     )
-    assert [item["section_id"] for item in retry["section_contracts"]] == [
-        "study-procedure.visits",
-        "evaluation-procedures",
-    ]
+    assert [item["section_id"] for item in retry["section_contracts"]] == ["evaluation-procedures"]
 
 
 def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp_path):
@@ -560,7 +554,7 @@ def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp
     findings = accepted_cross_section_duplicate_findings(tmp_path, reference, governing)
 
     assert len(findings) == 1
-    assert findings[0]["target_ids"] == ["objectives", "study-procedure.measurements"]
+    assert findings[0]["target_ids"] == ["study-procedure.measurements"]
     assert findings[0]["recovery_class"] == "drafting_defect"
     assert findings[0]["action"] == "retry_drafting_target"
 
@@ -695,11 +689,11 @@ def test_authorized_boilerplate_does_not_hide_an_unauthorized_cross_section_copy
     accepted, findings = validate_response(request, response)
 
     assert accepted is not None
-    assert {
-        item["section_id"] for item in accepted["drafts"]
-    }.isdisjoint({"introduction", "study-design.bias"})
+    accepted_ids = {item["section_id"] for item in accepted["drafts"]}
+    assert "introduction" in accepted_ids
+    assert "study-design.bias" not in accepted_ids
     duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
-    assert duplicate["target_ids"] == ["introduction", "study-design.bias"]
+    assert duplicate["target_ids"] == ["study-design.bias"]
 
 
 def test_mutated_drafting_request_with_stale_hash_is_blocked_before_response_ingestion(tmp_path):

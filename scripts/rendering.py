@@ -156,6 +156,21 @@ def _icf_procedure_parts(model: Mapping[str, Any]) -> tuple[str, str]:
     return _overview_and_detail(_icf_text(model, "icf.procedures"))
 
 
+def _icf_summary_parts(model: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
+    """Return the five independently drafted KEY INFORMATION concept blocks."""
+    draft = model.get("icf", {}).get("icf.key-information-summary", {})
+    values = [
+        str(item.get("text") or "").strip()
+        for item in draft.get("paragraphs", [])
+        if isinstance(item, Mapping) and str(item.get("text") or "").strip()
+    ]
+    for group in draft.get("lists", []):
+        if isinstance(group, Mapping):
+            values.extend(item for item in _list(group.get("items")) if item)
+    values = values[:5] + [""] * max(0, 5 - len(values))
+    return values[0], values[1], values[2], values[3], values[4]
+
+
 def _first_site(reference: Mapping[str, Any]) -> Mapping[str, Any]:
     sites = reference.get("sites") if isinstance(reference.get("sites"), list) else []
     return sites[0] if sites and isinstance(sites[0], Mapping) else {}
@@ -242,6 +257,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     second_intervention = _text(interventions[1].get("name") or interventions[1].get("intervention_name")) if len(interventions) > 1 else ""
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     icf_visits_overview, icf_visit_details = _icf_procedure_parts(model)
+    key_purpose, key_participation, key_risks, key_benefits, key_alternatives = _icf_summary_parts(model)
     protocol_visits_overview, protocol_visit_details = _overview_and_detail(_draft_text(model, "study-procedure.visits"))
     values = {
         "title": _text(get_path(reference, "study.title")), "studyTitle": _text(get_path(reference, "study.title")),
@@ -291,6 +307,8 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "AI_objectivesIntro": _draft_text(model, "objectives"), "AI_primaryOutcome": _endpoint_text(reference, ("primary",)),
         "AI_secondaryOutcomes": _endpoint_text(reference, ("secondary",)), "AI_exploratoryOutcomes": _endpoint_text(reference, ("other",)) or "Not applicable; no exploratory outcomes were specified in the approved source.",
         "AI_studyProcedure": _draft_text(model, "study-procedure.enrollment"), "AI_studyProcedureBullets": "",
+        "AI_keyPurpose": key_purpose, "AI_keyParticipation": key_participation,
+        "AI_keyRisks": key_risks, "AI_keyBenefits": key_benefits, "AI_keyAlternatives": key_alternatives,
         "AI_studyPurpose": _icf_text(model, "icf.study-purpose"), "AI_icfVisitsOverview": icf_visits_overview,
         "AI_visitsDetails": icf_visit_details, "AI_visitsAndLength": _icf_text(model, "icf.duration"),
         "AI_interventionPossibleSideEffects": _icf_text(model, "icf.risks"), "AI_payment": _icf_text(model, "icf.payment"),

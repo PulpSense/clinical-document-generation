@@ -30,7 +30,9 @@ from contracts import (
     contracted_template_bundle,
     get_path,
     icf_contract,
+    icf_summary_obligations,
     meaningful,
+    normalized_visit_records,
     protocol_contract,
     source_evidence_coverage_map,
 )
@@ -101,6 +103,8 @@ def _request_constraints() -> list[str]:
         "Return structured section content, not a whole document or document markup.",
         "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
         "Use participant-facing language for ICF sections.",
+        "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+        "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
         "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
@@ -372,12 +376,17 @@ def _section_payload(
 ) -> dict[str, Any]:
     allowed = ["agent_draft"]
     boilerplate_items: list[dict[str, str]] = []
-    if section.boilerplate_key:
+    boilerplate_keys = tuple(dict.fromkeys(
+        ([section.boilerplate_key] if section.boilerplate_key else [])
+        + list(section.boilerplate_keys)
+    ))
+    if boilerplate_keys:
         allowed.append("fixed_boilerplate")
-        text = boilerplate.get(section.boilerplate_key)
+    for boilerplate_key in boilerplate_keys:
+        text = boilerplate.get(boilerplate_key)
         if not text:
-            raise ValueError(f"Missing Fixed Clinical Boilerplate: {section.boilerplate_key}")
-        boilerplate_items.append({"boilerplate_id": section.boilerplate_key, "text": text, "sha256": sha256_value(text)})
+            raise ValueError(f"Missing Fixed Clinical Boilerplate: {boilerplate_key}")
+        boilerplate_items.append({"boilerplate_id": boilerplate_key, "text": text, "sha256": sha256_value(text)})
     approved_source_words, minimum_detail_words = _source_detail_budget(reference, section)
     evidence_scopes = []
     for path, focus_terms in section.evidence_scopes:
@@ -411,6 +420,17 @@ def _section_payload(
         "evidence_scopes": evidence_scopes,
         "approved_source_word_count": approved_source_words,
         "reference_detail_target_words": minimum_detail_words,
+        "summary_concepts": list(section.summary_concepts),
+        "summary_obligations": (
+            icf_summary_obligations(reference)
+            if section.section_id == "icf.key-information-summary"
+            else {}
+        ),
+        "concept_ownership": {
+            "owns": list(section.owned_concepts),
+            "brief_reference_only": list(section.brief_reference_concepts),
+            "do_not_restate": list(section.do_not_restate_concepts),
+        },
     }
 
 
@@ -975,6 +995,49 @@ def _coverage_findings(
     evidence_refs: Iterable[str],
     role_content: str | None = None,
 ) -> list[dict[str, Any]]:
+    if section_id == "icf.key-information-summary":
+        # Ordered concept-to-block grounding is validated after each paragraph
+        # has been normalized; aggregate citation coverage is insufficient.
+        return []
+    if contract.get("source_coverage") == "concept_reference":
+        source_value = request.get("approved_source")
+        source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
+        cited = set(map(str, evidence_refs))
+        findings: list[dict[str, Any]] = []
+        material = _material_source(request, contract)
+        missing = [path for path in material if f"source:{path}" not in cited]
+        if missing:
+            findings.append({
+                "category": "drafting", "field": section_id,
+                "issue": f"Section omits approved reference evidence: {', '.join(missing)}.",
+                "next_action": "Cite the evidence while referencing its owning section concisely.",
+            })
+        if section_id in {"endpoint-criteria.completion", "endpoint-criteria.study-completion"}:
+            normalized_content = _normalized_prose(content)
+            omitted = []
+            for visit in normalized_visit_records(source):
+                for label in (str(visit.get("visit") or ""), str(visit.get("timing") or "")):
+                    normalized_label = _normalized_prose(label)
+                    if normalized_label and normalized_label not in normalized_content:
+                        omitted.append(label)
+            if omitted:
+                findings.append({
+                    "category": "drafting", "field": section_id,
+                    "issue": "Section omits approved visit or time-point references: " + ", ".join(dict.fromkeys(omitted)) + ".",
+                    "next_action": "Name every approved visit and time point once without repeating its complete procedure inventory.",
+                })
+        else:
+            ungrounded = [
+                path for path, value in material.items()
+                if f"source:{path}" in cited and not evidence_grounded(content, value)
+            ]
+            if ungrounded:
+                findings.append({
+                    "category": "drafting", "field": section_id,
+                    "issue": f"Reference evidence is cited but not observable: {', '.join(ungrounded)}.",
+                    "next_action": "Preserve the supplied reference value without restating concepts owned elsewhere.",
+                })
+        return findings
     if contract.get("source_coverage") not in {"all_material_evidence", "all_material_items"}:
         return []
     material = _material_source(request, contract)
@@ -1184,7 +1247,7 @@ def _cross_section_duplicate_pairs(
 ) -> list[tuple[str, str]]:
     """Return section pairs that repeat non-boilerplate prose of eight words or more."""
     seen: dict[str, tuple[str, bool]] = {}
-    duplicate_pairs: set[tuple[str, str]] = set()
+    duplicate_pairs: list[tuple[str, str]] = []
     for section_id, item, contract in records:
         for text, evidence_refs, boilerplate_refs in _raw_content_items(item):
             key = _normalized_prose(text)
@@ -1203,8 +1266,10 @@ def _cross_section_duplicate_pairs(
             prior_section, prior_boilerplate = prior
             if prior_section == section_id or (prior_boilerplate and authorized_boilerplate):
                 continue
-            duplicate_pairs.add(tuple(sorted((prior_section, section_id))))
-    return sorted(duplicate_pairs)
+            pair = (prior_section, section_id)
+            if pair not in duplicate_pairs:
+                duplicate_pairs.append(pair)
+    return duplicate_pairs
 
 
 def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
@@ -1294,21 +1359,24 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 "next_action": "Use the exact listed Fixed Clinical Boilerplate with its matching boilerplate reference, or return an authorized agent draft.",
             })
     has_blocking_contract_findings = bool(findings)
+    results_by_id = {
+        str(item.get("section_id") or ""): item
+        for item in results if isinstance(item, Mapping)
+    }
     duplicate_records = (
-        (section_id, item, expected_contracts[section_id])
-        for item in results
-        if isinstance(item, Mapping)
-        and (section_id := str(item.get("section_id") or "")) in expected_contracts
+        (section_id, results_by_id[section_id], contract)
+        for section_id, contract in expected_contracts.items()
+        if section_id in results_by_id
     )
     duplicate_target_ids: set[str] = set()
     for prior_section, section_id in _cross_section_duplicate_pairs(duplicate_records):
-        duplicate_target_ids.update((prior_section, section_id))
+        duplicate_target_ids.add(section_id)
         findings.append({
             "category": "drafting",
             "field": section_id,
-            "target_ids": [prior_section, section_id],
+            "target_ids": [section_id],
             "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
-            "next_action": "Rewrite each target with independent source-grounded prose.",
+            "next_action": f"Rewrite only {section_id} with independent source-grounded prose; preserve {prior_section}.",
         })
     if has_blocking_contract_findings:
         return None, findings
@@ -1378,6 +1446,92 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         ))
         if not clean_paragraphs and not lists:
             findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
+        if section_id == "icf.key-information-summary":
+            summary_records = [
+                (paragraph["text"], paragraph.get("evidence_refs", []), paragraph.get("boilerplate_refs", []))
+                for paragraph in clean_paragraphs
+            ] + [
+                (value, group.get("evidence_refs", []), group.get("boilerplate_refs", []))
+                for group in lists
+                for value in group["items"]
+            ]
+            if len(summary_records) != 5:
+                findings.append({
+                    "category": "drafting", "field": section_id, "target_ids": [section_id],
+                    "issue": "KEY INFORMATION must contain exactly five concise concept summaries.",
+                    "next_action": "Return one concise block for each ordered summary_concepts value.",
+                })
+            elif any(len(text.split()) > 65 for text, _evidence, _boilerplate in summary_records):
+                findings.append({
+                    "category": "drafting", "field": section_id, "target_ids": [section_id],
+                    "issue": "KEY INFORMATION contains a summary block longer than 65 words.",
+                    "next_action": "Compress only the summary while preserving its evidence references.",
+                })
+            else:
+                source_values = {
+                    str(source.get("path")): source.get("value")
+                    for source in request.get("approved_input", [])
+                    if isinstance(source, Mapping)
+                }
+                obligations = expected_contracts[section_id].get("summary_obligations") or {}
+                concepts = list(expected_contracts[section_id].get("summary_concepts") or [])
+                for concept, (text, evidence_refs, boilerplate_refs) in zip(concepts, summary_records):
+                    allowed = set(map(str, (obligations.get(concept) or {}).get("evidence_refs") or []))
+                    allowed_sources = {ref for ref in allowed if ref.startswith("source:")}
+                    allowed_boilerplate = {ref.removeprefix("boilerplate:") for ref in allowed if ref.startswith("boilerplate:")}
+                    cited_sources = allowed_sources.intersection(map(str, evidence_refs))
+                    cited_boilerplate = allowed_boilerplate.intersection(map(str, boilerplate_refs))
+                    required_boilerplate = set(map(
+                        str,
+                        (obligations.get(concept) or {}).get("required_boilerplate_refs") or [],
+                    ))
+                    if allowed_sources and not cited_sources:
+                        findings.append({
+                            "category": "drafting", "field": section_id, "target_ids": [section_id],
+                            "issue": f"KEY INFORMATION concept {concept} lacks its canonical source evidence.",
+                            "next_action": "Use the ordered concept's canonical evidence references and observable source facts.",
+                        })
+                        continue
+                    if cited_sources and not any(
+                        evidence_grounded(text, source_values.get(ref.removeprefix("source:")))
+                        for ref in cited_sources
+                    ):
+                        findings.append({
+                            "category": "drafting", "field": section_id, "target_ids": [section_id],
+                            "issue": f"KEY INFORMATION concept {concept} cites source evidence whose material facts are not observable.",
+                            "next_action": "Rewrite the concept summary so its cited source contributes concrete facts.",
+                        })
+                    if not allowed_sources and allowed_boilerplate and not cited_boilerplate:
+                        findings.append({
+                            "category": "drafting", "field": section_id, "target_ids": [section_id],
+                            "issue": f"KEY INFORMATION concept {concept} lacks its authorized fallback boilerplate.",
+                            "next_action": "Use only the ordered concept's listed Fixed Clinical Boilerplate.",
+                        })
+                    missing_required_boilerplate = required_boilerplate - set(map(str, boilerplate_refs))
+                    if missing_required_boilerplate:
+                        findings.append({
+                            "category": "drafting", "field": section_id, "target_ids": [section_id],
+                            "issue": f"KEY INFORMATION concept {concept} omits required voluntary-participation language.",
+                            "next_action": "Retain the authorized voluntary-participation consent requirement alongside source-grounded alternatives.",
+                        })
+                    required_text = {
+                        str(item.get("boilerplate_id")): str(item.get("text") or "")
+                        for item in expected_contracts[section_id].get("fixed_boilerplate", [])
+                        if isinstance(item, Mapping)
+                        and str(item.get("boilerplate_id")) in required_boilerplate
+                    }
+                    missing_required_text = [
+                        boilerplate_id
+                        for boilerplate_id, authorized_text in required_text.items()
+                        if _normalized_prose(re.split(r"(?<=[.!?])\s+", authorized_text, maxsplit=1)[0])
+                        not in _normalized_prose(text)
+                    ]
+                    if missing_required_text:
+                        findings.append({
+                            "category": "drafting", "field": section_id, "target_ids": [section_id],
+                            "issue": f"KEY INFORMATION concept {concept} cites but omits retained voluntary-participation text.",
+                            "next_action": "Include the retained voluntary-participation statement in the summary text.",
+                        })
         if len(findings) == section_finding_count and section_id not in duplicate_target_ids:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
     return {"kind": "sections", "drafts": accepted}, findings
@@ -1603,7 +1757,7 @@ def accepted_cross_section_duplicate_findings(
         {
             "category": "content",
             "field": current,
-            "target_ids": [prior, current],
+            "target_ids": [current],
             "issue": f"Exact prose is duplicated across authenticated Protocol sections {prior} and {current} before rendering.",
             "recovery_class": "drafting_defect",
             "action": "retry_drafting_target",
@@ -1741,7 +1895,47 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
         fixed = contract.get("fixed_boilerplate") or []
         allowed_paths = [path for path in contract.get("minimum_evidence", []) if path in source and value_text(source[path])]
         section_id = str(contract.get("section_id"))
-        if section_id == "study-procedure.enrollment" and fixed and allowed_paths:
+        if section_id == "icf.key-information-summary":
+            fixed_by_id = {str(item.get("boilerplate_id")): item for item in fixed}
+            purpose = value_text(source.get("objectives.primary") or source.get("study.background")).rstrip(".")
+            participation = value_text(source.get("procedures.visit_schedule") or source.get("procedures.assessments")).rstrip(".")
+            duration = value_text(source.get("study.timeline")).rstrip(".")
+            risks = value_text(source.get("risks_benefits.risks")).rstrip(".")
+            benefits = value_text(source.get("risks_benefits.benefits")).rstrip(".")
+            alternatives = value_text(source.get("risks_benefits.alternatives")).rstrip(".")
+            result["outcome"] = "drafted"
+            result["paragraphs"] = [
+                {"text": f"Researchers are conducting this study to {purpose.casefold()}.", "evidence_refs": ["source:objectives.primary"] if value_text(source.get("objectives.primary")) else ["source:study.background"], "boilerplate_refs": []},
+                {"text": " ".join(filter(None, [f"You will take part in {participation}.", f"Your participation is expected to last {duration}."])), "evidence_refs": [f"source:{path}" for path in ("procedures.visit_schedule", "procedures.assessments", "study.timeline") if value_text(source.get(path))], "boilerplate_refs": []},
+                ({"text": f"The main risks include {risks.casefold()}.", "evidence_refs": ["source:risks_benefits.risks"], "boilerplate_refs": []} if risks else {"text": fixed_by_id["icf-sparse-risks"]["text"], "evidence_refs": [], "boilerplate_refs": ["icf-sparse-risks"]}),
+                ({"text": benefits + ".", "evidence_refs": ["source:risks_benefits.benefits"], "boilerplate_refs": []} if benefits else {"text": fixed_by_id["icf-sparse-benefits"]["text"], "evidence_refs": [], "boilerplate_refs": ["icf-sparse-benefits"]}),
+                ({"text": "Taking part is voluntary. Other care options are available; discuss them with your clinician.", "evidence_refs": ["source:risks_benefits.alternatives"], "boilerplate_refs": ["icf-voluntary"]} if alternatives else {"text": "Taking part is voluntary. You may discuss other available care options with your clinician.", "evidence_refs": [], "boilerplate_refs": ["alternatives", "icf-voluntary"]}),
+            ]
+            result["lists"] = []
+        elif section_id in {"endpoint-criteria.completion", "endpoint-criteria.study-completion"}:
+            approved_source_value = request.get("approved_source")
+            approved_source: Mapping[str, Any] = approved_source_value if isinstance(approved_source_value, Mapping) else {}
+            visits = normalized_visit_records(approved_source)
+            visit_text = "; ".join(
+                " ".join(filter(None, (str(visit.get("visit") or "").strip(), str(visit.get("timing") or "").strip())))
+                for visit in visits
+            )
+            timeline = value_text(source.get("study.timeline")).rstrip(".")
+            subject = "A participant completes the study" if section_id == "endpoint-criteria.completion" else "The study is complete"
+            prose = f"{subject} after the approved sequence: {visit_text}."
+            if timeline:
+                prose += f" The approved overall timeline is {timeline}."
+            result["outcome"] = "drafted"
+            result["paragraphs"] = [{
+                "text": prose,
+                "evidence_refs": [
+                    f"source:{path}" for path in contract.get("minimum_evidence", [])
+                    if value_text(source.get(path))
+                ],
+                "boilerplate_refs": [],
+            }]
+            result["lists"] = []
+        elif section_id == "study-procedure.enrollment" and fixed and allowed_paths:
             block = fixed[0]
             assessment_values = _leaf_texts(source.get("procedures.assessments"))
             assessments = "; ".join(assessment_values).rstrip(".")
@@ -1850,6 +2044,8 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
             result.update({"outcome": "drafted", "paragraphs": []})
     for result, contract in zip(response["section_results"], request["section_contracts"]):
         section_id = str(contract.get("section_id"))
+        if section_id == "icf.key-information-summary" or contract.get("source_coverage") == "concept_reference":
+            continue
         allowed_paths = [
             path for path in contract.get("minimum_evidence", [])
             if path in source and value_text(source[path])
