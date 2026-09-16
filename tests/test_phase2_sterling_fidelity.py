@@ -346,6 +346,33 @@ def test_safety_and_participant_rights_omissions_never_receive_generic_warning()
         assert quality._governed_content_omission(finding, [target]) is False
 
 
+def test_protocol_termination_authority_is_source_mode_and_absent_when_unsupported(tmp_path):
+    reference = source()
+    reference.setdefault("procedures", {})["termination"] = None
+    reference["procedures"]["study_termination"] = None
+    protocol = {item.section_id: item for item in contracts.protocol_contract("Prospective")}
+    for section_id in ("endpoint-criteria.termination", "endpoint-criteria.study-termination"):
+        assert protocol[section_id].role == "source"
+        assert protocol[section_id].required is False
+        assert protocol[section_id].boilerplate_key is None
+
+    report = rendering.render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {"protocol": [], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+    )
+    assert report["status"] == "passed"
+    visible = " ".join(
+        " ".join(paragraph.text.split())
+        for paragraph in Document(tmp_path / "candidate/protocol.docx").paragraphs
+        if paragraph.text.strip()
+    )
+    assert "18.3. Patient Termination" not in visible
+    assert "18.4. Study Termination" not in visible
+
+
 def test_exact_substantive_protocol_duplication_remains_blocking(tmp_path):
     duplicate = (
         "The primary endpoint is intermediate visual acuity at month 3 and all secondary endpoints are "
