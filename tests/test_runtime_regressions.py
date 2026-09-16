@@ -1876,6 +1876,28 @@ def test_content_verification_request_documents_warning_identity_contract(tmp_pa
     assert "failed `procedures` cross-document assessment" in instructions
     assert "notes must cite that finding_id as an exact token" in instructions
     assert "Safety, invention, contradiction, source-integrity" in instructions
+    assert "safety_critical" in instructions
+
+
+def test_content_omission_warning_requires_explicit_non_safety_classification():
+    ordinary = {
+        "category": "content",
+        "check": "substantive",
+        "safety_critical": False,
+        "contradiction": False,
+        "obscures_required_information": False,
+        "materially_unusable": False,
+    }
+
+    assert quality._governed_content_omission(ordinary, ["icf.procedures"]) is True
+    assert quality._governed_content_omission(
+        {**ordinary, "safety_critical": True},
+        ["icf.procedures"],
+    ) is False
+    assert quality._governed_content_omission(
+        {"category": "content", "check": "substantive"},
+        ["icf.procedures"],
+    ) is False
 
 
 def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_warning(
@@ -1915,6 +1937,10 @@ def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_wa
             "target_ids": ["icf.leaving-study"],
             "issue": "The ICF omits the optional leaving-study explanation.",
             "recommended_action": "Add a source-grounded leaving-study explanation at manual review.",
+            "safety_critical": False,
+            "contradiction": False,
+            "obscures_required_information": False,
+            "materially_unusable": False,
         }],
         "section_assessments": [{
             "artifact": "icf",
@@ -1949,6 +1975,10 @@ def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_wa
         "verification_request_id": request["request_id"],
         "issue": "The ICF omits the optional leaving-study explanation.",
         "recommended_action": "Add a source-grounded leaving-study explanation at manual review.",
+        "safety_critical": False,
+        "contradiction": False,
+        "obscures_required_information": False,
+        "materially_unusable": False,
         "severity": "warning",
         "publication_disposition": "warning",
         "action": "manual_review",

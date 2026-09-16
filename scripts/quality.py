@@ -4252,6 +4252,9 @@ def create_verification_requests(
         " Findings must include target_ids for affected section IDs. Every finding must include a unique finding_id "
         "made from ASCII letters or digits separated only by single hyphens or underscores. An ordinary substantive "
         "content omission is a finding with category `content`, check `substantive`, and no safety-critical target. "
+        "To qualify for warning treatment it must also set safety_critical, contradiction, "
+        "obscures_required_information, and materially_unusable to explicit false booleans; omitted or true values "
+        "remain blocking. "
         "It remains a finding with top-level status `blocked`, but the workflow may publish it as a manual-review "
         "warning. When a failed `procedures` cross-document assessment is caused solely by the same ordinary "
         "substantive content omission, its notes must cite that finding_id as an exact token. Safety, invention, "
@@ -4409,6 +4412,10 @@ def _governed_content_omission(
         and _text(finding.get("check")).casefold() == "substantive"
         and bool(normalized_targets)
         and not any(_safety_critical_content_target(target) for target in normalized_targets)
+        and finding.get("safety_critical") is False
+        and finding.get("contradiction") is False
+        and finding.get("obscures_required_information") is False
+        and finding.get("materially_unusable") is False
     )
 
 
@@ -4565,6 +4572,7 @@ def validate_verifications(
                     "concept_id", "primary_section", "secondary_section",
                     "primary_paragraphs", "secondary_paragraphs", "treatment",
                     "necessary", "concise", "material", "resolved", "repair_attempt",
+                    "safety_critical",
                     "contradiction", "obscures_required_information", "materially_unusable",
                     "disposition",
                 ):
