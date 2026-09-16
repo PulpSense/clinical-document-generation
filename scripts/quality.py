@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from drafting import evidence_grounded
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -3645,6 +3645,211 @@ def _normalized_substantive_text(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
 
 
+def _sterling_clause_sections(document: Document) -> dict[str, list[str]]:
+    contract = sterling_clause_contract()
+    headings = {
+        _normalized_substantive_text(str(item["section"])): str(item["section"])
+        for item in contract["clauses"]
+    }
+    sections: dict[str, list[str]] = {title: [] for title in headings.values()}
+    current = ""
+    for paragraph in document.paragraphs:
+        text = re.sub(r"\s+", " ", paragraph.text).strip()
+        key = _normalized_substantive_text(text)
+        if key in headings:
+            current = headings[key]
+            continue
+        if current and text:
+            sections[current].append(text)
+    return sections
+
+
+def _sterling_triggered(clause: Mapping[str, Any], reference: Mapping[str, Any]) -> bool:
+    trigger = clause.get("trigger") if isinstance(clause.get("trigger"), Mapping) else {}
+    rule = str(trigger.get("rule") or "")
+    paths = [str(path) for path in trigger.get("paths", [])]
+    if rule == "always":
+        return True
+    values = [get_path(reference, path) for path in paths]
+    if rule == "truthy":
+        return any(value is True for value in values)
+    if rule == "meaningful":
+        return any(meaningful(value) for value in values)
+    return False
+
+
+def validate_sterling_clause_contract(
+    rendered_document: Path | Document,
+    normalized_source: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate substantive Sterling language, applicability and placement."""
+    document = rendered_document if hasattr(rendered_document, "paragraphs") else Document(rendered_document)
+    contract = sterling_clause_contract()
+    sections = _sterling_clause_sections(document)
+    normalized_sections = {
+        title: _normalized_substantive_text(" ".join(values))
+        for title, values in sections.items()
+    }
+    findings: list[dict[str, Any]] = []
+    branch = canonical_study_type(get_path(normalized_source, "meta.study_type")) or "Prospective"
+    draftable_icf_ids = {
+        item.section_id for item in icf_contract(branch, "Sterling")
+    }
+
+    def add(clause: Mapping[str, Any], code: str, **extra: Any) -> None:
+        severity = str((clause.get("severity") or {}).get({
+            "sterling-clause-missing": "absent",
+            "sterling-clause-weakened": "altered",
+            "sterling-clause-unsupported": "unsupported",
+            "sterling-clause-misplaced": "misplaced",
+        }[code], "blocking"))
+        finding = {
+            "code": code,
+            "category": "content",
+            "check": "sterling_clause_contract",
+            "clause_id": clause["clause_id"],
+            "classification": clause["classification"],
+            "target_ids": [clause["section_id"]],
+            "expected_section": clause["section"],
+            "severity": severity,
+            "publication_disposition": "blocking",
+            "safety_critical": bool(clause.get("safety_critical")) or any(
+                marker in str(clause["clause_id"])
+                for marker in ("risk", "injury", "voluntary", "rights", "authorization", "privacy")
+            ),
+            "issue": {
+                "sterling-clause-missing": "Required governed Sterling clause is absent.",
+                "sterling-clause-weakened": "Governed Sterling clause is materially altered, incomplete, or overbroad.",
+                "sterling-clause-unsupported": "Sterling conditional or source-dependent language appears without its approved trigger.",
+                "sterling-clause-misplaced": "Governed Sterling clause is outside its required section.",
+            }[code],
+            **extra,
+        }
+        recovery = (
+            "deterministic_structure_defect"
+            if code == "sterling-clause-misplaced"
+            else "drafting_defect"
+            if str(clause["section_id"]) in draftable_icf_ids
+            else "document_structure_defect"
+        )
+        findings.append(recovery_finding(finding, recovery))
+
+    for clause in contract["clauses"]:
+        section = str(clause["section"])
+        text = normalized_sections.get(section, "")
+        validation = clause.get("validation") or {}
+        triggered = _sterling_triggered(clause, normalized_source)
+        exact_texts = [str(value) for value in validation.get("required_exact_texts", [])]
+        exact_boilerplate = validation.get("exact_boilerplate_id")
+        if exact_boilerplate:
+            exact_texts.append(sterling_clause_text(str(clause["clause_id"])))
+        normalized_exact = [_normalized_substantive_text(value) for value in exact_texts]
+        placement_markers = (
+            [_normalized_substantive_text(sterling_clause_text(str(clause["clause_id"])))]
+            if validation.get("placement_boilerplate_id")
+            else normalized_exact
+        )
+        term_groups = [
+            [_normalized_substantive_text(str(term)) for term in group]
+            for group in validation.get("required_term_groups", [])
+        ]
+        source_values = [
+            _normalized_substantive_text(_text(get_path(normalized_source, str(path))))
+            for path in validation.get("required_source_values", [])
+        ]
+        authority = clause.get("approved_source") if isinstance(clause.get("approved_source"), Mapping) else {}
+        authority_paths = [str(path) for path in authority.get("paths", [])]
+        authority_records = [
+            (path, get_path(normalized_source, path))
+            for path in authority_paths
+            if meaningful(get_path(normalized_source, path))
+        ]
+        authority_values = [value for _path, value in authority_records]
+        unsupported_markers = [
+            _normalized_substantive_text(str(value))
+            for value in validation.get("unsupported_markers", [])
+        ]
+
+        if not triggered:
+            unsupported = any(marker and marker in text for marker in unsupported_markers)
+            if validation.get("prohibit_when_untriggered") and section in {
+                "COMPENSATION TO YOU", "GENETIC INFORMATION NONDISCRIMINATION ACT"
+            }:
+                unsupported = unsupported or bool(text)
+            if unsupported:
+                add(clause, "sterling-clause-unsupported", actual_section=section)
+            continue
+
+        has_body = bool(text)
+        exact_ok = all(value in text for value in normalized_exact)
+        terms_ok = all(any(term and term in text for term in group) for group in term_groups)
+        sources_ok = all(value and value in text for value in source_values)
+        grounding_results = [
+            (
+                re.search(r"\b(?:no|not|without|will not|none)\b", text) is not None
+                if isinstance(value, str) and value.strip().casefold() == "none"
+                else evidence_grounded(text, value)
+            )
+            for value in authority_values
+        ]
+        grounding_ok = (
+            any(grounding_results)
+            if validation.get("source_grounding") == "any" and grounding_results
+            else all(grounding_results)
+        )
+        contradiction_patterns = {
+            "sterling.risks.foreseeable": (r"\bno (?:foreseeable )?risks?\b",),
+            "sterling.voluntary.core": (r"\bmust participate\b", r"\bcannot (?:leave|withdraw|stop)\b", r"\bwith penalty\b"),
+            "sterling.injury.core": (r"(?<!not )\bwaive (?:all |your )?legal rights\b",),
+            "sterling.privacy.authorization": (r"\bwill identify you\b", r"\bno confidentiality\b"),
+            "sterling.contact.participant-rights": (r"\bno participant rights\b",),
+        }
+        contradiction = any(
+            re.search(pattern, text)
+            for pattern in contradiction_patterns.get(str(clause["clause_id"]), ())
+        )
+        word_count = len(text.split())
+        length_ok = word_count >= int(validation.get("minimum_words", 0) or 0)
+        block_count = len([value for value in sections.get(section, []) if value.strip()])
+        block_ok = block_count >= int(validation.get("minimum_substantive_blocks", 0) or 0)
+        maximum = int(validation.get("maximum_words", 0) or 0)
+        maximum_ok = not maximum or word_count <= maximum
+        if has_body and exact_ok and terms_ok and sources_ok and grounding_ok and not contradiction and length_ok and block_ok and maximum_ok:
+            continue
+
+        # Exact or safeguard-bearing text in another governed section is a
+        # deterministic placement defect; preserve its bytes and move it.
+        marker_values = placement_markers
+        actual = next((
+            title for title, candidate in normalized_sections.items()
+            if title != section and marker_values
+            and sum(value in candidate for value in marker_values) >= max(1, len(marker_values) // 2)
+        ), "")
+        if actual:
+            add(clause, "sterling-clause-misplaced", actual_section=actual)
+        elif not has_body or not block_ok:
+            add(clause, "sterling-clause-missing")
+        else:
+            add(
+                clause,
+                "sterling-clause-weakened",
+                missing_term_groups=[group for group in term_groups if not any(term in text for term in group)],
+                missing_source_values=[value for value in source_values if value not in text],
+                ungrounded_source_paths=[
+                    path for path, value in authority_records
+                    if not evidence_grounded(text, value)
+                    and not (isinstance(value, str) and value.strip().casefold() == "none" and re.search(r"\b(?:no|not|without|will not|none)\b", text))
+                ],
+                contradiction=contradiction,
+            )
+    return {
+        "schema_version": "sterling-clause-validation/v1",
+        "status": "blocked" if findings else "passed",
+        "contract_version": contract["schema_version"],
+        "findings": findings,
+    }
+
+
 def assess_icf_output(
     rendered_document: Path | Document,
     normalized_source: Mapping[str, Any],
@@ -3765,6 +3970,57 @@ def assess_icf_output(
                     "normalized_text": value,
                     "repair_action": "redraft_summary",
                 }, "drafting_defect"))
+
+    # Section ownership also applies to paraphrases. BACKGROUND owns lens
+    # context, comparative evidence, the evidence gap, and rationale; PURPOSE
+    # owns only the concise purpose, hypothesis, and primary outcome.
+    stop_words = {
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+        "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
+        "was", "were", "will", "with",
+    }
+
+    def concept_tokens(value: str) -> set[str]:
+        return {
+            token for token in _normalized_substantive_text(value).split()
+            if len(token) >= 4 and token not in stop_words
+        }
+
+    background = " ".join(detail_blocks.get("icf.background", ()))
+    purpose = " ".join(detail_blocks.get("icf.study-purpose", ()))
+    background_tokens = concept_tokens(background)
+    purpose_tokens = concept_tokens(purpose)
+    union = background_tokens | purpose_tokens
+    overlap = len(background_tokens & purpose_tokens) / len(union) if union else 0.0
+    normalized_background = _normalized_substantive_text(background)
+    normalized_purpose = _normalized_substantive_text(purpose)
+    rationale_markers = (
+        "non diffractive", "dysphotops", "contrast sensitivity", "randomized",
+        "monofocal", "evidence", "broader range", "fewer visual",
+    )
+    repeated_markers = [
+        marker for marker in rationale_markers
+        if marker in normalized_background and marker in normalized_purpose
+    ]
+    if len(purpose_tokens) >= 24 and (overlap >= 0.30 or len(repeated_markers) >= 3):
+        findings.append(recovery_finding({
+            "code": "icf-concept-repetition",
+            "category": "content",
+            "check": "concept_repetition",
+            "concept_id": "clinical-background-and-rationale",
+            "primary_section": "icf.background",
+            "secondary_section": "icf.study-purpose",
+            "primary_paragraphs": list(detail_blocks.get("icf.background", ())),
+            "secondary_paragraphs": list(detail_blocks.get("icf.study-purpose", ())),
+            "target_ids": ["icf.study-purpose"],
+            "treatment": "excessive",
+            "necessary": False,
+            "concise": False,
+            "material": True,
+            "repair_action": "redraft_secondary_section",
+            "severity": "blocking",
+            "publication_disposition": "blocking",
+        }, "drafting_defect"))
     return {
         "schema_version": "icf-output-assessment/v1",
         "status": "repairable" if findings else "passed",
@@ -3801,7 +4057,7 @@ def assess_protocol_concept_repetition(
         "endpoint-inventory": (
             ("primary endpoint",), ("secondary endpoint", "secondary endpoints"),
             ("visual acuity", "symptom score", "questionnaire"),
-            ("distance", "intermediate", "near"), ("week", "month", "day"),
+            ("distance", "intermediate", "near", "defocus"), ("week", "month", "day"),
         ),
     }
     thresholds = {
@@ -3809,7 +4065,7 @@ def assess_protocol_concept_repetition(
         "complete-visit-schedule": (90, 4),
         "ae-sae-definitions": (35, 3),
         "statistical-methods": (30, 3),
-        "endpoint-inventory": (55, 4),
+        "endpoint-inventory": (28, 4),
     }
     owners = {
         concept: section_id
@@ -3831,6 +4087,15 @@ def assess_protocol_concept_repetition(
                 if len(normalized.split()) < minimum_words or matched < minimum_markers:
                     continue
                 primary_paragraphs = [str(item) for item in section_paragraphs.get(primary, ())]
+                secondary_tokens = set(normalized.split())
+                overlap = max((
+                    len(secondary_tokens & set(_normalized_substantive_text(item).split()))
+                    / max(1, len(secondary_tokens | set(_normalized_substantive_text(item).split())))
+                    for item in primary_paragraphs
+                ), default=0.0)
+                material = concept == "endpoint-inventory" and (
+                    overlap >= 0.45 or len(normalized.split()) >= 55
+                )
                 findings.append({
                     "code": "protocol-concept-repetition",
                     "concept_id": concept,
@@ -3841,16 +4106,20 @@ def assess_protocol_concept_repetition(
                     "treatment": "excessive",
                     "necessary": False,
                     "concise": False,
-                    "material": False,
+                    "material": material,
                     "contradiction": False,
                     "obscures_required_information": False,
                     "materially_unusable": False,
                     "target_ids": [secondary],
                     "repair_action": "redraft_secondary_section",
                     "disposition": "manual_review",
-                    "severity": "warning",
-                    "publication_disposition": "warning",
-                    "action": "manual_review",
+                    "severity": "blocking" if material else "warning",
+                    "publication_disposition": "blocking" if material else "warning",
+                    "action": RECOVERY_POLICIES["drafting_defect"] if material else "manual_review",
+                    **({
+                        "recovery_class": "drafting_defect",
+                        "owner": "drafting",
+                    } if material else {}),
                 })
                 break
     return findings
@@ -4045,6 +4314,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     "treatment": "excessive",
                     "necessary": False,
                     "concise": False,
+                    "severity": "blocking",
+                    "publication_disposition": "blocking",
                     "issue": f"Exact paragraph is repeated from Protocol section {seen[key]} in secondary section {current_section}.",
                 }, "drafting_defect"))
         elif len(text.split()) >= 8:
@@ -4089,6 +4360,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             {"family": icf_template, "required_static_text": required_static_text},
         )
         findings.extend(icf_assessment["findings"])
+        if icf_template.casefold() == "sterling":
+            findings.extend(validate_sterling_clause_contract(icf, reference)["findings"])
         icf_document = Document(icf)
         icf_visible = re.sub(r"\s+", " ", " ".join(paragraph.text for paragraph in icf_document.paragraphs)).casefold()
         for section_id, title in icf_retained_sections(branch, icf_template):
@@ -4294,6 +4567,11 @@ def create_verification_requests(
         "source_field_inventory": _source_field_inventory(reference),
         "protocol_concept_ownership": protocol_concept_ownership(branch),
         "authorized_boilerplate": authorized_boilerplate,
+        "sterling_clause_contract": (
+            sterling_clause_contract(repo_root)
+            if str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"
+            else None
+        ),
         "sections": sections,
         "checks": list(CONTENT_CHECKS),
         "cross_document_checks": cross_document_checks,
@@ -4398,6 +4676,8 @@ def _safety_critical_content_target(target: str) -> bool:
         for token in (
             "adverse", "contraindication", "emergency", "harm", "injury",
             "pregnancy", "risk", "risks", "safety", "sideeffect", "sideeffects",
+            "authorization", "compensation", "contact", "cost", "costs", "privacy",
+            "rights", "voluntary", "withdrawal",
         )
     )
 

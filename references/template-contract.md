@@ -25,6 +25,14 @@ The retained client references used to audit those families are:
 - `assets/client-templates/reference/sterling-icf-reference.docx`
 - `assets/client-templates/reference/prs-manual-reference.xml`
 
+Sterling substantive language is additionally governed by
+`references/sterling-clause-contract.json`. The contract classifies each
+retained or generated Sterling clause, binds its trigger and authority, assigns
+one intended section, declares exact versus meaning-preserving fidelity,
+limits merge fields, and defines deterministic severity. The template alone is
+not permission to retain an inapplicable conditional clause or an unsupported
+example-study, legal, payment, injury, privacy, authorization, or contact claim.
+
 The PRS template preserves the element names, ordering, optional nodes, and
 repeated-block taxonomy of the client-approved manual XML. Python may populate
 or repeat those nodes, but a drafting subagent may return only the two PRS
@@ -53,7 +61,8 @@ reapplies the matching retained client reference's document defaults, named styl
 heading design, generated-body design, and section spacer rhythm; formatting must
 not be approximated with generic font or spacing values. Protocol leaf bodies come
 only from accepted Section Drafts. ICF regulatory language stays
-in the selected client family, every accepted ICF draft is visible, and
+in the selected client family only when its family clause contract marks it
+mandatory or its approved trigger is satisfied. Every accepted ICF draft is visible, and
 study-specific prose from the authority example is removed unless the approved
 source supports it. Client outputs remain standard `.docx` files.
 

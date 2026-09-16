@@ -41,7 +41,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v11-source-constrained-boilerplate"
+PROMPT_VERSION = "section-drafting-v12-sterling-clauses-and-section-ownership"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -104,7 +104,10 @@ def _request_constraints() -> list[str]:
         "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
         "Use participant-facing language for ICF sections.",
         "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+        "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+        "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
         "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+        "Protocol General Information is a compact synopsis; Objectives owns objectives, hypotheses, and concise endpoint identification; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and never reproduce a long endpoint inventory outside Objectives unless scientific meaning requires it.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
         "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
@@ -1189,6 +1192,18 @@ def _normalized_prose(value: Any) -> str:
     return re.sub(r"\s+", " ", str(value or "")).strip().casefold()
 
 
+def _concept_tokens(value: Any) -> set[str]:
+    stop = {
+        "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
+        "in", "is", "it", "of", "on", "or", "that", "the", "this", "to",
+        "was", "were", "will", "with",
+    }
+    return {
+        token for token in re.sub(r"[^a-z0-9]+", " ", _normalized_prose(value)).split()
+        if len(token) >= 4 and token not in stop
+    }
+
+
 def _raw_content_items(item: Mapping[str, Any]) -> list[tuple[str, list[str], list[str]]]:
     content: list[tuple[str, list[str], list[str]]] = []
     for paragraph in item.get("paragraphs") or []:
@@ -1450,6 +1465,27 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             combined_evidence,
             "\n".join(role_content_parts),
         ))
+        if section_id == "icf.study-purpose":
+            approved_source = request.get("approved_source")
+            background = get_path(
+                approved_source if isinstance(approved_source, Mapping) else {},
+                "study.background",
+            )
+            purpose_tokens = _concept_tokens(combined_content)
+            background_tokens = _concept_tokens(background)
+            union = purpose_tokens | background_tokens
+            overlap = len(purpose_tokens & background_tokens) / len(union) if union else 0.0
+            if len(purpose_tokens) >= 24 and overlap >= 0.30:
+                findings.append({
+                    "category": "drafting",
+                    "field": section_id,
+                    "target_ids": [section_id],
+                    "code": "icf-concept-repetition",
+                    "primary_section": "icf.background",
+                    "secondary_section": section_id,
+                    "issue": "PURPOSE materially repeats the clinical background, comparative evidence, or rationale owned by BACKGROUND.",
+                    "next_action": "Rewrite only PURPOSE as a concise purpose, hypothesis, and primary-endpoint statement; preserve BACKGROUND.",
+                })
         if not clean_paragraphs and not lists:
             findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
         if section_id == "icf.key-information-summary":

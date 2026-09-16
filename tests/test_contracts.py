@@ -91,6 +91,7 @@ def test_contracted_template_bundle_identity_is_stable_and_covers_every_selected
         for item in group.values()
     }
     governed_paths.add(first["fixed_clinical_boilerplate"]["path"])
+    governed_paths.add(first["sterling_clause_contract"]["path"])
     governed_paths.update(first["approved_font_plan"]["packaged_font_assets"])
     assert governed_paths == set(first["resource_hashes"])
     assert all(

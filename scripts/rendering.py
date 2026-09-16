@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -211,6 +211,26 @@ def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primar
     return "\n".join(lines)
 
 
+def _endpoint_synopsis(reference: Mapping[str, Any]) -> str:
+    """Return a compact General Information endpoint synopsis."""
+    primary = list(get_path(reference, "endpoints.primary", []) or [])
+    secondary = list(get_path(reference, "endpoints.secondary", []) or [])
+    other = list(get_path(reference, "endpoints.other", []) or [])
+    lines = []
+    if primary:
+        item = primary[0]
+        label = _text(item)
+        timepoint = _text(item.get("time_point") or item.get("time_frame")) if isinstance(item, Mapping) else ""
+        lines.append(f"Primary: {label}{f' ({timepoint})' if timepoint else ''}")
+        if len(primary) > 1:
+            lines.append(f"{len(primary) - 1} additional primary endpoint(s); see Section 6.")
+    if secondary:
+        lines.append(f"{len(secondary)} secondary endpoint(s); see Section 6.")
+    if other:
+        lines.append(f"{len(other)} exploratory endpoint(s); see Section 6.")
+    return "\n".join(lines)
+
+
 def _document_control_date(reference: Mapping[str, Any]) -> str:
     supplied = _text(get_path(reference, "meta.date"))
     return supplied
@@ -306,7 +326,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "AI_statisticalConsiderations": _draft_text(model, "analysis-plan.considerations"),
         "AI_risks": _draft_text(model, "risks-benefits.risks") or _text(get_path(reference, "risks_benefits.risks")),
         "AI_benefits": _icf_text(model, "icf.benefits") or _draft_text(model, "risks-benefits.benefits"),
-        "AI_masked": _text(get_path(reference, "design.masking")), "AI_variables": _endpoint_text(reference),
+        "AI_masked": _text(get_path(reference, "design.masking")), "AI_variables": _endpoint_synopsis(reference),
         "AI_objectivesIntro": _draft_text(model, "objectives"), "AI_primaryOutcome": _endpoint_text(reference, ("primary",)),
         "AI_secondaryOutcomes": _endpoint_text(reference, ("secondary",)), "AI_exploratoryOutcomes": _endpoint_text(reference, ("other",)) or "Not applicable; no exploratory outcomes were specified in the approved source.",
         "AI_studyProcedure": _draft_text(model, "study-procedure.enrollment"), "AI_studyProcedureBullets": "",
@@ -1956,6 +1976,77 @@ def _replace_sterling_section_body(document: Document, heading_title: str, block
     _insert_icf_blocks(document, anchor, blocks, exemplar)
 
 
+def repair_sterling_clause_placement(
+    document: Document,
+    reference: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Move intact governed exact clauses to their Sterling-owned section."""
+    del reference  # placement is deterministic and never changes clause text
+    contract = sterling_clause_contract()
+    headings = {
+        _icf_heading_key(str(item["section"])): str(item["section"])
+        for item in contract["clauses"]
+    }
+    current = ""
+    located: list[tuple[Paragraph, str]] = []
+    for paragraph in document.paragraphs:
+        key = _icf_heading_key(paragraph.text)
+        if key in headings:
+            current = headings[key]
+            continue
+        if paragraph.text.strip():
+            located.append((paragraph, current))
+    repairs = []
+    for clause in contract["clauses"]:
+        source = clause.get("approved_source") or {}
+        validation = clause.get("validation") or {}
+        if not (
+            source.get("boilerplate_id")
+            or validation.get("exact_boilerplate_id")
+            or validation.get("placement_boilerplate_id")
+        ):
+            continue
+        try:
+            exact = _icf_heading_key(sterling_clause_text(str(clause["clause_id"])))
+        except ValueError:
+            continue
+        match = next((
+            (paragraph, section)
+            for paragraph, section in located
+            if _icf_heading_key(paragraph.text) == exact
+        ), None)
+        if match is None or match[1] == clause["section"]:
+            continue
+        target = next((
+            paragraph for paragraph in document.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key(str(clause["section"]))
+        ), None)
+        if target is None:
+            continue
+        paragraph, actual = match
+        target._p.addnext(paragraph._p)
+        repairs.append({
+            "clause_id": clause["clause_id"],
+            "from": actual,
+            "to": clause["section"],
+        })
+    return {
+        "schema_version": "sterling-clause-placement-repair/v1",
+        "status": "repaired" if repairs else "unchanged",
+        "repairs": repairs,
+        "revalidated": all(
+            any(
+                _icf_heading_key(paragraph.text) == _icf_heading_key(sterling_clause_text(str(clause["clause_id"])))
+                for paragraph in document.paragraphs[
+                    next((index + 1 for index, item in enumerate(document.paragraphs) if _icf_heading_key(item.text) == _icf_heading_key(str(clause["section"]))), len(document.paragraphs)):
+                ]
+            )
+            for clause in contract["clauses"]
+            if any(repair["clause_id"] == clause["clause_id"] for repair in repairs)
+        ),
+    }
+
+
 def _replace_icf_section_body(
     document: Document,
     heading_title: str,
@@ -2074,10 +2165,14 @@ def _normalize_sterling_retained_sections(
         "INFORMATION",
         [(boilerplate["icf-new-findings"], False)],
     )
+    withdrawal_blocks = [(boilerplate["icf-withdrawal"], False)]
+    termination = _text(get_path(reference, "procedures.termination"))
+    if termination:
+        withdrawal_blocks.append((termination, False))
     _replace_sterling_section_body(
         document,
         "VOLUNTARY PARTICIPATION/WITHDRAWAL",
-        [(boilerplate["icf-withdrawal"], False)],
+        withdrawal_blocks,
     )
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     investigator = get_path(reference, "parties.principal_investigator", {}) or {}
@@ -2105,6 +2200,46 @@ def _normalize_sterling_retained_sections(
         "QUESTIONS",
         [(text, False) for text in (research_contact, doctor_contact, irb_contact) if text],
     )
+
+
+def _insert_sterling_conditional_clauses(
+    document: Document,
+    reference: Mapping[str, Any],
+) -> None:
+    """Insert only triggered template-authorized Sterling conditional text."""
+    contract = sterling_clause_contract()
+    for clause in contract["clauses"]:
+        if clause.get("classification") != "conditional":
+            continue
+        trigger = clause.get("trigger") or {}
+        paths = [str(path) for path in trigger.get("paths", [])]
+        if trigger.get("rule") != "truthy" or not any(get_path(reference, path) is True for path in paths):
+            continue
+        heading_text = str(clause["section"])
+        if any(_icf_heading_key(item.text) == _icf_heading_key(heading_text) for item in document.paragraphs):
+            continue
+        anchor = next((
+            paragraph for paragraph in document.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key("QUESTIONS")
+        ), None)
+        if anchor is None:
+            raise LayoutRepairTargetError(
+                f"Sterling conditional clause has no insertion anchor: {clause['clause_id']}"
+            )
+        heading = document.add_paragraph()
+        _copy_paragraph_design(heading, anchor)
+        _set_paragraph_text(heading, heading_text)
+        anchor._p.addprevious(heading._p)
+        exemplar = next((
+            paragraph for paragraph in document.paragraphs
+            if paragraph.text.strip() and not _is_icf_heading(paragraph)
+        ), None)
+        for text in clause.get("authorized_texts", []):
+            paragraph = document.add_paragraph()
+            if exemplar is not None:
+                _copy_paragraph_design(paragraph, exemplar)
+            _set_paragraph_text(paragraph, str(text))
+            anchor._p.addprevious(paragraph._p)
 
 
 def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]) -> None:
@@ -3149,6 +3284,8 @@ def _template_document(
             _remove_advarra_example_study_prose(document)
         if sterling:
             _normalize_sterling_retained_sections(document, reference, boilerplate)
+            _insert_sterling_conditional_clauses(document, reference)
+            repair_sterling_clause_placement(document, reference)
         else:
             _normalize_icf_withdrawal(document, boilerplate)
             _normalize_advarra_contact_sections(document, reference, boilerplate)
