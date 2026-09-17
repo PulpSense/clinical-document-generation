@@ -1518,6 +1518,59 @@ def test_external_parent_visual_reviewer_rejects_invalid_or_unbound_response(
     assert not (revision / request["response_path"]).exists()
 
 
+def test_external_parent_visual_reviewer_rejects_request_claiming_wrong_active_revision(
+    tmp_path,
+):
+    revision = tmp_path / "revisions/r1"
+    request_path = revision / "hermes/verification-requests/visual.json"
+    request_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r2.verify.visual.protocol",
+        "task": "rendered_page_visual_verification",
+        "revision_id": "r2",
+        "response_path": "hermes/verification-responses/visual.json",
+        "artifacts": [{"artifact": "protocol", "pages": []}],
+        "checks": list(VISUAL_CHECKS),
+    }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "revision_id": request["revision_id"],
+        "producer": {"model_id": "test-parent-model", "reviewer_id": "parent-reviewer"},
+        "status": "blocked",
+        "findings": [{
+            "artifact": "protocol",
+            "page": 1,
+            "check": "bad_table_split",
+            "element": "3. GENERAL INFORMATION",
+            "issue": "The summary table split is invalid.",
+        }],
+        "page_assessments": [],
+    }
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        "#!/bin/sh\nprintf '%s\\n' '" + json.dumps(response) + "'\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    with pytest.raises(RuntimeError, match="did not produce one bound terminal response"):
+        workflow.command_parent_visual_reviewer(command)([{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": request["response_path"],
+            "request_id": request["request_id"],
+            "request_sha256": request["request_sha256"],
+            "task": request["task"],
+        }], 10.0, revision, {})
+
+    assert not (revision / request["response_path"]).exists()
+
+
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
     monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
         "package_fingerprint": "installed",

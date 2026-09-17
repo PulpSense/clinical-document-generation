@@ -3925,6 +3925,25 @@ def _handoff_response_is_bound(
     )
 
 
+def _parent_visual_response_is_bound(
+    run_dir: Path,
+    revision_id: str,
+    handoff: Mapping[str, Any],
+) -> bool:
+    revision_dir = run_dir / "revisions" / revision_id
+    request_path = revision_dir / str(handoff.get("request_path") or "")
+    try:
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(request, Mapping)
+        and request.get("task") == "rendered_page_visual_verification"
+        and request.get("revision_id") == revision_id
+        and _handoff_response_is_bound(run_dir, revision_id, handoff)
+    )
+
+
 def run_desktop_operation(
     run_dir: Path,
     *,
@@ -4481,7 +4500,7 @@ def run_desktop_operation(
                     return [
                         item for item in candidates
                         if revision_id
-                        and not _handoff_response_is_bound(run_dir, revision_id, item)
+                        and not _parent_visual_response_is_bound(run_dir, revision_id, item)
                     ]
 
                 def run_bounded_parent_review(
@@ -4575,7 +4594,7 @@ def run_desktop_operation(
                     item for item in handoffs
                     if item.get("fallback_owner") == "parent"
                     and revision_id
-                    and not _handoff_response_is_bound(run_dir, revision_id, item)
+                    and not _parent_visual_response_is_bound(run_dir, revision_id, item)
                 ]
                 if (
                     fallback_handoffs
@@ -5555,7 +5574,7 @@ def run_production_desktop_operation(
         )
         unresolved = [
             dict(item) for item in handoffs
-            if not _handoff_response_is_bound(run_dir, active_revision.name, item)
+            if not _parent_visual_response_is_bound(run_dir, active_revision.name, item)
         ]
         if unresolved:
             raise RuntimeError(
@@ -5795,6 +5814,8 @@ def command_parent_visual_reviewer(
             if not candidates:
                 continue
             request = _read(bound_request_path)
+            if request.get("revision_id") != revision_dir.name:
+                continue
             normalized = [
                 (candidate, bound)
                 for candidate in candidates
@@ -5836,7 +5857,7 @@ def command_parent_visual_reviewer(
                 response_path.unlink(missing_ok=True)
         unresolved = [
             dict(item) for item in handoffs
-            if not _handoff_response_is_bound(
+            if not _parent_visual_response_is_bound(
                 revision_dir.parent.parent,
                 revision_dir.name,
                 item,
