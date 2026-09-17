@@ -18,7 +18,7 @@ Create a client-approved Source-of-Truth first, draft clinical sections through 
 - Do not expose drafts, PDFs, page images, logs, or repair artifacts as client outputs.
 - Publish nothing unless the complete branch package passes.
 - Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect. Apply only the narrowly authorized quality corrections in `references/quality-corrections.md`; they do not permit font shrinking, deletion of consent text, or arbitrary page-count targets.
-- After approval, use one persistent Desktop operation. Aim for 10–20 minutes; 20 minutes remains successful, while 30 minutes is the hard correctness ceiling. Twenty minutes is not a cutoff.
+- After approval, use one persistent Desktop operation. Aim for 10–20 minutes; 20 minutes remains successful, while 45 minutes is the hard correctness ceiling. Twenty minutes is not a cutoff.
 - Normal generation is not software maintenance. During ordinary client generation, the installed skill and its templates, contracts, tests, and implementation remain read-only; only the run workspace and isolated runtime caches may be written. When the owner explicitly requests development maintenance, Hermes may edit the Git-managed development checkout and push committed changes directly to the authorized Git/GitHub branch. Do not build a ZIP merely because a development edit was committed or pushed. Repackage and re-certify only when the owner explicitly requests a distributable or installable release, or before the change is installed or activated; Hermes must never edit the active certified release in place.
 - For ordinary client document generation, use `--manual-review`. This complete unsigned client workflow does not require a certification key or `PROMOTION-RECORD.json`. Run certification, signing, `--bind-certification`, or `--install-release` only when the user explicitly requests a formally certified release; a missing signing key is never a generation blocker.
 
@@ -331,7 +331,7 @@ extracted, hash-verified candidate release built from the exact commit recorded
 in its manifest and binds its fingerprint. The corpus controller may prepare
 fixtures and reduce evidence but must not inject a test-only worker launcher. It must not
 import or launch the editable checkout, and it does not replace the operation's
-30-minute deadline with a harness timeout. The certification adapter must wire
+45-minute deadline with a harness timeout. The certification adapter must wire
 visual fallback to a Desktop-parent review callback; it must never redispatch
 that fallback through the worker launcher. A valid operation above 15 minutes
 may deliver but receives a non-certifying runtime outcome.
@@ -359,10 +359,10 @@ For every `awaiting_hermes` response:
 2. Keep request contents out of the parent orchestration context. The parent must route paths without reading request JSON; each assigned subagent reads its own request completely.
 3. Send one request path to each subagent and dispatch all returned handoffs concurrently. Never combine multiple request files in one subagent. If the delegation limit is lower than the handoff count, start one isolated `hermes chat -q` background process per handoff in the same turn instead of shrinking the wave.
 4. Give each subagent the absolute request path, revision directory, exact response path, and task. Require exact response JSON with no Markdown commentary and validation with the repository validator before completion. For `task: prs_narrative_drafting`, the response must use a `narrative` object containing exactly `brief_summary` and `detailed_description`; do not return `section_results` for PRS requests.
-5. Keep the parent turn alive with one bounded wait for every exact `response_path`. A handoff is complete when its exact response file contains parseable JSON bound to the request ID and hash. At that point, terminate and reap only that owned worker within the cleanup reserve, then advance without waiting for its final chat self-report. If a delegated visual reviewer fails or times out, the Desktop parent must inspect every page image bound by that same request and return the complete outer verification-response object. The external parent-review launcher must stream the reviewer's raw stdout unchanged; it must not choose the last decoded JSON object or save a nested `finding` object. The installed workflow selects and atomically saves only the unique object bound to the request schema, ID, hash, and task. Deterministic checks alone never count as Visual QA. Completion means every response path satisfies this condition; a missing drafting response at the operation deadline is one consolidated technical blocker and does not consume a drafting retry.
+5. Keep the parent turn alive with one bounded wait for every exact `response_path`. A handoff is complete when its exact response file contains parseable JSON bound to the request ID, hash, task, and revision. At that point, terminate and reap only that owned worker within the cleanup reserve, then advance without waiting for its final chat self-report. If a delegated visual reviewer fails or times out, the Desktop parent must inspect every page image bound by that same unchanged request and return the complete outer verification-response object. The external parent-review launcher must stream the reviewer's raw stdout unchanged; it must not choose the last decoded JSON object or save a nested `finding` object. The installed workflow selects and atomically saves only the unique object accepted by the existing response validator and binding checks. A parent callback is complete only after every declared response path passes those checks. If a callback returns or raises without accepted responses, retry the parent once with the exact original request; if any response remains absent or invalid, stop immediately with `missing_parent_visual_review_response` rather than waiting for the operation deadline. Deterministic checks alone never count as Visual QA. A missing drafting response at the operation deadline is one consolidated technical blocker and does not consume a drafting retry.
 6. Rerun `--stage generate`. The next `generate` call is the authoritative response validator; it accepts valid drafts, schedules targeted retries for rejected drafts, and returns the next handoff wave.
 
-Repeat until the workflow passes or blocks. A missing response remains pending and does not consume a retry.
+Repeat until the workflow passes or blocks. A missing drafting or delegated-worker response remains pending and does not consume a drafting retry; the bounded Desktop-parent rule above governs a missing parent visual response.
 
 `awaiting_hermes` is internal orchestration state. Do not expose its requests, findings, drafting decisions, or progress questions to the reviewer.
 
@@ -410,8 +410,11 @@ timing, and values before release.
 ## Retry behavior
 
 - Repairable post-approval drafting, deterministic construction, layout, and
-  reviewer-response failures retry within the one persisted 30-minute Desktop
-  operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap.
+  reviewer-response failures retry within the one persisted 45-minute Desktop
+  operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap,
+  except the Desktop-parent visual callback: after its initial callback, exactly one
+  unchanged-request parent retry is permitted before missing or invalid response evidence
+  becomes `missing_parent_visual_review_response`.
 - Invalid draft: retry only failed section IDs in their existing batch.
 - Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
 - Content contradiction: retry only implicated sections unless the approved source conflicts.
@@ -432,10 +435,13 @@ timing, and values before release.
   the package-wide content review and every document-scoped visual review against
   the repaired candidate. Never reuse a pass from an earlier set.
 - A transient API or malformed-routing response retries only that reviewer within
-  the current set and does not consume a new complete review set.
-- Only the persisted 30-minute deadline or a non-repairable integrity, source,
-  renderer, safety, unsupported-template, or atomic-delivery failure terminates
-  the post-approval operation without client outputs.
+  the current set and does not consume a new complete review set. The bounded
+  Desktop-parent exception above applies after delegated visual review has already
+  fallen back to the parent.
+- Only the persisted 45-minute deadline or a non-repairable integrity, source,
+  renderer, safety, unsupported-template, atomic-delivery, or exhausted bounded
+  parent-response validation failure terminates the post-approval operation without
+  client outputs.
 
 ## Independent verification
 
@@ -519,8 +525,8 @@ openable Desktop files, not inline-code paths, and must not include QA artifacts
 `delivery.confirmed: true` is the only completed delivery state. Record elapsed
 time and its runtime classification. A 10–20 minute result meets the normal
 target; a successful result above 20 minutes is diagnostic evidence but remains
-within the operation until the 30-minute correctness ceiling.
+within the operation until the 45-minute correctness ceiling.
 
 If `status: blocked` after all internal retries, return one consolidated technical blocker and repair report; do not ask supplemental clinical questions or present partial documents as usable. A complete candidate retained under `revisions/<revision-id>/candidate/` is internal evidence only until Render Assurance passes.
 
-If the persisted 30-minute operation deadline is reached, stop and preserve the failed run unchanged. Explain concisely which stage did not complete, what blocker or pending work remained, and that no partial documents are approved for delivery. If the deadline is the only terminal cause and the remaining work appears safely retryable, ask whether the user wants to start a fresh generation attempt using the exact same approved Source-of-Truth. Do not continue automatically, reset or extend the terminated operation, reuse stale verification results, or request new clinical inputs. If the findings indicate an implementation, integrity, security, renderer, unsupported-template, atomic-delivery, or environmental problem, explain the required correction instead of recommending a blind retry.
+If the persisted 45-minute operation deadline is reached, stop and preserve the failed run unchanged. Explain concisely which stage did not complete, what blocker or pending work remained, and that no partial documents are approved for delivery. If the deadline is the only terminal cause and the remaining work appears safely retryable, ask whether the user wants to start a fresh generation attempt using the exact same approved Source-of-Truth. Do not continue automatically, reset or extend the terminated operation, reuse stale verification results, or request new clinical inputs. If the findings indicate an implementation, integrity, security, renderer, unsupported-template, atomic-delivery, or environmental problem, explain the required correction instead of recommending a blind retry.

@@ -4796,6 +4796,7 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
             ("request_id", request.get("request_id")),
             ("request_sha256", request.get("request_sha256")),
             ("task", request.get("task")),
+            ("revision_id", request.get("revision_id")),
         )
     ):
         return False
@@ -4850,7 +4851,7 @@ def validate_verifications(
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
         malformed_response = False
-        for key, expected in (("schema_version", RESPONSE_SCHEMA), ("request_id", request["request_id"]), ("request_sha256", request["request_sha256"]), ("task", request["task"])):
+        for key, expected in (("schema_version", RESPONSE_SCHEMA), ("request_id", request["request_id"]), ("request_sha256", request["request_sha256"]), ("task", request["task"]), ("revision_id", request.get("revision_id"))):
             if response.get(key) != expected:
                 malformed_response = True
                 findings.append(recovery_finding({

@@ -49,7 +49,7 @@ REFERENCE = Path("reference/study.reference.json")
 DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1200.0
-DESKTOP_OPERATION_BUDGET_SECONDS = 1800.0
+DESKTOP_OPERATION_BUDGET_SECONDS = 2700.0
 FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
     "drafting": 480.0,
@@ -4211,7 +4211,6 @@ def run_desktop_operation(
         for item in raw_pending_handoffs
         if isinstance(item, Mapping)
     ]
-    fallback_attempted_responses: set[str] = set()
     last_result: dict[str, Any] = {}
     process_deadline_monotonic = process_monotonic_anchor + max(0.0, deadline_at_epoch - process_epoch_anchor)
 
@@ -4427,7 +4426,10 @@ def run_desktop_operation(
             remaining = remaining_seconds()
             if remaining <= 0:
                 continue
-            fallback_attempted = fallback_attempted_responses
+            supports_parent_fallback = False
+            bounded_parent_review_runner: Callable[
+                [Sequence[Mapping[str, Any]]], dict[str, Any] | None
+            ] | None = None
             try:
                 for handoff in handoffs:
                     if not isinstance(handoff, Mapping):
@@ -4473,24 +4475,59 @@ def run_desktop_operation(
                     target.append(item)
                 soft_timeout = min(remaining, soft_budgets.get(stage, remaining))
 
-                def fallback_or_raise(
-                    dispatch_error: Exception,
-                    dispatched: Sequence[Mapping[str, Any]],
-                ) -> None:
-                    incomplete = [
-                        item for item in dispatched
-                        if item.get("fallback_owner") == "parent"
-                        and revision_id
+                def unresolved_parent_handoffs(
+                    candidates: Sequence[Mapping[str, Any]],
+                ) -> list[Mapping[str, Any]]:
+                    return [
+                        item for item in candidates
+                        if revision_id
                         and not _handoff_response_is_bound(run_dir, revision_id, item)
                     ]
-                    if incomplete and fallback_handoff_runner is not None:
-                        fallback_attempted.update(
-                            str(item.get("response_path") or "") for item in incomplete
-                        )
-                        fallback_handoff_runner(incomplete, remaining_seconds())
-                        return
-                    raise dispatch_error
 
+                def run_bounded_parent_review(
+                    candidates: Sequence[Mapping[str, Any]],
+                ) -> dict[str, Any] | None:
+                    pending = unresolved_parent_handoffs(candidates)
+                    errors: list[str] = []
+                    for _attempt in range(2):
+                        if not pending:
+                            return None
+                        parent_remaining = remaining_seconds()
+                        if parent_remaining <= 0:
+                            break
+                        try:
+                            if fallback_handoff_runner is not None:
+                                fallback_handoff_runner(pending, parent_remaining)
+                            else:
+                                handoff_runner(
+                                    [{**item, "reviewer_owner": "parent"} for item in pending],
+                                    parent_remaining,
+                                )
+                        except Exception as parent_exc:
+                            errors.append(str(parent_exc))
+                        pending = unresolved_parent_handoffs(pending)
+                    if not pending:
+                        return None
+                    issue = (
+                        "The Desktop-parent visual reviewer did not produce accepted responses "
+                        "after the initial callback and one bounded retry."
+                    )
+                    if errors:
+                        issue += " " + " | ".join(errors)
+                    return {
+                        "status": "blocked",
+                        "stage": "parent_visual_review",
+                        "findings": [{
+                            "category": "verification",
+                            "field": str(item.get("response_path") or "parent_visual_review"),
+                            "code": "missing_parent_visual_review_response",
+                            "verification_request_id": item.get("request_id"),
+                            "issue": issue,
+                        } for item in pending],
+                        "client_outputs": [],
+                    }
+
+                bounded_parent_review_runner = run_bounded_parent_review
                 handoff_started = clock()
                 save("running")
                 try:
@@ -4506,8 +4543,8 @@ def run_desktop_operation(
                                     continue
                                 try:
                                     handoff_runner(delegated, timeout)
-                                except Exception as exc:
-                                    fallback_or_raise(exc, delegated)
+                                except Exception:
+                                    pass
                             hard_future.result()
                     elif supports_parent_fallback and fallback_owned:
                         for delegated, timeout in (
@@ -4517,65 +4554,38 @@ def run_desktop_operation(
                                 continue
                             try:
                                 handoff_runner(delegated, timeout)
-                            except Exception as exc:
-                                fallback_or_raise(exc, delegated)
+                            except Exception:
+                                pass
                     else:
-                        try:
-                            handoff_runner(
-                                dispatch_handoffs,
-                                soft_timeout if supports_parent_fallback else remaining,
-                            )
-                        except Exception as exc:
-                            fallback_or_raise(exc, dispatch_handoffs)
+                        handoff_runner(
+                            dispatch_handoffs,
+                            soft_timeout if supports_parent_fallback else remaining,
+                        )
                 finally:
                     record_timing(stage, clock() - handoff_started)
                     record_soft_budget_event(stage)
                     save("running")
-                fallback_handoffs = [
-                    item for item in handoffs
-                    if item.get("fallback_owner") == "parent"
-                    and str(item.get("response_path") or "") not in fallback_attempted
-                    and revision_id
-                    and not _handoff_response_is_bound(run_dir, revision_id, item)
-                ]
-                if fallback_handoffs:
-                    remaining = remaining_seconds()
-                    if remaining > 0:
-                        fallback_attempted.update(
-                            str(item.get("response_path") or "")
-                            for item in fallback_handoffs
-                        )
-                        if fallback_handoff_runner is not None:
-                            fallback_handoff_runner(fallback_handoffs, remaining)
-                        else:
-                            parent_handoffs = [{**item, "reviewer_owner": "parent"} for item in fallback_handoffs]
-                            handoff_runner(parent_handoffs, remaining)
+                if supports_parent_fallback:
+                    parent_block = run_bounded_parent_review(fallback_owned)
+                    if parent_block is not None:
+                        return finish(parent_block)
             except Exception as exc:
                 revision_id = str(result.get("revision_id") or "")
                 fallback_handoffs = [
                     item for item in handoffs
                     if item.get("fallback_owner") == "parent"
-                    and str(item.get("response_path") or "") not in fallback_attempted
                     and revision_id
                     and not _handoff_response_is_bound(run_dir, revision_id, item)
                 ]
-                if fallback_handoffs:
-                    remaining = remaining_seconds()
-                    if remaining > 0:
-                        try:
-                            fallback_attempted.update(
-                                str(item.get("response_path") or "")
-                                for item in fallback_handoffs
-                            )
-                            if fallback_handoff_runner is not None:
-                                fallback_handoff_runner(fallback_handoffs, remaining)
-                            else:
-                                parent_handoffs = [{**item, "reviewer_owner": "parent"} for item in fallback_handoffs]
-                                handoff_runner(parent_handoffs, remaining)
-                        except Exception as fallback_exc:
-                            exc = RuntimeError(f"Delegated reviewer failed ({exc}); parent reviewer fallback failed ({fallback_exc})")
-                        else:
-                            continue
+                if (
+                    fallback_handoffs
+                    and supports_parent_fallback
+                    and bounded_parent_review_runner is not None
+                ):
+                    parent_block = bounded_parent_review_runner(fallback_handoffs)
+                    if parent_block is not None:
+                        return finish(parent_block)
+                    continue
                 remaining = remaining_seconds()
                 if remaining > 0:
                     pending_handoffs = [dict(item) for item in handoffs]
@@ -5534,6 +5544,7 @@ def run_production_desktop_operation(
 
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
         nonlocal parent_review_record
+        parent_review_record = None
         active_revision = revision_dir()
         if parent_visual_reviewer is None:
             raise RuntimeError(
@@ -5542,6 +5553,15 @@ def run_production_desktop_operation(
         parent_visual_reviewer(
             handoffs, remaining_seconds, active_revision, configuration,
         )
+        unresolved = [
+            dict(item) for item in handoffs
+            if not _handoff_response_is_bound(run_dir, active_revision.name, item)
+        ]
+        if unresolved:
+            raise RuntimeError(
+                "Desktop-parent visual review returned without accepted bound responses: "
+                + ", ".join(str(item.get("response_path") or "") for item in unresolved)
+            )
         parent_review_record = {
             "status": "completed",
             "revision_id": active_revision.name,
@@ -5598,7 +5618,9 @@ def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
     return open_attachment
 
 
-_VERIFICATION_IDENTITY_FIELDS = ("schema_version", "request_id", "request_sha256", "task")
+_VERIFICATION_IDENTITY_FIELDS = (
+    "schema_version", "request_id", "request_sha256", "task", "revision_id",
+)
 
 
 def _bind_verification_response_payload(
@@ -5640,6 +5662,7 @@ def _bind_verification_response_payload(
         "request_id": request.get("request_id"),
         "request_sha256": request.get("request_sha256"),
         "task": request.get("task"),
+        "revision_id": request.get("revision_id"),
     }
     for key, expected in expected_identity.items():
         if key in response and response.get(key) != expected:
@@ -5776,7 +5799,12 @@ def command_parent_visual_reviewer(
                 (candidate, bound)
                 for candidate in candidates
                 for bound in [_bind_verification_response_payload(request, candidate)]
-                if bound is not None and _semantic_response_matches_request(request, bound)
+                if (
+                    isinstance(candidate.get("producer"), Mapping)
+                    and all(key in candidate for key in _VERIFICATION_IDENTITY_FIELDS)
+                    and bound is not None
+                    and _semantic_response_matches_request(request, bound)
+                )
             ]
             if normalized:
                 best_score = max(
@@ -5804,6 +5832,21 @@ def command_parent_visual_reviewer(
                 encoding="utf-8",
             )
             os.replace(temporary, response_path)
+            if not verification_response_is_terminal(revision_dir, bound_request_path):
+                response_path.unlink(missing_ok=True)
+        unresolved = [
+            dict(item) for item in handoffs
+            if not _handoff_response_is_bound(
+                revision_dir.parent.parent,
+                revision_dir.name,
+                item,
+            )
+        ]
+        if unresolved:
+            raise RuntimeError(
+                "Desktop-parent visual reviewer did not produce one bound terminal response for every handoff: "
+                + ", ".join(str(item.get("response_path") or "") for item in unresolved)
+            )
 
     return review
 

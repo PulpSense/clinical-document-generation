@@ -346,6 +346,7 @@ def test_production_parent_retains_failed_content_review_as_a_blocking_response(
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
+        "revision_id": "r1",
         "producer": {"model_id": "test-model", "reviewer_id": "content-reviewer"},
         "status": "failed",
         "findings": [{
@@ -1252,7 +1253,92 @@ def test_production_parent_fallback_never_redispatches_or_claims_parent_provenan
     assert not (tmp_path / "run/logs/desktop-parent-visual-review.json").exists()
 
 
-def test_external_parent_visual_reviewer_receives_one_bound_request_path(tmp_path):
+def test_production_parent_review_cannot_report_completed_without_bound_response(
+    tmp_path,
+    monkeypatch,
+):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    run_dir = tmp_path / "run"
+    reference = run_dir / "reference/study.reference.json"
+    reference.parent.mkdir(parents=True)
+    reference.write_text(json.dumps({"approval": {"revision_id": "r1"}}), encoding="utf-8")
+    handoff, _request, _response = _visual_handoff_fixture(run_dir, "protocol")
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "installed", "git_commit": "abc", "source": "test",
+    })
+    monkeypatch.setattr(
+        workflow,
+        "resolve_python_runtime",
+        lambda **_kwargs: {"executable": sys.executable, "version_info": [3, 11, 0]},
+    )
+
+    def invoke_fallback(_run_dir, **options):
+        options["fallback_handoff_runner"]([handoff], 10.0)
+        raise AssertionError("an unbound parent review must not return as completed")
+
+    monkeypatch.setattr(workflow, "run_desktop_operation", invoke_fallback)
+
+    with pytest.raises(RuntimeError, match="returned without accepted bound responses"):
+        workflow.run_production_desktop_operation(
+            run_dir,
+            skill_root=skill_root,
+            opener=lambda _path: b"unused",
+            parent_visual_reviewer=lambda *_args: None,
+            release_identity={"package_fingerprint": "installed", "git_commit": "abc"},
+        )
+
+
+def test_production_parent_review_record_is_cleared_when_a_later_callback_is_unbound(
+    tmp_path,
+    monkeypatch,
+):
+    skill_root = tmp_path / "profile/skills/clinical-document-generation"
+    skill_root.mkdir(parents=True)
+    run_dir = tmp_path / "run"
+    reference = run_dir / "reference/study.reference.json"
+    reference.parent.mkdir(parents=True)
+    reference.write_text(json.dumps({"approval": {"revision_id": "r1"}}), encoding="utf-8")
+    handoff, _request, response = _visual_handoff_fixture(run_dir, "protocol")
+    response_path = run_dir / "revisions/r1" / handoff["response_path"]
+    callback_calls = []
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _root: {
+        "package_fingerprint": "installed", "git_commit": "abc", "source": "test",
+    })
+    monkeypatch.setattr(
+        workflow,
+        "resolve_python_runtime",
+        lambda **_kwargs: {"executable": sys.executable, "version_info": [3, 11, 0]},
+    )
+
+    def parent(*_args):
+        callback_calls.append(True)
+        if len(callback_calls) == 1:
+            response_path.parent.mkdir(parents=True, exist_ok=True)
+            response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    def invoke_fallback(_run_dir, **options):
+        options["fallback_handoff_runner"]([handoff], 10.0)
+        response_path.unlink()
+        with pytest.raises(RuntimeError, match="returned without accepted bound responses"):
+            options["fallback_handoff_runner"]([handoff], 10.0)
+        return {"status": "blocked", "stage": "parent_visual_review", "client_outputs": []}
+
+    monkeypatch.setattr(workflow, "run_desktop_operation", invoke_fallback)
+    result = workflow.run_production_desktop_operation(
+        run_dir,
+        skill_root=skill_root,
+        opener=lambda _path: b"unused",
+        parent_visual_reviewer=parent,
+        release_identity={"package_fingerprint": "installed", "git_commit": "abc"},
+    )
+
+    assert result["status"] == "blocked"
+    assert result["parent_visual_review"] is None
+    assert callback_calls == [True, True]
+
+
+def test_external_parent_visual_reviewer_rejects_missing_bound_response(tmp_path):
     command = tmp_path / "parent-reviewer"
     command.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     command.chmod(0o700)
@@ -1260,10 +1346,11 @@ def test_external_parent_visual_reviewer_receives_one_bound_request_path(tmp_pat
     revision.mkdir(parents=True)
     reviewer = workflow.command_parent_visual_reviewer(command)
 
-    reviewer([{
-        "request_path": "hermes/verification-requests/visual.json",
-        "response_path": "hermes/verification-responses/visual.json",
-    }], 10.0, revision, {})
+    with pytest.raises(RuntimeError, match="did not produce one bound terminal response"):
+        reviewer([{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+        }], 10.0, revision, {})
 
     request = json.loads((revision / "hermes/desktop-parent-visual-review-request.json").read_text())
     assert request["revision_id"] == "r1"
@@ -1280,6 +1367,7 @@ def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested
         "schema_version": "hermes-verification/v1",
         "request_id": "r1.verify.visual.protocol",
         "task": "rendered_page_visual_verification",
+        "revision_id": "r1",
         "response_path": "hermes/verification-responses/visual.json",
         "artifacts": [{"artifact": "protocol", "pages": []}],
         "checks": list(VISUAL_CHECKS),
@@ -1291,7 +1379,8 @@ def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
-        "producer": {"model_id": "test-parent-model"},
+        "revision_id": "r1",
+        "producer": {"model_id": "test-parent-model", "reviewer_id": "desktop-parent-visual-reviewer"},
         "status": "blocked",
         "findings": [{
             "artifact": "protocol",
@@ -1321,7 +1410,7 @@ def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
 
-def test_external_parent_visual_reviewer_binds_semantic_only_response(tmp_path):
+def test_external_parent_visual_reviewer_rejects_semantic_only_unbound_response(tmp_path):
     revision = tmp_path / "revisions/r1"
     request_path = revision / "hermes/verification-requests/visual.json"
     response_path = revision / "hermes/verification-responses/visual.json"
@@ -1330,6 +1419,7 @@ def test_external_parent_visual_reviewer_binds_semantic_only_response(tmp_path):
         "schema_version": "hermes-verification/v1",
         "request_id": "r1.verify.visual.protocol",
         "task": "rendered_page_visual_verification",
+        "revision_id": "r1",
         "response_path": "hermes/verification-responses/visual.json",
         "artifacts": [{"artifact": "protocol", "pages": []}],
         "checks": list(VISUAL_CHECKS),
@@ -1337,7 +1427,7 @@ def test_external_parent_visual_reviewer_binds_semantic_only_response(tmp_path):
     request["request_sha256"] = verification_request_sha256(request)
     request_path.write_text(json.dumps(request), encoding="utf-8")
     semantic_response = {
-        "producer": {"model_id": "client-selected-model"},
+        "producer": {"model_id": "client-selected-model", "reviewer_id": "desktop-parent-visual-reviewer"},
         "status": "blocked",
         "finding": {
             "artifact": "protocol",
@@ -1354,20 +1444,78 @@ def test_external_parent_visual_reviewer_binds_semantic_only_response(tmp_path):
     )
     command.chmod(0o700)
 
-    workflow.command_parent_visual_reviewer(command)([{
-        "request_path": "hermes/verification-requests/visual.json",
-        "response_path": "hermes/verification-responses/visual.json",
-    }], 10.0, revision, {})
+    with pytest.raises(RuntimeError, match="did not produce one bound terminal response"):
+        workflow.command_parent_visual_reviewer(command)([{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": "hermes/verification-responses/visual.json",
+            "request_id": request["request_id"],
+            "request_sha256": request["request_sha256"],
+            "task": request["task"],
+        }], 10.0, revision, {})
 
-    bound = json.loads(response_path.read_text(encoding="utf-8"))
-    assert bound["schema_version"] == RESPONSE_SCHEMA
-    assert bound["request_id"] == request["request_id"]
-    assert bound["request_sha256"] == request["request_sha256"]
-    assert bound["task"] == request["task"]
-    assert bound["findings"] == [semantic_response["finding"]]
-    assert set(bound["workflow_binding"]["added_fields"]) == {
-        "schema_version", "request_id", "request_sha256", "task",
+    assert not response_path.exists()
+
+
+@pytest.mark.parametrize("invalid_kind", ("malformed", "wrong-request", "stale", "wrong-revision"))
+def test_external_parent_visual_reviewer_rejects_invalid_or_unbound_response(
+    tmp_path,
+    invalid_kind,
+):
+    revision = tmp_path / "revisions/r1"
+    request_path = revision / "hermes/verification-requests/visual.json"
+    request_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-verification/v1",
+        "request_id": "r1.verify.visual.protocol",
+        "task": "rendered_page_visual_verification",
+        "revision_id": "r1",
+        "response_path": "hermes/verification-responses/visual.json",
+        "artifacts": [{"artifact": "protocol", "pages": []}],
+        "checks": list(VISUAL_CHECKS),
     }
+    request["request_sha256"] = verification_request_sha256(request)
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response = {
+        "schema_version": RESPONSE_SCHEMA,
+        "request_id": request["request_id"],
+        "request_sha256": request["request_sha256"],
+        "task": request["task"],
+        "revision_id": "r1",
+        "producer": {"model_id": "test-parent-model", "reviewer_id": "parent-reviewer"},
+        "status": "blocked",
+        "findings": [{
+            "artifact": "protocol",
+            "page": 1,
+            "check": "bad_table_split",
+            "element": "3. GENERAL INFORMATION",
+            "issue": "The summary table split is invalid.",
+        }],
+        "page_assessments": [],
+    }
+    if invalid_kind == "wrong-request":
+        response["request_id"] = "r2.verify.visual.protocol"
+    elif invalid_kind == "stale":
+        response["request_sha256"] = "0" * 64
+    elif invalid_kind == "wrong-revision":
+        response["revision_id"] = "r2"
+    output = "not-json" if invalid_kind == "malformed" else json.dumps(response)
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        "#!/bin/sh\nprintf '%s\\n' '" + output + "'\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    with pytest.raises(RuntimeError, match="did not produce one bound terminal response"):
+        workflow.command_parent_visual_reviewer(command)([{
+            "request_path": "hermes/verification-requests/visual.json",
+            "response_path": request["response_path"],
+            "request_id": request["request_id"],
+            "request_sha256": request["request_sha256"],
+            "task": request["task"],
+        }], 10.0, revision, {})
+
+    assert not (revision / request["response_path"]).exists()
 
 
 def test_production_adapter_rejects_identity_and_configuration_rebinding(tmp_path, monkeypatch):
@@ -1552,26 +1700,27 @@ def test_synchronous_candidate_stage_records_timing_and_soft_budget_diagnostic(t
 
 
 def test_desktop_operation_uses_parent_visual_review_when_delegated_review_fails(tmp_path, monkeypatch):
-    handoff = {
-        "request_path": "hermes/verification-requests/visual.json",
-        "response_path": "hermes/verification-responses/visual.json",
-        "task": "rendered_page_visual_verification",
-        "fallback_owner": "parent",
-    }
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
     results = iter([
         {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
         {"status": "passed", "stage": "delivery", "manifest": "revisions/r1/delivery-manifest.json"},
     ])
     manifest_path = tmp_path / "revisions/r1/delivery-manifest.json"
-    manifest_path.parent.mkdir(parents=True)
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(_manifest()), encoding="utf-8")
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
     parent_reviews = []
 
+    def parent(pending, _remaining):
+        parent_reviews.extend(pending)
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
     result = workflow.run_desktop_operation(
         tmp_path,
         handoff_runner=lambda *_args: None,
-        fallback_handoff_runner=lambda handoffs, _remaining: parent_reviews.extend(handoffs),
+        fallback_handoff_runner=parent,
         opener=lambda path: b"1234" if path.endswith("Protocol final.docx") else b"567",
         budget_seconds=30,
     )
@@ -1582,14 +1731,7 @@ def test_desktop_operation_uses_parent_visual_review_when_delegated_review_fails
 
 def test_visual_soft_budget_routes_early_parent_fallback_without_shortening_the_operation(tmp_path, monkeypatch):
     now = [0.0]
-    handoff = {
-        "request_id": "r1.verify.visual",
-        "request_sha256": "v" * 64,
-        "request_path": "hermes/verification-requests/visual.json",
-        "response_path": "hermes/verification-responses/visual.json",
-        "task": "rendered_page_visual_verification",
-        "fallback_owner": "parent",
-    }
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
     results = iter([
         {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": [handoff]},
         {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
@@ -1602,10 +1744,16 @@ def test_visual_soft_budget_routes_early_parent_fallback_without_shortening_the_
         primary_timeouts.append(timeout_seconds)
         now[0] += timeout_seconds
 
+    def parent(pending, _remaining):
+        parent_reviews.extend(pending)
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
     result = workflow.run_desktop_operation(
         tmp_path,
         handoff_runner=primary,
-        fallback_handoff_runner=lambda handoffs, _remaining: parent_reviews.extend(handoffs),
+        fallback_handoff_runner=parent,
         opener=lambda _path: b"unused",
         budget_seconds=30.0,
         stage_soft_budgets={"independent_verification": 5.0},
@@ -1646,6 +1794,7 @@ def _visual_handoff_fixture(tmp_path, artifact):
         "schema_version": "hermes-verification/v1",
         "request_id": request_id,
         "task": handoff["task"],
+        "revision_id": "r1",
         "response_path": response_path,
         "checks": list(VISUAL_CHECKS),
         "artifacts": [{
@@ -1672,6 +1821,7 @@ def _visual_handoff_fixture(tmp_path, artifact):
         "request_id": request_id,
         "request_sha256": request["request_sha256"],
         "task": handoff["task"],
+        "revision_id": "r1",
         "producer": {"model_id": "test-verifier", "reviewer_id": f"{artifact}-visual-reviewer"},
         "status": "passed",
         "findings": [],
@@ -1887,7 +2037,7 @@ def test_new_visual_request_hash_gets_a_fresh_soft_budget(tmp_path, monkeypatch)
 
 def test_verifier_exception_falls_back_only_for_incomplete_parent_work(tmp_path, monkeypatch):
     protocol_handoff, _, protocol_response = _visual_handoff_fixture(tmp_path, "protocol")
-    icf_handoff, _, _ = _visual_handoff_fixture(tmp_path, "icf")
+    icf_handoff, _, icf_response = _visual_handoff_fixture(tmp_path, "icf")
     handoffs = [protocol_handoff, icf_handoff]
     results = iter([
         {"status": "awaiting_hermes", "stage": "independent_verification", "revision_id": "r1", "handoffs": handoffs},
@@ -1902,10 +2052,16 @@ def test_verifier_exception_falls_back_only_for_incomplete_parent_work(tmp_path,
         response.write_text(json.dumps(protocol_response), encoding="utf-8")
         raise RuntimeError("adapter failed after partial completion")
 
+    def parent(pending, _remaining):
+        parent_reviews.extend(pending)
+        response = tmp_path / "revisions/r1" / icf_handoff["response_path"]
+        response.parent.mkdir(parents=True, exist_ok=True)
+        response.write_text(json.dumps(icf_response), encoding="utf-8")
+
     result = workflow.run_desktop_operation(
         tmp_path,
         handoff_runner=primary,
-        fallback_handoff_runner=lambda pending, _remaining: parent_reviews.extend(pending),
+        fallback_handoff_runner=parent,
         opener=lambda _path: b"unused",
         budget_seconds=30.0,
     )
@@ -1941,10 +2097,12 @@ def test_mutated_visual_request_cannot_suppress_parent_fallback(tmp_path, monkey
     )
 
     assert result["status"] == "blocked"
-    assert parent_reviews == [handoff]
+    assert result["stage"] == "parent_visual_review"
+    assert result["findings"][0]["code"] == "missing_parent_visual_review_response"
+    assert parent_reviews == [handoff, handoff]
 
 
-def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monkeypatch):
+def test_parent_fallback_exception_gets_one_bounded_retry_then_blocks(tmp_path, monkeypatch):
     handoff, _, _ = _visual_handoff_fixture(tmp_path, "protocol")
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
         "status": "awaiting_hermes",
@@ -1953,28 +2111,23 @@ def test_parent_fallback_is_attempted_exactly_once_when_it_raises(tmp_path, monk
         "handoffs": [handoff],
     })
     fallback_calls = []
-    now = [0.0]
 
     def failed_fallback(pending, _remaining):
         fallback_calls.append(list(pending))
         raise RuntimeError("parent fallback failed")
 
-    def failed_worker(*_args):
-        raise RuntimeError("worker failed")
-
-    monkeypatch.setattr(workflow.time, "sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))
     result = workflow.run_desktop_operation(
         tmp_path,
-        handoff_runner=failed_worker,
+        handoff_runner=lambda *_args: None,
         fallback_handoff_runner=failed_fallback,
         opener=lambda _path: b"unused",
-        budget_seconds=0.2,
-        clock=lambda: now[0],
-        wall_clock=lambda: 1_000.0,
+        budget_seconds=30.0,
     )
 
-    assert result["status"] == "timeout"
-    assert fallback_calls == [[handoff]]
+    assert result["status"] == "blocked"
+    assert result["stage"] == "parent_visual_review"
+    assert result["findings"][0]["code"] == "missing_parent_visual_review_response"
+    assert fallback_calls == [[handoff], [handoff]]
 
 
 def test_empty_parent_visual_fallback_retries_parent_not_half_second_workers(
@@ -2015,6 +2168,11 @@ def test_empty_parent_visual_fallback_retries_parent_not_half_second_workers(
             response_path.write_text(json.dumps(response), encoding="utf-8")
 
     monkeypatch.setattr(workflow, "generate", generate)
+    monkeypatch.setattr(
+        workflow.time,
+        "sleep",
+        lambda seconds: now.__setitem__(0, now[0] + seconds),
+    )
     result = workflow.run_desktop_operation(
         tmp_path,
         handoff_runner=primary,
@@ -2030,7 +2188,83 @@ def test_empty_parent_visual_fallback_retries_parent_not_half_second_workers(
     assert result["stage"] == "quality"
     assert primary_timeouts == [5.0]
     assert fallback_calls == [[handoff], [handoff]]
-    assert len(generate_calls) == 3
+    assert len(generate_calls) == 2
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert state["attempt_counters"]["handoff_dispatches"] == {
+        handoff["request_sha256"]: 1,
+    }
+
+
+def test_first_valid_parent_visual_response_continues_normally(tmp_path, monkeypatch):
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
+    results = iter([
+        {
+            "status": "awaiting_hermes",
+            "stage": "independent_verification",
+            "revision_id": "r1",
+            "handoffs": [handoff],
+        },
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: next(results))
+    parent_calls = []
+
+    def parent(pending, _remaining):
+        parent_calls.append(list(pending))
+        response_path = tmp_path / "revisions/r1" / handoff["response_path"]
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response), encoding="utf-8")
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        fallback_handoff_runner=parent,
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "quality"
+    assert parent_calls == [[handoff]]
+
+
+def test_two_empty_parent_visual_callbacks_block_immediately(tmp_path, monkeypatch):
+    handoff, _request, _response = _visual_handoff_fixture(tmp_path, "protocol")
+    generate_calls = []
+    parent_calls = []
+    now = [0.0]
+
+    def generate(_run_dir, **_kwargs):
+        generate_calls.append(True)
+        return {
+            "status": "awaiting_hermes",
+            "stage": "independent_verification",
+            "revision_id": "r1",
+            "handoffs": [handoff],
+        }
+
+    monkeypatch.setattr(workflow, "generate", generate)
+    monkeypatch.setattr(
+        workflow.time,
+        "sleep",
+        lambda seconds: now.__setitem__(0, now[0] + seconds),
+    )
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        fallback_handoff_runner=lambda pending, _remaining: parent_calls.append(list(pending)),
+        opener=lambda _path: b"unused",
+        budget_seconds=0.3,
+        clock=lambda: now[0],
+        wall_clock=lambda: 1_000.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "parent_visual_review"
+    assert result["findings"][0]["code"] == "missing_parent_visual_review_response"
+    assert result["client_outputs"] == []
+    assert parent_calls == [[handoff], [handoff]]
+    assert len(generate_calls) == 1
 
 
 def test_upstream_generation_time_does_not_consume_the_verification_soft_budget(tmp_path, monkeypatch):
@@ -2147,9 +2381,13 @@ def test_desktop_operation_routes_parent_takeover_without_an_optional_second_run
     )
 
     assert result["status"] == "blocked"
-    assert len(routed) == 2
+    assert result["stage"] == "parent_visual_review"
+    assert result["findings"][0]["code"] == "missing_parent_visual_review_response"
+    assert len(routed) == 3
     assert routed[1][0]["response_path"] == handoff["response_path"]
     assert routed[1][0]["reviewer_owner"] == "parent"
+    assert routed[2][0]["response_path"] == handoff["response_path"]
+    assert routed[2][0]["reviewer_owner"] == "parent"
 
 
 def test_desktop_operation_uses_one_persistent_deadline_and_does_not_resume_after_timeout(tmp_path, monkeypatch):
@@ -2254,6 +2492,51 @@ def test_desktop_operation_resume_uses_wall_time_across_monotonic_epochs_and_run
     assert resumed["deadline_at_epoch"] == 10_020.0
     state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
     assert [item["version"] for item in state["runtime_history"]] == ["3.10.14", "3.11.15"]
+
+
+def test_default_forty_five_minute_deadline_is_persisted_and_preserved_on_resume(
+    tmp_path,
+    monkeypatch,
+):
+    monotonic = [100.0]
+    wall_time = [10_000.0]
+
+    def interrupt_during_generate(_run_dir, **_kwargs):
+        state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+        assert state["budget_seconds"] == 2_700.0
+        assert state["deadline_at_epoch"] == 12_700.0
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(workflow, "generate", interrupt_during_generate)
+    with pytest.raises(KeyboardInterrupt):
+        workflow.run_desktop_operation(
+            tmp_path,
+            handoff_runner=lambda *_args: None,
+            opener=lambda _path: b"unused",
+            clock=lambda: monotonic[0],
+            wall_clock=lambda: wall_time[0],
+        )
+
+    monotonic[0] = 5.0
+    wall_time[0] = 10_015.0
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "blocked",
+        "stage": "quality",
+        "findings": [],
+        "client_outputs": [],
+    })
+    resumed = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        opener=lambda _path: b"unused",
+        clock=lambda: monotonic[0],
+        wall_clock=lambda: wall_time[0],
+    )
+
+    assert resumed["status"] == "blocked"
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert state["budget_seconds"] == 2_700.0
+    assert state["deadline_at_epoch"] == 12_700.0
 
 
 def test_desktop_operation_persists_deadline_before_first_generate(tmp_path, monkeypatch):
@@ -2719,16 +3002,16 @@ def test_desktop_operation_requires_the_exact_branch_output_set_before_opening_f
     assert opened == []
 
 
-def test_runtime_target_is_ten_to_twenty_minutes_with_a_thirty_minute_ceiling():
+def test_runtime_target_is_ten_to_twenty_minutes_with_a_forty_five_minute_ceiling():
     assert workflow.NORMAL_RUNTIME_TARGET_MIN_SECONDS == 600.0
     assert workflow.NORMAL_RUNTIME_TARGET_MAX_SECONDS == 1200.0
-    assert workflow.DESKTOP_OPERATION_BUDGET_SECONDS == 1800.0
+    assert workflow.DESKTOP_OPERATION_BUDGET_SECONDS == 2700.0
     assert workflow.performance_classification(599.0) == "below_target_window"
     assert workflow.performance_classification(600.0) == "target_window"
     assert workflow.performance_classification(1200.0) == "target_window"
     assert workflow.performance_classification(1200.001) == "above_target_within_deadline"
-    assert workflow.performance_classification(1800.0) == "above_target_within_deadline"
-    assert workflow.performance_classification(1800.001) == "deadline_exceeded"
+    assert workflow.performance_classification(2700.0) == "above_target_within_deadline"
+    assert workflow.performance_classification(2700.001) == "deadline_exceeded"
 
 
 def test_desktop_operation_continues_after_fifteen_minutes(tmp_path, monkeypatch):
