@@ -413,7 +413,7 @@ timing, and values before release.
   reviewer-response failures retry within the one persisted 45-minute Desktop
   operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap,
   except the Desktop-parent visual callback: after its initial callback, exactly one
-  unchanged-request parent retry is permitted before missing or invalid response evidence
+  unchanged-request parent retry is permitted, with callback consumption persisted per exact request across process resume, before missing or invalid response evidence
   becomes `missing_parent_visual_review_response`.
 - Invalid draft: retry only failed section IDs in their existing batch.
 - Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
@@ -434,14 +434,16 @@ timing, and values before release.
   the failed evidence, repair only the implicated draft/layout target, then rerun
   the package-wide content review and every document-scoped visual review against
   the repaired candidate. Never reuse a pass from an earlier set.
-- A transient API or malformed-routing response retries only that reviewer within
-  the current set and does not consume a new complete review set. The bounded
-  Desktop-parent exception above applies after delegated visual review has already
-  fallen back to the parent.
+- A transient API or structurally incomplete verification response retries only
+  that reviewer within the current set and does not consume a new complete review
+  set. A governed finding whose effective recovery target is missing, empty,
+  wrong-category, or unsupported instead fails explicitly before any recovery
+  attempt or journal is created. The bounded Desktop-parent exception above
+  applies after delegated visual review has already fallen back to the parent.
 - Only the persisted 45-minute deadline or a non-repairable integrity, source,
-  renderer, safety, unsupported-template, atomic-delivery, or exhausted bounded
-  parent-response validation failure terminates the post-approval operation without
-  client outputs.
+  renderer, safety, unsupported-template, unsupported-recovery-route,
+  atomic-delivery, or exhausted bounded parent-response validation failure
+  terminates the post-approval operation without client outputs.
 
 ## Independent verification
 
@@ -452,15 +454,25 @@ concurrently so every-page image inspection stays off the serial critical path:
 - `clinical_content_verification`: checks source fidelity, every required section, unsupported claims, cross-document consistency, and participant-facing ICF language.
 - `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
 
-The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery.
+The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery. Before any content or visual response can become terminal, complete, recovery, or publication evidence, the workflow authenticates the exact request bytes and canonical payload hash against its workflow-owned request ledger; request or response self-declarations never establish authority.
 
 Every independent verification response records both `producer.model_id` for the actual selected model and `producer.reviewer_id` for the independent reviewer role. These identities are mandatory, distinct bindings in Final Exact-Artifact Review; neither field selects or restricts which model the client may use.
 
 Each request records its one-based `review_set`. A genuine finding invalidates
 the entire prior verification set after its evidence is archived; all reviewers
-then run concurrently on the repaired candidate. Missing or invalid repair
-routing is treated as an incomplete reviewer response and must be corrected by
-that reviewer—it is never silently ignored or guessed by the workflow.
+then run concurrently on the repaired candidate. A structurally incomplete
+verification response is retried as reviewer-transient. Once a finding declares
+a governed Recovery Class, however, its effective target is normalized and
+validated before archival; a missing, empty, wrong-category, or unsupported
+route returns an explicit blocker without creating an attempt or journal, while
+valid companion findings remain unchanged and unclaimed as repaired. Every
+verifier-originated or verification-routed finding must carry its nonempty
+`verification_request_id`; before archival the workflow resolves that identity
+exactly once in the current authenticated request inventory and verifies its
+request hash, task, review-set identity, and Run Revision binding. Pure
+deterministic and drafting findings remain governed by their own route contracts
+and do not fabricate a verification identity. Invalid routing is never silently
+ignored or guessed by the workflow.
 
 The Generation Manifest contains one hash-bound monotonic gate ledger in this
 fixed order: clinical fidelity; content completeness and consistency; DOCX/PRS
@@ -497,12 +509,12 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 - Sterling output must satisfy `references/sterling-clause-contract.json`. Validate substantive body language and section placement, not headings or signatures alone. Insert conditional or source-dependent clauses only when their declared approved-input trigger is present; never retain an untriggered template option or invent legal, regulatory, payment, injury, privacy, authorization, or contact terms. Exact governed clauses may be moved intact to repair placement, but a materially altered or missing safeguard requires targeted redrafting or blocks delivery.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
-- ICF section ownership is strict: KEY INFORMATION is a concise independent summary; BACKGROUND owns context, comparative evidence, the evidence gap, and rationale; PURPOSE owns a concise purpose, hypothesis, and primary-endpoint statement; PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Objectives owns endpoint identification; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Short role-specific references are allowed, while unnecessary paraphrased repetition targets only the secondary section and exact substantive duplication remains blocking.
+- ICF section ownership is strict and template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Objectives owns endpoint identification; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Short role-specific references are allowed, while unnecessary paraphrased repetition targets only the secondary section and exact substantive duplication remains blocking.
 - `meta.date` defaults once, during `prepare`, to `dd MMM yyyy`. `meta.version` remains blank unless the approved source supplies it.
 
 ## PRS XML authority
 
-- Keep `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml` as the structural authority derived from the client’s correct manual XML.
+- Keep `assets/client-templates/reference/prs-manual-reference.xml` as the client-derived structural architecture authority. Use `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml` only as the generation/format template whose populated output must validate against that structural reference.
 - Python alone owns XML tags, ordering, optional nodes, namespaces, escaping, and repeated blocks.
 - Derive intervention, arm, primary/secondary/other outcome, and location counts from the approved source—not from generated fields.
 - Validate every source-backed value inside every intervention, arm, outcome,

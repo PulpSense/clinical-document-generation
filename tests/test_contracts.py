@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts import ContractedTemplateBundleError, ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, contracted_template_bundle, icf_contract, input_findings, parse_source_truth, protocol_contract, protocol_table_contracts, source_contract, source_truth_markdown
+from contracts import ContractedTemplateBundleError, ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, contracted_template_bundle, icf_contract, icf_retained_sections, input_findings, parse_source_truth, protocol_contract, protocol_table_contracts, source_contract, source_truth_markdown
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -213,6 +213,42 @@ def test_icf_contract_is_template_and_branch_specific_for_research_injury():
     assert "icf.injury" not in prospective_advarra
     assert "icf.injury" in prospective_sterling
     assert "icf.injury" in ambispective_advarra
+
+
+def test_sterling_background_and_purpose_remain_separate():
+    sections = {section.section_id: section for section in icf_contract("Prospective", "Sterling")}
+
+    assert "icf.background" in sections
+    assert set(sections["icf.background"].evidence) >= {"study.background"}
+    assert set(sections["icf.background"].owned_concepts) == {
+        "clinical-background", "comparative-evidence", "evidence-gap", "study-rationale",
+    }
+    assert set(sections["icf.study-purpose"].evidence) >= {
+        "objectives.primary", "study.hypothesis", "endpoints.primary",
+    }
+    assert "study.background" not in sections["icf.study-purpose"].evidence
+    assert "icf.background" not in {
+        section_id for section_id, _title in icf_retained_sections("Prospective", "Sterling")
+    }
+    assert set(sections["icf.study-purpose"].do_not_restate_concepts) >= {
+        "clinical-background", "comparative-evidence", "study-rationale",
+    }
+
+
+def test_advarra_has_no_standalone_background_section():
+    sections = {section.section_id for section in icf_contract("Prospective", "Advarra")}
+
+    assert "icf.background" not in sections
+
+
+def test_advarra_purpose_uses_approved_background_context():
+    sections = {section.section_id: section for section in icf_contract("Prospective", "Advarra")}
+
+    purpose = sections["icf.study-purpose"]
+    assert set(purpose.evidence) >= {
+        "study.background", "objectives.primary", "study.hypothesis", "endpoints.primary",
+    }
+    assert "clinical-background" in purpose.owned_concepts
 
 
 def test_screening_washout_is_contractually_bound_to_protocol_and_icf():

@@ -459,6 +459,131 @@ def test_retrospective_eligibility_preserves_approved_criteria_verbatim(tmp_path
     )
 
 
+@pytest.mark.parametrize(
+    ("family", "expects_repetition_finding"),
+    (("Advarra", False), ("Sterling", True)),
+)
+def test_purpose_background_repetition_rule_is_template_family_specific(
+    tmp_path, family, expects_repetition_finding,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["meta"]["icf_template"] = family
+    reference["study"]["background"] = (
+        "Approved clinical context compares the established monitoring approach with the investigational device, "
+        "explains the remaining evidence gap, and gives the study rationale in participant-facing language without "
+        "adding unsupported clinical claims or repeating unrelated procedural details."
+    )
+    batch = next(
+        item for item in batch_plan("Prospective", family)
+        if item.batch_id == "icf-narrative"
+    )
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id=f"r-{family.casefold()}-purpose-ownership",
+        reference=reference,
+        batch=batch,
+        attempts={section_id: 1 for section_id in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    purpose = next(
+        item for item in response["section_results"]
+        if item["section_id"] == "icf.study-purpose"
+    )
+    purpose["paragraphs"] = [{
+        "text": reference["study"]["background"],
+        "evidence_refs": ["source:study.background"],
+        "boilerplate_refs": [],
+    }]
+    purpose["lists"] = []
+
+    _accepted, findings = validate_response(request, response)
+
+    repetition = [
+        finding for finding in findings
+        if finding.get("field") == "icf.study-purpose"
+        and finding.get("code") == "icf-concept-repetition"
+    ]
+    assert bool(repetition) is expects_repetition_finding
+
+
+def _icf_section_text(document, heading):
+    paragraphs = list(document.paragraphs)
+    start = next(index for index, paragraph in enumerate(paragraphs) if paragraph.text.strip() == heading)
+    values = []
+    for paragraph in paragraphs[start + 1:]:
+        if rendering._is_icf_heading(paragraph):
+            break
+        if paragraph.text.strip():
+            values.append(paragraph.text.strip())
+    return "\n".join(values)
+
+
+def test_sterling_background_accepted_draft_changes_rendered_background(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["meta"]["icf_template"] = "Sterling"
+    background = "Participant-facing approved comparative evidence and the remaining evidence gap."
+    purpose = "The study purpose, hypothesis, and primary endpoint are stated concisely."
+
+    render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {
+            "protocol": [],
+            "prs": {},
+            "icf": {
+                "icf.background": {"paragraphs": [{"text": background}], "lists": []},
+                "icf.study-purpose": {"paragraphs": [{"text": purpose}], "lists": []},
+                "icf.procedures": _minimal_source_bound_icf_procedures(),
+            },
+        },
+        artifact_names={"icf"},
+    )
+
+    output = Document(tmp_path / "candidate/icf.docx")
+    assert _icf_section_text(output, "BACKGROUND") == background
+    assert background not in _icf_section_text(output, "PURPOSE")
+    assert purpose in _icf_section_text(output, "PURPOSE")
+
+
+def test_advarra_purpose_uses_approved_background_context_without_new_heading(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["meta"]["icf_template"] = "Advarra"
+    purpose = (
+        "Approved participant-facing background context explains the evidence gap. "
+        "The study purpose, hypothesis, and primary endpoint follow."
+    )
+
+    render_documents(
+        ROOT,
+        tmp_path,
+        reference,
+        {
+            "protocol": [],
+            "prs": {},
+            "icf": {
+                "icf.study-purpose": {"paragraphs": [{"text": purpose}], "lists": []},
+                "icf.procedures": _minimal_source_bound_icf_procedures(),
+            },
+        },
+        artifact_names={"icf"},
+    )
+
+    output = Document(tmp_path / "candidate/icf.docx")
+    assert not any(paragraph.text.strip() == "BACKGROUND" for paragraph in output.paragraphs)
+    assert _icf_section_text(output, "PURPOSE OF THE STUDY") == purpose
+    assert _visible_text(output).count("Approved participant-facing background context") == 1
+
+
 def test_sterling_icf_removes_review_metadata_and_uses_heading_styles(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8"))
     reference["meta"]["icf_template"] = "Sterling"

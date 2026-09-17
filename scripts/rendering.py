@@ -1091,6 +1091,7 @@ _ADVARRA_ICF_HEADINGS = {
     "icf.injury": "IN CASE OF AN INJURY RELATED TO THIS RESEARCH STUDY",
 }
 _STERLING_ICF_HEADINGS = {
+    "icf.background": "BACKGROUND",
     "icf.study-purpose": "PURPOSE",
     "icf.procedures": "PROCEDURES",
     "icf.duration": "DURATION",
@@ -1107,7 +1108,7 @@ _ADVARRA_RETAINED_HEADINGS = {
     "LEAVING THE STUDY", "AGREEMENT TO BE IN THE STUDY",
 }
 _STERLING_RETAINED_HEADINGS = {
-    "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION", "KEY INFORMATION", "BACKGROUND",
+    "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION", "KEY INFORMATION",
     "INFORMATION", "VOLUNTARY PARTICIPATION/WITHDRAWAL", "QUESTIONS",
     "PARTICIPANT STATEMENT AUTHORIZATION",
 }
@@ -1811,6 +1812,7 @@ def _populate_icf_sections(document: Document, model: Mapping[str, Any], *, ster
     # These sections contain example-study prose in the client authorities.
     # Their accepted source-bound drafts are the body; the heading design is retained.
     source_bound_sections = (
+        *(("icf.background",) if sterling else ()),
         "icf.procedures", "icf.costs", "icf.alternatives", "icf.risks",
     )
     for section_id in source_bound_sections:

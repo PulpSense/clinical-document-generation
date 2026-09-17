@@ -23,7 +23,7 @@ import time
 import zipfile
 import zlib
 from pathlib import Path, PurePosixPath
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from docx import Document
 from docx.oxml.ns import qn
@@ -213,6 +213,164 @@ def verification_request_sha256(request: Mapping[str, Any]) -> str:
 def verification_request_hash_valid(request: Mapping[str, Any]) -> bool:
     supplied = str(request.get("request_sha256") or "")
     return bool(supplied) and supplied == verification_request_sha256(request)
+
+
+def _revision_owned_nonsymlink_path(revision_dir: Path, path: Path) -> bool:
+    """Require a lexical descendant with no symlink in its revision-owned chain."""
+    try:
+        relative = path.relative_to(revision_dir)
+    except ValueError:
+        return False
+    absolute_revision = revision_dir.absolute()
+    current = Path(absolute_revision.anchor)
+    for part in absolute_revision.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            return False
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return False
+    try:
+        return path.resolve(strict=False).is_relative_to(revision_dir.resolve(strict=True))
+    except OSError:
+        return False
+
+
+def verification_request_ledger_record(
+    request_path: Path,
+    request: Mapping[str, Any],
+    *,
+    request_bytes: bytes | None = None,
+) -> dict[str, Any]:
+    """Bind one workflow-owned request identity to its exact serialized bytes."""
+    return {
+        "schema_version": "verification-request-ledger/v1",
+        "request_id": request.get("request_id"),
+        "request_sha256": request.get("request_sha256"),
+        "request_file_sha256": (
+            hashlib.sha256(request_bytes).hexdigest()
+            if request_bytes is not None else sha256_file(request_path)
+        ),
+        "task": request.get("task"),
+        "revision_id": request.get("revision_id"),
+        "review_set": request.get("review_set"),
+    }
+
+
+def verification_request_authentication_findings(
+    revision_dir: Path,
+    request_path: Path,
+    request: Mapping[str, Any],
+    *,
+    request_id_counts: Mapping[str, int],
+) -> list[dict[str, Any]]:
+    """Authenticate a mutable verifier request against workflow-owned authority."""
+    request_id = request.get("request_id")
+    task = request.get("task")
+    target = (
+        "verification:visual"
+        if task == "rendered_page_visual_verification"
+        else "verification:content"
+    )
+
+    def finding(code: str, issue: str) -> dict[str, Any]:
+        return recovery_finding({
+            "category": "verification",
+            "field": "canonical_request_ledger",
+            "code": code,
+            "target_ids": [target],
+            "verification_request_id": request_id,
+            "issue": issue,
+        }, "document_structure_defect")
+
+    if not isinstance(request_id, str) or not request_id or Path(request_id).name != request_id:
+        return [finding(
+            "verification_request_not_found",
+            "Verification request identity is absent or is not a canonical ledger key.",
+        )]
+    canonical_request_path = (
+        revision_dir / "hermes/verification-requests" / f"{request_id}.json"
+    )
+    if (
+        request_path != canonical_request_path
+        or not _revision_owned_nonsymlink_path(revision_dir, request_path)
+    ):
+        return [finding(
+            "verification_request_noncanonical_path",
+            "Verification request is not the canonical non-symlinked request path for its identity.",
+        )]
+    if request_id_counts.get(request_id, 0) != 1:
+        return [finding(
+            "verification_request_id_duplicated",
+            "Verification request identity does not resolve exactly once in the active revision.",
+        )]
+    ledger_path = revision_dir / "request-ledger" / f"{request_id}.json"
+    if (
+        not ledger_path.is_file()
+        or not _revision_owned_nonsymlink_path(revision_dir, ledger_path)
+    ):
+        return [finding(
+            "verification_request_ledger_missing",
+            "Workflow-owned canonical verification request ledger entry is missing.",
+        )]
+    try:
+        ledger = _json(ledger_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return [finding(
+            "verification_request_ledger_invalid",
+            "Workflow-owned canonical verification request ledger entry is invalid.",
+        )]
+    expected_ledger_keys = {
+        "schema_version", "request_id", "request_sha256", "request_file_sha256",
+        "task", "revision_id", "review_set",
+    }
+    if (
+        set(ledger) != expected_ledger_keys
+        or ledger.get("schema_version") != "verification-request-ledger/v1"
+    ):
+        return [finding(
+            "verification_request_ledger_invalid",
+            "Workflow-owned canonical verification request ledger has a noncanonical schema or shape.",
+        )]
+    if request.get("revision_id") != revision_dir.name or ledger.get("revision_id") != revision_dir.name:
+        return [finding(
+            "verification_request_wrong_revision",
+            "Verification request is not bound to the active Run Revision.",
+        )]
+    if ledger.get("request_id") != request_id:
+        return [finding(
+            "verification_request_not_found",
+            "Verification request identity does not match its canonical ledger entry.",
+        )]
+    if ledger.get("task") != task:
+        return [finding(
+            "verification_request_wrong_task",
+            "Verification request task differs from its canonical ledger task.",
+        )]
+    if ledger.get("review_set") != request.get("review_set"):
+        return [finding(
+            "verification_request_stale_review_set",
+            "Verification request review set differs from its canonical ledger binding.",
+        )]
+    canonical_hash = ledger.get("request_sha256")
+    if canonical_hash != request.get("request_sha256"):
+        return [finding(
+            "verification_request_canonical_hash_mismatch",
+            "Supplied verification request hash differs from the workflow-owned canonical hash.",
+        )]
+    if not verification_request_hash_valid(request):
+        return [finding(
+            "verification_request_integrity_failure",
+            "Verification request body does not match its declared canonical payload identity.",
+        )]
+    if ledger.get("request_file_sha256") != sha256_file(request_path):
+        return [finding(
+            "verification_request_exact_bytes_mismatch",
+            "Verification request bytes differ from the workflow-owned canonical request bytes.",
+        )]
+    return []
+
 
 PAGE_RENDERER_BACKENDS = ("pypdfium2",)
 
@@ -4497,7 +4655,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     return governed
 
 
-def _content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+def content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     sections = [
         {
@@ -4539,6 +4697,327 @@ def _source_field_inventory(reference: Mapping[str, Any]) -> list[dict[str, Any]
     return inventory
 
 
+def verification_recovery_request_findings(
+    revision_dir: Path,
+    request_id: str,
+    *,
+    expected_task: str,
+    current_review_set: int,
+    reference: Mapping[str, Any],
+    render_report: Mapping[str, Any],
+    bound_artifact: str = "",
+    section_target_ids: Iterable[str] = (),
+    artifact_path: str | None = None,
+    allow_missing_response: bool = False,
+    _validate_companions: bool = True,
+    originating_finding: Mapping[str, Any] | None = None,
+) -> list[dict[str, str]]:
+    """Own canonical verification authority for one proposed recovery route."""
+    request_root = revision_dir / "hermes/verification-requests"
+    request_paths = sorted(request_root.iterdir()) if request_root.is_dir() else []
+    records: list[tuple[Path, dict[str, Any]]] = []
+    parsed_records: list[tuple[Path, dict[str, Any]]] = []
+    all_requests: list[dict[str, Any]] = []
+    counts: dict[str, int] = {}
+    malformed_inventory = False
+    for path in request_paths:
+        if path.suffix != ".json" or path.is_symlink() or not path.is_file():
+            malformed_inventory = True
+            continue
+        try:
+            request = _json(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            malformed_inventory = True
+            continue
+        identity = str(request.get("request_id") or "")
+        parsed_records.append((path, request))
+        all_requests.append(request)
+        counts[identity] = counts.get(identity, 0) + 1
+        if identity == request_id:
+            records.append((path, request))
+
+    def issue(code: str, text: str) -> list[dict[str, str]]:
+        return [{"code": code, "issue": text}]
+
+    if malformed_inventory:
+        return issue("verification_request_invalid_inventory", "The active verification request inventory contains an unreadable or non-object entry.")
+    required_bindings = ("request_id", "task", "revision_id", "review_set", "response_path")
+    for path, item in parsed_records:
+        if str(item.get("request_id") or "") == request_id:
+            continue
+        if (
+            any(key not in item or item.get(key) in (None, "") for key in required_bindings)
+            or item.get("task") not in {
+                "clinical_content_verification", "rendered_page_visual_verification",
+            }
+            or verification_request_authentication_findings(
+                revision_dir, path, item, request_id_counts=counts,
+            )
+        ):
+            return issue("verification_request_invalid_inventory", "The active verification request inventory contains a noncanonical or unauthenticated entry.")
+        if _validate_companions and verification_recovery_request_findings(
+            revision_dir,
+            str(item.get("request_id") or ""),
+            expected_task=str(item.get("task") or ""),
+            current_review_set=current_review_set,
+            reference=reference,
+            render_report=render_report,
+            allow_missing_response=True,
+            _validate_companions=False,
+        ):
+            return issue("verification_request_invalid_inventory", "The active verification request inventory contains a task-incomplete companion request.")
+    if not records:
+        return issue("verification_request_not_found", "The declared verification request identity does not resolve to a current request.")
+    if len(records) != 1 or counts.get(request_id, 0) != 1:
+        return issue("duplicate_verification_request_id", "The declared verification request identity resolves to more than one current request.")
+    request_path, request = records[0]
+    authentication = verification_request_authentication_findings(
+        revision_dir, request_path, request, request_id_counts=counts,
+    )
+    if authentication:
+        code = str(authentication[0].get("code") or "verification_request_canonical_mismatch")
+        return issue(code, str(authentication[0].get("issue") or "Verification request authentication failed."))
+    if request.get("review_set") != current_review_set:
+        return issue("verification_request_stale_review_set", "The declared verification request review set does not match the current generation review set.")
+    if request.get("task") != expected_task:
+        return issue("verification_request_wrong_task", "The declared verification request task does not match the normalized recovery route.")
+
+    target_ids = {str(item) for item in section_target_ids}
+    if expected_task == "clinical_content_verification":
+        expected_id = f"{revision_dir.name}.review-{current_review_set}.verify.content"
+        expected_sections = [
+            dict(item) for item in content_review_sections(reference)
+        ]
+        expected_artifacts = [
+            {"artifact": name if name.endswith(".xml") else Path(name).stem, "path": f"candidate/{name}"}
+            for name in sorted(document_set(get_path(reference, "meta.study_type")))
+        ]
+        branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+        expected_cross_document_checks = [] if branch == "Retrospective" else list(CROSS_DOCUMENT_CHECKS)
+        content_requests = [item for item in all_requests if item.get("task") == expected_task]
+        if (
+            len(content_requests) != 1
+            or request.get("request_id") != expected_id
+            or [dict(item) for item in request.get("sections", []) if isinstance(item, Mapping)]
+            != expected_sections
+            or [
+                {"artifact": str(item.get("artifact") or ""), "path": str(item.get("path") or "")}
+                for item in request.get("artifacts", []) if isinstance(item, Mapping)
+            ] != expected_artifacts
+            or list(request.get("checks") or []) != list(CONTENT_CHECKS)
+            or list(request.get("cross_document_checks") or []) != expected_cross_document_checks
+            or request.get("approved_source") != reference
+        ):
+            return issue("verification_request_incomplete_scope", "The declared content verification request is not the unique complete package-wide request for the current branch and review set.")
+        for artifact in request.get("artifacts", []):
+            if not isinstance(artifact, Mapping):
+                return issue("verification_request_stale_artifact", "The content verification artifact binding is malformed.")
+            path = revision_dir / str(artifact.get("path") or "")
+            exact_matches = (
+                path.is_file()
+                and _revision_owned_nonsymlink_path(revision_dir, path)
+                and sha256_file(path) == artifact.get("sha256")
+            )
+            content_matches = (
+                not artifact.get("content_sha256")
+                or path.is_file()
+                and _content_sha256(path) == artifact.get("content_sha256")
+            )
+            if not exact_matches or not content_matches:
+                return issue("verification_request_stale_artifact", "The content verification request is not bound to the current exact candidate bytes.")
+    else:
+        expected_artifacts = {
+            str(item.get("artifact") or ""): {
+                key: value for key, value in item.items()
+                if key not in {"renderer", "page_renderer"}
+            }
+            for item in render_report.get("artifacts", []) if isinstance(item, Mapping)
+        }
+        request_artifacts = [dict(item) for item in request.get("artifacts", []) if isinstance(item, Mapping)]
+        artifact_ids = {str(item.get("artifact") or "") for item in request_artifacts if item.get("artifact")}
+        artifact = next(iter(artifact_ids)) if len(artifact_ids) == 1 else ""
+        slug = re.sub(r"[^a-z0-9]+", "-", artifact.casefold()).strip("-")
+        expected_id = f"{revision_dir.name}.review-{current_review_set}.verify.visual.{slug}" if slug else ""
+        visual_matches = []
+        for path in request_paths:
+            try:
+                item = _json(path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                continue
+            if item.get("task") == expected_task and {
+                str(value.get("artifact") or "")
+                for value in item.get("artifacts", []) if isinstance(value, Mapping)
+            } == {artifact}:
+                visual_matches.append(item)
+        if (
+            not artifact
+            or artifact not in expected_artifacts
+            or len(visual_matches) != 1
+            or request.get("request_id") != expected_id
+            or list(request.get("checks") or []) != list(VISUAL_CHECKS)
+            or request_artifacts != [expected_artifacts[artifact]]
+        ):
+            return issue("verification_request_incomplete_scope", "The declared visual verification request is not the unique complete document-scoped request for the current render and review set.")
+        for visual_artifact in request_artifacts:
+            for key in ("docx", "pdf"):
+                path = revision_dir / str(visual_artifact.get(key) or "")
+                if (
+                    not path.is_file()
+                    or not _revision_owned_nonsymlink_path(revision_dir, path)
+                    or sha256_file(path) != visual_artifact.get(f"{key}_sha256")
+                ):
+                    return issue("verification_request_stale_artifact", "The visual verification request is not bound to the current exact DOCX/PDF bytes.")
+            for page in visual_artifact.get("pages", []):
+                if not isinstance(page, Mapping):
+                    return issue("verification_request_stale_artifact", "The visual verification page binding is malformed.")
+                path = revision_dir / str(page.get("path") or "")
+                if (
+                    not path.is_file()
+                    or not _revision_owned_nonsymlink_path(revision_dir, path)
+                    or sha256_file(path) != page.get("sha256")
+                ):
+                    return issue("verification_request_stale_artifact", "The visual verification request is not bound to the current exact page-image bytes.")
+
+    canonical_target_artifacts = {
+        "icf" if target.startswith("icf.") else "study.xml" if target.startswith("prs.") else "protocol"
+        for target in target_ids
+    }
+    if bound_artifact and canonical_target_artifacts and canonical_target_artifacts != {bound_artifact}:
+        return issue("recovery_target_wrong_artifact", "The finding's exact artifact does not own every normalized section recovery target.")
+    if target_ids:
+        def target_artifact(target: str) -> str:
+            if target.startswith("icf."):
+                return "icf"
+            if target.startswith("prs."):
+                return "study.xml"
+            return "protocol"
+
+        section_artifacts = {
+            target: [
+                str(item.get("artifact") or "")
+                for item in request.get("sections", [])
+                if isinstance(item, Mapping) and str(item.get("section_id") or "") == target
+            ]
+            for target in target_ids
+        }
+        if any(values != [target_artifact(target)] for target, values in section_artifacts.items()):
+            return issue("recovery_target_wrong_artifact", "The authenticated content request does not bind every normalized section target to its canonical artifact.")
+    request_artifact_ids = {
+        str(item.get("artifact") or "")
+        for item in request.get("artifacts", []) if isinstance(item, Mapping)
+    }
+    if bound_artifact and not target_ids and bound_artifact not in request_artifact_ids:
+        return issue("verification_request_wrong_artifact", "The declared verification request is not bound to the finding's exact artifact.")
+    if artifact_path is not None:
+        path_artifacts = {bound_artifact} if bound_artifact else canonical_target_artifacts
+        bound_paths = {
+            str(value)
+            for item in request.get("artifacts", []) if isinstance(item, Mapping)
+            and (
+                not path_artifacts
+                or str(item.get("artifact") or "") in path_artifacts
+            )
+            for value in [item.get("path"), item.get("docx"), item.get("pdf")]
+            if isinstance(value, str) and value
+        }
+        bound_paths.update(
+            str(page.get("path"))
+            for item in request.get("artifacts", []) if isinstance(item, Mapping)
+            and (
+                not path_artifacts
+                or str(item.get("artifact") or "") in path_artifacts
+            )
+            for page in item.get("pages", []) if isinstance(page, Mapping) and page.get("path")
+        )
+        if not artifact_path or artifact_path not in bound_paths:
+            return issue("verification_request_wrong_artifact_path", "The declared verification request does not contain the finding's exact artifact path.")
+    if _validate_companions:
+        expected_inventory = {
+            f"{revision_dir.name}.review-{current_review_set}.verify.content",
+            *{
+                f"{revision_dir.name}.review-{current_review_set}.verify.visual."
+                f"{re.sub(r'[^a-z0-9]+', '-', str(item.get('artifact') or '').casefold()).strip('-')}"
+                for item in render_report.get("artifacts", [])
+                if isinstance(item, Mapping) and str(item.get("artifact") or "")
+            },
+        }
+        if set(counts) != expected_inventory:
+            return issue("verification_request_invalid_inventory", "The active verification request inventory is not the complete expected content-and-visual request set.")
+    response_path = revision_dir / str(request.get("response_path") or "")
+    if not response_path.is_file():
+        return [] if allow_missing_response else issue(
+            "verification_response_missing",
+            "Verification-derived recovery has no corresponding authenticated response.",
+        )
+    if not _revision_owned_nonsymlink_path(revision_dir, response_path):
+        return issue("verification_response_invalid", "Verification response path is not revision-owned canonical evidence.")
+    try:
+        response = _json(response_path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return issue("verification_response_invalid", "Verification-derived recovery response is unreadable or malformed.")
+    if any(
+        response.get(key) != expected
+        for key, expected in (
+            ("schema_version", RESPONSE_SCHEMA),
+            ("request_id", request.get("request_id")),
+            ("request_sha256", request.get("request_sha256")),
+            ("task", request.get("task")),
+            ("revision_id", request.get("revision_id")),
+        )
+    ):
+        return issue("verification_response_invalid", "Verification-derived recovery response does not bind the canonical request.")
+    producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
+    if not _text(producer.get("model_id")) or not _text(producer.get("reviewer_id")):
+        return issue("verification_response_invalid", "Verification-derived recovery response lacks producer and reviewer identity.")
+    if originating_finding is not None and originating_finding.get("recovery_class") in {
+        "drafting_defect", "visual_defect", "deterministic_structure_defect",
+    }:
+        if str(response.get("status") or "").casefold() not in {"blocked", "failed"}:
+            return issue("verification_response_invalid", "A substantive verification-derived recovery requires a blocked or failed response.")
+        match_keys = (
+            "issue", "target_ids", "artifact", "page", "check", "element", "code",
+            "category", "recommended_action",
+        )
+        expected = {
+            key: originating_finding.get(key)
+            for key in match_keys if key in originating_finding
+        }
+        response_findings = response.get("findings") if isinstance(response.get("findings"), list) else []
+        source_finding = originating_finding.get("verification_source_finding")
+        if isinstance(source_finding, Mapping):
+            finding_matches = any(
+                isinstance(item, Mapping) and dict(item) == dict(source_finding)
+                for item in response_findings
+            )
+        else:
+            finding_matches = any(
+                isinstance(item, Mapping)
+                and all(item.get(key) == value for key, value in expected.items())
+                for item in response_findings
+            )
+        if not finding_matches:
+            return issue("verification_response_finding_mismatch", "The proposed recovery finding is not present in the exact authenticated response.")
+    return []
+
+
+def _assert_safe_mutation_path(path: Path, *, directory: bool | None = None) -> None:
+    """Reject symlinks and unexpected occupied types in every path component."""
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current = current / part
+        if not os.path.lexists(current):
+            continue
+        if current.is_symlink():
+            raise ValueError(f"Verification request path is unsafe: {current}")
+        if current == absolute and directory is not None:
+            valid = current.is_dir() if directory else current.is_file()
+            if not valid:
+                raise ValueError(f"Verification request path is unsafe: {current}")
+        elif current != absolute and not current.is_dir():
+            raise ValueError(f"Verification request path is unsafe: {current}")
+
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -4548,18 +5027,22 @@ def create_verification_requests(
     review_set: int = 1,
 ) -> list[Path]:
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
-    responses.mkdir(parents=True, exist_ok=True)
     content_files = []
     for path in sorted((revision_dir / "candidate").glob("*")):
         if not path.is_file():
             continue
-        artifact = {"path": path.relative_to(revision_dir).as_posix()}
+        if not _revision_owned_nonsymlink_path(revision_dir, path):
+            raise ValueError(f"Candidate artifact path is not revision-owned canonical evidence: {path}")
+        artifact = {
+            "artifact": path.name if path.suffix.casefold() == ".xml" else path.stem,
+            "path": path.relative_to(revision_dir).as_posix(),
+        }
         if path.suffix.casefold() == ".docx":
             artifact["content_sha256"] = _content_sha256(path)
         artifact["sha256"] = sha256_file(path)
         content_files.append(artifact)
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    sections = _content_review_sections(reference)
+    sections = content_review_sections(reference)
     repo_root = Path(__file__).resolve().parents[1]
     bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
     boilerplate_path = repo_root / str(bundle["fixed_clinical_boilerplate"]["path"])
@@ -4642,6 +5125,15 @@ def create_verification_requests(
             {key: value for key, value in artifact.items() if key not in {"renderer", "page_renderer"}}
             for artifact in artifacts
         ]
+        for request_artifact in request_artifacts:
+            for key in ("docx", "pdf"):
+                bound_path = revision_dir / str(request_artifact.get(key) or "")
+                if not bound_path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, bound_path):
+                    raise ValueError(f"Visual artifact path is not revision-owned canonical evidence: {bound_path}")
+            for page in request_artifact.get("pages", []):
+                bound_path = revision_dir / str(page.get("path") or "")
+                if not bound_path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, bound_path):
+                    raise ValueError(f"Visual page path is not revision-owned canonical evidence: {bound_path}")
         payloads.append({
             "schema_version": VERIFY_SCHEMA,
             "request_id": request_id,
@@ -4666,28 +5158,115 @@ def create_verification_requests(
         payload["contracted_template_bundle"] = bundle
         payload["request_sha256"] = verification_request_sha256(payload)
     expected = {payload["request_id"]: payload for payload in payloads}
-    existing_paths = sorted(requests.glob("*.json"))
-    existing = {}
-    for path in existing_paths:
-        try:
-            item = _json(path); existing[item.get("request_id")] = (path, item)
-        except (OSError, ValueError, json.JSONDecodeError):
-            existing[path.name] = (path, {})
-    for request_id, (path, request) in existing.items():
+    mutation_roots = (
+        revision_dir / "hermes",
+        requests,
+        responses,
+        revision_dir / "request-ledger",
+    )
+    for root in mutation_roots:
+        _assert_safe_mutation_path(root, directory=True)
+
+    proposed_ledgers: dict[str, dict[str, Any]] = {}
+    for payload in payloads:
+        request_id = str(payload["request_id"])
+        serialized = (json.dumps(payload, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+        request_path = requests / f"{request_id}.json"
+        ledger_path = revision_dir / "request-ledger" / f"{request_id}.json"
+        response_path = responses / f"{request_id}.json"
+        if payload.get("response_path") != response_path.relative_to(revision_dir).as_posix():
+            raise ValueError(f"Verification request response path is unsafe: {request_id}")
+        for path, label in (
+            (request_path, "request"),
+            (ledger_path, "ledger"),
+            (response_path, "response"),
+        ):
+            try:
+                _assert_safe_mutation_path(path, directory=False)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Verification request {label} path is unsafe: {request_id}"
+                ) from exc
+        ledger = verification_request_ledger_record(
+            request_path,
+            payload,
+            request_bytes=serialized,
+        )
+        ledger_occupied = os.path.lexists(ledger_path)
+        request_occupied = os.path.lexists(request_path)
+        if request_occupied and not ledger_occupied:
+            raise ValueError(f"Verification request canonical ledger is missing: {request_id}")
+        if ledger_occupied and _json(ledger_path) != ledger:
+            raise ValueError(f"Verification request identity collision: {request_id}")
+        if request_occupied:
+            try:
+                occupied_request = _json(request_path)
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                raise ValueError(f"Verification request identity collision: {request_id}") from exc
+            authentication = verification_request_authentication_findings(
+                revision_dir,
+                request_path,
+                occupied_request,
+                request_id_counts={request_id: 1},
+            )
+            if authentication:
+                raise ValueError(f"Verification request identity collision: {request_id}")
+        proposed_ledgers[request_id] = ledger
+
+    existing_records: list[tuple[Path, dict[str, Any]]] = []
+    if requests.is_dir():
+        entries = sorted(requests.iterdir())
+        if any(path.is_symlink() or not path.is_file() or path.suffix != ".json" for path in entries):
+            raise ValueError("Verification request inventory path is unsafe")
+        for path in entries:
+            try:
+                request = _json(path)
+            except (OSError, ValueError, json.JSONDecodeError) as exc:
+                raise ValueError("Verification request identity collision: invalid inventory") from exc
+            existing_records.append((path, request))
+    request_id_counts: dict[str, int] = {}
+    for _path, request in existing_records:
+        request_id = str(request.get("request_id") or "")
+        request_id_counts[request_id] = request_id_counts.get(request_id, 0) + 1
+
+    cleanup: list[tuple[Path, Path]] = []
+    for path, request in existing_records:
+        request_id = str(request.get("request_id") or "")
+        canonical_path = requests / f"{request_id}.json"
+        if path != canonical_path:
+            raise ValueError(f"Verification request identity collision: {request_id}")
+        authentication = verification_request_authentication_findings(
+            revision_dir,
+            path,
+            request,
+            request_id_counts=request_id_counts,
+        )
+        if authentication:
+            raise ValueError(f"Verification request identity collision: {request_id}")
+        response_path = responses / f"{request_id}.json"
+        if request.get("response_path") != response_path.relative_to(revision_dir).as_posix():
+            raise ValueError(f"Verification request response path is unsafe: {request_id}")
+        _assert_safe_mutation_path(response_path, directory=False)
         replacement = expected.get(request_id)
         if (
             replacement is not None
-            and verification_request_hash_valid(request)
             and request.get("request_sha256") == replacement["request_sha256"]
         ):
             continue
-        response_path = request.get("response_path")
-        if response_path:
-            (revision_dir / str(response_path)).unlink(missing_ok=True)
+        cleanup.append((path, response_path))
+
+    requests.mkdir(parents=True, exist_ok=True)
+    responses.mkdir(parents=True, exist_ok=True)
+    for path, response_path in cleanup:
+        response_path.unlink(missing_ok=True)
         path.unlink(missing_ok=True)
     result = []
     for payload in payloads:
-        path = requests / f"{payload['request_id']}.json"; _write(path, payload); result.append(path)
+        path = requests / f"{payload['request_id']}.json"
+        _write(path, payload)
+        ledger_path = revision_dir / "request-ledger" / f"{payload['request_id']}.json"
+        _write(ledger_path, proposed_ledgers[str(payload["request_id"])])
+        result.append(path)
     return result
 
 
@@ -4708,7 +5287,10 @@ def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, 
 
 
 def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return [dict(finding) for finding in findings if _is_publication_warning(finding)]
+    return [
+        {key: value for key, value in finding.items() if key != "verification_source_finding"}
+        for finding in findings if _is_publication_warning(finding)
+    ]
 
 
 def _deterministic_warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -4765,12 +5347,10 @@ def _notes_cite_finding(notes: Any, finding_id: str) -> bool:
 
 
 def verification_response_is_complete(revision_dir: Path, request_path: Path) -> bool:
-    """Return whether one current, bound verifier response satisfies its full pass contract."""
+    """Return whether one current, canonically authenticated response fully passes."""
     try:
-        request = _json(request_path)
+        _json(request_path)
     except (OSError, ValueError, json.JSONDecodeError):
-        return False
-    if not verification_request_hash_valid(request):
         return False
     findings, _ = validate_verifications(revision_dir, request_paths=[request_path])
     return not _blocking_findings(findings)
@@ -4782,12 +5362,31 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
         request = _json(request_path)
         if not isinstance(request, Mapping):
             return False
-        response = _json(revision_dir / str(request.get("response_path") or ""))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+    response_path = revision_dir / str(request.get("response_path") or "")
+    if not _revision_owned_nonsymlink_path(revision_dir, response_path):
+        return False
+    try:
+        response = _json(response_path)
     except (OSError, ValueError, json.JSONDecodeError):
         return False
     if not isinstance(response, Mapping):
         return False
-    if not verification_request_hash_valid(request):
+    request_id_counts: dict[str, int] = {}
+    for active_path in (revision_dir / "hermes/verification-requests").glob("*.json"):
+        try:
+            active_request = _json(active_path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        active_request_id = str(active_request.get("request_id") or "")
+        request_id_counts[active_request_id] = request_id_counts.get(active_request_id, 0) + 1
+    if verification_request_authentication_findings(
+        revision_dir,
+        request_path,
+        request,
+        request_id_counts=request_id_counts,
+    ):
         return False
     if any(
         response.get(key) != expected
@@ -4808,9 +5407,21 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
         return verification_response_is_complete(revision_dir, request_path)
     findings = response.get("findings") if isinstance(response.get("findings"), list) else []
     if status in {"blocked", "failed"}:
-        return bool(findings) and all(
+        if not findings or not all(
             isinstance(item, Mapping) and bool(_text(item.get("issue")))
             for item in findings
+        ):
+            return False
+        validation_findings, evidence = validate_verifications(
+            revision_dir, request_paths=[request_path]
+        )
+        if not evidence:
+            return False
+        return not any(
+            item.get("recovery_class") in {
+                "verifier_transient", "document_structure_defect",
+            }
+            for item in validation_findings
         )
     return False
 
@@ -4821,32 +5432,121 @@ def validate_verifications(
     request_paths: Iterable[Path] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     findings: list[dict[str, Any]] = []; evidence: dict[str, Any] = {}
-    request_records = [
-        (request_path, _json(request_path))
-        for request_path in sorted(
-            request_paths
-            if request_paths is not None
-            else (revision_dir / "hermes/verification-requests").glob("*.json")
-        )
-    ]
+    request_root = revision_dir / "hermes/verification-requests"
+    active_entries = sorted(request_root.iterdir()) if request_root.is_dir() else []
+    for path in active_entries:
+        if path.suffix != ".json" or path.is_symlink() or not path.is_file():
+            findings.append(recovery_finding({
+                "category": "verification",
+                "field": "verification_request_inventory",
+                "code": "verification_request_invalid_inventory",
+                "target_ids": ["verification:content"],
+                "verification_request_id": None,
+                "issue": f"Unexpected noncanonical verification request entry: {path.name}",
+            }, "document_structure_defect"))
+    selected_paths = sorted(
+        request_paths
+        if request_paths is not None
+        else [
+            path for path in active_entries
+            if path.suffix == ".json" and not path.is_symlink() and path.is_file()
+        ]
+    )
+    active_request_id_counts: dict[str, int] = {}
+    active_requests: dict[Path, dict[str, Any]] = {}
+    required_bindings = ("request_id", "task", "revision_id", "review_set", "response_path")
+    for active_path in active_entries:
+        if active_path.suffix != ".json" or active_path.is_symlink() or not active_path.is_file():
+            continue
+        try:
+            active_request = _json(active_path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            if active_path not in selected_paths:
+                findings.append(recovery_finding({
+                    "category": "verification", "field": "verification_request",
+                    "code": "verification_request_invalid_json",
+                    "target_ids": ["verification:content"], "verification_request_id": None,
+                    "issue": f"Verification request is not a readable JSON object: {exc}",
+                }, "document_structure_defect"))
+            continue
+        active_requests[active_path] = active_request
+        active_request_id = str(active_request.get("request_id") or "")
+        active_request_id_counts[active_request_id] = active_request_id_counts.get(active_request_id, 0) + 1
+    for active_path, active_request in active_requests.items():
+        if active_path in selected_paths:
+            continue
+        if any(key not in active_request or active_request.get(key) in (None, "") for key in required_bindings):
+            findings.append(recovery_finding({
+                "category": "verification", "field": "verification_request",
+                "code": "verification_request_missing_binding",
+                "target_ids": ["verification:content"],
+                "verification_request_id": active_request.get("request_id"),
+                "issue": "Companion verification request is missing a required binding.",
+            }, "document_structure_defect"))
+            continue
+        findings.extend(verification_request_authentication_findings(
+            revision_dir, active_path, active_request,
+            request_id_counts=active_request_id_counts,
+        ))
+    request_records: list[tuple[Path, dict[str, Any]]] = []
+    for request_path in selected_paths:
+        try:
+            request = _json(request_path)
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            findings.append(recovery_finding({
+                "category": "verification",
+                "field": "verification_request",
+                "code": "verification_request_invalid_json",
+                "target_ids": ["verification:content"],
+                "verification_request_id": None,
+                "issue": f"Verification request is not a readable JSON object: {exc}",
+            }, "document_structure_defect"))
+            continue
+        required_bindings = ("request_id", "task", "revision_id", "review_set", "response_path")
+        if any(key not in request or request.get(key) in (None, "") for key in required_bindings):
+            findings.append(recovery_finding({
+                "category": "verification",
+                "field": "verification_request",
+                "code": "verification_request_missing_binding",
+                "target_ids": [
+                    "verification:visual"
+                    if request.get("task") == "rendered_page_visual_verification"
+                    else "verification:content"
+                ],
+                "verification_request_id": request.get("request_id"),
+                "issue": "Verification request is missing a required identity, task, revision, review-set, or response-path binding.",
+            }, "document_structure_defect"))
+            continue
+        request_records.append((request_path, request))
     task_counts: dict[str, int] = {}
     for _, request in request_records:
         task = str(request.get("task"))
         task_counts[task] = task_counts.get(task, 0) + 1
     for request_path, request in request_records:
-        response_path = revision_dir / request["response_path"]
         evidence_key = request["task"] if task_counts[str(request.get("task"))] == 1 else request["request_id"]
         verification_target = "verification:visual" if request["task"] == "rendered_page_visual_verification" else "verification:content"
-        if not verification_request_hash_valid(request):
+        authentication_findings = verification_request_authentication_findings(
+            revision_dir,
+            request_path,
+            request,
+            request_id_counts=active_request_id_counts,
+        )
+        if authentication_findings:
+            findings.extend(authentication_findings)
+            continue
+        response_path = revision_dir / request["response_path"]
+        if not _revision_owned_nonsymlink_path(revision_dir, response_path):
             findings.append(recovery_finding({
                 "category": "verification",
-                "field": "request_sha256",
+                "field": request["task"],
+                "code": "verification_response_noncanonical_path",
                 "target_ids": [verification_target],
-                "issue": "Verification request body does not match its declared request hash.",
+                "verification_request_id": request["request_id"],
+                "issue": "Independent Hermes verification response path is not revision-owned canonical evidence.",
             }, "document_structure_defect"))
             continue
         if not response_path.is_file():
-            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
+            findings.append(recovery_finding({"category": "verification", "field": request["task"], "code": "verification_response_missing", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
         try: response = _json(response_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
@@ -4896,6 +5596,7 @@ def validate_verifications(
                     "category": category,
                     "field": request["task"],
                     "verification_request_id": request["request_id"],
+                    "verification_source_finding": dict(source),
                     "issue": _text(source.get("issue")),
                 }
                 for key in (
@@ -5067,23 +5768,27 @@ def validate_verifications(
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
-                exact_matches = path.is_file() and sha256_file(path) == artifact.get("sha256")
+                exact_matches = (
+                    path.is_file()
+                    and _revision_owned_nonsymlink_path(revision_dir, path)
+                    and sha256_file(path) == artifact.get("sha256")
+                )
                 content_matches = (
                     not artifact.get("content_sha256")
                     or path.is_file()
                     and _content_sha256(path) == artifact.get("content_sha256")
                 )
                 if not exact_matches or not content_matches:
-                    findings.append(recovery_finding({"category": "verification", "field": request["task"], "issue": f"Verification request is stale for {artifact.get('path')}."}, "document_structure_defect"))
+                    findings.append(recovery_finding({"category": "verification", "field": request["task"], "artifact": artifact.get("artifact"), "artifact_path": artifact.get("path"), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Verification request is stale for {artifact.get('path')}."}, "document_structure_defect"))
             else:
                 for key in ("docx", "pdf"):
                     path = revision_dir / str(artifact.get(key))
-                    if not path.is_file() or sha256_file(path) != artifact.get(f"{key}_sha256"):
-                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", key), "issue": f"Visual verification request is stale for {artifact.get(key)}."}, "document_structure_defect"))
+                    if not path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, path) or sha256_file(path) != artifact.get(f"{key}_sha256"):
+                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", key), "artifact": artifact.get("artifact"), "artifact_path": artifact.get(key), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Visual verification request is stale for {artifact.get(key)}."}, "document_structure_defect"))
                 for page in artifact.get("pages", []):
                     path = revision_dir / str(page.get("path"))
-                    if not path.is_file() or sha256_file(path) != page.get("sha256"):
-                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", "page"), "issue": f"Visual verification request is stale for {page.get('path')}."}, "document_structure_defect"))
+                    if not path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, path) or sha256_file(path) != page.get("sha256"):
+                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", "page"), "artifact": artifact.get("artifact"), "artifact_path": page.get("path"), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Visual verification request is stale for {page.get('path')}."}, "document_structure_defect"))
         if request["task"] == "clinical_content_verification":
             expected_sections = {(item["artifact"], item["section_id"]) for item in request.get("sections", [])}
             valid_section_rows = [
@@ -5245,7 +5950,7 @@ def _final_verification_scope_findings(
         }
         expected_sections = {
             (str(item["artifact"]), str(item["section_id"]))
-            for item in _content_review_sections(reference)
+            for item in content_review_sections(reference)
         }
         content_sections = {
             (str(item.get("artifact")), str(item.get("section_id")))
@@ -5498,4 +6203,4 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     return {"status": final_review["status"], "findings": findings, "warnings": warnings, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
-__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_hash_valid", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]
+__all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "content_review_sections", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_authentication_findings", "verification_request_hash_valid", "verification_request_ledger_record", "verification_recovery_request_findings", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

@@ -280,10 +280,13 @@ non-empty user-selected `model.default`; responses record the actual producing
 model. The host also needs `agent.reasoning_effort: medium` and at least 80 agent
 turns. A mismatch stops before activation with one configuration finding.
 
-Independent verification is bounded to three complete review sets. A genuine
-content or visual defect triggers a targeted repair followed by a fresh
-package-wide content review and fresh every-page visual reviews for every DOCX;
-transient API failures retry only the affected reviewer inside the current set.
+Independent verification review sets and reviewer retries remain uncapped within
+the one persisted 45-minute deadline. The sole bounded exception is the
+Desktop-parent visual fallback: one initial callback plus exactly one
+unchanged-request retry. A genuine content or visual defect triggers a targeted
+repair followed by a fresh package-wide content review and fresh every-page
+visual reviews for every DOCX; transient API failures retry only the affected
+reviewer inside the current set.
 
 `--rollback-release` verifies the immediately previous release before one
 atomic swap, restores it as active, and quarantines the suspect release without

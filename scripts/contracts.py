@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.26-phase2"
+CONTRACT_VERSION = "clinical-documents-v2.27-recovery-contract"
 BOILERPLATE_VERSION = "clinical-boilerplate-v11"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -461,6 +461,7 @@ def _section_spec(
     brief_reference_concepts: Iterable[str] = (),
     do_not_restate_concepts: Iterable[str] = (),
     boilerplate_keys: Iterable[str] = (),
+    content_expectations: Iterable[str] | None = None,
 ) -> SectionSpec:
     return SectionSpec(
         section_id,
@@ -471,7 +472,7 @@ def _section_spec(
         tuple(evidence),
         boilerplate,
         required,
-        content_expectations=_content_expectations(section_id, title),
+        content_expectations=tuple(content_expectations) if content_expectations is not None else _content_expectations(section_id, title),
         source_coverage=_source_coverage(section_id),
         fidelity_evidence=_fidelity_evidence(section_id),
         evidence_scopes=_evidence_scopes(section_id),
@@ -591,6 +592,38 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
     _section_spec("icf.injury", "", "Research injury", "icf-narrative", ("risks_benefits.injury_handling",), "injury"),
 )
 
+STERLING_BACKGROUND_SECTION = _section_spec(
+    "icf.background",
+    "",
+    "Background",
+    "icf-narrative",
+    ("study.background",),
+    owned_concepts=(
+        "clinical-background", "comparative-evidence", "evidence-gap", "study-rationale",
+    ),
+    content_expectations=(
+        "Explain the approved clinical and study context, relevant comparative evidence, evidence gap, and study rationale in participant-facing language.",
+        "Translate technical terms for participants without adding unsupported clinical claims.",
+        "Do not repeat the complete purpose, hypothesis, or primary endpoint owned by PURPOSE.",
+    ),
+)
+
+ADVARRA_PURPOSE_SECTION = _section_spec(
+    "icf.study-purpose",
+    "",
+    "Purpose of the study",
+    "icf-narrative",
+    ("study.background", "objectives.primary", "study.hypothesis", "endpoints.primary"),
+    owned_concepts=(
+        "clinical-background", "comparative-evidence", "evidence-gap", "study-rationale",
+        "study-purpose", "study-hypothesis", "primary-endpoint",
+    ),
+    content_expectations=(
+        "Give concise participant-facing context from the approved background, then state the study purpose, hypothesis, and primary endpoint when supplied.",
+        "Do not duplicate the same background passage elsewhere in the Advarra ICF.",
+    ),
+)
+
 
 def icf_summary_obligations(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     """Return representation-neutral evidence obligations for KEY INFORMATION."""
@@ -659,7 +692,6 @@ ICF_RETAINED_SHELL_SECTIONS = {
     "sterling": (
         ("icf.authorization-introduction", "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION"),
         ("icf.key-information", "KEY INFORMATION"),
-        ("icf.background", "BACKGROUND"),
         ("icf.information", "INFORMATION"),
         ("icf.voluntary-participation", "VOLUNTARY PARTICIPATION/WITHDRAWAL"),
         ("icf.contact-information", "QUESTIONS"),
@@ -678,9 +710,20 @@ def icf_contract(study_type: str, icf_template: str = "Advarra") -> tuple[Sectio
         return ()
     sterling = str(icf_template).strip().casefold() == "sterling"
     sections = ICF_STUDY_SECTIONS
-    if not sterling:
+    if sterling:
         sections = tuple(
-            section for section in sections
+            item
+            for section in sections
+            for item in (
+                (section, STERLING_BACKGROUND_SECTION)
+                if section.section_id == "icf.key-information-summary"
+                else (section,)
+            )
+        )
+    else:
+        sections = tuple(
+            ADVARRA_PURPOSE_SECTION if section.section_id == "icf.study-purpose" else section
+            for section in sections
             if section.section_id != "icf.key-information-summary"
         )
     if branch == "Prospective" and not sterling:

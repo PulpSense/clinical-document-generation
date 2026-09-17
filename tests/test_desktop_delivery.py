@@ -13,7 +13,7 @@ import threading
 import pytest
 
 import workflow
-from quality import RESPONSE_SCHEMA, VISUAL_CHECKS, verification_request_sha256
+from quality import RESPONSE_SCHEMA, VISUAL_CHECKS, verification_request_ledger_record, verification_request_sha256
 
 
 def _manifest():
@@ -316,6 +316,32 @@ def test_production_parent_publishes_bound_quiet_stdout_response(tmp_path):
         stdout_log,
     ) is True
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
+
+
+def test_production_response_rejects_non_object_producer_without_raising(tmp_path):
+    revision_dir = tmp_path / "revision"
+    request_path = revision_dir / "hermes/requests/draft.json"
+    response_path = revision_dir / "hermes/responses/draft.json"
+    request_path.parent.mkdir(parents=True)
+    response_path.parent.mkdir(parents=True)
+    request = {
+        "schema_version": "hermes-request/v2", "request_id": "draft-1",
+        "request_sha256": "a" * 64, "revision_id": "r1",
+        "task": "section_drafting", "batch_id": "protocol-foundations",
+    }
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    response_path.write_text(json.dumps({
+        "schema_version": "hermes-response/v2", "request_id": "draft-1",
+        "request_sha256": "a" * 64, "revision_id": "r1",
+        "task": "section_drafting", "batch_id": "protocol-foundations",
+        "producer": "invalid",
+    }), encoding="utf-8")
+    handoff = {
+        "request_path": "hermes/requests/draft.json",
+        "response_path": "hermes/responses/draft.json",
+        "task": "section_drafting",
+    }
+    assert workflow._production_response_is_bound(revision_dir, handoff) is False
 
 
 def test_production_parent_retains_failed_content_review_as_a_blocking_response(tmp_path):
@@ -1359,38 +1385,18 @@ def test_external_parent_visual_reviewer_rejects_missing_bound_response(tmp_path
 
 
 def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested_finding(tmp_path):
+    handoff, request, response = _visual_handoff_fixture(tmp_path, "protocol")
     revision = tmp_path / "revisions/r1"
-    request_path = revision / "hermes/verification-requests/visual.json"
-    response_path = revision / "hermes/verification-responses/visual.json"
-    request_path.parent.mkdir(parents=True)
-    request = {
-        "schema_version": "hermes-verification/v1",
-        "request_id": "r1.verify.visual.protocol",
-        "task": "rendered_page_visual_verification",
-        "revision_id": "r1",
-        "response_path": "hermes/verification-responses/visual.json",
-        "artifacts": [{"artifact": "protocol", "pages": []}],
-        "checks": list(VISUAL_CHECKS),
-    }
-    request["request_sha256"] = verification_request_sha256(request)
-    request_path.write_text(json.dumps(request), encoding="utf-8")
-    response = {
-        "schema_version": RESPONSE_SCHEMA,
-        "request_id": request["request_id"],
-        "request_sha256": request["request_sha256"],
-        "task": request["task"],
-        "revision_id": "r1",
-        "producer": {"model_id": "test-parent-model", "reviewer_id": "desktop-parent-visual-reviewer"},
-        "status": "blocked",
-        "findings": [{
-            "artifact": "protocol",
-            "page": 3,
-            "check": "bad_table_split",
-            "element": "3. GENERAL INFORMATION – Variables / Secondary endpoint(s)",
-            "issue": "The label is separated from its first bullet.",
-        }],
-        "page_assessments": [],
-    }
+    response_path = revision / handoff["response_path"]
+    response["status"] = "blocked"
+    response["findings"] = [{
+        "artifact": "protocol",
+        "page": 1,
+        "check": "bad_table_split",
+        "element": "3. GENERAL INFORMATION – Variables / Secondary endpoint(s)",
+        "issue": "The label is separated from its first bullet.",
+    }]
+    response["page_assessments"][0]["status"] = "blocked"
     command = tmp_path / "parent-reviewer"
     command.write_text(
         "#!/bin/sh\nprintf '%s\\n' '" + json.dumps(response) + "'\n",
@@ -1399,13 +1405,7 @@ def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested
     command.chmod(0o700)
 
     reviewer = workflow.command_parent_visual_reviewer(command)
-    reviewer([{
-        "request_path": "hermes/verification-requests/visual.json",
-        "response_path": "hermes/verification-responses/visual.json",
-        "request_id": request["request_id"],
-        "request_sha256": request["request_sha256"],
-        "task": request["task"],
-    }], 10.0, revision, {})
+    reviewer([handoff], 10.0, revision, {})
 
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
@@ -1835,7 +1835,7 @@ def _visual_handoff_fixture(tmp_path, artifact):
         path.write_bytes(payload)
     digest = {relative: workflow.sha256_file(revision / relative) for relative in files}
     request_id = f"r1.verify.visual.{artifact}"
-    request_path = f"hermes/verification-requests/{artifact}.json"
+    request_path = f"hermes/verification-requests/{request_id}.json"
     response_path = f"hermes/verification-responses/{artifact}.json"
     handoff = {
         "request_path": request_path,
@@ -1848,6 +1848,7 @@ def _visual_handoff_fixture(tmp_path, artifact):
         "request_id": request_id,
         "task": handoff["task"],
         "revision_id": "r1",
+        "review_set": 1,
         "response_path": response_path,
         "checks": list(VISUAL_CHECKS),
         "artifacts": [{
@@ -1869,6 +1870,11 @@ def _visual_handoff_fixture(tmp_path, artifact):
     request_file = revision / request_path
     request_file.parent.mkdir(parents=True, exist_ok=True)
     request_file.write_text(json.dumps(request), encoding="utf-8")
+    ledger_path = revision / "request-ledger" / f"{request_id}.json"
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    ledger_path.write_text(json.dumps(
+        verification_request_ledger_record(request_file, request)
+    ), encoding="utf-8")
     response = {
         "schema_version": RESPONSE_SCHEMA,
         "request_id": request_id,
@@ -1898,6 +1904,7 @@ def test_terminal_visual_finding_is_consumed_without_parent_fallback(tmp_path, m
         "artifact": "protocol",
         "page": 1,
         "check": "bad_table_split",
+        "element": "3. GENERAL INFORMATION",
         "target_ids": ["layout:protocol"],
         "issue": "A complete summary-table row split across pages.",
         "recommended_action": "Apply the governed local row-split repair and re-review.",
@@ -2181,6 +2188,46 @@ def test_parent_fallback_exception_gets_one_bounded_retry_then_blocks(tmp_path, 
     assert result["stage"] == "parent_visual_review"
     assert result["findings"][0]["code"] == "missing_parent_visual_review_response"
     assert fallback_calls == [[handoff], [handoff]]
+
+
+def test_parent_visual_retry_budget_persists_across_process_resume(tmp_path, monkeypatch):
+    handoff, _, _ = _visual_handoff_fixture(tmp_path, "protocol")
+    monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
+        "status": "awaiting_hermes",
+        "stage": "independent_verification",
+        "revision_id": "r1",
+        "handoffs": [handoff],
+    })
+    calls = []
+
+    def interrupt_after_callback(pending, _remaining):
+        calls.append(list(pending))
+        raise KeyboardInterrupt("simulated process interruption")
+
+    with pytest.raises(KeyboardInterrupt):
+        workflow.run_desktop_operation(
+            tmp_path,
+            handoff_runner=lambda *_args: None,
+            fallback_handoff_runner=interrupt_after_callback,
+            opener=lambda _path: b"unused",
+            budget_seconds=30.0,
+        )
+
+    result = workflow.run_desktop_operation(
+        tmp_path,
+        handoff_runner=lambda *_args: None,
+        fallback_handoff_runner=lambda pending, _remaining: calls.append(list(pending)),
+        opener=lambda _path: b"unused",
+        budget_seconds=30.0,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "parent_visual_review"
+    assert calls == [[handoff], [handoff]]
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert state["attempt_counters"]["parent_visual_callbacks"] == {
+        handoff["request_sha256"]: 2,
+    }
 
 
 def test_empty_parent_visual_fallback_retries_parent_not_half_second_workers(

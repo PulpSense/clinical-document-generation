@@ -14,16 +14,19 @@ Protocol and ICF Word assets live under `assets/client-templates/docx/`:
 - `ambispective-icf.template.docx` (Advarra)
 - `sterling-icf.template.docx`
 
-The PRS structural authority is:
+The PRS structural architecture authority is:
+
+- `assets/client-templates/reference/prs-manual-reference.xml`
+
+The separate PRS generation/format template is:
 
 - `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml`
 
-The retained client references used to audit those families are:
+The retained client references used to audit the Word families are:
 
 - `assets/client-templates/reference/protocol-reference.docx`
 - `assets/client-templates/reference/advarra-icf-reference.docx`
 - `assets/client-templates/reference/sterling-icf-reference.docx`
-- `assets/client-templates/reference/prs-manual-reference.xml`
 
 Sterling substantive language is additionally governed by
 `references/sterling-clause-contract.json`. The contract classifies each
@@ -33,10 +36,11 @@ limits merge fields, and defines deterministic severity. The template alone is
 not permission to retain an inapplicable conditional clause or an unsupported
 example-study, legal, payment, injury, privacy, authorization, or contact claim.
 
-The PRS template preserves the element names, ordering, optional nodes, and
-repeated-block taxonomy of the client-approved manual XML. Python may populate
-or repeat those nodes, but a drafting subagent may return only the two PRS
-narrative values.
+The PRS generation template materializes placeholders and allowed output
+surfaces derived from the client-approved manual XML. Its populated output must
+match the separate structural reference's element names, ordering, optional
+nodes, and repeated-block taxonomy. Python may populate or repeat those nodes,
+but a drafting subagent may return only the two PRS narrative values.
 
 ## Selection
 

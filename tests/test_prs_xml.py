@@ -146,24 +146,45 @@ def test_screening_washout_is_included_in_prs_eligibility(tmp_path):
     assert "30 days without participation in another study before screening" in criteria
 
 
-def test_screening_washout_does_not_duplicate_supplied_day_units(tmp_path):
+def _screening_criterion(tmp_path, value, *, qualifier=None):
     reference = fixture()
-    reference["procedures"]["minimum_days_before_screening_without_participation"] = "30 days"
-    output = tmp_path / "study.xml"
-
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = value
+    if qualifier:
+        reference["population"]["exclusion_criteria"].append(
+            f"Participation in {qualifier} within 90 days before screening."
+        )
+    output = tmp_path / f"study-{str(value).replace(' ', '-')}.xml"
     generate(
         TEMPLATE,
         output,
         reference,
         {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
     )
-
     study = next(ET.parse(output).getroot().iter("clinical_study"))
     criteria = study.findtext("eligibility/criteria/textblock") or ""
-    if not criteria:
-        criteria = " ".join(study.find("eligibility").itertext())
-    assert "30 days without participation in another study before screening" in criteria
-    assert "days days" not in criteria
+    return next(line.strip("• ") for line in criteria.splitlines() if "without participation" in line)
+
+
+def test_screening_washout_accepts_complete_before_screening_phrase(tmp_path):
+    expected = "At least 90 days without participation in another study before screening"
+    for value in ("90", "90 days", "90 days before screening", "At least 90 days before screening"):
+        criterion = _screening_criterion(tmp_path, value)
+        assert criterion == expected
+        assert criterion.count("days") == 1
+        assert criterion.count("before screening") == 1
+
+
+def test_screening_washout_preserves_approved_study_qualifier(tmp_path):
+    criterion = _screening_criterion(
+        tmp_path,
+        "At least 90 days before screening",
+        qualifier="another interventional study",
+    )
+    assert criterion == (
+        "At least 90 days without participation in another interventional study before screening"
+    )
+    assert criterion.count("another interventional study") == 1
+    assert criterion.count("before screening") == 1
 
 
 def test_screening_washout_preserves_approved_interventional_study_qualifier(tmp_path):

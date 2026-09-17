@@ -1465,7 +1465,16 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             combined_evidence,
             "\n".join(role_content_parts),
         ))
-        if section_id == "icf.study-purpose":
+        branch_value = request.get("branch")
+        icf_template = (
+            branch_value.get("icf_template")
+            if isinstance(branch_value, Mapping)
+            else ""
+        )
+        if (
+            section_id == "icf.study-purpose"
+            and str(icf_template or "").strip().casefold() == "sterling"
+        ):
             approved_source = request.get("approved_source")
             background = get_path(
                 approved_source if isinstance(approved_source, Mapping) else {},
