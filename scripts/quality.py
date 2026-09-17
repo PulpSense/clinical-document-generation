@@ -34,6 +34,7 @@ from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from drafting import evidence_grounded
+from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -4615,15 +4616,52 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             findings.append({"category": "content", "field": "icf.study-purpose", "target_ids": ["icf.study-purpose"], "issue": "Observational ICF retains interventional clinical-trial language."})
         minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
         if minimum_days:
-            day_count = re.sub(r"\s+days?\s*$", "", minimum_days, flags=re.I).strip()
+            screening_interval = screening_interval_requirement(reference)
+            day_count = screening_interval.days if screening_interval else minimum_days
             day_pattern = re.compile(rf"\b{re.escape(day_count)}\s*[- ]?\s*days?\b", re.I)
             if not day_pattern.search(visible):
                 findings.append({"category": "content", "field": "subjects.inclusion", "target_ids": ["subjects.inclusion"], "issue": "Protocol omits the approved minimum interval without participation in another study before screening."})
             if not day_pattern.search(icf_visible):
                 findings.append({"category": "content", "field": "icf.procedures", "target_ids": ["icf.procedures"], "issue": "ICF omits the approved minimum interval without participation in another study before screening."})
             xml_path = revision_dir / "candidate/study.xml"
-            if xml_path.is_file() and not day_pattern.search(xml_path.read_text(encoding="utf-8")):
-                findings.append(recovery_finding({"category": "content", "field": "prs.eligibility", "target_ids": ["layout:xml"], "issue": "PRS XML omits the approved minimum interval without participation in another study before screening."}, "document_structure_defect"))
+            if xml_path.is_file():
+                repo_root = Path(__file__).resolve().parents[1]
+                prs_findings = validate_prs_output(
+                    xml_path,
+                    reference,
+                    repo_root / "assets/client-templates/reference/prs-manual-reference.xml",
+                    generation_template=(
+                        repo_root
+                        / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml"
+                    ),
+                )
+                if any(
+                    item.get("code") == "screening_interval_semantic_mismatch"
+                    for item in prs_findings
+                ):
+                    findings.append(recovery_finding({
+                        "category": "content",
+                        "field": "prs.eligibility",
+                        "target_ids": ["layout:xml"],
+                        "issue": (
+                            "PRS XML omits or materially alters the approved minimum interval "
+                            "without participation in another study before screening."
+                        ),
+                    }, "document_structure_defect"))
+                if any(
+                    item.get("code") == "screening_interval_validator_inconsistency"
+                    for item in prs_findings
+                ):
+                    findings.append(recovery_finding({
+                        "category": "quality-gate",
+                        "field": "prs.eligibility-validator",
+                        "target_ids": ["quality-gate:prs-screening-interval"],
+                        "issue": (
+                            "PRS screening-interval validators disagree or cannot represent the "
+                            "approved value; maintenance is required before document repair."
+                        ),
+                    }, "capability_gap"))
+
         consent_to_sign = any(phrase in icf_visible for phrase in (
             "should not sign",
             "if you would like to participate, you will be asked to sign",

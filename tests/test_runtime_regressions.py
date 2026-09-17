@@ -1570,7 +1570,11 @@ def test_approved_investigator_and_facility_values_populate_protocol_agreement(t
     assert "Site One" in values
 
 
-def test_render_fields_normalize_markdown_email_population_and_day_units():
+@pytest.mark.parametrize(
+    "screening_interval",
+    (90, "90 days", "90 days before screening", "At least 90 days before screening"),
+)
+def test_render_fields_normalize_markdown_email_population_and_day_units(screening_interval):
     reference = _source()
     reference["parties"]["study_coordinator"]["email"] = (
         "[jamie.chen@example.org](mailto:jamie.chen@example.org)"
@@ -1579,7 +1583,7 @@ def test_render_fields_normalize_markdown_email_population_and_day_units():
     reference["population"]["inclusion_criteria"] = [
         "Adults 18 to 80 years old with eligible historical records.",
     ]
-    reference["procedures"]["minimum_days_before_screening_without_participation"] = "30 days"
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = screening_interval
 
     fields = render_fields(reference, {"protocol": [], "icf": {}, "prs": {}})
 
@@ -1587,7 +1591,7 @@ def test_render_fields_normalize_markdown_email_population_and_day_units():
     assert fields["AI_populationShort"] == (
         "Adults 18 to 80 years old with eligible historical records."
     )
-    assert fields["daysBeforeScreening"] == "30"
+    assert fields["daysBeforeScreening"] == "90"
 
 
 def test_render_fields_prefers_approved_protocol_summary_and_named_articles():

@@ -772,7 +772,7 @@ def test_recorded_acceptance_spells_out_the_screening_interval_with_units(tmp_pa
         + [item for group in inclusion["lists"] for item in group["items"]]
     )
 
-    assert "30 days" in visible
+    assert "90 days" in visible
 
 
 def test_sparse_complete_approval_cannot_create_post_approval_source_questions(tmp_path, monkeypatch):

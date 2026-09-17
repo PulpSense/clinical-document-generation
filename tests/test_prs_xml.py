@@ -3,6 +3,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from prs_xml import compare_structure, expected_counts, generate, repeated_counts, validate_output
+import prs_xml
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -143,7 +144,7 @@ def test_screening_washout_is_included_in_prs_eligibility(tmp_path):
     criteria = study.findtext("eligibility/criteria/textblock") or ""
     if not criteria:
         criteria = " ".join(study.find("eligibility").itertext())
-    assert "30 days without participation in another study before screening" in criteria
+    assert "90 days without participation in another study before screening" in criteria
 
 
 def _screening_criterion(tmp_path, value, *, qualifier=None):
@@ -203,7 +204,90 @@ def test_screening_washout_preserves_approved_interventional_study_qualifier(tmp
 
     study = next(ET.parse(output).getroot().iter("clinical_study"))
     criteria = study.findtext("eligibility/criteria/textblock") or ""
-    assert "30 days without participation in another interventional study before screening" in criteria
+    assert "90 days without participation in another interventional study before screening" in criteria
+
+
+def test_validation_semantically_rejects_mutated_screening_interval(tmp_path):
+    reference = fixture()
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = (
+        "At least 90 days before screening"
+    )
+    reference["population"]["exclusion_criteria"].append(
+        "Participation in another interventional study within 90 days before screening."
+    )
+    output = tmp_path / "study.xml"
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+    )
+    tree = ET.parse(output)
+    study = next(tree.getroot().iter("clinical_study"))
+    criteria = study.find("eligibility/criteria/textblock")
+    assert criteria is not None
+    criteria.text = (criteria.text or "").replace(
+        "At least 90 days without participation in another interventional study before screening",
+        "At least 30 days without participation in another study before screening",
+    )
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+
+    findings = validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE)
+
+    assert any(
+        item.get("code") == "screening_interval_semantic_mismatch"
+        and item.get("field") == "eligibility/criteria"
+        for item in findings
+    )
+
+
+def test_validation_rejects_mutated_approved_inclusion_criterion(tmp_path):
+    reference = fixture()
+    output = tmp_path / "study.xml"
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+    )
+    tree = ET.parse(output)
+    study = next(tree.getroot().iter("clinical_study"))
+    criteria = study.find("eligibility/criteria/textblock")
+    assert criteria is not None
+    approved = reference["population"]["inclusion_criteria"][0]
+    criteria.text = (criteria.text or "").replace(approved, "Unapproved replacement criterion.")
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+
+    findings = validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE)
+
+    assert any(item.get("field") == "eligibility/criteria/textblock" for item in findings)
+
+
+def test_validation_routes_source_oracle_disagreement_to_maintenance(tmp_path, monkeypatch):
+    reference = fixture()
+    output = tmp_path / "study.xml"
+    generate(
+        TEMPLATE,
+        output,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+    )
+    monkeypatch.setattr(
+        prs_xml,
+        "screening_interval_requirement",
+        lambda _reference: prs_xml.ScreeningIntervalRequirement(
+            days="91",
+            participation_scope="another study",
+        ),
+    )
+
+    findings = validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE)
+
+    assert any(
+        item.get("code") == "screening_interval_validator_inconsistency"
+        and item.get("field") == "quality_gate.screening_interval"
+        for item in findings
+    )
 
 
 def test_optional_prs_roles_are_not_inferred_and_official_affiliation_uses_the_approved_site(tmp_path):

@@ -15,6 +15,7 @@ from lxml import etree as LET
 
 from contracts import batch_plan
 from drafting import create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
+from prs_xml import generate as generate_prs_xml
 from quality import deterministic_content_check, render_pages, sha256_file
 from rendering import _has_page_boundary_before, _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
 import rendering
@@ -457,6 +458,85 @@ def test_retrospective_eligibility_preserves_approved_criteria_verbatim(tmp_path
         finding.get("field") == "subjects.eligibility"
         for finding in deterministic_content_check(tmp_path, reference)
     )
+
+
+@pytest.mark.parametrize(
+    "minimum_interval",
+    (90, "90 days", "90 days before screening", "At least 90 days before screening"),
+)
+def test_complete_candidate_prs_screening_interval_passes_deterministic_gate(
+    tmp_path, minimum_interval,
+):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = minimum_interval
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    generate_prs_xml(
+        ROOT / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+        tmp_path / "candidate/study.xml",
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+        structural_template=ROOT / "assets/client-templates/reference/prs-manual-reference.xml",
+    )
+
+    findings = deterministic_content_check(tmp_path, reference)
+
+    assert not any(finding.get("field") == "prs.eligibility" for finding in findings)
+
+
+def test_complete_candidate_prs_screening_interval_mutation_blocks_deterministic_gate(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    xml_path = tmp_path / "candidate/study.xml"
+    generate_prs_xml(
+        ROOT / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+        xml_path,
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+        structural_template=ROOT / "assets/client-templates/reference/prs-manual-reference.xml",
+    )
+    tree = LET.parse(str(xml_path))
+    criteria = tree.find(".//eligibility/criteria/textblock")
+    assert criteria is not None
+    criteria.text = (criteria.text or "").replace(
+        "At least 90 days without participation in another study before screening",
+        "No screening interval is stated",
+    )
+    tree.write(str(xml_path), encoding="utf-8", xml_declaration=True)
+
+    findings = deterministic_content_check(tmp_path, reference)
+
+    blocker = next(finding for finding in findings if finding.get("field") == "prs.eligibility")
+    assert blocker["recovery_class"] == "document_structure_defect"
+
+
+def test_unrepresentable_approved_screening_interval_routes_to_maintenance(tmp_path):
+    reference = json.loads(
+        (ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text(encoding="utf-8")
+    )
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = (
+        "ninety days before screening"
+    )
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    generate_prs_xml(
+        ROOT / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+        tmp_path / "candidate/study.xml",
+        reference,
+        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
+        structural_template=ROOT / "assets/client-templates/reference/prs-manual-reference.xml",
+    )
+
+    findings = deterministic_content_check(tmp_path, reference)
+
+    blocker = next(
+        finding for finding in findings
+        if finding.get("field") == "prs.eligibility-validator"
+    )
+    assert blocker["recovery_class"] == "capability_gap"
+    assert blocker["owner"] == "capability_gap"
 
 
 @pytest.mark.parametrize(

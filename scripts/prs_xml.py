@@ -6,6 +6,7 @@ import copy
 import hashlib
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
@@ -16,6 +17,12 @@ from contracts import facility_projection, get_path, meaningful
 TOKEN = re.compile(r"\{[#/^]?([A-Za-z_][A-Za-z0-9_.\-\[\]()&]*)\}")
 REPEATED = ("intervention", "location", "arm_group", "primary_outcome", "secondary_outcome", "other_outcome")
 ET.register_namespace("prs", "http://clinicaltrials.gov/prs")
+
+
+@dataclass(frozen=True)
+class ScreeningIntervalRequirement:
+    days: str
+    participation_scope: str
 
 SOURCE_SCALAR_BINDINGS: dict[str, tuple[str, ...]] = {
     "oversight_info/fda_regulated_drug": ("regulatory.prs.fda_regulated_drug", "regulatory.fda_regulated_drug"),
@@ -177,6 +184,105 @@ def _enrollment_count(value: Any) -> str:
     return match.group(1).replace(",", "") if match else ""
 
 
+def _normalize_participation_scope(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value).strip().casefold()
+    return re.sub(r"\bstudies\b$", "study", normalized)
+
+
+def screening_interval_requirement(
+    reference: Mapping[str, Any],
+) -> ScreeningIntervalRequirement | None:
+    raw = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
+    if not raw:
+        return None
+    match = re.fullmatch(
+        r"(?:at\s+least\s+)?(?P<days>\d+(?:\.\d+)?)\s*(?:days?)?"
+        r"(?:\s+before\s+screening)?\s*\.?",
+        raw,
+        re.I,
+    )
+    if not match:
+        return None
+    participation_scope = "another study"
+    inclusion = get_path(reference, "population.inclusion_criteria", []) or []
+    exclusion = get_path(reference, "population.exclusion_criteria", []) or []
+    for criterion in (*inclusion, *exclusion):
+        scope_match = re.search(
+            r"\banother(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b",
+            _text(criterion),
+            re.I,
+        )
+        if scope_match:
+            candidate = _normalize_participation_scope(scope_match.group(0))
+            participation_scope = candidate
+            if candidate != "another study":
+                break
+    return ScreeningIntervalRequirement(
+        days=match.group("days"),
+        participation_scope=participation_scope,
+    )
+
+
+def _screening_interval_requirement_from_xml(
+    study: ET.Element,
+) -> ScreeningIntervalRequirement | None:
+    criteria = study.find("eligibility/criteria")
+    text = " ".join(criteria.itertext()) if criteria is not None else ""
+    match = re.search(
+        r"\bat\s+least\s+(?P<days>\d+(?:\.\d+)?)\s+days?\s+without\s+participation\s+in\s+"
+        r"(?P<scope>another(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies))\s+before\s+screening\b",
+        text,
+        re.I,
+    )
+    if not match:
+        return None
+    normalized_scope = re.sub(r"\s+", " ", match.group("scope")).strip().casefold()
+    normalized_scope = re.sub(r"\bstudies\b$", "study", normalized_scope)
+    return ScreeningIntervalRequirement(
+        days=match.group("days"),
+        participation_scope=normalized_scope,
+    )
+
+
+def _validation_screening_interval_requirement(
+    reference: Mapping[str, Any],
+) -> ScreeningIntervalRequirement | None:
+    source_value = get_path(
+        reference,
+        "procedures.minimum_days_before_screening_without_participation",
+    )
+    source_text = str(source_value).strip() if source_value is not None else ""
+    source_match = re.fullmatch(
+        r"(?:at\s+least\s+)?(?P<quantity>\d+(?:\.\d+)?)\s*(?:day|days)?"
+        r"(?:\s+before\s+screening)?\s*\.?",
+        source_text,
+        re.I,
+    )
+    if not source_match:
+        return None
+    scope = "another study"
+    criteria_values = [
+        *(get_path(reference, "population.inclusion_criteria", []) or []),
+        *(get_path(reference, "population.exclusion_criteria", []) or []),
+    ]
+    for criterion in criteria_values:
+        criterion_match = re.search(
+            r"\banother(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b",
+            str(criterion),
+            re.I,
+        )
+        if criterion_match:
+            candidate = re.sub(r"\s+", " ", criterion_match.group(0)).strip().casefold()
+            candidate = re.sub(r"\bstudies\b$", "study", candidate)
+            scope = candidate
+            if candidate != "another study":
+                break
+    return ScreeningIntervalRequirement(
+        days=source_match.group("quantity"),
+        participation_scope=scope,
+    )
+
+
 def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[str, str]:
     pi = get_path(reference, "parties.principal_investigator", {}) or {}
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
@@ -226,20 +332,12 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
     observational = _text(get_path(reference, "regulatory.prs.observational_study_design"))
     inclusion = [_text(item) for item in get_path(reference, "population.inclusion_criteria", []) or []]
     exclusion = [_text(item) for item in get_path(reference, "population.exclusion_criteria", []) or []]
-    minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
-    if minimum_days:
-        duration = re.sub(r"^at\s+least\s+", "", minimum_days.strip(), flags=re.I)
-        duration = re.sub(r"\s+before\s+screening\s*\.?$", "", duration, flags=re.I).strip()
-        if not re.search(r"\bdays?\s*$", duration, re.I):
-            duration = f"{duration} days"
-        participation_scope = "another study"
-        for criterion in (*inclusion, *exclusion):
-            match = re.search(r"\banother\s+([a-z][a-z -]{0,40}?\s+)?stud(?:y|ies)\b", criterion, re.I)
-            if match:
-                participation_scope = re.sub(r"\s+", " ", match.group(0)).strip().casefold()
-                if participation_scope != "another study":
-                    break
-        inclusion.append(f"At least {duration} without participation in {participation_scope} before screening")
+    screening_interval = screening_interval_requirement(reference)
+    if screening_interval:
+        inclusion.append(
+            f"At least {screening_interval.days} days without participation in "
+            f"{screening_interval.participation_scope} before screening"
+        )
     criteria = "Inclusion Criteria:\n" + "\n".join(f"• {item}" for item in inclusion)
     criteria += "\n\nExclusion Criteria:\n" + "\n".join(f"• {item}" for item in exclusion)
     brief = narrative.get("brief_summary", {}) if isinstance(narrative.get("brief_summary"), Mapping) else narrative.get("brief_summary")
@@ -650,6 +748,38 @@ def validate_output(
             structure_differences.append(f"PRS XML branch-template parse error: {exc}")
     for difference in structure_differences: findings.append({"category": "xml", "field": "structure", "issue": difference})
     study = _study(ET.parse(path).getroot())
+    screening_interval_source = get_path(
+        reference,
+        "procedures.minimum_days_before_screening_without_participation",
+    )
+    canonical_screening_interval = screening_interval_requirement(reference)
+    expected_screening_interval = _validation_screening_interval_requirement(reference)
+    if meaningful(screening_interval_source) and (
+        canonical_screening_interval is None
+        or expected_screening_interval is None
+        or canonical_screening_interval != expected_screening_interval
+    ):
+        findings.append({
+            "category": "internal",
+            "field": "quality_gate.screening_interval",
+            "code": "screening_interval_validator_inconsistency",
+            "issue": (
+                "The approved screening interval is meaningful but the canonical quality-gate "
+                "parser cannot represent it."
+            ),
+        })
+    elif expected_screening_interval is not None:
+        actual_screening_interval = _screening_interval_requirement_from_xml(study)
+        if actual_screening_interval != expected_screening_interval:
+            findings.append({
+                "category": "xml",
+                "field": "eligibility/criteria",
+                "code": "screening_interval_semantic_mismatch",
+                "issue": (
+                    "Generated PRS eligibility does not preserve the approved minimum interval "
+                    "and participation scope before screening."
+                ),
+            })
     # Independent upload-documentation vocabulary oracle, NOT XSD enum
     # validation. These are string elements in ProtocolRecordSchema.xsd
     # (2018.05.08), https://cdn.clinicaltrials.gov/documents/xsd/prs/ProtocolRecordSchema.xsd
@@ -855,4 +985,13 @@ def validate_output(
     return findings
 
 
-__all__ = ["compare_structure", "expected_counts", "generate", "repeated_counts", "structural_signature", "validate_output"]
+__all__ = [
+    "ScreeningIntervalRequirement",
+    "compare_structure",
+    "expected_counts",
+    "generate",
+    "repeated_counts",
+    "screening_interval_requirement",
+    "structural_signature",
+    "validate_output",
+]

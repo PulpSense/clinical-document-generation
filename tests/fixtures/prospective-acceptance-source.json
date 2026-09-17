@@ -154,7 +154,7 @@
         ]
       }
     ],
-    "minimum_days_before_screening_without_participation": 30
+    "minimum_days_before_screening_without_participation": "90 days before screening"
   },
   "safety": {
     "roles": "The investigator assesses and reports safety events."

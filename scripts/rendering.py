@@ -26,6 +26,7 @@ from lxml import etree as ET
 from pypdf import PdfReader
 
 from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from prs_xml import screening_interval_requirement
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -71,10 +72,6 @@ def _list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return [part.strip() for part in _text(value).splitlines() if part.strip()]
     return [part for item in value if (part := _text(item))]
-
-
-def _day_count_text(value: Any) -> str:
-    return re.sub(r"\s+days?\s*$", "", _text(value), flags=re.I).strip()
 
 
 def _plain_language_assessments(value: Any) -> list[str]:
@@ -279,6 +276,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     icf_visits_overview, icf_visit_details = _icf_procedure_parts(model)
     key_purpose, key_participation, key_risks, key_benefits, key_alternatives = _icf_summary_parts(model)
     protocol_visits_overview, protocol_visit_details = _overview_and_detail(_draft_text(model, "study-procedure.visits"))
+    screening_interval = screening_interval_requirement(reference)
     values = {
         "title": _text(get_path(reference, "study.title")), "studyTitle": _text(get_path(reference, "study.title")),
         "AI_shortTitle": _protocol_short_title(reference),
@@ -311,7 +309,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "sampleSize": _text(get_path(reference, "population.sample_size")),
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
-        "daysBeforeScreening": _day_count_text(get_path(reference, "procedures.minimum_days_before_screening_without_participation")),
+        "daysBeforeScreening": screening_interval.days if screening_interval else "",
         "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if isinstance(visits, list) else "",
         "AI_duration": _text(get_path(reference, "study.timeline")), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
