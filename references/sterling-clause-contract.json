@@ -844,55 +844,6 @@
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving",
       "validation": {
-        "source_override_paths": [
-          "risks_benefits.authorization_duration",
-          "confidentiality.authorization_duration"
-        ],
-        "exact_default_when_source_absent": "This authorization does not expire unless you revoke it in writing."
-      },
-      "severity": {
-        "absent": "blocking",
-        "altered": "blocking",
-        "unsupported": "blocking",
-        "misplaced": "blocking"
-      },
-      "repeatable": false,
-      "module_id": "sterling.privacy.authorization-duration",
-      "applicability": {
-        "rule": "always"
-      },
-      "provenance": {
-        "type": "approved_input_or_controlled_default",
-        "paths": [
-          "risks_benefits.authorization_duration",
-          "confidentiality.authorization_duration"
-        ],
-        "template_paragraphs": [
-          198,
-          200,
-          202
-        ]
-      },
-      "placement": {
-        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
-        "order": 17
-      },
-      "substitutions": [
-        "approved expiration date or event"
-      ],
-      "expected_structure": {
-        "kind": "paragraphs",
-        "minimum": 1
-      },
-      "content": {
-        "default_text": "This authorization does not expire unless you revoke it in writing."
-      }
-    },
-    {
-      "classification": "core",
-      "section_id": "icf.privacy",
-      "fidelity": "meaning_preserving",
-      "validation": {
         "required_list_count": 1
       },
       "severity": {
@@ -932,7 +883,7 @@
       },
       "placement": {
         "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
-        "order": 18
+        "order": 17
       },
       "substitutions": [
         "approved information category names"
@@ -1029,7 +980,7 @@
       },
       "placement": {
         "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
-        "order": 19
+        "order": 18
       },
       "fidelity": "meaning_preserving_required_safeguards",
       "substitutions": [
@@ -1161,6 +1112,69 @@
       "content": {}
     },
     {
+      "module_id": "sterling.privacy.research-record-access",
+      "classification": "source-bound",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "confidentiality.research_record_access"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "confidentiality.research_record_access"
+        ],
+        "template_paragraphs": [
+          179
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 19
+      },
+      "fidelity": "meaning_preserving",
+      "substitutions": [
+        "approved access timing"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "validation": {
+        "source_override_paths": [
+          "confidentiality.research_record_access"
+        ],
+        "prohibit_when_untriggered": true,
+        "unsupported_markers": [
+          "cannot see your research file until",
+          "cannot see your research records until",
+          "access to your research records may be delayed"
+        ],
+        "unsupported_term_groups": [
+          [
+            "research records",
+            "research file"
+          ],
+          [
+            "after",
+            "until",
+            "only after",
+            "delayed"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "warning",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "content": {},
+      "section_id": "icf.privacy"
+    },
+    {
       "classification": "core",
       "section_id": "icf.contact-information",
       "fidelity": "meaning_preserving",
@@ -1207,6 +1221,55 @@
         "minimum": 1
       },
       "content": {}
+    },
+    {
+      "classification": "core",
+      "section_id": "icf.privacy",
+      "fidelity": "meaning_preserving",
+      "validation": {
+        "source_override_paths": [
+          "risks_benefits.authorization_duration",
+          "confidentiality.authorization_duration"
+        ],
+        "exact_default_when_source_absent": "This authorization does not expire unless you revoke it in writing."
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.privacy.authorization-duration",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_controlled_default",
+        "paths": [
+          "risks_benefits.authorization_duration",
+          "confidentiality.authorization_duration"
+        ],
+        "template_paragraphs": [
+          198,
+          200,
+          202
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 20
+      },
+      "substitutions": [
+        "approved expiration date or event"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {
+        "default_text": "This authorization does not expire unless you revoke it in writing."
+      }
     },
     {
       "classification": "core",
@@ -1263,67 +1326,71 @@
       "content": {}
     },
     {
-      "module_id": "sterling.privacy.research-record-access",
-      "classification": "source-bound",
-      "applicability": {
-        "rule": "meaningful",
-        "paths": [
-          "confidentiality.research_record_access"
-        ]
-      },
-      "provenance": {
-        "type": "approved_input",
-        "paths": [
-          "confidentiality.research_record_access"
-        ],
-        "template_paragraphs": [
-          179
-        ]
-      },
-      "placement": {
-        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
-        "order": 21
-      },
-      "fidelity": "meaning_preserving",
-      "substitutions": [
-        "approved access timing"
-      ],
-      "expected_structure": {
-        "kind": "paragraphs",
-        "minimum": 1
-      },
+      "classification": "core",
+      "section_id": "icf.privacy",
+      "fidelity": "meaning_preserving_required_safeguards",
       "validation": {
-        "source_override_paths": [
-          "confidentiality.research_record_access"
-        ],
-        "prohibit_when_untriggered": true,
-        "unsupported_markers": [
-          "cannot see your research file until",
-          "cannot see your research records until",
-          "access to your research records may be delayed"
-        ],
-        "unsupported_term_groups": [
+        "required_term_groups": [
           [
-            "research records",
-            "research file"
+            "revoke"
           ],
           [
-            "after",
-            "until",
-            "only after",
-            "delayed"
+            "writing"
+          ],
+          [
+            "already collected"
+          ],
+          [
+            "ordinary medical care or benefits"
+          ],
+          [
+            "cannot begin or continue"
           ]
         ]
       },
       "severity": {
         "absent": "blocking",
         "altered": "blocking",
-        "unsupported": "warning",
+        "unsupported": "blocking",
         "misplaced": "blocking"
       },
       "repeatable": false,
-      "content": {},
-      "section_id": "icf.privacy"
+      "safety_critical": true,
+      "module_id": "sterling.privacy.authorization-withdrawal",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template_core_with_approved_contact_substitution",
+        "paths": [
+          "confidentiality.authorization_withdrawal",
+          "sites.0.facility",
+          "parties.principal_investigator"
+        ],
+        "template_paragraphs": [
+          212,
+          214,
+          216
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 21
+      },
+      "substitutions": [
+        "approved written-withdrawal process and approved address"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 3
+      },
+      "content": {
+        "paragraphs": [
+          "You may revoke this authorization at any time by writing to the study doctor or study site using the contact information in this form.",
+          "Revoking your authorization will stop new research collection or use when required, but the study doctor and sponsor may continue to use information already collected as permitted for study integrity, legal, regulatory, or recordkeeping purposes.",
+          "Refusing or revoking authorization does not affect your ordinary medical care or benefits. You cannot begin or continue in the research study without the authorization required for research participation."
+        ]
+      }
     },
     {
       "classification": "core",
@@ -1436,6 +1503,54 @@
       },
       "repeatable": false,
       "section_id": "icf.privacy"
+    },
+    {
+      "classification": "core",
+      "section_id": "icf.privacy",
+      "fidelity": "meaning_preserving",
+      "validation": {
+        "required_term_groups": [
+          [
+            "clinicaltrials gov"
+          ],
+          [
+            "will not include information that can identify you",
+            "will not identify you"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.privacy.registry-disclosure",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template_core",
+        "template_paragraphs": [
+          228,
+          230
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 23
+      },
+      "substitutions": [
+        "approved registry and disclosure statement"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {
+        "default_text": "A description of this research study will be available on ClinicalTrials.gov. This website will not include information that can identify you. It may include a summary of the study results."
+      }
     },
     {
       "classification": "core",
@@ -1624,121 +1739,6 @@
         "minimum": 1
       },
       "content": {}
-    },
-    {
-      "classification": "core",
-      "section_id": "icf.privacy",
-      "fidelity": "meaning_preserving_required_safeguards",
-      "validation": {
-        "required_term_groups": [
-          [
-            "revoke"
-          ],
-          [
-            "writing"
-          ],
-          [
-            "already collected"
-          ],
-          [
-            "ordinary medical care or benefits"
-          ],
-          [
-            "cannot begin or continue"
-          ]
-        ]
-      },
-      "severity": {
-        "absent": "blocking",
-        "altered": "blocking",
-        "unsupported": "blocking",
-        "misplaced": "blocking"
-      },
-      "repeatable": false,
-      "safety_critical": true,
-      "module_id": "sterling.privacy.authorization-withdrawal",
-      "applicability": {
-        "rule": "always"
-      },
-      "provenance": {
-        "type": "template_core_with_approved_contact_substitution",
-        "paths": [
-          "confidentiality.authorization_withdrawal",
-          "sites.0.facility",
-          "parties.principal_investigator"
-        ],
-        "template_paragraphs": [
-          212,
-          214,
-          216
-        ]
-      },
-      "placement": {
-        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
-        "order": 27
-      },
-      "substitutions": [
-        "approved written-withdrawal process and approved address"
-      ],
-      "expected_structure": {
-        "kind": "paragraphs",
-        "minimum": 3
-      },
-      "content": {
-        "paragraphs": [
-          "You may revoke this authorization at any time by writing to the study doctor or study site using the contact information in this form.",
-          "Revoking your authorization will stop new research collection or use when required, but the study doctor and sponsor may continue to use information already collected as permitted for study integrity, legal, regulatory, or recordkeeping purposes.",
-          "Refusing or revoking authorization does not affect your ordinary medical care or benefits. You cannot begin or continue in the research study without the authorization required for research participation."
-        ]
-      }
-    },
-    {
-      "classification": "core",
-      "section_id": "icf.privacy",
-      "fidelity": "meaning_preserving",
-      "validation": {
-        "required_term_groups": [
-          [
-            "clinicaltrials gov"
-          ],
-          [
-            "will not include information that can identify you",
-            "will not identify you"
-          ]
-        ]
-      },
-      "severity": {
-        "absent": "blocking",
-        "altered": "blocking",
-        "unsupported": "blocking",
-        "misplaced": "blocking"
-      },
-      "repeatable": false,
-      "module_id": "sterling.privacy.registry-disclosure",
-      "applicability": {
-        "rule": "always"
-      },
-      "provenance": {
-        "type": "template_core",
-        "template_paragraphs": [
-          228,
-          230
-        ]
-      },
-      "placement": {
-        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
-        "order": 28
-      },
-      "substitutions": [
-        "approved registry and disclosure statement"
-      ],
-      "expected_structure": {
-        "kind": "paragraphs",
-        "minimum": 1
-      },
-      "content": {
-        "default_text": "A description of this research study will be available on ClinicalTrials.gov. This website will not include information that can identify you. It may include a summary of the study results."
-      }
     }
   ],
   "terminology_profiles": [

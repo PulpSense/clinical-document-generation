@@ -322,6 +322,8 @@ def test_research_record_access_is_source_bound(tmp_path):
     )
     assert finding["code"] == "sterling-module-unsupported"
     assert finding["severity"] == "warning"
+    assert finding["publication_disposition"] == "warning"
+    assert quality._deterministic_warning_findings([finding]) == [finding]
 
 
 def test_non_eye_sterling_study_uses_intervention_neutral_phi_category(tmp_path):
@@ -408,6 +410,54 @@ def test_no_drafting_instructions_merge_fields_unused_alternatives_or_duplicatio
     ]
     assert len(substantive) == len(set(substantive))
     assert fidelity_findings(path, source()) == []
+
+
+def test_governed_privacy_core_is_not_duplicated_by_matching_draft_text(tmp_path):
+    draft = model()
+    governed = contracts.sterling_clause_contract(ROOT)
+    privacy = next(
+        item
+        for item in governed["modules"]
+        if item["module_id"] == "sterling.privacy.authorization"
+    )
+    redisclosure = privacy["content"]["paragraphs"][-1]
+    draft["icf"]["icf.privacy"]["paragraphs"].append({"text": redisclosure})
+
+    _path, document = render(tmp_path, draft=draft)
+    assert visible(document).count(redisclosure) == 1
+
+
+def test_privacy_module_order_is_rendered_and_validated(tmp_path):
+    path, document = render(tmp_path)
+    texts = [normalized(paragraph.text) for paragraph in document.paragraphs]
+    duration = AUTHORIZATION_DURATION_DEFAULT
+    revocation = next(
+        text for text in texts if text.startswith("You may revoke this authorization")
+    )
+    assert texts.index(duration) < texts.index(revocation)
+    assert texts.index(revocation) < texts.index(POST_STUDY_HEADING)
+    assert texts.index(POST_STUDY_HEADING) < next(
+        index for index, text in enumerate(texts) if "ClinicalTrials.gov" in text
+    )
+
+    duration_paragraph = next(
+        paragraph for paragraph in document.paragraphs if paragraph.text == duration
+    )
+    post_heading = next(
+        paragraph for paragraph in document.paragraphs if paragraph.text == POST_STUDY_HEADING
+    )
+    duration_paragraph._p.addprevious(post_heading._p)
+    broken = tmp_path / "misordered-privacy.docx"
+    document.save(broken)
+    report = quality.validate_sterling_clause_contract(broken, source())
+    assert any(
+        item.get("misplaced_order") is True
+        and item.get("module_id") in {
+            "sterling.privacy.authorization-duration",
+            "sterling.privacy.post-study",
+        }
+        for item in report["findings"]
+    )
 
 
 def test_missing_core_results_body_fails_with_precise_module_diagnostic(tmp_path):

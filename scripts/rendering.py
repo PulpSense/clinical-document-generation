@@ -2371,15 +2371,25 @@ def _assemble_sterling_fidelity_modules(
     categories = _sterling_module("sterling.privacy.data-categories")
     recipients = _sterling_module("sterling.privacy.authorized-recipients")
     duration = _sterling_module("sterling.privacy.authorization-duration")
+    authorization_withdrawal = _sterling_module("sterling.privacy.authorization-withdrawal")
     post_study = _sterling_module("sterling.privacy.post-study")
     registry = _sterling_module("sterling.privacy.registry-disclosure")
     privacy_blocks = [
         (_text(text), False)
         for text in (privacy.get("content") or {}).get("paragraphs", [])[:2]
     ]
+    governed_privacy_values = [
+        *(privacy.get("content") or {}).get("paragraphs", []),
+        _text((duration.get("content") or {}).get("default_text")),
+        *(authorization_withdrawal.get("content") or {}).get("paragraphs", []),
+        _text((post_study.get("content") or {}).get("subheading")),
+        _text((post_study.get("content") or {}).get("paragraph")),
+        *(post_study.get("content") or {}).get("items", []),
+        _text((registry.get("content") or {}).get("default_text")),
+    ]
     governed_privacy_texts = {
-        _icf_heading_key(text)
-        for text, _is_list in privacy_blocks
+        _icf_heading_key(_text(text))
+        for text in governed_privacy_values
         if _text(text)
     }
     privacy_blocks.extend(

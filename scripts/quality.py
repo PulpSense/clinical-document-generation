@@ -3956,6 +3956,28 @@ def _sterling_triggered(clause: Mapping[str, Any], reference: Mapping[str, Any])
     return False
 
 
+def _sterling_module_anchor_text(
+    module: Mapping[str, Any], reference: Mapping[str, Any]
+) -> str:
+    validation = module.get("validation") or {}
+    for path in validation.get("source_override_paths", []):
+        value = get_path(reference, str(path))
+        if meaningful(value):
+            values = value if isinstance(value, (list, tuple, set)) else [value]
+            first = next((_text(item) for item in values if _text(item)), "")
+            if first:
+                return _normalized_substantive_text(first)
+    content = module.get("content") if isinstance(module.get("content"), Mapping) else {}
+    for key in ("intro", "subheading", "default_text"):
+        value = _text(content.get(key))
+        if value:
+            return _normalized_substantive_text(value)
+    paragraphs = content.get("paragraphs", [])
+    if isinstance(paragraphs, list) and paragraphs:
+        return _normalized_substantive_text(str(paragraphs[0]))
+    return _normalized_substantive_text(_text(content.get("paragraph")))
+
+
 def validate_sterling_clause_contract(
     rendered_document: Path | Document,
     normalized_source: Mapping[str, Any],
@@ -3971,6 +3993,28 @@ def validate_sterling_clause_contract(
         for paragraph in document.paragraphs
         if paragraph.text.strip() and paragraph.style.name.casefold().startswith("heading")
     ]
+    body_texts = [
+        _normalized_substantive_text(paragraph.text)
+        for paragraph in document.paragraphs
+    ]
+    module_positions: dict[str, int] = {}
+    for module in contract["modules"]:
+        if not _sterling_triggered(module, normalized_source):
+            continue
+        anchor = _sterling_module_anchor_text(module, normalized_source)
+        marker = " ".join(anchor.split()[:6])
+        if not marker:
+            continue
+        position = next(
+            (
+                index
+                for index, text in enumerate(body_texts)
+                if text == anchor or text.startswith(marker)
+            ),
+            None,
+        )
+        if position is not None:
+            module_positions[str(module["module_id"])] = position
     normalized_sections = {
         title: _normalized_substantive_text(" ".join(values))
         for title, values in sections.items()
@@ -4223,6 +4267,28 @@ def validate_sterling_clause_contract(
                 section_heading in heading_order
                 and immediately_after in heading_order
                 and heading_order.index(section_heading) == heading_order.index(immediately_after) + 1
+            )
+        module_id = str(clause["module_id"])
+        current_position = module_positions.get(module_id)
+        if current_position is not None:
+            current_order = int((clause.get("placement") or {}).get("order", 0) or 0)
+            same_section_positions = [
+                (
+                    int((other.get("placement") or {}).get("order", 0) or 0),
+                    module_positions.get(str(other["module_id"])),
+                )
+                for other in contract["modules"]
+                if other is not clause
+                and str((other.get("placement") or {}).get("section")) == section
+                and _sterling_triggered(other, normalized_source)
+                and str(other["module_id"]) in module_positions
+            ]
+            order_ok = order_ok and all(
+                (other_order < current_order and other_position < current_position)
+                or (other_order > current_order and other_position > current_position)
+                or other_order == current_order
+                for other_order, other_position in same_section_positions
+                if other_position is not None
             )
         maximum = int(validation.get("maximum_words", 0) or 0)
         maximum_ok = not maximum or word_count <= maximum
@@ -5603,12 +5669,8 @@ def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, A
 
 
 def _deterministic_warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        dict(item) for item in findings
-        if item.get("code") == "protocol-concept-repetition"
-        and item.get("publication_disposition") == "warning"
-        and item.get("action") == "manual_review"
-    ]
+    """Route every deterministic finding explicitly classified as a warning."""
+    return [dict(item) for item in findings if _is_publication_warning(item)]
 
 
 def _safety_critical_content_target(target: str) -> bool:
