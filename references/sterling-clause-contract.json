@@ -1,390 +1,1840 @@
 {
-  "schema_version": "sterling-clause-contract/v1",
+  "schema_version": "sterling-icf-modules/v2",
   "family": "Sterling",
   "authority": {
     "template": "assets/client-templates/reference/sterling-icf-reference.docx",
     "rendering_template": "assets/client-templates/docx/sterling-icf.template.docx",
     "boilerplate": "references/fixed-clinical-boilerplate.json"
   },
-  "clauses": [
+  "modules": [
     {
-      "clause_id": "sterling.introduction.informed-consent",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "template", "paragraphs": [20, 22]},
-      "section": "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION",
+      "classification": "core",
       "section_id": "icf.authorization-introduction",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": [],
-      "validation": {"required_term_groups": [["voluntary"], ["purpose"], ["procedures"], ["risks"], ["benefits"], ["questions"], ["signed copy", "copy"]]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "voluntary"
+          ],
+          [
+            "purpose"
+          ],
+          [
+            "procedures"
+          ],
+          [
+            "risks"
+          ],
+          [
+            "benefits"
+          ],
+          [
+            "questions"
+          ],
+          [
+            "signed copy",
+            "copy"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.introduction.informed-consent",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template",
+        "paragraphs": [
+          20,
+          22
+        ]
+      },
+      "placement": {
+        "section": "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION",
+        "order": 1
+      },
+      "substitutions": [],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.key-information.summary",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["objectives.primary", "study.hypothesis", "endpoints.primary", "procedures.assessments", "procedures.visit_schedule", "study.timeline", "risks_benefits.risks", "risks_benefits.benefits", "risks_benefits.alternatives"], "boilerplate_ids": ["icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"]},
-      "section": "KEY INFORMATION",
+      "classification": "core",
       "section_id": "icf.key-information-summary",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved study facts"],
-      "validation": {"minimum_substantive_blocks": 5, "source_grounding": "any"},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "minimum_substantive_blocks": 5,
+        "source_grounding": "any"
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.key-information.summary",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_authorized_boilerplate",
+        "paths": [
+          "objectives.primary",
+          "study.hypothesis",
+          "endpoints.primary",
+          "procedures.assessments",
+          "procedures.visit_schedule",
+          "study.timeline",
+          "risks_benefits.risks",
+          "risks_benefits.benefits",
+          "risks_benefits.alternatives"
+        ],
+        "boilerplate_ids": [
+          "icf-sparse-risks",
+          "icf-sparse-benefits",
+          "alternatives",
+          "icf-voluntary"
+        ]
+      },
+      "placement": {
+        "section": "KEY INFORMATION",
+        "order": 2
+      },
+      "substitutions": [
+        "approved study facts"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.background.context",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["study.background"]},
-      "approved_source": {"type": "approved_input", "paths": ["study.background"]},
-      "section": "BACKGROUND",
+      "classification": "source-bound",
       "section_id": "icf.background",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["participant-facing simplification"],
-      "validation": {"minimum_words": 12},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "minimum_words": 12
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.background.context",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "study.background"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "study.background"
+        ]
+      },
+      "placement": {
+        "section": "BACKGROUND",
+        "order": 3
+      },
+      "substitutions": [
+        "participant-facing simplification"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.purpose.study-purpose",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["objectives.primary", "study.hypothesis", "endpoints.primary"]},
-      "approved_source": {"type": "approved_input", "paths": ["objectives.primary", "study.hypothesis", "endpoints.primary"]},
-      "section": "PURPOSE",
+      "classification": "source-bound",
       "section_id": "icf.study-purpose",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["participant-facing simplification"],
-      "validation": {"required_term_groups": [["purpose", "objective"], ["hypothesis", "hypothesize"], ["primary endpoint", "main outcome"]], "maximum_words": 140},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "purpose",
+            "objective"
+          ],
+          [
+            "hypothesis",
+            "hypothesize",
+            "test whether"
+          ],
+          [
+            "primary endpoint",
+            "main outcome"
+          ]
+        ],
+        "maximum_words": 140
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.purpose.study-purpose",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "objectives.primary",
+          "study.hypothesis",
+          "endpoints.primary"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "objectives.primary",
+          "study.hypothesis",
+          "endpoints.primary"
+        ]
+      },
+      "placement": {
+        "section": "PURPOSE",
+        "order": 4
+      },
+      "substitutions": [
+        "participant-facing simplification"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.duration.participation",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["study.timeline"]},
-      "approved_source": {"type": "approved_input", "paths": ["study.timeline"]},
-      "section": "DURATION",
+      "classification": "source-bound",
       "section_id": "icf.duration",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved timing and visit names"],
-      "validation": {"minimum_words": 6},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "minimum_words": 6
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.duration.participation",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "study.timeline"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "study.timeline"
+        ]
+      },
+      "placement": {
+        "section": "DURATION",
+        "order": 5
+      },
+      "substitutions": [
+        "approved timing and visit names"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.procedures.activities",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["procedures.assessments", "procedures.visit_schedule"]},
-      "approved_source": {"type": "approved_input", "paths": ["procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria"]},
-      "section": "PROCEDURES",
+      "classification": "source-bound",
       "section_id": "icf.procedures",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["participant-facing sequence"],
-      "validation": {"minimum_words": 12},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "minimum_words": 12
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.procedures.activities",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "procedures.assessments",
+          "procedures.visit_schedule"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "procedures.assessments",
+          "procedures.visit_schedule",
+          "design.intervention_description",
+          "population.inclusion_criteria",
+          "population.exclusion_criteria"
+        ]
+      },
+      "placement": {
+        "section": "PROCEDURES",
+        "order": 6
+      },
+      "substitutions": [
+        "participant-facing sequence"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.risks.foreseeable",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["risks_benefits.risks", "risks_benefits.risk_mitigation"], "boilerplate_ids": ["icf-sparse-risks"]},
-      "section": "POTENTIAL RISKS, EFFECTS, DISCOMFORTS, INCONVENIENCES",
+      "classification": "core",
       "section_id": "icf.risks",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["source-supported risks and safeguards"],
-      "validation": {"required_term_groups": [["risk", "discomfort", "inconvenience"]], "minimum_words": 12},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "risk",
+            "discomfort",
+            "inconvenience"
+          ]
+        ],
+        "minimum_words": 12
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.risks.foreseeable",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_authorized_boilerplate",
+        "paths": [
+          "risks_benefits.risks",
+          "risks_benefits.risk_mitigation"
+        ],
+        "boilerplate_ids": [
+          "icf-sparse-risks"
+        ]
+      },
+      "placement": {
+        "section": "POTENTIAL RISKS, EFFECTS, DISCOMFORTS, INCONVENIENCES",
+        "order": 7
+      },
+      "substitutions": [
+        "source-supported risks and safeguards"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.benefits.potential",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["risks_benefits.benefits"], "boilerplate_ids": ["icf-sparse-benefits"]},
-      "section": "POTENTIAL BENEFITS",
+      "classification": "core",
       "section_id": "icf.benefits",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["source-supported benefit statement"],
-      "validation": {"required_term_groups": [["benefit"]], "minimum_words": 8},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "benefit"
+          ]
+        ],
+        "minimum_words": 8
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.benefits.potential",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_authorized_boilerplate",
+        "paths": [
+          "risks_benefits.benefits"
+        ],
+        "boilerplate_ids": [
+          "icf-sparse-benefits"
+        ]
+      },
+      "placement": {
+        "section": "POTENTIAL BENEFITS",
+        "order": 8
+      },
+      "substitutions": [
+        "source-supported benefit statement"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.alternatives.options",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["risks_benefits.alternatives"], "boilerplate_ids": ["alternatives"]},
-      "section": "ALTERNATIVE TREATMENTS",
+      "classification": "core",
       "section_id": "icf.alternatives",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["source-supported alternatives"],
-      "validation": {"required_term_groups": [["choose not", "not participate", "alternative"], ["care options", "treatment"]]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_term_groups": [
+          [
+            "choose not",
+            "not participate",
+            "alternative"
+          ],
+          [
+            "care options",
+            "treatment"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": true,
-      "repeat_locations": ["KEY INFORMATION", "ALTERNATIVE TREATMENTS"]
+      "repeat_locations": [
+        "KEY INFORMATION",
+        "ALTERNATIVE TREATMENTS"
+      ],
+      "module_id": "sterling.alternatives.options",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_authorized_boilerplate",
+        "paths": [
+          "risks_benefits.alternatives"
+        ],
+        "boilerplate_ids": [
+          "alternatives"
+        ]
+      },
+      "placement": {
+        "section": "ALTERNATIVE TREATMENTS",
+        "order": 9
+      },
+      "substitutions": [
+        "source-supported alternatives"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.information.new-findings",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "authorized_boilerplate", "boilerplate_id": "icf-new-findings"},
-      "section": "INFORMATION",
+      "classification": "core",
       "section_id": "icf.information",
       "fidelity": "exact_normalized",
-      "permitted_substitutions": [],
-      "validation": {"exact_boilerplate_id": "icf-new-findings"},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "exact_boilerplate_id": "icf-new-findings"
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.information.new-findings",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "authorized_boilerplate",
+        "boilerplate_id": "icf-new-findings"
+      },
+      "placement": {
+        "section": "INFORMATION",
+        "order": 10
+      },
+      "substitutions": [],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.compensation.terms",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["risks_benefits.compensation_or_reimbursement"]},
-      "approved_source": {"type": "approved_input", "paths": ["risks_benefits.compensation_or_reimbursement"]},
-      "section": "COMPENSATION TO YOU",
+      "classification": "source-bound",
       "section_id": "icf.payment",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved payment or no-payment terms"],
-      "validation": {"minimum_words": 5, "prohibit_when_untriggered": true},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "minimum_words": 5,
+        "prohibit_when_untriggered": true
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.compensation.terms",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "risks_benefits.compensation_or_reimbursement"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "risks_benefits.compensation_or_reimbursement"
+        ]
+      },
+      "placement": {
+        "section": "COMPENSATION TO YOU",
+        "order": 11
+      },
+      "substitutions": [
+        "approved payment or no-payment terms"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.costs.responsibility",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["risks_benefits.costs"], "boilerplate_ids": ["costs"]},
-      "section": "COSTS TO YOU",
+      "classification": "core",
       "section_id": "icf.costs",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["source-supported costs"],
-      "validation": {"required_term_groups": [["cost", "responsibility"]]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "cost",
+            "responsibility"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.costs.responsibility",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_authorized_boilerplate",
+        "paths": [
+          "risks_benefits.costs"
+        ],
+        "boilerplate_ids": [
+          "costs"
+        ]
+      },
+      "placement": {
+        "section": "COSTS TO YOU",
+        "order": 12
+      },
+      "substitutions": [
+        "source-supported costs"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.voluntary.core",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "authorized_boilerplate", "boilerplate_id": "icf-withdrawal"},
-      "section": "VOLUNTARY PARTICIPATION/WITHDRAWAL",
+      "classification": "core",
       "section_id": "icf.voluntary-participation",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["study doctor", "study staff"],
-      "validation": {"placement_boilerplate_id": "icf-withdrawal", "required_term_groups": [["voluntary"], ["refuse", "choose not"], ["leave", "withdraw", "stop"], ["without penalty"], ["loss of benefits"], ["information collected before withdrawal", "information collected before you stop"]]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_term_groups": [
+          [
+            "participation is voluntary"
+          ],
+          [
+            "decline"
+          ],
+          [
+            "withdraw"
+          ],
+          [
+            "without penalty"
+          ],
+          [
+            "ordinary medical care"
+          ],
+          [
+            "information collected before"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": true,
-      "repeat_locations": ["KEY INFORMATION", "ALTERNATIVE TREATMENTS", "VOLUNTARY PARTICIPATION/WITHDRAWAL", "PARTICIPANT STATEMENT AUTHORIZATION"]
+      "repeat_locations": [
+        "KEY INFORMATION",
+        "ALTERNATIVE TREATMENTS",
+        "VOLUNTARY PARTICIPATION/WITHDRAWAL",
+        "PARTICIPANT STATEMENT AUTHORIZATION"
+      ],
+      "module_id": "sterling.voluntary.core",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "authorized_boilerplate",
+        "boilerplate_id": "icf-withdrawal"
+      },
+      "placement": {
+        "section": "VOLUNTARY PARTICIPATION/WITHDRAWAL",
+        "order": 13
+      },
+      "substitutions": [
+        "study doctor",
+        "study staff"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 2
+      },
+      "content": {
+        "paragraphs": [
+          "Your participation is voluntary. You may decline to participate or withdraw from the study at any time without penalty or loss of benefits to which you are otherwise entitled. Your decision will not affect your ordinary medical care.",
+          "Tell the study doctor or study staff if you decide to withdraw. The study team will explain any appropriate final safety steps. After your withdrawal takes effect, no new routine research procedures will be performed unless you separately agree to them. Information collected before you withdraw may continue to be used as described in this form and as permitted by applicable requirements."
+        ]
+      }
     },
     {
-      "clause_id": "sterling.withdrawal.investigator-termination",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["procedures.termination"]},
-      "approved_source": {"type": "approved_input", "paths": ["procedures.termination"]},
-      "section": "VOLUNTARY PARTICIPATION/WITHDRAWAL",
+      "classification": "core",
       "section_id": "icf.voluntary-participation",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved termination authority and grounds"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["participation may be stopped without your consent", "study doctor or the fda", "fail to respond to the study drug", "disease worsens", "fail to follow instructions"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "source_override_paths": [
+          "procedures.termination"
+        ],
+        "required_list_count": 1,
+        "unsupported_markers": [
+          "fail to respond to the study drug",
+          "disease worsens",
+          "severe or unacceptable side effects"
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.withdrawal.investigator-termination",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_controlled_default",
+        "paths": [
+          "procedures.termination"
+        ],
+        "template_paragraphs": [
+          133,
+          135,
+          136,
+          137,
+          138
+        ]
+      },
+      "placement": {
+        "section": "VOLUNTARY PARTICIPATION/WITHDRAWAL",
+        "order": 14
+      },
+      "substitutions": [
+        "approved termination authority and grounds"
+      ],
+      "expected_structure": {
+        "kind": "list",
+        "minimum": 1,
+        "word_numbering_required": true
+      },
+      "content": {
+        "intro": "The investigator may stop your participation without your consent for a reason related to your safety, eligibility, compliance with required study activities, or closure of the study. Participation may be stopped because:",
+        "default_items": [
+          "Participation may be stopped to protect your health or welfare.",
+          "You are no longer eligible.",
+          "Required instructions or procedures are not followed.",
+          "The investigator, sponsor, IRB, or applicable authority stops the study."
+        ]
+      }
     },
     {
-      "clause_id": "sterling.injury.core",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["risks_benefits.injury_handling"], "boilerplate_ids": ["injury"]},
-      "section": "STUDY COMPLICATIONS COMPENSATION",
+      "classification": "core",
       "section_id": "icf.injury",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["source-supported injury handling", "study contact"],
-      "validation": {"required_term_groups": [["injury", "medical problem"], ["contact"], ["emergency"], ["cost"], ["legal rights"]]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "injury",
+            "medical problem"
+          ],
+          [
+            "contact"
+          ],
+          [
+            "emergency"
+          ],
+          [
+            "cost"
+          ],
+          [
+            "legal rights"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.injury.core",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_authorized_boilerplate",
+        "paths": [
+          "risks_benefits.injury_handling"
+        ],
+        "boilerplate_ids": [
+          "injury"
+        ]
+      },
+      "placement": {
+        "section": "STUDY COMPLICATIONS COMPENSATION",
+        "order": 15
+      },
+      "substitutions": [
+        "source-supported injury handling",
+        "study contact"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.privacy.authorization",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input_or_authorized_boilerplate", "paths": ["risks_benefits.privacy", "confidentiality.data_handling"], "boilerplate_ids": ["icf-privacy-authorization"]},
-      "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+      "classification": "core",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["applicable source-supported record categories and authorized recipients"],
-      "validation": {"required_term_groups": [["authorize", "permission"], ["collect", "use"], ["disclose"], ["medical", "health"], ["sponsor"], ["ethics committee", "institutional review board", "irb"], ["regulatory"], ["not identify", "identity will remain confidential"]]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_term_groups": [
+          [
+            "health information"
+          ],
+          [
+            "collected",
+            "used"
+          ],
+          [
+            "disclosed"
+          ],
+          [
+            "conduct the study",
+            "research study"
+          ],
+          [
+            "may disclose"
+          ],
+          [
+            "authorized recipients",
+            "may receive"
+          ],
+          [
+            "voluntary"
+          ],
+          [
+            "ordinary medical care or benefits"
+          ],
+          [
+            "cannot begin or continue"
+          ],
+          [
+            "redisclosed"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": true,
-      "repeat_locations": ["CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION", "PARTICIPANT STATEMENT AUTHORIZATION"]
+      "repeat_locations": [
+        "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "PARTICIPANT STATEMENT AUTHORIZATION"
+      ],
+      "module_id": "sterling.privacy.authorization",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template_core_with_approved_source_supplement",
+        "paths": [
+          "risks_benefits.privacy",
+          "confidentiality.data_handling"
+        ],
+        "boilerplate_ids": [
+          "icf-privacy-authorization"
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 16
+      },
+      "substitutions": [
+        "applicable source-supported record categories and authorized recipients"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 4
+      },
+      "content": {
+        "paragraphs": [
+          "As part of this research study, health information about you will be collected, used, and disclosed to conduct the study, evaluate its results, protect participants, and meet legal, regulatory, and recordkeeping requirements.",
+          "The study doctor, study staff, and health care providers or facilities that hold relevant records may disclose the information described below to the authorized recipients listed in this section.",
+          "Your authorization is voluntary. Refusing or revoking authorization will not affect your ordinary medical care or benefits, but you cannot begin or continue in this research study without the authorization required for the research.",
+          "Information disclosed to a recipient may be redisclosed and may no longer be protected by the same privacy laws. The study team will use appropriate safeguards and reports or publications will not identify you."
+        ]
+      }
     },
     {
-      "clause_id": "sterling.privacy.authorization-duration",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["risks_benefits.authorization_duration", "confidentiality.authorization_duration"]},
-      "approved_source": {"type": "approved_input", "paths": ["risks_benefits.authorization_duration", "confidentiality.authorization_duration"]},
-      "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+      "classification": "core",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved expiration date or event"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["will not expire", "will end on", "years after"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "source_override_paths": [
+          "risks_benefits.authorization_duration",
+          "confidentiality.authorization_duration"
+        ],
+        "exact_default_when_source_absent": "This authorization does not expire unless you revoke it in writing."
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.privacy.authorization-duration",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_controlled_default",
+        "paths": [
+          "risks_benefits.authorization_duration",
+          "confidentiality.authorization_duration"
+        ],
+        "template_paragraphs": [
+          198,
+          200,
+          202
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 17
+      },
+      "substitutions": [
+        "approved expiration date or event"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {
+        "default_text": "This authorization does not expire unless you revoke it in writing."
+      }
     },
     {
-      "clause_id": "sterling.privacy.data-categories",
-      "classification": "source_dependent",
-      "trigger": {"rule": "meaningful", "paths": ["confidentiality.information_categories"]},
-      "approved_source": {"type": "approved_input", "paths": ["confidentiality.information_categories"]},
-      "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+      "classification": "core",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved information category names"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["social security number", "race", "family medical history", "allergies"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_list_count": 1
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.privacy.data-categories",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "derived_from_approved_study_facts",
+        "paths": [
+          "procedures.assessments",
+          "procedures.visit_schedule",
+          "population.inclusion_criteria",
+          "population.exclusion_criteria"
+        ],
+        "template_paragraphs": [
+          162,
+          164,
+          165,
+          166,
+          167,
+          168,
+          169,
+          170,
+          171,
+          172,
+          173,
+          174,
+          175
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 18
+      },
+      "substitutions": [
+        "approved information category names"
+      ],
+      "expected_structure": {
+        "kind": "list",
+        "minimum": 1,
+        "word_numbering_required": true
+      },
+      "content": {
+        "intro": "The health information collected or used for this study may include:",
+        "controlled_rules": [
+          {
+            "markers": [
+              "demographic"
+            ],
+            "text": "Demographic information collected for the study."
+          },
+          {
+            "markers": [
+              "medical history",
+              "health history"
+            ],
+            "text": "Relevant medical history and other health information needed for the study."
+          },
+          {
+            "markers": [
+              "eye",
+              "vision",
+              "visual acuity",
+              "intraocular",
+              "lens"
+            ],
+            "text": "Results of study eye examinations, vision tests, and other ophthalmic study procedures."
+          },
+          {
+            "markers": [
+              "questionnaire",
+              "survey"
+            ],
+            "text": "Responses to study questionnaires or surveys."
+          },
+          {
+            "markers": [
+              "assessment",
+              "test",
+              "procedure",
+              "ecg",
+              "blood pressure"
+            ],
+            "exclude_markers": [
+              "eye",
+              "vision",
+              "visual acuity",
+              "intraocular",
+              "lens"
+            ],
+            "text": "Results of study assessments, tests, and procedures."
+          },
+          {
+            "markers": [
+              "adverse event",
+              "device deficien",
+              "safety"
+            ],
+            "text": "Information about adverse events, device deficiencies, and other safety concerns collected during the study."
+          }
+        ]
+      }
     },
     {
-      "clause_id": "sterling.privacy.gina",
+      "module_id": "sterling.privacy.authorized-recipients",
+      "classification": "core",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "derived_from_approved_facts_and_controlled_rules",
+        "paths": [
+          "parties.sponsor",
+          "parties.irb",
+          "parties.principal_investigator",
+          "sites"
+        ],
+        "template_paragraphs": [
+          183,
+          185,
+          186,
+          187,
+          188,
+          189,
+          190
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 19
+      },
+      "fidelity": "meaning_preserving_required_safeguards",
+      "substitutions": [
+        "approved sponsor name",
+        "approved IRB name",
+        "applicable study team and oversight roles"
+      ],
+      "expected_structure": {
+        "kind": "list",
+        "minimum": 2,
+        "word_numbering_required": true
+      },
+      "content": {
+        "intro": "The following people or organizations may receive and use your study information:",
+        "controlled_recipients": [
+          "study_team",
+          "sponsor",
+          "irb",
+          "regulatory_when_supported"
+        ]
+      },
+      "validation": {
+        "required_list_count": 2,
+        "required_term_groups": [
+          [
+            "study doctor",
+            "study staff"
+          ],
+          [
+            "sponsor"
+          ],
+          [
+            "institutional review board",
+            "irb"
+          ]
+        ],
+        "required_list_term_groups": [
+          [
+            "study doctor",
+            "study staff"
+          ],
+          [
+            "sponsor"
+          ],
+          [
+            "institutional review board",
+            "irb"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "section_id": "icf.privacy"
+    },
+    {
       "classification": "conditional",
-      "trigger": {"rule": "truthy", "paths": ["regulatory.genetic_information_collected"]},
-      "approved_source": {"type": "template_conditional", "paragraphs": [232, 234, 236, 237, 238, 240]},
-      "section": "GENETIC INFORMATION NONDISCRIMINATION ACT",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["sponsor name"],
-      "validation": {"required_term_groups": [["genetic information nondiscrimination act", "gina"], ["health insurance"], ["employer"], ["life insurance"], ["disability insurance"], ["long-term care"]], "prohibit_when_untriggered": true},
+      "validation": {
+        "required_term_groups": [
+          [
+            "genetic information nondiscrimination act",
+            "gina"
+          ],
+          [
+            "health insurance"
+          ],
+          [
+            "employer"
+          ],
+          [
+            "life insurance"
+          ],
+          [
+            "disability insurance"
+          ],
+          [
+            "long-term care"
+          ]
+        ],
+        "prohibit_when_untriggered": true
+      },
       "authorized_texts": [
         "A federal law, called the Genetic Information Nondiscrimination Act (GINA), generally makes it illegal for health insurance companies, group health plans, and most employers to discriminate against you based on your genetic information.",
         "Health insurance companies and group health plans may not request genetic information obtained from this research or use it when making decisions about eligibility or premiums. Employers with 15 or more employees may not use genetic information obtained from this research when making employment decisions or setting terms of employment.",
         "GINA does not protect against genetic discrimination by companies that sell life insurance, disability insurance, or long-term care insurance."
       ],
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.privacy.gina",
+      "applicability": {
+        "rule": "truthy",
+        "paths": [
+          "regulatory.genetic_information_collected"
+        ]
+      },
+      "provenance": {
+        "type": "template_conditional",
+        "paragraphs": [
+          232,
+          234,
+          236,
+          237,
+          238,
+          240
+        ]
+      },
+      "placement": {
+        "section": "GENETIC INFORMATION NONDISCRIMINATION ACT",
+        "order": 19
+      },
+      "substitutions": [
+        "sponsor name"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.contact.study",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input", "paths": ["parties.principal_investigator.name", "parties.study_coordinator.business_phone", "parties.study_coordinator.office_phone"]},
-      "section": "QUESTIONS",
+      "classification": "core",
       "section_id": "icf.contact-information",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["principal investigator name", "deduplicated approved study phone numbers"],
-      "validation": {"required_source_values": ["parties.principal_investigator.name", "parties.study_coordinator.business_phone"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_source_values": [
+          "parties.principal_investigator.name",
+          "parties.study_coordinator.business_phone"
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": true,
-      "repeat_locations": ["front matter", "QUESTIONS", "STUDY COMPLICATIONS COMPENSATION"]
+      "repeat_locations": [
+        "front matter",
+        "QUESTIONS",
+        "STUDY COMPLICATIONS COMPENSATION"
+      ],
+      "module_id": "sterling.contact.study",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "parties.principal_investigator.name",
+          "parties.study_coordinator.business_phone",
+          "parties.study_coordinator.office_phone"
+        ]
+      },
+      "placement": {
+        "section": "QUESTIONS",
+        "order": 20
+      },
+      "substitutions": [
+        "principal investigator name",
+        "deduplicated approved study phone numbers"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.contact.participant-rights",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "approved_input", "paths": ["parties.irb.name", "parties.irb.phone", "parties.irb.email"]},
-      "section": "QUESTIONS",
+      "classification": "core",
       "section_id": "icf.contact-information",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["approved IRB name", "approved IRB phone", "approved IRB email"],
-      "validation": {"required_term_groups": [["rights"], ["research participant"]], "required_source_values": ["parties.irb.name", "parties.irb.phone", "parties.irb.email"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_term_groups": [
+          [
+            "rights"
+          ],
+          [
+            "research participant"
+          ]
+        ],
+        "required_source_values": [
+          "parties.irb.name",
+          "parties.irb.phone",
+          "parties.irb.email"
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": false,
-      "safety_critical": true
+      "safety_critical": true,
+      "module_id": "sterling.contact.participant-rights",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "parties.irb.name",
+          "parties.irb.phone",
+          "parties.irb.email"
+        ]
+      },
+      "placement": {
+        "section": "QUESTIONS",
+        "order": 21
+      },
+      "substitutions": [
+        "approved IRB name",
+        "approved IRB phone",
+        "approved IRB email"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.authorization.participant-statement",
-      "classification": "mandatory",
-      "trigger": {"rule": "always"},
-      "approved_source": {"type": "template", "paragraphs": [249, 251, 253, 255]},
-      "section": "PARTICIPANT STATEMENT AUTHORIZATION",
+      "module_id": "sterling.privacy.research-record-access",
+      "classification": "source-bound",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "confidentiality.research_record_access"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "confidentiality.research_record_access"
+        ],
+        "template_paragraphs": [
+          179
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 21
+      },
+      "fidelity": "meaning_preserving",
+      "substitutions": [
+        "approved access timing"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "validation": {
+        "source_override_paths": [
+          "confidentiality.research_record_access"
+        ],
+        "prohibit_when_untriggered": true,
+        "unsupported_markers": [
+          "cannot see your research file until",
+          "cannot see your research records until",
+          "access to your research records may be delayed"
+        ],
+        "unsupported_term_groups": [
+          [
+            "research records",
+            "research file"
+          ],
+          [
+            "after",
+            "until",
+            "only after",
+            "delayed"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "warning",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "content": {},
+      "section_id": "icf.privacy"
+    },
+    {
+      "classification": "core",
       "section_id": "icf.participant-authorization",
       "fidelity": "exact_normalized",
-      "permitted_substitutions": [],
-      "validation": {"required_exact_texts": ["I have read or have had read to me the Participant Informed Consent Form and Authorization to Use and Disclose Medical Information and I agree to participate voluntarily in this study. I give my permission to the study doctor to use and disclose my protected health information as described in this consent form.", "I will receive a signed copy of this form.", "All my questions have been answered.", "I have not waived any of my legal rights by signing this document."]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_exact_texts": [
+          "I have read or have had read to me the Participant Informed Consent Form and Authorization to Use and Disclose Medical Information and I agree to participate voluntarily in this study. I give my permission to the study doctor to use and disclose my protected health information as described in this consent form.",
+          "I will receive a signed copy of this form.",
+          "All my questions have been answered.",
+          "I have not waived any of my legal rights by signing this document."
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": false,
-      "safety_critical": true
+      "safety_critical": true,
+      "module_id": "sterling.authorization.participant-statement",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template",
+        "paragraphs": [
+          249,
+          251,
+          253,
+          255
+        ]
+      },
+      "placement": {
+        "section": "PARTICIPANT STATEMENT AUTHORIZATION",
+        "order": 22
+      },
+      "substitutions": [],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.results.individual-results",
-      "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["procedures.return_of_results"]},
-      "approved_source": {"type": "approved_input", "paths": ["procedures.return_of_results"]},
-      "section": "STUDY RESULTS",
+      "module_id": "sterling.privacy.post-study",
+      "classification": "core",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template_core",
+        "template_paragraphs": [
+          218,
+          220,
+          222,
+          224,
+          225,
+          226
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 22
+      },
+      "fidelity": "meaning_preserving_required_safeguards",
+      "substitutions": [],
+      "expected_structure": {
+        "kind": "subsection_and_list",
+        "minimum": 1,
+        "word_numbering_required": true
+      },
+      "content": {
+        "subheading": "What happens to information about me after the study is over or if I cancel my permission to use my PHI?",
+        "paragraph": "Information already collected may continue to be used or disclosed when permitted to preserve study integrity, meet legal or regulatory requirements, allow oversight, or maintain required records. The study team will continue to protect information retained after the study or after you revoke permission.",
+        "items": [
+          "To preserve study results that already include your information.",
+          "To allow the sponsor, IRB, or government authorities to confirm that the study was conducted properly.",
+          "To meet applicable legal, regulatory, and recordkeeping requirements."
+        ]
+      },
+      "validation": {
+        "required_term_groups": [
+          [
+            "after the study is over"
+          ],
+          [
+            "cancel my permission"
+          ],
+          [
+            "already collected"
+          ],
+          [
+            "study integrity",
+            "preserve study results"
+          ],
+          [
+            "legal",
+            "regulatory",
+            "recordkeeping"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "section_id": "icf.privacy"
+    },
+    {
+      "classification": "core",
       "section_id": "icf.study-results",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved result-return policy"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["will not receive the results", "will be provided with these results", "new medical condition"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "source_override_paths": [
+          "procedures.return_of_results"
+        ],
+        "exact_default_when_source_absent": "You will not routinely receive the results of testing performed for this study. If a study test identifies a new medical condition or concern, the study doctor will inform you and recommend appropriate follow-up with your treating doctor. The finding may affect whether you can continue in the study.",
+        "immediately_after": "PROCEDURES"
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.results.policy",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "approved_input_or_controlled_default",
+        "paths": [
+          "procedures.return_of_results"
+        ],
+        "template_paragraphs": [
+          64,
+          68,
+          70,
+          72
+        ]
+      },
+      "placement": {
+        "section": "STUDY RESULTS",
+        "order": 23
+      },
+      "substitutions": [
+        "approved result-return policy"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {
+        "default_text": "You will not routinely receive the results of testing performed for this study. If a study test identifies a new medical condition or concern, the study doctor will inform you and recommend appropriate follow-up with your treating doctor. The finding may affect whether you can continue in the study."
+      }
     },
     {
-      "clause_id": "sterling.risks.unknown",
-      "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["risks_benefits.unknown_risks"]},
-      "approved_source": {"type": "approved_input", "paths": ["risks_benefits.unknown_risks"]},
-      "section": "POTENTIAL RISKS, EFFECTS, DISCOMFORTS, INCONVENIENCES",
+      "classification": "source-bound",
       "section_id": "icf.risks",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved unknown-risk statement"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["risks or inconveniences that are currently unknown", "currently unforeseeable"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "prohibit_when_untriggered": true,
+        "unsupported_markers": [
+          "risks or inconveniences that are currently unknown",
+          "currently unforeseeable"
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": false,
-      "safety_critical": true
+      "safety_critical": true,
+      "module_id": "sterling.risks.unknown",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "risks_benefits.unknown_risks"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "risks_benefits.unknown_risks"
+        ]
+      },
+      "placement": {
+        "section": "POTENTIAL RISKS, EFFECTS, DISCOMFORTS, INCONVENIENCES",
+        "order": 24
+      },
+      "substitutions": [
+        "approved unknown-risk statement"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.risks.pregnancy",
-      "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["risks_benefits.pregnancy"]},
-      "approved_source": {"type": "approved_input", "paths": ["risks_benefits.pregnancy"]},
-      "section": "Risks related to Pregnancy",
+      "classification": "source-bound",
       "section_id": "icf.risks",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["approved reproductive-risk and contraception requirements"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["becoming pregnant", "birth control", "egg donation", "sperm donation", "pregnancy outcome"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "prohibit_when_untriggered": true,
+        "unsupported_markers": [
+          "becoming pregnant",
+          "birth control",
+          "egg donation",
+          "sperm donation",
+          "pregnancy outcome"
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": false,
-      "safety_critical": true
+      "safety_critical": true,
+      "module_id": "sterling.risks.pregnancy",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "risks_benefits.pregnancy"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "risks_benefits.pregnancy"
+        ]
+      },
+      "placement": {
+        "section": "Risks related to Pregnancy",
+        "order": 25
+      },
+      "substitutions": [
+        "approved reproductive-risk and contraception requirements"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.injury.financial-responsibility",
-      "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["risks_benefits.injury_financial_responsibility"]},
-      "approved_source": {"type": "approved_input", "paths": ["risks_benefits.injury_financial_responsibility"]},
-      "section": "STUDY COMPLICATIONS COMPENSATION",
+      "classification": "source-bound",
       "section_id": "icf.injury",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["approved care provider and payment-responsibility terms"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["cooperate in obtaining any proceeds from insurance", "no financial payments", "paid for by"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "prohibit_when_untriggered": true,
+        "unsupported_markers": [
+          "cooperate in obtaining any proceeds from insurance",
+          "no financial payments",
+          "paid for by"
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": false,
-      "safety_critical": true
+      "safety_critical": true,
+      "module_id": "sterling.injury.financial-responsibility",
+      "applicability": {
+        "rule": "meaningful",
+        "paths": [
+          "risks_benefits.injury_financial_responsibility"
+        ]
+      },
+      "provenance": {
+        "type": "approved_input",
+        "paths": [
+          "risks_benefits.injury_financial_responsibility"
+        ]
+      },
+      "placement": {
+        "section": "STUDY COMPLICATIONS COMPENSATION",
+        "order": 26
+      },
+      "substitutions": [
+        "approved care provider and payment-responsibility terms"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {}
     },
     {
-      "clause_id": "sterling.privacy.authorization-withdrawal",
-      "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["confidentiality.authorization_withdrawal"]},
-      "approved_source": {"type": "approved_input", "paths": ["confidentiality.authorization_withdrawal"]},
-      "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+      "classification": "core",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving_required_safeguards",
-      "permitted_substitutions": ["approved written-withdrawal process and approved address"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["withdraw your permission", "must write your study doctor a letter", "cannot continue participating"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
+      "validation": {
+        "required_term_groups": [
+          [
+            "revoke"
+          ],
+          [
+            "writing"
+          ],
+          [
+            "already collected"
+          ],
+          [
+            "ordinary medical care or benefits"
+          ],
+          [
+            "cannot begin or continue"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
       "repeatable": false,
-      "safety_critical": true
+      "safety_critical": true,
+      "module_id": "sterling.privacy.authorization-withdrawal",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template_core_with_approved_contact_substitution",
+        "paths": [
+          "confidentiality.authorization_withdrawal",
+          "sites.0.facility",
+          "parties.principal_investigator"
+        ],
+        "template_paragraphs": [
+          212,
+          214,
+          216
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 27
+      },
+      "substitutions": [
+        "approved written-withdrawal process and approved address"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 3
+      },
+      "content": {
+        "paragraphs": [
+          "You may revoke this authorization at any time by writing to the study doctor or study site using the contact information in this form.",
+          "Revoking your authorization will stop new research collection or use when required, but the study doctor and sponsor may continue to use information already collected as permitted for study integrity, legal, regulatory, or recordkeeping purposes.",
+          "Refusing or revoking authorization does not affect your ordinary medical care or benefits. You cannot begin or continue in the research study without the authorization required for research participation."
+        ]
+      }
     },
     {
-      "clause_id": "sterling.privacy.registry-disclosure",
-      "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["regulatory.prs.participant_registry_disclosure"]},
-      "approved_source": {"type": "approved_input", "paths": ["regulatory.prs.participant_registry_disclosure"]},
-      "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+      "classification": "core",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving",
-      "permitted_substitutions": ["approved registry and disclosure statement"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["clinicaltrials.gov", "required by u.s. law"]},
-      "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
-      "repeatable": false
+      "validation": {
+        "required_term_groups": [
+          [
+            "clinicaltrials gov"
+          ],
+          [
+            "will not include information that can identify you",
+            "will not identify you"
+          ]
+        ]
+      },
+      "severity": {
+        "absent": "blocking",
+        "altered": "blocking",
+        "unsupported": "blocking",
+        "misplaced": "blocking"
+      },
+      "repeatable": false,
+      "module_id": "sterling.privacy.registry-disclosure",
+      "applicability": {
+        "rule": "always"
+      },
+      "provenance": {
+        "type": "template_core",
+        "template_paragraphs": [
+          228,
+          230
+        ]
+      },
+      "placement": {
+        "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        "order": 28
+      },
+      "substitutions": [
+        "approved registry and disclosure statement"
+      ],
+      "expected_structure": {
+        "kind": "paragraphs",
+        "minimum": 1
+      },
+      "content": {
+        "default_text": "A description of this research study will be available on ClinicalTrials.gov. This website will not include information that can identify you. It may include a summary of the study results."
+      }
+    }
+  ],
+  "terminology_profiles": [
+    {
+      "profile_id": "lens",
+      "applicability": {
+        "paths": [
+          "design.intervention_name",
+          "design.intervention_type"
+        ],
+        "markers": [
+          "lens",
+          "intraocular"
+        ]
+      },
+      "preferred": {
+        "singular": "study lens",
+        "plural": "study lenses"
+      },
+      "replacements": {
+        "study drug/device/product": "study lens",
+        "drug/device/product": "study lens",
+        "study drug/device": "study lens",
+        "drug/device": "study lens",
+        "study product": "study lens",
+        "study drug": "study lens"
+      },
+      "prohibited": [
+        "drug/device",
+        "drug/device/product",
+        "study product",
+        "study drug",
+        "receiving a drug",
+        "discontinuing a drug"
+      ]
+    },
+    {
+      "profile_id": "drug",
+      "applicability": {
+        "paths": [
+          "design.intervention_name",
+          "design.intervention_type"
+        ],
+        "markers": [
+          "drug",
+          "medication",
+          "medicine"
+        ]
+      },
+      "preferred": {
+        "singular": "study drug",
+        "plural": "study drugs"
+      },
+      "replacements": {},
+      "prohibited": []
+    },
+    {
+      "profile_id": "device",
+      "applicability": {
+        "paths": [
+          "design.intervention_name",
+          "design.intervention_type"
+        ],
+        "markers": [
+          "device"
+        ]
+      },
+      "preferred": {
+        "singular": "study device",
+        "plural": "study devices"
+      },
+      "replacements": {
+        "study product": "study device"
+      },
+      "prohibited": []
+    },
+    {
+      "profile_id": "procedure",
+      "applicability": {
+        "paths": [
+          "design.intervention_name",
+          "design.intervention_type"
+        ],
+        "markers": [
+          "procedure",
+          "surgery"
+        ]
+      },
+      "preferred": {
+        "singular": "study procedure",
+        "plural": "study procedures"
+      },
+      "replacements": {
+        "study product": "study procedure"
+      },
+      "prohibited": []
     }
   ]
 }

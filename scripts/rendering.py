@@ -1107,7 +1107,7 @@ _ADVARRA_RETAINED_HEADINGS = {
 }
 _STERLING_RETAINED_HEADINGS = {
     "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION", "KEY INFORMATION",
-    "INFORMATION", "VOLUNTARY PARTICIPATION/WITHDRAWAL", "QUESTIONS",
+    "STUDY RESULTS", "INFORMATION", "VOLUNTARY PARTICIPATION/WITHDRAWAL", "QUESTIONS",
     "PARTICIPANT STATEMENT AUTHORIZATION",
 }
 _ADVARRA_ICF_HEADING_KEYS = {
@@ -1984,8 +1984,8 @@ def repair_sterling_clause_placement(
     del reference  # placement is deterministic and never changes clause text
     contract = sterling_clause_contract()
     headings = {
-        _icf_heading_key(str(item["section"])): str(item["section"])
-        for item in contract["clauses"]
+        _icf_heading_key(str(item["placement"]["section"])): str(item["placement"]["section"])
+        for item in contract["modules"]
     }
     current = ""
     located: list[tuple[Paragraph, str]] = []
@@ -1997,8 +1997,8 @@ def repair_sterling_clause_placement(
         if paragraph.text.strip():
             located.append((paragraph, current))
     repairs = []
-    for clause in contract["clauses"]:
-        source = clause.get("approved_source") or {}
+    for clause in contract["modules"]:
+        source = clause.get("provenance") or {}
         validation = clause.get("validation") or {}
         if not (
             source.get("boilerplate_id")
@@ -2007,7 +2007,7 @@ def repair_sterling_clause_placement(
         ):
             continue
         try:
-            exact = _icf_heading_key(sterling_clause_text(str(clause["clause_id"])))
+            exact = _icf_heading_key(sterling_clause_text(str(clause["module_id"])))
         except ValueError:
             continue
         match = next((
@@ -2015,20 +2015,21 @@ def repair_sterling_clause_placement(
             for paragraph, section in located
             if _icf_heading_key(paragraph.text) == exact
         ), None)
-        if match is None or match[1] == clause["section"]:
+        expected_section = str(clause["placement"]["section"])
+        if match is None or match[1] == expected_section:
             continue
         target = next((
             paragraph for paragraph in document.paragraphs
-            if _icf_heading_key(paragraph.text) == _icf_heading_key(str(clause["section"]))
+            if _icf_heading_key(paragraph.text) == _icf_heading_key(expected_section)
         ), None)
         if target is None:
             continue
         paragraph, actual = match
         target._p.addnext(paragraph._p)
         repairs.append({
-            "clause_id": clause["clause_id"],
+            "clause_id": clause["module_id"],
             "from": actual,
-            "to": clause["section"],
+            "to": expected_section,
         })
     return {
         "schema_version": "sterling-clause-placement-repair/v1",
@@ -2036,13 +2037,13 @@ def repair_sterling_clause_placement(
         "repairs": repairs,
         "revalidated": all(
             any(
-                _icf_heading_key(paragraph.text) == _icf_heading_key(sterling_clause_text(str(clause["clause_id"])))
+                _icf_heading_key(paragraph.text) == _icf_heading_key(sterling_clause_text(str(clause["module_id"])))
                 for paragraph in document.paragraphs[
-                    next((index + 1 for index, item in enumerate(document.paragraphs) if _icf_heading_key(item.text) == _icf_heading_key(str(clause["section"]))), len(document.paragraphs)):
+                    next((index + 1 for index, item in enumerate(document.paragraphs) if _icf_heading_key(item.text) == _icf_heading_key(str(clause["placement"]["section"]))), len(document.paragraphs)):
                 ]
             )
-            for clause in contract["clauses"]
-            if any(repair["clause_id"] == clause["clause_id"] for repair in repairs)
+            for clause in contract["modules"]
+            if any(repair["clause_id"] == clause["module_id"] for repair in repairs)
         ),
     }
 
@@ -2155,9 +2156,270 @@ def _align_sterling_study_site_continuations(
         raise LayoutRepairTargetError("Sterling STUDY SITE repair target is missing.")
 
 
+def _sterling_module(module_id: str) -> Mapping[str, Any]:
+    contract = sterling_clause_contract()
+    return next(
+        module
+        for module in contract["modules"]
+        if module["module_id"] == module_id
+    )
+
+
+def _sterling_module_source_or_default(
+    reference: Mapping[str, Any],
+    module: Mapping[str, Any],
+) -> str:
+    for path in (module.get("provenance") or {}).get("paths", []):
+        value = get_path(reference, str(path))
+        if meaningful(value):
+            if isinstance(value, (list, tuple)):
+                return " ".join(_text(item) for item in value if _text(item))
+            return _text(value)
+    return _text((module.get("content") or {}).get("default_text"))
+
+
+def _ensure_sterling_heading_after(
+    document: Document,
+    authority: Document,
+    title: str,
+    after_title: str,
+) -> Paragraph:
+    existing = next(
+        (
+            paragraph
+            for paragraph in document.paragraphs
+            if _icf_heading_key(paragraph.text) == _icf_heading_key(title)
+        ),
+        None,
+    )
+    after = next(
+        paragraph
+        for paragraph in document.paragraphs
+        if _icf_heading_key(paragraph.text) == _icf_heading_key(after_title)
+    )
+    heading_texts = {
+        _icf_heading_key(value)
+        for value in set(_STERLING_ICF_HEADINGS.values()) | _STERLING_RETAINED_HEADINGS
+    }
+    if existing is not None:
+        elements, _ = _icf_section_elements(document, existing, heading_texts)
+        for element in elements:
+            element.getparent().remove(element)
+        existing._p.getparent().remove(existing._p)
+    authority_heading = next(
+        paragraph
+        for paragraph in authority.paragraphs
+        if _icf_heading_key(paragraph.text) == _icf_heading_key(title)
+    )
+    heading = document.add_paragraph()
+    _copy_paragraph_design(heading, authority_heading)
+    run = heading.add_run(title)
+    _copy_run_design(run, _first_visible_run(authority_heading))
+    after_elements, _ = _icf_section_elements(document, after, heading_texts)
+    anchor = after_elements[-1] if after_elements else after._p
+    anchor.addnext(heading._p)
+    return heading
+
+
+def _sterling_termination_items(reference: Mapping[str, Any]) -> list[str]:
+    module = _sterling_module("sterling.withdrawal.investigator-termination")
+    source = get_path(reference, "procedures.termination")
+    if meaningful(source):
+        return _list(source)
+    return [_text(item) for item in (module.get("content") or {}).get("default_items", [])]
+
+
+def _sterling_phi_categories(reference: Mapping[str, Any]) -> list[str]:
+    module = _sterling_module("sterling.privacy.data-categories")
+    evidence = " ".join(
+        _text(get_path(reference, path))
+        for path in (module.get("provenance") or {}).get("paths", [])
+        if meaningful(get_path(reference, path))
+    ).casefold()
+    values = []
+    for rule in (module.get("content") or {}).get("controlled_rules", []):
+        included = any(str(marker).casefold() in evidence for marker in rule.get("markers", []))
+        excluded = any(
+            str(marker).casefold() in evidence
+            for marker in rule.get("exclude_markers", [])
+        )
+        if included and not excluded:
+            values.append(_text(rule.get("text")))
+    return list(dict.fromkeys(filter(None, values)))
+
+
+def _sterling_authorized_recipients(reference: Mapping[str, Any]) -> list[str]:
+    recipients = ["The study doctor, study staff, and other health care professionals involved in the study."]
+    sponsor = get_path(reference, "parties.sponsor", {}) or {}
+    sponsor_name = _text(sponsor.get("name") if isinstance(sponsor, Mapping) else sponsor)
+    if sponsor_name:
+        recipients.append(f"The study sponsor, {sponsor_name}, and its authorized monitors or auditors.")
+    irb = get_path(reference, "parties.irb", {}) or {}
+    irb_name = _text(irb.get("name") if isinstance(irb, Mapping) else irb)
+    if irb_name:
+        recipients.append(f"The reviewing institutional review board (IRB), {irb_name}.")
+    supplied = get_path(reference, "confidentiality.authorized_recipients")
+    if meaningful(supplied):
+        recipients.extend(_list(supplied))
+    return list(dict.fromkeys(recipients))
+
+
+def _sterling_revocation_paragraphs(reference: Mapping[str, Any]) -> list[str]:
+    module = _sterling_module("sterling.privacy.authorization-withdrawal")
+    paragraphs = [_text(item) for item in (module.get("content") or {}).get("paragraphs", [])]
+    supplied = _text(get_path(reference, "confidentiality.authorization_withdrawal"))
+    if supplied:
+        paragraphs[0] = supplied
+    else:
+        site = _first_site(reference)
+        facility = site.get("facility") if isinstance(site, Mapping) else {}
+        if isinstance(facility, Mapping):
+            projection = facility_projection(facility)
+            address = ", ".join(filter(None, [
+                projection.get("name", ""), projection.get("street", ""), projection.get("locality", "")
+            ]))
+            if address:
+                paragraphs[0] = (
+                    "You may revoke this authorization at any time by writing to the study doctor "
+                    f"or study site at {address}."
+                )
+    return paragraphs
+
+
+def _normalize_lens_terminology(document: Document, reference: Mapping[str, Any]) -> None:
+    contract = sterling_clause_contract()
+    profile = next(
+        (
+            item
+            for item in contract.get("terminology_profiles", [])
+            if item.get("profile_id") == "lens"
+        ),
+        None,
+    )
+    if not isinstance(profile, Mapping):
+        raise ValueError("Sterling lens terminology profile is unavailable.")
+    applicability = profile.get("applicability") or {}
+    intervention = " ".join(
+        _text(get_path(reference, str(path)))
+        for path in applicability.get("paths", [])
+        if meaningful(get_path(reference, str(path)))
+    ).casefold()
+    if not any(str(marker).casefold() in intervention for marker in applicability.get("markers", [])):
+        return
+    replacements = tuple(
+        (rf"\b{re.escape(str(source))}\b", str(target))
+        for source, target in (profile.get("replacements") or {}).items()
+    )
+    for paragraph in _all_paragraphs(document):
+        text = paragraph.text
+        revised = text
+        for pattern, replacement in replacements:
+            revised = re.sub(pattern, replacement, revised, flags=re.I)
+        if revised != text:
+            _set_paragraph_text(paragraph, revised)
+
+
+def _assemble_sterling_fidelity_modules(
+    document: Document,
+    authority: Document,
+    reference: Mapping[str, Any],
+    model: Mapping[str, Any],
+) -> None:
+    results = _sterling_module("sterling.results.policy")
+    results_heading = _ensure_sterling_heading_after(
+        document, authority, "STUDY RESULTS", "PROCEDURES"
+    )
+    authority_results = next(
+        paragraph
+        for paragraph in authority.paragraphs
+        if _icf_heading_key(paragraph.text) == _icf_heading_key("STUDY RESULTS")
+    )
+    authority_elements, authority_exemplar = _icf_section_elements(
+        authority, authority_results, {
+            _icf_heading_key(value)
+            for value in set(_STERLING_ICF_HEADINGS.values()) | _STERLING_RETAINED_HEADINGS
+        }
+    )
+    results_exemplar = next(
+        (
+            Paragraph(element, authority)
+            for element in authority_elements
+            if element.tag == qn("w:p") and Paragraph(element, authority).text.strip()
+        ),
+        authority_exemplar,
+    )
+    _insert_icf_blocks(
+        document,
+        results_heading._p,
+        [(_sterling_module_source_or_default(reference, results), False)],
+        results_exemplar,
+    )
+
+    voluntary = _sterling_module("sterling.voluntary.core")
+    termination = _sterling_module("sterling.withdrawal.investigator-termination")
+    withdrawal_blocks = [
+        (_text(text), False)
+        for text in (voluntary.get("content") or {}).get("paragraphs", [])
+    ]
+    withdrawal_blocks.append((_text((termination.get("content") or {}).get("intro")), False))
+    withdrawal_blocks.extend((item, True) for item in _sterling_termination_items(reference))
+    _replace_sterling_section_body(
+        document, "VOLUNTARY PARTICIPATION/WITHDRAWAL", withdrawal_blocks
+    )
+
+    privacy = _sterling_module("sterling.privacy.authorization")
+    categories = _sterling_module("sterling.privacy.data-categories")
+    recipients = _sterling_module("sterling.privacy.authorized-recipients")
+    duration = _sterling_module("sterling.privacy.authorization-duration")
+    post_study = _sterling_module("sterling.privacy.post-study")
+    registry = _sterling_module("sterling.privacy.registry-disclosure")
+    privacy_blocks = [
+        (_text(text), False)
+        for text in (privacy.get("content") or {}).get("paragraphs", [])[:2]
+    ]
+    governed_privacy_texts = {
+        _icf_heading_key(text)
+        for text, _is_list in privacy_blocks
+        if _text(text)
+    }
+    privacy_blocks.extend(
+        (text, is_list)
+        for text, is_list in _icf_blocks(model, "icf.privacy")
+        if _icf_heading_key(text) not in governed_privacy_texts
+    )
+    privacy_blocks.append((_text((categories.get("content") or {}).get("intro")), False))
+    privacy_blocks.extend((item, True) for item in _sterling_phi_categories(reference))
+    privacy_blocks.append((_text((recipients.get("content") or {}).get("intro")), False))
+    privacy_blocks.extend((item, True) for item in _sterling_authorized_recipients(reference))
+    privacy_blocks.extend(
+        (_text(text), False)
+        for text in (privacy.get("content") or {}).get("paragraphs", [])[2:]
+    )
+    access = _text(get_path(reference, "confidentiality.research_record_access"))
+    if access:
+        privacy_blocks.append((access, False))
+    privacy_blocks.append((_sterling_module_source_or_default(reference, duration), False))
+    privacy_blocks.extend((text, False) for text in _sterling_revocation_paragraphs(reference))
+    privacy_blocks.append((_text((post_study.get("content") or {}).get("subheading")), False))
+    privacy_blocks.append((_text((post_study.get("content") or {}).get("paragraph")), False))
+    privacy_blocks.extend(
+        (_text(item), True)
+        for item in (post_study.get("content") or {}).get("items", [])
+    )
+    privacy_blocks.append((_text((registry.get("content") or {}).get("default_text")), False))
+    _replace_sterling_section_body(
+        document,
+        "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
+        privacy_blocks,
+    )
+    _normalize_lens_terminology(document, reference)
+
+
 def _normalize_sterling_retained_sections(
     document: Document,
+    authority: Document,
     reference: Mapping[str, Any],
+    model: Mapping[str, Any],
     boilerplate: Mapping[str, str],
 ) -> None:
     _replace_sterling_section_body(
@@ -2165,15 +2427,7 @@ def _normalize_sterling_retained_sections(
         "INFORMATION",
         [(boilerplate["icf-new-findings"], False)],
     )
-    withdrawal_blocks = [(boilerplate["icf-withdrawal"], False)]
-    termination = _text(get_path(reference, "procedures.termination"))
-    if termination:
-        withdrawal_blocks.append((termination, False))
-    _replace_sterling_section_body(
-        document,
-        "VOLUNTARY PARTICIPATION/WITHDRAWAL",
-        withdrawal_blocks,
-    )
+    _assemble_sterling_fidelity_modules(document, authority, reference, model)
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     investigator = get_path(reference, "parties.principal_investigator", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
@@ -2208,14 +2462,14 @@ def _insert_sterling_conditional_clauses(
 ) -> None:
     """Insert only triggered template-authorized Sterling conditional text."""
     contract = sterling_clause_contract()
-    for clause in contract["clauses"]:
+    for clause in contract["modules"]:
         if clause.get("classification") != "conditional":
             continue
-        trigger = clause.get("trigger") or {}
+        trigger = clause.get("applicability") or {}
         paths = [str(path) for path in trigger.get("paths", [])]
         if trigger.get("rule") != "truthy" or not any(get_path(reference, path) is True for path in paths):
             continue
-        heading_text = str(clause["section"])
+        heading_text = str(clause["placement"]["section"])
         if any(_icf_heading_key(item.text) == _icf_heading_key(heading_text) for item in document.paragraphs):
             continue
         anchor = next((
@@ -2224,7 +2478,7 @@ def _insert_sterling_conditional_clauses(
         ), None)
         if anchor is None:
             raise LayoutRepairTargetError(
-                f"Sterling conditional clause has no insertion anchor: {clause['clause_id']}"
+                f"Sterling conditional clause has no insertion anchor: {clause['module_id']}"
             )
         heading = document.add_paragraph()
         _copy_paragraph_design(heading, anchor)
@@ -3283,7 +3537,7 @@ def _template_document(
         if not sterling:
             _remove_advarra_example_study_prose(document)
         if sterling:
-            _normalize_sterling_retained_sections(document, reference, boilerplate)
+            _normalize_sterling_retained_sections(document, authority, reference, model, boilerplate)
             _insert_sterling_conditional_clauses(document, reference)
             repair_sterling_clause_placement(document, reference)
         else:

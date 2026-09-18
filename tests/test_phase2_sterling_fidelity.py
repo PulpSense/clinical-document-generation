@@ -36,19 +36,24 @@ def codes(report):
 
 
 def clause(report, clause_id):
-    return next(item for item in report["findings"] if item.get("clause_id") == clause_id)
+    return next(item for item in report["findings"] if item.get("module_id") == clause_id)
 
 
-def test_missing_mandatory_sterling_clause_is_blocking():
+def test_missing_core_sterling_module_is_blocking():
     governed = contracts.sterling_clause_contract(ROOT)
-    assert len(governed["clauses"]) == 28
-    assert {item["classification"] for item in governed["clauses"]} == {
-        "mandatory", "conditional", "source_dependent", "prohibited_from_invention"
+    assert len(governed["modules"]) == 31
+    assert {item["classification"] for item in governed["modules"]} == {
+        "core", "conditional", "source-bound"
     }
     assert all(
         set(item["severity"]) == {"absent", "altered", "unsupported", "misplaced"}
-        and set(item["severity"].values()) == {"blocking"}
-        for item in governed["clauses"]
+        and set(item["severity"].values()) <= {"blocking", "warning"}
+        for item in governed["modules"]
+    )
+    assert all(
+        set(item["severity"].values()) == {"blocking"}
+        for item in governed["modules"]
+        if item["classification"] == "core"
     )
 
     document = document_with_sections([
@@ -58,7 +63,7 @@ def test_missing_mandatory_sterling_clause_is_blocking():
     report = quality.validate_sterling_clause_contract(document, source())
 
     finding = clause(report, "sterling.voluntary.core")
-    assert finding["code"] == "sterling-clause-missing"
+    assert finding["code"] == "sterling-module-missing"
     assert finding["severity"] == "blocking"
     assert finding["target_ids"] == ["icf.voluntary-participation"]
 
@@ -73,7 +78,7 @@ def test_conditional_sterling_clause_is_rejected_without_trigger():
     report = quality.validate_sterling_clause_contract(document, source())
 
     finding = clause(report, "sterling.privacy.gina")
-    assert finding["code"] == "sterling-clause-unsupported"
+    assert finding["code"] == "sterling-module-unsupported"
     assert finding["severity"] == "blocking"
 
 
@@ -87,7 +92,7 @@ def test_conditional_sterling_clause_is_required_when_trigger_exists():
     report = quality.validate_sterling_clause_contract(document, reference)
 
     finding = clause(report, "sterling.privacy.gina")
-    assert finding["code"] == "sterling-clause-missing"
+    assert finding["code"] == "sterling-module-missing"
     assert finding["severity"] == "blocking"
 
 
@@ -104,7 +109,7 @@ def test_triggered_sterling_conditional_clause_is_inserted_by_renderer():
         for paragraph in document.paragraphs
     )
     assert not any(
-        item.get("clause_id") == "sterling.privacy.gina"
+        item.get("module_id") == "sterling.privacy.gina"
         for item in report["findings"]
     )
 
@@ -119,24 +124,24 @@ def test_source_dependent_payment_cannot_be_invented():
     report = quality.validate_sterling_clause_contract(document, reference)
 
     finding = clause(report, "sterling.compensation.terms")
-    assert finding["code"] == "sterling-clause-unsupported"
+    assert finding["code"] == "sterling-module-unsupported"
     assert finding["severity"] == "blocking"
 
 
 def test_required_sterling_clause_in_wrong_section_is_repairable_and_exactly_localized():
-    voluntary = contracts.sterling_clause_text("sterling.voluntary.core")
+    governed_text = contracts.sterling_clause_text("sterling.information.new-findings")
     document = document_with_sections([
-        ("COSTS TO YOU", [voluntary]),
-        ("VOLUNTARY PARTICIPATION/WITHDRAWAL", []),
+        ("COSTS TO YOU", [governed_text]),
+        ("INFORMATION", []),
     ])
 
     report = quality.validate_sterling_clause_contract(document, source())
 
-    finding = clause(report, "sterling.voluntary.core")
-    assert finding["code"] == "sterling-clause-misplaced"
+    finding = clause(report, "sterling.information.new-findings")
+    assert finding["code"] == "sterling-module-misplaced"
     assert finding["severity"] == "blocking"
     assert finding["recovery_class"] == "deterministic_structure_defect"
-    assert finding["expected_section"] == "VOLUNTARY PARTICIPATION/WITHDRAWAL"
+    assert finding["expected_section"] == "INFORMATION"
     assert finding["actual_section"] == "COSTS TO YOU"
 
 
@@ -149,7 +154,7 @@ def test_materially_weakened_voluntariness_and_participant_rights_are_blocking()
 
     report = quality.validate_sterling_clause_contract(document, source())
 
-    assert clause(report, "sterling.voluntary.core")["code"] == "sterling-clause-weakened"
+    assert clause(report, "sterling.voluntary.core")["code"] == "sterling-module-weakened"
     rights = clause(report, "sterling.contact.participant-rights")
     assert rights["severity"] == "blocking"
     assert rights["safety_critical"] is True
@@ -165,7 +170,7 @@ def test_contradictory_safety_language_cannot_satisfy_keyword_validation():
     report = quality.validate_sterling_clause_contract(document, source())
 
     finding = clause(report, "sterling.risks.foreseeable")
-    assert finding["code"] == "sterling-clause-weakened"
+    assert finding["code"] == "sterling-module-weakened"
     assert finding["contradiction"] is True
 
 
@@ -179,7 +184,7 @@ def test_unrelated_heading_cannot_lend_body_text_to_governed_section():
     report = quality.validate_sterling_clause_contract(document, source())
 
     finding = clause(report, "sterling.voluntary.core")
-    assert finding["code"] == "sterling-clause-missing"
+    assert finding["code"] == "sterling-module-missing"
 
 
 def test_governed_body_language_inside_a_table_is_visible_to_validation():
@@ -193,7 +198,7 @@ def test_governed_body_language_inside_a_table_is_visible_to_validation():
     report = quality.validate_sterling_clause_contract(document, source())
 
     assert not any(
-        item.get("clause_id") == "sterling.information.new-findings"
+        item.get("module_id") == "sterling.information.new-findings"
         for item in report["findings"]
     )
 
@@ -208,8 +213,8 @@ def test_sterling_validation_checks_required_body_not_only_headings_and_signatur
 
     report = quality.validate_sterling_clause_contract(document, source())
 
-    assert "sterling-clause-missing" in codes(report)
-    assert {item["clause_id"] for item in report["findings"]} >= {
+    assert "sterling-module-missing" in codes(report)
+    assert {item["module_id"] for item in report["findings"]} >= {
         "sterling.information.new-findings",
         "sterling.voluntary.core",
         "sterling.contact.participant-rights",
@@ -218,10 +223,10 @@ def test_sterling_validation_checks_required_body_not_only_headings_and_signatur
 
 
 def test_recoverable_sterling_placement_is_repaired_and_revalidated():
-    voluntary = contracts.sterling_clause_text("sterling.voluntary.core")
+    governed_text = contracts.sterling_clause_text("sterling.information.new-findings")
     document = document_with_sections([
-        ("COSTS TO YOU", [voluntary]),
-        ("VOLUNTARY PARTICIPATION/WITHDRAWAL", []),
+        ("COSTS TO YOU", [governed_text]),
+        ("INFORMATION", []),
     ])
 
     repair = rendering.repair_sterling_clause_placement(document, source())
@@ -230,7 +235,7 @@ def test_recoverable_sterling_placement_is_repaired_and_revalidated():
     assert repair["status"] == "repaired"
     assert repair["revalidated"] is True
     assert not any(
-        item.get("clause_id") == "sterling.voluntary.core"
+        item.get("module_id") == "sterling.information.new-findings"
         for item in report["findings"]
     )
 

@@ -3808,8 +3808,8 @@ def _sterling_clause_sections(document: Document) -> dict[str, list[str]]:
     """Read governed sections in body order, including table-contained text."""
     contract = sterling_clause_contract()
     headings = {
-        _normalized_substantive_text(str(item["section"])): str(item["section"])
-        for item in contract["clauses"]
+        _normalized_substantive_text(str(item["placement"]["section"])): str(item["placement"]["section"])
+        for item in contract["modules"]
     }
     sections: dict[str, list[str]] = {title: [] for title in headings.values()}
     current = ""
@@ -3855,8 +3855,79 @@ def _sterling_clause_sections(document: Document) -> dict[str, list[str]]:
     return sections
 
 
+def _sterling_section_list_texts(document: Document) -> dict[str, list[str]]:
+    """Return normalized text only from genuine Word lists in each governed section."""
+    contract = sterling_clause_contract()
+    headings = {
+        _normalized_substantive_text(str(item["placement"]["section"])): str(item["placement"]["section"])
+        for item in contract["modules"]
+    }
+    values: dict[str, list[str]] = {title: [] for title in headings.values()}
+    current = ""
+    for paragraph in document.paragraphs:
+        key = _normalized_substantive_text(paragraph.text)
+        if key in headings:
+            current = headings[key]
+            continue
+        if paragraph.text.strip() and paragraph.style.name.casefold().startswith("heading"):
+            current = ""
+            continue
+        properties = paragraph._p.pPr
+        if (
+            current
+            and properties is not None
+            and properties.find(qn("w:numPr")) is not None
+            and key
+        ):
+            values[current].append(key)
+    return values
+
+
+def _sterling_module_list_texts(document: Document) -> dict[str, list[str]]:
+    """Bind genuine Word-list items to the module intro that owns the list."""
+    contract = sterling_clause_contract()
+    paragraphs = list(document.paragraphs)
+    result: dict[str, list[str]] = {}
+    for module in contract["modules"]:
+        structure = module.get("expected_structure") or {}
+        if "list" not in str(structure.get("kind") or ""):
+            continue
+        content = module.get("content") if isinstance(module.get("content"), Mapping) else {}
+        anchor_text = next(
+            (
+                _normalized_substantive_text(str(content.get(key) or ""))
+                for key in ("intro", "paragraph")
+                if str(content.get(key) or "").strip()
+            ),
+            "",
+        )
+        if not anchor_text:
+            result[str(module["module_id"])] = []
+            continue
+        anchor = next(
+            (
+                index
+                for index, paragraph in enumerate(paragraphs)
+                if _normalized_substantive_text(paragraph.text) == anchor_text
+            ),
+            None,
+        )
+        items: list[str] = []
+        if anchor is not None:
+            for paragraph in paragraphs[anchor + 1:]:
+                text = _normalized_substantive_text(paragraph.text)
+                if not text:
+                    continue
+                properties = paragraph._p.pPr
+                if properties is None or properties.find(qn("w:numPr")) is None:
+                    break
+                items.append(text)
+        result[str(module["module_id"])] = items
+    return result
+
+
 def _sterling_triggered(clause: Mapping[str, Any], reference: Mapping[str, Any]) -> bool:
-    trigger = clause.get("trigger") if isinstance(clause.get("trigger"), Mapping) else {}
+    trigger = clause.get("applicability") if isinstance(clause.get("applicability"), Mapping) else {}
     rule = str(trigger.get("rule") or "")
     paths = [str(path) for path in trigger.get("paths", [])]
     if rule == "always":
@@ -3877,6 +3948,13 @@ def validate_sterling_clause_contract(
     document = rendered_document if hasattr(rendered_document, "paragraphs") else Document(rendered_document)
     contract = sterling_clause_contract()
     sections = _sterling_clause_sections(document)
+    section_list_texts = _sterling_section_list_texts(document)
+    module_list_texts = _sterling_module_list_texts(document)
+    heading_order = [
+        _normalized_substantive_text(paragraph.text)
+        for paragraph in document.paragraphs
+        if paragraph.text.strip() and paragraph.style.name.casefold().startswith("heading")
+    ]
     normalized_sections = {
         title: _normalized_substantive_text(" ".join(values))
         for title, values in sections.items()
@@ -3889,54 +3967,54 @@ def validate_sterling_clause_contract(
 
     def add(clause: Mapping[str, Any], code: str, **extra: Any) -> None:
         severity = str((clause.get("severity") or {}).get({
-            "sterling-clause-missing": "absent",
-            "sterling-clause-weakened": "altered",
-            "sterling-clause-unsupported": "unsupported",
-            "sterling-clause-misplaced": "misplaced",
+            "sterling-module-missing": "absent",
+            "sterling-module-weakened": "altered",
+            "sterling-module-unsupported": "unsupported",
+            "sterling-module-misplaced": "misplaced",
         }[code], "blocking"))
         finding = {
             "code": code,
             "category": "content",
             "check": "sterling_clause_contract",
-            "clause_id": clause["clause_id"],
+            "module_id": clause["module_id"],
             "classification": clause["classification"],
             "target_ids": [clause["section_id"]],
-            "expected_section": clause["section"],
+            "expected_section": clause["placement"]["section"],
             "severity": severity,
-            "publication_disposition": "blocking",
+            "publication_disposition": "blocking" if severity == "blocking" else "warning",
             "safety_critical": bool(clause.get("safety_critical")) or any(
-                marker in str(clause["clause_id"])
+                marker in str(clause["module_id"])
                 for marker in ("risk", "injury", "voluntary", "rights", "authorization", "privacy")
             ),
             "issue": {
-                "sterling-clause-missing": "Required governed Sterling clause is absent.",
-                "sterling-clause-weakened": "Governed Sterling clause is materially altered, incomplete, or overbroad.",
-                "sterling-clause-unsupported": "Sterling conditional or source-dependent language appears without its approved trigger.",
-                "sterling-clause-misplaced": "Governed Sterling clause is outside its required section.",
+                "sterling-module-missing": "Required governed Sterling module is absent or malformed.",
+                "sterling-module-weakened": "Governed Sterling module is materially altered, incomplete, overbroad, or structurally malformed.",
+                "sterling-module-unsupported": "Sterling conditional or source-bound language appears without its approved applicability rule.",
+                "sterling-module-misplaced": "Governed Sterling module is outside its required section.",
             }[code],
             **extra,
         }
         recovery = (
             "deterministic_structure_defect"
-            if code == "sterling-clause-misplaced"
+            if code == "sterling-module-misplaced"
             else "drafting_defect"
             if str(clause["section_id"]) in draftable_icf_ids
             else "document_structure_defect"
         )
         findings.append(recovery_finding(finding, recovery))
 
-    for clause in contract["clauses"]:
-        section = str(clause["section"])
+    for clause in contract["modules"]:
+        section = str(clause["placement"]["section"])
         text = normalized_sections.get(section, "")
         validation = clause.get("validation") or {}
         triggered = _sterling_triggered(clause, normalized_source)
         exact_texts = [str(value) for value in validation.get("required_exact_texts", [])]
         exact_boilerplate = validation.get("exact_boilerplate_id")
         if exact_boilerplate:
-            exact_texts.append(sterling_clause_text(str(clause["clause_id"])))
+            exact_texts.append(sterling_clause_text(str(clause["module_id"])))
         normalized_exact = [_normalized_substantive_text(value) for value in exact_texts]
         placement_markers = (
-            [_normalized_substantive_text(sterling_clause_text(str(clause["clause_id"])))]
+            [_normalized_substantive_text(sterling_clause_text(str(clause["module_id"])))]
             if validation.get("placement_boilerplate_id")
             else normalized_exact
         )
@@ -3948,7 +4026,7 @@ def validate_sterling_clause_contract(
             _normalized_substantive_text(_text(get_path(normalized_source, str(path))))
             for path in validation.get("required_source_values", [])
         ]
-        authority = clause.get("approved_source") if isinstance(clause.get("approved_source"), Mapping) else {}
+        authority = clause.get("provenance") if isinstance(clause.get("provenance"), Mapping) else {}
         authority_paths = [str(path) for path in authority.get("paths", [])]
         authority_records = [
             (path, get_path(normalized_source, path))
@@ -3963,13 +4041,39 @@ def validate_sterling_clause_contract(
 
         if not triggered:
             unsupported = any(marker and marker in text for marker in unsupported_markers)
+            unsupported_term_groups = [
+                [_normalized_substantive_text(str(term)) for term in group]
+                for group in validation.get("unsupported_term_groups", [])
+            ]
+            unsupported = unsupported or bool(unsupported_term_groups) and all(
+                any(term and term in text for term in group)
+                for group in unsupported_term_groups
+            )
             if validation.get("prohibit_when_untriggered") and section in {
                 "COMPENSATION TO YOU", "GENETIC INFORMATION NONDISCRIMINATION ACT"
             }:
                 unsupported = unsupported or bool(text)
             if unsupported:
-                add(clause, "sterling-clause-unsupported", actual_section=section)
+                add(clause, "sterling-module-unsupported", actual_section=section)
             continue
+
+        source_override_paths = [
+            str(path) for path in validation.get("source_override_paths", [])
+        ]
+        source_overrides = [
+            get_path(normalized_source, path)
+            for path in source_override_paths
+            if meaningful(get_path(normalized_source, path))
+        ]
+        exact_default = _normalized_substantive_text(
+            str(validation.get("exact_default_when_source_absent") or "")
+        )
+        if source_overrides:
+            override_ok = all(evidence_grounded(text, value) for value in source_overrides)
+            default_ok = not exact_default or exact_default not in text
+        else:
+            override_ok = True
+            default_ok = not exact_default or exact_default in text
 
         has_body = bool(text)
         exact_ok = all(value in text for value in normalized_exact)
@@ -3983,10 +4087,14 @@ def validate_sterling_clause_contract(
             )
             for value in authority_values
         ]
+        grounding_required = str(authority.get("type") or "") in {
+            "approved_input",
+            "approved_input_or_authorized_boilerplate",
+        }
         grounding_ok = (
             any(grounding_results)
             if validation.get("source_grounding") == "any" and grounding_results
-            else all(grounding_results)
+            else all(grounding_results) if grounding_required else True
         )
         contradiction_patterns = {
             "sterling.risks.foreseeable": (r"\bno (?:foreseeable )?risks?\b",),
@@ -3997,15 +4105,112 @@ def validate_sterling_clause_contract(
         }
         contradiction = any(
             re.search(pattern, text)
-            for pattern in contradiction_patterns.get(str(clause["clause_id"]), ())
+            for pattern in contradiction_patterns.get(str(clause["module_id"]), ())
         )
         word_count = len(text.split())
         length_ok = word_count >= int(validation.get("minimum_words", 0) or 0)
         block_count = len([value for value in sections.get(section, []) if value.strip()])
         block_ok = block_count >= int(validation.get("minimum_substantive_blocks", 0) or 0)
+        expected_structure = clause.get("expected_structure") or {}
+        structure_kind = str(expected_structure.get("kind") or "")
+        content = clause.get("content") if isinstance(clause.get("content"), Mapping) else {}
+        section_lists = (
+            module_list_texts.get(str(clause["module_id"]), [])
+            if "list" in structure_kind
+            else section_list_texts.get(section, [])
+        )
+        expected_list_items: list[str] = []
+        if "list" in structure_kind:
+            if source_overrides:
+                for value in source_overrides:
+                    items = value if isinstance(value, (list, tuple, set)) else [value]
+                    expected_list_items.extend(
+                        _normalized_substantive_text(_text(item))
+                        for item in items
+                        if _text(item)
+                    )
+            else:
+                expected_list_items.extend(
+                    _normalized_substantive_text(str(item))
+                    for key in ("default_items", "items")
+                    for item in content.get(key, [])
+                    if str(item).strip()
+                )
+                rules = content.get("controlled_rules", [])
+                if isinstance(rules, list):
+                    evidence = " ".join(
+                        _text(get_path(normalized_source, path))
+                        for path in authority_paths
+                        if meaningful(get_path(normalized_source, path))
+                    ).casefold()
+                    expected_list_items.extend(
+                        _normalized_substantive_text(str(rule.get("text") or ""))
+                        for rule in rules
+                        if isinstance(rule, Mapping)
+                        and any(str(marker).casefold() in evidence for marker in rule.get("markers", []))
+                        and not any(
+                            str(marker).casefold() in evidence
+                            for marker in rule.get("exclude_markers", [])
+                        )
+                        and str(rule.get("text") or "").strip()
+                    )
+        required_list_groups = [
+            [_normalized_substantive_text(str(term)) for term in group]
+            for group in validation.get("required_list_term_groups", [])
+        ]
+        list_text = " ".join(section_lists)
+        expected_lists_ok = all(
+            item and any(item == actual for actual in section_lists)
+            for item in expected_list_items
+        )
+        list_terms_ok = all(
+            any(term and term in list_text for term in group)
+            for group in required_list_groups
+        )
+        list_minimum = (
+            int(expected_structure.get("minimum", 0) or 0)
+            if "list" in structure_kind
+            else int(validation.get("required_list_count", 0) or 0)
+        )
+        list_ok = (
+            len(section_lists) >= list_minimum
+            and expected_lists_ok
+            and list_terms_ok
+        )
+        expected_paragraphs = [
+            _normalized_substantive_text(str(item))
+            for item in content.get("paragraphs", [])
+            if str(item).strip()
+        ]
+        paragraph_markers = [
+            " ".join(item.split()[:6])
+            for item in expected_paragraphs
+        ]
+        module_paragraph_count = sum(
+            any(
+                marker
+                and _normalized_substantive_text(candidate).startswith(marker)
+                for candidate in sections.get(section, [])
+            )
+            for marker in paragraph_markers
+        )
+        paragraph_structure_ok = True
+        if structure_kind == "paragraphs" and expected_paragraphs:
+            paragraph_structure_ok = module_paragraph_count >= int(expected_structure.get("minimum", 0) or 0)
+        immediately_after = _normalized_substantive_text(
+            str(validation.get("immediately_after") or "")
+        )
+        section_heading = _normalized_substantive_text(section)
+        order_ok = True
+        if immediately_after:
+            order_ok = (
+                section_heading in heading_order
+                and immediately_after in heading_order
+                and heading_order.index(section_heading) == heading_order.index(immediately_after) + 1
+            )
         maximum = int(validation.get("maximum_words", 0) or 0)
         maximum_ok = not maximum or word_count <= maximum
-        if has_body and exact_ok and terms_ok and sources_ok and grounding_ok and not contradiction and length_ok and block_ok and maximum_ok:
+        if has_body and exact_ok and terms_ok and sources_ok and grounding_ok and override_ok and default_ok and not contradiction and length_ok and block_ok and list_ok and paragraph_structure_ok and order_ok and maximum_ok:
             continue
 
         # Exact or safeguard-bearing text in another governed section is a
@@ -4017,13 +4222,13 @@ def validate_sterling_clause_contract(
             and sum(value in candidate for value in marker_values) >= max(1, len(marker_values) // 2)
         ), "")
         if actual:
-            add(clause, "sterling-clause-misplaced", actual_section=actual)
+            add(clause, "sterling-module-misplaced", actual_section=actual)
         elif not has_body or not block_ok:
-            add(clause, "sterling-clause-missing")
+            add(clause, "sterling-module-missing")
         else:
             add(
                 clause,
-                "sterling-clause-weakened",
+                "sterling-module-weakened",
                 missing_term_groups=[group for group in term_groups if not any(term in text for term in group)],
                 missing_source_values=[value for value in source_values if value not in text],
                 ungrounded_source_paths=[
@@ -4032,10 +4237,60 @@ def validate_sterling_clause_contract(
                     and not (isinstance(value, str) and value.strip().casefold() == "none" and re.search(r"\b(?:no|not|without|will not|none)\b", text))
                 ],
                 contradiction=contradiction,
+                malformed_list=not list_ok,
+                malformed_paragraph_structure=not paragraph_structure_ok,
+                missing_expected_list_items=[
+                    item for item in expected_list_items if item not in section_lists
+                ],
+                missing_list_term_groups=[
+                    group for group in required_list_groups
+                    if not any(term and term in list_text for term in group)
+                ],
+                misplaced_order=not order_ok,
+                source_override_missing=not override_ok,
+                conflicting_default=not default_ok,
             )
+    applicable_profile = next(
+        (
+            profile
+            for profile in contract.get("terminology_profiles", [])
+            if any(
+                str(marker).casefold()
+                in " ".join(
+                    _text(get_path(normalized_source, str(path)))
+                    for path in (profile.get("applicability") or {}).get("paths", [])
+                    if meaningful(get_path(normalized_source, str(path)))
+                ).casefold()
+                for marker in (profile.get("applicability") or {}).get("markers", [])
+            )
+        ),
+        None,
+    )
+    if isinstance(applicable_profile, Mapping):
+        whole_document = _normalized_substantive_text(
+            " ".join(paragraph.text for paragraph in document.paragraphs)
+        )
+        prohibited = [
+            str(term)
+            for term in applicable_profile.get("prohibited", [])
+            if _normalized_substantive_text(str(term)) in whole_document
+        ]
+        if prohibited:
+            findings.append(recovery_finding({
+                "code": "sterling-intervention-terminology-invalid",
+                "category": "content",
+                "check": "sterling_terminology_profile",
+                "profile_id": applicable_profile.get("profile_id"),
+                "target_ids": ["icf"],
+                "severity": "blocking",
+                "publication_disposition": "blocking",
+                "safety_critical": False,
+                "issue": "Participant-facing ICF contains terminology prohibited for the approved intervention type.",
+                "prohibited_terms": prohibited,
+            }, "document_structure_defect"))
     return {
-        "schema_version": "sterling-clause-validation/v1",
-        "status": "blocked" if findings else "passed",
+        "schema_version": "sterling-module-validation/v2",
+        "status": "blocked" if any(item.get("severity") == "blocking" for item in findings) else "passed",
         "contract_version": contract["schema_version"],
         "findings": findings,
     }

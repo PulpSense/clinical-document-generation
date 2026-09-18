@@ -19,9 +19,9 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.27-recovery-contract"
+CONTRACT_VERSION = "clinical-documents-v2.28-sterling-fidelity"
 BOILERPLATE_VERSION = "clinical-boilerplate-v11"
-STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
+STERLING_CLAUSE_CONTRACT_VERSION = "sterling-icf-modules/v2"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
 LAYOUT_PRESERVATION_BASELINE_SCHEMA = "layout-preservation-baseline/v1"
@@ -830,46 +830,69 @@ def meaningful(value: Any) -> bool:
 
 
 def sterling_clause_contract(repo_root: Path | None = None) -> dict[str, Any]:
-    """Load and minimally validate the governed Sterling language contract."""
+    """Load and validate the governed, template-derived Sterling module contract."""
     root = (repo_root or Path(__file__).resolve().parents[1]).resolve()
     path = root / STERLING_CLAUSE_CONTRACT_RESOURCE
     payload = json.loads(path.read_text(encoding="utf-8"))
-    clauses = payload.get("clauses") if isinstance(payload, Mapping) else None
+    modules = payload.get("modules") if isinstance(payload, Mapping) else None
+    terminology_profiles = payload.get("terminology_profiles") if isinstance(payload, Mapping) else None
     if payload.get("schema_version") != STERLING_CLAUSE_CONTRACT_VERSION:
         raise ValueError("Sterling Clause Contract version is not supported.")
-    if payload.get("family") != "Sterling" or not isinstance(clauses, list):
-        raise ValueError("Sterling Clause Contract is malformed.")
-    identifiers = [str(item.get("clause_id") or "") for item in clauses if isinstance(item, Mapping)]
+    if (
+        payload.get("family") != "Sterling"
+        or not isinstance(modules, list)
+        or not isinstance(terminology_profiles, list)
+    ):
+        raise ValueError("Sterling ICF module contract is malformed.")
+    identifiers = [str(item.get("module_id") or "") for item in modules if isinstance(item, Mapping)]
     required_fields = {
-        "clause_id", "classification", "trigger", "approved_source", "section",
-        "section_id", "fidelity", "permitted_substitutions", "validation", "severity",
-        "repeatable",
+        "module_id", "classification", "applicability", "provenance", "placement",
+        "section_id", "fidelity", "substitutions", "expected_structure", "validation",
+        "severity", "repeatable",
     }
     if (
-        len(identifiers) != len(clauses)
+        len(identifiers) != len(modules)
         or not all(identifiers)
         or len(identifiers) != len(set(identifiers))
-        or any(not required_fields <= set(item) for item in clauses if isinstance(item, Mapping))
+        or any(not required_fields <= set(item) for item in modules if isinstance(item, Mapping))
     ):
-        raise ValueError("Sterling Clause Contract contains incomplete or duplicate clauses.")
-    allowed = {"mandatory", "conditional", "source_dependent", "prohibited_from_invention"}
-    if any(str(item.get("classification")) not in allowed for item in clauses):
-        raise ValueError("Sterling Clause Contract contains an unknown classification.")
+        raise ValueError("Sterling ICF module contract contains incomplete or duplicate modules.")
+    allowed = {"core", "conditional", "source-bound"}
+    if any(str(item.get("classification")) not in allowed for item in modules):
+        raise ValueError("Sterling ICF module contract contains an unknown classification.")
+    if any(
+        not str(profile.get("profile_id") or "").strip()
+        or not isinstance(profile.get("applicability"), Mapping)
+        or not isinstance(profile.get("preferred"), Mapping)
+        or not isinstance(profile.get("replacements"), Mapping)
+        or not isinstance(profile.get("prohibited"), list)
+        for profile in terminology_profiles
+        if isinstance(profile, Mapping)
+    ) or len(terminology_profiles) != len({
+        str(profile.get("profile_id")) for profile in terminology_profiles if isinstance(profile, Mapping)
+    }):
+        raise ValueError("Sterling ICF terminology profiles are incomplete or duplicated.")
     allowed_triggers = {"always", "meaningful", "truthy"}
     required_severities = {"absent", "altered", "unsupported", "misplaced"}
     if any(
-        str((item.get("trigger") or {}).get("rule")) not in allowed_triggers
+        str((item.get("applicability") or {}).get("rule")) not in allowed_triggers
         or set(item.get("severity") or {}) != required_severities
-        or not all(str((item.get("severity") or {}).get(key)) == "blocking" for key in required_severities)
-        or not isinstance(item.get("permitted_substitutions"), list)
+        or any(
+            str((item.get("severity") or {}).get(key)) not in {"blocking", "warning"}
+            for key in required_severities
+        )
+        or not isinstance(item.get("substitutions"), list)
         or not isinstance(item.get("repeatable"), bool)
-        or not str(item.get("section") or "").strip()
+        or not str((item.get("placement") or {}).get("section") or "").strip()
+        or not isinstance((item.get("placement") or {}).get("order"), int)
         or not str(item.get("section_id") or "").strip()
         or not str(item.get("fidelity") or "").strip()
+        or not isinstance(item.get("provenance"), Mapping)
+        or not isinstance(item.get("expected_structure"), Mapping)
         or not isinstance(item.get("validation"), Mapping)
-        for item in clauses
+        for item in modules
     ):
-        raise ValueError("Sterling Clause Contract contains an incomplete trigger, validation, location, substitution, repetition, fidelity, or severity rule.")
+        raise ValueError("Sterling ICF module contract contains an incomplete applicability, provenance, validation, placement, structure, substitution, repetition, fidelity, or severity rule.")
     return copy.deepcopy(dict(payload))
 
 
@@ -878,12 +901,12 @@ def sterling_clause_text(clause_id: str, repo_root: Path | None = None) -> str:
     root = (repo_root or Path(__file__).resolve().parents[1]).resolve()
     contract = sterling_clause_contract(root)
     clause = next(
-        (item for item in contract["clauses"] if item["clause_id"] == clause_id),
+        (item for item in contract["modules"] if item["module_id"] == clause_id),
         None,
     )
     if clause is None:
         raise KeyError(clause_id)
-    source = clause.get("approved_source") or {}
+    source = clause.get("provenance") or {}
     boilerplate_id = source.get("boilerplate_id")
     if not boilerplate_id:
         exact_id = (clause.get("validation") or {}).get("exact_boilerplate_id")
