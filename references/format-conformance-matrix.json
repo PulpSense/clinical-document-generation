@@ -118,7 +118,7 @@
       "icf_template": "Advarra",
       "fixture": {
         "path": "references/conformance-fixtures/prospective-acceptance-source.json",
-        "sha256": "60b6058af707892495c8d1630a07588301450724d3893e4e8988d05307ef882c"
+        "sha256": "6d4cbf1dbf31b9dc5182360890570b21d6edfcf8ddc50d4b87ba6566d889809d"
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-advarra.json",
@@ -176,7 +176,7 @@
       "icf_template": "Sterling",
       "fixture": {
         "path": "references/conformance-fixtures/prospective-acceptance-source.json",
-        "sha256": "60b6058af707892495c8d1630a07588301450724d3893e4e8988d05307ef882c"
+        "sha256": "6d4cbf1dbf31b9dc5182360890570b21d6edfcf8ddc50d4b87ba6566d889809d"
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-sterling.json",
@@ -234,7 +234,7 @@
       "icf_template": "Advarra",
       "fixture": {
         "path": "references/conformance-fixtures/ambispective-acceptance-source.json",
-        "sha256": "cc830be47efd5286de7d24b508ba6223b48455d19a6898dbd70360836cf24907"
+        "sha256": "cdf9b68c512b469019bbe92acd39b0b2dca9a5963fdf078c752659da9d7728ae"
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-advarra.json",
@@ -292,7 +292,7 @@
       "icf_template": "Sterling",
       "fixture": {
         "path": "references/conformance-fixtures/ambispective-acceptance-source.json",
-        "sha256": "cc830be47efd5286de7d24b508ba6223b48455d19a6898dbd70360836cf24907"
+        "sha256": "cdf9b68c512b469019bbe92acd39b0b2dca9a5963fdf078c752659da9d7728ae"
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-sterling.json",
@@ -345,5 +345,5 @@
       ]
     }
   ],
-  "matrix_sha256": "30d276db77614fd8618d5c6f877a643ba366de3cbcfeb7656776afb7542094c8"
+  "matrix_sha256": "f8844eefffafe1b4444c980d13de85d4a03e084c995eb3ad00b6942cde015f4d"
 }

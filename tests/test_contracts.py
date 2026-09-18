@@ -656,7 +656,8 @@ def test_protocol_contract_binds_the_detailed_source_fields_needed_by_the_refere
     assert "confidentiality.retention" in protocol["confidentiality-publication"].evidence
     assert protocol["study-procedure.discontinued"].evidence == ("procedures.discontinued_subjects",)
     assert "procedures.replacement" in protocol["endpoint-criteria.discontinuation"].evidence
-    assert "risks_benefits.compensation_or_reimbursement" in protocol["risks-benefits.benefits"].evidence
+    assert "risks_benefits.compensation_or_reimbursement" not in protocol["risks-benefits.benefits"].evidence
+    assert "risks_benefits.compensation_or_reimbursement" in protocol["financial-injury"].evidence
 
 
 def test_schedule_cannot_extend_beyond_study_timeline():

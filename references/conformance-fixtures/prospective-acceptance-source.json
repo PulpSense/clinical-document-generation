@@ -29,7 +29,7 @@
   "population": {
     "study_population": "Adults with the target condition.",
     "sample_size": "40 participants",
-    "sample_justification": "Descriptive estimates with expected attrition.",
+    "sample_justification": "This exploratory feasibility study will characterize outcome variability for later planning.",
     "minimum_age": "18 Years",
     "maximum_age": "80 Years",
     "inclusion_criteria": [
@@ -162,7 +162,8 @@
   "risks_benefits": {
     "risks": "Device discomfort and privacy risks.",
     "benefits": "No direct benefit is guaranteed.",
-    "injury_handling": "Research-related concerns will be reported to the investigator.",
+    "costs": "The sponsor pays study-only costs; the participant or insurer is responsible for ordinary-care costs.",
+    "injury_handling": "The investigator will arrange injury care. No compensation is available. The sponsor is financially responsible for uncovered injury-care costs.",
     "privacy": "Records will be stored confidentially.",
     "compensation_or_reimbursement": "No compensation is planned."
   },

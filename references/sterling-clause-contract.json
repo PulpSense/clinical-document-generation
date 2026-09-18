@@ -328,13 +328,10 @@
         "rule": "always"
       },
       "provenance": {
-        "type": "approved_input_or_authorized_boilerplate",
+        "type": "approved_input",
         "paths": [
           "risks_benefits.risks",
           "risks_benefits.risk_mitigation"
-        ],
-        "boilerplate_ids": [
-          "icf-sparse-risks"
         ]
       },
       "placement": {
@@ -404,11 +401,13 @@
           [
             "choose not",
             "not participate",
-            "alternative"
+            "alternative",
+            "decline"
           ],
           [
             "care options",
-            "treatment"
+            "treatment",
+            "ordinary cataract care"
           ]
         ]
       },
@@ -531,7 +530,9 @@
         "required_term_groups": [
           [
             "cost",
-            "responsibility"
+            "responsibility",
+            "pays for",
+            "billed to"
           ]
         ]
       },
@@ -547,12 +548,9 @@
         "rule": "always"
       },
       "provenance": {
-        "type": "approved_input_or_authorized_boilerplate",
+        "type": "approved_input",
         "paths": [
           "risks_benefits.costs"
-        ],
-        "boilerplate_ids": [
-          "costs"
         ]
       },
       "placement": {
@@ -731,12 +729,9 @@
         "rule": "always"
       },
       "provenance": {
-        "type": "approved_input_or_authorized_boilerplate",
+        "type": "approved_input",
         "paths": [
           "risks_benefits.injury_handling"
-        ],
-        "boilerplate_ids": [
-          "injury"
         ]
       },
       "placement": {
@@ -832,7 +827,7 @@
       },
       "content": {
         "paragraphs": [
-          "As part of this research study, health information about you will be collected, used, and disclosed to conduct the study, evaluate its results, protect participants, and meet legal, regulatory, and recordkeeping requirements.",
+          "As part of this research study, protected health information (PHI) about you will be collected, used, and disclosed to conduct the study, evaluate its results, protect participants, and meet legal, regulatory, and recordkeeping requirements.",
           "The study doctor, study staff, and health care providers or facilities that hold relevant records may disclose the information described below to the authorized recipients listed in this section.",
           "Your authorization is voluntary. Refusing or revoking authorization will not affect your ordinary medical care or benefits, but you cannot begin or continue in this research study without the authorization required for the research.",
           "Information disclosed to a recipient may be redisclosed and may no longer be protected by the same privacy laws. The study team will use appropriate safeguards and reports or publications will not identify you."
@@ -998,8 +993,8 @@
         "controlled_recipients": [
           "study_team",
           "sponsor",
-          "irb",
-          "regulatory_when_supported"
+          "irb_or_ethics_committee",
+          "regulatory_or_government_authorities"
         ]
       },
       "validation": {
@@ -1014,7 +1009,11 @@
           ],
           [
             "institutional review board",
-            "irb"
+            "irb",
+            "ethics committee"
+          ],
+          [
+            "regulatory or government authorities"
           ]
         ],
         "required_list_term_groups": [
@@ -1027,7 +1026,11 @@
           ],
           [
             "institutional review board",
-            "irb"
+            "irb",
+            "ethics committee"
+          ],
+          [
+            "regulatory or government authorities"
           ]
         ]
       },
@@ -1382,13 +1385,12 @@
       ],
       "expected_structure": {
         "kind": "paragraphs",
-        "minimum": 3
+        "minimum": 2
       },
       "content": {
         "paragraphs": [
           "You may revoke this authorization at any time by writing to the study doctor or study site using the contact information in this form.",
-          "Revoking your authorization will stop new research collection or use when required, but the study doctor and sponsor may continue to use information already collected as permitted for study integrity, legal, regulatory, or recordkeeping purposes.",
-          "Refusing or revoking authorization does not affect your ordinary medical care or benefits. You cannot begin or continue in the research study without the authorization required for research participation."
+          "Revoking your authorization will stop new research collection or use when required, but the study doctor and sponsor may continue to use information already collected as permitted for study integrity, legal, regulatory, or recordkeeping purposes."
         ]
       }
     },

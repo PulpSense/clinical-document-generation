@@ -2543,7 +2543,7 @@ def test_long_generated_privacy_remains_splittable_without_a_large_blank(
     render_documents(ROOT, tmp_path, reference, model, artifact_names={"icf"})
     report = render_pages(tmp_path, page_renderer_identities=[governed_pdfium])
 
-    assert report["status"] == "passed"
+    assert report["status"] == "passed", report
     artifact = next(item for item in report["artifacts"] if item["artifact"] == "icf")
     pages = [
         " ".join((page.extract_text() or "").split())

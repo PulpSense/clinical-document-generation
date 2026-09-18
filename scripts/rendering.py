@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, evidence_claim_citation, facility_projection, get_path, linked_evidence_citations, meaningful, normalize_privacy_modules, normalize_visit_term, normalized_study_classification, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 
 
@@ -674,6 +674,8 @@ def _heading_level(paragraph: Paragraph) -> int | None:
 
 
 def _set_paragraph_text(paragraph: Paragraph, text: str) -> None:
+    for smart_tag in list(paragraph._p.findall(qn("w:smartTag"))):
+        paragraph._p.remove(smart_tag)
     if paragraph.runs:
         paragraph.runs[0].text = text
         for run in paragraph.runs[1:]:
@@ -719,16 +721,85 @@ def _normalize_protocol_container_introductions(
             heading._p.addnext(paragraph._p)
 
 
-def _study_descriptor(reference: Mapping[str, Any]) -> str:
+def protocol_subtitle(reference: Mapping[str, Any]) -> str:
+    """Build one grammatical subtitle from normalized source classifications."""
     branch = (canonical_study_type(get_path(reference, "meta.study_type")) or "clinical").casefold()
-    registry_type = _text(get_path(reference, "regulatory.prs.study_type")).casefold()
-    intervention_type = _text(get_path(reference, "design.intervention_type")).casefold()
-    if registry_type == "observational":
-        description = " ".join(part for part in (branch, "observational", intervention_type, "study") if part)
+    classification = normalized_study_classification(reference)
+    intervention = _text(get_path(reference, "design.intervention_type")).casefold()
+    intervention_name = _text(get_path(reference, "design.intervention_name"))
+    lens_study = "lens" in " ".join((
+        intervention,
+        intervention_name.casefold(),
+    ))
+    sterling_lens = (
+        str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"
+        and lens_study
+    )
+    if not sterling_lens:
+        registry_type = _text(get_path(reference, "regulatory.prs.study_type")).casefold()
+        if registry_type == "observational":
+            description = " ".join(
+                part for part in (branch, "observational", intervention, "study") if part
+            )
+        else:
+            description = " ".join(part for part in (branch, registry_type, "study") if part)
+        article = "An" if description[:1] in "aeiou" else "A"
+        return f"{article} {description}"
+    if classification == "Observational":
+        description = f"{branch} observational study of intraocular lenses"
+    elif classification == "Interventional":
+        kind = "medical device " if any(marker in intervention for marker in ("device", "lens")) else ""
+        description = f"{branch} interventional {kind}study"
     else:
-        description = " ".join(part for part in (branch, registry_type, "study") if part)
+        description = f"{branch} study"
     article = "An" if description[:1] in "aeiou" else "A"
     return f"{article} {description}"
+
+
+def _study_descriptor(reference: Mapping[str, Any]) -> str:
+    return protocol_subtitle(reference)
+
+
+def normalize_visit_language(text: str) -> str:
+    """Normalize visit name/timing combinations without changing visit facts."""
+    value = str(text or "")
+    value = re.sub(
+        r"\b(Preoperative screening) at the Preoperative time point\b",
+        r"\1",
+        value,
+        flags=re.I,
+    )
+    value = re.sub(
+        r"\b(?:with|at) One operative visit per eye\b",
+        "with one operative visit for each eye",
+        value,
+    )
+    value = re.sub(
+        r"\bOne\s+operative\s+visit\s+per\s+eye\b",
+        "One operative visit for each eye",
+        value,
+        flags=re.I,
+    )
+    return value
+
+
+def _normalize_source_claims(document: Document, reference: Mapping[str, Any]) -> None:
+    """Normalize visit prose and render only citations linked to exact claims."""
+    evidence_pattern = re.compile(
+        r"\b(?:(?:large|multicenter|multi-center)\s+)?"
+        r"randomi[sz]ed(?:\s+controlled)?\s+(?:trial|study)\b",
+        re.I,
+    )
+    for paragraph in _all_paragraphs(document):
+        if paragraph._p.xpath(".//w:fldChar | .//w:instrText | .//w:fldSimple"):
+            continue
+        revised = normalize_visit_language(paragraph.text)
+        if evidence_pattern.search(revised):
+            citation = evidence_claim_citation(reference, revised)
+            if citation and citation.casefold() not in revised.casefold():
+                revised = f"{revised.rstrip().rstrip('.')} ({citation})."
+        if revised != paragraph.text:
+            _set_paragraph_text(paragraph, revised)
 
 
 def _normalize_source_bound_shell(document: Document, reference: Mapping[str, Any], *, icf: bool) -> None:
@@ -1353,6 +1424,10 @@ def _normalize_icf_heading_styles(document: Document, *, sterling: bool = False)
         heading_style.element.get_or_add_pPr().append(outline)
     for index, paragraph in enumerate(document.paragraphs):
         if _is_icf_heading(paragraph):
+            # Some client headings contain Word smart-tag fragments that
+            # python-docx omits from paragraph.text but office renderers show.
+            # Re-emit the governed visible heading text and remove those stale fragments.
+            _set_paragraph_text(paragraph, paragraph.text)
             paragraph.style = heading_style
             # Same-level headings share the family body left edge; retain all
             # authority run typography and spacing, without new page rules.
@@ -1588,7 +1663,18 @@ def _normalize_protocol_running_header(document: Document) -> None:
 
 def _ensure_protocol_references(document: Document, authority: Document, reference: Mapping[str, Any]) -> None:
     """Render supplied citations without leaving an orphaned empty heading."""
-    references = _text(reference.get("references"))
+    reference_items: list[str] = []
+    supplied = reference.get("references")
+    values = supplied if isinstance(supplied, list) else [supplied]
+    for value in values:
+        if isinstance(value, Mapping):
+            citation = value.get("citation") or value.get("reference") or value.get("source")
+            if meaningful(citation):
+                reference_items.append(_text(citation))
+        elif meaningful(value):
+            reference_items.append(_text(value))
+    reference_items.extend(linked_evidence_citations(reference))
+    references = "\n".join(dict.fromkeys(filter(None, reference_items)))
     heading = next((paragraph for paragraph in document.paragraphs if paragraph.text.strip() == "REFERENCES"), None)
     if not references:
         if heading is not None:
@@ -2249,15 +2335,20 @@ def _sterling_phi_categories(reference: Mapping[str, Any]) -> list[str]:
 
 
 def _sterling_authorized_recipients(reference: Mapping[str, Any]) -> list[str]:
-    recipients = ["The study doctor, study staff, and other health care professionals involved in the study."]
+    recipients = ["The study doctor and authorized study team."]
     sponsor = get_path(reference, "parties.sponsor", {}) or {}
     sponsor_name = _text(sponsor.get("name") if isinstance(sponsor, Mapping) else sponsor)
     if sponsor_name:
-        recipients.append(f"The study sponsor, {sponsor_name}, and its authorized monitors or auditors.")
+        recipients.append(f"The sponsor, {sponsor_name}, and its authorized representatives.")
+    else:
+        recipients.append("The sponsor and its authorized representatives.")
     irb = get_path(reference, "parties.irb", {}) or {}
     irb_name = _text(irb.get("name") if isinstance(irb, Mapping) else irb)
     if irb_name:
-        recipients.append(f"The reviewing institutional review board (IRB), {irb_name}.")
+        recipients.append(f"The reviewing Institutional Review Board (IRB) or ethics committee, {irb_name}.")
+    else:
+        recipients.append("The reviewing Institutional Review Board (IRB) or ethics committee.")
+    recipients.append("Applicable regulatory or government authorities.")
     supplied = get_path(reference, "confidentiality.authorized_recipients")
     if meaningful(supplied):
         recipients.extend(_list(supplied))
@@ -2317,6 +2408,48 @@ def _normalize_lens_terminology(document: Document, reference: Mapping[str, Any]
             revised = re.sub(pattern, replacement, revised, flags=re.I)
         if revised != text:
             _set_paragraph_text(paragraph, revised)
+
+
+def _sterling_privacy_supplements(
+    model: Mapping[str, Any],
+    *,
+    governed_module_ids: set[str],
+    governed_texts: set[str],
+) -> list[tuple[str, bool]]:
+    """Preserve unique source modules while deterministic modules own their IDs."""
+    draft = (model.get("icf") or {}).get("icf.privacy", {})
+    if not isinstance(draft, Mapping):
+        return []
+    draft, conflicts = normalize_privacy_modules(draft)
+    if conflicts:
+        raise ValueError(conflicts[0]["code"])
+    blocks: list[tuple[str, bool]] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(module_id: str, text: str, is_list: bool) -> None:
+        value = _text(text)
+        normalized = _icf_heading_key(value)
+        if not value or module_id in governed_module_ids or normalized in governed_texts:
+            return
+        identity = (module_id or "unscoped", normalized)
+        if identity in seen:
+            return
+        seen.add(identity)
+        blocks.append((value, is_list))
+
+    for paragraph in draft.get("paragraphs", []):
+        if not isinstance(paragraph, Mapping):
+            continue
+        module_id = str(paragraph.get("module_id") or "")
+        for part in str(paragraph.get("text") or "").split("\n\n"):
+            add(module_id, part, False)
+    for group in draft.get("lists", []):
+        if not isinstance(group, Mapping):
+            continue
+        module_id = str(group.get("module_id") or "")
+        for item in _list(group.get("items")):
+            add(module_id, item, True)
+    return blocks
 
 
 def _assemble_sterling_fidelity_modules(
@@ -2380,6 +2513,13 @@ def _assemble_sterling_fidelity_modules(
     ]
     governed_privacy_values = [
         *(privacy.get("content") or {}).get("paragraphs", []),
+        _text((categories.get("content") or {}).get("intro")),
+        *[
+            _text(rule.get("text"))
+            for rule in (categories.get("content") or {}).get("controlled_rules", [])
+        ],
+        _text((recipients.get("content") or {}).get("intro")),
+        *_sterling_authorized_recipients(reference),
         _text((duration.get("content") or {}).get("default_text")),
         *(authorization_withdrawal.get("content") or {}).get("paragraphs", []),
         _text((post_study.get("content") or {}).get("subheading")),
@@ -2392,11 +2532,16 @@ def _assemble_sterling_fidelity_modules(
         for text in governed_privacy_values
         if _text(text)
     }
-    privacy_blocks.extend(
-        (text, is_list)
-        for text, is_list in _icf_blocks(model, "icf.privacy")
-        if _icf_heading_key(text) not in governed_privacy_texts
-    )
+    governed_privacy_module_ids = {
+        str(module.get("module_id"))
+        for module in sterling_clause_contract().get("modules", [])
+        if module.get("section_id") == "icf.privacy"
+    }
+    privacy_blocks.extend(_sterling_privacy_supplements(
+        model,
+        governed_module_ids=governed_privacy_module_ids,
+        governed_texts=governed_privacy_texts,
+    ))
     privacy_blocks.append((_text((categories.get("content") or {}).get("intro")), False))
     privacy_blocks.extend((item, True) for item in _sterling_phi_categories(reference))
     privacy_blocks.append((_text((recipients.get("content") or {}).get("intro")), False))
@@ -2726,6 +2871,16 @@ def _compact_icf_signature_end(document: Document) -> None:
         for paragraph in paragraphs[no_sign_index:final_index]:
             paragraph.paragraph_format.keep_with_next = True
             paragraph.paragraph_format.keep_together = True
+
+
+def _remove_trailing_plain_icf_blanks(document: Document) -> None:
+    """Prevent an empty terminal paragraph from creating a header-only page."""
+    for paragraph in reversed(document.paragraphs):
+        if paragraph.text.strip() or paragraph._p.xpath(
+            ".//w:fldSimple | .//w:instrText | .//w:br | .//w:drawing | .//w:pict"
+        ):
+            break
+        paragraph._p.getparent().remove(paragraph._p)
 
 
 def _normalize_icf_preferences(document: Document) -> None:
@@ -3568,6 +3723,7 @@ def _template_document(
         _normalize_retained_icf_agreement_prose(document, sterling=sterling)
         _normalize_generated_icf_privacy_prose(document, model, sterling=sterling)
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
+        _remove_trailing_plain_icf_blanks(document)
 
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -3592,6 +3748,7 @@ def _template_document(
         _normalize_protocol_contact_table(document)
         _normalize_protocol_table_pagination(document)
         _protect_protocol_heading_content(document)
+    _normalize_source_claims(document, reference)
     for repair in layout_repair_rules:
         rule = repair["rule"]
         target = repair["target"]
@@ -3835,7 +3992,6 @@ def render_documents(
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
 ) -> dict[str, Any]:
     output = revision_dir / "candidate"; output.mkdir(parents=True, exist_ok=True)
-    fields = render_fields(reference, model)
     bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
     protocol_template, icf_template = template_paths(repo_root, reference, contracted_bundle=bundle)
     boilerplate = _boilerplate(repo_root, bundle)
@@ -3844,6 +4000,31 @@ def render_documents(
     unknown_artifacts = selected - set(bundle["contracted_templates"])
     if unknown_artifacts:
         raise ValueError(f"Unknown layout-repair artifacts: {sorted(unknown_artifacts)}")
+    render_model: Mapping[str, Any] = model
+    if (
+        "icf" in selected
+        and str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"
+    ):
+        privacy = (model.get("icf") or {}).get("icf.privacy", {})
+        normalized_privacy, privacy_findings = normalize_privacy_modules(
+            privacy if isinstance(privacy, Mapping) else {}
+        )
+        if privacy_findings:
+            return {
+                "status": "blocked",
+                "contracted_template_bundle": bundle,
+                "font_substitutions": dict(font_substitutions or {}),
+                "layout_repairs": {},
+                "artifacts": [{
+                    "artifact": "icf",
+                    "path": "",
+                    "status": "blocked",
+                    "findings": privacy_findings,
+                }],
+            }
+        render_model = copy.deepcopy(dict(model))
+        render_model.setdefault("icf", {})["icf.privacy"] = normalized_privacy
+    fields = render_fields(reference, render_model)
     normalized_repairs: dict[str, list[dict[str, str]]] = {}
     for artifact, repairs in dict(layout_repairs or {}).items():
         if artifact not in selected:
@@ -3874,7 +4055,7 @@ def render_documents(
         try:
             document = _template_document(
                 reference,
-                model,
+                render_model,
                 template,
                 authority_path=authority,
                 icf=kind == "icf",
@@ -3900,7 +4081,7 @@ def render_documents(
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
         phrases = [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
         findings = audit_docx(path, required_phrases=phrases)
-        if kind == "icf" and not _icf_blocks(model, "icf.procedures"):
+        if kind == "icf" and not _icf_blocks(render_model, "icf.procedures"):
             findings.insert(0, {
                 "category": "rendering",
                 "field": "icf.procedures",

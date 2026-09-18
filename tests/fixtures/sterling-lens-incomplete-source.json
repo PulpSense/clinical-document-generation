@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "study_type": "Prospective",
+    "icf_template": "Sterling"
+  },
+  "study": {
+    "title": "Incomplete PureSee and Odyssey Lens Study",
+    "background": "The study will describe visual outcomes after cataract surgery.",
+    "hypothesis": "The studied lens combination may be associated with useful visual outcomes.",
+    "timeline": "3 months"
+  },
+  "design": {
+    "study_design": "Prospective, single-center observational study.",
+    "intervention_name": "PureSee and Odyssey intraocular lenses",
+    "intervention_type": "Medical device — intraocular lenses",
+    "number_of_sites": 1
+  },
+  "procedures": {
+    "assessments": "Preoperative screening, cataract surgery with intraocular-lens implantation, and Month 3 visual-outcome assessments.",
+    "minimum_days_before_screening_without_participation": "90 days before screening"
+  },
+  "population": {
+    "sample_size": "40 participants",
+    "sample_justification": "Forty participants will be enrolled.",
+    "inclusion_criteria": ["Adults undergoing cataract surgery."],
+    "exclusion_criteria": ["Unable to complete follow-up."]
+  },
+  "objectives": {
+    "primary": ["Describe Month 3 visual outcomes."]
+  },
+  "endpoints": {
+    "primary": [{"label": "Month 3 visual outcome", "time_point": "Month 3"}]
+  },
+  "risks_benefits": {
+    "risks": null,
+    "costs": null,
+    "injury_handling": null,
+    "compensation_or_reimbursement": "No compensation is planned."
+  },
+  "regulatory": {
+    "prs": {"study_type": "Observational"}
+  }
+}

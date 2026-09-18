@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, evidence_claim_citation, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, release_source_findings, section_applies, sterling_clause_contract, sterling_clause_text
 from drafting import evidence_grounded
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
@@ -4672,7 +4672,7 @@ def assess_protocol_concept_repetition(
 
 
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
+    findings: list[dict[str, Any]] = list(release_source_findings(reference))
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
     draftable_sections = {
@@ -4693,6 +4693,45 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     visible = "\n".join([*(p.text for p in document.paragraphs), table_text])
     normalized_visible = re.sub(r"\s+", " ", visible).casefold()
     source_visible = json.dumps(reference, ensure_ascii=False).casefold()
+    unsupported_evidence_patterns = (
+        r"\b(?:large|multicenter|multi-center) randomi[sz]ed(?: controlled)? (?:trial|study)\b.{0,80}\b(?:found|showed|suggested|reported|proved|demonstrated|concluded)\b",
+        r"\brandomi[sz]ed controlled (?:trial|study)\b.{0,80}\b(?:found|showed|suggested|reported|proved|demonstrated|concluded)\b",
+    )
+    evidence_claims = [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", visible)
+        if sentence.strip() and any(
+            re.search(pattern, sentence, re.I) for pattern in unsupported_evidence_patterns
+        )
+    ]
+    unsupported_claims = []
+    for claim in evidence_claims:
+        citation = evidence_claim_citation(reference, claim)
+        citation_anchor = (citation or "").split(".", 1)[0].strip().casefold()
+        if not citation or not citation_anchor or citation_anchor not in claim.casefold():
+            unsupported_claims.append(claim)
+    if unsupported_claims:
+        findings.append(recovery_finding({
+            "category": "content",
+            "field": "unsupported_evidence_claim",
+            "target_ids": ["introduction"],
+            "issue": "Protocol asserts a specific evidence design or scale without a usable approved citation.",
+            "required": "Render the approved citation and reference, or use neutral source-grounded wording that does not claim a specific evidence design or scale.",
+            "unsupported_claims": unsupported_claims,
+            "publication_disposition": "blocking",
+        }, "drafting_defect"))
+    for phrase in (
+        "preoperative screening at the preoperative time point",
+        "with one operative visit per eye",
+    ):
+        if phrase in normalized_visible:
+            findings.append(recovery_finding({
+                "category": "content",
+                "field": "visit_language_normalization",
+                "target_ids": ["study-procedure.visits"],
+                "issue": f"Protocol contains mechanically concatenated visit language: {phrase}",
+                "publication_disposition": "blocking",
+            }, "drafting_defect"))
     def heading_key(value: str) -> str:
         first_line = next((line for line in value.splitlines() if line.strip()), "")
         normalized = re.sub(r"(?<=\d)\.(?=\s|$)", "", first_line)

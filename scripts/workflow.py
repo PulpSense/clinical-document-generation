@@ -38,7 +38,7 @@ from docx import Document
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
-from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
+from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, parse_source_truth, protocol_contract, recovery_finding, release_source_findings, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
@@ -8138,6 +8138,9 @@ def generate(
             return _repair_block(run_dir, "approval_gate", findings)
         return {"status": "blocked", "stage": "approval_gate", "findings": findings, "client_outputs": []}
     reference = contract["normalized_reference"]
+    release_findings = release_source_findings(reference)
+    if release_findings:
+        return _repair_block(run_dir, "release_source_gate", release_findings)
     if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [{"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}], "client_outputs": []}
     state = working_reference.setdefault("generation", {})
     try:

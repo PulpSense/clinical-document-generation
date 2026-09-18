@@ -19,8 +19,8 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.28-sterling-fidelity"
-BOILERPLATE_VERSION = "clinical-boilerplate-v11"
+CONTRACT_VERSION = "clinical-documents-v2.29-sterling-source-gates"
+BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-icf-modules/v2"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
@@ -357,7 +357,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "subjects.inclusion": "Preserve every approved inclusion criterion and the approved minimum interval without participation in another study before screening as distinct, usable criteria.",
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and keep the two groups distinct.",
-        "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied.",
+        "study-design.design": "Explain the approved design, setting, arms, intervention, masking, and research-versus-routine-care assignment boundary. Use the normalized study classification consistently and do not infer assignment from procedures.",
         "study-design.bias": "Explain applicable bias controls and use only the listed boilerplate when source detail is sparse.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
         "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
@@ -368,7 +368,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
         "analysis-plan.methodology": "Explain how each endpoint is summarized or analyzed. Group endpoints sharing one method, use concise cross-references to Objectives, and do not reproduce a standalone endpoint inventory.",
         "analysis-plan.considerations": "State only source-supported cross-cutting analysis conventions or software/version details, and otherwise cross-reference Section 10.2 without repeating its methods or endpoint inventory.",
-        "sample-size": "State the approved sample size and explain its approved justification.",
+        "sample-size": "State the approved sample size and explain only its approved statistical or feasibility basis and any source-supported attrition allowance. Do not call a sample sufficient or infer an attrition rate without that support.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
         "study-procedure.discontinued": "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
         "quality-safety": (
@@ -381,14 +381,20 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "do not restate unrelated efficacy endpoints, confidence intervals, sensor outcomes, usability, "
             "or missing-data methods from a broader analysis-plan field."
         ),
+        "financial-injury": "State the approved participant-cost allocation, compensation or reimbursement terms, and research-injury care, payment, and financial responsibility. Generic promises to explain these facts later are not sufficient.",
+        "risks-benefits.risks": "State every approved study-specific foreseeable risk and mitigation without replacing surgery, device, postoperative, visual-symptom, or study-procedure facts with generic inconvenience language.",
+        "risks-benefits.benefits": "State that direct benefit is not guaranteed when supported and describe only source-supported knowledge benefits using the study's outcomes and intervention terminology. Do not include compensation or reimbursement.",
         "icf.study-purpose": "State the study purpose, hypothesis, and primary endpoint concisely in participant-facing language. Do not repeat the lens descriptions, comparative evidence, unmet evidence gap, or complete rationale owned by BACKGROUND.",
         "icf.key-information-summary": "Give five concise participant-facing summary blocks covering the study purpose, expected participation and duration, principal risks, possible benefit or absence of direct benefit, and alternatives plus voluntary participation. Do not copy detailed-section prose.",
-        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
-        "icf.duration": "State the approved participation duration and relevant time points.",
+        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, assignment boundary, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
+        "icf.duration": "State only the approved participation duration and relevant time points; do not repeat planned enrollment.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
-        "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
+        "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement. Use study-specific outcomes and intervention terminology; do not use generic condition/intervention/procedure wording or discuss compensation or reimbursement.",
         "icf.payment": "State the approved payment or reimbursement terms exactly enough for participant use.",
-        "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
+        "icf.costs": "State the approved allocation of sponsor/study costs and participant/insurer or ordinary-care costs. Generic promises that the study team will explain costs later are not sufficient.",
+        "icf.alternatives": "State that participation is optional and that the person may decline research while continuing or discussing ordinary care with the treating doctor; do not invent specific alternatives.",
+        "icf.injury": "State who provides or arranges research-injury care, whether payment or compensation is available, and who is financially responsible. Generic deferral language is not sufficient.",
+        "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language. Give each distinct source-specific privacy supplement a stable module_id so deterministic composition can preserve it exactly once.",
     }
     return (
         specific.get(section_id, f"Explain {title.lower()} using all material approved facts supplied for this section."),
@@ -430,7 +436,7 @@ def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
         "confidentiality-publication": ("confidentiality.retention",),
         "financial-injury": ("risks_benefits.injury_handling", "risks_benefits.costs"),
         "risks-benefits.risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
-        "risks-benefits.benefits": ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"),
+        "risks-benefits.benefits": ("risks_benefits.benefits",),
         "endpoint-criteria.discontinuation": ("procedures.discontinuation", "procedures.replacement"),
         "icf.procedures": ("design.intervention_description",),
         "icf.risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
@@ -496,7 +502,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
-    _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.intervention_description"), owned_concepts=("study-design", "intervention-assignment")),
+    _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.assignment_method", "design.intervention_description"), owned_concepts=("study-design", "intervention-assignment")),
     _section_spec("study-design.bias", "8.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design",), "bias"),
     _section_spec(
         "study-design.assignment",
@@ -537,7 +543,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "protocol-sparse-risks"),
-    _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"), "protocol-sparse-benefits"),
+    _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits",), "protocol-sparse-benefits"),
 )
 
 RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
@@ -581,8 +587,8 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
         boilerplate_keys=("icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"),
     ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-purpose", "study-hypothesis", "primary-endpoint"), do_not_restate_concepts=("clinical-background", "comparative-evidence", "study-rationale")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
-    _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline", "population.sample_size")),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.assignment_method", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline",)),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
     _section_spec("icf.payment", "", "Payment", "icf-narrative", ("risks_benefits.compensation_or_reimbursement",)),
@@ -776,6 +782,381 @@ def _prs_study_type_from_design(reference: Mapping[str, Any]) -> str | None:
         if (match := assertion.match(design)) is not None
     }
     return next(iter(matches)) if len(matches) == 1 else None
+
+
+def _normalized_words(value: Any) -> str:
+    return " ".join(str(value or "").casefold().split())
+
+
+def _lens_assignment_classification(reference: Mapping[str, Any]) -> str | None:
+    """Classify only affirmative, source-supported lens-assignment assertions."""
+    assertions: set[str] = set()
+    structured = get_path(reference, "design.assignment_classification")
+    if isinstance(structured, Mapping):
+        value = structured.get("value")
+        provenance = _normalized_words(structured.get("provenance"))
+        if value in PRS_STUDY_TYPES.values() and provenance in {
+            "approved source", "approved_source", "reviewer approved", "reviewer_approved",
+        }:
+            assertions.add(str(value))
+
+    assignment = _normalized_words(get_path(reference, "design.assignment_method"))
+    clauses = [item.strip() for item in re.split(r"[.;]|\bbut\b|\bhowever\b", assignment) if item.strip()]
+    negation = re.compile(
+        r"\b(?:not|never|no|neither|without)\b|"
+        r"\b(?:does|did|do|was|were|is|are)(?:\s+not|n['’]?t)\b",
+        re.I,
+    )
+
+    def affirmed(clause: str, patterns: Iterable[str]) -> bool:
+        return any(
+            not negation.search(clause[max(0, match.start() - 40):match.end()])
+            for pattern in patterns
+            for match in re.finditer(pattern, clause, re.I)
+        )
+
+    routine_care_patterns = (
+        r"\b(?:lens|intervention)\s+select(?:ion|ions|ed)?\b.{0,100}\b(?:routine|ordinary)[- ](?:clinical[- ]?)?care\b",
+        r"\b(?:routine|ordinary)[- ](?:clinical[- ]?)?care\b.{0,100}\b(?:lens|intervention)\s+select(?:ion|ions|ed)?\b",
+    )
+    independence_patterns = (
+        r"\b(?:lens|intervention)\s+select(?:ion|ions)?\b.{0,35}\b(?:independent|independently)\b",
+        r"\b(?:lens|intervention)\b.{0,20}\bselected\s+independently\b",
+        r"\b(?:investigator|doctor|surgeon)\b.{0,25}\bindependently\s+selects?\b.{0,20}\b(?:lens|intervention)\b",
+        r"\b(?:lens|intervention)\s+select(?:ion|ions|ed)?\b.{0,100}\bbefore\s+(?:study\s+)?(?:enrollment|participation)\b",
+    )
+    research_patterns = (
+        r"\bparticipants?\b.{0,40}\bassigned\b.{0,50}\b(?:to\s+receive|lens|intervention|treatment)\b.{0,60}\bby\s+(?:the\s+)?(?:study|research)\s+protocol\b",
+        r"\b(?:lens|intervention)\s+assignments?\b.{0,100}\bdetermined\b.{0,100}\bby\s+(?:the\s+)?(?:study|research)\s+protocol\b",
+        r"\b(?:study|research)\s+protocol\b.{0,50}\b(?:assigns?|determines?|dictates?)\b.{0,50}\b(?:lens|intervention|treatment)\b",
+        r"\bparticipants?\b.{0,40}\brandomi[sz]ed\b.{0,40}\b(?:to\s+receive|lens|intervention|treatment)\b",
+    )
+    for clause in clauses:
+        routine_care = affirmed(clause, routine_care_patterns)
+        independent = affirmed(clause, independence_patterns)
+        if routine_care and independent:
+            assertions.add("Observational")
+        if affirmed(clause, research_patterns):
+            assertions.add("Interventional")
+    if len(assertions) != 1:
+        return None
+    return next(iter(assertions))
+
+
+def _is_lens_assignment_study(reference: Mapping[str, Any]) -> bool:
+    evidence = " ".join(
+        _normalized_words(get_path(reference, path))
+        for path in (
+            "design.intervention_name",
+            "design.intervention_type",
+            "design.intervention_description",
+            "procedures.assessments",
+            "procedures.visit_schedule",
+        )
+    )
+    return any(marker in evidence for marker in ("intraocular lens", " lens ", "lens implantation")) and any(
+        marker in evidence for marker in ("implant", "operative", "cataract surgery")
+    )
+
+
+def normalized_study_classification(reference: Mapping[str, Any]) -> str | None:
+    """Return one source-supported document classification, or None on ambiguity."""
+    declared = get_path(reference, "regulatory.prs.study_type")
+    declared = str(declared) if declared in PRS_STUDY_TYPES.values() else None
+    design = _prs_study_type_from_design(reference)
+    lens_study = _is_lens_assignment_study(reference)
+    assignment = _lens_assignment_classification(reference) if lens_study else None
+    if lens_study and assignment is None:
+        return None
+    supported = assignment or design or declared
+    if not supported:
+        return None
+    assertions = {item for item in (declared, design, assignment) if item}
+    return supported if len(assertions) == 1 else None
+
+
+def _has_all_groups(text: str, groups: Iterable[Iterable[str]]) -> bool:
+    return all(any(marker in text for marker in group) for group in groups)
+
+
+def _contains_unresolved_policy(text: str) -> bool:
+    return any(marker in text for marker in (
+        "unknown", "unresolved", "not specified", "not established",
+        "to be determined", "not yet determined", "will explain", "explain later",
+        "will be explained", "depends on information not provided",
+    ))
+
+
+def _cost_allocation_complete(value: Any) -> bool:
+    text = _normalized_words(value)
+    if not text or _contains_unresolved_policy(text):
+        return False
+    study_allocation = any(re.search(pattern, text) for pattern in (
+        r"\b(?:sponsor|study)\b.{0,45}\b(?:pays?|will\s+pay|will\s+not\s+pay|covers?|will\s+cover|provided\s+at\s+no\s+cost|study-only)\b",
+        r"\bstudy-only\b.{0,35}\b(?:paid|covered|testing|procedure|visit|device)\b",
+    ))
+    participant_allocation = any(re.search(pattern, text) for pattern in (
+        r"\b(?:participant|you|insurer|insurance)\b.{0,55}\b(?:responsible|billed|will\s+pay|pays?|no\s+cost)\b",
+        r"\b(?:billed|charged)\s+to\b.{0,35}\b(?:participant|you|insurer|insurance)\b",
+        r"\b(?:ordinary|usual)\s+care\b.{0,55}\b(?:participant|you|insurer|insurance|billed|covered)\b",
+    ))
+    return study_allocation and participant_allocation
+
+
+def _injury_policy_complete(value: Any) -> bool:
+    text = _normalized_words(value)
+    if not text or _contains_unresolved_policy(text):
+        return False
+    care = any(re.search(pattern, text) for pattern in (
+        r"\b(?:study\s+doctor|investigator|sponsor|study)\s+(?:will\s+)?(?:arrange|provide)s?\b.{0,30}\b(?:care|treatment)\b",
+        r"\bparticipant\b.{0,30}\bmust\s+(?:obtain|seek)\b.{0,25}\b(?:care|treatment)\b",
+        r"\b(?:care|treatment)\b.{0,35}\b(?:will\s+be\s+)?(?:arranged|provided)\s+by\b",
+    ))
+    compensation = any(re.search(pattern, text) for pattern in (
+        r"\bno\s+(?:additional\s+)?compensation\b",
+        r"\bcompensation\b.{0,30}\b(?:is|will\s+be)\s+(?:available|provided|unavailable|not\s+available)\b",
+        r"\bpayment\b.{0,30}\b(?:is|will\s+be)\s+(?:available|provided|unavailable|not\s+available)\b",
+    ))
+    responsibility = any(re.search(pattern, text) for pattern in (
+        r"\b(?:participant|you|insurer|insurance|sponsor|study)\b.{0,45}(?<!not\s)\b(?:is|are)\s+(?:financially\s+)?responsible\b",
+        r"\b(?:participant|you|insurer|insurance|sponsor|study)\b.{0,45}\bwill\s+pay\b",
+        r"\b(?:costs?|expenses?)\b.{0,35}\b(?:covered|paid)\s+by\b",
+    ))
+    return care and compensation and responsibility
+
+
+def _sample_size_rationale_complete(value: Any) -> bool:
+    text = _normalized_words(value)
+    if not text:
+        return False
+    statistical = any(marker in text for marker in ("power", "precision", "confidence interval", "standard error")) and any(
+        marker in text for marker in ("assumption", "effect size", "variance", "alpha", "%", "estimate")
+    )
+    feasibility = "feasibility" in text and any(
+        marker in text for marker in ("site", "recruit", "eligible", "volume", "capacity", "enrollment")
+    )
+    pilot = any(marker in text for marker in ("pilot", "exploratory")) and any(
+        marker in text for marker in ("characterize", "estimate", "variability", "planning", "feasibility")
+    )
+    evaluable = "evaluable" in text and any(
+        marker in text for marker in ("source-supported", "historical", "power", "precision", "feasibility", "pilot")
+    )
+    basis = statistical or feasibility or pilot or evaluable
+    attrition_claim = any(marker in text for marker in ("dropout", "attrition", "withdrawn", "nonevaluable"))
+    attrition_supported = any(marker in text for marker in (
+        "source-supported", "historical", "prior retention", "observed retention", "retention data",
+    ))
+    return basis and (not attrition_claim or attrition_supported)
+
+
+def evidence_claim_citation(reference: Mapping[str, Any], claim: str) -> str | None:
+    """Return the citation explicitly bound to this approved evidence claim."""
+    normalized_claim = _normalized_words(claim).rstrip(".")
+    records: list[Mapping[str, Any]] = []
+    for path in ("study.background_evidence", "study.background_citations", "references"):
+        value = get_path(reference, path)
+        if isinstance(value, list):
+            records.extend(item for item in value if isinstance(item, Mapping))
+        elif isinstance(value, Mapping):
+            records.append(value)
+    for record in records:
+        supported_claim = _normalized_words(
+            record.get("claim") or record.get("source_passage") or record.get("conclusion")
+        ).rstrip(".")
+        citation = record.get("citation") or record.get("reference") or record.get("source")
+        if meaningful(citation) and supported_claim and (
+            supported_claim in normalized_claim or normalized_claim in supported_claim
+        ):
+            return " ".join(str(citation).split())
+    return None
+
+
+def evidence_claim_supported(reference: Mapping[str, Any], claim: str) -> bool:
+    """Require an approved record that binds this exact evidence claim to its citation."""
+    return evidence_claim_citation(reference, claim) is not None
+
+
+def linked_evidence_citations(reference: Mapping[str, Any]) -> list[str]:
+    """Return unique citations from claim-linked approved evidence records."""
+    citations: list[str] = []
+    for path in ("study.background_evidence", "study.background_citations"):
+        value = get_path(reference, path)
+        records = value if isinstance(value, list) else [value]
+        for record in records:
+            if not isinstance(record, Mapping) or not meaningful(
+                record.get("claim") or record.get("source_passage") or record.get("conclusion")
+            ):
+                continue
+            citation = record.get("citation") or record.get("reference") or record.get("source")
+            if meaningful(citation):
+                citations.append(" ".join(str(citation).split()))
+    return list(dict.fromkeys(citations))
+
+
+def normalize_privacy_modules(
+    section: Mapping[str, Any],
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    """Deduplicate identical privacy modules and reject conflicting same-ID payloads."""
+    records: list[tuple[str, dict[str, Any], str]] = []
+    for kind, key in (("paragraph", "paragraphs"), ("list", "lists")):
+        values = section.get(key) if isinstance(section.get(key), list) else []
+        for value in values:
+            if not isinstance(value, Mapping):
+                continue
+            item = copy.deepcopy(dict(value))
+            module_id = str(item.get("module_id") or "").strip()
+            if kind == "paragraph":
+                canonical_content: Any = " ".join(str(item.get("text") or "").split())
+            else:
+                canonical_content = [
+                    " ".join(str(entry).split())
+                    for entry in item.get("items", [])
+                    if str(entry).strip()
+                ]
+            canonical = json.dumps(
+                {"kind": kind, "content": canonical_content},
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            if module_id:
+                item["module_id"] = module_id
+                if kind == "paragraph":
+                    item["text"] = canonical_content
+                else:
+                    item["items"] = canonical_content
+            records.append((kind, item, canonical))
+
+    payloads: dict[str, set[str]] = {}
+    for _kind, item, canonical in records:
+        module_id = str(item.get("module_id") or "")
+        if module_id:
+            payloads.setdefault(module_id, set()).add(canonical)
+    conflicts = {
+        module_id: sorted(values)
+        for module_id, values in payloads.items()
+        if len(values) > 1
+    }
+    findings = [
+        {
+            "code": f"conflicting_privacy_module:{module_id}",
+            "category": "source-evidence",
+            "field": "icf.privacy",
+            "module_id": module_id,
+            "target_ids": ["icf.privacy"],
+            "issue": f"Approved privacy payloads disagree for module_id {module_id}.",
+            "required": "Provide one approved payload for this privacy module identity.",
+            "payload_sha256s": sorted(
+                hashlib.sha256(value.encode("utf-8")).hexdigest()
+                for value in values
+            ),
+            "publication_disposition": "blocking",
+        }
+        for module_id, values in sorted(conflicts.items())
+    ]
+
+    normalized: dict[str, list[dict[str, Any]]] = {"paragraphs": [], "lists": []}
+    seen: set[str] = set()
+    for kind, item, _canonical in records:
+        module_id = str(item.get("module_id") or "")
+        if module_id in conflicts:
+            continue
+        if module_id and module_id in seen:
+            continue
+        if module_id:
+            seen.add(module_id)
+        normalized["paragraphs" if kind == "paragraph" else "lists"].append(item)
+    return normalized, findings
+
+
+def release_source_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Return post-approval facts that must block document release when absent.
+
+    These are deliberately separate from ``input_findings``: they do not expand
+    the reviewer-intake checklist, but generic deferred prose cannot satisfy the
+    Protocol or ICF release contract.
+    """
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    if branch not in {"Prospective", "Ambispective"}:
+        return []
+    findings: list[dict[str, Any]] = []
+
+    def add(field: str, issue: str, required: str, artifacts: Iterable[str]) -> None:
+        findings.append({
+            "category": "source-evidence",
+            "field": field,
+            "issue": issue,
+            "required": required,
+            "affected_artifacts": list(artifacts),
+            "publication_disposition": "blocking",
+            "safety_critical": field in {
+                "study_specific_foreseeable_risks", "research_injury_responsibility",
+                "study_design_classification",
+            },
+        })
+
+    classification = normalized_study_classification(reference)
+    if classification is None or (
+        _is_lens_assignment_study(reference)
+        and _lens_assignment_classification(reference) is None
+    ):
+        add(
+            "study_design_classification",
+            "The approved source does not resolve whether lens assignment is observational or interventional, or its classification facts conflict.",
+            "Submit a separately approved source correction stating whether the studied lens assignments are determined by the research protocol or selected independently as routine clinical care before study participation.",
+            ("protocol.docx", "icf.docx"),
+        )
+
+    risks = _normalized_words(get_path(reference, "risks_benefits.risks"))
+    generic_risk_markers = (
+        "study team will explain", "will be explained later", "risks will be discussed",
+    )
+    lens_risk_groups = (
+        ("cataract surgery", "surgical risk", "surgery risk"),
+        ("intraocular lens", "lens-related", "device-related"),
+        ("postoperative", "after surgery", "post-operative"),
+        ("visual symptom", "visual disturbance", "dysphotops"),
+        ("study procedure", "study eye examination", "research procedure", "study examination"),
+    )
+    risks_complete = bool(risks) and not any(marker in risks for marker in generic_risk_markers)
+    if _is_lens_assignment_study(reference):
+        risks_complete = risks_complete and _has_all_groups(risks, lens_risk_groups)
+    if not risks_complete:
+        add(
+            "study_specific_foreseeable_risks",
+            "Study-specific foreseeable risks are missing or generic deferral language was supplied.",
+            "Provide source-supported foreseeable risks for the study, including as applicable cataract-surgery, intraocular-lens/device, postoperative, visual-symptom, and additional study-procedure risks; do not invent a risk list.",
+            ("protocol.docx", "icf.docx"),
+        )
+
+    if not _cost_allocation_complete(get_path(reference, "risks_benefits.costs")):
+        add(
+            "participant_cost_allocation",
+            "The approved source does not allocate participant, insurer, sponsor, and study costs.",
+            "State which study-related procedures, devices, visits, treatment, and ordinary-care items are paid by the sponsor or study, billed to the participant or insurer, or otherwise assigned.",
+            ("protocol.docx", "icf.docx"),
+        )
+
+    if not _injury_policy_complete(get_path(reference, "risks_benefits.injury_handling")):
+        add(
+            "research_injury_responsibility",
+            "Research-injury care, payment or compensation, and financial responsibility are not established by the approved source.",
+            "State who provides or arranges care for a research-related injury, whether payment or compensation is available, and who is financially responsible.",
+            ("protocol.docx", "icf.docx"),
+        )
+
+    justification = (
+        get_path(reference, "population.sample_justification")
+        or get_path(reference, "statistics.sample_size_justification")
+    )
+    if not _sample_size_rationale_complete(justification):
+        add(
+            "sample_size_justification",
+            "The sample-size rationale or attrition allowance is asserted without an approved statistical or feasibility basis.",
+            "Provide approved support for the evaluable sample-size rationale and any dropout or attrition assumption; do not infer an attrition rate from planned and evaluable counts alone.",
+            ("protocol.docx",),
+        )
+    return findings
 
 
 def document_set(value: Any) -> tuple[str, ...]:
@@ -1159,6 +1540,24 @@ def _sample_size_evidence_rows(reference: Mapping[str, Any]) -> list[Mapping[str
     return [row for _path, _index, row in _sample_size_evidence_records(reference)]
 
 
+def normalize_visit_term(value: Any) -> str:
+    """Normalize source visit labels/timing without changing their meaning."""
+    text = re.sub(r"\s+", " ", str(value or "")).strip()
+    text = re.sub(
+        r"\bPreoperative screening at the Preoperative time point\b",
+        "Preoperative screening",
+        text,
+        flags=re.I,
+    )
+    text = re.sub(
+        r"\bOne operative visit per eye\b",
+        "One operative visit for each eye",
+        text,
+        flags=re.I,
+    )
+    return text
+
+
 def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Combine the approved visit inventory and procedure relationships.
 
@@ -1172,8 +1571,8 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
         raw = get_path(reference, path, [])
         source_rows = [row for row in raw if isinstance(row, Mapping)] if isinstance(raw, list) else []
         source_keys = [
-            (str(row.get("visit") or row.get("visitName") or "").strip(),
-             str(row.get("timing") or row.get("visitWindow") or "").strip())
+            (normalize_visit_term(row.get("visit") or row.get("visitName")),
+             normalize_visit_term(row.get("timing") or row.get("visitWindow")))
             for row in source_rows
         ]
         for row in source_rows:
@@ -1182,8 +1581,8 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
             ):
                 continue
             record = copy.deepcopy(dict(row))
-            record["visit"] = str(row.get("visit") or row.get("visitName") or "").strip()
-            record["timing"] = str(row.get("timing") or row.get("visitWindow") or "").strip()
+            record["visit"] = normalize_visit_term(row.get("visit") or row.get("visitName"))
+            record["timing"] = normalize_visit_term(row.get("timing") or row.get("visitWindow"))
             raw_procedures = row.get("procedures", [])
             record["procedures"] = (
                 [str(item).strip() for item in raw_procedures if meaningful(item)]

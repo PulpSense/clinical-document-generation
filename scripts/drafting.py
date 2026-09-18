@@ -32,6 +32,7 @@ from contracts import (
     icf_contract,
     icf_summary_obligations,
     meaningful,
+    normalize_privacy_modules,
     normalized_visit_records,
     protocol_contract,
     source_evidence_coverage_map,
@@ -112,6 +113,9 @@ def _request_constraints() -> list[str]:
         "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+        "Do not assert an evidence design or scale (for example, a large randomized controlled trial) unless the approved source includes a usable supporting citation; preserve the supported conclusion in neutral wording when no citation is available.",
+        "Normalize visit names and timing into natural sentences (for example, Preoperative screening and One operative visit for each eye); do not mechanically concatenate a visit name with a duplicate time-point phrase.",
+        "Generic promises that the study team will later explain risks, costs, or research-injury responsibility do not satisfy those sections.",
         "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
         "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays.",
     ]
@@ -383,6 +387,14 @@ def _section_payload(
         ([section.boilerplate_key] if section.boilerplate_key else [])
         + list(section.boilerplate_keys)
     ))
+    source_replaces_boilerplate = {
+        "financial-injury", "risks-benefits.risks", "risks-benefits.benefits",
+        "icf.risks", "icf.benefits", "icf.costs", "icf.alternatives",
+    }
+    if section.section_id in source_replaces_boilerplate and any(
+        meaningful(get_path(reference, path)) for path in section.evidence
+    ):
+        boilerplate_keys = ()
     if boilerplate_keys:
         allowed.append("fixed_boilerplate")
     for boilerplate_key in boilerplate_keys:
@@ -1140,6 +1152,7 @@ def _validate_paragraph(
     if not isinstance(paragraph, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}]
     text = str(paragraph.get("text") or "").strip()
+    module_id = str(paragraph.get("module_id") or "").strip()
     evidence_refs = paragraph.get("evidence_refs") if isinstance(paragraph.get("evidence_refs"), list) else []
     boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
     if len(text.split()) < 5:
@@ -1161,7 +1174,15 @@ def _validate_paragraph(
         findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported boilerplate references: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
     if not evidence_refs and not boilerplate_refs:
         findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)})
-    return {"text": text, "evidence_refs": list(map(str, evidence_refs)), "boilerplate_refs": list(map(str, boilerplate_refs))}, findings
+    if module_id and (
+        section_id != "icf.privacy"
+        or re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,127}", module_id) is None
+    ):
+        findings.append({"category": "drafting", "field": section_id, "issue": "Privacy module_id is invalid or is used outside icf.privacy.", "next_action": "Use one stable lowercase privacy module identifier containing only letters, digits, dots, underscores, or hyphens."})
+    clean = {"text": text, "evidence_refs": list(map(str, evidence_refs)), "boilerplate_refs": list(map(str, boilerplate_refs))}
+    if module_id:
+        clean["module_id"] = module_id
+    return clean, findings
 
 
 def _validate_list(
@@ -1174,6 +1195,7 @@ def _validate_list(
     if not isinstance(group, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}]
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
+    module_id = str(group.get("module_id") or "").strip()
     evidence_refs = list(map(str, group.get("evidence_refs") or [])); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
     findings: list[dict[str, Any]] = []
     if not items or any(not _substantive_list_item(item) for item in items):
@@ -1185,7 +1207,15 @@ def _validate_list(
     if invalid_evidence or unrelated: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported section evidence: {', '.join(invalid_evidence or unrelated)}", "next_action": "Cite only listed section evidence."})
     if invalid_boilerplate: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported boilerplate: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
     if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="List", position=position)})
-    return {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}, findings
+    if module_id and (
+        section_id != "icf.privacy"
+        or re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,127}", module_id) is None
+    ):
+        findings.append({"category": "drafting", "field": section_id, "issue": "Privacy module_id is invalid or is used outside icf.privacy.", "next_action": "Use one stable lowercase privacy module identifier containing only letters, digits, dots, underscores, or hyphens."})
+    clean = {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}
+    if module_id:
+        clean["module_id"] = module_id
+    return clean, findings
 
 
 def _normalized_prose(value: Any) -> str:
@@ -1427,6 +1457,14 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id, position)
             findings.extend(list_findings)
             if clean_group: lists.append(clean_group)
+        if section_id == "icf.privacy":
+            normalized_privacy, privacy_findings = normalize_privacy_modules({
+                "paragraphs": clean_paragraphs,
+                "lists": lists,
+            })
+            clean_paragraphs = normalized_privacy["paragraphs"]
+            lists = normalized_privacy["lists"]
+            findings.extend(privacy_findings)
         combined_content = "\n".join(
             [paragraph["text"] for paragraph in clean_paragraphs]
             + [item for group in lists for item in group["items"]]

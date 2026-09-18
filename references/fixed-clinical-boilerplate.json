@@ -1,5 +1,5 @@
 {
-  "version": "clinical-boilerplate-v11",
+  "version": "clinical-boilerplate-v12",
   "sections": {
     "bias": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
     "analysis-considerations-cross-reference": "The statistical methods for the study endpoints are described in the preceding Statistical Methodology section.",
@@ -17,7 +17,7 @@
     "ethics-confidentiality": "The study will be conducted under the approved protocol, applicable institutional review board requirements, and applicable ethical and privacy protections. Study records will use appropriate identifiers and access controls. Identifiable information will be available only to authorized personnel and oversight bodies as permitted by the approved protocol and applicable law.",
     "confidentiality-cross-reference": "Confidentiality protections for study records and participant information are described in Section 16.",
     "confidentiality": "Study records will use appropriate identifiers and access controls. Identifiable information will be available only to authorized personnel and oversight bodies as permitted by the approved protocol and applicable law.",
-    "injury": "If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. The study team will explain available care and any responsibility for related costs. Signing this form does not waive your legal rights.",
+    "injury": "If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. Signing this form does not waive your legal rights.",
     "completion": "Participant completion requires fulfillment of the approved participant-completion criteria. Discontinuation is a distinct participant disposition, not completion; closeout documentation does not change that disposition.",
     "study-completion": "Study completion follows the approved study-completion criteria and applicable closeout requirements. Participant completion and discontinuation remain distinct dispositions in the study records.",
     "termination": "The investigator may end an individual participant's study participation when continued participation is unsafe, eligibility is no longer met, required follow-up cannot be completed, or the approved protocol otherwise requires termination.",
