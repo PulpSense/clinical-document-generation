@@ -369,6 +369,29 @@ def test_lens_terminology_is_specific_and_generic_drug_product_terms_are_absent(
     )
 
 
+@pytest.mark.parametrize("surface", ["table", "header", "footer"])
+def test_lens_terminology_validation_covers_every_docx_surface(tmp_path, surface):
+    path, document = render(tmp_path / surface)
+    if surface == "table":
+        document.add_table(rows=1, cols=1).cell(0, 0).text = "Study drug"
+    else:
+        part = (
+            document.sections[0].header
+            if surface == "header"
+            else document.sections[0].footer
+        )
+        part.add_paragraph("Study drug")
+    broken = tmp_path / f"{surface}-terminology.docx"
+    document.save(broken)
+
+    report = quality.validate_sterling_clause_contract(broken, source())
+    assert any(
+        item.get("code") == "sterling-intervention-terminology-invalid"
+        and "study drug" in item.get("prohibited_terms", [])
+        for item in report["findings"]
+    )
+
+
 def test_no_drafting_instructions_merge_fields_unused_alternatives_or_duplication(tmp_path):
     path, document = render(tmp_path)
     text = visible(document)

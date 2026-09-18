@@ -3804,6 +3804,22 @@ def _normalized_substantive_text(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
 
 
+def _all_docx_paragraphs(document: Document) -> Iterable[Paragraph]:
+    """Yield body, table, header, and footer paragraphs for exact-artifact checks."""
+    yield from document.paragraphs
+    for table in document.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                yield from cell.paragraphs
+    for section in document.sections:
+        for part in (section.header, section.footer):
+            yield from part.paragraphs
+            for table in part.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        yield from cell.paragraphs
+
+
 def _sterling_clause_sections(document: Document) -> dict[str, list[str]]:
     """Read governed sections in body order, including table-contained text."""
     contract = sterling_clause_contract()
@@ -4268,7 +4284,7 @@ def validate_sterling_clause_contract(
     )
     if isinstance(applicable_profile, Mapping):
         whole_document = _normalized_substantive_text(
-            " ".join(paragraph.text for paragraph in document.paragraphs)
+            " ".join(paragraph.text for paragraph in _all_docx_paragraphs(document))
         )
         prohibited = [
             str(term)
