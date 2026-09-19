@@ -289,6 +289,284 @@ def test_lens_assignment_classification_is_polarity_aware(assignment, declared, 
 
 
 @pytest.mark.parametrize(
+    ("assignment", "expected"),
+    [
+        (
+            "The lens is selected independently during routine clinical care before study participation",
+            "Observational",
+        ),
+        (
+            "THE LENS IS SELECTED INDEPENDENTLY DURING ROUTINE CLINICAL CARE BEFORE STUDY PARTICIPATION!",
+            "Observational",
+        ),
+        (
+            "Before enrollment, the surgeon independently selects the lens as part of ordinary clinical care.",
+            "Observational",
+        ),
+        (
+            "Lens selection is independently completed in routine care before research participation.",
+            "Observational",
+        ),
+        (
+            "Lens selection is determined by the research protocol",
+            "Interventional",
+        ),
+        (
+            "LENS SELECTION IS DETERMINED BY THE RESEARCH PROTOCOL!",
+            "Interventional",
+        ),
+        (
+            "The study protocol determines lens selection before enrollment.",
+            "Interventional",
+        ),
+        (
+            "The intraocular lens is assigned by the study protocol.",
+            "Interventional",
+        ),
+    ],
+)
+def test_affirmative_lens_assignment_forms_are_classified(assignment, expected):
+    reference = fixture()
+    reference["design"]["assignment_method"] = assignment
+    reference["regulatory"]["prs"]["study_type"] = expected
+    reference["design"]["study_design"] = (
+        f"Prospective, single-center {expected.casefold()} medical device study."
+    )
+    assert contracts.normalized_study_classification(reference) == expected
+    assert not any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+@pytest.mark.parametrize(
+    "assignment",
+    [
+        "The lens is not selected independently during routine clinical care before study participation.",
+        "THE LENS ISN'T SELECTED INDEPENDENTLY DURING ROUTINE CLINICAL CARE BEFORE STUDY PARTICIPATION!",
+        "Before enrollment, the surgeon does not independently select the lens as part of ordinary clinical care.",
+        "Lens selection is not independently completed in routine care before research participation.",
+        "Lens selection is not determined by the research protocol.",
+        "LENS SELECTION ISN'T DETERMINED BY THE RESEARCH PROTOCOL!",
+        "The study protocol does not determine lens selection before enrollment.",
+        "The intraocular lens is not assigned by the study protocol.",
+        "The lens cannot be assigned by the study protocol.",
+        "The lens hasn't been assigned by the study protocol.",
+        "The lens mustn't be assigned by the study protocol.",
+        "Nor is the lens assigned by the study protocol.",
+        "It can't be true that lens selection is determined by the research protocol.",
+        (
+            "It is not the case, despite the preliminary planning discussion and review, "
+            "that the intraocular lens is assigned by the study protocol."
+        ),
+        (
+            "It is not the case, after the clinical team completed a detailed review of the "
+            "screening schedule, operative workflow, follow-up plan, questionnaire sequence, "
+            "and data-management procedures, that lens selection is determined by the research protocol."
+        ),
+        (
+            "It is not true, after review of the study procedures, that the lens is determined "
+            "by the research protocol."
+        ),
+        (
+            "It is not the case, after the clinical team reviewed the screening schedule, "
+            "operative workflow, and follow-up plan, that the lens is selected independently "
+            "during routine clinical care before study participation."
+        ),
+    ],
+)
+def test_negated_affirmative_lens_assignment_forms_do_not_classify(assignment):
+    reference = fixture()
+    reference["design"]["assignment_method"] = assignment
+    reference["design"]["study_design"] = "Prospective single-center lens study."
+    reference["regulatory"]["prs"].pop("study_type")
+    assert contracts.normalized_study_classification(reference) is None
+    assert any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+@pytest.mark.parametrize(
+    "assignment",
+    [
+        (
+            "It is not the case—after the clinical team reviewed the screening schedule; "
+            "the operative workflow; the follow-up plan; the questionnaire sequence; and "
+            "the data-management procedures—that lens selection is determined by the "
+            "research protocol."
+        ),
+        (
+            "It is not true—after review of the screening schedule; operative workflow; "
+            "and follow-up plan—that the intraocular lens is assigned by the study protocol."
+        ),
+        (
+            "It isn't true—after review of the screening schedule; operative workflow; "
+            "and follow-up plan—that the lens is selected independently during routine "
+            "clinical care before study participation."
+        ),
+        (
+            "It is not the case—after the team confirmed that screening was complete; "
+            "the workflow was reviewed; and follow-up was approved—that lens selection "
+            "is determined by the research protocol."
+        ),
+        (
+            "It is not the case that, after review of the screening schedule; operative "
+            "workflow; and follow-up plan, lens selection is determined by the research protocol."
+        ),
+        (
+            "It wasn't true—after review of the screening schedule; operative workflow; "
+            "and follow-up plan—that the lens is assigned by the study protocol."
+        ),
+        (
+            "It is not the case, after the team reported, in a note, that screening was "
+            "complete; and confirmed follow-up, that lens selection is determined by the "
+            "research protocol."
+        ),
+        (
+            "It is not true that questionnaire order is randomized; it wasn't true—after "
+            "review of the screening schedule; operative workflow; and follow-up plan—that "
+            "the lens is assigned by the study protocol."
+        ),
+        (
+            "It is not true that the note says 'screening; lens selection is determined by "
+            "the research protocol'."
+        ),
+        (
+            "It was not the case that the note said \"screening; the lens is assigned by "
+            "the study protocol.\""
+        ),
+        (
+            "It is not true that questionnaire order is randomized, and it isn't true; "
+            "lens selection is determined by the research protocol."
+        ),
+        (
+            "It is not the case after the team said that screening was complete; follow-up "
+            "was approved that lens selection is determined by the research protocol."
+        ),
+        (
+            "It is not true that questionnaire order is randomized and it isn't true because "
+            "the note says that follow-up was approved; lens selection is determined by the "
+            "research protocol."
+        ),
+    ],
+)
+def test_governing_negation_preserves_internal_semicolons(assignment):
+    reference = fixture()
+    reference["design"]["assignment_method"] = assignment
+    reference["design"]["study_design"] = "Prospective single-center lens study."
+    reference["regulatory"]["prs"].pop("study_type")
+    assert contracts.normalized_study_classification(reference) is None
+    assert any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+def test_ambiguous_governing_negation_punctuation_blocks_classification():
+    reference = fixture()
+    reference["design"]["assignment_method"] = (
+        "It is not the case; lens selection is determined by the research protocol."
+    )
+    reference["design"]["study_design"] = "Prospective single-center lens study."
+    reference["regulatory"]["prs"].pop("study_type")
+    assert contracts.normalized_study_classification(reference) is None
+    assert any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+@pytest.mark.parametrize(
+    ("assignment", "expected"),
+    [
+        (
+            "Questionnaire order is not randomized, and lens selection is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "Questionnaire order isn't randomized, yet lens selection is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "Questionnaire order is not randomized; lens selection is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "Questionnaire order is not randomized and lens selection is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "Questionnaire order is not randomized and the study protocol determines lens selection.",
+            "Interventional",
+        ),
+        (
+            "Questionnaire order is not randomized and the surgeon independently selects the lens "
+            "during routine clinical care before study participation.",
+            "Observational",
+        ),
+        (
+            "It is not the case that questionnaire order is randomized; "
+            "lens selection is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "It is not true that questionnaire order is randomized, and lens selection "
+            "is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "It is not true that questionnaire order is randomized and lens selection "
+            "is determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "It isn’t true that questionnaire order is randomized; lens selection is "
+            "determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "It wasn’t true that questionnaire order was randomized and lens selection is "
+            "determined by the research protocol.",
+            "Interventional",
+        ),
+        (
+            "Follow-up timing is not assigned by the study, and the lens is selected independently "
+            "during routine clinical care before study participation.",
+            "Observational",
+        ),
+    ],
+)
+def test_unrelated_negative_clause_does_not_negate_separate_affirmative_assignment(
+    assignment, expected
+):
+    reference = fixture()
+    reference["design"]["assignment_method"] = assignment
+    reference["regulatory"]["prs"]["study_type"] = expected
+    reference["design"]["study_design"] = (
+        f"Prospective, single-center {expected.casefold()} medical device study."
+    )
+    assert contracts.normalized_study_classification(reference) == expected
+    assert not any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+def test_mixed_affirmative_lens_assignment_forms_block_classification():
+    reference = fixture()
+    reference["design"]["assignment_method"] = (
+        "The lens is selected independently during routine clinical care before study participation; "
+        "however, lens selection is determined by the research protocol."
+    )
+    assert contracts.normalized_study_classification(reference) is None
+    assert any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+@pytest.mark.parametrize(
     ("costs", "valid"),
     [
         ("The sponsor pays study-only testing. Ordinary care may be billed to the participant or insurer.", True),

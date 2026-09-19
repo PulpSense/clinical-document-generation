@@ -801,23 +801,215 @@ def _lens_assignment_classification(reference: Mapping[str, Any]) -> str | None:
             assertions.add(str(value))
 
     assignment = _normalized_words(get_path(reference, "design.assignment_method"))
-    clauses = [item.strip() for item in re.split(r"[.;]|\bbut\b|\bhowever\b", assignment) if item.strip()]
+    governing_negation_start = re.compile(
+        r"\b(?:not\s+(?:the\s+case|true)|"
+        r"it\s+(?:(?:is|was)\s+not|(?:isn|wasn)['’]?t)\s+(?:the\s+case|true)|"
+        r"it\s+(?:cannot|can['’]?t)\s+be\s+(?:the\s+case|true)|"
+        r"it['’]?s\s+not\s+(?:the\s+case|true))\b",
+        re.I,
+    )
+    independent_clause_boundary = re.compile(
+        r";|\bbut\b|\bhowever\b|,\s*(?:and|while|whereas|yet)\b|"
+        r"\band\s+(?=(?:"
+        r"(?:the\s+)?(?:intraocular\s+)?(?:lens|intervention)"
+        r"(?:\s+(?:selection|assignment))?|"
+        r"(?:the\s+)?(?:study|research)\s+protocol|"
+        r"(?:the\s+)?(?:investigator|doctor|surgeon)"
+        r")\b)",
+        re.I,
+    )
+
+    def governing_scope_boundary(governed: str) -> tuple[int, int] | None:
+        """Return the first unambiguous clause boundary outside the governed span."""
+        protected: list[tuple[int, int]] = []
+        dashes = [match.start() for match in re.finditer("—", governed)]
+        if len(dashes) % 2:
+            return None
+        protected.extend(zip(dashes[::2], dashes[1::2]))
+
+        for opening_quote, closing_quote in (
+            ("'", "'"),
+            ('"', '"'),
+            ("‘", "’"),
+            ("“", "”"),
+        ):
+            if opening_quote == closing_quote:
+                positions = [
+                    index
+                    for index, character in enumerate(governed)
+                    if character == opening_quote
+                    and not (
+                        opening_quote == "'"
+                        and index > 0
+                        and index + 1 < len(governed)
+                        and governed[index - 1].isalnum()
+                        and governed[index + 1].isalnum()
+                    )
+                ]
+                if len(positions) % 2:
+                    return None
+                protected.extend(zip(positions[::2], positions[1::2]))
+                continue
+            openings = [index for index, character in enumerate(governed) if character == opening_quote]
+            closings = [
+                index
+                for index, character in enumerate(governed)
+                if character == closing_quote
+                and not (
+                    closing_quote == "’"
+                    and index > 0
+                    and index + 1 < len(governed)
+                    and governed[index - 1].isalnum()
+                    and governed[index + 1].isalnum()
+                )
+            ]
+            if len(openings) != len(closings) or any(
+                opening >= closing for opening, closing in zip(openings, closings)
+            ):
+                return None
+            protected.extend(zip(openings, closings))
+
+        stack: list[tuple[str, int]] = []
+        closing = {")": "(", "]": "[", "}": "{"}
+        for index, character in enumerate(governed):
+            if character in "([{":
+                stack.append((character, index))
+            elif character in closing:
+                if not stack or stack[-1][0] != closing[character]:
+                    return None
+                _, start = stack.pop()
+                protected.append((start, index))
+        if stack:
+            return None
+
+        def is_protected(index: int) -> bool:
+            return any(start < index < end for start, end in protected)
+
+        governing_start = governing_negation_start.match(governed)
+        if governing_start is None:
+            return None
+        leading = governed[governing_start.end():]
+        if leading.lstrip().startswith(","):
+            opening = governing_start.end() + leading.index(",")
+            closing_matches = list(
+                re.finditer(r",\s*(?=that\b)", governed[opening + 1:], re.I)
+            )
+            if not closing_matches:
+                return None
+            protected.append(
+                (opening, opening + 1 + closing_matches[-1].start())
+            )
+
+        that_matches = [
+            match
+            for match in re.finditer(r"\bthat\b", governed, re.I)
+            if not is_protected(match.start())
+        ]
+        if not that_matches:
+            return None
+        that_match = that_matches[0]
+        for later_that in that_matches[1:]:
+            intervening_boundaries = [
+                match
+                for match in independent_clause_boundary.finditer(
+                    governed[that_match.end():later_that.start()]
+                )
+                if not is_protected(that_match.end() + match.start())
+            ]
+            if not intervening_boundaries:
+                return None
+            last_boundary = intervening_boundaries[-1]
+            segment_start = that_match.end() + last_boundary.end()
+            if governing_negation_start.search(
+                governed[segment_start:later_that.start()]
+            ) is None:
+                return None
+
+        after_that = governed[that_match.end():]
+        if after_that.lstrip().startswith(","):
+            opening = that_match.end() + after_that.index(",")
+            closing_match = re.search(
+                r",\s*(?=(?:the\s+)?(?:intraocular\s+)?(?:lens|intervention|"
+                r"participants?|(?:study|research)\s+protocol)\b)",
+                governed[opening + 1:],
+                re.I,
+            )
+            if closing_match is None:
+                return None
+            protected.append((opening, opening + 1 + closing_match.start()))
+
+        boundary_match = next(
+            (
+                match
+                for match in independent_clause_boundary.finditer(governed)
+                if match.start() > that_match.end() and not is_protected(match.start())
+            ),
+            None,
+        )
+        boundary = boundary_match.start() if boundary_match else len(governed)
+        for nested_start in governing_negation_start.finditer(governed[:boundary]):
+            if nested_start.start() == 0 or is_protected(nested_start.start()):
+                continue
+            nested_tail = governed[nested_start.end():boundary]
+            if re.match(
+                r"\s*(?:that\b|—[^—]*—\s*that\b|\([^)]*\)\s*that\b|"
+                r"\[[^]]*\]\s*that\b|\{[^}]*\}\s*that\b|,.*?,\s*that\b)",
+                nested_tail,
+                re.I,
+            ) is None:
+                return None
+        return boundary_match.span() if boundary_match else (boundary, boundary)
+
+    clauses: list[str] = []
+
+    def append_sentence_clauses(sentence: str) -> bool:
+        sentence = sentence.strip()
+        if not sentence:
+            return True
+        governing_start = governing_negation_start.search(sentence)
+        if governing_start is None:
+            clauses.extend(
+                item.strip()
+                for item in independent_clause_boundary.split(sentence)
+                if item.strip()
+            )
+            return True
+        prefix = sentence[:governing_start.start()].strip(" ;")
+        if prefix:
+            clauses.extend(
+                item.strip()
+                for item in independent_clause_boundary.split(prefix)
+                if item.strip()
+            )
+        governed = sentence[governing_start.start():].strip()
+        scope_boundary = governing_scope_boundary(governed)
+        if scope_boundary is None:
+            return False
+        boundary_start, boundary_end = scope_boundary
+        clauses.append(governed[:boundary_start].strip())
+        if boundary_start == len(governed):
+            return True
+        return append_sentence_clauses(governed[boundary_end:])
+
+    for sentence in assignment.split("."):
+        if not append_sentence_clauses(sentence):
+            return None
     negation = re.compile(
-        r"\b(?:not|never|no|neither|without)\b|"
-        r"\b(?:does|did|do|was|were|is|are)(?:\s+not|n['’]?t)\b",
+        r"\b(?:not|never|no|nor|neither|without|cannot|can['’]?t|won['’]?t)\b|"
+        r"\b(?:does|did|do|was|were|is|are|has|have|had|can|could|would|should|will|must)"
+        r"(?:\s+not|n['’]?t)\b",
         re.I,
     )
 
     def affirmed(clause: str, patterns: Iterable[str]) -> bool:
-        return any(
-            not negation.search(clause[max(0, match.start() - 40):match.end()])
-            for pattern in patterns
-            for match in re.finditer(pattern, clause, re.I)
+        """Return true only when a complete assertion clause is affirmative."""
+        return not negation.search(clause) and any(
+            re.search(pattern, clause, re.I) for pattern in patterns
         )
 
     routine_care_patterns = (
-        r"\b(?:lens|intervention)\s+select(?:ion|ions|ed)?\b.{0,100}\b(?:routine|ordinary)[- ](?:clinical[- ]?)?care\b",
-        r"\b(?:routine|ordinary)[- ](?:clinical[- ]?)?care\b.{0,100}\b(?:lens|intervention)\s+select(?:ion|ions|ed)?\b",
+        r"\b(?:lens|intervention)(?:\s+selection)?\b.{0,100}\b(?:routine|ordinary)[- ](?:clinical[- ]?)?care\b",
+        r"\b(?:routine|ordinary)[- ](?:clinical[- ]?)?care\b.{0,100}\b(?:lens|intervention)(?:\s+selection)?\b",
     )
     independence_patterns = (
         r"\b(?:lens|intervention)\s+select(?:ion|ions)?\b.{0,35}\b(?:independent|independently)\b",
@@ -827,7 +1019,8 @@ def _lens_assignment_classification(reference: Mapping[str, Any]) -> str | None:
     )
     research_patterns = (
         r"\bparticipants?\b.{0,40}\bassigned\b.{0,50}\b(?:to\s+receive|lens|intervention|treatment)\b.{0,60}\bby\s+(?:the\s+)?(?:study|research)\s+protocol\b",
-        r"\b(?:lens|intervention)\s+assignments?\b.{0,100}\bdetermined\b.{0,100}\bby\s+(?:the\s+)?(?:study|research)\s+protocol\b",
+        r"\b(?:lens|intervention)\s+(?:select(?:ion|ions)|assignments?)\b.{0,100}\b(?:determined|assigned)\b.{0,100}\bby\s+(?:the\s+)?(?:study|research)\s+protocol\b",
+        r"\b(?:lens|intervention)\b.{0,20}\bassigned\b.{0,60}\bby\s+(?:the\s+)?(?:study|research)\s+protocol\b",
         r"\b(?:study|research)\s+protocol\b.{0,50}\b(?:assigns?|determines?|dictates?)\b.{0,50}\b(?:lens|intervention|treatment)\b",
         r"\bparticipants?\b.{0,40}\brandomi[sz]ed\b.{0,40}\b(?:to\s+receive|lens|intervention|treatment)\b",
     )
