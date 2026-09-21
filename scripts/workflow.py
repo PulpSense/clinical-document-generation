@@ -5830,7 +5830,10 @@ def command_parent_visual_reviewer(
             [str(command), str(request_path)],
             check=True,
             timeout=max(1.0, remaining_seconds),
-            env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
+            env={
+                "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+                "HERMES_HOME": os.environ["HERMES_HOME"],
+            },
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,

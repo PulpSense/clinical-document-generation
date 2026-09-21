@@ -1364,6 +1364,33 @@ def test_production_parent_review_record_is_cleared_when_a_later_callback_is_unb
     assert callback_calls == [True, True]
 
 
+def test_external_parent_visual_reviewer_preserves_hermes_home_and_accepts_terminal_response(
+    tmp_path,
+    monkeypatch,
+):
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
+    revision = tmp_path / "revisions/r1"
+    response_path = revision / handoff["response_path"]
+    hermes_home = tmp_path / "hermes-profile"
+    hermes_home.mkdir()
+    monkeypatch.setenv("HERMES_HOME", str(hermes_home))
+    monkeypatch.setenv("HOME", "/ambient/home-must-not-authorize-hermes")
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        "#!/usr/bin/python3\n"
+        "import json\n"
+        "import os\n"
+        f"assert os.environ.get('HERMES_HOME') == {str(hermes_home)!r}\n"
+        f"print(json.dumps({response!r}))\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    workflow.command_parent_visual_reviewer(command)([handoff], 10.0, revision, {})
+
+    assert json.loads(response_path.read_text(encoding="utf-8")) == response
+
+
 def test_external_parent_visual_reviewer_rejects_missing_bound_response(tmp_path):
     command = tmp_path / "parent-reviewer"
     command.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
