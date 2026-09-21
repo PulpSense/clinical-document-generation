@@ -1058,8 +1058,17 @@ def normalized_study_classification(reference: Mapping[str, Any]) -> str | None:
     declared = str(declared) if declared in PRS_STUDY_TYPES.values() else None
     design = _prs_study_type_from_design(reference)
     lens_study = _is_lens_assignment_study(reference)
-    assignment = _lens_assignment_classification(reference) if lens_study else None
-    if lens_study and assignment is None:
+    assignment_text = _normalized_words(get_path(reference, "design.assignment_method"))
+    structured_assignment = get_path(reference, "design.assignment_classification")
+    assignment_evidence = bool(
+        assignment_text or isinstance(structured_assignment, Mapping)
+    )
+    assignment = (
+        _lens_assignment_classification(reference)
+        if lens_study and assignment_evidence
+        else None
+    )
+    if lens_study and assignment_evidence and assignment is None:
         return None
     supported = assignment or design or declared
     if not supported:
@@ -1132,14 +1141,34 @@ def _sample_size_rationale_complete(value: Any) -> bool:
         marker in text for marker in ("characterize", "estimate", "variability", "planning", "feasibility")
     )
     evaluable = "evaluable" in text and any(
-        marker in text for marker in ("source-supported", "historical", "power", "precision", "feasibility", "pilot")
+        marker in text for marker in (
+            "source-supported", "historical", "power", "precision", "feasibility",
+            "pilot", "dropout", "attrition",
+        )
     )
-    basis = statistical or feasibility or pilot or evaluable
-    attrition_claim = any(marker in text for marker in ("dropout", "attrition", "withdrawn", "nonevaluable"))
-    attrition_supported = any(marker in text for marker in (
-        "source-supported", "historical", "prior retention", "observed retention", "retention data",
-    ))
-    return basis and (not attrition_claim or attrition_supported)
+    characterization = any(
+        marker in text for marker in (
+            "to characterize", "to estimate", "to evaluate", "to assess",
+        )
+    ) and any(
+        marker in text for marker in (
+            "outcome", "performance", "effect", "precision", "variability",
+            "rate", "safety", "feasibility",
+        )
+    )
+    attrition_allowance = any(
+        marker in text for marker in (
+            "dropout", "attrition", "withdrawal", "nonevaluable", "non-evaluable",
+        )
+    ) and any(
+        marker in text for marker in (
+            "account for", "allow for", "allowance", "increase", "increased",
+        )
+    )
+    return (
+        statistical or feasibility or pilot or evaluable
+        or characterization or attrition_allowance
+    )
 
 
 def evidence_claim_citation(reference: Mapping[str, Any], claim: str) -> str | None:
@@ -1289,10 +1318,24 @@ def release_source_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]
         })
 
     classification = normalized_study_classification(reference)
-    if classification is None or (
-        _is_lens_assignment_study(reference)
-        and _lens_assignment_classification(reference) is None
-    ):
+    assignment_text = _normalized_words(get_path(reference, "design.assignment_method"))
+    structured_assignment = get_path(reference, "design.assignment_classification")
+    assignment_evidence = bool(
+        assignment_text or isinstance(structured_assignment, Mapping)
+    )
+    declared_raw = get_path(reference, "regulatory.prs.study_type")
+    declared = str(declared_raw) if declared_raw in PRS_STUDY_TYPES.values() else None
+    design = _prs_study_type_from_design(reference)
+    assignment = (
+        _lens_assignment_classification(reference)
+        if _is_lens_assignment_study(reference) and assignment_evidence
+        else None
+    )
+    invalid_declared = meaningful(declared_raw) and declared is None
+    classification_conflict = invalid_declared or (
+        assignment_evidence and assignment is None
+    ) or len({item for item in (declared, design, assignment) if item}) > 1
+    if classification is None and classification_conflict:
         add(
             "study_design_classification",
             "The approved source does not resolve whether lens assignment is observational or interventional, or its classification facts conflict.",
@@ -1314,7 +1357,7 @@ def release_source_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]
     risks_complete = bool(risks) and not any(marker in risks for marker in generic_risk_markers)
     if _is_lens_assignment_study(reference):
         risks_complete = risks_complete and _has_all_groups(risks, lens_risk_groups)
-    if not risks_complete:
+    if risks and not risks_complete:
         add(
             "study_specific_foreseeable_risks",
             "Study-specific foreseeable risks are missing or generic deferral language was supplied.",
@@ -1322,7 +1365,8 @@ def release_source_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]
             ("protocol.docx", "icf.docx"),
         )
 
-    if not _cost_allocation_complete(get_path(reference, "risks_benefits.costs")):
+    costs = get_path(reference, "risks_benefits.costs")
+    if _normalized_words(costs) and not _cost_allocation_complete(costs):
         add(
             "participant_cost_allocation",
             "The approved source does not allocate participant, insurer, sponsor, and study costs.",
@@ -1330,7 +1374,8 @@ def release_source_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]
             ("protocol.docx", "icf.docx"),
         )
 
-    if not _injury_policy_complete(get_path(reference, "risks_benefits.injury_handling")):
+    injury = get_path(reference, "risks_benefits.injury_handling")
+    if _normalized_words(injury) and not _injury_policy_complete(injury):
         add(
             "research_injury_responsibility",
             "Research-injury care, payment or compensation, and financial responsibility are not established by the approved source.",
@@ -1345,8 +1390,8 @@ def release_source_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]
     if not _sample_size_rationale_complete(justification):
         add(
             "sample_size_justification",
-            "The sample-size rationale or attrition allowance is asserted without an approved statistical or feasibility basis.",
-            "Provide approved support for the evaluable sample-size rationale and any dropout or attrition assumption; do not infer an attrition rate from planned and evaluable counts alone.",
+            "The approved sample-size text does not state why the planned enrollment is appropriate for this study.",
+            "Provide the approved source's stated rationale, such as the analytical objective, feasibility, pilot or exploratory intent, or an attrition allowance.",
             ("protocol.docx",),
         )
     return findings

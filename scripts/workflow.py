@@ -1077,6 +1077,18 @@ def verify_installation(
     """Prove that an extracted release owns a complete local assurance path."""
     skill_root = skill_root.resolve()
     findings = _manifest_integrity(skill_root)
+    for sibling in sorted(skill_root.parent.glob(f"{skill_root.name}.previous-*")):
+        if sibling.is_dir() and (sibling / "SKILL.md").is_file():
+            findings.append({
+                "category": "installation",
+                "field": "skill_discovery",
+                "code": "installation.discoverable_stale_release",
+                "path": str(sibling),
+                "issue": (
+                    "A legacy clinical-document release remains discoverable as a Hermes skill "
+                    "and can shadow the active release. Move it outside the skills tree before use."
+                ),
+            })
     fallback_fonts = skill_root / "assets/fallback-fonts"
     if not any(fallback_fonts.glob("*.ttf")):
         findings.append({"category": "installation", "field": "fallback_fonts", "issue": "No packaged compatible fonts are present."})
@@ -7486,6 +7498,51 @@ def _quality_retry(
         )
         for section_id in batch.section_ids
     }
+    routed_inputs: list[tuple[int, dict[str, Any]]] = []
+    for original_index, raw in enumerate(findings):
+        finding = dict(raw)
+        raw_targets = finding.get("target_ids")
+        targets = [
+            str(item).strip()
+            for item in (raw_targets if isinstance(raw_targets, list) else [])
+            if str(item).strip()
+        ]
+        parsed_targets = [RetryTarget.parse(target) for target in targets]
+        if (
+            finding.get("recovery_class") == "drafting_defect"
+            and finding.get("action") == RECOVERY_POLICIES["drafting_defect"]
+            and parsed_targets
+            and all(
+                target.category == "section" and target.target_id in known_sections
+                for target in parsed_targets
+            )
+        ):
+            draftable_targets = [
+                target.target_id for target in parsed_targets
+                if target.target_id in draftable_sections
+            ]
+            deterministic_targets = [
+                target.target_id for target in parsed_targets
+                if target.target_id not in draftable_sections
+            ]
+            if draftable_targets and deterministic_targets:
+                routed_inputs.append((original_index, {
+                    **finding,
+                    "target_ids": draftable_targets,
+                    "route_partition": "draftable_contract_surface",
+                }))
+                routed_inputs.append((original_index, {
+                    **finding,
+                    "target_ids": deterministic_targets,
+                    "reported_recovery_class": "drafting_defect",
+                    "reported_action": RECOVERY_POLICIES["drafting_defect"],
+                    "recovery_class": "deterministic_structure_defect",
+                    "action": RECOVERY_POLICIES["deterministic_structure_defect"],
+                    "route_normalization": "nondraftable_contract_surface",
+                    "route_partition": "deterministic_contract_surface",
+                }))
+                continue
+        routed_inputs.append((original_index, finding))
 
     # Resolve every effective route before archival. Only the historical,
     # deterministic field/artifact fallbacks are permitted here; unsupported
@@ -7505,15 +7562,51 @@ def _quality_retry(
     except (OSError, ValueError, json.JSONDecodeError):
         render_report = {}
     current_review_set = max(1, int(generation_state.get("review_set", 1)))
-    for index, raw in enumerate(findings):
+    for original_index, raw in routed_inputs:
         finding = dict(raw)
         recovery_class = str(finding.get("recovery_class") or "")
+        raw_targets = finding.get("target_ids")
+        targets = [
+            str(item).strip()
+            for item in (raw_targets if isinstance(raw_targets, list) else [])
+            if str(item).strip()
+        ]
+        if not targets:
+            field = str(finding.get("field") or "").strip()
+            artifact = str(finding.get("artifact") or "").strip()
+            if field in known_sections:
+                targets = [field]
+            elif recovery_class == "visual_defect" and artifact:
+                targets = [f"layout:{artifact}"]
+            elif recovery_class == "verifier_transient":
+                targets = ["verification:content"]
+        finding["target_ids"] = targets
+
+        parsed_for_normalization = [RetryTarget.parse(target) for target in targets]
+        nondraftable_contract_surface = bool(parsed_for_normalization) and all(
+            target.category == "section"
+            and target.target_id in known_sections
+            and target.target_id not in draftable_sections
+            for target in parsed_for_normalization
+        )
+        if (
+            recovery_class == "drafting_defect"
+            and finding.get("action") == RECOVERY_POLICIES["drafting_defect"]
+            and nondraftable_contract_surface
+        ):
+            finding["reported_recovery_class"] = recovery_class
+            finding["reported_action"] = finding.get("action")
+            finding["recovery_class"] = "deterministic_structure_defect"
+            finding["action"] = RECOVERY_POLICIES["deterministic_structure_defect"]
+            finding["route_normalization"] = "nondraftable_contract_surface"
+            recovery_class = "deterministic_structure_defect"
+
         if (
             recovery_class not in RECOVERY_POLICIES
             or finding.get("action") != RECOVERY_POLICIES[recovery_class]
         ):
             normalized.append(finding)
-            route_error_indexes.add(index)
+            route_error_indexes.add(original_index)
             route_errors.append({
                 "category": "recovery-classification",
                 "field": "recovery_class",
@@ -7524,26 +7617,9 @@ def _quality_retry(
                     "The finding does not declare one governed Recovery Class and its exact action."
                 ),
                 "issue": "The governed recovery route is missing or malformed.",
-                "original_finding": original_findings[index],
+                "original_finding": original_findings[original_index],
             })
             continue
-        raw_targets = finding.get("target_ids")
-        targets = [
-            str(item).strip()
-            for item in (raw_targets if isinstance(raw_targets, list) else [])
-            if str(item).strip()
-        ]
-        if not targets:
-            field = str(finding.get("field") or "").strip()
-            recovery_class = str(finding.get("recovery_class") or "")
-            artifact = str(finding.get("artifact") or "").strip()
-            if field in known_sections:
-                targets = [field]
-            elif recovery_class == "visual_defect" and artifact:
-                targets = [f"layout:{artifact}"]
-            elif recovery_class == "verifier_transient":
-                targets = ["verification:content"]
-        finding["target_ids"] = targets
         normalized.append(finding)
 
         recovery_class = str(finding.get("recovery_class") or "")
@@ -7567,7 +7643,7 @@ def _quality_retry(
                 artifact = str(finding.get("artifact") or target.value).removesuffix(".docx")
                 layout_target = target.value.removesuffix(".docx")
                 if layout_target not in {"protocol", "icf"} or artifact != layout_target:
-                    visual_route_unsupported_indexes.add(index)
+                    visual_route_unsupported_indexes.add(original_index)
                     visual_route_unsupported.append({
                         **finding,
                         "contracted_layout_family": None,
@@ -7658,14 +7734,14 @@ def _quality_retry(
                         recovery_class == "verifier_transient"
                         and finding.get("code") == "verification_response_missing"
                     ),
-                    originating_finding=finding,
+                    originating_finding=original_findings[original_index],
                 )
                 if authority_findings:
                     unsupported_targets.append(parsed_targets[0].target_id if parsed_targets else None)
                     routing_failure_code = str(authority_findings[0].get("code") or "verification_request_canonical_mismatch")
                     routing_failure = str(authority_findings[0].get("issue") or "Verification request authority validation failed.")
         if unsupported_targets:
-            route_error_indexes.add(index)
+            route_error_indexes.add(original_index)
             route_errors.append({
                 "category": "recovery-classification",
                 "field": "target_ids",
@@ -7676,7 +7752,7 @@ def _quality_retry(
                     "No supported target can be resolved for the finding's intended recovery route."
                 ),
                 "issue": "The governed recovery target cannot be routed without silently dropping or inventing it.",
-                "original_finding": original_findings[index],
+                "original_finding": original_findings[original_index],
             })
     findings = normalized
 

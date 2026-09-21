@@ -189,22 +189,27 @@ def render_pair(tmp_path, reference=None, draft=None):
     )
 
 
-def test_incomplete_lens_source_has_actionable_shared_release_blockers():
+def test_absent_nonobligatory_release_details_do_not_block_generation():
     reference = json.loads(INCOMPLETE_LENS_SOURCE.read_text(encoding="utf-8"))
-    findings = contracts.release_source_findings(reference)
-    by_field = {item["field"]: item for item in findings}
-    assert {
-        "study_design_classification",
-        "study_specific_foreseeable_risks",
-        "participant_cost_allocation",
-        "research_injury_responsibility",
-        "sample_size_justification",
-    } <= set(by_field)
-    assert all(item["category"] == "source-evidence" for item in by_field.values())
-    assert "separately approved source correction" in by_field["study_design_classification"]["required"]
-    assert set(by_field["study_specific_foreseeable_risks"]["affected_artifacts"]) == {"icf.docx", "protocol.docx"}
-    assert set(by_field["participant_cost_allocation"]["affected_artifacts"]) == {"icf.docx", "protocol.docx"}
-    assert set(by_field["research_injury_responsibility"]["affected_artifacts"]) == {"icf.docx", "protocol.docx"}
+    reference["population"]["sample_justification"] = (
+        "Forty participants are planned to characterize outcomes and account for dropout."
+    )
+    assert contracts.release_source_findings(reference) == []
+
+
+def test_approved_source_with_absent_nonobligatory_release_details_can_generate():
+    reference = json.loads(INCOMPLETE_LENS_SOURCE.read_text(encoding="utf-8"))
+    reference["design"]["study_design"] = (
+        "Prospective, observational, single-center, single-cohort study with no control arm."
+    )
+    reference["regulatory"]["prs"]["study_type"] = "Observational"
+    reference["population"]["sample_justification"] = (
+        "An estimated 35 subjects will be sufficient to characterize performance; "
+        "the planned sample is increased to 40 to account for dropout."
+    )
+
+    assert contracts.normalized_study_classification(reference) == "Observational"
+    assert contracts.release_source_findings(reference) == []
 
 
 def test_complete_source_passes_release_contract_and_supported_classifications_are_consistent():
@@ -223,7 +228,67 @@ def test_complete_source_passes_release_contract_and_supported_classifications_a
 
     ambiguous = fixture()
     ambiguous["design"].pop("assignment_method")
-    assert rendering.protocol_subtitle(ambiguous) == "A prospective study"
+    assert rendering.protocol_subtitle(ambiguous) == (
+        "A prospective observational study of intraocular lenses"
+    )
+
+
+def test_structured_assignment_classification_remains_authoritative_without_free_text():
+    reference = fixture()
+    reference["design"].pop("assignment_method")
+    reference["design"]["study_design"] = "Prospective single-center lens outcomes study."
+    reference["regulatory"]["prs"]["study_type"] = None
+    reference["design"]["assignment_classification"] = {
+        "value": "Observational",
+        "provenance": "approved_source",
+    }
+
+    assert contracts.normalized_study_classification(reference) == "Observational"
+    assert not any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+def test_supplied_classification_conflict_blocks_without_assignment_method_text():
+    reference = fixture()
+    reference["design"].pop("assignment_method")
+    reference["design"].pop("assignment_classification", None)
+    reference["design"]["study_design"] = "Observational study."
+    reference["regulatory"]["prs"]["study_type"] = "Interventional"
+
+    assert contracts.normalized_study_classification(reference) is None
+    assert any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+def test_supplied_unsupported_prs_classification_remains_blocking_at_release():
+    reference = fixture()
+    reference["design"].pop("assignment_method")
+    reference["design"].pop("assignment_classification", None)
+    reference["design"]["study_design"] = "Prospective single-center lens outcomes study."
+    reference["regulatory"]["prs"]["study_type"] = "Nonsense"
+
+    assert any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
+
+
+def test_absent_optional_classification_remains_nonblocking():
+    reference = fixture()
+    reference["design"].pop("assignment_method")
+    reference["design"].pop("assignment_classification", None)
+    reference["design"]["study_design"] = "Prospective single-center lens outcomes study."
+    reference["regulatory"]["prs"]["study_type"] = None
+
+    assert contracts.normalized_study_classification(reference) is None
+    assert not any(
+        item["field"] == "study_design_classification"
+        for item in contracts.release_source_findings(reference)
+    )
 
 
 def test_protocol_subtitle_preserves_unrelated_non_lens_behavior():
@@ -574,7 +639,7 @@ def test_mixed_affirmative_lens_assignment_forms_block_classification():
         ("The sponsor is not responsible; participant insurance terms are unresolved.", False),
         ("Costs are not specified.", False),
         ("The study team will explain costs later.", False),
-        ("", False),
+        ("", True),
     ],
 )
 def test_cost_allocation_requires_complete_polarity_aware_policy(costs, valid):
@@ -593,7 +658,7 @@ def test_cost_allocation_requires_complete_polarity_aware_policy(costs, valid):
         ("The investigator will not provide care. No compensation is available. The participant is responsible for costs.", False),
         ("Injury compensation is unknown.", False),
         ("The study team will explain injury terms later.", False),
-        ("", False),
+        ("", True),
     ],
 )
 def test_injury_policy_requires_care_compensation_and_cost_responsibility(injury, valid):
@@ -609,10 +674,14 @@ def test_injury_policy_requires_care_compensation_and_cost_responsibility(injury
         ("The sample size is sufficient.", False),
         ("Forty participants will be enrolled.", False),
         ("The sample size was selected for the study.", False),
+        ("Forty participants are planned to provide sufficient data.", False),
+        ("Forty participants are planned to account for study needs.", False),
+        ("Forty participants are planned to allow for.", False),
         ("A site feasibility review of eligible cataract-surgery volume supports recruitment of 40 participants.", True),
         ("Forty participants provide 80% power for the approved effect-size and variance assumptions.", True),
         ("This exploratory pilot will characterize outcome variability for later planning.", True),
-        ("Forty participants are planned to account for dropout from 35 evaluable participants.", False),
+        ("Forty participants are planned to account for dropout from 35 evaluable participants.", True),
+        ("Thirty-five subjects will characterize performance; 40 are planned to account for dropout.", True),
         ("Historical site retention data support a 5-participant attrition allowance from 40 enrolled to 35 evaluable.", True),
     ],
 )

@@ -3263,6 +3263,111 @@ def test_correctly_bound_content_finding_proceeds_normally(tmp_path):
     assert (revision / "attempts").is_dir()
 
 
+def test_nondraftable_protocol_surface_finding_rebuilds_instead_of_blocking(
+    tmp_path, monkeypatch,
+):
+    source = _source()
+    request = _verification_request_payload(
+        "r-test.review-1.verify.content",
+        "clinical_content_verification",
+    )
+    request["artifacts"] = [
+        {
+            "artifact": name if name.endswith(".xml") else Path(name).stem,
+            "path": f"candidate/{name}",
+        }
+        for name in sorted(("protocol.docx", "icf.docx", "study.xml"))
+    ]
+    request["sections"] = quality.content_review_sections(source)
+    request["request_sha256"] = verification_request_sha256(request)
+    finding = {
+        "category": "source-integrity",
+        "field": "clinical_content_verification",
+        "artifact": "protocol",
+        "target_ids": ["title-page"],
+        "verification_request_id": request["request_id"],
+        "recovery_class": "drafting_defect",
+        "action": "retry_drafting_target",
+        "issue": "The deterministic Protocol subtitle is malformed.",
+    }
+    monkeypatch.setattr(
+        workflow,
+        "generate",
+        lambda *_args, **_kwargs: {
+            "status": "passed",
+            "stage": "quality",
+            "client_outputs": [],
+        },
+    )
+
+    result, _run_dir, revision, _reference_path, _working = _quality_retry_fixture(
+        tmp_path,
+        [finding],
+        request_records=(("content.json", request),),
+    )
+
+    assert result["status"] == "passed"
+    attempt = json.loads(
+        next((revision / "attempts").glob("*/attempt-manifest.json")).read_text()
+    )
+    routed = attempt["findings"][0]
+    assert routed["recovery_class"] == "deterministic_structure_defect"
+    assert routed["action"] == "rebuild_deterministic_structure"
+    assert routed["route_normalization"] == "nondraftable_contract_surface"
+    assert routed["reported_recovery_class"] == "drafting_defect"
+    assert routed["reported_action"] == "retry_drafting_target"
+    assert not list((revision / "hermes/requests").glob("*.json"))
+
+
+def test_mixed_deterministic_and_draftable_targets_partition_before_recovery(
+    tmp_path,
+):
+    source = _source()
+    request = _verification_request_payload(
+        "r-test.review-1.verify.content",
+        "clinical_content_verification",
+    )
+    request["artifacts"] = [
+        {
+            "artifact": name if name.endswith(".xml") else Path(name).stem,
+            "path": f"candidate/{name}",
+        }
+        for name in sorted(("protocol.docx", "icf.docx", "study.xml"))
+    ]
+    request["sections"] = quality.content_review_sections(source)
+    request["request_sha256"] = verification_request_sha256(request)
+    finding = {
+        "category": "source-integrity",
+        "field": "clinical_content_verification",
+        "artifact": "protocol",
+        "target_ids": ["title-page", "introduction"],
+        "verification_request_id": request["request_id"],
+        "recovery_class": "drafting_defect",
+        "action": "retry_drafting_target",
+        "issue": "Repair deterministic front matter and drafted introduction text.",
+    }
+
+    result, _run_dir, revision, _reference_path, _working = _quality_retry_fixture(
+        tmp_path,
+        [finding],
+        request_records=(("content.json", request),),
+    )
+
+    assert result["status"] == "awaiting_hermes", result
+    assert result["stage"] == "drafting_retry"
+    attempt = json.loads(
+        next((revision / "attempts").glob("*/attempt-manifest.json")).read_text()
+    )
+    routed = attempt["findings"]
+    assert [item["target_ids"] for item in routed] == [["introduction"], ["title-page"]]
+    assert [item["recovery_class"] for item in routed] == [
+        "drafting_defect",
+        "deterministic_structure_defect",
+    ]
+    assert routed[1]["reported_recovery_class"] == "drafting_defect"
+    assert routed[1]["reported_action"] == "retry_drafting_target"
+
+
 def test_terminal_route_must_bind_the_findings_exact_artifact_path(tmp_path):
     request = _verification_request_payload(
         "r-test.review-1.verify.content",

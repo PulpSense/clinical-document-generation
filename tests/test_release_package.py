@@ -4131,6 +4131,64 @@ def test_installation_smoke_uses_public_assurance_with_the_release_owned_page_re
     assert observed["fonts"] == {"Liberation Sans", "Liberation Serif", "Liberation Mono"}
 
 
+def test_installation_smoke_rejects_discoverable_legacy_release_sibling(
+    tmp_path, monkeypatch,
+):
+    skills_dir = tmp_path / "skills"
+    active = skills_dir / "clinical-document-generation"
+    previous = skills_dir / "clinical-document-generation.previous-legacy"
+    (active / "assets/fallback-fonts").mkdir(parents=True)
+    (active / "assets/fallback-fonts/font.ttf").write_bytes(b"font")
+    previous.mkdir(parents=True)
+    (previous / "SKILL.md").write_text(
+        "---\nname: clinical-document-generation\n---\n",
+        encoding="utf-8",
+    )
+    bundled = {
+        "kind": "pypdfium2",
+        "source": "release-owned runtime",
+    }
+    monkeypatch.setattr(workflow, "_manifest_integrity", lambda _root: [])
+    monkeypatch.setattr(
+        workflow,
+        "renderers",
+        lambda **_kwargs: [{"kind": "LibreOffice", "source": "host prerequisite"}],
+    )
+    monkeypatch.setattr(workflow, "page_renderers", lambda **_kwargs: [bundled])
+    monkeypatch.setattr(
+        workflow,
+        "render_assurance",
+        lambda *_args, **_kwargs: {
+            "status": "passed",
+            "fonts": {},
+            "render": {
+                "status": "passed",
+                "renderer_attempts": [],
+                "artifacts": [],
+                "findings": [],
+            },
+            "findings": [],
+        },
+    )
+
+    result = verify_installation(active)
+
+    assert result["status"] == "blocked"
+    assert [
+        finding for finding in result["findings"]
+        if finding.get("code") == "installation.discoverable_stale_release"
+    ] == [{
+        "category": "installation",
+        "field": "skill_discovery",
+        "code": "installation.discoverable_stale_release",
+        "path": str(previous),
+        "issue": (
+            "A legacy clinical-document release remains discoverable as a Hermes skill "
+            "and can shadow the active release. Move it outside the skills tree before use."
+        ),
+    }]
+
+
 def test_installation_smoke_reports_the_exact_pdfium_integrity_failure(
     tmp_path, monkeypatch
 ):
