@@ -3319,6 +3319,64 @@ def test_nondraftable_protocol_surface_finding_rebuilds_instead_of_blocking(
     assert not list((revision / "hermes/requests").glob("*.json"))
 
 
+def test_sterling_retained_surface_finding_rebuilds_instead_of_blocking(
+    tmp_path, monkeypatch,
+):
+    source = _source()
+    source["meta"]["icf_template"] = "Sterling"
+    request = _verification_request_payload(
+        "r-test.review-1.verify.content",
+        "clinical_content_verification",
+    )
+    request["artifacts"] = [
+        {
+            "artifact": name if name.endswith(".xml") else Path(name).stem,
+            "path": f"candidate/{name}",
+        }
+        for name in sorted(("protocol.docx", "icf.docx", "study.xml"))
+    ]
+    request["approved_source"] = source
+    request["sections"] = quality.content_review_sections(source)
+    request["request_sha256"] = verification_request_sha256(request)
+    finding = {
+        "category": "content",
+        "field": "clinical_content_verification",
+        "artifact": "icf",
+        "target_ids": ["icf.voluntary-participation"],
+        "verification_request_id": request["request_id"],
+        "recovery_class": "drafting_defect",
+        "action": "retry_drafting_target",
+        "issue": "Remove unsupported investigator-termination authority.",
+    }
+    monkeypatch.setattr(
+        workflow,
+        "generate",
+        lambda *_args, **_kwargs: {
+            "status": "passed",
+            "stage": "quality",
+            "client_outputs": [],
+        },
+    )
+
+    result, _run_dir, revision, _reference_path, _working = _quality_retry_fixture(
+        tmp_path,
+        [finding],
+        reference=source,
+        request_records=(("content.json", request),),
+    )
+
+    assert result["status"] == "passed", json.dumps(result, indent=2)
+    attempt = json.loads(
+        next((revision / "attempts").glob("*/attempt-manifest.json")).read_text()
+    )
+    routed = attempt["findings"][0]
+    assert routed["target_ids"] == ["icf.voluntary-participation"]
+    assert routed["recovery_class"] == "deterministic_structure_defect"
+    assert routed["action"] == "rebuild_deterministic_structure"
+    assert routed["route_normalization"] == "nondraftable_contract_surface"
+    assert not list((revision / "hermes/requests").glob("*.json"))
+
+
 def test_mixed_deterministic_and_draftable_targets_partition_before_recovery(
     tmp_path,
 ):

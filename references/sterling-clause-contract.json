@@ -656,10 +656,13 @@
       "repeatable": false,
       "module_id": "sterling.withdrawal.investigator-termination",
       "applicability": {
-        "rule": "always"
+        "rule": "meaningful",
+        "paths": [
+          "procedures.termination"
+        ]
       },
       "provenance": {
-        "type": "approved_input_or_controlled_default",
+        "type": "approved_input",
         "paths": [
           "procedures.termination"
         ],
@@ -683,15 +686,7 @@
         "minimum": 1,
         "word_numbering_required": true
       },
-      "content": {
-        "intro": "The investigator may stop your participation without your consent for a reason related to your safety, eligibility, compliance with required study activities, or closure of the study. Participation may be stopped because:",
-        "default_items": [
-          "Participation may be stopped to protect your health or welfare.",
-          "You are no longer eligible.",
-          "Required instructions or procedures are not followed.",
-          "The investigator, sponsor, IRB, or applicable authority stops the study."
-        ]
-      }
+      "content": {}
     },
     {
       "classification": "core",

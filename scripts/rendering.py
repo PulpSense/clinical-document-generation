@@ -2308,11 +2308,8 @@ def _ensure_sterling_heading_after(
 
 
 def _sterling_termination_items(reference: Mapping[str, Any]) -> list[str]:
-    module = _sterling_module("sterling.withdrawal.investigator-termination")
     source = get_path(reference, "procedures.termination")
-    if meaningful(source):
-        return _list(source)
-    return [_text(item) for item in (module.get("content") or {}).get("default_items", [])]
+    return _list(source) if meaningful(source) else []
 
 
 def _sterling_phi_categories(reference: Mapping[str, Any]) -> list[str]:
@@ -2489,13 +2486,12 @@ def _assemble_sterling_fidelity_modules(
     )
 
     voluntary = _sterling_module("sterling.voluntary.core")
-    termination = _sterling_module("sterling.withdrawal.investigator-termination")
     withdrawal_blocks = [
         (_text(text), False)
         for text in (voluntary.get("content") or {}).get("paragraphs", [])
     ]
-    withdrawal_blocks.append((_text((termination.get("content") or {}).get("intro")), False))
-    withdrawal_blocks.extend((item, True) for item in _sterling_termination_items(reference))
+    if meaningful(get_path(reference, "procedures.termination")):
+        withdrawal_blocks.extend((item, True) for item in _sterling_termination_items(reference))
     _replace_sterling_section_body(
         document, "VOLUNTARY PARTICIPATION/WITHDRAWAL", withdrawal_blocks
     )

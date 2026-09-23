@@ -202,7 +202,7 @@ def test_source_results_policy_overrides_default_without_duplication(tmp_path):
     assert STUDY_RESULTS_DEFAULT not in text
 
 
-def test_withdrawal_restores_concepts_and_real_default_reason_bullets(tmp_path):
+def test_withdrawal_without_source_omits_investigator_termination_authority(tmp_path):
     _path, document = render(tmp_path)
     paragraphs = section_paragraphs(document, "VOLUNTARY PARTICIPATION/WITHDRAWAL")
     text = normalized(" ".join(p.text for p in paragraphs)).casefold()
@@ -211,22 +211,19 @@ def test_withdrawal_restores_concepts_and_real_default_reason_bullets(tmp_path):
         "decline",
         "withdraw",
         "without penalty",
-        "health or welfare",
-        "no longer eligible",
-        "required instructions or procedures",
-        "investigator",
-        "sponsor",
-        "irb",
         "information collected before",
     ):
         assert concept in text
     bullets = [normalized(p.text).casefold() for p in paragraphs if has_real_list(p)]
-    assert len(bullets) >= 4
-    assert any("health or welfare" in item for item in bullets)
-    assert any("no longer eligible" in item for item in bullets)
-    assert any("required instructions or procedures" in item for item in bullets)
-    assert any("stops the study" in item for item in bullets)
-    assert not any("drug" in item or "disease worsens" in item for item in bullets)
+    assert bullets == []
+    for unsupported in (
+        "health or welfare",
+        "no longer eligible",
+        "required instructions or procedures",
+        "stops the study",
+    ):
+        assert unsupported not in text
+    assert fidelity_findings(_path, source()) == []
 
 
 def test_source_withdrawal_reasons_replace_defaults_and_remain_real_bullets(tmp_path):
@@ -239,6 +236,14 @@ def test_source_withdrawal_reasons_replace_defaults_and_remain_real_bullets(tmp_
     paragraphs = section_paragraphs(document, "VOLUNTARY PARTICIPATION/WITHDRAWAL")
     bullets = [normalized(p.text) for p in paragraphs if has_real_list(p)]
     assert bullets == reference["procedures"]["termination"]
+    text = normalized(" ".join(p.text for p in paragraphs)).casefold()
+    for unsupported in (
+        "safety, eligibility, compliance",
+        "reason related to your safety",
+        "no longer eligible",
+        "required instructions or procedures",
+    ):
+        assert unsupported not in text
     assert not any("no longer eligible" in item.casefold() for item in bullets)
 
 
