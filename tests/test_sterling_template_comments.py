@@ -5,7 +5,7 @@ from pathlib import Path
 
 from docx import Document
 
-from contracts import icf_contract
+from contracts import icf_contract, icf_retained_sections
 from quality import create_verification_requests, validate_sterling_clause_contract
 from rendering import render_documents
 
@@ -31,7 +31,8 @@ def _render(tmp_path, source):
 
 def test_commented_fixed_sections_are_not_sent_for_ai_drafting():
     draft_ids = {section.section_id for section in icf_contract("Prospective", "Sterling")}
-    assert {"icf.authorization-introduction", "icf.information", "icf.voluntary-participation"}.isdisjoint(draft_ids)
+    retained_ids = {section_id for section_id, _title in icf_retained_sections("Prospective", "Sterling")}
+    assert retained_ids.isdisjoint(draft_ids)
 
 
 def test_fixed_introduction_and_new_information_keep_template_wording(tmp_path):

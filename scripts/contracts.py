@@ -351,22 +351,22 @@ RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
 
 def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
     specific = {
-        "introduction": "Name the study and explain its approved clinical background, hypothesis, primary endpoint, and rationale.",
+        "introduction": "Explain the approved clinical problem, evidence gap, and rationale in direct clinical language. State the hypothesis or primary endpoint only if needed to make the rationale intelligible; the title page and Study Design carry their full wording.",
         "objectives": "State the approved study purpose and objectives concisely. Distinguish the hypothesis and primary endpoint only where needed to clarify that purpose; the detailed endpoint inventory belongs in Study Design.",
         "subjects.population": "Describe the approved population and planned sample size without adding eligibility facts.",
         "subjects.inclusion": "Preserve every approved inclusion criterion and the approved minimum interval without participation in another study before screening as distinct, usable criteria.",
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and keep the two groups distinct.",
         "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied. Identify every approved primary, secondary, and exploratory endpoint once in a grouped, readable account of what the design evaluates.",
-        "study-design.bias": "Explain applicable bias controls and use only the listed boilerplate when source detail is sparse.",
+        "study-design.bias": "Explain source-supported steps that reduce bias. If no additional control is supplied, use the listed boilerplate concisely; omit a second description of masking or the absence of a control arm already stated in Study Design.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
         "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
         "evaluation-procedures": "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
         "endpoint-criteria.completion": "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
-        "endpoint-criteria.study-completion": "Reference every approved visit and time point concisely when stating the study-level timeline and completion rule, without repeating the complete participant visit or assessment inventory.",
+        "endpoint-criteria.study-completion": "State the approved study-level completion trigger and closeout rule concisely. Mention a time point only if it changes that rule; the visit schedule belongs in Sections 9 and 15.",
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
-        "analysis-plan.methodology": "Explain how each endpoint is summarized or analyzed. Group endpoints sharing one method, use concise cross-references to Objectives, and do not reproduce a standalone endpoint inventory.",
+        "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State one method once for outcomes sharing it and refer to the grouped outcomes in Study Design instead of repeating their full measure names and time points.",
         "analysis-plan.considerations": "State a source-supported general consideration that affects interpretation of the analyses, such as the approved descriptive or inferential approach or specified software. Do not write a sentence whose only content is a cross-reference to Section 10.2.",
         "sample-size": "State the approved sample size and explain its approved justification.",
         "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
@@ -1563,6 +1563,17 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         signatures = {_candidate_signature(value) for value in candidates.get(requirement.field, []) if _candidate_signature(value)}
         if len(signatures) > 1:
             findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input has conflicting source candidates.", "required": "One reviewer-selected value."})
+    full_title = str(get_path(reference, "study.title") or "").strip()
+    short_title = str(get_path(reference, "study.short_title") or "").strip()
+    if full_title and (
+        short_title and re.sub(r"\s+", " ", full_title).casefold() == re.sub(r"\s+", " ", short_title).casefold()
+        or not short_title and len(full_title) > 80
+    ):
+        findings.append({
+            "category": "source-evidence", "field": "study.short_title",
+            "issue": "The running header needs a concise short title instead of the full study title.",
+            "required": "A reviewer-approved concise short title distinct from the full title.",
+        })
     if branch != "Retrospective":
         prs_study_type = get_path(reference, "regulatory.prs.study_type")
         if meaningful(prs_study_type) and str(prs_study_type) not in PRS_STUDY_TYPES.values():

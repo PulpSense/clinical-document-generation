@@ -216,16 +216,34 @@ def _endpoint_synopsis(reference: Mapping[str, Any]) -> str:
     lines = []
     if primary:
         item = primary[0]
-        label = _text(item)
+        label = _text(item.get("outcome_measure") or item) if isinstance(item, Mapping) else _text(item)
+        label = label.rstrip(".")
         timepoint = _text(item.get("time_point") or item.get("time_frame")) if isinstance(item, Mapping) else ""
-        lines.append(f"Primary: {label}{f' ({timepoint})' if timepoint else ''}")
+        lines.append(f"Primary endpoint: {label}{f' ({timepoint})' if timepoint else ''}.")
         if len(primary) > 1:
-            lines.append(f"{len(primary) - 1} additional primary endpoint(s); see Section 6.")
+            lines.append(f"{len(primary) - 1} additional primary endpoint(s); see Section 8.1.")
     if secondary:
-        lines.append(f"{len(secondary)} secondary endpoint(s); see Section 6.")
+        lines.append(f"{len(secondary)} secondary endpoint(s); see Section 8.1.")
     if other:
-        lines.append(f"{len(other)} exploratory endpoint(s); see Section 6.")
+        lines.append(f"{len(other)} exploratory endpoint(s); see Section 8.1.")
     return "\n".join(lines)
+
+
+def _protocol_followup_summary(reference: Mapping[str, Any]) -> str:
+    """Show the last approved participant visit in the front-matter synopsis."""
+    table_visits = get_path(reference, "procedures.visit_schedule_table", [])
+    visits = [row for row in table_visits if isinstance(row, Mapping)] if isinstance(table_visits, list) else []
+    if not visits:
+        visits = normalized_visit_records(reference)
+    if visits:
+        final = visits[-1]
+        name = _text(final.get("visit") or final.get("visitName"))
+        timing = _text(final.get("timing") or final.get("visitWindow"))
+        if "postoperative" in f"{name} {timing}".casefold() and name and not re.fullmatch(r"Visit\s+\w+", name, flags=re.I):
+            return name
+        if "postoperative" in timing.casefold():
+            return timing
+    return _text(get_path(reference, "study.timeline"))
 
 
 def _document_control_date(reference: Mapping[str, Any]) -> str:
@@ -311,7 +329,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "interventionName": _text(get_path(reference, "design.intervention_name")),
         "daysBeforeScreening": screening_interval.days if screening_interval else "",
         "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if isinstance(visits, list) else "",
-        "AI_duration": _text(get_path(reference, "study.timeline")), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
+        "AI_duration": _protocol_followup_summary(reference), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
         "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True) or "\n".join(f"• {item}" for item in inclusion),
         "AI_exclusionCriteria": _draft_text(model, "subjects.exclusion", bullets=True) or _draft_text(model, "subjects.eligibility", bullets=True),
@@ -3095,6 +3113,9 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     if matrix_mode:
         row_values = [list(row) for row in row_values]
         row_values[1][0] = ""
+    for row in row_values[header_rows:]:
+        if row and row[0]:
+            row[0] = row[0][0].upper() + row[0][1:]
 
     authority = Document(authority_path)
     design = authority.tables[-1]

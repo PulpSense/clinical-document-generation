@@ -5136,8 +5136,14 @@ def create_verification_requests(
         " Check each section purpose and editorial relevance: flag prose that answers another section's "
         "question instead of its own, redundant narration of a source-derived table or notes, and "
         "self-referential filler that conveys no approved clinical fact. Identify the exact passage and the "
-        "section or table that already carries its information. A clinically unusable section is material; "
-        "minor wording preferences are not findings."
+        "section or table that already carries its information. Flag a full title in a Protocol running "
+        "header despite an approved short title, unrelated phases in the Section 3 follow-up synopsis, "
+        "unsupported clinical product claims in the Introduction, an endpoint inventory in Objectives, "
+        "a hypothesis repeated as a measurement method, a cross-reference-only statistical consideration, "
+        "duplicated schedule prose below the Section 15 table, and generic Section 16 privacy prose that "
+        "omits supplied operational detail. Section 18.5 must state the completion rule rather than a "
+        "second visit schedule. A clinically unusable section is material; minor wording preferences are "
+        "not findings."
     )
     if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling":
         content_instructions += (
