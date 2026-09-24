@@ -34,6 +34,7 @@ from contracts import (
     meaningful,
     normalized_visit_records,
     protocol_contract,
+    protocol_table_contracts,
     source_evidence_coverage_map,
 )
 
@@ -41,7 +42,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v12-sterling-clauses-and-section-ownership"
+PROMPT_VERSION = "section-drafting-v13-brad-editorial-ownership"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -107,8 +108,9 @@ def _request_constraints() -> list[str]:
         "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
         "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
         "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
-        "Protocol General Information is a compact synopsis; Objectives owns objectives, hypotheses, and concise endpoint identification; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and never reproduce a long endpoint inventory outside Objectives unless scientific meaning requires it.",
-        "Satisfy every section's content_expectations and cover every material value named by minimum_evidence.",
+        "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and do not reproduce the endpoint inventory outside Study Design unless scientific meaning requires it.",
+        "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+        "Write clinical content that serves the section purpose. Omit self-referential filler, generic transitions, and repeated conclusions that add no source-supported information.",
         "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
@@ -1002,6 +1004,16 @@ def _coverage_findings(
         # Ordered concept-to-block grounding is validated after each paragraph
         # has been normalized; aggregate citation coverage is insufficient.
         return []
+    if contract.get("source_coverage") == "table_with_notes":
+        source_value = request.get("approved_source")
+        source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
+        table = protocol_table_contracts(source)["schedule-of-assessments"]
+        if table["rows"] or table["supplemental_notes"]:
+            # The renderer supplies this source-derived detail after the prose.
+            # The complete table and notes are audited by content verification.
+            return []
+        # With no table detail, the prose remains responsible for the source.
+        contract = {**contract, "source_coverage": "all_material_items"}
     if contract.get("source_coverage") == "concept_reference":
         source_value = request.get("approved_source")
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}

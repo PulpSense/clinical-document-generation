@@ -20,7 +20,7 @@ from xml.etree import ElementTree as ET
 
 
 CONTRACT_VERSION = "clinical-documents-v2.27-recovery-contract"
-BOILERPLATE_VERSION = "clinical-boilerplate-v11"
+BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
@@ -352,23 +352,24 @@ RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
 def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
     specific = {
         "introduction": "Name the study and explain its approved clinical background, hypothesis, primary endpoint, and rationale.",
-        "objectives": "Distinguish the approved objective, hypothesis, and every supplied primary, secondary, and exploratory endpoint; reconcile different clinical constructs rather than silently substituting one for another.",
+        "objectives": "State the approved study purpose and objectives concisely. Distinguish the hypothesis and primary endpoint only where needed to clarify that purpose; the detailed endpoint inventory belongs in Study Design.",
         "subjects.population": "Describe the approved population and planned sample size without adding eligibility facts.",
         "subjects.inclusion": "Preserve every approved inclusion criterion and the approved minimum interval without participation in another study before screening as distinct, usable criteria.",
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and keep the two groups distinct.",
-        "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied.",
+        "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied. Identify every approved primary, secondary, and exploratory endpoint once in a grouped, readable account of what the design evaluates.",
         "study-design.bias": "Explain applicable bias controls and use only the listed boilerplate when source detail is sparse.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
         "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
-        "evaluation-procedures": "Account for every approved assessment and visit in the Schedule of Assessments narrative.",
+        "evaluation-procedures": "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
         "endpoint-criteria.completion": "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
         "endpoint-criteria.study-completion": "Reference every approved visit and time point concisely when stating the study-level timeline and completion rule, without repeating the complete participant visit or assessment inventory.",
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
         "analysis-plan.methodology": "Explain how each endpoint is summarized or analyzed. Group endpoints sharing one method, use concise cross-references to Objectives, and do not reproduce a standalone endpoint inventory.",
-        "analysis-plan.considerations": "State only source-supported cross-cutting analysis conventions or software/version details, and otherwise cross-reference Section 10.2 without repeating its methods or endpoint inventory.",
+        "analysis-plan.considerations": "State a source-supported general consideration that affects interpretation of the analyses, such as the approved descriptive or inferential approach or specified software. Do not write a sentence whose only content is a cross-reference to Section 10.2.",
         "sample-size": "State the approved sample size and explain its approved justification.",
+        "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
         "study-procedure.discontinued": "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
         "quality-safety": (
@@ -397,6 +398,10 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
 
 
 def _source_coverage(section_id: str) -> str:
+    if section_id == "evaluation-procedures":
+        # The source-derived table and its notes carry the assessment inventory.
+        # Requiring all items in the adjacent prose duplicates that inventory.
+        return "table_with_notes"
     if section_id in {
         "analysis-plan.considerations",
         "endpoint-criteria.completion",
@@ -490,13 +495,13 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("general-information", "3.", "GENERAL INFORMATION", role="summary", owned_concepts=("protocol-synopsis",), brief_reference_concepts=("endpoint-inventory",), do_not_restate_concepts=("endpoint-inventory",)),
     _section_spec("table-of-contents", "4.", "TABLE OF CONTENTS", role="container"),
     _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.title", "study.hypothesis", "endpoints.primary"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
-    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("study-objectives", "endpoint-inventory"), brief_reference_concepts=("clinical-rationale", "primary-endpoint"), do_not_restate_concepts=("clinical-rationale",)),
+    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-objectives",), brief_reference_concepts=("clinical-rationale", "primary-endpoint", "endpoint-inventory"), do_not_restate_concepts=("clinical-rationale", "endpoint-inventory")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
-    _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.intervention_description"), owned_concepts=("study-design", "intervention-assignment")),
+    _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.intervention_description", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("study-design", "intervention-assignment", "endpoint-inventory")),
     _section_spec("study-design.bias", "8.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design",), "bias"),
     _section_spec(
         "study-design.assignment",
@@ -509,13 +514,13 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("study-procedure", "9.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.consent", "9.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent",), "consent"),
     _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "procedures.intervention_management"), owned_concepts=("complete-visit-schedule",)),
-    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessment_details", "study.hypothesis", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("endpoint-measurement-methods",), brief_reference_concepts=("complete-visit-schedule", "endpoint-inventory"), do_not_restate_concepts=("complete-visit-schedule", "endpoint-inventory")),
+    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessment_details", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("endpoint-measurement-methods",), brief_reference_concepts=("complete-visit-schedule", "endpoint-inventory"), do_not_restate_concepts=("complete-visit-schedule", "endpoint-inventory")),
     _section_spec("study-procedure.unscheduled", "9.4.", "Unscheduled Visits", "protocol-operations", ("procedures.unscheduled_visits",), "unscheduled"),
     _section_spec("study-procedure.discontinued", "9.5.", "Discontinued Subjects", "protocol-operations", ("procedures.discontinued_subjects",), "discontinued-subjects"),
     _section_spec("analysis-plan", "10.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "10.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.analysis_populations"), owned_concepts=("analysis-populations",), brief_reference_concepts=("endpoint-inventory",), do_not_restate_concepts=("endpoint-inventory",)),
     _section_spec("analysis-plan.methodology", "10.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("statistical-methods",), brief_reference_concepts=("primary-endpoint", "secondary-endpoints", "endpoint-inventory"), do_not_restate_concepts=("endpoint-inventory",)),
-    _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.software",), "analysis-considerations-cross-reference", brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
+    _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.software"), brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
     _section_spec("sample-size", "11.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification", "population.sample_size_evidence", "statistics.sample_size_evidence")),
     _section_spec("confidentiality-publication", "12.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("confidentiality.publication", "confidentiality.retention"), "publication"),
     _section_spec("quality-safety", "13.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", role="container"),
@@ -557,7 +562,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("analysis-plan", "9.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "9.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
     _section_spec("analysis-plan.methodology", "9.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan"), owned_concepts=("statistical-methods",)),
-    _section_spec("analysis-plan.considerations", "9.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.software",), "analysis-considerations-cross-reference", brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
+    _section_spec("analysis-plan.considerations", "9.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.software"), brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
     _section_spec("sample-size", "10.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification")),
     _section_spec("confidentiality", "11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("risks_benefits.privacy", "confidentiality.data_handling"), "retrospective-confidentiality"),
     _section_spec("quality-safety", "12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", "protocol-analysis-and-oversight", ("risks_benefits.risks", "safety.roles"), "retrospective-safety"),

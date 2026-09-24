@@ -482,7 +482,7 @@ def test_content_review_request_requires_structured_protocol_concept_findings(tm
     request = json.loads(request_path.read_text(encoding="utf-8"))
     ownership = request["protocol_concept_ownership"]
     assert ownership["introduction"]["owns"] == ["clinical-rationale"]
-    assert ownership["objectives"]["do_not_restate"] == ["clinical-rationale"]
+    assert ownership["objectives"]["do_not_restate"] == ["clinical-rationale", "endpoint-inventory"]
     instructions = request["instructions"]
     for field in (
         "concept_id",
@@ -500,8 +500,8 @@ def test_protocol_secondary_sections_do_not_own_complete_schedule_or_methods():
     protocol = {item.section_id: item for item in contracts.protocol_contract("Prospective")}
     assert "procedures.visit_schedule" not in protocol["study-procedure.measurements"].evidence
     assert "procedures.assessments" not in protocol["study-procedure.measurements"].evidence
-    assert protocol["analysis-plan.considerations"].evidence == ("statistics.software",)
-    assert protocol["analysis-plan.considerations"].boilerplate_key == "analysis-considerations-cross-reference"
+    assert protocol["analysis-plan.considerations"].evidence == ("statistics.analysis_plan", "statistics.software")
+    assert protocol["analysis-plan.considerations"].boilerplate_key is None
     assert {"procedures.visit_schedule", "procedures.assessments"} <= set(protocol["endpoint-criteria.completion"].evidence)
     assert {"study.timeline", "procedures.visit_schedule", "procedures.assessments"} <= set(protocol["endpoint-criteria.study-completion"].evidence)
     assert protocol["endpoint-criteria.completion"].source_coverage == "concept_reference"
@@ -511,13 +511,12 @@ def test_protocol_secondary_sections_do_not_own_complete_schedule_or_methods():
     assert "statistical-methods" in protocol["analysis-plan.considerations"].do_not_restate_concepts
 
 
-def test_analysis_cross_reference_contains_no_source_gap_commentary():
+def test_analysis_cross_reference_is_not_available_as_filler():
     boilerplate = json.loads(
         (ROOT / "references/fixed-clinical-boilerplate.json").read_text(encoding="utf-8")
-    )["sections"]["analysis-considerations-cross-reference"]
+    )["sections"]
 
-    assert "approved source" not in boilerplate.casefold()
-    assert "when specified" not in boilerplate.casefold()
+    assert "analysis-considerations-cross-reference" not in boilerplate
 
 
 def test_key_information_rejects_generic_blocks_with_unearned_source_refs(tmp_path):

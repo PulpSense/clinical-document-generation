@@ -540,8 +540,8 @@ def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp
         response = recorded_acceptance_response(request)
         target = next(item for item in response["section_results"] if item["section_id"] == section_id)
         target["paragraphs"].append({
-            "text": "The approved hypothesis states that prospective monitoring will describe recovery.",
-            "evidence_refs": ["source:study.hypothesis"],
+            "text": "The approved primary outcome is assessed at Month 3.",
+            "evidence_refs": ["source:endpoints.primary"],
             "boilerplate_refs": [],
         })
         response_path = tmp_path / request["response_path"]
@@ -567,7 +567,7 @@ def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tm
     assert prepare(run_dir)["status"] == "awaiting_approval"
     approval = approve(run_dir, approved_by="reviewer")
     revision_dir = run_dir / "revisions" / approval["revision_id"]
-    shared_text = "The approved hypothesis states that prospective monitoring will describe recovery."
+    shared_text = "The approved primary outcome is assessed at Month 3."
 
     drafting = generate(run_dir)
     for relative in drafting["requests"]:
@@ -577,7 +577,7 @@ def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tm
             if result["section_id"] in {"objectives", "study-procedure.measurements"}:
                 result["paragraphs"].append({
                     "text": shared_text,
-                    "evidence_refs": ["source:study.hypothesis"],
+                    "evidence_refs": ["source:endpoints.primary"],
                     "boilerplate_refs": [],
                 })
         response_path = revision_dir / request["response_path"]

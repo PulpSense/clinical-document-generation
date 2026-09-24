@@ -1,10 +1,9 @@
 {
-  "version": "clinical-boilerplate-v11",
+  "version": "clinical-boilerplate-v12",
   "sections": {
     "bias": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
-    "analysis-considerations-cross-reference": "The statistical methods for the study endpoints are described in the preceding Statistical Methodology section.",
     "consent": "Written informed consent will be obtained before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
-    "unscheduled": "An unscheduled contact may occur when an additional study-related assessment is needed. The reason for the contact, assessments performed, and resulting actions will be documented in the study records.",
+    "unscheduled": "An unscheduled visit may occur when an additional study-related assessment is needed. The reason for the visit, assessments performed, and resulting actions will be documented in the study records.",
     "discontinued-subjects": "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements.",
     "discontinuation": "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements.",
     "publication": "Study results may be presented or published only in a form that protects participant confidentiality and follows the approved publication and data-governance requirements.",

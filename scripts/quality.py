@@ -5126,6 +5126,11 @@ def create_verification_requests(
         "section unless the primary section is incomplete. For manual review, explicitly set material, contradiction, "
         "obscures_required_information, and materially_unusable to false. Treat ordinary noncontradictory concept "
         "repetition as manual review; omitted or true material-harm flags remain blocking."
+        " Check each section purpose and editorial relevance: flag prose that answers another section's "
+        "question instead of its own, redundant narration of a source-derived table or notes, and "
+        "self-referential filler that conveys no approved clinical fact. Identify the exact passage and the "
+        "section or table that already carries its information. A clinically unusable section is material; "
+        "minor wording preferences are not findings."
     )
     payloads = [{
         "schema_version": VERIFY_SCHEMA,

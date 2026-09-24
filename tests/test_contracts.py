@@ -290,8 +290,9 @@ def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     icf = {section.section_id: section for section in ICF_STUDY_SECTIONS}
 
     assert {"study.hypothesis", "endpoints.primary"} <= set(protocol["introduction"].evidence)
-    assert {"study.hypothesis", "endpoints.primary", "endpoints.secondary"} <= set(protocol["objectives"].evidence)
-    assert {"study.hypothesis", "endpoints.primary", "endpoints.secondary"} <= set(protocol["study-procedure.measurements"].evidence)
+    assert {"study.hypothesis", "endpoints.primary"} <= set(protocol["objectives"].evidence)
+    assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["study-design.design"].evidence)
+    assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["study-procedure.measurements"].evidence)
     assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["analysis-plan.methodology"].evidence)
     assert {"study.hypothesis", "objectives.secondary", "endpoints.primary", "endpoints.secondary"} <= set(retrospective["objectives"].evidence)
     assert {"study.hypothesis", "endpoints.primary"} <= set(icf["icf.study-purpose"].evidence)
@@ -647,7 +648,7 @@ def test_protocol_contract_binds_the_detailed_source_fields_needed_by_the_refere
 
     assert protocol["study-design.assignment"].role == "source"
     assert protocol["study-design.assignment"].evidence == ("design.assignment_method",)
-    assert "endpoints.other" in protocol["objectives"].evidence
+    assert "endpoints.other" in protocol["study-design.design"].evidence
     assert {"procedures.assessment_details", "procedures.intervention_management"} <= set(protocol["study-procedure.visits"].evidence)
     assert "statistics.analysis_populations" in protocol["analysis-plan.datasets"].evidence
     assert "endpoints.other" in protocol["analysis-plan.methodology"].evidence
