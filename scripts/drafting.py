@@ -42,7 +42,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v13-brad-editorial-ownership"
+PROMPT_VERSION = "section-drafting-v14-method-group-coverage"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -1014,6 +1014,30 @@ def _coverage_findings(
             return []
         # With no table detail, the prose remains responsible for the source.
         contract = {**contract, "source_coverage": "all_material_items"}
+    if contract.get("source_coverage") == "method_group_summary":
+        material = _material_source(request, contract)
+        cited = set(map(str, evidence_refs))
+        missing = [path for path in material if f"source:{path}" not in cited]
+        findings = [{
+            "category": "drafting",
+            "field": section_id,
+            "issue": f"Statistical Methodology omits method-group evidence references: {', '.join(missing)}.",
+            "next_action": "Cite each approved method and endpoint group while describing shared methods once; Study Design owns the full endpoint inventory.",
+        }] if missing else []
+        ungrounded_methods = [
+            path for path, value in material.items()
+            if path.startswith("statistics.") and f"source:{path}" in cited
+            and not evidence_grounded(content, value)
+        ]
+        if ungrounded_methods:
+            findings.append({
+                "category": "drafting",
+                "field": section_id,
+                "issue": "Statistical Methodology does not preserve the approved analysis method: "
+                + ", ".join(ungrounded_methods) + ".",
+                "next_action": "State the approved methods for each outcome group without repeating endpoint names and time points.",
+            })
+        return findings
     if contract.get("source_coverage") == "concept_reference":
         source_value = request.get("approved_source")
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
@@ -2107,7 +2131,7 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
             result.update({"outcome": "drafted", "paragraphs": []})
     for result, contract in zip(response["section_results"], request["section_contracts"]):
         section_id = str(contract.get("section_id"))
-        if section_id == "icf.key-information-summary" or contract.get("source_coverage") == "concept_reference":
+        if section_id == "icf.key-information-summary" or contract.get("source_coverage") in {"concept_reference", "method_group_summary"}:
             continue
         allowed_paths = [
             path for path in contract.get("minimum_evidence", [])

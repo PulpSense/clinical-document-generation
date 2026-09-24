@@ -45,7 +45,10 @@ this file.
 - `parties`: sponsor, principal investigator, sub-investigators, coordinator,
   IRB/ethics committee, funding source, and their contact details.
 - `sites`: one row per site with facility, contact, backup contact, and
-  investigator details.
+  investigator details. A supplied full address string remains intact. Explicit
+  city/country and any supplied state/postal components feed PRS XML; an
+  unambiguous US mailing string may supply those components. Clarify a supplied
+  multi-part address that cannot be separated safely before approval.
 - `population`: study population, planned sample size, sample justification,
   age/sex eligibility, inclusion criteria, exclusion criteria, and supporting
   sample-size evidence.

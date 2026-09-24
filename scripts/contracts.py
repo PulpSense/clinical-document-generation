@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.28-sterling-template-ownership"
+CONTRACT_VERSION = "clinical-documents-v2.29-method-group-coverage"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -75,6 +75,7 @@ LAYOUT_REPAIR_RULES = {
     "protocol": (
         "heading_cohesion", "heading_whitespace_cohesion",
         "heading_page_boundary", "table_pagination", "table_page_boundary",
+        "section15_table_opening",
     ),
     "icf": (
         "heading_cohesion", "heading_whitespace_cohesion",
@@ -398,6 +399,10 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
 
 
 def _source_coverage(section_id: str) -> str:
+    if section_id == "analysis-plan.methodology":
+        # Endpoint identity belongs in Study Design. Statistical Methodology
+        # cites those endpoints but describes methods once per outcome group.
+        return "method_group_summary"
     if section_id == "evaluation-procedures":
         # The source-derived table and its notes carry the assessment inventory.
         # Requiring all items in the adjacent prose duplicates that inventory.
@@ -939,6 +944,19 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
     state = first("state", "region", "province")
     postal_code = first("zip", "postal_code", "postalCode", "postcode", "zip_code")
     country = first("country", "country_name")
+    # A complete, comma-delimited US address is common in approved source
+    # packets. Decompose only its unambiguous final components; retain the
+    # original display address below. Other formats need explicit components.
+    if isinstance(address, str) and not nested and not any((city, state, postal_code, country)):
+        parts = [part.strip() for part in re.split(r"[,;\n]", address) if part.strip()]
+        if len(parts) >= 4 and parts[-1].casefold().rstrip(".") in {
+            "usa", "us", "u.s.a", "united states", "united states of america",
+        }:
+            state_zip = re.fullmatch(r"(.+?)\s+(\d{5}(?:-\d{4})?)", parts[-2])
+            if state_zip:
+                city, state, postal_code, country = (
+                    parts[-3], state_zip.group(1), state_zip.group(2), parts[-1]
+                )
     locality_parts = [city, state, postal_code, country]
     raw_segments: list[str] = []
     if nested:
@@ -1572,6 +1590,23 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "issue": "PRS study type must be Observational or Interventional.",
                 "required": "Observational or Interventional.",
             })
+        for index, site in enumerate(get_path(reference, "sites", []) or []):
+            if not isinstance(site, Mapping):
+                continue
+            facility = site.get("facility")
+            if not isinstance(facility, Mapping):
+                continue
+            address = facility.get("address")
+            if not isinstance(address, str) or not re.search(r"[,;\n]", address):
+                continue
+            projection = facility_projection(facility)
+            if not projection["city"] or not projection["country"]:
+                findings.append({
+                    "category": "source-evidence",
+                    "field": f"sites[{index}].facility.address",
+                    "issue": "Supplied site address cannot be separated into PRS location components.",
+                    "required": "Provide the site city and country as explicit facility fields; include state and postal code when supplied.",
+                })
     sample_size = _sample_size_signature(get_path(reference, "population.sample_size"))
     for evidence_path in ("population.sample_size_evidence", "statistics.sample_size_evidence"):
         rows = get_path(reference, evidence_path, [])
@@ -1771,6 +1806,7 @@ def source_contract(
         "Required Source Input is missing.",
         "Required Source Input has conflicting source candidates.",
         "Required Source Input has conflicting declared aliases.",
+        "Supplied site address cannot be separated into PRS location components.",
     }
     source_gaps = [
         finding for finding in findings

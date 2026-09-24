@@ -10,7 +10,9 @@ they are not permission to redesign the client documents during a run.
   identity must not be concatenated into it, whether the organizations match or
   differ. Preserve funding information separately where applicable.
 - Include every supplied site-address component. Accept structured or complete
-  string addresses without duplication; never invent a postal code.
+  string addresses without duplication; never invent a postal code. Sterling's
+  IRB-owned ICF first-page merge tags remain unfilled; check the supplied
+  address in the Protocol and PRS location instead of demanding it in those tags.
 - Both visit tables use the same visit identities. Preserve explicit identifiers;
   consistent display ordinals may identify an explicit ordered visit schedule.
   An assessments-only list is not a source of invented numbered visits.
@@ -102,6 +104,8 @@ readiness distinct. The PRS upload schema documents sex tokens `All`, `Female`,
 and `Male` (with `Both` equivalent to `All`), although its `gender` declaration
 uses `xs:string`, not an XSD enumeration. Map source display wording explicitly;
 do not change the approved source to match transport spelling.
+Map an approved `USA` or `US` location to the manual PRS reference's
+`United States` country label in XML while preserving the original source text.
 
 Unknown calendar dates cannot be derived from a document-control date or relative
 visit durations. Optional empty fields remain optional; deprecated `end_date`

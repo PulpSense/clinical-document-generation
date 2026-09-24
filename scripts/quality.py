@@ -3756,35 +3756,61 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
     document = Document(path)
     findings: list[dict[str, Any]] = []
     if path.stem == "icf":
-        # Inspect the address destination, never an unrelated later mention.
-        address_blocks = []
-        if document.tables:
-            for row in document.tables[0].rows:
-                if re.fullmatch(r"(?:study\s+site\s+)?address\s*:", row.cells[0].text.strip(), re.I):
-                    address_blocks.append("\n".join(cell.text for cell in row.cells[1:]))
-        if not address_blocks:
-            collecting = False
-            for paragraph in document.paragraphs:
-                text = paragraph.text
-                if re.match(r"^\s*(?:study\s+site|site\s+address)\s*:", text, re.I):
-                    address_blocks.append(text)
-                    collecting = True
-                elif collecting and text.startswith("\t"):
-                    address_blocks.append(text)
-                elif collecting and text.strip():
-                    break
-        normalized = " ".join(re.findall(r"\w+", "\n".join(address_blocks).casefold()))
-        for item in _source_field_inventory(reference):
-            field = item["source_path"]
-            if not re.fullmatch(
-                r"sites\[0\]\.facility\.(?:address(?:\.(?:line1|line2|address_line1|address_line2|street|city|state|country|zip|postal_code))?|city|state|country|zip|postal_code)", field
+        sterling = str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"
+        if sterling:
+            # Sterling owns the final first-page mail merge. The approved
+            # address belongs in the source and protocol, while these exact
+            # tags must survive in the ICF for the IRB's merge process.
+            first_page_paragraphs = document.paragraphs[:20]
+            site_index = next((
+                index for index, paragraph in enumerate(first_page_paragraphs)
+                if paragraph.text.strip().startswith("STUDY SITE:")
+            ), None)
+            site_block = "\n".join(
+                paragraph.text for paragraph in first_page_paragraphs[site_index:site_index + 3]
+            ) if site_index is not None else ""
+            for field, marker in (
+                ("sites[0].facility.name", "«Company_Name»"),
+                ("sites[0].facility.address", "«Address»"),
+                ("sites[0].facility.address.location", "«City_State_ZIP»"),
             ):
-                continue
-            value = " ".join(re.findall(r"\w+", str(item["value"]).casefold()))
-            if value and not re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", normalized):
-                findings.append({"category": "content", "field": field,
-                                 "target_ids": ["layout:icf"],
-                                 "issue": f"ICF omits supplied site-address component {field}: {item['value']}"})
+                if site_block.count(marker) != 1:
+                    findings.append({
+                        "category": "template_contract",
+                        "field": field,
+                        "target_ids": ["layout:icf"],
+                        "issue": f"Sterling first-page merge field {marker} must appear exactly once in the STUDY SITE block.",
+                    })
+        else:
+            # Inspect the address destination, never an unrelated later mention.
+            address_blocks = []
+            if document.tables:
+                for row in document.tables[0].rows:
+                    if re.fullmatch(r"(?:study\s+site\s+)?address\s*:", row.cells[0].text.strip(), re.I):
+                        address_blocks.append("\n".join(cell.text for cell in row.cells[1:]))
+            if not address_blocks:
+                collecting = False
+                for paragraph in document.paragraphs:
+                    text = paragraph.text
+                    if re.match(r"^\s*(?:study\s+site|site\s+address)\s*:", text, re.I):
+                        address_blocks.append(text)
+                        collecting = True
+                    elif collecting and text.startswith("\t"):
+                        address_blocks.append(text)
+                    elif collecting and text.strip():
+                        break
+            normalized = " ".join(re.findall(r"\w+", "\n".join(address_blocks).casefold()))
+            for item in _source_field_inventory(reference):
+                field = item["source_path"]
+                if not re.fullmatch(
+                    r"sites\[0\]\.facility\.(?:address(?:\.(?:line1|line2|address_line1|address_line2|street|city|state|country|zip|postal_code))?|city|state|country|zip|postal_code)", field
+                ):
+                    continue
+                value = " ".join(re.findall(r"\w+", str(item["value"]).casefold()))
+                if value and not re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", normalized):
+                    findings.append({"category": "content", "field": field,
+                                     "target_ids": ["layout:icf"],
+                                     "issue": f"ICF omits supplied site-address component {field}: {item['value']}"})
     if path.stem == "protocol":
         sponsor_name = str(get_path(reference, "parties.sponsor.name", "") or "").strip()
         if sponsor_name:
@@ -5150,7 +5176,9 @@ def create_verification_requests(
             " Sterling IRB owns the consent front-matter merge fields for title, protocol number, "
             "investigator, site, telephones, and sponsor. Their exact template merge tags are intentional "
             "and must remain unfilled; do not report those tags as missing drafted content or a "
-            "Protocol/ICF mismatch. The fixed introduction and INFORMATION clause are retained from "
+            "Protocol/ICF mismatch. Verify the site merge tags at their first-page positions; check the "
+            "actual supplied site address in the Protocol and the PRS location components. The fixed "
+            "introduction and INFORMATION clause are retained from "
             "the template. The exact registry statement appears only when its approved source trigger "
             "is present. Continue reviewing all study-specific ICF sections against approved evidence."
         )

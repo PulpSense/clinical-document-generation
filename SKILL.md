@@ -258,6 +258,8 @@ Create `<run-dir>/reference/study.reference.json` from the user’s supplied fac
 
 Set `meta.study_type` to exactly `Prospective`, `Ambispective`, or `Retrospective`. For prospective/ambispective studies, set `meta.icf_template` to `Advarra` or `Sterling` based on the user’s choice or clear evidence. Do not guess between templates.
 
+Preserve any supplied site address exactly in the source. An unambiguous full US mailing address can be projected into PRS city, state, postal code, and country without changing the approved text. If a supplied comma-delimited address cannot be separated safely, resolve that existing site field before approval; never invent location components during XML generation.
+
 For prospective/ambispective studies, preserve `regulatory.prs.study_type` as `Observational` or `Interventional` when explicit source evidence supplies it; during preparation, an unambiguous classification in `design.study_design` populates the review field. If neither classification is explicit, leave it unresolved without a missing-input question or intake blocker. Never infer it from uncertain or negated design text, and never restore a reviewer-cleared value. A supplied unsupported classification still fails controlled-vocabulary validation, and missing or invalid required PRS output values still fail downstream XML validation. `meta.study_type` describes the workflow branch and is not a PRS classification.
 
 ### 2. Prepare the Source-of-Truth

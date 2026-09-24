@@ -55,7 +55,7 @@
       "section_id": "icf.study-purpose",
       "fidelity": "meaning_preserving",
       "permitted_substitutions": ["participant-facing simplification"],
-      "validation": {"required_term_groups": [["purpose", "objective"], ["hypothesis", "hypothesize"], ["primary endpoint", "main outcome"]], "maximum_words": 140},
+      "validation": {"required_term_groups": [["purpose", "objective"], ["hypothesis", "hypothesize", "researchers expect", "we expect"], ["primary endpoint", "main outcome", "primary measure", "main measure"]], "maximum_words": 140},
       "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
       "repeatable": false
     },

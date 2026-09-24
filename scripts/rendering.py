@@ -1020,6 +1020,13 @@ def _replace_protocol_leaf_bodies(
                 block for block in blocks
                 if _layout_target_key(block[0]) not in caption_keys
             ]
+        if section.section_id == "evaluation-procedures" and sum(
+            len(text.split()) for text, _is_list in blocks
+        ) > 24:
+            # The source-derived matrix and notes own the visit inventory.
+            # Keep a long draft from repeating it ahead of a near-full-page
+            # table; the short connective states no new clinical fact.
+            blocks = [("The approved visits and assessments are summarized in Table 15.1.", False)]
         if branch == "Retrospective" and section.section_id == "subjects.eligibility":
             blocks = _retrospective_eligibility_blocks(reference)
         if not blocks:
@@ -3092,6 +3099,39 @@ def _repair_table_page_boundary(document: Document, target: str) -> None:
     caption.paragraph_format.page_break_before = True
 
 
+def _repair_section15_table_opening(document: Document, target: str) -> None:
+    """Keep the Section 15 lead-in with its assessment-table opening."""
+    if _protocol_heading_key(target) != "15 standard evaluation procedures":
+        raise LayoutRepairTargetError(f"Section 15 repair has the wrong target: {target}")
+    heading = _target_heading(document, target, protocol=True)
+    introduction = None
+    caption = None
+    table = None
+    for sibling in heading._p.itersiblings():
+        if sibling.tag == qn("w:tbl"):
+            table = Table(sibling, document)
+            break
+        if sibling.tag != qn("w:p"):
+            continue
+        paragraph = Paragraph(sibling, document)
+        value = paragraph.text.strip()
+        if not value:
+            continue
+        if re.match(r"^\d+(?:\.\d+)*\.?\s+", value) and not value.startswith("Table 15.1"):
+            break
+        if value.startswith("Table 15.1"):
+            caption = paragraph
+        elif introduction is None:
+            introduction = paragraph
+    if introduction is None or caption is None or table is None or not table.rows:
+        raise LayoutRepairTargetError("Section 15 heading, introduction, caption, and table are not one exact opening block.")
+    for paragraph in (heading, introduction, caption):
+        paragraph.paragraph_format.keep_with_next = True
+        paragraph.paragraph_format.keep_together = True
+        paragraph.paragraph_format.widow_control = True
+    _prevent_row_split(table.rows[0])
+
+
 def _assessment_matrix(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
     """Populate Table 15.1 only from approved visit/procedure relationships."""
     placeholder = next((paragraph for paragraph in document.paragraphs if "{visitsTable}" in paragraph.text), None)
@@ -3375,6 +3415,8 @@ def _template_document(
             _repair_table_pagination(document, target)
         elif rule == "table_page_boundary":
             _repair_table_page_boundary(document, target)
+        elif rule == "section15_table_opening":
+            _repair_section15_table_opening(document, target)
         elif rule == "sterling_study_site_alignment":
             _align_sterling_study_site_continuations(document, reference)
     _set_update_fields(document)

@@ -6320,6 +6320,14 @@ def _layout_repair_plan(
         )
         if sterling_site_reconstruction:
             disposition = "repair:sterling_study_site_alignment"
+        section15_table_opening = (
+            artifact == "protocol"
+            and check == "artificial_pagination"
+            and target.casefold() == "15. standard evaluation procedures"
+            and family in {"prospective-protocol", "ambispective-protocol"}
+        )
+        if section15_table_opening:
+            disposition = "repair:section15_table_opening"
         if disposition.startswith("prevention:"):
             unsupported.append({
                 **finding,
@@ -6360,6 +6368,8 @@ def _layout_repair_plan(
         ladder = (
             ("heading_whitespace_cohesion", "heading_page_boundary")
             if exact_sterling_duration_gap
+            else ("section15_table_opening", "heading_page_boundary")
+            if section15_table_opening
             else ("heading_cohesion", "heading_page_boundary")
             if check == "orphan_heading"
             else ("table_pagination", "table_page_boundary")

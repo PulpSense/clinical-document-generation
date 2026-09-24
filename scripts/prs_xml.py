@@ -19,6 +19,14 @@ REPEATED = ("intervention", "location", "arm_group", "primary_outcome", "seconda
 ET.register_namespace("prs", "http://clinicaltrials.gov/prs")
 
 
+def _prs_country(value: Any) -> str:
+    """Use the manual PRS reference's country name for explicit US aliases."""
+    raw = _text(value)
+    if raw.casefold().rstrip(".") in {"usa", "us", "u.s.a", "united states of america"}:
+        return "United States"
+    return raw
+
+
 @dataclass(frozen=True)
 class ScreeningIntervalRequirement:
     days: str
@@ -506,7 +514,7 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
         contact_fields = _contact_fields(contact)
         backup_fields = _contact_fields(_site_backup_contact(site))
         investigator_fields = _contact_fields(investigator)
-        _set(node, "status", site.get("status")); _set(node, "facility/name", facility_fields["name"]); _set(node, "facility/address/city", facility_fields["city"]); _set(node, "facility/address/state", facility_fields["state"]); _set(node, "facility/address/country", facility_fields["country"]); _set(node, "facility/address/zip", facility_fields["postal_code"])
+        _set(node, "status", site.get("status")); _set(node, "facility/name", facility_fields["name"]); _set(node, "facility/address/city", facility_fields["city"]); _set(node, "facility/address/state", facility_fields["state"]); _set(node, "facility/address/country", _prs_country(facility_fields["country"])); _set(node, "facility/address/zip", facility_fields["postal_code"])
         for field, value in contact_fields.items():
             _set(node, f"contact/{field}", value)
         for field, value in backup_fields.items():
@@ -944,14 +952,14 @@ def validate_output(
 
     for index, (node, site) in enumerate(zip(generated_locations, source_sites), start=1):
         facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
-        address = facility.get("address") if isinstance(facility.get("address"), Mapping) else {}
+        projected = facility_projection(facility)
         require_repeated_value(node, "status", site.get("status"), f"location[{index}].status")
         require_repeated_value(node, "facility/name", facility.get("name"), f"location[{index}].facility.name")
         for field, expected_value in (
-            ("city", address.get("city") or facility.get("city")),
-            ("state", address.get("state") or facility.get("state")),
-            ("country", address.get("country") or facility.get("country")),
-            ("zip", address.get("zip") or facility.get("zip") or facility.get("postal_code")),
+            ("city", projected["city"]),
+            ("state", projected["state"]),
+            ("country", _prs_country(projected["country"])),
+            ("zip", projected["postal_code"]),
         ):
             require_repeated_value(node, f"facility/address/{field}", expected_value, f"location[{index}].facility.address.{field}")
         contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}
