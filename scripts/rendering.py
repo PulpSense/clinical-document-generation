@@ -260,7 +260,14 @@ def _protocol_short_title(reference: Mapping[str, Any]) -> str:
     if branch:
         title = re.sub(rf"^\s*{re.escape(branch)}\s+", "", title, flags=re.I)
     title = re.sub(r"^\s*Evaluation\s+of\s+the\s+", "", title, flags=re.I)
-    return title
+    title = re.sub(r"^\s*(?:A|An)\s+.{0,100}?\bstudy\s+evaluating\s+", "", title, flags=re.I)
+    title = re.sub(r"\s+", " ", title).strip()
+    if len(title) <= 72:
+        return title[:1].upper() + title[1:]
+    boundary = title.rfind(" ", 0, 73)
+    concise = title[:boundary] if boundary > 35 else title[:72]
+    concise = re.sub(r"\s+(?:a|an|and|for|in|of|the|to|with)$", "", concise, flags=re.I)
+    return concise[:1].upper() + concise[1:]
 
 
 def _protocol_number(reference: Mapping[str, Any]) -> str:

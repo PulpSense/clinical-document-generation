@@ -1563,17 +1563,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         signatures = {_candidate_signature(value) for value in candidates.get(requirement.field, []) if _candidate_signature(value)}
         if len(signatures) > 1:
             findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input has conflicting source candidates.", "required": "One reviewer-selected value."})
-    full_title = str(get_path(reference, "study.title") or "").strip()
-    short_title = str(get_path(reference, "study.short_title") or "").strip()
-    if full_title and (
-        short_title and re.sub(r"\s+", " ", full_title).casefold() == re.sub(r"\s+", " ", short_title).casefold()
-        or not short_title and len(full_title) > 80
-    ):
-        findings.append({
-            "category": "source-evidence", "field": "study.short_title",
-            "issue": "The running header needs a concise short title instead of the full study title.",
-            "required": "A reviewer-approved concise short title distinct from the full title.",
-        })
     if branch != "Retrospective":
         prs_study_type = get_path(reference, "regulatory.prs.study_type")
         if meaningful(prs_study_type) and str(prs_study_type) not in PRS_STUDY_TYPES.values():

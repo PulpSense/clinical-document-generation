@@ -8,7 +8,7 @@ from docx import Document
 from contracts import batch_plan, input_findings, protocol_contract
 from drafting import _coverage_findings, create_drafting_request
 from quality import create_verification_requests
-from rendering import _endpoint_synopsis, _protocol_followup_summary, render_documents
+from rendering import _endpoint_synopsis, _protocol_followup_summary, _protocol_short_title, render_documents
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -80,13 +80,30 @@ def test_content_review_explicitly_checks_section_purpose_and_editorial_relevanc
     assert "section 18.5 must state the completion rule" in instructions
 
 
-def test_full_title_cannot_double_as_approved_short_title():
+def test_optional_short_title_never_blocks_intake_and_long_titles_get_header_fallback():
     source = _source()
-    source["study"]["short_title"] = source["study"]["title"]
-    assert any(item["field"] == "study.short_title" for item in input_findings(source))
     source["study"].pop("short_title")
-    source["study"]["title"] = "A very long full study title describing the intervention, population, setting, outcomes, and follow-up period"
-    assert any(item["field"] == "study.short_title" for item in input_findings(source))
+    source["study"]["title"] = (
+        "Visual and Patient-Reported Outcomes after Mix-and-Match Implantation "
+        "of an Extended Depth of Focus and a Trifocal Intraocular Lens"
+    )
+    assert not any(item["field"] == "study.short_title" for item in input_findings(source))
+    assert _protocol_short_title(source) == "Visual and Patient-Reported Outcomes after Mix-and-Match Implantation"
+    source["study"]["short_title"] = "PureSee and Odyssey Study"
+    assert _protocol_short_title(source) == "PureSee and Odyssey Study"
+
+
+def test_brad_reference_style_header_drops_generic_study_preamble():
+    source = _source()
+    source["study"].pop("short_title")
+    source["study"]["title"] = (
+        "A randomized, investigator-masked, longitudinal study evaluating "
+        "long-term changes in symptoms and tear production of acoltremon "
+        "ophthalmic solution 0.003% compared to control in subjects with dry eye disease"
+    )
+    concise = _protocol_short_title(source)
+    assert concise.startswith("Long-term changes in symptoms")
+    assert len(concise) <= 72
 
 
 def test_general_information_uses_complete_endpoint_synopsis_and_final_visit():

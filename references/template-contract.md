@@ -78,7 +78,8 @@ Protocol formatting is also source-bound to the retained client reference:
   separate hypothesis row.
 - The running header uses the approved short title; when none is supplied, it
   removes the canonical study-type prefix and a leading `Evaluation of the`
-  phrase from the full title. The page control stays on one line.
+  phrase from the full title, then shortens a long title at a word boundary
+  without adding study facts. The page control stays on one line.
 - The visible TOC is populated from rendered-page evidence and inherits the
   authority's `TOC 1` and `TOC 2` indents and dot leaders.
 - The visit-schedule table inherits the authority's widths, borders, typography,
