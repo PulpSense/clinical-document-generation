@@ -129,12 +129,12 @@
       "clause_id": "sterling.information.new-findings",
       "classification": "mandatory",
       "trigger": {"rule": "always"},
-      "approved_source": {"type": "authorized_boilerplate", "boilerplate_id": "icf-new-findings"},
+      "approved_source": {"type": "template", "paragraphs": [114]},
       "section": "INFORMATION",
       "section_id": "icf.information",
       "fidelity": "exact_normalized",
       "permitted_substitutions": [],
-      "validation": {"exact_boilerplate_id": "icf-new-findings"},
+      "validation": {"exact_template": true},
       "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
       "repeatable": false
     },
@@ -376,13 +376,13 @@
     {
       "clause_id": "sterling.privacy.registry-disclosure",
       "classification": "prohibited_from_invention",
-      "trigger": {"rule": "meaningful", "paths": ["regulatory.prs.participant_registry_disclosure"]},
-      "approved_source": {"type": "approved_input", "paths": ["regulatory.prs.participant_registry_disclosure"]},
+      "trigger": {"rule": "truthy", "paths": ["regulatory.prs.participant_registry_disclosure"]},
+      "approved_source": {"type": "template", "paragraphs": [230]},
       "section": "CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION",
       "section_id": "icf.privacy",
       "fidelity": "meaning_preserving",
       "permitted_substitutions": ["approved registry and disclosure statement"],
-      "validation": {"prohibit_when_untriggered": true, "unsupported_markers": ["clinicaltrials.gov", "required by u.s. law"]},
+      "validation": {"exact_template": true, "prohibit_when_untriggered": true, "unsupported_markers": ["clinicaltrials.gov", "required by u.s. law"]},
       "severity": {"absent": "blocking", "altered": "blocking", "unsupported": "blocking", "misplaced": "blocking"},
       "repeatable": false
     }

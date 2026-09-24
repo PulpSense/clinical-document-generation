@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.27-recovery-contract"
+CONTRACT_VERSION = "clinical-documents-v2.28-sterling-template-ownership"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -879,7 +879,7 @@ def sterling_clause_contract(repo_root: Path | None = None) -> dict[str, Any]:
 
 
 def sterling_clause_text(clause_id: str, repo_root: Path | None = None) -> str:
-    """Return exact authorized boilerplate for a clause that has one."""
+    """Return exact authorized template or boilerplate text for a clause."""
     root = (repo_root or Path(__file__).resolve().parents[1]).resolve()
     contract = sterling_clause_contract(root)
     clause = next(
@@ -889,6 +889,14 @@ def sterling_clause_text(clause_id: str, repo_root: Path | None = None) -> str:
     if clause is None:
         raise KeyError(clause_id)
     source = clause.get("approved_source") or {}
+    if source.get("type") == "template" and (clause.get("validation") or {}).get("exact_template"):
+        from docx import Document
+
+        paragraphs = source.get("paragraphs") or []
+        if len(paragraphs) != 1 or not isinstance(paragraphs[0], int):
+            raise ValueError(f"Sterling clause has no single exact template paragraph: {clause_id}")
+        template = root / str(contract["authority"]["template"])
+        return Document(template).paragraphs[paragraphs[0]].text
     boilerplate_id = source.get("boilerplate_id")
     if not boilerplate_id:
         exact_id = (clause.get("validation") or {}).get("exact_boilerplate_id")

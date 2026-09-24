@@ -2163,7 +2163,7 @@ def _normalize_sterling_retained_sections(
     _replace_sterling_section_body(
         document,
         "INFORMATION",
-        [(boilerplate["icf-new-findings"], False)],
+        [(sterling_clause_text("sterling.information.new-findings"), False)],
     )
     withdrawal_blocks = [(boilerplate["icf-withdrawal"], False)]
     termination = _text(get_path(reference, "procedures.termination"))
@@ -2242,6 +2242,31 @@ def _insert_sterling_conditional_clauses(
             anchor._p.addprevious(paragraph._p)
 
 
+def _preserve_sterling_registry_statement(
+    document: Document,
+    authority: Document,
+    reference: Mapping[str, Any],
+) -> None:
+    """Use the exact reviewed template statement only when the source authorizes it."""
+    for paragraph in list(document.paragraphs):
+        lowered = paragraph.text.strip().casefold()
+        if lowered.startswith((
+            "this clinical trial may be registered on publicly accessible databases",
+            "this research study may be registered on publicly accessible databases",
+            "a description of this clinical trial will be available on http://www.clinicaltrials.gov",
+            "a description of this research study will be available on http://www.clinicaltrials.gov",
+        )):
+            paragraph._p.getparent().remove(paragraph._p)
+    if get_path(reference, "regulatory.prs.participant_registry_disclosure") is not True:
+        return
+    exact = sterling_clause_text("sterling.privacy.registry-disclosure")
+    source_paragraph = next((p for p in authority.paragraphs if p.text == exact), None)
+    questions = next((p for p in document.paragraphs if _icf_heading_key(p.text) == _icf_heading_key("QUESTIONS")), None)
+    if source_paragraph is None or questions is None:
+        raise LayoutRepairTargetError("Sterling registry statement has no template paragraph or placement anchor.")
+    questions._p.addprevious(copy.deepcopy(source_paragraph._p))
+
+
 def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]) -> None:
     if document.tables:
         front = document.tables[0]
@@ -2259,45 +2284,6 @@ def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]
             new_label, value = replacements[label]
             _set_paragraph_text(row.cells[0].paragraphs[0], new_label)
             _set_paragraph_text(row.cells[1].paragraphs[0], value)
-
-
-def _normalize_sterling_front_matter_phone(
-    document: Document,
-    reference: Mapping[str, Any],
-) -> None:
-    """Render one aligned Sterling phone value without duplicate aliases."""
-    coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
-    if not isinstance(coordinator, Mapping):
-        return
-    phones = list(dict.fromkeys(
-        value
-        for value in (
-            _text(coordinator.get("business_phone") or coordinator.get("phone")),
-            _text(coordinator.get("office_phone")),
-        )
-        if value
-    ))
-    if not phones:
-        return
-    phone = next((
-        paragraph for paragraph in document.paragraphs
-        if paragraph.text.strip().casefold().startswith("telephone:")
-    ), None)
-    if phone is None:
-        return
-    _set_paragraph_text(phone, f"TELEPHONE:\t{' / '.join(phones)}")
-    phone.paragraph_format.tab_stops.clear_all()
-    phone.paragraph_format.tab_stops.add_tab_stop(Inches(1.5))
-    sibling = phone._p.getnext()
-    while sibling is not None and sibling.tag == qn("w:p"):
-        paragraph = Paragraph(sibling, document)
-        value = paragraph.text.strip()
-        if value.casefold().startswith("sponsor:"):
-            break
-        following = sibling.getnext()
-        if value in phones:
-            sibling.getparent().remove(sibling)
-        sibling = following
 
 
 def _normalize_sterling_generated_section_spacing(document: Document) -> None:
@@ -3269,6 +3255,20 @@ def _template_document(
     _apply_authority_styles(document, authority)
     _apply_authority_bullet_numbering(document, authority)
     fields = render_fields(reference, model)
+    if sterling:
+        # Sterling IRB's open template comment reserves these merge fields for
+        # its final document. Keep the reviewed field labels in the output.
+        fields.update({
+            "studyTitle": "«Protocol_Title»",
+            "protocolNumber": "«Protocol_No»",
+            "principalInvestigatorName": "«First_Name» «Middle_Name» «Last_Name», «Suffix»",
+            "facilityName": "«Company_Name»",
+            "facilityAddress": "«Address»",
+            "facilityLocation": "«City_State_ZIP»",
+            "studyCordinatorPhone": "«Telephone»",
+            "sterlingSecondaryPhone": "«Telephone_2_if_applicable»",
+            "sponsorName": "«Sponsor»",
+        })
     generated_plain_paragraphs = _normalize_generated_placeholder_layout(document)
     if not icf:
         _assessment_matrix(document, reference, authority_path)
@@ -3290,8 +3290,7 @@ def _template_document(
             _normalize_icf_withdrawal(document, boilerplate)
             _normalize_advarra_contact_sections(document, reference, boilerplate)
         _normalize_icf_front_matter(document, reference)
-        if sterling:
-            _normalize_sterling_front_matter_phone(document, reference)
+        # Sterling's front-matter telephone fields belong to the IRB merge.
         _normalize_source_bound_shell(document, reference, icf=True)
         if not sterling:
             _restore_advarra_injury_section(document, authority, reference)
@@ -3304,6 +3303,8 @@ def _template_document(
         _normalize_retained_icf_agreement_prose(document, sterling=sterling)
         _normalize_generated_icf_privacy_prose(document, model, sterling=sterling)
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
+        if sterling:
+            _preserve_sterling_registry_statement(document, authority, reference)
 
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -3634,7 +3635,11 @@ def render_documents(
             _clear_icf_review_highlighting(document)
         font_replacements = _apply_font_substitutions(document, substitutions)
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
-        phrases = [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
+        phrases = (
+            ["«Protocol_Title»", "«Protocol_No»"]
+            if kind == "icf" and str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling"
+            else [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
+        )
         findings = audit_docx(path, required_phrases=phrases)
         if kind == "icf" and not _icf_blocks(model, "icf.procedures"):
             findings.insert(0, {

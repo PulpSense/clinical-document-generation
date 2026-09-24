@@ -5,40 +5,11 @@ import pytest
 from docx import Document
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt
+from docx.shared import Pt
 
 import rendering
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_sterling_front_matter_phone_is_single_and_tab_aligned():
-    document = Document()
-    phone = document.add_paragraph('TELEPHONE:\t770-532-4444')
-    duplicate = document.add_paragraph('770-532-4444')
-    document.add_paragraph()
-    sponsor = document.add_paragraph('SPONSOR: North Georgia Eye Associates')
-
-    rendering._normalize_sterling_front_matter_phone(
-        document,
-        {
-            'parties': {
-                'study_coordinator': {
-                    'business_phone': '770-532-4444',
-                    'office_phone': '770-532-4444',
-                }
-            }
-        },
-    )
-
-    paragraphs = document.paragraphs
-    phone_index = next(index for index, paragraph in enumerate(paragraphs) if paragraph._p is phone._p)
-    sponsor_index = next(index for index, paragraph in enumerate(paragraphs) if paragraph._p is sponsor._p)
-    block = paragraphs[phone_index:sponsor_index]
-    assert sum(paragraph.text.count('770-532-4444') for paragraph in block) == 1
-    assert phone.text == 'TELEPHONE:\t770-532-4444'
-    assert phone.paragraph_format.tab_stops[0].position == Inches(1.5)
-    assert duplicate._p.getparent() is None
 
 
 def test_sterling_duration_and_procedures_collapse_redundant_blank_runs():
@@ -299,7 +270,10 @@ def test_rendered_icf_families_preserve_complete_site_address(tmp_path, branch, 
     rendering.render_documents(ROOT, tmp_path, reference, {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'icf'})
     doc = Document(tmp_path / 'candidate/icf.docx')
     text = '\n'.join(p.text for p in rendering._all_paragraphs(doc))
-    assert '123 Example Lane, Example City, EX, Example Country' in text
+    if family == 'Sterling':
+        assert '«Address»' in text and '«City_State_ZIP»' in text
+    else:
+        assert '123 Example Lane, Example City, EX, Example Country' in text
 
 
 

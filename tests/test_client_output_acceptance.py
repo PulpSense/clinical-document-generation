@@ -716,7 +716,7 @@ def test_rendering_uses_prs_provider_study_id_when_protocol_number_is_absent(tmp
 
     assert report["status"] == "passed"
     assert "AS-SP-001" in _visible_text(Document(tmp_path / "candidate/protocol.docx"))
-    assert "AS-SP-001" in _visible_text(Document(tmp_path / "candidate/icf.docx"))
+    assert "«Protocol_No»" in _visible_text(Document(tmp_path / "candidate/icf.docx"))
 
 
 def test_sterling_icf_uses_concise_key_risk_summary_and_complete_detailed_risk(tmp_path):
@@ -759,7 +759,7 @@ def test_sterling_icf_uses_concise_key_risk_summary_and_complete_detailed_risk(t
     assert "private information could be disclosed" in visible
     assert "safeguards will be used to protect it" in visible
     assert "risks or inconveniences that are currently unknown" not in visible
-    assert "in a timely manner" not in visible
+    assert "in a timely manner" in visible
     assert "Sterling Institutional Review Board" not in visible
     assert "Example IRB" in visible
     assert "555-0100" in visible
@@ -797,7 +797,8 @@ def test_sterling_icf_does_not_duplicate_flat_site_address(tmp_path):
 
     assert fields["facilityAddress"] == "220 Clinic Way"
     assert fields["facilityLocation"] == "Boston, MA, United States"
-    assert "Boston, MA, United States" in visible
+    assert "«City_State_ZIP»" in visible
+    assert "Boston, MA, United States" not in visible
 
 
 def test_protocol_general_information_preserves_every_supplied_site_and_full_address(tmp_path):

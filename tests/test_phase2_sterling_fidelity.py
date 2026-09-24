@@ -282,7 +282,7 @@ def test_protocol_endpoint_inventory_repetition_targets_secondary_sections():
         "and each questionnaire response at month 3."
     )
     sections = {
-        "objectives": [inventory],
+        "study-design.design": [inventory],
         "study-procedure.measurements": [
             inventory + " Each measurement is collected using the scheduled study assessments."
         ],

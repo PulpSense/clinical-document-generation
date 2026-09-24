@@ -3934,6 +3934,8 @@ def validate_sterling_clause_contract(
         exact_boilerplate = validation.get("exact_boilerplate_id")
         if exact_boilerplate:
             exact_texts.append(sterling_clause_text(str(clause["clause_id"])))
+        if validation.get("exact_template"):
+            exact_texts.append(sterling_clause_text(str(clause["clause_id"])))
         normalized_exact = [_normalized_substantive_text(value) for value in exact_texts]
         placement_markers = (
             [_normalized_substantive_text(sterling_clause_text(str(clause["clause_id"])))]
@@ -4555,7 +4557,12 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 findings.append({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": f"Retrospective study procedure omits approved visit {visit_name}."})
     if branch != "Retrospective":
         icf = revision_dir / "candidate/icf.docx"
-        findings.extend(audit_docx(icf, required_phrases=[str(get_path(reference, "study.title", ""))]))
+        required_icf_title = (
+            ["«Protocol_Title»", "«Protocol_No»"]
+            if icf_template.casefold() == "sterling"
+            else [str(get_path(reference, "study.title", ""))]
+        )
+        findings.extend(audit_docx(icf, required_phrases=required_icf_title))
         repo_root = Path(__file__).resolve().parents[1]
         bundle = contracted_template_bundle(repo_root, reference)
         boilerplate = _json(repo_root / str(bundle["fixed_clinical_boilerplate"]["path"]))
@@ -5132,6 +5139,15 @@ def create_verification_requests(
         "section or table that already carries its information. A clinically unusable section is material; "
         "minor wording preferences are not findings."
     )
+    if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling":
+        content_instructions += (
+            " Sterling IRB owns the consent front-matter merge fields for title, protocol number, "
+            "investigator, site, telephones, and sponsor. Their exact template merge tags are intentional "
+            "and must remain unfilled; do not report those tags as missing drafted content or a "
+            "Protocol/ICF mismatch. The fixed introduction and INFORMATION clause are retained from "
+            "the template. The exact registry statement appears only when its approved source trigger "
+            "is present. Continue reviewing all study-specific ICF sections against approved evidence."
+        )
     payloads = [{
         "schema_version": VERIFY_SCHEMA,
         "request_id": content_request_id,
