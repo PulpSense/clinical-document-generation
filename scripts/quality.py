@@ -2999,6 +2999,48 @@ def _windows_word_pdf(docx: Path, output_dir: Path, *, timeout_seconds: float = 
     return output
 
 
+def _protocol_section15_opening_findings(docx_path: Path, pdf_path: Path) -> list[dict[str, Any]]:
+    """Catch a split Section 15 opening in the exact rendered Protocol PDF."""
+    heading = "15. STANDARD EVALUATION PROCEDURES"
+    caption = "Table 15.1. Proposed Visits and Study Assessments"
+    paragraphs = {paragraph.text.strip() for paragraph in Document(docx_path).paragraphs}
+    if heading not in paragraphs or caption not in paragraphs:
+        return []
+    try:
+        page_lines = [
+            [re.sub(r"\s+", " ", line).strip() for line in (page.extract_text() or "").splitlines()]
+            for page in PdfReader(pdf_path).pages
+        ]
+    except (OSError, ValueError, TypeError, AttributeError, KeyError):
+        # The mandatory image reviewer still owns pages with unextractable text.
+        return []
+    heading_pages = [number for number, lines in enumerate(page_lines, 1) if heading in lines]
+    caption_pages = [number for number, lines in enumerate(page_lines, 1) if caption in lines]
+    if not heading_pages or not caption_pages:
+        return []
+    heading_page, caption_page = heading_pages[-1], caption_pages[-1]
+    table_page = next((
+        number for number, lines in enumerate(page_lines, 1)
+        if number >= caption_page
+        and any(re.match(r"^Activity(?:\s|$)", line) for line in lines)
+    ), None)
+    if heading_page == caption_page and table_page in {None, caption_page}:
+        return []
+    return [{
+        "category": "visual",
+        "field": "protocol",
+        "artifact": "protocol",
+        "page": heading_page,
+        "check": "artificial_pagination",
+        "element": heading,
+        "target_ids": ["layout:protocol"],
+        "issue": (
+            "Section 15 heading, introduction, caption, and assessment-table opening "
+            "must appear together on one rendered page."
+        ),
+    }]
+
+
 def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, Any]:
     """Read final bytes independently of the renderer's TOC mapping algorithm.
 
@@ -3361,6 +3403,8 @@ def render_pages(
                     "target_ids": [f"layout:{docx.stem}"],
                     "issue": f"Rendered {docx.stem} contains a textless page at page {page_number}.",
                 })
+            if docx.stem == "protocol":
+                findings.extend(_protocol_section15_opening_findings(docx, pdf))
             toc_destinations = audit_final_toc_destinations(docx, pdf)
             findings.extend(toc_destinations["findings"])
             artifacts.append({

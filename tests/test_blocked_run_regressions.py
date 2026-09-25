@@ -229,6 +229,84 @@ def test_section_15_repair_distinguishes_table_lead_in_from_caption():
     assert caption.paragraph_format.page_break_before is False
 
 
+@pytest.mark.parametrize("rule", ["table_pagination", "table_page_boundary"])
+def test_section_15_table_pagination_repair_keeps_the_whole_opening(tmp_path, rule):
+    reference = source()
+    report = rendering.render_documents(
+        ROOT, tmp_path, reference,
+        {"protocol": [{
+            "section_id": "evaluation-procedures",
+            "paragraphs": [{"text": "The approved visits and assessments are summarized in Table 15.1."}],
+            "lists": [],
+        }], "icf": {}, "prs": {}},
+        artifact_names={"protocol"},
+        layout_repairs={"protocol": [{
+            "rule": rule,
+            "target": "Table 15.1. Proposed Visits and Study Assessments",
+        }]},
+    )
+    assert report["status"] == "passed"
+    paragraphs = Document(tmp_path / "candidate/protocol.docx").paragraphs
+    heading = next(p for p in paragraphs if p.text == "15. STANDARD EVALUATION PROCEDURES")
+    caption = next(p for p in paragraphs if p.text == "Table 15.1. Proposed Visits and Study Assessments")
+    assert heading.paragraph_format.page_break_before is True
+    assert caption.paragraph_format.page_break_before is False
+
+
+def test_rendered_section_15_opening_split_has_a_deterministic_finding(tmp_path, monkeypatch):
+    docx = tmp_path / "protocol.docx"
+    document = Document()
+    document.add_paragraph("15. STANDARD EVALUATION PROCEDURES", style="Heading 1")
+    document.add_paragraph("The approved visits and assessments follow.")
+    document.add_paragraph("Table 15.1. Proposed Visits and Study Assessments", style="Heading 2")
+    document.add_table(rows=2, cols=2)
+    document.save(docx)
+
+    class Page:
+        def __init__(self, text):
+            self.text = text
+
+        def extract_text(self):
+            return self.text
+
+    class Reader:
+        def __init__(self, pages):
+            self.pages = [Page(text) for text in pages]
+
+    opening = (
+        "15. STANDARD EVALUATION PROCEDURES\n"
+        "The approved visits and assessments follow.\n"
+    )
+    table = "Table 15.1. Proposed Visits and Study Assessments\nActivity Preoperative screening\n"
+    monkeypatch.setattr(quality, "PdfReader", lambda _path: Reader(["4. TABLE OF CONTENTS", opening, table]))
+    findings = quality._protocol_section15_opening_findings(docx, tmp_path / "protocol.pdf")
+    assert len(findings) == 1
+    assert findings[0]["check"] == "artificial_pagination"
+    assert findings[0]["element"] == "15. STANDARD EVALUATION PROCEDURES"
+    plan, unsupported = workflow._layout_repair_plan(
+        findings,
+        study_type="Prospective",
+        existing_repairs={"protocol": [{
+            "rule": "table_pagination",
+            "target": "Table 15.1. Proposed Visits and Study Assessments",
+        }]},
+    )
+    assert unsupported == []
+    assert plan == {"protocol": [{
+        "rule": "section15_table_opening",
+        "target": "15. STANDARD EVALUATION PROCEDURES",
+    }]}
+
+    monkeypatch.setattr(quality, "PdfReader", lambda _path: Reader([
+        "4. TABLE OF CONTENTS", opening + "Table 15.1. Proposed Visits and Study Assessments\n",
+        "Activity Preoperative screening\n",
+    ]))
+    assert quality._protocol_section15_opening_findings(docx, tmp_path / "protocol.pdf")
+
+    monkeypatch.setattr(quality, "PdfReader", lambda _path: Reader(["4. TABLE OF CONTENTS", opening + table]))
+    assert quality._protocol_section15_opening_findings(docx, tmp_path / "protocol.pdf") == []
+
+
 def test_section_15_matrix_owns_fully_allocated_visit_notes():
     reference = {
         "meta": {"study_type": "Prospective"},

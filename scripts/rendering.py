@@ -3399,6 +3399,7 @@ def _template_document(
         _normalize_protocol_table_pagination(document)
         _protect_protocol_heading_content(document)
     section15_repairs = []
+    section15_caption = _layout_target_key("Table 15.1. Proposed Visits and Study Assessments")
     for repair in layout_repair_rules:
         rule = repair["rule"]
         target = repair["target"]
@@ -3418,13 +3419,17 @@ def _template_document(
             _repair_heading_page_boundary(document, target, protocol=not icf)
         elif rule == "table_pagination":
             _repair_table_pagination(document, target)
+            if _layout_target_key(target) == section15_caption:
+                section15_repairs.append("15. STANDARD EVALUATION PROCEDURES")
         elif rule == "table_page_boundary":
             _repair_table_page_boundary(document, target)
+            if _layout_target_key(target) == section15_caption:
+                section15_repairs.append("15. STANDARD EVALUATION PROCEDURES")
         elif rule == "sterling_study_site_alignment":
             _align_sterling_study_site_continuations(document, reference)
     # This repair owns the complete opening. Apply it after earlier caption or
     # table rules so their page breaks cannot split the unit again.
-    for target in section15_repairs:
+    for target in dict.fromkeys(section15_repairs):
         _repair_section15_table_opening(document, target)
     _set_update_fields(document)
     return document
