@@ -401,6 +401,38 @@ def test_production_parent_retains_failed_content_review_as_a_blocking_response(
     assert json.loads(response_path.read_text(encoding="utf-8")) == response
 
 
+def test_production_parent_binds_exact_visual_stdout_missing_only_revision(tmp_path):
+    handoff, request, response = _visual_handoff_fixture(tmp_path, "icf")
+    revision_dir = tmp_path / "revisions/r1"
+    response.pop("revision_id")
+    stdout_log = tmp_path / "worker.stdout.log"
+    stdout_log.write_text(
+        "reasoning before the final object\n" + json.dumps(response) + "\n",
+        encoding="utf-8",
+    )
+
+    assert workflow._production_publish_quiet_response(
+        revision_dir, handoff, stdout_log,
+    ) is True
+    published = json.loads((revision_dir / handoff["response_path"]).read_text())
+    assert published["revision_id"] == request["revision_id"]
+    assert published["workflow_binding"]["added_fields"] == ["revision_id"]
+
+
+def test_production_parent_rejects_visual_stdout_with_wrong_hash(tmp_path):
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "icf")
+    revision_dir = tmp_path / "revisions/r1"
+    response.pop("revision_id")
+    response["request_sha256"] = "0" * 64
+    stdout_log = tmp_path / "worker.stdout.log"
+    stdout_log.write_text(json.dumps(response), encoding="utf-8")
+
+    assert workflow._production_publish_quiet_response(
+        revision_dir, handoff, stdout_log,
+    ) is False
+    assert not (revision_dir / handoff["response_path"]).exists()
+
+
 def test_production_verifier_prompt_includes_layout_preservation_notes(tmp_path):
     prompt = workflow._production_agent_prompt(
         tmp_path / "skill",
@@ -1382,6 +1414,47 @@ def test_external_parent_visual_reviewer_rejects_missing_bound_response(tmp_path
     assert request["revision_id"] == "r1"
     assert request["producer_model_policy"] == "record_actual_nonempty_model_id"
     assert len(request["handoffs"]) == 1
+
+
+def test_external_parent_visual_reviewer_preserves_host_auth_environment(tmp_path, monkeypatch):
+    handoff, _request, response = _visual_handoff_fixture(tmp_path, "protocol")
+    revision = tmp_path / "revisions/r1"
+    monkeypatch.setenv("CLINICAL_PARENT_REVIEW_TEST_AUTH", "available")
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        f"#!{sys.executable}\n"
+        "import json, os, sys\n"
+        "if os.environ.get('CLINICAL_PARENT_REVIEW_TEST_AUTH') != 'available':\n"
+        "    print('reviewer authentication environment unavailable', file=sys.stderr)\n"
+        "    sys.exit(1)\n"
+        f"print(json.dumps({response!r}))\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    workflow.command_parent_visual_reviewer(command)([handoff], 10.0, revision, {})
+
+    assert json.loads((revision / handoff["response_path"]).read_text()) == response
+
+
+def test_external_parent_visual_reviewer_records_command_failure(tmp_path):
+    revision = tmp_path / "revisions/r1"
+    revision.mkdir(parents=True)
+    command = tmp_path / "parent-reviewer"
+    command.write_text(
+        "#!/bin/sh\nprintf '%s\\n' 'reviewer startup failed' >&2\nexit 1\n",
+        encoding="utf-8",
+    )
+    command.chmod(0o700)
+
+    with pytest.raises(RuntimeError, match="exited with status 1") as error:
+        workflow.command_parent_visual_reviewer(command)([], 10.0, revision, {})
+
+    diagnostics = list((tmp_path / "logs/parent-visual-reviewer").glob("*.json"))
+    assert len(diagnostics) == 1
+    assert json.loads(diagnostics[0].read_text())["stderr"] == "reviewer startup failed\n"
+    assert "reviewer startup failed" not in str(error.value)
+    assert diagnostics[0].stat().st_mode & 0o777 == 0o600
 
 
 def test_external_parent_visual_reviewer_selects_outer_bound_response_not_nested_finding(tmp_path):

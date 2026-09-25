@@ -4786,7 +4786,23 @@ def _production_publish_quiet_response(
     if not candidates:
         return False
     response_path = revision_dir / str(handoff.get("response_path") or "")
+    verification_task = str(handoff.get("task") or "") in {
+        "clinical_content_verification", "rendered_page_visual_verification",
+    }
+    request = _read(revision_dir / str(handoff.get("request_path") or "")) if verification_task else None
     for candidate in reversed(candidates):
+        if request is not None and "revision_id" not in candidate:
+            # Hermes can finish a complete visual judgment while omitting the
+            # workflow-owned revision field. Bind only a response that already
+            # names the exact schema, request ID, hash, and task.
+            if not all(key in candidate for key in (
+                "schema_version", "request_id", "request_sha256", "task", "producer",
+            )):
+                continue
+            bound = _bind_verification_response_payload(request, candidate)
+            if bound is None or not _semantic_response_matches_request(request, bound):
+                continue
+            candidate = bound
         _write(response_path, candidate)
         if _production_response_is_bound(
             revision_dir, handoff,
@@ -4859,7 +4875,8 @@ def _production_agent_prompt(
         f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
         f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
-        f"Read the request completely. {task_rule}{layout_rule} Bind every schema, request ID, request hash, task, target, and evidence "
+        f"Read the request completely. {task_rule}{layout_rule} Bind the exact schema_version, request_id, "
+        "request_sha256, task, revision_id, target, and evidence "
         "reference exactly. producer.model_id must record the actual model used for this response, and "
         "producer.reviewer_id must record the independent reviewer role for this response."
         f"{response_write_rule}{verification_rule} The validator interpreter is dependency-complete; do not search "
@@ -5816,13 +5833,29 @@ def command_parent_visual_reviewer(
         })
         completed = subprocess.run(
             [str(command), str(request_path)],
-            check=True,
+            check=False,
             timeout=max(1.0, remaining_seconds),
-            env={"PATH": "/usr/bin:/bin:/usr/sbin:/sbin"},
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
         )
+        diagnostic_dir = revision_dir.parent.parent / "logs/parent-visual-reviewer"
+        diagnostic_dir.mkdir(parents=True, exist_ok=True)
+        diagnostic_path = diagnostic_dir / f"{revision_dir.name}.{time.time_ns()}.json"
+        descriptor = os.open(diagnostic_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as diagnostic_file:
+            json.dump({
+                "request_path": str(request_path),
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }, diagnostic_file, ensure_ascii=False)
+            diagnostic_file.write("\n")
+        if completed.returncode != 0:
+            raise RuntimeError(
+                "Desktop-parent reviewer command exited with status "
+                f"{completed.returncode}; inspect {diagnostic_path} for captured output."
+            )
         candidates = response_candidates(completed.stdout)
         for handoff in handoffs:
             bound_request_path = (revision_dir / str(handoff.get("request_path") or "")).resolve()
