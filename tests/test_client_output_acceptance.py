@@ -764,7 +764,7 @@ def test_sterling_icf_uses_concise_key_risk_summary_and_complete_detailed_risk(t
     assert "Example IRB" in visible
     assert "555-0100" in visible
     assert "irb@example.org" in visible
-    assert "no new routine research procedures will be performed unless you separately agree" in visible
+    assert "follow-up care or testing" in visible
     assert "the FDA" not in visible
 
 
@@ -1094,7 +1094,7 @@ def test_shallow_section_draft_cannot_pass_content_depth_gate(tmp_path):
     assert any(item["field"] == "introduction" for item in findings)
 
 
-def test_participant_completion_omitting_follow_up_visits_is_rejected_without_forcing_a_study_itinerary(tmp_path):
+def test_participant_completion_omitting_follow_up_visits_and_study_closeout_repeating_visits_are_rejected(tmp_path):
     reference = json.loads((
         ROOT / "tests/fixtures/release-certification/prospective-advarra/approved-reference.json"
     ).read_text(encoding="utf-8"))
@@ -1131,7 +1131,7 @@ def test_participant_completion_omitting_follow_up_visits_is_rejected_without_fo
     accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
 
     assert "endpoint-criteria.completion" not in accepted_ids
-    assert "endpoint-criteria.study-completion" in accepted_ids
+    assert "endpoint-criteria.study-completion" not in accepted_ids
     assert any(
         "omits approved visit or time-point" in item["issue"]
         for item in findings if item["field"] == "endpoint-criteria.completion"

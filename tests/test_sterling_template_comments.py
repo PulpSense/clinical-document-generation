@@ -82,6 +82,18 @@ def test_registry_statement_is_absent_when_source_says_no(tmp_path):
     assert not any(item["clause_id"] == "sterling.privacy.registry-disclosure" for item in findings)
 
 
+def test_withdrawal_preserves_template_safety_followup_option_and_source_details(tmp_path):
+    source = _source()
+    source["procedures"]["discontinuation"] = "Participants who leave early will be offered a final safety assessment."
+    document = _render(tmp_path, source)
+    paragraphs = [paragraph.text for paragraph in document.paragraphs]
+    heading = paragraphs.index("VOLUNTARY PARTICIPATION/WITHDRAWAL")
+    withdrawal = [text for text in paragraphs[heading + 1:] if text.strip()][:2]
+    assert "follow-up care or testing" in withdrawal[0]
+    assert "no new routine research procedures" not in withdrawal[0]
+    assert withdrawal[1] == source["procedures"]["discontinuation"]
+
+
 def test_content_reviewer_knows_sterling_merge_fields_are_intentional(tmp_path):
     request_path = create_verification_requests(tmp_path, _source(), {"artifacts": []})[0]
     instructions = json.loads(request_path.read_text())["instructions"]

@@ -5217,10 +5217,15 @@ def create_verification_requests(
         "section or table that already carries its information. Flag a full title in a Protocol running "
         "header despite an approved short title, unrelated phases in the Section 3 follow-up synopsis, "
         "unsupported clinical product claims in the Introduction, an endpoint inventory in Objectives, "
+        "or a speculative claim that the untested study combination outperforms alternatives even when that "
+        "prediction appears in the approved background. The Introduction should establish the relevant "
+        "prior evidence and the gap, without restating the title, hypothesis, or endpoint definition. "
         "a hypothesis repeated as a measurement method, a cross-reference-only statistical consideration, "
         "duplicated schedule prose below the Section 15 table, and generic Section 16 privacy prose that "
-        "omits supplied operational detail. Section 18.5 must state the completion rule rather than a "
-        "second visit schedule. A clinically unusable section is material; minor wording preferences are "
+        "omits supplied operational detail. Section 18.5 states the source-supplied closeout timeline and "
+        "defines a completion trigger only if the source provides one; it does not repeat participant visits "
+        "or the exit form. Section 10.3 states an interpretation limit without repeating Section 10.2's "
+        "endpoint methods. A clinically unusable section is material; minor wording preferences are "
         "not findings."
     )
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):

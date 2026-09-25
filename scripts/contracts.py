@@ -352,23 +352,23 @@ RETROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
 
 def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
     specific = {
-        "introduction": "Explain the approved clinical problem, evidence gap, and rationale in direct clinical language. State the hypothesis or primary endpoint only if needed to make the rationale intelligible; the title page and Study Design carry their full wording.",
-        "objectives": "State the approved study purpose and objectives concisely. Distinguish the hypothesis and primary endpoint only where needed to clarify that purpose; the detailed endpoint inventory belongs in Study Design.",
+        "introduction": "Write one concise clinical-background paragraph: identify the setting, summarize relevant prior evidence with its stated uncertainty, then name the evidence gap that motivates this study. Do not repeat a speculative comparison claiming the untested study combination will outperform alternative treatment patterns. Leave the study title, hypothesis, and endpoint definitions to their owning sections.",
+        "objectives": "State the approved study purpose and each supplied objective concisely. Study Design owns the hypothesis and endpoint definitions; this section describes what the study aims to learn.",
         "subjects.population": "Describe the approved population and planned sample size without adding eligibility facts.",
         "subjects.inclusion": "Preserve every approved inclusion criterion and the approved minimum interval without participation in another study before screening as distinct, usable criteria.",
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and keep the two groups distinct.",
         "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied. Identify every approved primary, secondary, and exploratory endpoint once in a grouped, readable account of what the design evaluates.",
-        "study-design.bias": "Explain source-supported steps that reduce bias. If no additional control is supplied, use the listed boilerplate concisely; omit a second description of masking or the absence of a control arm already stated in Study Design.",
+        "study-design.bias": "State the source-supported bias controls directly. If none are supplied, use the listed concise boilerplate. Study Design already describes design, setting, arms, and masking.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
         "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
         "evaluation-procedures": "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
         "endpoint-criteria.completion": "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
-        "endpoint-criteria.study-completion": "State the approved study-level completion trigger and closeout rule concisely. Mention a time point only if it changes that rule; the visit schedule belongs in Sections 9 and 15.",
+        "endpoint-criteria.study-completion": "State the supplied study-level closeout timeline concisely. Define a completion trigger only when the source supplies one. Sections 9 and 15 own the visit schedule, and Section 18.1 owns participant completion.",
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
         "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State one method once for outcomes sharing it and refer to the grouped outcomes in Study Design instead of repeating their full measure names and time points.",
-        "analysis-plan.considerations": "State a source-supported general consideration that affects interpretation of the analyses, such as the approved descriptive or inferential approach or specified software. Do not write a sentence whose only content is a cross-reference to Section 10.2.",
+        "analysis-plan.considerations": "State only the source-supported interpretation limit or analysis qualification, such as descriptive-only analysis or no planned inferential test. Section 10.2 owns the endpoint methods and Section 10.1 owns dataset inclusion. Keep this section to one short paragraph.",
         "sample-size": "State the approved sample size and explain its approved justification.",
         "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
@@ -408,6 +408,10 @@ def _source_coverage(section_id: str) -> str:
         # The source-derived table and its notes carry the assessment inventory.
         # Requiring all items in the adjacent prose duplicates that inventory.
         return "table_with_notes"
+    if section_id == "introduction":
+        # Background is evidence for the rationale, not a requirement to
+        # reproduce every promotional or hypothetical claim in the source.
+        return "rationale_summary"
     if section_id in {
         "analysis-plan.considerations",
         "endpoint-criteria.completion",
@@ -451,6 +455,9 @@ def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
 def _evidence_scopes(section_id: str) -> tuple[tuple[str, tuple[str, ...]], ...]:
     """Limit broad source fields to the clauses owned by a narrow section."""
     return {
+        "analysis-plan.considerations": (
+            ("statistics.analysis_plan", ("no inferential", "hypothesis test", "interpret", "limitations")),
+        ),
         "quality-safety.analysis": (
             ("statistics.analysis_plan", ("adverse event", "safety")),
         ),
@@ -500,8 +507,8 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("investigator-agreement", "2.", "INVESTIGATOR AGREEMENT", role="container"),
     _section_spec("general-information", "3.", "GENERAL INFORMATION", role="summary", owned_concepts=("protocol-synopsis",), brief_reference_concepts=("endpoint-inventory",), do_not_restate_concepts=("endpoint-inventory",)),
     _section_spec("table-of-contents", "4.", "TABLE OF CONTENTS", role="container"),
-    _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.title", "study.hypothesis", "endpoints.primary"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
-    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-objectives",), brief_reference_concepts=("clinical-rationale", "primary-endpoint", "endpoint-inventory"), do_not_restate_concepts=("clinical-rationale", "endpoint-inventory")),
+    _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background",), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
+    _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary"), owned_concepts=("study-objectives",), brief_reference_concepts=("clinical-rationale", "primary-endpoint", "endpoint-inventory"), do_not_restate_concepts=("clinical-rationale", "endpoint-inventory")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
@@ -545,7 +552,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation", "procedures.replacement"), "discontinuation"),
     _section_spec("endpoint-criteria.termination", "18.3.", "Patient Termination", evidence=("procedures.termination",), role="source", required=False),
     _section_spec("endpoint-criteria.study-termination", "18.4.", "Study Termination", evidence=("procedures.study_termination",), role="source", required=False),
-    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
+    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline",), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "protocol-sparse-risks"),
     _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits",), "protocol-sparse-benefits"),

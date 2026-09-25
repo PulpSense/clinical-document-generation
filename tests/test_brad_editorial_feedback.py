@@ -6,7 +6,7 @@ from pathlib import Path
 from docx import Document
 
 from contracts import batch_plan, input_findings, protocol_contract
-from drafting import _coverage_findings, create_drafting_request
+from drafting import _coverage_findings, _section_payload, create_drafting_request
 from quality import create_verification_requests
 from rendering import _endpoint_synopsis, _protocol_followup_summary, _protocol_short_title, render_documents
 
@@ -77,7 +77,8 @@ def test_content_review_explicitly_checks_section_purpose_and_editorial_relevanc
     assert "self-referential" in instructions
     assert "unsupported clinical product claims" in instructions
     assert "generic section 16 privacy prose" in instructions
-    assert "section 18.5 must state the completion rule" in instructions
+    assert "defines a completion trigger only if the source provides one" in instructions
+    assert "speculative claim that the untested study combination outperforms alternatives" in instructions
 
 
 def test_optional_short_title_never_blocks_intake_and_long_titles_get_header_fallback():
@@ -125,6 +126,86 @@ def test_completion_and_bias_contracts_do_not_require_repeated_design_or_visit_i
     assert "every approved visit" not in " ".join(sections["endpoint-criteria.study-completion"].content_expectations)
     assert "no masking" not in " ".join(sections["study-design.bias"].content_expectations)
     assert "study.timeline" in sections["endpoint-criteria.study-completion"].evidence
+
+
+def test_editorial_contracts_do_not_feed_other_sections_into_introduction_or_closeout():
+    sections = {item.section_id: item for item in protocol_contract("Prospective")}
+    assert sections["introduction"].evidence == ("study.background",)
+    assert sections["introduction"].source_coverage == "rationale_summary"
+    assert sections["objectives"].evidence == ("objectives.primary", "objectives.secondary")
+    assert sections["endpoint-criteria.study-completion"].evidence == ("study.timeline",)
+
+    source = _source()
+    source["statistics"]["analysis_plan"] = (
+        "Visual acuity will be summarized with mean and standard deviation. "
+        "No inferential hypothesis test is planned for this descriptive study."
+    )
+    boilerplate = json.loads((ROOT / "references/fixed-clinical-boilerplate.json").read_text())["sections"]
+    considerations = _section_payload(sections["analysis-plan.considerations"], boilerplate, source)
+    scoped = next(item["value"] for item in considerations["evidence_scopes"] if item["path"] == "statistics.analysis_plan")
+    assert "inferential" in scoped.casefold()
+    assert "visual acuity" not in scoped.casefold()
+
+    bias = _section_payload(sections["study-design.bias"], boilerplate, source)
+    assert "design.study_design" not in bias["minimum_evidence"]
+    source["design"]["study_design"] = "Randomized, double-masked study with allocation concealment."
+    controlled_bias = _section_payload(sections["study-design.bias"], boilerplate, source)
+    assert "design.study_design" in controlled_bias["minimum_evidence"]
+
+
+def test_editorial_validation_catches_brad_repetitions_without_rejecting_concise_prose():
+    source = _source()
+    request = {"approved_source": source}
+    introduction = {"source_coverage": "rationale_summary", "minimum_evidence": ["study.background"]}
+    assert _coverage_findings(
+        request, introduction, "introduction",
+        "The hypothesis is favorable. The primary endpoint is visual acuity.",
+        ["source:study.background"],
+    )
+    assert not _coverage_findings(
+        request, introduction, "introduction",
+        source["study"]["background"],
+        ["source:study.background"],
+    )
+    source["study"]["background"] = (
+        "Evidence is limited for outcomes after mixed implantation of lenses in the two eyes."
+    )
+    assert _coverage_findings(
+        request, introduction, "introduction",
+        "Mix-and-match implantation may offer wider vision with fewer disturbances than bilateral implantation. "
+        "Evidence is limited for outcomes after mixed implantation of lenses in the two eyes.",
+        ["source:study.background"],
+    )
+    objectives = {"concept_ownership": {"owns": ["study-objectives"]}, "minimum_evidence": ["objectives.primary"]}
+    assert _coverage_findings(request, objectives, "objectives", "The primary endpoint is visual acuity.", ["source:objectives.primary"])
+    assert not _coverage_findings(request, objectives, "objectives", "Evaluate vision and patient satisfaction.", ["source:objectives.primary"])
+
+    completion = {"source_coverage": "concept_reference", "minimum_evidence": ["study.timeline"]}
+    assert _coverage_findings(
+        request, completion, "endpoint-criteria.study-completion",
+        "Study closeout follows the approved timeline. The exit form is completed at the final visit.",
+        ["source:study.timeline"],
+    )
+
+    request["approved_source"]["statistics"]["analysis_plan"] = "No inferential hypothesis test is planned."
+    considerations = {
+        "source_coverage": "concept_reference",
+        "minimum_evidence": ["statistics.analysis_plan"],
+        "evidence_scopes": [{"path": "statistics.analysis_plan", "value": "No inferential hypothesis test is planned."}],
+    }
+    verbose = (
+        "No inferential hypothesis test is planned. Visual acuity and defocus curves will be summarized "
+        "using means and standard deviations. Questionnaire responses will be counted in every category. "
+        "Safety events will be categorized by seriousness, severity, relationship, action, and outcome. "
+        "Participants with evaluable visits enter each corresponding analysis set. These summaries describe "
+        "observed study outcomes and should be interpreted as descriptive rather than inferential evidence."
+    )
+    assert _coverage_findings(request, considerations, "analysis-plan.considerations", verbose, ["source:statistics.analysis_plan"])
+    assert not _coverage_findings(
+        request, considerations, "analysis-plan.considerations",
+        "No inferential hypothesis test is planned; results will be interpreted descriptively.",
+        ["source:statistics.analysis_plan"],
+    )
 
 
 def test_generated_header_and_schedule_activity_follow_reviewed_case(tmp_path):

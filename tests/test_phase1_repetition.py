@@ -503,7 +503,7 @@ def test_protocol_secondary_sections_do_not_own_complete_schedule_or_methods():
     assert protocol["analysis-plan.considerations"].evidence == ("statistics.analysis_plan", "statistics.software")
     assert protocol["analysis-plan.considerations"].boilerplate_key is None
     assert {"procedures.visit_schedule", "procedures.assessments"} <= set(protocol["endpoint-criteria.completion"].evidence)
-    assert {"study.timeline", "procedures.visit_schedule", "procedures.assessments"} <= set(protocol["endpoint-criteria.study-completion"].evidence)
+    assert protocol["endpoint-criteria.study-completion"].evidence == ("study.timeline",)
     assert protocol["endpoint-criteria.completion"].source_coverage == "concept_reference"
     assert protocol["endpoint-criteria.study-completion"].source_coverage == "concept_reference"
     assert "complete-visit-schedule" in protocol["endpoint-criteria.completion"].do_not_restate_concepts

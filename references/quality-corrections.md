@@ -28,7 +28,8 @@ they are not permission to redesign the client documents during a run.
   genuinely unallocated assessment as a note, but do not repeat a visit's fully
   allocated activities below the table. Keep the Section 15 heading, short
   introduction, caption, and table opening together when pagination is repaired.
-- Study Completion states the study-level closeout rule; Sections 9 and 15 own
+- Study Completion states the supplied study-level closeout timeline and only
+  defines a completion trigger when one is supplied; Sections 9 and 15 own
   the visit itinerary. Summary of benefits states potential benefit or its
   absence; Section 17 owns payment and reimbursement terms.
 - Compare timeline statements only after identifying their reference points.

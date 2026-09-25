@@ -42,7 +42,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v16-completion-grounding"
+PROMPT_VERSION = "section-drafting-v17-editorial-ownership"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -397,6 +397,12 @@ def _section_payload(
     for path, focus_terms in section.evidence_scopes:
         value = get_path(reference, path)
         scoped_value = _focused_evidence_value(value, focus_terms)
+        if section.section_id == "analysis-plan.considerations" and not scoped_value:
+            # Some approved plans contain no explicit interpretation clause.
+            # Keep their plan available rather than creating an uncitable
+            # required section; the section contract still asks for a concise
+            # supported qualification.
+            scoped_value = value
         evidence_scopes.append({
             "path": path,
             "focus_terms": list(focus_terms),
@@ -412,6 +418,19 @@ def _section_payload(
         if path not in scoped_values or scoped_values[path]
     ]
     content_expectations = list(section.content_expectations)
+    if section.section_id == "study-design.bias":
+        design_text = str(get_path(reference, "design.study_design") or "")
+        # A design label supplies no bias-control method. Explicit allocation,
+        # masking, or assessment controls remain source evidence when present.
+        has_bias_control = bool(re.search(
+            r"\b(?:randomi[sz](?:ed|ation)|allocation concealment|"
+            r"(?:single|double)[ -]mask(?:ed|ing)|independent assessor|"
+            r"central review|standardized assessment)\b",
+            design_text,
+            re.I,
+        ))
+        if not has_bias_control:
+            minimum_evidence = [path for path in minimum_evidence if path != "design.study_design"]
     if section.section_id == "endpoint-criteria.completion" and not meaningful(get_path(reference, "procedures.completion")):
         # A visit itinerary and follow-up duration do not establish a formal
         # participant-completion rule. The source still supplies that context
@@ -1024,6 +1043,47 @@ def _coverage_findings(
     evidence_refs: Iterable[str],
     role_content: str | None = None,
 ) -> list[dict[str, Any]]:
+    if section_id == "introduction":
+        findings: list[dict[str, Any]] = []
+        source_value = request.get("approved_source")
+        source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
+        background = get_path(source, "study.background")
+        if "source:study.background" not in set(map(str, evidence_refs)):
+            findings.append({
+                "category": "drafting", "field": section_id,
+                "issue": "Introduction does not cite the approved background.",
+                "next_action": "Summarize the approved clinical context and evidence gap from study.background.",
+            })
+        elif background and not evidence_grounded(content, background):
+            findings.append({
+                "category": "drafting", "field": section_id,
+                "issue": "Introduction cites the background without conveying its concrete clinical context.",
+                "next_action": "Name the source-supported setting and specific evidence gap in concise clinical language.",
+            })
+        if re.search(r"\b(?:the\s+)?(?:study\s+)?hypothes(?:is|izes)\b|\bprimary endpoint\b", content, re.I):
+            findings.append({
+                "category": "drafting", "field": section_id,
+                "issue": "Introduction repeats the hypothesis or endpoint definition instead of closing on the evidence gap.",
+                "next_action": "End with the source-supported evidence gap and rationale; leave hypothesis and endpoint definitions to Study Design.",
+            })
+        for sentence in re.split(r"(?<=[.!?])\s+|\n+", content):
+            comparison = re.search(r"\b(?:may|might|could|expected to|will)\b.{0,180}\b(?:better|broader|wider|fewer|less|more)\b.{0,180}\b(?:than|compared with|relative to)\b", sentence, re.I)
+            study_combination = re.search(r"\b(?:mix.and.match|combination|combined|study intervention)\b|\bdominant eye\b.{0,100}\bnon.dominant eye\b", sentence, re.I)
+            if comparison and study_combination:
+                findings.append({
+                    "category": "drafting", "field": section_id,
+                    "issue": "Introduction presents speculative superiority of the untested study combination as background evidence.",
+                    "next_action": "Summarize prior evidence and the specific evidence gap; leave the combination's expected benefit as a hypothesis in Study Design.",
+                })
+                break
+        return findings
+    if section_id == "objectives" and "endpoint-inventory" not in set(contract.get("concept_ownership", {}).get("owns", [])):
+        if re.search(r"\b(?:primary|secondary) endpoint(?:s)?\b", content, re.I):
+            return [{
+                "category": "drafting", "field": section_id,
+                "issue": "Objectives repeats an endpoint definition owned by Study Design.",
+                "next_action": "State the approved purpose and objectives without naming the primary or secondary endpoint inventory.",
+            }]
     if section_id == "icf.key-information-summary":
         # Ordered concept-to-block grounding is validated after each paragraph
         # has been normalized; aggregate citation coverage is insufficient.
@@ -1106,6 +1166,30 @@ def _coverage_findings(
         cited = set(map(str, evidence_refs))
         findings: list[dict[str, Any]] = []
         material = _material_source(request, contract)
+        if section_id == "analysis-plan.considerations":
+            interpretation = str(material.get("statistics.analysis_plan") or "")
+            software = material.get("statistics.software")
+            if interpretation and len(interpretation.split()) <= 30 and not software and len(content.split()) > 60:
+                findings.append({
+                    "category": "drafting", "field": section_id,
+                    "issue": "General Statistical Considerations expands a short interpretation qualification into a methods recap.",
+                    "next_action": "State the approved interpretation qualification in one short paragraph; Section 10.2 owns endpoint methods.",
+                })
+        if section_id == "endpoint-criteria.study-completion":
+            timeline = _normalized_prose(get_path(source, "study.timeline"))
+            mentioned_visits = [
+                str(visit.get("visit") or "").strip()
+                for visit in normalized_visit_records(source)
+                if len(str(visit.get("visit") or "").strip()) >= 8
+                and _normalized_prose(visit.get("visit")) in _normalized_prose(content)
+                and _normalized_prose(visit.get("visit")) not in timeline
+            ]
+            if mentioned_visits or re.search(r"\bexit form\b", content, re.I):
+                findings.append({
+                    "category": "drafting", "field": section_id,
+                    "issue": "Study Completion repeats a participant visit or assessment instead of the study-level timeline.",
+                    "next_action": "State the approved closeout timeline only; keep visits and the exit form in Sections 9, 15, and 18.1.",
+                })
         missing = [path for path in material if f"source:{path}" not in cited]
         if missing:
             findings.append({

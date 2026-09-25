@@ -1750,7 +1750,7 @@ def test_advarra_icf_contact_and_withdrawal_are_source_bound(tmp_path):
     assert "study subject adviser" not in visible
     assert "schedule study exit procedures" not in visible
     assert "555-0101" in visible
-    assert "no new routine research procedures" in visible
+    assert "follow-up care or testing" in visible
 
 
 def test_advarra_icf_replaces_unsupported_introduction_and_risk_shell_text(tmp_path):

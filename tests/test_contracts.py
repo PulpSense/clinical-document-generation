@@ -289,8 +289,8 @@ def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     retrospective = {section.section_id: section for section in protocol_contract("Retrospective")}
     icf = {section.section_id: section for section in ICF_STUDY_SECTIONS}
 
-    assert {"study.hypothesis", "endpoints.primary"} <= set(protocol["introduction"].evidence)
-    assert {"study.hypothesis", "endpoints.primary"} <= set(protocol["objectives"].evidence)
+    assert protocol["introduction"].evidence == ("study.background",)
+    assert protocol["objectives"].evidence == ("objectives.primary", "objectives.secondary")
     assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["study-design.design"].evidence)
     assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["study-procedure.measurements"].evidence)
     assert {"endpoints.primary", "endpoints.secondary"} <= set(protocol["analysis-plan.methodology"].evidence)
@@ -309,7 +309,8 @@ def test_completion_sections_require_every_approved_visit_and_time_point_without
 
     study = protocol["endpoint-criteria.study-completion"]
     assert study.source_coverage == "concept_reference"
-    assert any("visit schedule belongs" in item for item in study.content_expectations)
+    assert study.evidence == ("study.timeline",)
+    assert any("Sections 9 and 15 own the visit schedule" in item for item in study.content_expectations)
     assert "complete-visit-schedule" in study.do_not_restate_concepts
 
 

@@ -2192,6 +2192,12 @@ def _normalize_sterling_retained_sections(
         [(sterling_clause_text("sterling.information.new-findings"), False)],
     )
     withdrawal_blocks = [(boilerplate["icf-withdrawal"], False)]
+    discontinuation = _text(
+        get_path(reference, "procedures.discontinuation")
+        or get_path(reference, "procedures.discontinued_subjects")
+    )
+    if discontinuation:
+        withdrawal_blocks.append((discontinuation, False))
     termination = _text(get_path(reference, "procedures.termination"))
     if termination:
         withdrawal_blocks.append((termination, False))
