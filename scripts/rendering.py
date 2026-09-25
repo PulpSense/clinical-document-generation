@@ -742,9 +742,15 @@ def _normalize_protocol_container_introductions(
 def _study_descriptor(reference: Mapping[str, Any]) -> str:
     branch = (canonical_study_type(get_path(reference, "meta.study_type")) or "clinical").casefold()
     registry_type = _text(get_path(reference, "regulatory.prs.study_type")).casefold()
-    intervention_type = _text(get_path(reference, "design.intervention_type")).casefold()
+    intervention_type = _text(get_path(reference, "design.intervention_type")).strip().rstrip(".;: ")
     if registry_type == "observational":
-        description = " ".join(part for part in (branch, "observational", intervention_type, "study") if part)
+        topic = re.split(r"\s*[—–:]\s*", intervention_type, maxsplit=1)[-1].strip()
+        if topic.casefold() in {"medical device", "device"}:
+            description = f"{branch} observational study involving a medical device"
+        elif topic:
+            description = f"{branch} observational study of {topic}"
+        else:
+            description = f"{branch} observational study"
     else:
         description = " ".join(part for part in (branch, registry_type, "study") if part)
     article = "An" if description[:1] in "aeiou" else "A"

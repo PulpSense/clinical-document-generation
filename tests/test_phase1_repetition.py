@@ -104,6 +104,92 @@ def test_equivalent_narrative_and_structured_inputs_have_same_icf_summary_obliga
         assert all(item["evidence_refs"] for item in obligations.values())
 
 
+def test_key_information_participant_duration_uses_followup_not_whole_study_timeline(tmp_path):
+    reference = fixture()
+    reference["meta"]["icf_template"] = "Sterling"
+    reference["study"]["timeline"] = "Enrollment: 6 months; follow-up: 3 months; data analysis: 1 month."
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    request_path = create_drafting_request(
+        repo_root=ROOT,
+        revision_dir=tmp_path,
+        revision_id="r-summary-timeline",
+        reference=reference,
+        batch=batch,
+        attempts={item: 1 for item in batch.section_ids},
+        wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    summary = next(item for item in response["section_results"] if item["section_id"] == "icf.key-information-summary")
+    summary["paragraphs"][1] = {
+        "text": "You will attend screening and follow-up over three months.",
+        "evidence_refs": ["source:study.timeline"],
+        "boilerplate_refs": [],
+    }
+
+    _accepted, findings = validate_response(request, response)
+
+    assert not any(
+        "participation-duration cites source evidence whose material facts are not observable" in item["issue"]
+        for item in findings
+    )
+
+    summary["paragraphs"][1]["text"] = "You will attend screening and follow-up over two months."
+    _accepted, wrong_duration_findings = validate_response(request, response)
+    assert any(
+        "participation-duration cites source evidence whose material facts are not observable" in item["issue"]
+        for item in wrong_duration_findings
+    )
+
+
+def test_icf_procedures_rejects_source_gap_commentary_before_rendering(tmp_path):
+    reference = fixture()
+    reference["meta"]["icf_template"] = "Sterling"
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    request_path = create_drafting_request(
+        repo_root=ROOT, revision_dir=tmp_path, revision_id="r-source-commentary",
+        reference=reference, batch=batch,
+        attempts={item: 1 for item in batch.section_ids}, wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    procedures = next(item for item in response["section_results"] if item["section_id"] == "icf.procedures")
+    procedures["paragraphs"][0]["text"] = (
+        "The source does not describe the tests as treatment, so you will complete research assessments."
+    )
+
+    _accepted, findings = validate_response(request, response)
+
+    assert any(
+        item.get("field") == "icf.procedures"
+        and "internal drafting language" in item["issue"]
+        for item in findings
+    )
+
+
+def test_icf_purpose_rejects_redundant_enrollment_count(tmp_path):
+    reference = fixture()
+    reference["meta"]["icf_template"] = "Sterling"
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    request_path = create_drafting_request(
+        repo_root=ROOT, revision_dir=tmp_path, revision_id="r-purpose-enrollment",
+        reference=reference, batch=batch,
+        attempts={item: 1 for item in batch.section_ids}, wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    purpose = next(item for item in response["section_results"] if item["section_id"] == "icf.study-purpose")
+    purpose["paragraphs"][0]["text"] += " The study is expected to include 40 treatment subjects; 0 control subjects."
+
+    _accepted, findings = validate_response(request, response)
+
+    assert any(
+        item.get("field") == "icf.study-purpose"
+        and "Enrollment counts belong" in item["issue"]
+        for item in findings
+    )
+
+
 def test_sterling_key_information_does_not_reuse_detailed_purpose_risk_or_duration(tmp_path):
     reference = fixture()
     reference["meta"]["icf_template"] = "Sterling"

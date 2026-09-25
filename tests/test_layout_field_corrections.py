@@ -224,6 +224,54 @@ def test_street_containing_city_does_not_suppress_locality_or_postal_alias():
     assert fields['studySiteAddress'] == '10 Example City Road, Example City, 12345'
 
 
+def test_complete_approved_us_address_does_not_duplicate_country_or_reorder_components():
+    facility = {
+        'address': '300 Test Clinic Road, Test City, New York 10003, USA',
+        'city': 'Test City', 'state': 'New York', 'postal_code': '10003',
+        'country': 'United States',
+    }
+    assert rendering._facility_address(facility) == facility['address']
+    from contracts import facility_projection
+    assert facility_projection(facility)['street'] == '300 Test Clinic Road'
+
+
+def test_observational_title_descriptor_handles_punctuated_device_type():
+    reference = {
+        'meta': {'study_type': 'Prospective'},
+        'regulatory': {'prs': {'study_type': 'Observational'}},
+        'design': {'intervention_type': 'Medical device — intraocular lenses.'},
+    }
+    assert rendering._study_descriptor(reference) == (
+        'A prospective observational study of intraocular lenses'
+    )
+
+
+def test_assessment_notes_do_not_repeat_procedures_assigned_to_the_same_visit():
+    from contracts import protocol_table_contracts
+    screening = 'At screening: informed consent, demographics, general information/medical history.'
+    month_three = 'At Month 3: binocular uncorrected photopic intermediate VA (66 cm); AIOLIS; monitor adverse events.'
+    unallocated = 'An additional questionnaire is completed when clinically indicated.'
+    reference = {
+        'meta': {'study_type': 'Prospective'},
+        'procedures': {
+            'visit_schedule': [
+                {'visit': 'Preoperative (Screening)', 'timing': 'Preoperative',
+                 'procedures': 'Informed Consent; Demographics; General Information: Medical History'},
+                {'visit': 'Month 3 postoperative', 'timing': '3 Month postoperative',
+                 'procedures': 'Uncorrected photopic intermediate VA (66cm, binocular); AIOLIS; Monitor for Adverse Events'},
+            ],
+            'assessments': [screening, month_three, '3 Month postoperative', unallocated],
+        },
+    }
+
+    notes = protocol_table_contracts(reference)['schedule-of-assessments']['supplemental_notes']
+
+    assert screening not in notes
+    assert month_three not in notes
+    assert '3 Month postoperative' not in notes
+    assert unallocated in notes
+
+
 
 def test_small_assessment_table_retains_activity_column_proportion():
     doc = Document()

@@ -2728,6 +2728,68 @@ def _quality_retry_fixture(
     return result, run_dir, revision, reference_path, state
 
 
+@pytest.mark.parametrize('target', ['title-page', 'general-information'])
+def test_content_verifier_routes_code_owned_protocol_section_to_construction(tmp_path, target):
+    request_id = 'r-test.verify.content'
+    finding = {
+        'finding_id': f'{target}-defect',
+        'category': 'content',
+        'check': 'source_supported',
+        'artifact': 'protocol',
+        'target_ids': [target],
+        'issue': 'The source-driven protocol shell contains a malformed value.',
+        'verification_request_id': request_id,
+        'recovery_class': 'drafting_defect',
+        'action': 'retry_drafting_target',
+    }
+    request = _verification_request_payload(request_id, 'clinical_content_verification')
+    _result, _run, revision, _path, _state = _quality_retry_fixture(
+        tmp_path, [finding], request_records=[('content.json', request)],
+    )
+    request_path = revision / 'hermes/verification-requests' / f'{request_id}.json'
+
+    findings, _evidence = quality.validate_verifications(
+        revision, request_paths=[request_path],
+    )
+
+    matching = [item for item in findings if item.get('target_ids') == [target]]
+    assert len(matching) == 1
+    assert matching[0]['recovery_class'] == 'deterministic_structure_defect'
+    assert matching[0]['action'] == 'rebuild_deterministic_structure'
+
+
+def test_retained_icf_section_is_known_to_deterministic_recovery(tmp_path, monkeypatch):
+    reference = _source()
+    reference['meta']['icf_template'] = 'Sterling'
+    run_dir = tmp_path / 'run'
+    revision = run_dir / 'revisions/r-test'
+    revision.mkdir(parents=True)
+    reference_path = run_dir / 'reference/study.reference.json'
+    reference_path.parent.mkdir(parents=True)
+    working = {'generation': {'review_set': 1}}
+    reference_path.write_text(json.dumps(working), encoding='utf-8')
+    finding = {
+        'category': 'content', 'artifact': 'icf',
+        'target_ids': ['icf.key-information'],
+        'recovery_class': 'deterministic_structure_defect',
+        'action': 'rebuild_deterministic_structure',
+        'issue': 'The retained heading needs source-driven reconstruction.',
+    }
+
+    class ReachedRecoveryArchive(Exception):
+        pass
+
+    def reached_archive(*_args, **_kwargs):
+        raise ReachedRecoveryArchive
+
+    monkeypatch.setattr(workflow, '_archive_failed_attempt', reached_archive)
+    with pytest.raises(ReachedRecoveryArchive):
+        workflow._quality_retry(
+            run_dir, reference_path, working, reference, revision, {}, [finding],
+            'quality', require_promoted_runtime=False,
+        )
+
+
 def _prearchive_routing_fixture(tmp_path, finding, *, reference=None, companions=()):
     result, run_dir, revision, _reference_path, working = _quality_retry_fixture(
         tmp_path,

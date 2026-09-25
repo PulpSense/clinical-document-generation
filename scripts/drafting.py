@@ -976,6 +976,16 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
                 values.add(f"{int(whole)}.{fraction.rstrip('0') or '0'}")
             else:
                 values.add(str(int(token)))
+        number_words = {
+            "zero": "0", "one": "1", "two": "2", "three": "3",
+            "four": "4", "five": "5", "six": "6", "seven": "7",
+            "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
+        }
+        values.update(
+            number_words[word]
+            for word in re.findall(r"\b[a-z]+\b", text.casefold())
+            if word in number_words
+        )
         return values
 
     content_numbers = numeric_tokens(content)
@@ -1706,6 +1716,17 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             section_id == "icf.study-purpose"
             and str(icf_template or "").strip().casefold() == "sterling"
         ):
+            if re.search(
+                r"\b\d+\s+(?:(?:treatment|control|study)\s+)?(?:subjects|participants)\b",
+                combined_content, re.I,
+            ):
+                findings.append({
+                    "category": "drafting",
+                    "field": section_id,
+                    "target_ids": [section_id],
+                    "issue": "Enrollment counts belong in KEY INFORMATION or DURATION, not PURPOSE.",
+                    "next_action": "Remove the participant count from PURPOSE and keep its concise study aim, hypothesis, and primary outcome.",
+                })
             approved_source = request.get("approved_source")
             background = get_path(
                 approved_source if isinstance(approved_source, Mapping) else {},
@@ -1774,9 +1795,17 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                             "next_action": "Use the ordered concept's canonical evidence references and observable source facts.",
                         })
                         continue
+                    def cited_fact_is_observable(ref: str) -> bool:
+                        value = source_values.get(ref.removeprefix("source:"))
+                        if concept == "participation-duration" and ref == "source:study.timeline":
+                            # This participant summary owns follow-up duration, not
+                            # recruitment and analysis phases from the same field.
+                            value = _approved_followup_value(value)
+                            return bool(value) and evidence_grounded(text, value)
+                        return evidence_grounded(text, value)
+
                     if cited_sources and not any(
-                        evidence_grounded(text, source_values.get(ref.removeprefix("source:")))
-                        for ref in cited_sources
+                        cited_fact_is_observable(ref) for ref in cited_sources
                     ):
                         findings.append({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],

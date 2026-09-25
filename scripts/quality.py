@@ -5906,9 +5906,27 @@ def validate_verifications(
                                 "action": "manual_review",
                             })
                         else:
+                            approved_source = request.get("approved_source") or {}
+                            branch = str(get_path(approved_source, "meta.study_type") or "")
+                            icf_family = str(get_path(approved_source, "meta.icf_template") or "Advarra")
+                            draftable_targets = {
+                                section_id
+                                for batch in batch_plan(branch, icf_family)
+                                for section_id in batch.section_ids
+                            }
+                            code_owned_targets = {
+                                (str(section.get("artifact") or ""), str(section.get("section_id") or ""))
+                                for section in request.get("sections", [])
+                                if isinstance(section, Mapping)
+                                and str(section.get("section_id") or "") not in draftable_targets
+                            }
+                            code_owned_finding = bool(supplied_targets) and all(
+                                (_text(source.get("artifact")), target) in code_owned_targets
+                                for target in supplied_targets
+                            )
                             recovery_class = (
                                 "deterministic_structure_defect"
-                                if set(supplied_targets) == {"prs.structured"}
+                                if set(supplied_targets) == {"prs.structured"} or code_owned_finding
                                 else "drafting_defect"
                             )
                             findings.append(recovery_finding({

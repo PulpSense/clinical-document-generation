@@ -212,6 +212,8 @@ PRS_CLASSIFICATION_ASSERTIONS = (
 FORBIDDEN_DRAFT_LANGUAGE = (
     "the approved source provides",
     "the approved source identifies",
+    "the source does not describe",
+    "the approved source does not describe",
     "no additional study-specific claim",
     "needs review",
     "internal only",
@@ -384,8 +386,8 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "do not restate unrelated efficacy endpoints, confidence intervals, sensor outcomes, usability, "
             "or missing-data methods from a broader analysis-plan field."
         ),
-        "icf.study-purpose": "State the study purpose, hypothesis, and primary endpoint concisely in participant-facing language. Do not repeat the lens descriptions, comparative evidence, unmet evidence gap, or complete rationale owned by BACKGROUND.",
-        "icf.key-information-summary": "Give five concise participant-facing summary blocks covering the study purpose, expected participation and duration, principal risks, possible benefit or absence of direct benefit, and alternatives plus voluntary participation. Do not copy detailed-section prose.",
+        "icf.study-purpose": "State the study purpose, hypothesis, and primary endpoint concisely in participant-facing language. Keep enrollment counts in KEY INFORMATION or DURATION. Do not repeat the lens descriptions, comparative evidence, unmet evidence gap, or complete rationale owned by BACKGROUND.",
+        "icf.key-information-summary": "Give five concise participant-facing summary blocks covering the study purpose, expected participation and duration, principal risks, possible benefit or absence of direct benefit, and alternatives plus voluntary participation. When the timeline also contains enrollment or analysis phases, summarize only participant follow-up here. Paraphrase sparse risk and benefit boilerplate in plain language so the summary does not copy its detailed-section sentence.",
         "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
         "icf.duration": "State the approved participation duration and relevant time points.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
@@ -947,6 +949,11 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
     def identity(value: str) -> str:
         return " ".join("".join(c.casefold() if c.isalnum() else " " for c in value).split())
 
+    country_identities = {identity(first("country", "country_name"))}
+    us_identities = {"usa", "us", "u s a", "united states", "united states of america"}
+    if country_identities & us_identities:
+        country_identities.update(us_identities)
+
     name = text(facility.get("name") or facility.get("facility_name"))
     city = first("city", "locality", "town")
     state = first("state", "region", "province")
@@ -975,7 +982,7 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
     else:
         raw_segments = [part.strip() for part in re.split(r"[,;\n]", text(address)) if part.strip()]
         known_components = [name, *locality_parts]
-        known_identities = {identity(part) for part in known_components if part}
+        known_identities = {identity(part) for part in known_components if part} | country_identities
         known_tokens = {token for part in known_components for token in identity(part).split()}
         street_parts = []
         for segment in raw_segments:
@@ -1002,11 +1009,14 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
         supplied_tokens = set(identity(" ".join(supplied_segments)).split())
         required_tokens = {
             token
-            for part in locality_parts
+            for part in locality_parts[:-1]
             if part
             for token in identity(part).split()
         }
-        if supplied_segments and required_tokens and required_tokens <= supplied_tokens:
+        country_present = not country or any(
+            set(marker.split()) <= supplied_tokens for marker in country_identities if marker
+        )
+        if supplied_segments and required_tokens and required_tokens <= supplied_tokens and country_present:
             display_address = ", ".join(supplied_segments)
     return {
         "name": name,
@@ -1295,6 +1305,7 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
     matrix = bool(assessment_rows and assessment_rows[0][0] == "Activity")
     represented = {re.sub(r"\s+", " ", row[0]).strip().casefold().rstrip(".") for row in assessment_rows}
     represented.update(visit["visit"].casefold() for visit in visits)
+    represented.update(visit["timing"].casefold() for visit in visits if visit["timing"])
 
     def fully_allocated_visit_note(note: str) -> bool:
         """Suppress a prose inventory only when one visit's matrix already owns every term."""
@@ -1306,8 +1317,8 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
 
         def tokens(value: str) -> set[str]:
             normalized = []
-            for raw in re.findall(r"[a-z0-9]+", value.casefold()):
-                if raw in {"and", "of", "the", "a", "an"}:
+            for raw in re.findall(r"[a-z]+|\d+", value.casefold()):
+                if raw in {"and", "of", "the", "a", "an", "at"}:
                     continue
                 normalized.append({"completion": "complete", "monitoring": "monitor"}.get(raw, raw))
             return set(normalized)
