@@ -623,6 +623,8 @@ STERLING_BACKGROUND_SECTION = _section_spec(
     ),
     content_expectations=(
         "Explain the approved clinical and study context, relevant comparative evidence, evidence gap, and study rationale in participant-facing language.",
+        "Preserve the source's qualification on prior trial results: if it says suggested, do not present the result as definitive. Describe the untested combination's evidence gap without predicting superiority over another lens strategy.",
+        "Bibliographic references appended to study.background are source traceability; do not copy DOI strings into participant-facing prose solely to satisfy evidence coverage.",
         "Translate technical terms for participants without adding unsupported clinical claims.",
         "Do not repeat the complete purpose, hypothesis, or primary endpoint owned by PURPOSE.",
     ),

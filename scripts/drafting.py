@@ -130,7 +130,10 @@ def _prs_section_payload(target: str) -> dict[str, Any]:
                 "study.background", "study.hypothesis", "objectives.primary", "design.study_design",
                 "endpoints.primary", "endpoints.secondary", "population.study_population", "procedures.assessments",
             ],
-            "content_expectations": ["Explain the approved background, hypothesis, objectives, design, population, procedures, and every endpoint in registry-ready prose."],
+            "content_expectations": [
+                "Explain the approved background, hypothesis, objectives, design, population, procedures, and every endpoint in registry-ready prose.",
+                "Preserve qualifications on prior comparative evidence. Where the combination has minimal data, state the evidence gap without predicting a comparative advantage for the untested combination.",
+            ],
         },
     }
     contract = contracts[target]
@@ -967,6 +970,12 @@ def _direct_safety_role_errors(
 
 def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
     """Require observable anchors for every material scalar supplied by a cited source path."""
+    if isinstance(value, str):
+        clinical_text = re.split(r"\bReferences?\s*:\s*", value, maxsplit=1, flags=re.I)[0].strip()
+        if clinical_text != value.strip() and len(clinical_text.split()) >= 10:
+            # Bibliographic identifiers are traceability data, not clinical
+            # claims that must be copied into every narrative section.
+            value = clinical_text
     content_tokens = _grounding_tokens(content)
     def numeric_tokens(text: str) -> set[str]:
         values = set()
@@ -1043,6 +1052,52 @@ def _approved_followup_value(timeline: Any) -> str:
     if follow_up:
         return follow_up.group(1)
     return text if len(re.findall(r"\d+(?:\.\d+)?", text)) <= 1 else ""
+
+
+def _background_claim_findings(
+    section_id: str, content: str, approved_source: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    if section_id not in {"icf.background", "prs.detailed-description"}:
+        return []
+    source_background = str(get_path(approved_source, "study.background") or "")
+    source_trial_qualified = bool(re.search(
+        r"\btrial\b.{0,110}\bsuggest\w*\b.{0,100}\bbetter\b.{0,80}\bintermediate\b.{0,50}\bnear\b",
+        source_background, re.I,
+    ))
+    combination_unproven = bool(
+        re.search(r"\b(?:mix.and.match|combination)\b", source_background, re.I)
+        and re.search(r"\b(?:minimal|limited|little|no)\s+(?:\w+\s+){0,2}(?:data|evidence)\b", source_background, re.I)
+    )
+    findings: list[dict[str, Any]] = []
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", content):
+        trial_result = re.search(
+            r"\btrial\b.{0,180}\bbetter\b.{0,80}\bintermediate\b.{0,50}\bnear\b",
+            sentence, re.I,
+        )
+        if (
+            source_trial_qualified
+            and trial_result
+            and not re.search(
+                r"\b(?:suggest\w*|may|might|could|possibly|possible|appeared)\b",
+                trial_result.group(0), re.I,
+            )
+        ):
+            findings.append({
+                "category": "drafting", "field": section_id, "target_ids": [section_id],
+                "issue": "The section strengthens qualified trial evidence into a definitive comparative result.",
+                "next_action": "Keep the source's suggested qualification in the same trial sentence.",
+            })
+        if (
+            combination_unproven
+            and re.search(r"\b(?:mix.and.match|combination|combined|pairing|paired)\b|\bdominant eye\b.{0,100}\bnon.dominant eye\b", sentence, re.I)
+            and re.search(r"\b(?:may|might|could|expected to|will)\b.{0,180}\b(?:better|broader|wider|fewer|less|more)\b.{0,180}\b(?:than|compared (?:with|to)|relative to)\b", sentence, re.I)
+        ):
+            findings.append({
+                "category": "drafting", "field": section_id, "target_ids": [section_id],
+                "issue": "The section predicts comparative superiority for an untested combination.",
+                "next_action": "Describe the documented prior lens evidence and the combination's evidence gap without a comparative advantage claim.",
+            })
+    return findings
 
 
 def _coverage_findings(
@@ -1234,8 +1289,11 @@ def _coverage_findings(
                     "next_action": "Preserve the supplied reference value without restating concepts owned elsewhere.",
                 })
         return findings
+    source_value = request.get("approved_source")
+    approved_source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
+    claim_findings = _background_claim_findings(section_id, content, approved_source)
     if contract.get("source_coverage") not in {"all_material_evidence", "all_material_items"}:
-        return []
+        return claim_findings
     material = _material_source(request, contract)
     cited = set(map(str, evidence_refs))
     missing = [path for path in material if f"source:{path}" not in cited]
@@ -1287,7 +1345,7 @@ def _coverage_findings(
                 ),
                 "next_action": "Name every approved party and state each assigned safety responsibility in that party's sentence.",
             })
-    return findings
+    return findings + claim_findings
 
 
 def _reference_next_action(

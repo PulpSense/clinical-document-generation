@@ -3951,6 +3951,7 @@ def validate_sterling_clause_contract(
         title: _normalized_substantive_text(" ".join(values))
         for title, values in sections.items()
     }
+    raw_sections = {title: " ".join(values) for title, values in sections.items()}
     findings: list[dict[str, Any]] = []
     branch = canonical_study_type(get_path(normalized_source, "meta.study_type")) or "Prospective"
     draftable_icf_ids = {
@@ -4051,7 +4052,7 @@ def validate_sterling_clause_contract(
             (
                 re.search(r"\b(?:no|not|without|will not|none)\b", text) is not None
                 if isinstance(value, str) and value.strip().casefold() == "none"
-                else evidence_grounded(text, value)
+                else evidence_grounded(raw_sections.get(section, ""), value)
             )
             for value in authority_values
         ]
@@ -4100,7 +4101,7 @@ def validate_sterling_clause_contract(
                 missing_source_values=[value for value in source_values if value not in text],
                 ungrounded_source_paths=[
                     path for path, value in authority_records
-                    if not evidence_grounded(text, value)
+                    if not evidence_grounded(raw_sections.get(section, ""), value)
                     and not (isinstance(value, str) and value.strip().casefold() == "none" and re.search(r"\b(?:no|not|without|will not|none)\b", text))
                 ],
                 contradiction=contradiction,
