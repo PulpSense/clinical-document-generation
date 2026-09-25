@@ -70,6 +70,18 @@ def _branch_acceptance_case_ids() -> tuple[str, ...]:
 
 
 DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = _branch_acceptance_case_ids()
+REQUIRED_HISTORICAL_REGRESSION_IDS = frozenset({
+    "glucolumen-complete-exclusion",
+    "novastep-section-3-continuation",
+    "timeline-grammar-connectors",
+    "malformed-review-envelope",
+    "deterministic-structured-reconstruction",
+    "run01-address-and-layout-block",
+    "run02-parent-visual-callback-block",
+    "run02-archived-recovery-request-routing",
+    "run03-code-owned-review-routing",
+    "run04-sterling-background-qualification",
+})
 
 
 def _historical_regression_inventory() -> tuple[tuple[str, ...], tuple[str, ...]]:
@@ -83,7 +95,7 @@ def _historical_regression_inventory() -> tuple[tuple[str, ...], tuple[str, ...]
     if (
         manifest.get("negative_outputs_are_golden") is not False
         or not isinstance(cases, list)
-        or len(cases) != 5
+        or len(cases) < len(REQUIRED_HISTORICAL_REGRESSION_IDS)
     ):
         raise ValueError("Historical reliability regression manifest is invalid.")
     if any(
@@ -102,6 +114,7 @@ def _historical_regression_inventory() -> tuple[tuple[str, ...], tuple[str, ...]
     if (
         not all(case_ids)
         or len(set(case_ids)) != len(case_ids)
+        or not REQUIRED_HISTORICAL_REGRESSION_IDS.issubset(case_ids)
         or not test_nodes
         or len(set(test_nodes)) != len(test_nodes)
     ):

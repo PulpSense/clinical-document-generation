@@ -2942,7 +2942,7 @@ def test_observational_outputs_remove_unapproved_template_study_claims(tmp_path)
 
     title_table = next(table for table in protocol.tables if table.cell(0, 0).text.strip() == "Protocol Number")
     assert title_table.cell(1, 1).text.strip() == ""
-    assert "An ambispective observational device study" in protocol_visible
+    assert "An ambispective observational study involving a medical device" in protocol_visible
     assert "investigator-initiated clinical trial" not in protocol_visible
     assert "All subjects will be monitored for adverse events" not in protocol_visible
     assert "1996 version of the Declaration of Helsinki" not in protocol_visible
@@ -3516,7 +3516,7 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
             for index, page in enumerate(protocol_pages)
         )
         sparse_pages = [page for page in protocol_pages if len(page.split()) < 50]
-        assert all("Duration / Follow- up" in page for page in sparse_pages)
+        assert all(re.search(r"Duration / Follow[-‑]\s?up", page) for page in sparse_pages)
         if any("Table 9.2-1. Visit Schedule" in paragraph.text for paragraph in protocol.paragraphs):
             assert any(
                 "Table 9.2-1. Visit Schedule" in page
@@ -3541,7 +3541,7 @@ def test_every_protocol_and_icf_family_uses_natural_body_pagination(tmp_path, go
             )
             assert "2. INVESTIGATOR AGREEMENT" not in section_three_page
             assert "Objective" in section_three_page
-            assert re.search(r"Duration / Follow- ?up", section_three_page)
+            assert re.search(r"Duration / Follow[-‑]\s?up", section_three_page)
         numbered_body_headings = [
             paragraph
             for paragraph in protocol.paragraphs
@@ -3696,7 +3696,7 @@ def test_rendered_section_three_starts_after_investigator_agreement(
     assert "2. INVESTIGATOR AGREEMENT" not in section_three_page
     assert toc_page_index > section_three_page_index
     assert "Objective" in section_three_page
-    assert re.search(r"Duration / Follow- ?up", section_three_page)
+    assert re.search(r"Duration / Follow[-‑]\s?up", section_three_page)
     assert "15. STANDARD EVALUATION PROCEDURES" in section_sixteen_page
     assert "Table 9.2-1. Visit Schedule" in visits_heading_page
 
@@ -3800,7 +3800,7 @@ def test_section_three_table_repair_moves_the_complete_block_before_the_toc(
     section_three_page = pages[toc_page - 1]
 
     assert "3. GENERAL INFORMATION" in section_three_page
-    assert "Duration / Follow-up" in section_three_page
+    assert re.search(r"Duration / Follow[-‑]\s?up", section_three_page)
     assert "device fitting." in section_three_page
     assert len(section_three_page.split()) >= 150
 

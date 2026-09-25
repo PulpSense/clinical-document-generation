@@ -4715,11 +4715,8 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 prs_findings = validate_prs_output(
                     xml_path,
                     reference,
-                    repo_root / "assets/client-templates/reference/prs-manual-reference.xml",
-                    generation_template=(
-                        repo_root
-                        / "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml"
-                    ),
+                    repo_root / str(bundle["prs_authority"]["structural_reference"]["path"]),
+                    generation_template=repo_root / str(bundle["prs_authority"]["generation_template"]["path"]),
                 )
                 if any(
                     item.get("code") == "screening_interval_semantic_mismatch"

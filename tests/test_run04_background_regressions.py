@@ -7,7 +7,7 @@ import pytest
 from docx import Document
 
 from contracts import batch_plan
-from drafting import create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
+from drafting import _background_claim_findings, create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
 from quality import validate_sterling_clause_contract
 
 
@@ -46,6 +46,33 @@ def test_sterling_background_accepts_clinical_facts_without_bibliography_numbers
     findings = validate_sterling_clause_contract(document, reference())["findings"]
 
     assert not [item for item in findings if item["clause_id"] == "sterling.background.context"]
+
+
+def test_run04_exact_reviewed_background_separates_qualification_from_bibliography():
+    replay = json.loads((ROOT / "tests/fixtures/reliability-replays/run04-background.json").read_text())
+    value = reference()
+    value["study"]["background"] = replay["approved_background"]
+    document = Document()
+    document.add_heading("BACKGROUND", level=1)
+    for paragraph in replay["candidate_paragraphs"]:
+        document.add_paragraph(paragraph)
+
+    clauses = validate_sterling_clause_contract(document, value)["findings"]
+    claims = _background_claim_findings(
+        "icf.background", "\n".join(replay["candidate_paragraphs"]), value,
+    )
+
+    assert not [item for item in clauses if item["clause_id"] == "sterling.background.context"]
+    assert any("qualified trial evidence" in item["issue"] for item in claims)
+
+    corrected = "\n".join(replay["candidate_paragraphs"]).replace(
+        "PureSee provided better intermediate and near vision",
+        "PureSee suggested better intermediate and near vision",
+    ).replace(
+        "Placing an EDOF lens in the dominant eye and a multifocal lens in the non-dominant eye may provide a wider range of vision with fewer visual disturbances than placing the same EDOF or trifocal lens in both eyes.",
+        "The benefit of placing different lens types in the two eyes has not been established for this combination.",
+    )
+    assert _background_claim_findings("icf.background", corrected, value) == []
 
 
 def test_sterling_background_keeps_decimal_clinical_values_intact():

@@ -7481,6 +7481,42 @@ def _apply_pending_recovery_plan(
     return created
 
 
+def _repeated_drafting_findings(
+    generation: dict[str, Any], findings: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Detect the same reviewed drafting defect across three distinct review sets."""
+    review_set = max(1, int(generation.get("review_set", 1)))
+    history = generation.setdefault("drafting_finding_review_sets", {})
+    stalled: list[dict[str, Any]] = []
+    for finding in findings:
+        if finding.get("recovery_class") != "drafting_defect":
+            continue
+        identity = {
+            "artifact": finding.get("artifact"),
+            "check": finding.get("check"),
+            "field": finding.get("field"),
+            "target_ids": sorted(str(item) for item in finding.get("target_ids", [])),
+            "issue": re.sub(r"\s+", " ", str(finding.get("issue") or "")).strip().casefold(),
+        }
+        key = canonical_evidence_sha256(identity)
+        sets = history.setdefault(key, [])
+        if review_set not in sets:
+            sets.append(review_set)
+        if len(sets) >= 3:
+            stalled.append({
+                **dict(finding),
+                "category": "recovery",
+                "field": "repeated_drafting_finding",
+                "code": "drafting_repair_stalled",
+                "review_sets": list(sets),
+                "issue": (
+                    "The same drafting defect survived three distinct independent review sets. "
+                    "The installed drafting route needs maintenance for this target."
+                ),
+            })
+    return stalled
+
+
 def _quality_retry(
     run_dir: Path,
     reference_path: Path,
@@ -7852,6 +7888,14 @@ def _quality_retry(
             structural,
             candidate_outputs=_candidate_outputs(revision_dir),
         )
+    if stage == "quality":
+        stalled = _repeated_drafting_findings(generation_state, findings)
+        _write(reference_path, working_reference)
+        if stalled:
+            return _repair_block(
+                run_dir, "internal_recovery_stalled", stalled,
+                candidate_outputs=_candidate_outputs(revision_dir),
+            )
     expected_gate_attempts = list(generation_state.get("gate_attempts") or [])
     _validate_expected_gate_attempts(revision_dir, expected_gate_attempts)
     recovery_attempt_dir = _archive_failed_attempt(revision_dir, stage, findings)
@@ -8010,7 +8054,7 @@ def _quality_retry(
         generation.get("recovery_strategy_attempts") or {},
     )
     generation["recovery_strategy_attempts"] = strategy_attempts
-    if stage == "quality" and (section_targets or has_layout_target or deterministic_reconstruction):
+    if stage in {"quality", "recovery_no_progress"} and (section_targets or has_layout_target or deterministic_reconstruction):
         generation = working_reference.setdefault("generation", {})
         current_review_set = max(1, int(generation.get("review_set", 1)))
         strategy_ids = {_recovery_strategy_id(item) for item in normalized}

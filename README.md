@@ -168,6 +168,23 @@ runtime classifications below 15 minutes, through the 18-minute diagnostic windo
 or above 18 minutes within the unchanged 45-minute correctness ceiling. Recorded drafting or synthetic verification remains
 labelled structural-only in preflight evidence and cannot satisfy the live gate.
 
+Before activating a candidate for client work, run the complete live corpus a
+second time from fresh run directories against the same frozen package and
+preflight evidence. Check both reports with:
+
+```bash
+"$CLINICAL_PYTHON" tests/reliability_activation_gate.py \
+  /absolute/path/to/first/release-certification-corpus.json \
+  /absolute/path/to/second/release-certification-corpus.json
+```
+
+The repeat gate requires every case in both runs to pass within the approved
+runtime, binds both runs to the same commit, package fingerprint and preflight,
+and rejects reused case reports. Keep the currently active skill until this
+check passes. Bind one of the passing full-corpus reports to the release archive
+only after the repeat gate succeeds. Installation then uses the short host smoke
+check; the full suite belongs to preflight, not installation.
+
 Certification fixtures live under `tests/fixtures/release-certification/`.
 Each fixture manifest explicitly declares synthetic/non-private provenance,
 hashes its source input, reviewed Source-of-Truth, and approved reference, fixes

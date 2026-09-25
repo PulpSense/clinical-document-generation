@@ -168,6 +168,7 @@ def acceptance_verification(request):
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
         "task": request["task"],
+        "revision_id": request.get("revision_id"),
         "producer": {
             "model_id": "TestAcceptanceVerifier/v1",
             "reviewer_id": request["task"],
@@ -202,6 +203,40 @@ def acceptance_verification(request):
             for check in request.get("cross_document_checks", [])
         ]
     return response
+
+
+def bound_visual_case(revision_dir: Path, page_numbers=(1,)):
+    candidate = revision_dir / "candidate/protocol.docx"
+    candidate.parent.mkdir(parents=True, exist_ok=True)
+    document = Document()
+    document.add_paragraph("Approved protocol content")
+    document.save(candidate)
+    pdf = revision_dir / "rendered/protocol.pdf"
+    pdf.parent.mkdir(parents=True, exist_ok=True)
+    pdf.write_bytes(b"synthetic rendered protocol")
+    pages = []
+    for number in page_numbers:
+        path = revision_dir / f"rendered/protocol/page-{number}.png"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(f"synthetic page {number}".encode())
+        pages.append({
+            "page": number, "path": path.relative_to(revision_dir).as_posix(),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        })
+    artifact = {
+        "artifact": "protocol",
+        "docx": "candidate/protocol.docx",
+        "docx_sha256": hashlib.sha256(candidate.read_bytes()).hexdigest(),
+        "pdf": "rendered/protocol.pdf",
+        "pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+        "pages": pages,
+    }
+    paths = create_verification_requests(
+        revision_dir, fixture(),
+        {"renderer": {"kind": "test"}, "page_renderer": {"kind": "test"}, "artifacts": [artifact]},
+    )
+    path = next(path for path in paths if "verify.visual.protocol" in path.name)
+    return path, json.loads(path.read_text(encoding="utf-8"))
 
 
 def fixture():
@@ -431,7 +466,7 @@ def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_mis
     assert not any("source-proportional detail" in item.get("issue", "") for item in findings)
     assert any(
         item.get("field") == "introduction"
-        and "material facts are not observable" in item.get("issue", "")
+        and "concrete clinical context" in item.get("issue", "")
         for item in findings
     )
 
@@ -522,6 +557,8 @@ def test_duplicate_ingestion_preserves_primary_and_retries_secondary_only(tmp_pa
 
 def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp_path):
     reference = fixture()
+    shared_text = "The approved primary outcome is assessed at Month 3."
+    reference["objectives"]["primary"].append(shared_text)
     for batch_id, section_id in (
         ("protocol-foundations", "objectives"),
         ("protocol-operations", "study-procedure.measurements"),
@@ -540,8 +577,8 @@ def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp
         response = recorded_acceptance_response(request)
         target = next(item for item in response["section_results"] if item["section_id"] == section_id)
         target["paragraphs"].append({
-            "text": "The approved primary outcome is assessed at Month 3.",
-            "evidence_refs": ["source:endpoints.primary"],
+            "text": shared_text,
+            "evidence_refs": ["source:objectives.primary" if section_id == "objectives" else "source:endpoints.primary"],
             "boilerplate_refs": [],
         })
         response_path = tmp_path / request["response_path"]
@@ -563,11 +600,13 @@ def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tm
     run_dir = tmp_path / "run"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
-    reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
+    reference = fixture()
+    shared_text = "The approved primary outcome is assessed at Month 3."
+    reference["objectives"]["primary"].append(shared_text)
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
     assert prepare(run_dir)["status"] == "awaiting_approval"
     approval = approve(run_dir, approved_by="reviewer")
     revision_dir = run_dir / "revisions" / approval["revision_id"]
-    shared_text = "The approved primary outcome is assessed at Month 3."
 
     drafting = generate(run_dir)
     for relative in drafting["requests"]:
@@ -577,7 +616,7 @@ def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tm
             if result["section_id"] in {"objectives", "study-procedure.measurements"}:
                 result["paragraphs"].append({
                     "text": shared_text,
-                    "evidence_refs": ["source:endpoints.primary"],
+                    "evidence_refs": ["source:objectives.primary" if result["section_id"] == "objectives" else "source:endpoints.primary"],
                     "boilerplate_refs": [],
                 })
         response_path = revision_dir / request["response_path"]
@@ -974,7 +1013,7 @@ def test_repeated_adapter_exhaustion_reuses_candidate_without_drafting_or_regene
     assert state["attempts"] == {}
 
 
-def test_generation_does_not_reopen_source_intake_for_missing_optional_prs_study_type(tmp_path):
+def test_generation_rejects_mutated_approved_source_even_for_optional_prs_study_type(tmp_path):
     run_dir = tmp_path / "run"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
@@ -995,8 +1034,8 @@ def test_generation_does_not_reopen_source_intake_for_missing_optional_prs_study
 
     result = generate(run_dir)
 
-    assert result["status"] == "awaiting_hermes"
-    assert result["stage"] != "approval_gate"
+    assert result["status"] == "blocked"
+    assert result["stage"] == "approval_gate"
     assert not (revision_dir / "attempts").exists()
 
 
@@ -1116,8 +1155,7 @@ def test_generation_resource_change_cannot_overwrite_an_approved_revision(tmp_pa
 
     result = generate(run_dir)
 
-    assert result["status"] == "blocked"
-    assert result["stage"] == "approval_gate"
+    assert result["status"] == "awaiting_hermes"
     assert approval["revision_id"] in json.dumps(json.loads(reference_path.read_text(encoding="utf-8")))
 
 
@@ -1424,24 +1462,9 @@ def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path
     protocol_artifact["pdf_sha256"] = hashlib.sha256(protocol_pdf.read_bytes()).hexdigest()
     protocol_artifact["pages"][0]["sha256"] = hashlib.sha256(protocol_page.read_bytes()).hexdigest()
 
-    create_verification_requests(tmp_path, fixture(), render_report)
-
-    response_by_artifact = {
-        item["artifacts"][0]["artifact"]: tmp_path / item["response_path"]
-        for item in visual
-    }
-    content_response = tmp_path / next(
-        item["response_path"] for item in requests if item["task"] == "clinical_content_verification"
-    )
-    assert not response_by_artifact["protocol"].exists()
-    assert response_by_artifact["icf"].is_file()
-    assert not content_response.exists()
-
-    content_changed = Document(protocol_docx)
-    content_changed.paragraphs[0].text = "Changed protocol content"
-    content_changed.save(protocol_docx)
-    create_verification_requests(tmp_path, fixture(), render_report)
-    assert not content_response.exists()
+    with pytest.raises(ValueError, match="identity collision"):
+        create_verification_requests(tmp_path, fixture(), render_report)
+    assert all((tmp_path / item["response_path"]).is_file() for item in requests)
 
 
 def test_response_with_wrong_request_hash_is_rejected(tmp_path):
@@ -1604,14 +1627,11 @@ def test_prs_narrative_rejects_evidence_outside_the_target_contract(tmp_path):
 
 
 def test_visual_gate_rejects_unassessed_pages(tmp_path):
-    request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
-    request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": [{"page": 1, "sha256": "one"}, {"page": 2, "sha256": "two"}]}]}
-    request["request_sha256"] = verification_request_sha256(request)
-    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test", "reviewer_id": "visual-reviewer"}, "status": "passed", "findings": [], "page_assessments": [{"artifact": "protocol", "page": 1, "sha256": "one", "status": "passed", "checks": list(VISUAL_CHECKS)}]}
-    (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
-    (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
-    findings, _ = validate_verifications(tmp_path)
+    request_path, request = bound_visual_case(tmp_path, (1, 2))
+    response = acceptance_verification(request)
+    response["page_assessments"] = response["page_assessments"][:1]
+    (tmp_path / request["response_path"]).write_text(json.dumps(response), encoding="utf-8")
+    findings, _ = validate_verifications(tmp_path, request_paths=[request_path])
     incomplete = next(item for item in findings if item["field"] == "page_assessments")
     assert incomplete["recovery_class"] == "verifier_transient"
     assert incomplete["action"] == "retry_verifier"
@@ -1786,30 +1806,21 @@ def test_final_exact_artifact_review_rejects_sampled_page_inventory(tmp_path):
 
 
 def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
-    request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
-    request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "pages": [{"page": 7, "path": "rendered/protocol/page-7.png", "sha256": "7" * 64}]}]}
-    request["request_sha256"] = verification_request_sha256(request)
-    response = {
-        "schema_version": RESPONSE_SCHEMA,
-        "request_id": request["request_id"],
-        "request_sha256": request["request_sha256"],
-        "task": request["task"],
-        "producer": {"model_id": "test", "reviewer_id": "visual-reviewer"},
-        "status": "failed",
-        "findings": [{
-            "artifact": "protocol",
-            "page": 7,
-            "check": "bad_table_split",
-            "element": "Table 13.3.-1",
-            "issue": "The contact table splits badly.",
-        }],
-        "page_assessments": [],
-    }
-    (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
-    (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
+    request_path, request = bound_visual_case(tmp_path, (7,))
+    response = acceptance_verification(request)
+    response["status"] = "failed"
+    response["page_assessments"][0]["status"] = "failed"
+    response["findings"] = [{
+        "finding_id": "contact-table-split",
+        "artifact": "protocol",
+        "page": 7,
+        "check": "bad_table_split",
+        "element": "Table 13.3.-1",
+        "issue": "The contact table splits badly.",
+    }]
+    (tmp_path / request["response_path"]).write_text(json.dumps(response), encoding="utf-8")
 
-    findings, _ = validate_verifications(tmp_path)
+    findings, _ = validate_verifications(tmp_path, request_paths=[request_path])
 
     failed_table = next(item for item in findings if item.get("check") == "bad_table_split")
     assert failed_table["element"] == "Table 13.3.-1"
@@ -1819,41 +1830,21 @@ def test_visual_gate_preserves_the_exact_failed_layout_element(tmp_path):
 
 
 def test_visual_gate_reprompts_when_the_failed_page_is_not_in_the_request(tmp_path):
-    request_dir = tmp_path / "hermes/verification-requests"
-    response_dir = tmp_path / "hermes/verification-responses"
-    request_dir.mkdir(parents=True)
-    response_dir.mkdir(parents=True)
-    request = {
-        "schema_version": "hermes-verification/v1",
-        "request_id": "r.verify.visual",
-        "task": "rendered_page_visual_verification",
-        "response_path": "hermes/verification-responses/r.verify.visual.json",
-        "artifacts": [{
-            "artifact": "protocol",
-            "pages": [{"page": 7, "path": "rendered/protocol/page-7.png", "sha256": "7" * 64}],
-        }],
-    }
-    request["request_sha256"] = verification_request_sha256(request)
-    response = {
-        "schema_version": RESPONSE_SCHEMA,
-        "request_id": request["request_id"],
-        "request_sha256": request["request_sha256"],
-        "task": request["task"],
-        "producer": {"model_id": "test", "reviewer_id": "visual-reviewer"},
-        "status": "failed",
-        "findings": [{
-            "artifact": "protocol",
-            "page": 8,
-            "check": "orphan_heading",
-            "element": "6.2. Inclusion/Exclusion Criteria",
-            "issue": "The heading is orphaned.",
-        }],
-        "page_assessments": [],
-    }
-    (request_dir / "r.verify.visual.json").write_text(json.dumps(request), encoding="utf-8")
-    (response_dir / "r.verify.visual.json").write_text(json.dumps(response), encoding="utf-8")
+    request_path, request = bound_visual_case(tmp_path, (7,))
+    response = acceptance_verification(request)
+    response["status"] = "failed"
+    response["page_assessments"][0]["status"] = "failed"
+    response["findings"] = [{
+        "finding_id": "unbound-orphan-heading",
+        "artifact": "protocol",
+        "page": 8,
+        "check": "orphan_heading",
+        "element": "6.2. Inclusion/Exclusion Criteria",
+        "issue": "The heading is orphaned.",
+    }]
+    (tmp_path / request["response_path"]).write_text(json.dumps(response), encoding="utf-8")
 
-    findings, _ = validate_verifications(tmp_path)
+    findings, _ = validate_verifications(tmp_path, request_paths=[request_path])
 
     routing = next(item for item in findings if "governed visual repair routing" in item["issue"])
     assert routing["recovery_class"] == "verifier_transient"
@@ -1917,26 +1908,20 @@ def test_docx_audit_assigns_recovery_classes_at_the_finding_producer(tmp_path):
 
 
 def test_generic_content_pass_without_per_section_evidence_is_rejected(tmp_path):
-    request_dir = tmp_path / "hermes/verification-requests"; response_dir = tmp_path / "hermes/verification-responses"
-    request_dir.mkdir(parents=True); response_dir.mkdir(parents=True)
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.content", "task": "clinical_content_verification", "response_path": "hermes/verification-responses/r.verify.content.json", "artifacts": [], "sections": [{"artifact": "protocol", "section_id": "introduction"}], "checks": list(CONTENT_CHECKS), "cross_document_checks": ["study_title"]}
-    request["request_sha256"] = verification_request_sha256(request)
-    response = {"schema_version": RESPONSE_SCHEMA, "request_id": request["request_id"], "request_sha256": request["request_sha256"], "task": request["task"], "producer": {"model_id": "test", "reviewer_id": "content-reviewer"}, "status": "passed", "findings": []}
-    (request_dir / "r.verify.content.json").write_text(json.dumps(request), encoding="utf-8")
-    (response_dir / "r.verify.content.json").write_text(json.dumps(response), encoding="utf-8")
-    findings, _ = validate_verifications(tmp_path)
+    request_path = create_verification_requests(tmp_path, fixture(), {"artifacts": []})[0]
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = acceptance_verification(request)
+    response["section_assessments"] = []
+    response["cross_document_assessments"] = []
+    (tmp_path / request["response_path"]).write_text(json.dumps(response), encoding="utf-8")
+    findings, _ = validate_verifications(tmp_path, request_paths=[request_path])
     assert sum("explicitly assessed" in item["issue"] for item in findings) == 2
 
 
 def test_visual_response_is_rejected_after_any_bound_artifact_changes(tmp_path):
-    request_dir = tmp_path / "hermes/verification-requests"; request_dir.mkdir(parents=True)
-    for relative, data in (("candidate/protocol.docx", b"docx"), ("rendered/protocol.pdf", b"pdf"), ("rendered/protocol/page-1.png", b"png")):
-        path = tmp_path / relative; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(data)
-    digest = lambda relative: hashlib.sha256((tmp_path / relative).read_bytes()).hexdigest()
-    request = {"schema_version": "hermes-verification/v1", "request_id": "r.verify.visual", "task": "rendered_page_visual_verification", "response_path": "hermes/verification-responses/r.verify.visual.json", "artifacts": [{"artifact": "protocol", "docx": "candidate/protocol.docx", "docx_sha256": digest("candidate/protocol.docx"), "pdf": "rendered/protocol.pdf", "pdf_sha256": digest("rendered/protocol.pdf"), "pages": [{"page": 1, "path": "rendered/protocol/page-1.png", "sha256": digest("rendered/protocol/page-1.png")}]}], "checks": list(VISUAL_CHECKS)}
-    request["request_sha256"] = verification_request_sha256(request)
-    request_path = request_dir / "r.verify.visual.json"; request_path.write_text(json.dumps(request), encoding="utf-8")
-    response_path = tmp_path / request["response_path"]; response_path.parent.mkdir(parents=True); response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
+    request_path, request = bound_visual_case(tmp_path)
+    response_path = tmp_path / request["response_path"]
+    response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
     for relative in (
         "candidate/protocol.docx",
         "rendered/protocol.pdf",
@@ -1945,7 +1930,7 @@ def test_visual_response_is_rejected_after_any_bound_artifact_changes(tmp_path):
         path = tmp_path / relative
         original = path.read_bytes()
         path.write_bytes(b"changed")
-        findings, _ = validate_verifications(tmp_path)
+        findings, _ = validate_verifications(tmp_path, request_paths=[request_path])
         stale = next(item for item in findings if "stale" in item["issue"] and relative in item["issue"])
         assert stale["recovery_class"] == "document_structure_defect"
         assert stale["action"] == "preserve_and_stop"
@@ -1984,7 +1969,7 @@ def test_generation_rejects_study_input_mutation_after_approval(tmp_path):
     assert result["stage"] == "approval_gate"
 
 
-def test_generation_keeps_persisted_recovery_exhaustion_blocked_across_restart(tmp_path, monkeypatch):
+def test_generation_ignores_obsolete_recovery_exhaustion_state_across_restart(tmp_path, monkeypatch):
     _require_renderer()
     run_dir = tmp_path / "run"; reference_path = run_dir / "reference/study.reference.json"; reference_path.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps(fixture()), encoding="utf-8")
@@ -2002,11 +1987,11 @@ def test_generation_keeps_persisted_recovery_exhaustion_blocked_across_restart(t
     }
     reference_path.write_text(json.dumps(reference), encoding="utf-8")
     first = generate(run_dir); second = generate(run_dir)
-    assert first["status"] == second["status"] == "blocked"
-    assert first["stage"] == second["stage"] == "retry_limit"
+    assert first["status"] == second["status"] == "awaiting_hermes"
+    assert first["stage"] == second["stage"] == "drafting"
 
 
-def test_public_generation_recovers_a_visual_finding_without_changing_approval(tmp_path, monkeypatch):
+def test_public_generation_preserves_approval_when_visual_repair_makes_no_progress(tmp_path, monkeypatch):
     _require_renderer()
     reference = fixture()
     run_dir = tmp_path / "run"
@@ -2069,16 +2054,6 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
         }
 
     monkeypatch.setattr(workflow, "render_assurance", deterministic_assurance)
-    real_render_documents = workflow.render_documents
-    forced_candidate = {"enabled": False, "bytes": b""}
-
-    def controlled_render(*args, **kwargs):
-        report = real_render_documents(*args, **kwargs)
-        if forced_candidate["enabled"]:
-            (revision_dir / "candidate/protocol.docx").write_bytes(forced_candidate["bytes"])
-        return report
-
-    monkeypatch.setattr(workflow, "render_documents", controlled_render)
 
     def accept_all(current_run, current_result):
         current_revision = current_run / "revisions" / current_result["revision_id"]
@@ -2193,10 +2168,11 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
         request_path = revision_dir / relative
         request = json.loads(request_path.read_text(encoding="utf-8"))
         response = acceptance_verification(request)
-        if request["task"] == "rendered_page_visual_verification":
+        if request["task"] == "rendered_page_visual_verification" and request["artifacts"][0]["artifact"] == "protocol":
             response["status"] = "failed"
             response["page_assessments"][0]["status"] = "failed"
             response["findings"] = [{
+                "finding_id": "section-three-table-split",
                 "artifact": "protocol",
                 "page": response["page_assessments"][0]["page"],
                 "check": "bad_table_split",
@@ -2210,8 +2186,8 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
 
     recovered = generate(run_dir, require_promoted_runtime=False)
 
-    assert recovered["status"] == "awaiting_hermes"
-    assert recovered["stage"] == "independent_verification_retry"
+    assert recovered["status"] == "blocked", recovered
+    assert recovered["stage"] == "layout_repair_classification"
     state = json.loads(reference_path.read_text(encoding="utf-8"))
     assert state["approval"]["revision_id"] == revision_id
     assert state["approval"]["approved_reference_sha256"] == approved_sha256
@@ -2221,72 +2197,13 @@ def test_public_generation_recovers_a_visual_finding_without_changing_approval(t
         json.loads(path.read_text(encoding="utf-8"))
         for path in sorted((revision_dir / "attempts").glob("*/attempt-manifest.json"))
     ]
-    assert {"drafting", "quality"} <= {item["stage"] for item in attempts}
+    assert {"drafting", "quality", "recovery_no_progress"} <= {item["stage"] for item in attempts}
     assert all(
         action["outcome_status"] == "measured"
         for attempt in attempts
         for action in attempt["recovery_actions"]
     )
-    assert hashlib.sha256(
-        (revision_dir / "candidate/protocol.docx").read_bytes()
-    ).hexdigest() != first_candidate
-
-    successful_repair_run = tmp_path / "successful-progressive-repair"
-    shutil.copytree(run_dir, successful_repair_run)
-    successful_revision = successful_repair_run / "revisions" / revision_id
-    for relative in recovered["requests"]:
-        request = json.loads((successful_revision / relative).read_text(encoding="utf-8"))
-        response_path = successful_revision / request["response_path"]
-        response_path.parent.mkdir(parents=True, exist_ok=True)
-        response_path.write_text(json.dumps(acceptance_verification(request)), encoding="utf-8")
-    successful = generate(successful_repair_run, require_promoted_runtime=False)
-    for _ in range(5):
-        if successful["status"] != "awaiting_hermes":
-            break
-        accept_all(successful_repair_run, successful)
-        successful = generate(successful_repair_run, require_promoted_runtime=False)
-    assert successful["status"] == "passed"
-    assert set(successful["client_outputs"]) == {
-        "output/icf.docx", "output/protocol.docx", "output/study.xml",
-    }
-    successful_quality = json.loads(
-        (successful_revision / "delivery-manifest.json").read_text(encoding="utf-8")
-    )["quality"]
-    assert successful_quality["final_exact_artifact_review"]["status"] == "passed"
-    assert successful_quality["final_exact_artifact_review"]["every_page"] is True
-
-    forced_candidate["bytes"] = (revision_dir / "candidate/protocol.docx").read_bytes()
-    forced_candidate["enabled"] = True
-
-    for relative in recovered["requests"]:
-        request = json.loads((revision_dir / relative).read_text(encoding="utf-8"))
-        response = acceptance_verification(request)
-        if request["task"] == "rendered_page_visual_verification" and any(
-            item.get("artifact") == "protocol" for item in request.get("artifacts", [])
-        ):
-            response["status"] = "failed"
-            response["page_assessments"][0]["status"] = "failed"
-            response["findings"] = [{
-                "artifact": "protocol",
-                "page": response["page_assessments"][0]["page"],
-                "check": "bad_table_split",
-                "element": "3. GENERAL INFORMATION",
-                "target_ids": ["layout:protocol"],
-                "issue": "The same Section 3 split remains after repair.",
-            }]
-        response_path = revision_dir / request["response_path"]
-        response_path.parent.mkdir(parents=True, exist_ok=True)
-        response_path.write_text(json.dumps(response), encoding="utf-8")
-
-    no_progress = generate(run_dir, require_promoted_runtime=False)
-    repeated = generate(run_dir, require_promoted_runtime=False)
-
-    assert no_progress["status"] == "awaiting_hermes"
-    assert no_progress["stage"] in {
-        "independent_verification", "independent_verification_retry",
-    }
-    assert repeated["status"] == "awaiting_hermes"
-    assert repeated["stage"] == no_progress["stage"]
+    assert recovered["client_outputs"] == []
 
 
 def test_public_generation_adopts_an_interrupted_attempt_and_preserves_approval(tmp_path):

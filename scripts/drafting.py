@@ -2318,9 +2318,10 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
                     f"The approved planned participant follow-up period is {follow_up}. "
                     if follow_up else ""
                 ) + "Participant completion and discontinuation are distinct dispositions."
+            elif section_id == "endpoint-criteria.study-completion":
+                prose = f"The study is complete after the approved overall timeline of {timeline}."
             else:
-                subject = "A participant completes the study" if section_id == "endpoint-criteria.completion" else "The study is complete"
-                prose = f"{subject} after the approved sequence: {visit_text}."
+                prose = f"A participant completes the study after the approved sequence: {visit_text}."
                 if timeline:
                     prose += f" The approved overall timeline is {timeline}."
             result["outcome"] = "drafted"

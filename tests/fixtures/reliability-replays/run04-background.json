@@ -1,0 +1,27 @@
+{
+  "schema_version": "clinical-reliability-replay/v1",
+  "provenance": "minimized synthetic run04 approved background and final reviewed draft",
+  "source_commit": "5cc0f669b2b7ddce8907baf0a8a62f42bf62a1a1",
+  "approved_background": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggesting high visual acuity and spectacle independence at distance, intermediate, and near. The TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggested better intermediate and near vision with the PureSee IOL, compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile. Mix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone. To date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye). References: Hacopian AG, Brunson PB, Hall B. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703; Bissen-Miyajima H et al. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7; Corbett D et al. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8.",
+  "candidate_paragraphs": [
+    "The TECNIS Odyssey is a newer intraocular lens (IOL) intended to provide a range of vision. Current reports suggest good vision and less need for glasses at distance, intermediate, and near. The TECNIS PureSee is a newer extended depth of focus (EDOF) IOL with a non-diffractive design. Compared with diffractive IOLs, that design may lead to fewer reports of unwanted visual effects, called dysphotopsias, and better contrast sensitivity, or the ability to distinguish objects from their background.",
+    "In a large randomized controlled trial comparing PureSee with a monofocal lens, PureSee provided better intermediate and near vision, while distance vision, contrast sensitivity, and reports of dysphotopsias were similar. Placing an EDOF lens in the dominant eye and a multifocal lens in the non-dominant eye may provide a wider range of vision with fewer visual disturbances than placing the same EDOF or trifocal lens in both eyes. That possible advantage has not been established for the PureSee–Odyssey combination. There is still little information about vision, patient satisfaction, and patient-reported visual disturbances when PureSee is placed in the dominant eye and Odyssey in the non-dominant eye. This evidence gap is the reason for studying the combination.",
+    "The approved background cites Hacopian AG, Brunson PB, and Hall B, OPTH. 2026;20:1-8, doi:10.2147/OPTH.S572703; Bissen-Miyajima H and colleagues, Ophthalmol Ther. 2025;14(11):2937-2945, doi:10.1007/s40123-025-01235-7; and Corbett D and colleagues, Eye. 2024;38(S1):9-14, doi:10.1038/s41433-024-03039-8."
+  ],
+  "expected_terminal_findings": [
+    {
+      "check": "sterling_clause_contract",
+      "target_ids": [
+        "icf.background"
+      ],
+      "issue": "Governed Sterling clause is materially altered, incomplete, or overbroad."
+    },
+    {
+      "check": "source_supported",
+      "target_ids": [
+        "icf.background"
+      ],
+      "issue": "The ICF BACKGROUND states that the randomized trial showed PureSee 'provided better intermediate and near vision.' The approved study.background says the trial 'suggested better intermediate and near vision.' The participant-facing statement strengthens a qualified source claim into a definitive comparative result. Restore the source's qualification."
+    }
+  ]
+}

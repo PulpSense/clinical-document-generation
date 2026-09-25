@@ -77,6 +77,64 @@
         "tests/test_prs_xml.py::test_validation_rejects_missing_nested_node_in_selected_design_branch",
         "tests/test_prs_xml.py::test_xml_validation_rejects_source_scalar_mutation_and_preserves_structured_contact_aliases"
       ]
+    },
+    {
+      "id": "run03-code-owned-review-routing",
+      "defects": [
+        "title-page descriptor",
+        "site address sequencing",
+        "code-owned findings routed to deterministic construction"
+      ],
+      "test_nodes": [
+        "tests/test_runtime_regressions.py::test_run03_review_findings_route_to_deterministic_construction"
+      ]
+    },
+    {
+      "id": "run04-sterling-background-qualification",
+      "defects": [
+        "bibliography numbers do not weaken clause grounding",
+        "qualified clinical trial claim is preserved",
+        "unsupported combination superiority is rejected"
+      ],
+      "test_nodes": [
+        "tests/test_run04_background_regressions.py::test_run04_exact_reviewed_background_separates_qualification_from_bibliography"
+      ]
+    },
+    {
+      "id": "run01-address-and-layout-block",
+      "defects": [
+        "ICF site address preserved",
+        "Section 15 table opening stays with its heading",
+        "facility components mapped once"
+      ],
+      "test_nodes": [
+        "tests/test_blocked_run_regressions.py::test_sterling_site_merge_fields_are_the_required_address_destination",
+        "tests/test_blocked_run_regressions.py::test_section_15_table_opening_has_a_governed_layout_repair",
+        "tests/test_blocked_run_regressions.py::test_rendered_section_15_opening_split_has_a_deterministic_finding"
+      ]
+    },
+    {
+      "id": "run02-parent-visual-callback-block",
+      "defects": [
+        "parent visual reviewer preserves host authorization",
+        "failed callback reports immediately",
+        "valid callback resumes the operation"
+      ],
+      "test_nodes": [
+        "tests/test_desktop_delivery.py::test_external_parent_visual_reviewer_preserves_host_auth_environment",
+        "tests/test_desktop_delivery.py::test_two_empty_parent_visual_callbacks_block_immediately"
+      ]
+    },
+    {
+      "id": "run02-archived-recovery-request-routing",
+      "defects": [
+        "archived reviewer finding remains authenticated after a no-progress attempt",
+        "Section 15 visual and drafting companions retain exact targets"
+      ],
+      "test_nodes": [
+        "tests/test_blocked_run_regressions.py::test_no_progress_reuses_authenticated_attempt_provenance_without_stale_request",
+        "tests/test_runtime_regressions.py::test_mixed_no_progress_continues_all_unresolved_repairable_companions"
+      ]
     }
   ]
 }

@@ -103,6 +103,60 @@ def test_recovery_findings_declare_the_owning_seam():
     )["owner"] == "construction"
 
 
+def test_repeated_identical_drafting_finding_stops_after_three_review_sets():
+    finding = contracts.recovery_finding({
+        "artifact": "icf", "check": "source_supported", "field": "icf.background",
+        "target_ids": ["icf.background"],
+        "issue": "The trial result was stated more strongly than the source.",
+    }, "drafting_defect")
+    generation = {"review_set": 1}
+
+    assert workflow._repeated_drafting_findings(generation, [finding]) == []
+    assert workflow._repeated_drafting_findings(generation, [finding]) == []
+    generation["review_set"] = 2
+    assert workflow._repeated_drafting_findings(generation, [finding]) == []
+    generation["review_set"] = 3
+    stalled = workflow._repeated_drafting_findings(generation, [finding])
+
+    assert len(stalled) == 1
+    assert stalled[0]["code"] == "drafting_repair_stalled"
+    assert stalled[0]["review_sets"] == [1, 2, 3]
+    assert stalled[0]["target_ids"] == ["icf.background"]
+
+    revised = {**finding, "issue": "A distinct omission in the trial description."}
+    assert workflow._repeated_drafting_findings(generation, [revised]) == []
+
+
+def test_quality_retry_stops_stalled_draft_before_archiving_another_attempt(tmp_path):
+    reference = prospective_reference()
+    reference["meta"]["icf_template"] = "Sterling"
+    finding = contracts.recovery_finding({
+        "artifact": "icf", "check": "source_supported", "field": "icf.background",
+        "target_ids": ["icf.background"], "issue": "Qualified source claim is overstated.",
+    }, "drafting_defect")
+    run = tmp_path / "run"
+    revision = run / "revisions/r-test"
+    revision.mkdir(parents=True)
+    reference_path = run / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    working = {"generation": {"review_set": 1}}
+    for review_set in (1, 2):
+        working["generation"]["review_set"] = review_set
+        assert workflow._repeated_drafting_findings(working["generation"], [finding]) == []
+    working["generation"]["review_set"] = 3
+    reference_path.write_text(json.dumps(working), encoding="utf-8")
+
+    result = workflow._quality_retry(
+        run, reference_path, working, reference, revision, {}, [finding], "quality",
+        require_promoted_runtime=False,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["stage"] == "internal_recovery_stalled"
+    assert result["findings"][0]["code"] == "drafting_repair_stalled"
+    assert not (revision / "attempts").exists()
+
+
 def test_delivery_retries_same_bytes_until_deadline_not_legacy_retry_count(monkeypatch):
     payload = b"exact"
     manifest = {"client_outputs": [{

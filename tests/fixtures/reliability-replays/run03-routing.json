@@ -1,0 +1,30 @@
+{
+  "schema_version": "clinical-reliability-replay/v1",
+  "provenance": "minimized synthetic run03 reviewer findings",
+  "source_commit": "c7824716b2838c0f9c5c5c4d97caf7e4f9e4f658",
+  "terminal_stage": "internal_recovery_routing",
+  "findings": [
+    {
+      "finding_id": "title-page-malformed-design",
+      "category": "content",
+      "check": "substantive",
+      "artifact": "protocol",
+      "target_ids": [
+        "title-page"
+      ],
+      "issue": "The title-page descriptor reads “A prospective observational medical device — intraocular lenses. study”. It concatenates the study design with the intervention type and leaves a period inside the phrase, rather than presenting an intelligible study description.",
+      "recommended_action": "Reconstruct the title-page descriptor from approved design.study_design and design.intervention_type without concatenating the two source strings."
+    },
+    {
+      "finding_id": "site-address-duplicated-country",
+      "category": "content",
+      "check": "source_supported",
+      "artifact": "protocol",
+      "target_ids": [
+        "general-information"
+      ],
+      "issue": "The Section 3 Study sites entry reads “300 Test Clinic Road, USA, Test City, New York, United States, 10003”. The approved sites[0].facility.address is “300 Test Clinic Road, Test City, New York 10003, USA”; the generated address inserts USA immediately after the street and repeats the country, corrupting the mailing-address sequence. The PRS separately has the correct city, state, postal code and country components.",
+      "recommended_action": "Use the approved full site address once, or compose the street and structured components without duplicating the country."
+    }
+  ]
+}

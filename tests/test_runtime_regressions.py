@@ -2758,6 +2758,33 @@ def test_content_verifier_routes_code_owned_protocol_section_to_construction(tmp
     assert matching[0]['action'] == 'rebuild_deterministic_structure'
 
 
+@pytest.mark.parametrize('finding_index', [0, 1])
+def test_run03_review_findings_route_to_deterministic_construction(tmp_path, finding_index):
+    replay = json.loads((ROOT / 'tests/fixtures/reliability-replays/run03-routing.json').read_text())
+    request_id = 'r-test.verify.content'
+    original = replay['findings'][finding_index]
+    findings = [{
+        **original,
+        'verification_request_id': request_id,
+        'recovery_class': 'drafting_defect',
+        'action': 'retry_drafting_target',
+    }]
+    request = _verification_request_payload(request_id, 'clinical_content_verification')
+    _result, _run, revision, _path, _state = _quality_retry_fixture(
+        tmp_path, findings, request_records=[('content.json', request)],
+    )
+
+    routed, _evidence = quality.validate_verifications(
+        revision,
+        request_paths=[revision / 'hermes/verification-requests' / f'{request_id}.json'],
+    )
+
+    matching = [item for item in routed if item.get('target_ids') == original['target_ids']]
+    assert len(matching) == 1
+    assert matching[0]['recovery_class'] == 'deterministic_structure_defect'
+    assert matching[0]['action'] == 'rebuild_deterministic_structure'
+
+
 def test_retained_icf_section_is_known_to_deterministic_recovery(tmp_path, monkeypatch):
     reference = _source()
     reference['meta']['icf_template'] = 'Sterling'
@@ -5508,7 +5535,15 @@ def test_protocol_renders_assignment_endpoint_hierarchy_and_both_operational_tab
     ]
     reference["population"]["sample_size_evidence"] = []
 
-    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}})
+    endpoint_inventory = "\n".join(
+        f"{item['category']}: {item['label']} ({item['time_point']})"
+        for item in reference["endpoints"]["other"]
+    )
+    model = {
+        "protocol": [{"section_id": "study-design.design", "paragraphs": [{"text": endpoint_inventory}], "lists": []}],
+        "icf": {}, "prs": {},
+    }
+    render_documents(ROOT, tmp_path, reference, model)
 
     document = Document(tmp_path / "candidate/protocol.docx")
     visible = _visible(document)

@@ -9,6 +9,13 @@ import quality
 from quality import RESPONSE_SCHEMA, VISUAL_CHECKS, verification_request_sha256
 
 
+@pytest.fixture(autouse=True)
+def isolate_atomic_publication_from_content_review(monkeypatch):
+    # Publication tests use byte sentinels, not parseable clinical documents.
+    # The content gate has its own tests; keep this suite focused on exact bytes.
+    monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [])
+
+
 def _publish_fixture(tmp_path: Path):
     run_dir = tmp_path / "run"
     revision_dir = run_dir / "revisions/r-test"
@@ -77,25 +84,37 @@ def _passing_quality(revision_dir: Path, reference):
     responses = revision_dir / "hermes/verification-responses"
     requests.mkdir(parents=True, exist_ok=True)
     responses.mkdir(parents=True, exist_ok=True)
+    ledgers = revision_dir / "request-ledger"
+    ledgers.mkdir(parents=True, exist_ok=True)
+
+    def write_request(request):
+        request_id = request["request_id"]
+        path = requests / f"{request_id}.json"
+        path.write_text(json.dumps(request), encoding="utf-8")
+        (ledgers / f"{request_id}.json").write_text(
+            json.dumps(quality.verification_request_ledger_record(path, request)), encoding="utf-8"
+        )
     content_id = "r-test.review-1.verify.content"
     content_request = {
         "schema_version": "hermes-verification/v1",
         "request_id": content_id,
         "task": "clinical_content_verification",
+        "revision_id": "r-test",
         "review_set": 1,
         "artifacts": list(build["candidate_files"]),
-        "sections": quality._content_review_sections(reference),
+        "sections": quality.content_review_sections(reference),
         "checks": list(quality.CONTENT_CHECKS),
         "cross_document_checks": list(quality.CROSS_DOCUMENT_CHECKS),
         "response_path": f"hermes/verification-responses/{content_id}.json",
     }
     content_request["request_sha256"] = verification_request_sha256(content_request)
-    (requests / "content.json").write_text(json.dumps(content_request), encoding="utf-8")
+    write_request(content_request)
     (revision_dir / content_request["response_path"]).write_text(json.dumps({
         "schema_version": RESPONSE_SCHEMA,
         "request_id": content_id,
         "request_sha256": content_request["request_sha256"],
         "task": content_request["task"],
+        "revision_id": "r-test",
         "producer": {"model_id": "client-selected-test-model", "reviewer_id": "independent-content"},
         "status": "passed",
         "findings": [],
@@ -119,6 +138,7 @@ def _passing_quality(revision_dir: Path, reference):
             "schema_version": "hermes-verification/v1",
             "request_id": request_id,
             "task": "rendered_page_visual_verification",
+            "revision_id": "r-test",
             "review_set": 1,
             "renderer": renderer,
             "page_renderer": page_renderer,
@@ -127,12 +147,13 @@ def _passing_quality(revision_dir: Path, reference):
             "response_path": f"hermes/verification-responses/{request_id}.json",
         }
         request["request_sha256"] = verification_request_sha256(request)
-        (requests / f"visual-{artifact_name}.json").write_text(json.dumps(request), encoding="utf-8")
+        write_request(request)
         (revision_dir / request["response_path"]).write_text(json.dumps({
             "schema_version": RESPONSE_SCHEMA,
             "request_id": request_id,
             "request_sha256": request["request_sha256"],
             "task": request["task"],
+            "revision_id": "r-test",
             "producer": {"model_id": "client-selected-test-model", "reviewer_id": f"independent-{artifact_name}"},
             "status": "passed",
             "findings": [],
