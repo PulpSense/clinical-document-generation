@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.29-method-group-coverage"
+CONTRACT_VERSION = "clinical-documents-v2.31-section-ownership"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -372,6 +372,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "sample-size": "State the approved sample size and explain its approved justification.",
         "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
+        "risks-benefits.benefits": "Describe only source-supported potential benefits or absence of direct benefit. Payment and reimbursement belong in Section 17.",
         "study-procedure.discontinued": "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
         "quality-safety": (
             "For each approved safety.roles record, write a separate direct active-voice sentence beginning "
@@ -440,7 +441,7 @@ def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
         "confidentiality-publication": ("confidentiality.retention",),
         "financial-injury": ("risks_benefits.injury_handling", "risks_benefits.costs"),
         "risks-benefits.risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
-        "risks-benefits.benefits": ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"),
+        "risks-benefits.benefits": ("risks_benefits.benefits",),
         "endpoint-criteria.discontinuation": ("procedures.discontinuation", "procedures.replacement"),
         "icf.procedures": ("design.intervention_description",),
         "icf.risks": ("risks_benefits.risks", "risks_benefits.risk_mitigation"),
@@ -547,7 +548,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "procedures.visit_schedule", "procedures.assessments"), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "protocol-sparse-risks"),
-    _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement"), "protocol-sparse-benefits"),
+    _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits",), "protocol-sparse-benefits"),
 )
 
 RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
@@ -1287,6 +1288,39 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
     matrix = bool(assessment_rows and assessment_rows[0][0] == "Activity")
     represented = {re.sub(r"\s+", " ", row[0]).strip().casefold().rstrip(".") for row in assessment_rows}
     represented.update(visit["visit"].casefold() for visit in visits)
+
+    def fully_allocated_visit_note(note: str) -> bool:
+        """Suppress a prose inventory only when one visit's matrix already owns every term."""
+        if not matrix:
+            return False
+        match = re.fullmatch(r"\s*([^:]+):\s*(.+?)\s*", note)
+        if not match:
+            return False
+
+        def tokens(value: str) -> set[str]:
+            normalized = []
+            for raw in re.findall(r"[a-z0-9]+", value.casefold()):
+                if raw in {"and", "of", "the", "a", "an"}:
+                    continue
+                normalized.append({"completion": "complete", "monitoring": "monitor"}.get(raw, raw))
+            return set(normalized)
+
+        label_tokens = tokens(match.group(1))
+        matched_columns = [
+            index for index, visit in enumerate(visits, start=1)
+            if label_tokens and label_tokens <= tokens(
+                f"{visit['visit']} {visit['timing']}"
+            )
+        ]
+        if len(matched_columns) != 1:
+            return False
+        column = matched_columns[0]
+        allocated = " ".join(
+            [str(visits[column - 1]["visit"]), str(visits[column - 1]["timing"])]
+            + [str(row[0]) for row in assessment_rows[2:] if row[column] == "X"]
+        )
+        return bool(tokens(note)) and tokens(note) <= tokens(allocated)
+
     unallocated = []
     for item in inventory:
         if "record" in item:
@@ -1296,7 +1330,7 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
                 for key, value in item["record"].items()))
             continue
         key = re.sub(r"\s+", " ", item["activity"]).strip().casefold().rstrip(".")
-        if key in represented:
+        if key in represented or fully_allocated_visit_note(item["activity"]):
             continue
         represented.add(key)
         unallocated.append(item)

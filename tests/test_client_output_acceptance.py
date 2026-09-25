@@ -1094,7 +1094,7 @@ def test_shallow_section_draft_cannot_pass_content_depth_gate(tmp_path):
     assert any(item["field"] == "introduction" for item in findings)
 
 
-def test_completion_drafts_omitting_approved_follow_up_visits_are_rejected(tmp_path):
+def test_participant_completion_omitting_follow_up_visits_is_rejected_without_forcing_a_study_itinerary(tmp_path):
     reference = json.loads((
         ROOT / "tests/fixtures/release-certification/prospective-advarra/approved-reference.json"
     ).read_text(encoding="utf-8"))
@@ -1129,11 +1129,11 @@ def test_completion_drafts_omitting_approved_follow_up_visits_are_rejected(tmp_p
     accepted, findings = validate_response(request, response)
     accepted_ids = {draft["section_id"] for draft in (accepted or {}).get("drafts", [])}
 
-    assert not completion_ids & accepted_ids
-    assert completion_ids <= {item["field"] for item in findings}
-    assert all(
-        any("omits approved visit or time-point" in item["issue"] for item in findings if item["field"] == section_id)
-        for section_id in completion_ids
+    assert "endpoint-criteria.completion" not in accepted_ids
+    assert "endpoint-criteria.study-completion" in accepted_ids
+    assert any(
+        "omits approved visit or time-point" in item["issue"]
+        for item in findings if item["field"] == "endpoint-criteria.completion"
     )
 
 

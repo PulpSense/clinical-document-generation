@@ -42,7 +42,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v14-method-group-coverage"
+PROMPT_VERSION = "section-drafting-v15-section-ownership"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -1051,7 +1051,7 @@ def _coverage_findings(
                 "issue": f"Section omits approved reference evidence: {', '.join(missing)}.",
                 "next_action": "Cite the evidence while referencing its owning section concisely.",
             })
-        if section_id in {"endpoint-criteria.completion", "endpoint-criteria.study-completion"}:
+        if section_id == "endpoint-criteria.completion":
             normalized_content = _normalized_prose(content)
             omitted = []
             for visit in normalized_visit_records(source):
@@ -1068,6 +1068,7 @@ def _coverage_findings(
         else:
             ungrounded = [
                 path for path, value in material.items()
+                if section_id != "endpoint-criteria.study-completion" or path == "study.timeline"
                 if f"source:{path}" in cited and not evidence_grounded(content, value)
             ]
             if ungrounded:

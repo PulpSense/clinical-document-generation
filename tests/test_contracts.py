@@ -301,13 +301,16 @@ def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
 def test_completion_sections_require_every_approved_visit_and_time_point_without_repeating_full_inventory():
     protocol = {section.section_id: section for section in protocol_contract("Prospective")}
 
-    for section_id in ("endpoint-criteria.completion", "endpoint-criteria.study-completion"):
-        section = protocol[section_id]
-        assert "procedures.assessments" in section.evidence
-        assert section.source_coverage == "concept_reference"
-        assert any("every approved visit" in item for item in section.content_expectations)
-        assert any("time point" in item for item in section.content_expectations)
-        assert "complete-visit-schedule" in section.do_not_restate_concepts
+    participant = protocol["endpoint-criteria.completion"]
+    assert "procedures.assessments" in participant.evidence
+    assert participant.source_coverage == "concept_reference"
+    assert any("every approved visit" in item for item in participant.content_expectations)
+    assert "complete-visit-schedule" in participant.do_not_restate_concepts
+
+    study = protocol["endpoint-criteria.study-completion"]
+    assert study.source_coverage == "concept_reference"
+    assert any("visit schedule belongs" in item for item in study.content_expectations)
+    assert "complete-visit-schedule" in study.do_not_restate_concepts
 
 
 def test_protocol_ethics_and_confidentiality_use_substantive_boilerplate():
@@ -657,7 +660,8 @@ def test_protocol_contract_binds_the_detailed_source_fields_needed_by_the_refere
     assert "confidentiality.retention" in protocol["confidentiality-publication"].evidence
     assert protocol["study-procedure.discontinued"].evidence == ("procedures.discontinued_subjects",)
     assert "procedures.replacement" in protocol["endpoint-criteria.discontinuation"].evidence
-    assert "risks_benefits.compensation_or_reimbursement" in protocol["risks-benefits.benefits"].evidence
+    assert "risks_benefits.compensation_or_reimbursement" in protocol["financial-injury"].evidence
+    assert "risks_benefits.compensation_or_reimbursement" not in protocol["risks-benefits.benefits"].evidence
 
 
 def test_schedule_cannot_extend_beyond_study_timeline():

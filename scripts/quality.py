@@ -4520,6 +4520,14 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 "target_ids": [section.section_id],
                 "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
             })
+    benefits_text = "\n".join(section_paragraphs.get("risks-benefits.benefits", []))
+    if re.search(r"\b(?:compensat\w*|reimburs\w*|payment\w*)\b|\$\s*\d", benefits_text, re.I):
+        findings.append({
+            "category": "content",
+            "field": "risks-benefits.benefits",
+            "target_ids": ["risks-benefits.benefits"],
+            "issue": "Protocol benefits section includes payment or reimbursement terms owned by Section 17.",
+        })
     concept_findings = assess_protocol_concept_repetition(
         section_paragraphs,
         protocol_concept_ownership(branch),

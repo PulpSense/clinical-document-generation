@@ -6601,6 +6601,8 @@ def _validate_expected_gate_attempts(
                 "measured",
                 "interrupted_no_action",
                 "terminal_measured",
+                "construction_failed",
+                "render_assurance_failed",
             }
             for action in actions
         ):
@@ -7305,7 +7307,7 @@ def _complete_pending_recovery_attempts(
             outcome_status=outcome_status,
         )
         manifest = _read(attempt_dir / "attempt-manifest.json")
-        for action in manifest.get("recovery_actions", []):
+        for action_index, action in enumerate(manifest.get("recovery_actions", [])):
             finding = dict(action.get("triggering_finding") or {})
             recovery_class = finding.get("recovery_class")
             made_progress = (
@@ -7324,6 +7326,9 @@ def _complete_pending_recovery_attempts(
                 no_progress.append({
                     **finding,
                     "strategy_id": action.get("strategy_id"),
+                    "recovery_attempt_path": relative,
+                    "recovery_action_index": action_index,
+                    "triggering_finding_sha256": canonical_evidence_sha256(finding),
                     "issue": (
                         "The governed recovery strategy did not materially change "
                         "the implicated candidate bytes; a new review set is not eligible."
@@ -8026,6 +8031,62 @@ def _quality_retry(
     return generate(run_dir, **retry_options)
 
 
+def _internalize_no_progress_findings(
+    revision_dir: Path,
+    working_reference: Mapping[str, Any],
+    findings: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Rebind a measured internal outcome to its archived reviewer authority."""
+    entries = list(get_path(working_reference, "generation.gate_attempts", []) or [])
+    if any(item.get("verification_request_id") for item in findings):
+        _validate_expected_gate_attempts(revision_dir, entries)
+    normalized = []
+    for raw in findings:
+        finding = dict(raw)
+        request_id = finding.get("verification_request_id")
+        if not request_id:
+            normalized.append(finding)
+            continue
+        relative = str(finding.get("recovery_attempt_path") or "")
+        action_index = finding.get("recovery_action_index")
+        if (
+            not relative.startswith("attempts/")
+            or PurePosixPath(relative).is_absolute()
+            or ".." in PurePosixPath(relative).parts
+            or not isinstance(action_index, int)
+            or isinstance(action_index, bool)
+            or sum(entry.get("path") == relative for entry in entries) != 1
+        ):
+            raise ValueError("Measured recovery outcome has no unique tracked predecessor attempt.")
+        manifest = _read(revision_dir / relative / "attempt-manifest.json")
+        actions = manifest.get("recovery_actions")
+        if not isinstance(actions, list) or not 0 <= action_index < len(actions):
+            raise ValueError("Measured recovery outcome has no indexed predecessor action.")
+        action = actions[action_index]
+        predecessor = action.get("triggering_finding")
+        if (
+            not isinstance(predecessor, Mapping)
+            or action.get("outcome_status") != "measured"
+            or action.get("candidate_bytes_changed") is not False
+            or action.get("strategy_id") != finding.get("strategy_id")
+            or canonical_evidence_sha256(predecessor)
+            != finding.get("triggering_finding_sha256")
+            or predecessor.get("verification_request_id") != request_id
+        ):
+            raise ValueError("Measured recovery outcome does not match its archived reviewer finding.")
+        finding["prior_review_binding"] = {
+            "verification_request_id": request_id,
+            "recovery_attempt_path": relative,
+            "recovery_action_index": action_index,
+        }
+        finding.pop("verification_request_id", None)
+        finding.pop("verification_source_finding", None)
+        finding["category"] = "recovery"
+        finding["field"] = "recovery_no_progress"
+        normalized.append(finding)
+    return normalized
+
+
 def _continue_repairable_no_progress(
     run_dir: Path,
     reference_path: Path,
@@ -8064,9 +8125,20 @@ def _continue_repairable_no_progress(
         )
     if not all(item.get("recovery_class") in {"visual_defect", "drafting_defect"} for item in findings):
         return None
+    try:
+        continuation_findings = _internalize_no_progress_findings(
+            revision_dir, working_reference, findings,
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return _repair_block(
+            run_dir,
+            "integrity",
+            [{"category": "integrity", "field": "recovery_no_progress", "issue": str(exc)}],
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
     return _quality_retry(
         run_dir, reference_path, working_reference, reference,
-        revision_dir, attempts, findings, "recovery_no_progress",
+        revision_dir, attempts, continuation_findings, "recovery_no_progress",
         contracted_bundle=contracted_bundle,
         operation_deadline=operation_deadline,
         clock=clock,
@@ -8314,28 +8386,16 @@ def generate(
             if partial_repair:
                 document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
             if document_report["status"] != "passed":
-                no_progress = _complete_pending_recovery_attempts(
+                # A failed construction has no rebuilt candidate to compare.
+                # Preserve its actual finding instead of calling the missing
+                # artifact a no-progress recovery action.
+                _complete_pending_recovery_attempts(
                     revision_dir,
                     reference_path,
                     working_reference,
-                    require_candidate_change=True,
+                    require_candidate_change=False,
+                    outcome_status="construction_failed",
                 )
-                if no_progress:
-                    continuation = _continue_repairable_no_progress(
-                        run_dir, reference_path, working_reference, reference,
-                        revision_dir, attempts, no_progress,
-                        contracted_bundle=bundle,
-                        operation_deadline=operation_deadline,
-                        clock=clock,
-                        stage_observer=stage_observer,
-                        require_promoted_runtime=require_promoted_runtime,
-                    )
-                    if continuation is not None:
-                        return continuation
-                    return _repair_block(
-                        run_dir, "recovery_no_progress", no_progress,
-                        candidate_outputs=_candidate_outputs(revision_dir),
-                    )
                 findings, classification_block = _document_report_failure(run_dir, revision_dir, document_report)
                 if classification_block is not None:
                     return classification_block
@@ -8359,30 +8419,13 @@ def generate(
                         revision_dir,
                         outcome="blocked",
                     )
-                    no_progress = _complete_pending_recovery_attempts(
+                    _complete_pending_recovery_attempts(
                         revision_dir,
                         reference_path,
                         working_reference,
-                        require_candidate_change=True,
+                        require_candidate_change=False,
+                        outcome_status="construction_failed",
                     )
-                    if no_progress:
-                        continuation = _continue_repairable_no_progress(
-                            run_dir, reference_path, working_reference, reference,
-                            revision_dir, attempts, no_progress,
-                            contracted_bundle=bundle,
-                            operation_deadline=operation_deadline,
-                            clock=clock,
-                            stage_observer=stage_observer,
-                            require_promoted_runtime=require_promoted_runtime,
-                        )
-                        if continuation is not None:
-                            return continuation
-                        return _repair_block(
-                            run_dir,
-                            "recovery_no_progress",
-                            no_progress,
-                            candidate_outputs=_candidate_outputs(revision_dir),
-                        )
                     findings = [
                         recovery_finding(
                             {
@@ -8499,28 +8542,13 @@ def generate(
         structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
         _write(reference_path, working_reference)
         if assurance_report.get("status") != "passed":
-            no_progress = _complete_pending_recovery_attempts(
+            _complete_pending_recovery_attempts(
                 revision_dir,
                 reference_path,
                 working_reference,
-                require_candidate_change=True,
+                require_candidate_change=False,
+                outcome_status="render_assurance_failed",
             )
-            if no_progress:
-                continuation = _continue_repairable_no_progress(
-                    run_dir, reference_path, working_reference, reference,
-                    revision_dir, attempts, no_progress,
-                    contracted_bundle=bundle,
-                    operation_deadline=operation_deadline,
-                    clock=clock,
-                    stage_observer=stage_observer,
-                    require_promoted_runtime=require_promoted_runtime,
-                )
-                if continuation is not None:
-                    return continuation
-                return _repair_block(
-                    run_dir, "recovery_no_progress", no_progress,
-                    candidate_outputs=_candidate_outputs(revision_dir),
-                )
             findings = [
                 {**finding, "target_ids": finding.get("target_ids") or [f"layout:{finding.get('artifact') or 'documents'}"]}
                 for finding in assurance_report.get("findings", [])

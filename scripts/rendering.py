@@ -283,12 +283,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     sponsor = get_path(reference, "parties.sponsor", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
     facility_fields = facility_projection(facility)
-    raw_facility_address = facility.get("address")
-    address_mapping = raw_facility_address if isinstance(raw_facility_address, Mapping) else {}
-    facility_city = _text(
-        address_mapping.get("city") or address_mapping.get("locality")
-        or facility.get("city") or facility.get("locality")
-    )
+    facility_city = facility_fields["city"]
     visits = get_path(reference, "procedures.visit_schedule", []) or get_path(reference, "procedures.assessments", []) or []
     inclusion = _list(get_path(reference, "population.inclusion_criteria", []))
     interventions = [
@@ -1581,8 +1576,7 @@ def _populate_protocol_signature_values(document: Document, reference: Mapping[s
         site_investigators = site.get("investigators") if isinstance(site.get("investigators"), list) else []
         investigator = site_investigators[0] if site_investigators and isinstance(site_investigators[0], Mapping) else {}
     facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
-    address = facility.get("address")
-    city = _text(address.get("city") if isinstance(address, Mapping) else facility.get("city"))
+    city = facility_projection(facility)["city"]
     values = {
         "Investigator Name (print or type)": _text(investigator.get("name")),
         "Investigator’s Title": _text(investigator.get("role") or investigator.get("title") or investigator.get("degrees") or investigator.get("degree")),
@@ -3117,9 +3111,11 @@ def _repair_section15_table_opening(document: Document, target: str) -> None:
         value = paragraph.text.strip()
         if not value:
             continue
-        if re.match(r"^\d+(?:\.\d+)*\.?\s+", value) and not value.startswith("Table 15.1"):
+        if re.match(r"^\d+(?:\.\d+)*\.?\s+", value):
             break
-        if value.startswith("Table 15.1"):
+        if _layout_target_key(value) == _layout_target_key(
+            "Table 15.1. Proposed Visits and Study Assessments"
+        ):
             caption = paragraph
         elif introduction is None:
             introduction = paragraph
@@ -3129,6 +3125,11 @@ def _repair_section15_table_opening(document: Document, target: str) -> None:
         paragraph.paragraph_format.keep_with_next = True
         paragraph.paragraph_format.keep_together = True
         paragraph.paragraph_format.widow_control = True
+    # A previous table repair may have placed a break on the caption. Move the
+    # entire opening instead of preserving that split below the heading.
+    heading.paragraph_format.page_break_before = True
+    introduction.paragraph_format.page_break_before = False
+    caption.paragraph_format.page_break_before = False
     _prevent_row_split(table.rows[0])
 
 
@@ -3397,9 +3398,13 @@ def _template_document(
         _normalize_protocol_contact_table(document)
         _normalize_protocol_table_pagination(document)
         _protect_protocol_heading_content(document)
+    section15_repairs = []
     for repair in layout_repair_rules:
         rule = repair["rule"]
         target = repair["target"]
+        if rule == "section15_table_opening":
+            section15_repairs.append(target)
+            continue
         if rule == "heading_cohesion":
             _repair_heading_cohesion(document, target, protocol=not icf)
         elif rule == "heading_whitespace_cohesion":
@@ -3415,10 +3420,12 @@ def _template_document(
             _repair_table_pagination(document, target)
         elif rule == "table_page_boundary":
             _repair_table_page_boundary(document, target)
-        elif rule == "section15_table_opening":
-            _repair_section15_table_opening(document, target)
         elif rule == "sterling_study_site_alignment":
             _align_sterling_study_site_continuations(document, reference)
+    # This repair owns the complete opening. Apply it after earlier caption or
+    # table rules so their page breaks cannot split the unit again.
+    for target in section15_repairs:
+        _repair_section15_table_opening(document, target)
     _set_update_fields(document)
     return document
 
