@@ -1888,6 +1888,14 @@ def source_evidence_coverage_map(reference: Mapping[str, Any]) -> dict[str, Any]
             if not section_applies(reference, section):
                 continue
             for source_path in section.evidence:
+                if (
+                    section.section_id == "endpoint-criteria.completion"
+                    and not meaningful(get_path(reference, "procedures.completion"))
+                    and source_path != "study.timeline"
+                ):
+                    # The visit schedule cannot become a completion criterion
+                    # when no such criterion was approved.
+                    continue
                 destinations.setdefault(source_path, []).append({
                     "artifact": artifact,
                     "section_id": section.section_id,

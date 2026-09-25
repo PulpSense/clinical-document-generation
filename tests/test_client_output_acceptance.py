@@ -1098,6 +1098,7 @@ def test_participant_completion_omitting_follow_up_visits_is_rejected_without_fo
     reference = json.loads((
         ROOT / "tests/fixtures/release-certification/prospective-advarra/approved-reference.json"
     ).read_text(encoding="utf-8"))
+    reference["procedures"]["completion"] = "Participant completion follows the Month 3 visit at Day 90 +/- 7."
     batch = next(item for item in batch_plan("Prospective", "Advarra") if item.batch_id == "protocol-operations")
     request_path = create_drafting_request(
         repo_root=ROOT,

@@ -5223,6 +5223,12 @@ def create_verification_requests(
         "second visit schedule. A clinically unusable section is material; minor wording preferences are "
         "not findings."
     )
+    if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
+        content_instructions += (
+            " The approved source provides no participant-completion criterion for Protocol Section 18.1. "
+            "Do not treat the visit schedule or exit form as a completion rule; flag any affirmative claim that does so. "
+            "A source-grounded follow-up period and a distinction between completion and discontinuation are appropriate."
+        )
     if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling":
         content_instructions += (
             " Sterling IRB owns the consent front-matter merge fields for title, protocol number, "

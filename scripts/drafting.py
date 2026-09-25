@@ -42,7 +42,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v15-section-ownership"
+PROMPT_VERSION = "section-drafting-v16-completion-grounding"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -411,6 +411,18 @@ def _section_payload(
         path for path in section.evidence
         if path not in scoped_values or scoped_values[path]
     ]
+    content_expectations = list(section.content_expectations)
+    if section.section_id == "endpoint-criteria.completion" and not meaningful(get_path(reference, "procedures.completion")):
+        # A visit itinerary and follow-up duration do not establish a formal
+        # participant-completion rule. The source still supplies that context
+        # to the batch, but Section 18.1 owns only the approved timeline here.
+        minimum_evidence = [path for path in minimum_evidence if path == "study.timeline"]
+        boilerplate_items = []
+        allowed = ["agent_draft"]
+        content_expectations = [
+            "Describe only the approved participant follow-up period and distinguish completion from discontinuation. "
+            "No participant-completion criterion was supplied; do not derive one from the scheduled visits or exit form."
+        ]
     return {
         "section_id": section.section_id,
         "number": section.number,
@@ -420,7 +432,7 @@ def _section_payload(
         "allowed_modes": allowed,
         "minimum_evidence": minimum_evidence,
         "fixed_boilerplate": boilerplate_items,
-        "content_expectations": list(section.content_expectations),
+        "content_expectations": content_expectations,
         "source_coverage": section.source_coverage,
         "evidence_scopes": evidence_scopes,
         "approved_source_word_count": approved_source_words,
@@ -992,6 +1004,18 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
     return material
 
 
+def _approved_followup_value(timeline: Any) -> str:
+    text = str(timeline or "")
+    follow_up = re.search(
+        r"\bfollow[\s-]*up\b\s*[:=]?\s*(\d+(?:\.\d+)?\s*(?:days?|weeks?|months?|years?))\b",
+        text,
+        re.I,
+    )
+    if follow_up:
+        return follow_up.group(1)
+    return text if len(re.findall(r"\d+(?:\.\d+)?", text)) <= 1 else ""
+
+
 def _coverage_findings(
     request: Mapping[str, Any],
     contract: Mapping[str, Any],
@@ -1004,6 +1028,44 @@ def _coverage_findings(
         # Ordered concept-to-block grounding is validated after each paragraph
         # has been normalized; aggregate citation coverage is insufficient.
         return []
+    if section_id == "endpoint-criteria.completion":
+        source_value = request.get("approved_source")
+        source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
+        if not meaningful(get_path(source, "procedures.completion")):
+            findings: list[dict[str, Any]] = []
+            timeline = get_path(source, "study.timeline")
+            follow_up_value = _approved_followup_value(timeline)
+            if timeline and (
+                "source:study.timeline" not in set(map(str, evidence_refs))
+                or (bool(follow_up_value) and not evidence_grounded(content, follow_up_value))
+            ):
+                findings.append({
+                    "category": "drafting", "field": section_id,
+                    "issue": "Section omits the approved participant follow-up period.",
+                    "next_action": "State the approved follow-up period without inventing a completion criterion.",
+                })
+            visit_labels = tuple(
+                label.casefold()
+                for visit in normalized_visit_records(source)
+                for label in (str(visit.get("visit") or "").strip(), str(visit.get("timing") or "").strip())
+                if label
+            )
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", content):
+                normalized = sentence.casefold()
+                if (
+                    re.search(r"\b(?:complet(?:e|es|ed|ing|ion)|finish(?:es|ed)?)\b", normalized)
+                    and (
+                        re.search(r"\b(?:after|upon|once|when|following|requires?|defined as|consists of|at|by|if)\b", normalized)
+                        or any(label in normalized for label in visit_labels)
+                    )
+                ):
+                    findings.append({
+                        "category": "drafting", "field": section_id,
+                        "issue": "Section states a participant-completion criterion that the approved source does not provide.",
+                        "next_action": "Describe the approved follow-up period and distinguish completion from discontinuation; do not treat scheduled visits as a completion rule.",
+                    })
+                    break
+            return findings
     if contract.get("source_coverage") == "table_with_notes":
         source_value = request.get("approved_source")
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
@@ -1324,6 +1386,44 @@ def _cross_section_duplicate_pairs(
     return duplicate_pairs
 
 
+def _icf_summary_detail_sentence_pairs(
+    records: Iterable[tuple[str, Mapping[str, Any], Mapping[str, Any]]],
+    *,
+    repeatable_text: Iterable[str] = (),
+) -> list[tuple[str, str]]:
+    """Catch generated summary sentences repeated inside longer ICF paragraphs."""
+    items = list(records)
+    summary = next((item for item in items if item[0] == "icf.key-information-summary"), None)
+    if summary is None:
+        return []
+    allowed_repeatable = {
+        re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+        for value in repeatable_text if value
+    }
+
+    def sentences(item: tuple[str, Mapping[str, Any], Mapping[str, Any]]) -> set[str]:
+        _section_id, draft, _contract = item
+        result = set()
+        for text, _evidence_refs, _boilerplate_refs in _raw_content_items(draft):
+            for sentence in re.split(r"(?<=[.!?])\s+", text):
+                normalized = re.sub(r"[^a-z0-9]+", " ", sentence.casefold()).strip()
+                explicitly_repeatable = any(
+                    normalized == allowed or normalized in allowed or allowed in normalized
+                    for allowed in allowed_repeatable
+                )
+                if len(normalized) >= 80 and len(normalized.split()) >= 12 and not explicitly_repeatable:
+                    result.add(normalized)
+        return result
+
+    summary_sentences = sentences(summary)
+    return [
+        ("icf.key-information-summary", section_id)
+        for section_id, draft, contract in items
+        if section_id != "icf.key-information-summary"
+        and summary_sentences & sentences((section_id, draft, contract))
+    ]
+
+
 def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
@@ -1415,13 +1515,23 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         str(item.get("section_id") or ""): item
         for item in results if isinstance(item, Mapping)
     }
-    duplicate_records = (
+    duplicate_records = [
         (section_id, results_by_id[section_id], contract)
         for section_id, contract in expected_contracts.items()
         if section_id in results_by_id
-    )
+    ]
     duplicate_target_ids: set[str] = set()
-    for prior_section, section_id in _cross_section_duplicate_pairs(duplicate_records):
+    repeatable_icf_text = [
+        str(block.get("text") or "")
+        for contract in expected_contracts.values()
+        for block in contract.get("fixed_boilerplate") or []
+        if isinstance(block, Mapping) and block.get("boilerplate_id") == "icf-voluntary"
+    ]
+    duplicate_pairs = list(dict.fromkeys([
+        *_cross_section_duplicate_pairs(duplicate_records),
+        *_icf_summary_detail_sentence_pairs(duplicate_records, repeatable_text=repeatable_icf_text),
+    ]))
+    for prior_section, section_id in duplicate_pairs:
         target_section = (
             "icf.key-information-summary"
             if "icf.key-information-summary" in {prior_section, section_id}
@@ -1823,7 +1933,7 @@ def accepted_cross_section_duplicate_findings(
     reference: Mapping[str, Any],
     expected_governing: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    """Find authenticated Protocol prose collisions before candidate rendering."""
+    """Find authenticated Protocol and ICF prose collisions before rendering."""
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     records: list[tuple[str, Mapping[str, Any], Mapping[str, Any]]] = []
     for section in protocol_contract(branch):
@@ -1841,7 +1951,7 @@ def accepted_cross_section_duplicate_findings(
             {},
         )
         records.append((section.section_id, draft, contract))
-    return [
+    findings = [
         {
             "category": "content",
             "field": current,
@@ -1852,6 +1962,28 @@ def accepted_cross_section_duplicate_findings(
         }
         for prior, current in _cross_section_duplicate_pairs(records)
     ]
+    icf_records = [
+        (section.section_id, draft, {})
+        for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra")))
+        if (draft := accepted_draft(revision_dir, section.section_id, expected_governing)) is not None
+    ]
+    repeatable_icf_text = []
+    if any(section_id == "icf.key-information-summary" for section_id, _, _ in icf_records):
+        repeatable_icf_text = [load_boilerplate(
+            Path(__file__).resolve().parents[1], reference,
+        ).get("icf-voluntary", "")]
+    for summary, detail in _icf_summary_detail_sentence_pairs(
+        icf_records, repeatable_text=repeatable_icf_text,
+    ):
+        findings.append({
+            "category": "content",
+            "field": summary,
+            "target_ids": [summary],
+            "issue": f"A generated ICF summary sentence is duplicated in {detail} before rendering.",
+            "recovery_class": "drafting_defect",
+            "action": "retry_drafting_target",
+        })
+    return findings
 
 
 def retry_attempts(findings: Iterable[Mapping[str, Any]], prior: Mapping[str, int]) -> tuple[dict[str, int], list[dict[str, Any]]]:
@@ -2009,10 +2141,17 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
                 for visit in visits
             )
             timeline = value_text(source.get("study.timeline")).rstrip(".")
-            subject = "A participant completes the study" if section_id == "endpoint-criteria.completion" else "The study is complete"
-            prose = f"{subject} after the approved sequence: {visit_text}."
-            if timeline:
-                prose += f" The approved overall timeline is {timeline}."
+            if section_id == "endpoint-criteria.completion" and not meaningful(source.get("procedures.completion")):
+                follow_up = _approved_followup_value(timeline)
+                prose = (
+                    f"The approved planned participant follow-up period is {follow_up}. "
+                    if follow_up else ""
+                ) + "Participant completion and discontinuation are distinct dispositions."
+            else:
+                subject = "A participant completes the study" if section_id == "endpoint-criteria.completion" else "The study is complete"
+                prose = f"{subject} after the approved sequence: {visit_text}."
+                if timeline:
+                    prose += f" The approved overall timeline is {timeline}."
             result["outcome"] = "drafted"
             result["paragraphs"] = [{
                 "text": prose,
