@@ -1041,7 +1041,8 @@ def test_production_connect_proxy_closes_listener_when_thread_start_fails(monkey
     ]
 
 
-def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_path, monkeypatch):
+@pytest.mark.parametrize("launch_failure", [True, False])
+def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_path, monkeypatch, launch_failure):
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     run_dir = tmp_path / "run"
     launcher = tmp_path / "managed/hermes/venv/bin/hermes"
@@ -1110,27 +1111,42 @@ def test_production_partial_launch_failure_reaps_prior_worker_and_proxies(tmp_pa
     monkeypatch.setattr(workflow.subprocess, "Popen", popen)
     monkeypatch.setattr(workflow.os, "killpg", killpg)
 
-    with pytest.raises(RuntimeError, match="third launch failed"):
+    monkeypatch.setattr(workflow, "_production_publish_quiet_response", lambda *args: None)
+    if not launch_failure:
+        for process in processes:
+            process.returncode = 0
+    with pytest.raises(RuntimeError, match="third launch failed" if launch_failure else "fully reaped"):
         workflow._production_dispatch_handoffs(
             [
                 {"request_path": "hermes/requests/a.json", "response_path": "hermes/responses/a.json"},
                 {"request_path": "hermes/requests/b.json", "response_path": "hermes/responses/b.json"},
                 {"request_path": "hermes/requests/c.json", "response_path": "hermes/responses/c.json"},
-            ],
+            ][:3 if launch_failure else 2],
             30.0, run_dir / "revision", workflow.CERTIFIED_HERMES_CONFIGURATION,
             skill_root=skill_root, run_dir=run_dir,
             runtime_identity={"executable": "/usr/bin/python3"},
         )
 
     assert len(created_proxies) == 3
-    assert all(proxy.closed for proxy in created_proxies)
-    assert [process.wait_calls for process in processes] == [2, 1]
-    assert killed == [
-        (processes[0].pid, signal.SIGTERM),
-        (processes[0].pid, signal.SIGKILL),
-        (processes[1].pid, signal.SIGTERM),
-    ]
+    if launch_failure:
+        assert all(proxy.closed for proxy in created_proxies)
+        assert [process.wait_calls for process in processes] == [2, 1]
+        assert killed == [
+            (processes[0].pid, signal.SIGTERM),
+            (processes[0].pid, signal.SIGKILL),
+            (processes[1].pid, signal.SIGTERM),
+        ]
+    else:
+        assert all(proxy.closed for proxy in created_proxies[:2])
+        events = [json.loads(line) for line in (run_dir / "logs/hermes-agent-events.jsonl").read_text().splitlines()]
+        assert len(events) == 2
+        for event in events:
+            request_id = Path(event["request_path"]).stem
+            assert Path(event["stdout_log"]).name.startswith(f"{request_id}.dispatch-")
+            assert Path(event["stderr_log"]).name.startswith(f"{request_id}.dispatch-")
+        assert events[0]["stdout_log"] != events[1]["stdout_log"]
     assert all(not path.exists() for path in profile_paths)
+
 
 
 def test_production_profile_write_failure_closes_proxy_and_removes_profile(tmp_path, monkeypatch):

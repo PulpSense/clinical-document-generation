@@ -41,7 +41,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import render_documents
 
 
@@ -5247,6 +5247,20 @@ def _reap_production_worker(
         raise RuntimeError("Production worker process or resources could not be fully released.") from errors[0]
 
 
+def _open_production_worker_logs(logs: Path, request_id: str) -> tuple[Any, Any]:
+    """Keep each dispatch's stdout and stderr instead of overwriting a retry."""
+    stdout = tempfile.NamedTemporaryFile(
+        "w", dir=logs, prefix=f"{request_id}.dispatch-", suffix=".stdout.log",
+        encoding="utf-8", delete=False,
+    )
+    try:
+        stderr = Path(stdout.name.replace(".stdout.log", ".stderr.log")).open("x", encoding="utf-8")
+    except BaseException:
+        stdout.close()
+        raise
+    return stdout, stderr
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -5350,8 +5364,7 @@ def _production_dispatch_handoffs(
                 command.append("--safe-mode")
             else:
                 command.extend(("--skills", str(configuration["skill"])))
-            stdout_handle = (logs / f"{request_id}.stdout.log").open("w", encoding="utf-8")
-            stderr_handle = (logs / f"{request_id}.stderr.log").open("w", encoding="utf-8")
+            stdout_handle, stderr_handle = _open_production_worker_logs(logs, request_id)
             worker_environment = dict(environment)
             worker_environment.update({
                 "HTTPS_PROXY": f"http://127.0.0.1:{proxy.port}",
@@ -5456,7 +5469,7 @@ def _production_dispatch_handoffs(
                 _reap_production_worker(process, stdout_handle, stderr_handle, profile, proxy)
             except BaseException as exc:
                 cleanup_errors.append(exc)
-        for process, handoff, _, _, _, started, _ in processes:
+        for process, handoff, stdout_handle, stderr_handle, _, started, _ in processes:
             ended = time.monotonic()
             event_path = run_dir / "logs/hermes-agent-events.jsonl"
             try:
@@ -5473,8 +5486,8 @@ def _production_dispatch_handoffs(
                         "elapsed_seconds": round(ended - started, 3),
                         "returncode": process.returncode,
                         "response_exists": response_path.is_file(),
-                        "stdout_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stdout.log",
-                        "stderr_log": f"logs/hermes-agents/{Path(str(handoff['request_path'])).stem}.stderr.log",
+                        "stdout_log": Path(str(stdout_handle.name)).relative_to(run_dir).as_posix(),
+                        "stderr_log": Path(str(stderr_handle.name)).relative_to(run_dir).as_posix(),
                     }, ensure_ascii=False) + "\n")
             except BaseException as exc:
                 cleanup_errors.append(exc)
@@ -8375,6 +8388,27 @@ def _complete_pending_deterministic_reconstructions(
     _write(reference_path, working_reference)
 
 
+def _begin_independent_review(
+    revision_dir: Path, reference: Mapping[str, Any],
+    render_report: Mapping[str, Any], bundle: Mapping[str, Any], review_set: int,
+) -> tuple[list[Path], list[dict[str, Any]]]:
+    """Apply existing Sterling checks before spending independent review calls."""
+    if (
+        canonical_study_type(get_path(reference, "meta.study_type")) != "Retrospective"
+        and str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"
+    ):
+        findings = validate_sterling_clause_contract(
+            revision_dir / "candidate/icf.docx", reference,
+        )["findings"]
+        if findings:
+            return [], findings
+    paths = create_verification_requests(
+        revision_dir, reference, render_report,
+        contracted_bundle=bundle, review_set=review_set,
+    )
+    return paths, []
+
+
 def generate(
     run_dir: Path,
     *,
@@ -8811,13 +8845,16 @@ def generate(
     _advance_pending_review_set(reference_path, working_reference)
     review_set = max(1, int(state.setdefault("review_set", 1)))
     _write(reference_path, working_reference)
-    create_verification_requests(
-        revision_dir,
-        reference,
-        render_report,
-        contracted_bundle=bundle,
-        review_set=review_set,
+    _, early_findings = _begin_independent_review(
+        revision_dir, reference, render_report, bundle, review_set,
     )
+    if early_findings:
+        return _quality_retry(
+            run_dir, reference_path, working_reference, reference, revision_dir,
+            attempts, early_findings, "drafting", contracted_bundle=bundle,
+            operation_deadline=operation_deadline, clock=clock,
+            stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime,
+        )
     _bind_available_verification_responses(revision_dir)
     pending_checks = pending_verifications(revision_dir)
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)

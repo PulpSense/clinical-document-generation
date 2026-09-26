@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.31-section-ownership"
+CONTRACT_VERSION = "clinical-documents-v2.32-successful-run-polish"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -369,8 +369,10 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "endpoint-criteria.completion": "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
         "endpoint-criteria.study-completion": "State the supplied study-level closeout timeline concisely. Define a completion trigger only when the source supplies one. Sections 9 and 15 own the visit schedule, and Section 18.1 owns participant completion.",
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
-        "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State one method once for outcomes sharing it and refer to the grouped outcomes in Study Design instead of repeating their full measure names and time points.",
+        "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State shared methods once per outcome group. Cite the supplied primary and secondary endpoint paths in evidence_refs without adding Study Design cross-references to the prose. Section 10.3 owns the approved interpretation qualification, such as no planned inferential test.",
         "analysis-plan.considerations": "State only the source-supported interpretation limit or analysis qualification, such as descriptive-only analysis or no planned inferential test. Section 10.2 owns the endpoint methods and Section 10.1 owns dataset inclusion. Keep this section to one short paragraph.",
+        "icf.duration": "Describe approved participation timing; Purpose and Key Information own enrollment and control-group counts.",
+        "icf.payment": "State the complete approved compensation and reimbursement fact once in patient-readable language; do not add a duplicate formal source sentence.",
         "sample-size": "State the approved sample size and explain its approved justification.",
         "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
@@ -602,7 +604,7 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
     ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-purpose", "study-hypothesis", "primary-endpoint"), do_not_restate_concepts=("clinical-background", "comparative-evidence", "study-rationale")),
     _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
-    _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline", "population.sample_size")),
+    _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline",)),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
     _section_spec("icf.payment", "", "Payment", "icf-narrative", ("risks_benefits.compensation_or_reimbursement",)),

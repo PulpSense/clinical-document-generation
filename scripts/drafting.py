@@ -430,6 +430,17 @@ def _section_payload(
         if path not in scoped_values or scoped_values[path]
     ]
     content_expectations = list(section.content_expectations)
+    if str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling":
+        if section.section_id == "icf.key-information-summary":
+            content_expectations.append(
+                "Keep each summary block at 65 words or fewer. Preserve the supplied voluntary-participation "
+                "boilerplate sentence verbatim within the alternatives-voluntariness block."
+            )
+        elif section.section_id == "icf.study-purpose":
+            content_expectations.append(
+                "Identify the expectation as the researchers' hypothesis or use 'researchers expect'. "
+                "Label the primary measurement 'main outcome' or 'primary endpoint' and explain it in plain language."
+            )
     if section.section_id == "study-design.bias":
         design_text = str(get_path(reference, "design.study_design") or "")
         # A design label supplies no bias-control method. Explicit allocation,
@@ -688,12 +699,15 @@ def _section_evidence_value(section_id: str, path: str, value: Any) -> Any:
         r"\b(?:mean|median|standard deviation|confidence|regression|hypothesis test|percentages?)\b",
         c, re.I,
     )]
-    if not population:
-        return value
-    return " ".join(
-        c for c in clauses
-        if (c in population) == (section_id == "analysis-plan.datasets")
-    )
+    if section_id == "analysis-plan.methodology":
+        methods = [c for c in clauses if c not in population and not re.fullmatch(
+            r"\s*No inferential hypothesis test is planned for this descriptive observational study\.?\s*",
+            c, re.I,
+        )]
+        # Never create an empty method scope when the source provides only a
+        # qualification; retain the original evidence in that case.
+        return " ".join(methods) if methods else value
+    return " ".join(population) if population else value
 
 
 _GROUNDING_STOPWORDS = {
@@ -1038,6 +1052,17 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
     """Require observable anchors for every material scalar supplied by a cited source path."""
     if isinstance(value, str):
         value = _clinical_evidence_text(value)
+    if isinstance(value, str) and re.fullmatch(
+        r"no compensation or reimbursement will be provided to participants for study participation\.?",
+        value.strip(), re.I,
+    ) and re.fullmatch(
+        r"you will not (?:receive compensation or reimbursement|be paid or reimbursed) "
+        r"for (?:taking part|participating)(?: in this study)?\.?",
+        content.strip(), re.I,
+    ):
+        # Exact negative payment meaning; do not infer amounts or accept partial
+        # negation, conditional payment, or contradictory additional sentences.
+        return True
     content_tokens = _grounding_tokens(content)
     def numeric_tokens(text: str) -> set[str]:
         values = set()
@@ -1360,7 +1385,16 @@ def _coverage_findings(
         return claim_findings
     material = _material_source(request, contract)
     cited = set(map(str, evidence_refs))
-    missing = [path for path in material if f"source:{path}" not in cited]
+    missing = [
+        path for path, value in material.items()
+        if f"source:{path}" not in cited
+        and not (
+            section_id == "study-procedure.visits"
+            and path == "procedures.assessments"
+            and "source:procedures.visit_schedule" in cited
+            and evidence_grounded(content, value, all_items=True)
+        )
+    ]
     findings: list[dict[str, Any]] = []
     if missing:
         findings.append({
