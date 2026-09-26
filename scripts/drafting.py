@@ -397,8 +397,7 @@ def _section_payload(
         boilerplate_items.append({"boilerplate_id": boilerplate_key, "text": text, "sha256": sha256_value(text)})
     approved_source_words, minimum_detail_words = _source_detail_budget(reference, section)
     evidence_scopes = []
-    if section.section_id in {"analysis-plan.methodology", "analysis-plan.datasets"}:
-        path = "statistics.analysis_plan"
+    for path in section.evidence:
         value = get_path(reference, path)
         scoped_value = _section_evidence_value(section.section_id, path, value)
         if scoped_value != value:
@@ -685,7 +684,19 @@ def _clinical_evidence_text(value: str) -> str:
 
 
 def _section_evidence_value(section_id: str, path: str, value: Any) -> Any:
-    """Partition explicit population clauses from methods without changing source."""
+    """Project explicit section-owned clauses without mutating approved source."""
+    if path == "study.background" and isinstance(value, str) and section_id in {"introduction", "icf.background"}:
+        clinical = _clinical_evidence_text(value)
+        # Proposal backgrounds often include objectives and the planned study
+        # design. Those clauses remain available to their owning sections,
+        # but must not impose endpoint numbers on clinical context/rationale.
+        clauses = re.split(r"(?<=[.!?])\s+|\n+", clinical)
+        retained = [clause for clause in clauses if not re.match(
+            r"\s*(?:(?:the\s+)?(?:primary\s+|secondary\s+|study\s+)?objective(?:s)?\s+(?:is|are|will|:)"
+            r"|lens selection\b|(?:the\s+)?(?:planned\s+)?study design\s*[:])",
+            clause, re.I,
+        )]
+        return " ".join(retained).strip()
     if path != "statistics.analysis_plan" or not isinstance(value, str):
         return value
     if section_id not in {"analysis-plan.methodology", "analysis-plan.datasets"}:
@@ -1098,7 +1109,12 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
             expected = {token.rstrip("s") for token in re.findall(r"[A-Za-z0-9]+", leaf.casefold()) if token}
         if not expected:
             return True
-        numbers = numeric_tokens(leaf)
+        numeric_leaf = leaf
+        if re.search(r"\bboth\s+(?:groups|cohorts)\b", content, re.I):
+            # The observed pair covers only a source cohort/group count. It
+            # cannot supply a coincidentally equal duration, dose or distance.
+            numeric_leaf = re.sub(r"\b(?:two|2)\s+(groups|cohorts)\b", r"\1", numeric_leaf, flags=re.I)
+        numbers = numeric_tokens(numeric_leaf)
         if not numbers <= content_numbers:
             return False
         required = min(12, max(1, math.ceil(len(expected) * 0.45)))
@@ -1244,7 +1260,7 @@ def _coverage_findings(
         findings: list[dict[str, Any]] = []
         source_value = request.get("approved_source")
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
-        background = get_path(source, "study.background")
+        background = _section_evidence_value(section_id, "study.background", get_path(source, "study.background"))
         if "source:study.background" not in set(map(str, evidence_refs)):
             findings.append({
                 "category": "drafting", "field": section_id,
