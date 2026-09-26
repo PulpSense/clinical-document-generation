@@ -16,6 +16,15 @@ import workflow
 from quality import CONTENT_CHECKS, RESPONSE_SCHEMA, VISUAL_CHECKS, verification_request_ledger_record, verification_request_sha256
 
 
+@pytest.fixture(autouse=True)
+def authenticated_worker_profile(monkeypatch):
+    # These adapter tests isolate host authentication; its real probe has
+    # dedicated coverage in test_worker_readiness.py.
+    monkeypatch.setattr(workflow, "_production_worker_readiness", lambda root: {
+        "status": "passed", "logged_in": True, "provider": "openai-codex",
+    })
+
+
 def _manifest():
     return {
         "status": "passed",

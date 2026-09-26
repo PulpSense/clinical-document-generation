@@ -157,6 +157,54 @@ def test_quality_retry_stops_stalled_draft_before_archiving_another_attempt(tmp_
     assert not (revision / "attempts").exists()
 
 
+def test_drafting_validation_retry_stops_repeated_condition_before_fourth_model_call(tmp_path):
+    reference = prospective_reference()
+    reference["meta"]["icf_template"] = "Sterling"
+    finding = contracts.recovery_finding({
+        "field": "icf.background", "target_ids": ["icf.background"],
+        "issue": "Clinical fact is not observable.",
+    }, "drafting_defect")
+    working = {"generation": {}}
+    generation = working["generation"]
+    for attempt in (1, 2):
+        assert workflow._repeated_drafting_findings(
+            generation, [finding], stage="drafting", attempts={"icf.background": attempt},
+        ) == []
+    # Re-reading the same response is not a new failed attempt.
+    assert workflow._repeated_drafting_findings(
+        generation, [finding], stage="drafting", attempts={"icf.background": 2},
+    ) == []
+    run = tmp_path / "run"
+    revision = run / "revisions/r-test"
+    revision.mkdir(parents=True)
+    reference_path = run / "reference/study.reference.json"
+    reference_path.parent.mkdir(parents=True)
+    reference_path.write_text(json.dumps(working))
+    result = workflow._quality_retry(
+        run, reference_path, working, reference, revision,
+        {"icf.background": 3}, [finding], "drafting", require_promoted_runtime=False,
+    )
+    assert result["stage"] == "internal_recovery_stalled"
+    assert result["findings"][0]["code"] == "drafting_validation_stalled"
+    assert not (revision / "attempts").exists()
+
+
+def test_drafting_validation_progress_resets_the_old_condition_streak():
+    original = contracts.recovery_finding({
+        "field": "icf.background", "target_ids": ["icf.background"], "issue": "Missing evidence.",
+    }, "drafting_defect")
+    changed = {**original, "issue": "A different condition."}
+    generation = {}
+    for attempt, finding in [(1, original), (2, original), (3, changed), (4, original)]:
+        assert workflow._repeated_drafting_findings(
+            generation, [finding], stage="drafting", attempts={"icf.background": attempt},
+        ) == []
+    # An intervening successful attempt also breaks the repeated-failure streak.
+    assert workflow._repeated_drafting_findings(
+        generation, [original], stage="drafting", attempts={"icf.background": 6},
+    ) == []
+
+
 def test_delivery_retries_same_bytes_until_deadline_not_legacy_retry_count(monkeypatch):
     payload = b"exact"
     manifest = {"client_outputs": [{

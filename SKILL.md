@@ -85,6 +85,13 @@ and passes the returned identity to `run_desktop_operation` so every resume is
 recorded. In the examples below, `CLINICAL_PYTHON` is that validated absolute
 Python 3.10+ path.
 
+Before starting a study Desktop operation, verify the selected provider login in
+the same isolated `HERMES_HOME` used by its workers. A login in the dashboard's
+profile does not establish a login in another profile. The shipped adapter
+records `logs/worker-readiness.json` before creating the study deadline; resolve
+a failed login there and start a fresh operation. An authentication rejection
+during generation stops immediately with `worker_authentication`.
+
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve

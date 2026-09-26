@@ -81,6 +81,7 @@ REQUIRED_HISTORICAL_REGRESSION_IDS = frozenset({
     "run02-archived-recovery-request-routing",
     "run03-code-owned-review-routing",
     "run04-sterling-background-qualification",
+    "run26-drafting-timeout",
 })
 
 

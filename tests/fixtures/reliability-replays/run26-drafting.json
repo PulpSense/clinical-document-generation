@@ -1,0 +1,327 @@
+{
+  "background": {
+    "request": {
+      "schema_version": "hermes-request/v2",
+      "request_id": "r-7d9a87d5284a.draft.icf-narrative.quality-retry.a21.0e95a44d",
+      "request_sha256": "5f857e06c0d2409a86a0c2470410456b7465ded63df4ff16d2569195dce14593",
+      "revision_id": "r-7d9a87d5284a",
+      "task": "section_drafting",
+      "batch_id": "icf-narrative",
+      "section_contracts": [
+        {
+          "section_id": "icf.background",
+          "number": "",
+          "title": "Background",
+          "role": "leaf",
+          "required": true,
+          "allowed_modes": [
+            "agent_draft"
+          ],
+          "minimum_evidence": [
+            "study.background"
+          ],
+          "fixed_boilerplate": [],
+          "content_expectations": [
+            "Explain the approved clinical and study context, relevant comparative evidence, evidence gap, and study rationale in participant-facing language.",
+            "Preserve the source's qualification on prior trial results: if it says suggested, do not present the result as definitive. Describe the untested combination's evidence gap without predicting superiority over another lens strategy.",
+            "Bibliographic references appended to study.background are source traceability; do not copy DOI strings into participant-facing prose solely to satisfy evidence coverage.",
+            "Translate technical terms for participants without adding unsupported clinical claims.",
+            "Do not repeat the complete purpose, hypothesis, or primary endpoint owned by PURPOSE."
+          ],
+          "source_coverage": "all_material_evidence",
+          "evidence_scopes": [],
+          "approved_source_word_count": 268,
+          "reference_detail_target_words": 0,
+          "summary_concepts": [],
+          "summary_obligations": {},
+          "concept_ownership": {
+            "owns": [
+              "clinical-background",
+              "comparative-evidence",
+              "evidence-gap",
+              "study-rationale"
+            ],
+            "brief_reference_only": [],
+            "do_not_restate": []
+          }
+        }
+      ],
+      "approved_input": [
+        {
+          "path": "study.background",
+          "value": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggests high visual acuity and spectacle independence at distance, intermediate, and near.1,2\n\nThe TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggesting better intermediate and near vision with the PureSee IOL, compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile.3\n\nMix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone.\nTo date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye).\n1. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n2. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7\n3.  Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8",
+          "sha256": "8fe829029a1ad3d12affad5fc9351b73d12b0c3e29ba9900afa7505d2cd8a803"
+        }
+      ],
+      "approved_source": {
+        "study": {
+          "background": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggests high visual acuity and spectacle independence at distance, intermediate, and near.1,2\n\nThe TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggesting better intermediate and near vision with the PureSee IOL, compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile.3\n\nMix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone.\nTo date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye).\n1. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n2. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7\n3.  Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8"
+        }
+      }
+    },
+    "response": {
+      "schema_version": "hermes-response/v2",
+      "request_id": "r-7d9a87d5284a.draft.icf-narrative.quality-retry.a21.0e95a44d",
+      "request_sha256": "5f857e06c0d2409a86a0c2470410456b7465ded63df4ff16d2569195dce14593",
+      "task": "section_drafting",
+      "revision_id": "r-7d9a87d5284a",
+      "batch_id": "icf-narrative",
+      "producer": {
+        "model_id": "gpt-6-astra",
+        "reviewer_id": "icf-narrative"
+      },
+      "section_results": [
+        {
+          "section_id": "icf.background",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "The TECNIS Odyssey and TECNIS PureSee are new artificial lenses placed inside the eye, called intraocular lenses (IOLs). The Odyssey is a full range of vision lens. Current reports suggest that it provides clear vision and allows people to see without glasses at distance, at intermediate distances, and up close.",
+              "evidence_refs": [
+                "study.background"
+              ],
+              "boilerplate_refs": []
+            },
+            {
+              "text": "The PureSee is a non-diffractive extended depth of focus (EDOF) lens, which extends the range over which vision stays in focus. Its non-diffractive design may reduce unwanted visual effects, called dysphotopsias, and improve contrast sensitivity\u2014the ability to distinguish objects from their background\u2014compared with diffractive lenses, which use a different way of directing light. A large randomized controlled trial, in which people were assigned by chance to lens groups, suggested better intermediate and near vision with PureSee than with a monofocal lens, which focuses at one distance. That trial also suggested similar contrast sensitivity, distance vision, and unwanted visual effects with PureSee and the monofocal lens.",
+              "evidence_refs": [
+                "study.background"
+              ],
+              "boilerplate_refs": []
+            },
+            {
+              "text": "A mix-and-match approach uses different lens types in the two eyes. The approach in this study pairs PureSee in the dominant eye, the eye a person tends to favor, with Odyssey in the non-dominant eye. The reason for studying this approach is to learn about the range of vision and unwanted visual effects when these different lens designs are used together. There are currently very limited data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias with this particular pairing. It has not been established that this combination gives a better range of vision or fewer visual disturbances than using EDOF lenses in both eyes or trifocal lenses in both eyes.",
+              "evidence_refs": [
+                "study.background"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  },
+  "methods": {
+    "request": {
+      "schema_version": "hermes-request/v2",
+      "request_id": "r-7d9a87d5284a.draft.protocol-analysis-and-oversight.quality-retry.a5.f1b340f8",
+      "request_sha256": "abb20008a8da55f5b4c172b79a31577d036a5b5893b85f4ca13dd7bce61295f5",
+      "revision_id": "r-7d9a87d5284a",
+      "task": "section_drafting",
+      "batch_id": "protocol-analysis-and-oversight",
+      "section_contracts": [
+        {
+          "section_id": "analysis-plan.methodology",
+          "number": "10.2.",
+          "title": "Statistical Methodology",
+          "role": "leaf",
+          "required": true,
+          "allowed_modes": [
+            "agent_draft"
+          ],
+          "minimum_evidence": [
+            "statistics.methodology",
+            "statistics.analysis_plan",
+            "endpoints.primary",
+            "endpoints.secondary",
+            "endpoints.other"
+          ],
+          "fixed_boilerplate": [],
+          "content_expectations": [
+            "Explain the approved analysis method for each endpoint group. State one method once for outcomes sharing it and refer to the grouped outcomes in Study Design instead of repeating their full measure names and time points.",
+            "Do not replace supplied detail with generic clinical prose."
+          ],
+          "source_coverage": "method_group_summary",
+          "evidence_scopes": [],
+          "approved_source_word_count": 129,
+          "reference_detail_target_words": 83,
+          "summary_concepts": [],
+          "summary_obligations": {},
+          "concept_ownership": {
+            "owns": [
+              "statistical-methods"
+            ],
+            "brief_reference_only": [
+              "primary-endpoint",
+              "secondary-endpoints",
+              "endpoint-inventory"
+            ],
+            "do_not_restate": [
+              "endpoint-inventory"
+            ]
+          }
+        }
+      ],
+      "approved_input": [
+        {
+          "path": "statistics.analysis_plan",
+          "value": "The analysis population will include participants who complete the Month 3 postoperative assessment and have evaluable outcome data. Continuous visual-acuity and defocus-curve outcomes will be summarized descriptively using sample size, mean, standard deviation, median, minimum, and maximum. AIOLIS questionnaire responses will be summarized by response category using counts and percentages. Adverse events and device deficiencies will be summarized descriptively by event category, seriousness, severity, relationship, action taken, and outcome. No inferential hypothesis test is planned for this descriptive observational study.",
+          "sha256": "052a034264bc0fad3a5d982f37a2518b93f711815ea1c1fbfe5f535723babb58"
+        },
+        {
+          "path": "statistics.methodology",
+          "value": null,
+          "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+        },
+        {
+          "path": "endpoints.primary",
+          "value": [
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Binocular DCIVA (66 cm)",
+              "time_point": "3 Month postoperative"
+            }
+          ],
+          "sha256": "026c5168e9c5d7fc84055b2494fefaa0622fc00fc9e4fbf8caa8a64093153627"
+        },
+        {
+          "path": "endpoints.secondary",
+          "value": [
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular CDVA",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular UIVA (66 cm)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular UDVA",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular DCNVA (40 cm)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular UNVA (40cm)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Binocular distance-corrected defocus curve (+1.0 D through -2.50 D)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Percentages of subject responses on each of the AIOLIS questionnaire questions.",
+              "time_point": "3 Month postoperative"
+            }
+          ],
+          "sha256": "1867169bcaa9c60bcae34e34c3fe66022f3d8bec2e34945fc22ae7d07bdbb018"
+        }
+      ],
+      "approved_source": {
+        "statistics": {
+          "analysis_plan": "The analysis population will include participants who complete the Month 3 postoperative assessment and have evaluable outcome data. Continuous visual-acuity and defocus-curve outcomes will be summarized descriptively using sample size, mean, standard deviation, median, minimum, and maximum. AIOLIS questionnaire responses will be summarized by response category using counts and percentages. Adverse events and device deficiencies will be summarized descriptively by event category, seriousness, severity, relationship, action taken, and outcome. No inferential hypothesis test is planned for this descriptive observational study.",
+          "methodology": null
+        },
+        "endpoints": {
+          "primary": [
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Binocular DCIVA (66 cm)",
+              "time_point": "3 Month postoperative"
+            }
+          ],
+          "secondary": [
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular CDVA",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular UIVA (66 cm)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular UDVA",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular DCNVA (40 cm)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Mean binocular UNVA (40cm)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Binocular distance-corrected defocus curve (+1.0 D through -2.50 D)",
+              "time_point": "3 Month postoperative"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "label": "Percentages of subject responses on each of the AIOLIS questionnaire questions.",
+              "time_point": "3 Month postoperative"
+            }
+          ]
+        }
+      }
+    },
+    "response": {
+      "schema_version": "hermes-response/v2",
+      "request_id": "r-7d9a87d5284a.draft.protocol-analysis-and-oversight.quality-retry.a5.f1b340f8",
+      "request_sha256": "abb20008a8da55f5b4c172b79a31577d036a5b5893b85f4ca13dd7bce61295f5",
+      "task": "section_drafting",
+      "revision_id": "r-7d9a87d5284a",
+      "batch_id": "protocol-analysis-and-oversight",
+      "producer": {
+        "model_id": "gpt-6-astra",
+        "reviewer_id": "protocol-analysis-and-oversight"
+      },
+      "section_results": [
+        {
+          "section_id": "analysis-plan.methodology",
+          "outcome": "drafted",
+          "paragraphs": [
+            {
+              "text": "For the primary and secondary continuous visual-acuity and defocus-curve outcomes grouped in Study Design, descriptive summaries will report sample size, mean, standard deviation, median, minimum, and maximum. AIOLIS questionnaire responses will be summarized for each question by response category using counts and percentages.",
+              "evidence_refs": [
+                "source:statistics.analysis_plan",
+                "source:endpoints.primary",
+                "source:endpoints.secondary"
+              ],
+              "boilerplate_refs": []
+            },
+            {
+              "text": "Adverse events and device deficiencies will be summarized descriptively by event category, seriousness, severity, relationship, action taken, and outcome. No inferential hypothesis test is planned for this descriptive observational study.",
+              "evidence_refs": [
+                "source:statistics.analysis_plan"
+              ],
+              "boilerplate_refs": []
+            }
+          ],
+          "lists": []
+        }
+      ]
+    }
+  }
+}

@@ -4580,6 +4580,8 @@ def run_desktop_operation(
                                     continue
                                 try:
                                     handoff_runner(delegated, timeout)
+                                except WorkerAuthenticationError:
+                                    raise
                                 except Exception:
                                     pass
                             hard_future.result()
@@ -4591,6 +4593,8 @@ def run_desktop_operation(
                                 continue
                             try:
                                 handoff_runner(delegated, timeout)
+                            except WorkerAuthenticationError:
+                                raise
                             except Exception:
                                 pass
                     else:
@@ -4607,6 +4611,12 @@ def run_desktop_operation(
                     if parent_block is not None:
                         return finish(parent_block)
             except Exception as exc:
+                if isinstance(exc, WorkerAuthenticationError):
+                    return finish({
+                        "status": "blocked", "stage": "worker_authentication",
+                        "findings": [{"category": "environment", "field": "worker_authentication", "issue": str(exc)}],
+                        "client_outputs": [],
+                    })
                 revision_id = str(result.get("revision_id") or "")
                 fallback_handoffs = [
                     item for item in handoffs
@@ -4983,6 +4993,60 @@ def _production_authentication_path() -> Path:
     """Return the one centralized credential file required by managed Hermes."""
     account_home = Path(pwd.getpwuid(os.getuid()).pw_dir).expanduser().resolve()
     return account_home / ".hermes/auth.json"
+
+
+class WorkerAuthenticationError(RuntimeError):
+    """A confirmed worker login defect cannot be repaired by redispatch."""
+
+
+def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
+    """Read authentication status in the exact worker profile without model calls."""
+    launcher, interpreter = _managed_hermes_pair()
+    environment = _production_subprocess_environment(skill_root)
+    probe = (
+        "import json; from hermes_cli.auth import get_auth_status, get_active_provider; "
+        "s=get_auth_status(); "
+        "print(json.dumps({'logged_in':s.get('logged_in') is True, "
+        "'provider':str(get_active_provider() or '')}))"
+    )
+    try:
+        completed = subprocess.run(
+            [str(interpreter), "-c", probe], cwd=launcher.parent.parent.parent,
+            env=environment, text=True, capture_output=True, timeout=20, check=False,
+        )
+        status = json.loads(completed.stdout) if completed.returncode == 0 else {}
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        status = {}
+    logged_in = isinstance(status, Mapping) and status.get("logged_in") is True
+    return {
+        "status": "passed" if logged_in else "blocked",
+        "logged_in": logged_in,
+        "provider": str(status.get("provider") or "") if isinstance(status, Mapping) else "",
+        "profile": environment["HERMES_HOME"],
+        "assurance": "read_only_auth_status_no_model_call",
+        "issue": "" if logged_in else (
+            "The isolated Hermes worker profile has no usable login, or its status could not be checked. "
+            "Verify the selected provider login in this profile before starting a fresh study operation."
+        ),
+    }
+
+
+def _worker_log_reports_authentication_failure(paths: Sequence[Path]) -> bool:
+    patterns = re.compile(
+        r"incorrect api key|invalid_api_key|no codex credentials|not logged in|logged out|"
+        r"authentication required|re.authentication required|(?:http\s*)?401\s*[:\s].*unauthorized",
+        re.I,
+    )
+    for path in paths:
+        try:
+            with path.open("rb") as handle:
+                handle.seek(max(0, path.stat().st_size - 256 * 1024))
+                text = handle.read().decode("utf-8", errors="replace")
+            if patterns.search(text):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 PRODUCTION_HERMES_NETWORK_HOST = "chatgpt.com"
@@ -5370,6 +5434,18 @@ def _production_dispatch_handoffs(
             )
         ]
         if missing:
+            if any(
+                process.returncode not in (None, 0)
+                and not _production_response_is_bound(revision_dir, handoff)
+                and _worker_log_reports_authentication_failure([
+                    Path(str(stdout.name)), Path(str(stderr.name)),
+                ])
+                for process, handoff, stdout, stderr, _, _, _ in processes
+            ):
+                raise WorkerAuthenticationError(
+                    "The selected provider rejected the isolated Hermes worker login. "
+                    "Authenticate the worker profile before starting a fresh operation."
+                )
             raise RuntimeError(
                 "Hermes workers did not produce complete bound responses: " + ", ".join(missing)
             )
@@ -5583,6 +5659,17 @@ def run_production_desktop_operation(
     runtime_identity = resolve_python_runtime(environment=os.environ)
     managed_hermes_identity = _managed_hermes_identity()
     identity = {**identity, "managed_hermes_identity": managed_hermes_identity}
+    state_path = desktop_operation_state_path(run_dir, operation_id)
+    prior_state = _read(state_path) if state_path.is_file() else {}
+    if prior_state.get("status") not in {"passed", "timeout"}:
+        readiness = _production_worker_readiness(root)
+        _write(run_dir / "logs/worker-readiness.json", readiness)
+        if readiness["status"] != "passed":
+            return {
+                "status": "blocked", "stage": "worker_readiness",
+                "findings": [{"category": "environment", "field": "worker_authentication", "issue": readiness["issue"]}],
+                "client_outputs": [], "worker_readiness": readiness,
+            }
     parent_review_record: dict[str, Any] | None = None
 
     def revision_dir() -> Path:
@@ -7483,11 +7570,15 @@ def _apply_pending_recovery_plan(
 
 def _repeated_drafting_findings(
     generation: dict[str, Any], findings: Sequence[Mapping[str, Any]],
+    *, stage: str = "quality", attempts: Mapping[str, int] | None = None,
 ) -> list[dict[str, Any]]:
-    """Detect the same reviewed drafting defect across three distinct review sets."""
+    """Detect an unchanged validation condition across distinct completed attempts."""
     review_set = max(1, int(generation.get("review_set", 1)))
-    history = generation.setdefault("drafting_finding_review_sets", {})
+    history = generation.setdefault(
+        "drafting_finding_attempts" if stage == "drafting" else "drafting_finding_review_sets", {},
+    )
     stalled: list[dict[str, Any]] = []
+    rows = []
     for finding in findings:
         if finding.get("recovery_class") != "drafting_defect":
             continue
@@ -7499,18 +7590,47 @@ def _repeated_drafting_findings(
             "issue": re.sub(r"\s+", " ", str(finding.get("issue") or "")).strip().casefold(),
         }
         key = canonical_evidence_sha256(identity)
+        rows.append((finding, identity, key))
+    if stage == "drafting":
+        current: dict[str, set[str]] = {}
+        for finding, identity, key in rows:
+            for target in identity["target_ids"] or [str(finding.get("field") or "")]:
+                current.setdefault(target, set()).add(key)
+        last = generation.setdefault("drafting_validation_last_failures", {})
+        for target, keys in current.items():
+            attempt = int((attempts or {}).get(target, 1))
+            previous = last.get(target, {})
+            prior_keys = set(previous.get("keys") or [])
+            if attempt not in {previous.get("attempt"), int(previous.get("attempt") or 0) + 1}:
+                for key in prior_keys:
+                    history.pop(key, None)
+            else:
+                for key in prior_keys - keys:
+                    history.pop(key, None)
+            last[target] = {"attempt": attempt, "keys": sorted(keys)}
+    for finding, identity, key in rows:
         sets = history.setdefault(key, [])
-        if review_set not in sets:
-            sets.append(review_set)
+        epoch = (
+            canonical_evidence_sha256({
+                target: int((attempts or {}).get(target, 1))
+                for target in identity["target_ids"] or [str(finding.get("field") or "")]
+            }) if stage == "drafting" else review_set
+        )
+        if epoch not in sets:
+            sets.append(epoch)
         if len(sets) >= 3:
             stalled.append({
                 **dict(finding),
                 "category": "recovery",
                 "field": "repeated_drafting_finding",
-                "code": "drafting_repair_stalled",
-                "review_sets": list(sets),
+                "code": "drafting_validation_stalled" if stage == "drafting" else "drafting_repair_stalled",
+                "drafting_attempts" if stage == "drafting" else "review_sets": list(sets),
+                "unsatisfied_condition": dict(finding),
                 "issue": (
+                    "The same drafting validation condition survived three distinct completed attempts. "
+                    if stage == "drafting" else
                     "The same drafting defect survived three distinct independent review sets. "
+                ) + (
                     "The installed drafting route needs maintenance for this target."
                 ),
             })
@@ -7888,8 +8008,10 @@ def _quality_retry(
             structural,
             candidate_outputs=_candidate_outputs(revision_dir),
         )
-    if stage == "quality":
-        stalled = _repeated_drafting_findings(generation_state, findings)
+    if stage in {"quality", "drafting"}:
+        stalled = _repeated_drafting_findings(
+            generation_state, findings, stage=stage, attempts=prior_attempts,
+        )
         _write(reference_path, working_reference)
         if stalled:
             return _repair_block(

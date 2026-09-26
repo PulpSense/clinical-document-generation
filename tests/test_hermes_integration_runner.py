@@ -101,6 +101,8 @@ def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path,
     request = {
         "schema_version": "hermes-verification/v1",
         "request_id": "visual",
+        "revision_id": revision_dir.name,
+        "review_set": 1,
         "task": "rendered_page_visual_verification",
         "response_path": response_path.relative_to(revision_dir).as_posix(),
         "checks": list(quality.VISUAL_CHECKS),
@@ -120,11 +122,15 @@ def _write_complete_visual_verification(revision_dir: Path) -> tuple[dict, Path,
     request["request_sha256"] = quality.verification_request_sha256(request)
     request_path.parent.mkdir(parents=True, exist_ok=True)
     request_path.write_text(json.dumps(request), encoding="utf-8")
+    ledger = revision_dir / "request-ledger/visual.json"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(json.dumps(quality.verification_request_ledger_record(request_path, request)))
     response_path.parent.mkdir(parents=True, exist_ok=True)
     response_path.write_text(json.dumps({
         "schema_version": quality.RESPONSE_SCHEMA,
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
+        "revision_id": request["revision_id"],
         "task": request["task"],
         "status": "passed",
         "findings": [],
@@ -1901,9 +1907,11 @@ def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Pat
         "schema_version": "hermes-verification/v1",
         "request_id": "content",
         "task": "clinical_content_verification",
-        "revision_id": "r-test",
+        "revision_id": revision_dir.name,
+        "review_set": 1,
         "artifacts": [],
-        "sections": [],
+        "sections": [{"artifact": "protocol", "section_id": "study-procedure.visits"}],
+        "checks": list(quality.CONTENT_CHECKS),
         "cross_document_checks": [],
         "response_path": response_path.relative_to(revision_dir).as_posix(),
     }
@@ -1912,6 +1920,7 @@ def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Pat
         "schema_version": "hermes-verification-response/v1",
         "request_id": request["request_id"],
         "request_sha256": request["request_sha256"],
+        "revision_id": request["revision_id"],
         "task": request["task"],
         "producer": {
             "model_id": "gpt-5.6-sol",
@@ -1919,15 +1928,20 @@ def test_bound_verifier_finding_is_terminal_for_the_worker_handoff(tmp_path: Pat
         },
         "status": "blocked",
         "findings": [{
-            "target_ids": ["objectives"],
+            "finding_id": "internal-source-language",
+            "artifact": "protocol",
+            "target_ids": ["study-procedure.visits"],
             "issue": "Client-facing content exposes internal source-review language.",
         }],
-        "section_assessments": [],
+        "section_assessments": [{"artifact": "protocol", "section_id": "study-procedure.visits", "status": "failed", "checks": list(quality.CONTENT_CHECKS)}],
         "cross_document_assessments": [],
     }
     request_path.parent.mkdir(parents=True)
     response_path.parent.mkdir(parents=True)
     request_path.write_text(json.dumps(request), encoding="utf-8")
+    ledger = revision_dir / "request-ledger/content.json"
+    ledger.parent.mkdir(parents=True)
+    ledger.write_text(json.dumps(quality.verification_request_ledger_record(request_path, request)))
     response_path.write_text(json.dumps(response), encoding="utf-8")
     handoff = {
         "request_path": request_path.relative_to(revision_dir).as_posix(),

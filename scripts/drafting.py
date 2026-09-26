@@ -397,6 +397,15 @@ def _section_payload(
         boilerplate_items.append({"boilerplate_id": boilerplate_key, "text": text, "sha256": sha256_value(text)})
     approved_source_words, minimum_detail_words = _source_detail_budget(reference, section)
     evidence_scopes = []
+    if section.section_id in {"analysis-plan.methodology", "analysis-plan.datasets"}:
+        path = "statistics.analysis_plan"
+        value = get_path(reference, path)
+        scoped_value = _section_evidence_value(section.section_id, path, value)
+        if scoped_value != value:
+            evidence_scopes.append({
+                "path": path, "focus_terms": [], "value": scoped_value,
+                "sha256": sha256_value(scoped_value),
+            })
     for path, focus_terms in section.evidence_scopes:
         value = get_path(reference, path)
         scoped_value = _focused_evidence_value(value, focus_terms)
@@ -628,6 +637,63 @@ def pending_requests(revision_dir: Path, expected_governing: Mapping[str, Any] |
 
 def _allowed_evidence(request: Mapping[str, Any]) -> set[str]:
     return {f"source:{item.get('path')}" for item in request.get("approved_input", []) if isinstance(item, Mapping)}
+
+
+def _canonical_evidence_refs(request: Mapping[str, Any], refs: Iterable[Any]) -> list[str]:
+    """Normalize only exact approved path aliases; never infer source authority."""
+    allowed = _allowed_evidence(request)
+    return [
+        f"source:{ref}" if f"source:{ref}" in allowed else str(ref)
+        for ref in refs
+    ]
+
+
+def _clinical_evidence_text(value: str) -> str:
+    """Exclude identified bibliography entries and their inline reference labels."""
+    heading = re.search(r"\bReferences?\s*:\s*", value, re.I)
+    entries = list(re.finditer(
+        r"(?m)^\s*(\d{1,3})[.)]\s+"
+        r"(?=[^\n]*(?i:\bdoi\s*:|https?://(?:dx\.)?doi\.org/|\bPMID\s*:))"
+        r"(?=[^\n]*\b(?:19|20)\d{2}\b)"
+        r"[A-Z][A-Za-z'’\-]+\s+(?:[A-Z]{1,4}\b|et al\.)[^\n]*",
+        value,
+    ))
+    starts = ([heading.start()] if heading else []) + [m.start() for m in entries]
+    if not starts:
+        return value
+    clinical = value[:min(starts)].strip()
+    reference_ids = {m.group(1) for m in entries}
+    if reference_ids:
+        def remove_label(match: re.Match[str]) -> str:
+            ids = set(re.findall(r"\d+", match.group(2)))
+            return match.group(1) if ids <= reference_ids else match.group(0)
+        clinical = re.sub(
+            r"([A-Za-z][.!?])(\d+(?:\s*,\s*\d+)*)(?=\s|$)", remove_label, clinical,
+        )
+    return clinical
+
+
+def _section_evidence_value(section_id: str, path: str, value: Any) -> Any:
+    """Partition explicit population clauses from methods without changing source."""
+    if path != "statistics.analysis_plan" or not isinstance(value, str):
+        return value
+    if section_id not in {"analysis-plan.methodology", "analysis-plan.datasets"}:
+        return value
+    clauses = re.split(r"(?<=[.!?])\s+|\n+", value)
+    population = [c for c in clauses if re.match(
+        r"\s*(?:the\s+)?(?:analysis\s+population|analysis\s+data\s*sets?|analysed\s+population|analyzed\s+population)\b"
+        r"\s+(?:(?:will|shall)\s+)?(?:include|includes|comprise|comprises|consist|consists|is defined|are defined)\b",
+        c, re.I,
+    ) and not re.search(
+        r"\b(?:mean|median|standard deviation|confidence|regression|hypothesis test|percentages?)\b",
+        c, re.I,
+    )]
+    if not population:
+        return value
+    return " ".join(
+        c for c in clauses
+        if (c in population) == (section_id == "analysis-plan.datasets")
+    )
 
 
 _GROUNDING_STOPWORDS = {
@@ -971,11 +1037,7 @@ def _direct_safety_role_errors(
 def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
     """Require observable anchors for every material scalar supplied by a cited source path."""
     if isinstance(value, str):
-        clinical_text = re.split(r"\bReferences?\s*:\s*", value, maxsplit=1, flags=re.I)[0].strip()
-        if clinical_text != value.strip() and len(clinical_text.split()) >= 10:
-            # Bibliographic identifiers are traceability data, not clinical
-            # claims that must be copied into every narrative section.
-            value = clinical_text
+        value = _clinical_evidence_text(value)
     content_tokens = _grounding_tokens(content)
     def numeric_tokens(text: str) -> set[str]:
         values = set()
@@ -1036,7 +1098,9 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
     }
     material: dict[str, Any] = {}
     for path in map(str, contract.get("minimum_evidence", [])):
-        value = scopes[path] if path in scopes else source.get(path)
+        value = scopes[path] if path in scopes else _section_evidence_value(
+            str(contract.get("section_id") or ""), path, source.get(path),
+        )
         if _leaf_texts(value):
             material[path] = value
     return material
@@ -1391,7 +1455,7 @@ def _validate_paragraph(
     if not isinstance(paragraph, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}]
     text = str(paragraph.get("text") or "").strip()
-    evidence_refs = paragraph.get("evidence_refs") if isinstance(paragraph.get("evidence_refs"), list) else []
+    evidence_refs = _canonical_evidence_refs(request, paragraph.get("evidence_refs")) if isinstance(paragraph.get("evidence_refs"), list) else []
     boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
     if len(text.split()) < 5:
         findings.append({"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."})
@@ -1405,7 +1469,7 @@ def _validate_paragraph(
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
     invalid_boilerplate = sorted(set(map(str, boilerplate_refs)) - allowed_boilerplate)
     if invalid_evidence:
-        findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported evidence references: {', '.join(invalid_evidence)}", "next_action": "Cite only evidence included in the request."})
+        findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported evidence references: {', '.join(invalid_evidence)}", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)})
     elif unrelated_evidence:
         findings.append({"category": "drafting", "field": section_id, "issue": f"Evidence is not approved for this section: {', '.join(unrelated_evidence)}", "next_action": "Cite the section's listed evidence or Fixed Clinical Boilerplate."})
     if invalid_boilerplate:
@@ -1425,7 +1489,7 @@ def _validate_list(
     if not isinstance(group, Mapping):
         return None, [{"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}]
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
-    evidence_refs = list(map(str, group.get("evidence_refs") or [])); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
+    evidence_refs = _canonical_evidence_refs(request, group.get("evidence_refs") or []); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
     findings: list[dict[str, Any]] = []
     if not items or any(not _substantive_list_item(item) for item in items):
         findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
@@ -1605,7 +1669,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             text = str(item.get("text") or "").strip()
             if re.search(r"</?[A-Za-z_][^>]*>", text) or len(text.split()) < 8:
                 findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty, too short, or contains XML markup.", "next_action": "Return source-grounded prose only."})
-            evidence_refs = list(map(str, item.get("evidence_refs") or []))
+            evidence_refs = _canonical_evidence_refs(request, item.get("evidence_refs") or [])
             contract = contracts.get(section_id, {})
             invalid = sorted(set(evidence_refs) - _allowed_evidence(request))
             target_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}

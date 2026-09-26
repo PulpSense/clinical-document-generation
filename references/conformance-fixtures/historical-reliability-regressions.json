@@ -135,6 +135,21 @@
         "tests/test_blocked_run_regressions.py::test_no_progress_reuses_authenticated_attempt_provenance_without_stale_request",
         "tests/test_runtime_regressions.py::test_mixed_no_progress_continues_all_unresolved_repairable_companions"
       ]
+    },
+    {
+      "id": "run26-drafting-timeout",
+      "defects": [
+        "numbered bibliography and citation labels excluded from clinical grounding",
+        "section-owned methods do not repeat population eligibility",
+        "exact approved citation aliases normalized",
+        "deterministic drafting no-progress detected",
+        "worker login checked before deadline"
+      ],
+      "test_nodes": [
+        "tests/test_run26_reliability.py",
+        "tests/test_worker_readiness.py",
+        "tests/test_reliability_maintenance.py::test_drafting_validation_retry_stops_repeated_condition_before_fourth_model_call"
+      ]
     }
   ]
 }
