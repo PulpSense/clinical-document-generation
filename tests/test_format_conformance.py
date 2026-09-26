@@ -14,6 +14,37 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_layout_corpus_runs_only_the_five_baseline_cases(tmp_path, monkeypatch):
+    selected = []
+
+    def record_selected_cases(root, **kwargs):
+        selected.extend(kwargs.get("case_ids") or [])
+        return {"status": "blocked", "cases": [], "evidence_root": str(tmp_path)}
+
+    monkeypatch.setattr(workflow, "page_renderers", lambda **kwargs: [object()])
+    monkeypatch.setattr(workflow, "load_format_conformance_matrix", lambda root: {
+        "matrix_sha256": "a" * 64,
+        "cases": [{"case_id": case} for case in (
+            "retrospective-protocol", "prospective-advarra", "prospective-sterling",
+            "ambispective-advarra", "ambispective-sterling",
+        )],
+    })
+    monkeypatch.setattr(workflow, "run_release_gate", record_selected_cases)
+    monkeypatch.setattr(workflow, "audit_format_conformance_outputs", lambda *args: {
+        "status": "blocked", "evidence_sha256": "b" * 64, "cases": [],
+    })
+
+    workflow.run_format_conformance(ROOT, evidence_root=tmp_path, allow_source_tree=True)
+
+    assert selected == [
+        "retrospective-sparse-complete",
+        "prospective-advarra-sparse-complete",
+        "prospective-sterling-rich-complete",
+        "ambispective-advarra-sparse-complete",
+        "ambispective-sterling-rich-complete",
+    ]
+
+
 def _gate_owner(gate_id):
     matrix = quality.load_format_conformance_matrix(ROOT)
     return next(item["retry_owner"] for item in matrix["gate_sequence"] if item["gate_id"] == gate_id)

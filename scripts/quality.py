@@ -85,6 +85,13 @@ DETERMINISTIC_BRANCH_ACCEPTANCE_CASES = (
     "ambispective-advarra-sparse-complete", "ambispective-advarra-rich-complete",
     "retrospective-sparse-complete", "retrospective-rich-complete",
 )
+FORMAT_CONFORMANCE_BASELINE_CASES = {
+    "retrospective-protocol": "retrospective-sparse-complete",
+    "prospective-advarra": "prospective-advarra-sparse-complete",
+    "prospective-sterling": "prospective-sterling-rich-complete",
+    "ambispective-advarra": "ambispective-advarra-sparse-complete",
+    "ambispective-sterling": "ambispective-sterling-rich-complete",
+}
 
 
 def certification_runtime_classification(elapsed_seconds: float) -> str:
@@ -683,18 +690,11 @@ def audit_format_conformance_outputs(
     evidence_root: Path,
 ) -> dict[str, Any]:
     """Compare generated deterministic DOCX semantics with approved baselines."""
-    selected_cases = {
-        "retrospective-protocol": "retrospective-sparse-complete",
-        "prospective-advarra": "prospective-advarra-sparse-complete",
-        "prospective-sterling": "prospective-sterling-rich-complete",
-        "ambispective-advarra": "ambispective-advarra-sparse-complete",
-        "ambispective-sterling": "ambispective-sterling-rich-complete",
-    }
     reported = {str(item.get("case")): item for item in release_gate_report.get("cases", []) if isinstance(item, Mapping)}
     results = []
     for case in matrix.get("cases", []):
         case_id = str(case.get("case_id") or "")
-        lifecycle_case = selected_cases.get(case_id, "")
+        lifecycle_case = FORMAT_CONFORMANCE_BASELINE_CASES.get(case_id, "")
         gate_case = reported.get(lifecycle_case, {})
         findings = []
         baseline_record = case.get("approved_output_baseline", {})
