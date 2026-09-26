@@ -356,8 +356,8 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "AI_costs": _icf_text(model, "icf.costs"), "AI_alternatives": _icf_text(model, "icf.alternatives"),
         "AI_privacy": _icf_text(model, "icf.privacy"), "AI_injuryCompensation": _icf_text(model, "icf.injury"),
         "AI_authorizationDuration": _icf_text(model, "icf.privacy"),
-        "referencesExists": "REFERENCES" if _text(reference.get("references")) else "",
-        "references": _text(reference.get("references")),
+        "referencesExists": "REFERENCES" if _supplied_protocol_references(reference) else "",
+        "references": _supplied_protocol_references(reference),
         "fundingSourceName": _text(get_path(reference, "parties.funding_source.name")), "fundingSourceAdress": _address(get_path(reference, "parties.funding_source.address")),
         "fundingSourceClarification": _text(get_path(reference, "parties.funding_source.clarification")),
         "testArticle(s)": _text(get_path(reference, "design.test_articles") or get_path(reference, "design.intervention_name")) or first_intervention or _text(get_path(reference, "design.arms")),
@@ -1618,9 +1618,36 @@ def _normalize_protocol_running_header(document: Document) -> None:
                         properties.append(OxmlElement("w:noWrap"))
 
 
+def _supplied_protocol_references(reference: Mapping[str, Any]) -> str:
+    """Preserve explicit references and recognizable bibliography in background."""
+    explicit = _text(reference.get("references"))
+    background = _text(get_path(reference, "study.background"))
+    heading = re.search(r"(?im)^[ \t]*references?(?:[ \t]*:[ \t]*|[ \t]*$)", background)
+    if heading:
+        embedded = background[heading.end():].strip()
+    else:
+        blocks = re.findall(
+            r"(?m)^[ \t]*\d{1,3}[.)][ \t]+[^\n]+(?:\n(?!(?:[ \t]*\d{1,3}[.)][ \t]+|[ \t]*$))(?:(?:[ \t]+|(?i:doi\s*:|PMID\s*:|https?://))[^\n]+))*",
+            background,
+        )
+        entries = [block for block in blocks if (
+            re.search(r"\b(?:19|20)\d{2}\b", block)
+            and (
+                re.search(r"\bdoi\s*:|https?://(?:dx\.)?doi\.org/|\bPMID\s*:", block, re.I)
+                or (
+                    re.match(r"\s*\d{1,3}[.)]\s+[A-Z][A-Za-z'’\-]+\s+[A-Z]{1,4}\b", block)
+                    and re.search(r"\b(?:19|20)\d{2}\s*;\s*\d+[^\n]*:\s*\d+", block)
+                )
+            )
+        )]
+        embedded = "\n".join(entry.strip() for entry in entries)
+    supplied = list(dict.fromkeys(line.strip() for line in (explicit + "\n" + embedded).splitlines() if line.strip()))
+    return "\n".join(supplied)
+
+
 def _ensure_protocol_references(document: Document, authority: Document, reference: Mapping[str, Any]) -> None:
     """Render supplied citations without leaving an orphaned empty heading."""
-    references = _text(reference.get("references"))
+    references = _supplied_protocol_references(reference)
     heading = next((paragraph for paragraph in document.paragraphs if paragraph.text.strip() == "REFERENCES"), None)
     if not references:
         if heading is not None:

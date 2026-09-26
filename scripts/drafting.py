@@ -1131,6 +1131,49 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
     return material
 
 
+def _timeline_grounded(content: str, value: Any) -> bool:
+    """Compare recognized study phases with their durations, not lexical shorthand."""
+    phases = {
+        "enrollment": r"\b(?:enroll(?:ment|ing|ed)?|recruit(?:ment|ing|ed)?)\b",
+        "followup": r"\bfollow[ -]?up\b",
+        "analysis": r"\b(?:analys(?:is|es)|analy[sz](?:ing|e|ed))\b",
+    }
+    duration = re.compile(r"\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(months?|weeks?|days?|years?|[mdwy])\b", re.I)
+    words = dict(zip("one two three four five six seven eight nine ten eleven twelve".split(), map(str, range(1, 13))))
+
+    def facts(text: str) -> dict[str, set[tuple[str, str]]]:
+        found: dict[str, set[tuple[str, str]]] = {}
+        # Keep phase binding within a sentence or semicolon clause. Decimal
+        # points inside a duration must not split the clause.
+        for clause in re.split(r"[;,\n]|\band\b|(?<!\d)\.(?!\d)", text.casefold()):
+            values = list(duration.finditer(clause))
+            for phase, pattern in phases.items():
+                for anchor in re.finditer(pattern, clause):
+                    distances = [(max(m.start() - anchor.end(), anchor.start() - m.end(), 0), m) for m in values]
+                    if not distances:
+                        continue
+                    nearest = min(d for d, _ in distances)
+                    matches = [m for d, m in distances if d == nearest and d <= 100]
+                    if len(matches) != 1:
+                        continue
+                    match = matches[0]
+                    number = words.get(match.group(1), match.group(1))
+                    unit = match.group(2)[0]
+                    found.setdefault(phase, set()).add((str(float(number)), unit))
+        return found
+
+    expected = facts(str(value or ""))
+    if not expected:
+        return evidence_grounded(content, value)
+    # Unrecognized source wording retains the existing fallback rather than
+    # claiming that a partial phase parse covers the entire supplied timeline.
+    source_numbers = duration.findall(str(value or ""))
+    if len(source_numbers) != sum(len(values) for values in expected.values()):
+        return evidence_grounded(content, value)
+    observed = facts(content)
+    return all(observed.get(phase) == values for phase, values in expected.items())
+
+
 def _approved_followup_value(timeline: Any) -> str:
     text = str(timeline or "")
     follow_up = re.search(
@@ -1409,7 +1452,11 @@ def _coverage_findings(
         for path, value in material.items()
         if f"source:{path}" in cited
         and not (section_id == "quality-safety" and path == "safety.roles")
-        and not evidence_grounded(content, value, all_items=all_items)
+        and not (
+            _timeline_grounded(content, value)
+            if section_id == "icf.duration" and path == "study.timeline"
+            else evidence_grounded(content, value, all_items=all_items)
+        )
     ]
     if ungrounded:
         findings.append({

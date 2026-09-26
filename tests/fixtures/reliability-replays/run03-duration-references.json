@@ -1,0 +1,3095 @@
+{
+  "request": {
+    "schema_version": "hermes-request/v2",
+    "request_id": "r-36b10b32b69a.draft.icf-narrative.quality-retry.a2.d825fdd2",
+    "revision_id": "r-36b10b32b69a",
+    "task": "section_drafting",
+    "wave": "quality-retry",
+    "batch_id": "icf-narrative",
+    "artifact": "icf",
+    "branch": {
+      "study_type": "Prospective",
+      "icf_template": "Sterling"
+    },
+    "topology_version": "clinical-drafting-v1",
+    "prompt_version": "section-drafting-v17-editorial-ownership",
+    "governing_resources": {
+      "approved_source_sha256": "0b2f96baae1019d8d781068bade6b242e65a385447e88dad18d5f2ca98229f9e",
+      "source_evidence_coverage_map": {
+        "schema_version": "source-evidence-coverage-map/v1",
+        "study_type": "Prospective",
+        "icf_template": "Sterling",
+        "entries": [
+          {
+            "source_path": "confidentiality.data_handling",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.privacy",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "ethics.confidentiality",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "confidentiality.publication",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality-publication",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "confidentiality.retention",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality-publication",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "design.arms",
+            "approved_value_sha256": "9235bcbf2d0ee21bcfe1ca5eae2aa7606e5106269917dcb59fa4e9e22bf8b811",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "design.intervention_description",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "design.intervention_name",
+            "approved_value_sha256": "4fe3901b06c340673e4d2e5369e4924322020f887cc0d9a5e3616199df7af157",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "design.interventions",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "design.study_design",
+            "approved_value_sha256": "04a00f057bc2d136bd0d9c71649c96d4c28cc76c38ed21321edee0e12a10ab8e",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.bias",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "endpoints.other",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "endpoints.primary",
+            "approved_value_sha256": "7bdd68cad8bac52e0038317808966427acc988c1e76907e0c4625ff84fc5924c",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.study-purpose",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "endpoints.secondary",
+            "approved_value_sha256": "7cd6d48e8ebc4a9bdded7978f58c72563ce9f0bf5f99a71910d83a9c98d644f0",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "ethics.confidentiality",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "ethics.confidentiality",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "meta.protocol_number",
+            "approved_value_sha256": "e6b595f530cb3211835dd3d4aa87dca9914d885b1a11b0bd417bc1852998ef31",
+            "destinations": [
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "objectives.primary",
+            "approved_value_sha256": "a564339a789bdd1cbfadaade5a0827c93951e5ec0064317b745042e4fa4e92f1",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.study-purpose",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "objectives",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "objectives.secondary",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "objectives",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.exclusion_criteria",
+            "approved_value_sha256": "eab6087714a4ddad389f4d9f4a1f8bddc183ecd2aa9db1d768aaad0f7c3d8353",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.exclusion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.inclusion_criteria",
+            "approved_value_sha256": "bef7a0c850483825c82b69663727747d3aa78bb6f695d2eca4cab3148867ae8b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.maximum_age",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.minimum_age",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.sample_justification",
+            "approved_value_sha256": "45086d3dd55145faece40bda9771310453ddba3e6d56d1c7436576de0fd767e7",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.sample_size",
+            "approved_value_sha256": "102e827e6b8254d300181362b0a4be2dee74d352932fea2ca4219407f31c9cbd",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.population",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.sample_size_evidence",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.study_population",
+            "approved_value_sha256": "77b9430ecd25b57f79962aabde4c0dc9b7695f097afeeed00fb2637de0d03ff2",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.population",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.assessment_details",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.assessments",
+            "approved_value_sha256": "0fedab8e3cfaf432ec3226abb29d7b891805e8010f922206710d04695af28acd",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.consent",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.consent",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.discontinuation",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.discontinuation",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.discontinued_subjects",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.discontinued",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.evaluation",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.intervention_management",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.methods",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.minimum_days_before_screening_without_participation",
+            "approved_value_sha256": "70748f3033506cf0cf702783e4078f809cc605e731ee7d09947f4fb7afe42acb",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.replacement",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.discontinuation",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.unscheduled_visits",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.unscheduled",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.visit_schedule",
+            "approved_value_sha256": "0a61a3361ecf8e07984b6bc8c3048395e5f447d5d1910345b6c9902c39457c8a",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.visit_schedule_table",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.alternatives",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.alternatives",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.benefits",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.benefits",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "risks-benefits.benefits",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.compensation_or_reimbursement",
+            "approved_value_sha256": "4f58d22d5ca4a735a155cb42d7e2ef6575cd98bedd1cc6f66d36344125d5eb62",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.payment",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "financial-injury",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.costs",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.costs",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "financial-injury",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.injury_handling",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.injury",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "financial-injury",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.privacy",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.privacy",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.risk_mitigation",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.risks",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "risks-benefits.risks",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.risks",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.risks",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.general",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "risks-benefits.risks",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.adverse_events",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.analysis",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.reporting",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.follow_up",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.follow-up",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.general_information",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.general",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.monitoring",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.monitoring",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.analysis_plan",
+            "approved_value_sha256": "052a034264bc0fad3a5d982f37a2518b93f711815ea1c1fbfe5f535723babb58",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.considerations",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.datasets",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.analysis",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.analysis_populations",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.datasets",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.methodology",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.sample_size_evidence",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.software",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.considerations",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "study.background",
+            "approved_value_sha256": "8fe829029a1ad3d12affad5fc9351b73d12b0c3e29ba9900afa7505d2cd8a803",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.background",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "introduction",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "study.hypothesis",
+            "approved_value_sha256": "3d7f257141f588cf1d3b595f202a6fe0f5504def9604a50296cabe870ef6edd5",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.study-purpose",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "study.timeline",
+            "approved_value_sha256": "28e11eee3047019cb64ed4b54ff66e7757c8b5291da1ac9c16c803b51f45b037",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.duration",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.completion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.study-completion",
+                "required": true,
+                "approved": true
+              }
+            ]
+          }
+        ]
+      },
+      "contracted_template_bundle": {
+        "schema_version": "contracted-template-bundle/v2",
+        "selection": {
+          "study_type": "Prospective",
+          "icf_family": "Sterling"
+        },
+        "contracted_templates": {
+          "protocol": {
+            "path": "assets/client-templates/docx/prospective-protocol.template.docx",
+            "sha256": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0"
+          },
+          "icf": {
+            "path": "assets/client-templates/docx/sterling-icf.template.docx",
+            "sha256": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347"
+          }
+        },
+        "client_template_authorities": {
+          "protocol": {
+            "path": "assets/client-templates/reference/protocol-reference.docx",
+            "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+          },
+          "icf": {
+            "path": "assets/client-templates/reference/sterling-icf-reference.docx",
+            "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
+          }
+        },
+        "document_section_contract": {
+          "version": "clinical-documents-v2.32-successful-run-polish",
+          "sha256": "e88c23010415dbf716af281dd89dc79e9b69efef5c2509ad4445e4acd8f2339e"
+        },
+        "fixed_clinical_boilerplate": {
+          "version": "clinical-boilerplate-v12",
+          "path": "references/fixed-clinical-boilerplate.json",
+          "sha256": "51250289d3e6215d1be6b2fe4ee506347883400eab934055340e5298a41f9758"
+        },
+        "sterling_clause_contract": {
+          "path": "references/sterling-clause-contract.json",
+          "sha256": "6312b587264e5047c250839377db95c2302446b99ec0d055b08db659230c9f99"
+        },
+        "approved_font_plan": {
+          "version": "approved-font-plan/v1",
+          "available_font_policy": "preserve",
+          "missing_font_policy": "approved_packaged_substitute",
+          "unknown_inventory_policy": "preserve_then_resolve_by_smoke_render",
+          "approved_fallbacks": {
+            "aptos": "Liberation Sans",
+            "arial": "Liberation Sans",
+            "arial unicode ms": "Liberation Sans",
+            "calibri": "Liberation Sans",
+            "courier new": "Liberation Mono",
+            "dejavu sans": "Liberation Sans",
+            "helvetica": "Liberation Sans",
+            "noto sans": "Liberation Sans",
+            "noto sans symbols": "Liberation Sans",
+            "segoe ui symbol": "Liberation Sans",
+            "symbol": "Liberation Sans",
+            "times new roman": "Liberation Serif",
+            "verdana": "Liberation Sans"
+          },
+          "packaged_families": {
+            "Liberation Mono": "LiberationMono-Regular.ttf",
+            "Liberation Sans": "LiberationSans-Regular.ttf",
+            "Liberation Serif": "LiberationSerif-Regular.ttf"
+          },
+          "packaged_font_assets": {
+            "assets/fallback-fonts/LiberationMono-Bold.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-Bold.ttf",
+              "sha256": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb"
+            },
+            "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-BoldItalic.ttf",
+              "sha256": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130"
+            },
+            "assets/fallback-fonts/LiberationMono-Italic.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-Italic.ttf",
+              "sha256": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1"
+            },
+            "assets/fallback-fonts/LiberationMono-Regular.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-Regular.ttf",
+              "sha256": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1"
+            },
+            "assets/fallback-fonts/LiberationSans-Bold.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-Bold.ttf",
+              "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173"
+            },
+            "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-BoldItalic.ttf",
+              "sha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee"
+            },
+            "assets/fallback-fonts/LiberationSans-Italic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-Italic.ttf",
+              "sha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0"
+            },
+            "assets/fallback-fonts/LiberationSans-Regular.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-Regular.ttf",
+              "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+            },
+            "assets/fallback-fonts/LiberationSerif-Bold.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-Bold.ttf",
+              "sha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce"
+            },
+            "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf",
+              "sha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7"
+            },
+            "assets/fallback-fonts/LiberationSerif-Italic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-Italic.ttf",
+              "sha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e"
+            },
+            "assets/fallback-fonts/LiberationSerif-Regular.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-Regular.ttf",
+              "sha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74"
+            }
+          },
+          "sha256": "4a4fa12e026266c53b3e16a62033195b480b86395b158ae7f39a778e6c32f3d1"
+        },
+        "layout_preservation_baseline": {
+          "schema_version": "layout-preservation-baseline/v1",
+          "artifacts": {
+            "protocol": {
+              "contracted_template": {
+                "path": "assets/client-templates/docx/prospective-protocol.template.docx",
+                "sha256": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0"
+              },
+              "client_template_authority": {
+                "path": "assets/client-templates/reference/protocol-reference.docx",
+                "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+              }
+            },
+            "icf": {
+              "contracted_template": {
+                "path": "assets/client-templates/docx/sterling-icf.template.docx",
+                "sha256": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347"
+              },
+              "client_template_authority": {
+                "path": "assets/client-templates/reference/sterling-icf-reference.docx",
+                "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
+              }
+            }
+          },
+          "sha256": "868f0640d45a2c5e7b94582b64b839d7fb3dece33f1c8cdf806fc33f1bce14e2"
+        },
+        "prs_authority": {
+          "generation_template": {
+            "path": "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+            "sha256": "7e133378afa382ced797c14917f6e73fd5007d95b23dc6adcdac0092a05ebfab"
+          },
+          "structural_reference": {
+            "path": "assets/client-templates/reference/prs-manual-reference.xml",
+            "sha256": "0d6c2f4c1252f25509e19da12757df231a9408192987b54dbf78d32dc74c6033"
+          }
+        },
+        "resource_hashes": {
+          "assets/client-templates/docx/prospective-protocol.template.docx": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0",
+          "assets/client-templates/docx/sterling-icf.template.docx": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347",
+          "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml": "7e133378afa382ced797c14917f6e73fd5007d95b23dc6adcdac0092a05ebfab",
+          "assets/client-templates/reference/protocol-reference.docx": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b",
+          "assets/client-templates/reference/prs-manual-reference.xml": "0d6c2f4c1252f25509e19da12757df231a9408192987b54dbf78d32dc74c6033",
+          "assets/client-templates/reference/sterling-icf-reference.docx": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357",
+          "assets/fallback-fonts/LiberationMono-Bold.ttf": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb",
+          "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130",
+          "assets/fallback-fonts/LiberationMono-Italic.ttf": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1",
+          "assets/fallback-fonts/LiberationMono-Regular.ttf": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1",
+          "assets/fallback-fonts/LiberationSans-Bold.ttf": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+          "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee",
+          "assets/fallback-fonts/LiberationSans-Italic.ttf": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0",
+          "assets/fallback-fonts/LiberationSans-Regular.ttf": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+          "assets/fallback-fonts/LiberationSerif-Bold.ttf": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce",
+          "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7",
+          "assets/fallback-fonts/LiberationSerif-Italic.ttf": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e",
+          "assets/fallback-fonts/LiberationSerif-Regular.ttf": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74",
+          "references/fixed-clinical-boilerplate.json": "51250289d3e6215d1be6b2fe4ee506347883400eab934055340e5298a41f9758",
+          "references/sterling-clause-contract.json": "6312b587264e5047c250839377db95c2302446b99ec0d055b08db659230c9f99"
+        },
+        "identity_sha256": "2e98c894012cac7f89eb5a9089de1ff0226743a29514a9dae065be4371081995"
+      },
+      "implementation_sha256": {
+        "scripts/contracts.py": "31ac327ce85c4256b3852d89af814f810beb6210d22db0875ac12be6edab1d45",
+        "scripts/drafting.py": "e6862dd324de088a4a884206fa640d7223f33439e234f20a9db39d19e70fd742",
+        "scripts/prs_xml.py": "5383c8daa71173e43bd476e8d36a298e2ba34a0265973254aa49248e59c94bf9",
+        "scripts/quality.py": "ef21cda430d71f17d5690d6e7800856f2b1d6f1e7a1239948b0d184fd22b6e00",
+        "scripts/rendering.py": "e52b6cff76c9c640903394399d938b9b79bf1d149826258ec1b2c604584a0440",
+        "scripts/workflow.py": "4a7b6a340763a22075662df803c48ce6c06d6b5ce77af8eae35ba8bdc1a0d390"
+      },
+      "topology_version": "clinical-drafting-v1",
+      "prompt_version": "section-drafting-v17-editorial-ownership",
+      "producer_policy": "nonempty-model-id"
+    },
+    "attempts": {
+      "icf.duration": 2
+    },
+    "approved_input": [
+      {
+        "path": "study.title",
+        "value": "Visual and Patient-Reported Outcomes after Mix-and-Match Implantation of an Extended Depth of Focus and a Trifocal Intraocular Lens",
+        "sha256": "ed674a3b86c8d8d0157d18abebabea720041bf853aba0ce964ae6b2cf2e6be28"
+      },
+      {
+        "path": "study.short_title",
+        "value": "PureSee and Odyssey mix-and-match outcomes",
+        "sha256": "42a2ef5d69d07c72ed7bc82e5977ddcc69917fb9d9941b4437b894433c3b0a21"
+      },
+      {
+        "path": "study.background",
+        "value": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggests high visual acuity and spectacle independence at distance, intermediate, and near.1,2\n\nThe TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggesting better intermediate and near vision with the PureSee IOL, compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile.3\n\nMix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone.\nTo date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye).\n1. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n2. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7\n3.  Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8",
+        "sha256": "8fe829029a1ad3d12affad5fc9351b73d12b0c3e29ba9900afa7505d2cd8a803"
+      },
+      {
+        "path": "study.hypothesis",
+        "value": "The hypothesis is that mix-and-match implantation of the PureSee and Odyssey intraocular lenses (IOLs) will result in excellent visual outcomes at distance, intermediate, and near, high patient satisfaction, and low reports of visual disturbances.",
+        "sha256": "3d7f257141f588cf1d3b595f202a6fe0f5504def9604a50296cabe870ef6edd5"
+      },
+      {
+        "path": "study.timeline",
+        "value": "Enrollment: 6M; Follow-Up: 3M; Data Analysis: 1M",
+        "sha256": "28e11eee3047019cb64ed4b54ff66e7757c8b5291da1ac9c16c803b51f45b037"
+      },
+      {
+        "path": "study.status",
+        "value": "Fully developed protocol: No; IRB: Not submitted",
+        "sha256": "b4b122ab47f08874d6ddf5166bf4bfc31442681477de76f08d57088863114daa"
+      },
+      {
+        "path": "study.condition",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "objectives.primary",
+        "value": [
+          "The objective of this study is to test the hypothesis that mix-and-match implantation of the PureSee and Odyssey IOLs will result in excellent visual outcomes at distance, intermediate, and near, high patient satisfaction, and low reports of visual disturbances."
+        ],
+        "sha256": "a564339a789bdd1cbfadaade5a0827c93951e5ec0064317b745042e4fa4e92f1"
+      },
+      {
+        "path": "objectives.secondary",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "endpoints.primary",
+        "value": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Binocular DCIVA (66 cm)",
+            "time_point": "3 Month postoperative"
+          }
+        ],
+        "sha256": "026c5168e9c5d7fc84055b2494fefaa0622fc00fc9e4fbf8caa8a64093153627"
+      },
+      {
+        "path": "endpoints.secondary",
+        "value": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular CDVA",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular UIVA (66 cm)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular UDVA",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular DCNVA (40 cm)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular UNVA (40cm)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Binocular distance-corrected defocus curve (+1.0 D through -2.50 D)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Percentages of subject responses on each of the AIOLIS questionnaire questions.",
+            "time_point": "3 Month postoperative"
+          }
+        ],
+        "sha256": "1867169bcaa9c60bcae34e34c3fe66022f3d8bec2e34945fc22ae7d07bdbb018"
+      },
+      {
+        "path": "population.study_population",
+        "value": "Adult patients undergoing age-related cataract surgery.",
+        "sha256": "77b9430ecd25b57f79962aabde4c0dc9b7695f097afeeed00fb2637de0d03ff2"
+      },
+      {
+        "path": "population.sample_size",
+        "value": "40 subjects; no control subjects",
+        "sha256": "102e827e6b8254d300181362b0a4be2dee74d352932fea2ca4219407f31c9cbd"
+      },
+      {
+        "path": "population.sample_justification",
+        "value": "We estimate that 35 subjects will be sufficient to characterize the performance of the mix-and-match approach using PureSee and Odyssey. To account for dropout, the sample size will be increased to 40.",
+        "sha256": "45086d3dd55145faece40bda9771310453ddba3e6d56d1c7436576de0fd767e7"
+      },
+      {
+        "path": "population.inclusion_criteria",
+        "value": [
+          "Adult patients undergoing age-related cataract surgery."
+        ],
+        "sha256": "bef7a0c850483825c82b69663727747d3aa78bb6f695d2eca4cab3148867ae8b"
+      },
+      {
+        "path": "population.exclusion_criteria",
+        "value": [
+          "Moderate-severe any disease state (deemed by the surgeon) that could increase risk of complicated cataract surgery (ie, pseudoexfoliation syndrome, zonular dehiscence, history of eye trauma, and prior refractive surgery)"
+        ],
+        "sha256": "eab6087714a4ddad389f4d9f4a1f8bddc183ecd2aa9db1d768aaad0f7c3d8353"
+      },
+      {
+        "path": "design.study_design",
+        "value": "Prospective, observational, single-center, single-cohort study with no control arm and no masking.",
+        "sha256": "04a00f057bc2d136bd0d9c71649c96d4c28cc76c38ed21321edee0e12a10ab8e"
+      },
+      {
+        "path": "design.number_of_sites",
+        "value": "1",
+        "sha256": "391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf"
+      },
+      {
+        "path": "design.masking",
+        "value": "None",
+        "sha256": "f2953d2931e36d0c55640f51865f8394ebe52194765d04e521017232558f871c"
+      },
+      {
+        "path": "design.intervention_name",
+        "value": "TECNIS PureSee intraocular lens in the dominant eye and TECNIS Odyssey intraocular lens in the non-dominant eye.",
+        "sha256": "4fe3901b06c340673e4d2e5369e4924322020f887cc0d9a5e3616199df7af157"
+      },
+      {
+        "path": "design.intervention_type",
+        "value": "Medical device \u2014 intraocular lenses.",
+        "sha256": "6524e13fe859082f83db6ed7fa40c4785859d3470cea4457e842b04a5ba78d71"
+      },
+      {
+        "path": "design.controls",
+        "value": "None",
+        "sha256": "f2953d2931e36d0c55640f51865f8394ebe52194765d04e521017232558f871c"
+      },
+      {
+        "path": "design.arms",
+        "value": [
+          {
+            "description": "TECNIS PureSee intraocular lens in the dominant eye and TECNIS Odyssey intraocular lens in the non-dominant eye.",
+            "name": "PureSee dominant eye / Odyssey non-dominant eye"
+          }
+        ],
+        "sha256": "54e0bb34cca3ccc36f09008ae2b626fe8e37f5d79b9017cde25b71f917f65156"
+      },
+      {
+        "path": "design.intervention_description",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.assessments",
+        "value": [
+          "Preoperative (Screening)",
+          "Operative (one visit per eye)",
+          "3 Month postoperative"
+        ],
+        "sha256": "405b94af7b3bdaa8e347c836527c151634a97224d6a71dc5ce4da228b342320a"
+      },
+      {
+        "path": "procedures.visit_schedule",
+        "value": [
+          {
+            "procedures": "Informed Consent; Demographics; General Information: Medical History",
+            "timing": "Preoperative",
+            "visit": "Preoperative (Screening)"
+          },
+          {
+            "procedures": "Cataract surgery and implantation of PureSee in the dominant eye and Odyssey in the non-dominant eye",
+            "timing": "One visit per eye",
+            "visit": "Operative (one visit per eye)"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66cm, binocular); Uncorrected photopic near VA (40cm, binocular); Distance corrected photopic distance VA (binocular); Distance corrected photopic intermediate VA (66cm, binocular); Distance corrected photopic near VA (40cm, binocular); Distance corrected defocus curve; AIOLIS; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form1",
+            "timing": "3 Month postoperative",
+            "visit": "3 Month postoperative"
+          }
+        ],
+        "sha256": "c32cbbc7e2ee6683205cc6efc5de34e12c3d2cf33361055c9bebd270a7f91da7"
+      },
+      {
+        "path": "procedures.schedule_of_assessments_source",
+        "value": [
+          {
+            "activity": "Informed Consent",
+            "month_3": "",
+            "screening": "X"
+          },
+          {
+            "activity": "Demographics",
+            "month_3": "",
+            "screening": "X"
+          },
+          {
+            "activity": "General Information: Medical History",
+            "month_3": "",
+            "screening": "X"
+          },
+          {
+            "activity": "Uncorrected photopic distance VA (binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Uncorrected photopic intermediate VA (66cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Uncorrected photopic near VA (40cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected photopic distance VA (binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected photopic intermediate VA (66cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected photopic near VA (40cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected defocus curve",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "AIOLIS",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Monitor for Adverse Events and Device Deficiencies",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Complete Exit Form1",
+            "month_3": "X",
+            "screening": ""
+          }
+        ],
+        "sha256": "e296d26bff6cdda7198cbab013d4e8d36f7c28f919ade616632145e9d94d81d2"
+      },
+      {
+        "path": "procedures.minimum_days_before_screening_without_participation",
+        "value": "90 days before screening.",
+        "sha256": "70748f3033506cf0cf702783e4078f809cc605e731ee7d09947f4fb7afe42acb"
+      },
+      {
+        "path": "procedures.methods",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.unscheduled_visits",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.discontinuation",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.termination",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.study_termination",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.compensation_or_reimbursement",
+        "value": "No compensation or reimbursement will be provided to participants for study participation.",
+        "sha256": "4f58d22d5ca4a735a155cb42d7e2ef6575cd98bedd1cc6f66d36344125d5eb62"
+      },
+      {
+        "path": "risks_benefits.risks",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.risk_mitigation",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.benefits",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.costs",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.alternatives",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.privacy",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.injury_handling",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "confidentiality.data_handling",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "confidentiality.publication",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "parties.irb.name",
+        "value": "Synthetic Test IRB",
+        "sha256": "26c7e28bd1a2e36e75e8fdc4cfd6e4079c0cea8361c7cd8e8ca1c02c9a323038"
+      },
+      {
+        "path": "parties.irb.affiliation",
+        "value": "Independent ethics committee \u2014 synthetic test organization",
+        "sha256": "867ecaf20238e994a1d89e96ffdbb252d861b89d71d70f43e941aeb393a951db"
+      },
+      {
+        "path": "parties.irb.phone",
+        "value": "+1 202-555-0100",
+        "sha256": "bda6b6f764abb33e5684be43279c61e43dc01ffb17ae80df3c71bfba044f1105"
+      },
+      {
+        "path": "parties.irb.email",
+        "value": "irb@synthetic-example.test",
+        "sha256": "954e20421ced02b3a6c2f354b3208c4707d003e1fa6a369572167b28d5b9c92e"
+      },
+      {
+        "path": "parties.irb.address",
+        "value": "100 Test Review Avenue, Test City, New York 10001, USA",
+        "sha256": "97351679265da285dda7cd8b9456b69d009471c68727a84c3f648bd7b2501392"
+      },
+      {
+        "path": "parties.sponsor.name",
+        "value": "Synthetic Vision Research Sponsor",
+        "sha256": "fff8d14fbc8eab15b40c0dcc83f7940c83062be93d11c908dd30dab792432673"
+      },
+      {
+        "path": "parties.sponsor.address",
+        "value": "200 Test Sponsor Boulevard, Test City, New York 10002, USA",
+        "sha256": "d0aaab67a0b0404b67a017cee1e977adaa0fe02752a03c103faecfac9d7943c3"
+      },
+      {
+        "path": "parties.principal_investigator.name",
+        "value": "Avery Morgan",
+        "sha256": "e37bd48d7c70c5d9bc19ba486a9f7c5051159db5a9d9173d1b93bb7c1d2d62e4"
+      },
+      {
+        "path": "parties.principal_investigator.title",
+        "value": "MD, Principal Investigator",
+        "sha256": "f9f1d3c1a7cf19166bd068607eadce65f0441216d2e31a4450dc837f79de3cf3"
+      },
+      {
+        "path": "parties.study_coordinator.name",
+        "value": "Jordan Lee",
+        "sha256": "11f2e2fa0e1424835156bfbd2268f6fee8854250e21b472bd746f1edba302dbd"
+      },
+      {
+        "path": "parties.study_coordinator.title",
+        "value": "CRC, Study Coordinator",
+        "sha256": "3679940bc1dbbbfd4b847b6bcd62684a81c772c0ebfc7dd84b5d180b3ee65e6a"
+      },
+      {
+        "path": "parties.study_coordinator.business_phone",
+        "value": "+1 202-555-0101",
+        "sha256": "279128ff35a63fa416b54029068fb64e368ef7fa43cd307e05cc55df16286ed7"
+      },
+      {
+        "path": "parties.study_coordinator.office_phone",
+        "value": "+1 202-555-0102",
+        "sha256": "236d233a6f241ebf40f5fb020390789d432031b813c96fad7d9d95f4ea9ff362"
+      },
+      {
+        "path": "parties.study_coordinator.email",
+        "value": "jordan.lee@synthetic-example.test",
+        "sha256": "739f367cf9607dc50705a91b124455215b921faf9f0f02749bcbeecf31f97272"
+      }
+    ],
+    "approved_source": {
+      "study": {
+        "title": "Visual and Patient-Reported Outcomes after Mix-and-Match Implantation of an Extended Depth of Focus and a Trifocal Intraocular Lens",
+        "short_title": "PureSee and Odyssey mix-and-match outcomes",
+        "background": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggests high visual acuity and spectacle independence at distance, intermediate, and near.1,2\n\nThe TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggesting better intermediate and near vision with the PureSee IOL, compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile.3\n\nMix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone.\nTo date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye).\n1. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n2. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7\n3.  Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8",
+        "hypothesis": "The hypothesis is that mix-and-match implantation of the PureSee and Odyssey intraocular lenses (IOLs) will result in excellent visual outcomes at distance, intermediate, and near, high patient satisfaction, and low reports of visual disturbances.",
+        "timeline": "Enrollment: 6M; Follow-Up: 3M; Data Analysis: 1M",
+        "status": "Fully developed protocol: No; IRB: Not submitted",
+        "condition": null
+      },
+      "objectives": {
+        "primary": [
+          "The objective of this study is to test the hypothesis that mix-and-match implantation of the PureSee and Odyssey IOLs will result in excellent visual outcomes at distance, intermediate, and near, high patient satisfaction, and low reports of visual disturbances."
+        ],
+        "secondary": null
+      },
+      "endpoints": {
+        "primary": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Binocular DCIVA (66 cm)",
+            "time_point": "3 Month postoperative"
+          }
+        ],
+        "secondary": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular CDVA",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular UIVA (66 cm)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular UDVA",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular DCNVA (40 cm)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Mean binocular UNVA (40cm)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Binocular distance-corrected defocus curve (+1.0 D through -2.50 D)",
+            "time_point": "3 Month postoperative"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "label": "Percentages of subject responses on each of the AIOLIS questionnaire questions.",
+            "time_point": "3 Month postoperative"
+          }
+        ]
+      },
+      "population": {
+        "study_population": "Adult patients undergoing age-related cataract surgery.",
+        "sample_size": "40 subjects; no control subjects",
+        "sample_justification": "We estimate that 35 subjects will be sufficient to characterize the performance of the mix-and-match approach using PureSee and Odyssey. To account for dropout, the sample size will be increased to 40.",
+        "inclusion_criteria": [
+          "Adult patients undergoing age-related cataract surgery."
+        ],
+        "exclusion_criteria": [
+          "Moderate-severe any disease state (deemed by the surgeon) that could increase risk of complicated cataract surgery (ie, pseudoexfoliation syndrome, zonular dehiscence, history of eye trauma, and prior refractive surgery)"
+        ]
+      },
+      "design": {
+        "study_design": "Prospective, observational, single-center, single-cohort study with no control arm and no masking.",
+        "number_of_sites": "1",
+        "masking": "None",
+        "intervention_name": "TECNIS PureSee intraocular lens in the dominant eye and TECNIS Odyssey intraocular lens in the non-dominant eye.",
+        "intervention_type": "Medical device \u2014 intraocular lenses.",
+        "controls": "None",
+        "arms": [
+          {
+            "description": "TECNIS PureSee intraocular lens in the dominant eye and TECNIS Odyssey intraocular lens in the non-dominant eye.",
+            "name": "PureSee dominant eye / Odyssey non-dominant eye"
+          }
+        ],
+        "intervention_description": null
+      },
+      "procedures": {
+        "assessments": [
+          "Preoperative (Screening)",
+          "Operative (one visit per eye)",
+          "3 Month postoperative"
+        ],
+        "visit_schedule": [
+          {
+            "procedures": "Informed Consent; Demographics; General Information: Medical History",
+            "timing": "Preoperative",
+            "visit": "Preoperative (Screening)"
+          },
+          {
+            "procedures": "Cataract surgery and implantation of PureSee in the dominant eye and Odyssey in the non-dominant eye",
+            "timing": "One visit per eye",
+            "visit": "Operative (one visit per eye)"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66cm, binocular); Uncorrected photopic near VA (40cm, binocular); Distance corrected photopic distance VA (binocular); Distance corrected photopic intermediate VA (66cm, binocular); Distance corrected photopic near VA (40cm, binocular); Distance corrected defocus curve; AIOLIS; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form1",
+            "timing": "3 Month postoperative",
+            "visit": "3 Month postoperative"
+          }
+        ],
+        "schedule_of_assessments_source": [
+          {
+            "activity": "Informed Consent",
+            "month_3": "",
+            "screening": "X"
+          },
+          {
+            "activity": "Demographics",
+            "month_3": "",
+            "screening": "X"
+          },
+          {
+            "activity": "General Information: Medical History",
+            "month_3": "",
+            "screening": "X"
+          },
+          {
+            "activity": "Uncorrected photopic distance VA (binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Uncorrected photopic intermediate VA (66cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Uncorrected photopic near VA (40cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected photopic distance VA (binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected photopic intermediate VA (66cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected photopic near VA (40cm, binocular)",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Distance corrected defocus curve",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "AIOLIS",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Monitor for Adverse Events and Device Deficiencies",
+            "month_3": "X",
+            "screening": ""
+          },
+          {
+            "activity": "Complete Exit Form1",
+            "month_3": "X",
+            "screening": ""
+          }
+        ],
+        "minimum_days_before_screening_without_participation": "90 days before screening.",
+        "methods": null,
+        "unscheduled_visits": null,
+        "discontinuation": null,
+        "termination": null,
+        "study_termination": null
+      },
+      "risks_benefits": {
+        "compensation_or_reimbursement": "No compensation or reimbursement will be provided to participants for study participation.",
+        "risks": null,
+        "risk_mitigation": null,
+        "benefits": null,
+        "costs": null,
+        "alternatives": null,
+        "privacy": null,
+        "injury_handling": null
+      },
+      "confidentiality": {
+        "data_handling": null,
+        "publication": null
+      },
+      "parties": {
+        "irb": {
+          "name": "Synthetic Test IRB",
+          "affiliation": "Independent ethics committee \u2014 synthetic test organization",
+          "phone": "+1 202-555-0100",
+          "email": "irb@synthetic-example.test",
+          "address": "100 Test Review Avenue, Test City, New York 10001, USA"
+        },
+        "sponsor": {
+          "name": "Synthetic Vision Research Sponsor",
+          "address": "200 Test Sponsor Boulevard, Test City, New York 10002, USA"
+        },
+        "principal_investigator": {
+          "name": "Avery Morgan",
+          "title": "MD, Principal Investigator"
+        },
+        "study_coordinator": {
+          "name": "Jordan Lee",
+          "title": "CRC, Study Coordinator",
+          "business_phone": "+1 202-555-0101",
+          "office_phone": "+1 202-555-0102",
+          "email": "jordan.lee@synthetic-example.test"
+        }
+      }
+    },
+    "source_evidence_coverage_map": {
+      "schema_version": "source-evidence-coverage-map/v1",
+      "study_type": "Prospective",
+      "icf_template": "Sterling",
+      "entries": [
+        {
+          "source_path": "confidentiality.data_handling",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.privacy",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics.confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "confidentiality.publication",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality-publication",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "confidentiality.retention",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality-publication",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.arms",
+          "approved_value_sha256": "9235bcbf2d0ee21bcfe1ca5eae2aa7606e5106269917dcb59fa4e9e22bf8b811",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.intervention_description",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.intervention_name",
+          "approved_value_sha256": "4fe3901b06c340673e4d2e5369e4924322020f887cc0d9a5e3616199df7af157",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.interventions",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.study_design",
+          "approved_value_sha256": "04a00f057bc2d136bd0d9c71649c96d4c28cc76c38ed21321edee0e12a10ab8e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.other",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.primary",
+          "approved_value_sha256": "7bdd68cad8bac52e0038317808966427acc988c1e76907e0c4625ff84fc5924c",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.study-purpose",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.secondary",
+          "approved_value_sha256": "7cd6d48e8ebc4a9bdded7978f58c72563ce9f0bf5f99a71910d83a9c98d644f0",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "ethics.confidentiality",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics.confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "meta.protocol_number",
+          "approved_value_sha256": "e6b595f530cb3211835dd3d4aa87dca9914d885b1a11b0bd417bc1852998ef31",
+          "destinations": [
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.primary",
+          "approved_value_sha256": "a564339a789bdd1cbfadaade5a0827c93951e5ec0064317b745042e4fa4e92f1",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.study-purpose",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.secondary",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.exclusion_criteria",
+          "approved_value_sha256": "eab6087714a4ddad389f4d9f4a1f8bddc183ecd2aa9db1d768aaad0f7c3d8353",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.exclusion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.inclusion_criteria",
+          "approved_value_sha256": "bef7a0c850483825c82b69663727747d3aa78bb6f695d2eca4cab3148867ae8b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.maximum_age",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.minimum_age",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_justification",
+          "approved_value_sha256": "45086d3dd55145faece40bda9771310453ddba3e6d56d1c7436576de0fd767e7",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size",
+          "approved_value_sha256": "102e827e6b8254d300181362b0a4be2dee74d352932fea2ca4219407f31c9cbd",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size_evidence",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.study_population",
+          "approved_value_sha256": "77b9430ecd25b57f79962aabde4c0dc9b7695f097afeeed00fb2637de0d03ff2",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessment_details",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessments",
+          "approved_value_sha256": "0fedab8e3cfaf432ec3226abb29d7b891805e8010f922206710d04695af28acd",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.consent",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.consent",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinuation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.discontinuation",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinued_subjects",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.discontinued",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.evaluation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.intervention_management",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.methods",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.minimum_days_before_screening_without_participation",
+          "approved_value_sha256": "70748f3033506cf0cf702783e4078f809cc605e731ee7d09947f4fb7afe42acb",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.replacement",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.discontinuation",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.unscheduled_visits",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.unscheduled",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule",
+          "approved_value_sha256": "0a61a3361ecf8e07984b6bc8c3048395e5f447d5d1910345b6c9902c39457c8a",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule_table",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.alternatives",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.alternatives",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.benefits",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.benefits",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "risks-benefits.benefits",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.compensation_or_reimbursement",
+          "approved_value_sha256": "4f58d22d5ca4a735a155cb42d7e2ef6575cd98bedd1cc6f66d36344125d5eb62",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.payment",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "financial-injury",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.costs",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.costs",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "financial-injury",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.injury_handling",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.injury",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "financial-injury",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.privacy",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.privacy",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risk_mitigation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.risks",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "risks-benefits.risks",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risks",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.risks",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.general",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "risks-benefits.risks",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.adverse_events",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.analysis",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.reporting",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.follow_up",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.follow-up",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.general_information",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.general",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.monitoring",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.monitoring",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_plan",
+          "approved_value_sha256": "052a034264bc0fad3a5d982f37a2518b93f711815ea1c1fbfe5f535723babb58",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.analysis",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_populations",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.methodology",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.sample_size_evidence",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.software",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.background",
+          "approved_value_sha256": "8fe829029a1ad3d12affad5fc9351b73d12b0c3e29ba9900afa7505d2cd8a803",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.background",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.hypothesis",
+          "approved_value_sha256": "3d7f257141f588cf1d3b595f202a6fe0f5504def9604a50296cabe870ef6edd5",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.study-purpose",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.timeline",
+          "approved_value_sha256": "28e11eee3047019cb64ed4b54ff66e7757c8b5291da1ac9c16c803b51f45b037",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.duration",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.completion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.study-completion",
+              "required": true,
+              "approved": true
+            }
+          ]
+        }
+      ]
+    },
+    "evidence_checklist": [
+      {
+        "section_id": "icf.duration",
+        "required_source_paths": [
+          "study.timeline"
+        ],
+        "approved_values": {
+          "study.timeline": "Enrollment: 6M; Follow-Up: 3M; Data Analysis: 1M"
+        }
+      }
+    ],
+    "section_contracts": [
+      {
+        "section_id": "icf.duration",
+        "number": "",
+        "title": "Length and participation",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft"
+        ],
+        "minimum_evidence": [
+          "study.timeline"
+        ],
+        "fixed_boilerplate": [],
+        "content_expectations": [
+          "State the approved participation duration and relevant time points.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_evidence",
+        "evidence_scopes": [],
+        "approved_source_word_count": 7,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      }
+    ],
+    "accepted_context": [],
+    "prior_target_drafts": [],
+    "findings": [
+      {
+        "category": "drafting",
+        "field": "icf.duration",
+        "issue": "Evidence is not approved for this section: source:procedures.visit_schedule",
+        "next_action": "Cite the section's listed evidence or Fixed Clinical Boilerplate.",
+        "target_ids": [
+          "icf.duration"
+        ],
+        "recovery_class": "drafting_defect",
+        "action": "retry_drafting_target",
+        "owner": "drafting"
+      }
+    ],
+    "constraints": [
+      "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+      "Use only supplied approved evidence and listed Fixed Clinical Boilerplate.",
+      "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+      "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+      "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims.",
+      "Return exactly one result for every requested section ID.",
+      "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+      "Return structured section content, not a whole document or document markup.",
+      "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
+      "Use participant-facing language for ICF sections.",
+      "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+      "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+      "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+      "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+      "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and do not reproduce the endpoint inventory outside Study Design unless scientific meaning requires it.",
+      "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+      "Write clinical content that serves the section purpose. Omit self-referential filler, generic transitions, and repeated conclusions that add no source-supported information.",
+      "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+      "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+      "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+      "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+      "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+    ],
+    "response_path": "hermes/responses/r-36b10b32b69a.draft.icf-narrative.quality-retry.a2.d825fdd2.json",
+    "request_sha256": "27b2124e58777aeda54f89254036ee1d9f0756f8b06487b85c93996e917a7d31"
+  },
+  "response": {
+    "schema_version": "hermes-response/v2",
+    "request_id": "r-36b10b32b69a.draft.icf-narrative.quality-retry.a2.d825fdd2",
+    "request_sha256": "27b2124e58777aeda54f89254036ee1d9f0756f8b06487b85c93996e917a7d31",
+    "revision_id": "r-36b10b32b69a",
+    "task": "section_drafting",
+    "batch_id": "icf-narrative",
+    "producer": {
+      "model_id": "gpt-6-astra",
+      "reviewer_id": "icf-narrative"
+    },
+    "section_results": [
+      {
+        "section_id": "icf.duration",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Your follow-up period in this study will last 3 months. The research team plans to enroll participants over 6 months and spend 1 month analyzing the study results.",
+            "evidence_refs": [
+              "source:study.timeline"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      }
+    ]
+  },
+  "reference": {
+    "study": {
+      "background": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggests high visual acuity and spectacle independence at distance, intermediate, and near.1,2\n\nThe TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggesting better intermediate and near vision with the PureSee IOL, compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile.3\n\nMix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone.\nTo date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye).\n1. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n2. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7\n3.  Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8"
+    }
+  }
+}
