@@ -687,6 +687,15 @@ def _clinical_evidence_text(value: str) -> str:
 
 def _section_evidence_value(section_id: str, path: str, value: Any) -> Any:
     """Project explicit section-owned clauses without mutating approved source."""
+    if path in {"procedures.visit_schedule", "procedures.visit_schedule_table"} and isinstance(value, list):
+        # Ordinal row identifiers belong to the structured schedule. Narrative
+        # grounding checks the visit name, timing and procedures; a number that
+        # is part of the actual visit name remains clinical evidence.
+        return [
+            {key: copy.deepcopy(child) for key, child in record.items() if key not in {"visitNumber", "visit_number"}}
+            if isinstance(record, Mapping) else copy.deepcopy(record)
+            for record in value
+        ]
     if path == "study.background" and isinstance(value, str) and section_id in {"introduction", "icf.background"}:
         clinical = _clinical_evidence_text(value)
         # Proposal backgrounds often include objectives and the planned study
