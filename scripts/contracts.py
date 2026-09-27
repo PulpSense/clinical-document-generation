@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.33-background-evidence-scope"
+CONTRACT_VERSION = "clinical-documents-v2.34-completion-and-prs-fidelity"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -366,7 +366,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
         "evaluation-procedures": "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
-        "endpoint-criteria.completion": "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
+        "endpoint-criteria.completion": "State the supplied participant-completion rule and distinguish completion from discontinuation. Do not repeat the visit inventory or study-wide timeline; Sections 9 and 15 own the schedule and Section 18.5 owns study closeout.",
         "endpoint-criteria.study-completion": "State the supplied study-level closeout timeline concisely. Define a completion trigger only when the source supplies one. Sections 9 and 15 own the visit schedule, and Section 18.1 owns participant completion.",
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
         "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State shared methods once per outcome group. Cite the supplied primary and secondary endpoint paths in evidence_refs without adding Study Design cross-references to the prose. Section 10.3 owns the approved interpretation qualification, such as no planned inferential test.",
@@ -552,11 +552,11 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),
     _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.costs", "risks_benefits.injury_handling"), "injury"),
     _section_spec("endpoint-criteria", "18.", "STUDY ENDPOINT CRITERIA", role="container"),
-    _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("procedures.completion", "study.timeline", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.assessments"), "completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
+    _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("procedures.completion", "study.timeline"), "completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation", "procedures.replacement"), "discontinuation"),
     _section_spec("endpoint-criteria.termination", "18.3.", "Patient Termination", evidence=("procedures.termination",), role="source", required=False),
     _section_spec("endpoint-criteria.study-termination", "18.4.", "Study Termination", evidence=("procedures.study_termination",), role="source", required=False),
-    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline",), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
+    _section_spec("endpoint-criteria.study-completion", "18.5.", "Study Completion", "protocol-operations", ("study.timeline", "study.completion"), "study-completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("risks-benefits", "19.", "SUMMARY OF RISKS AND BENEFITS", role="container"),
     _section_spec("risks-benefits.risks", "19.1.", "Summary of risks", "protocol-analysis-and-oversight", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "protocol-sparse-risks"),
     _section_spec("risks-benefits.benefits", "19.2.", "Summary of benefits", "protocol-analysis-and-oversight", ("risks_benefits.benefits",), "protocol-sparse-benefits"),
@@ -1344,6 +1344,44 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         return bool(tokens(note)) and tokens(note) <= tokens(allocated)
 
     unallocated = []
+    def additional_schedule_detail(note: str) -> str:
+        """Keep novel facts; omit only schedule words already in matrix headers."""
+        if not matrix:
+            return note
+        headers = " ".join(assessment_rows[0][1:]).casefold()
+        stop = {"a", "an", "the", "and", "of", "for", "on", "from", "to", "at", "all", "are", "is", "measured", "time", "point", "points", "assessment", "assessments"}
+        def schedule_tokens(text: str) -> set[str]:
+            return {word.rstrip("s") for word in re.findall(r"[a-z]+|\d+", text.casefold()) if word not in stop}
+        header_tokens = schedule_tokens(headers)
+        if "after" in header_tokens and "surgery" in header_tokens:
+            header_tokens.add("postoperative")
+        def normalized_words(text: str) -> str:
+            return " ".join(word for word in re.findall(r"[a-z]+|\d+", text.casefold()) if word not in {"the", "and", "has"})
+
+        retained = []
+        for sentence in re.split(r"(?<=[.!?])\s+", note):
+            words = schedule_tokens(sentence)
+            cross_reference = bool(re.fullmatch(r"\s*See (?:the )?structured visit schedule for each activity\.?\s*", sentence, re.I))
+            inventory_only = (
+                bool(words) and words <= header_tokens
+                and all(schedule_tokens(visit["visit"]) <= words for visit in visits)
+                and not re.search(r"\b(?:after|before|during|between|not|never|only|no|requires?)\b", sentence, re.I)
+            )
+            timing_visits = [visit for visit in visits if re.search(r"\b(?:month|week|day|postoperative)\b", visit["visit"], re.I)]
+            common_anchor = (
+                bool(re.fullmatch(r"\s*All postoperative time points are measured from surgery on (?:the )?second eye\.?\s*", sentence, re.I))
+                and bool(timing_visits)
+                and all(re.search(r"after (?:the )?second[- ]eye surgery", visit["timing"], re.I) for visit in timing_visits)
+            )
+            interval = (
+                bool(re.search(r"\binterval between surgeries\b", sentence, re.I))
+                and normalized_words(sentence) in normalized_words(headers)
+            )
+            if cross_reference or inventory_only or common_anchor or interval:
+                continue
+            retained.append(sentence)
+        return " ".join(retained).strip()
+
     for item in inventory:
         if "record" in item:
             unallocated.append(item)
@@ -1355,8 +1393,10 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         if key in represented or fully_allocated_visit_note(item["activity"]):
             continue
         represented.add(key)
-        unallocated.append(item)
-        supplemental_notes.append(item["activity"])
+        detail = additional_schedule_detail(item["activity"])
+        if detail:
+            unallocated.append({**item, "activity": detail})
+            supplemental_notes.append(detail)
 
     # Only an explicit positive each-contact relationship authorizes X marks.
     # Historical abstraction and pre-consent contacts are not research AE visits.

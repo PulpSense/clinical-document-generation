@@ -243,6 +243,8 @@ def _protocol_followup_summary(reference: Mapping[str, Any]) -> str:
             return name
         if "postoperative" in timing.casefold():
             return timing
+        if timing or name:
+            return timing or name
     return _text(get_path(reference, "study.timeline"))
 
 

@@ -453,6 +453,8 @@ def _section_payload(
         ))
         if not has_bias_control:
             minimum_evidence = [path for path in minimum_evidence if path != "design.study_design"]
+    if section.section_id == "endpoint-criteria.completion" and meaningful(get_path(reference, "procedures.completion")):
+        minimum_evidence = [path for path in minimum_evidence if path == "procedures.completion"]
     if section.section_id == "endpoint-criteria.completion" and not meaningful(get_path(reference, "procedures.completion")):
         # A visit itinerary and follow-up duration do not establish a formal
         # participant-completion rule. The source still supplies that context
@@ -1248,6 +1250,19 @@ def _background_claim_findings(
     return findings
 
 
+def _completion_condition_items(value: Any) -> list[str]:
+    """Keep independently supplied conjuncts of an explicit closeout condition."""
+    conditions = []
+    for leaf in _leaf_texts(value):
+        for match in re.finditer(r"\b(?:after|when|once|upon)\s+(.+?)(?=\.(?!\d)(?:\s|$)|[!?]|$)", leaf, re.I):
+            for clause in re.split(r"\s+and\s+", match.group(1), flags=re.I):
+                clause = re.sub(r"^\s*(?:completion of|completing)\s+", "", clause, flags=re.I)
+                clause = re.sub(r"\s+(?:(?:is|are|has been|have been)\s+)?complete(?:d)?\s*$", "", clause, flags=re.I)
+                if clause.strip():
+                    conditions.append(clause.strip())
+    return conditions
+
+
 def _coverage_findings(
     request: Mapping[str, Any],
     contract: Mapping[str, Any],
@@ -1411,23 +1426,25 @@ def _coverage_findings(
                 "next_action": "Cite the evidence while referencing its owning section concisely.",
             })
         if section_id == "endpoint-criteria.completion":
-            normalized_content = _normalized_prose(content)
-            omitted = []
-            for visit in normalized_visit_records(source):
-                for label in (str(visit.get("visit") or ""), str(visit.get("timing") or "")):
-                    normalized_label = _normalized_prose(label)
-                    if normalized_label and normalized_label not in normalized_content:
-                        omitted.append(label)
-            if omitted:
+            completion = material.get("procedures.completion")
+            missing_conditions = [item for item in _completion_condition_items(completion) if not evidence_grounded(content, item)]
+            if completion and (not evidence_grounded(content, completion) or missing_conditions):
                 findings.append({
                     "category": "drafting", "field": section_id,
-                    "issue": "Section omits approved visit or time-point references: " + ", ".join(dict.fromkeys(omitted)) + ".",
-                    "next_action": "Name every approved visit and time point once without repeating its complete procedure inventory.",
+                    "issue": "Section omits the approved participant-completion condition.",
+                    "next_action": "Preserve the supplied completion condition and its timing without repeating the full visit schedule. Missing conditions: " + "; ".join(missing_conditions),
                 })
         else:
+            if section_id == "endpoint-criteria.study-completion":
+                missing_conditions = [item for item in _completion_condition_items(material.get("study.completion")) if not evidence_grounded(content, item)]
+                if missing_conditions:
+                    findings.append({
+                        "category": "drafting", "field": section_id,
+                        "issue": "Study Completion omits a supplied closeout prerequisite: " + "; ".join(missing_conditions),
+                        "next_action": "Preserve every supplied prerequisite for study closeout or starting analysis.",
+                    })
             ungrounded = [
                 path for path, value in material.items()
-                if section_id != "endpoint-criteria.study-completion" or path == "study.timeline"
                 if f"source:{path}" in cited and not evidence_grounded(content, value)
             ]
             if ungrounded:

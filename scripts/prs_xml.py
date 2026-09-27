@@ -187,9 +187,26 @@ def _stable_study_uid(reference: Mapping[str, Any]) -> str:
 
 
 def _enrollment_count(value: Any) -> str:
-    """Return the approved total count, never a concatenation of every number."""
-    match = re.search(r"(?<!\w)(\d[\d,]*)(?!\w)", _text(value))
-    return match.group(1).replace(",", "") if match else ""
+    """Prefer an explicitly identified total over a preceding subgroup count."""
+    text = _text(value)
+    number = r"(?<!\w)(\d[\d,]*)(?!\w)"
+    patterns = (
+        number + r"\s*(?:(?:subjects?|participants?|patients?)\s+)?(?:in\s+)?(?:total|overall)\b",
+        r"\b(?:total|overall)\s*(?:(?:planned\s+)?(?:sample\s+size|enrollment|subjects?|participants?|patients?))?\s*(?:is|of|:|=)?\s*" + number,
+    )
+    totals = {match.group(1).replace(",", "") for pattern in patterns for match in re.finditer(pattern, text, re.I)}
+    if totals:
+        return next(iter(totals)) if len(totals) == 1 else ""
+    # A leading study-wide count followed by a parenthetical breakdown retains
+    # the established mapping. Do not mistake an explicitly per-group first
+    # count for a study-wide count when no total was supplied.
+    match = re.search(number, text)
+    if match and not re.search(r"\b(?:arm|group|cohort)\b", text[:match.start()], re.I) and not re.match(
+        r"\s*(?:(?:subjects?|participants?|patients?)\s+)?(?:per\s+|(?:in\s+)?each\s+|in\s+(?:the\s+)?)(?:arm|group|cohort)\b",
+        text[match.end():], re.I,
+    ):
+        return match.group(1).replace(",", "")
+    return ""
 
 
 def _normalize_participation_scope(value: str) -> str:
@@ -491,11 +508,56 @@ def _set(node: ET.Element, path: str, value: Any) -> None:
     if target is not None: target.text = _text(value)
 
 
+def _intervention_items(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    explicit = _items(reference, "design.interventions")
+    items = explicit or ([{
+        "type": get_path(reference, "design.intervention_type"),
+        "name": get_path(reference, "design.intervention_name"),
+        "description": get_path(reference, "design.intervention_description"),
+    }] if meaningful(get_path(reference, "design.intervention_name")) else [])
+    arms = [_text(item.get("arm_group_label") or item.get("label") or item.get("name")) for item in _items(reference, "design.arms")]
+    result = []
+    for original in items:
+        item = dict(original)
+        supplied = item.get("arm_group_labels") or item.get("arm_group_label") or item.get("armGroupLabel")
+        if supplied:
+            labels = [_text(label) for label in supplied] if isinstance(supplied, list) else [_text(supplied)]
+        elif not explicit:
+            # Infer only exact cohort names present in the supplied combined
+            # intervention name. Never link an unrelated comparator by position.
+            name = _text(item.get("intervention_name") or item.get("name")).casefold()
+            matches = [
+                (match.start(), match.end(), arm)
+                for arm in arms if arm
+                for match in re.finditer(r"(?<!\w)" + re.escape(arm.casefold()) + r"(?!\w)", name)
+            ]
+            accepted: list[tuple[int, int, str]] = []
+            for start, end, arm in sorted(matches, key=lambda item: item[1] - item[0], reverse=True):
+                if not any(start < previous_end and end > previous_start for previous_start, previous_end, _ in accepted):
+                    accepted.append((start, end, arm))
+            labels = [arm for arm in arms if any(matched_arm == arm for _, _, matched_arm in accepted)]
+            if not labels and len(arms) == 1:
+                labels = arms
+        else:
+            labels = []
+        item["arm_group_labels"] = list(dict.fromkeys(labels))
+        result.append(item)
+    return result
+
+
 def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
-    interventions = _items(reference, "design.interventions") or ([{"type": get_path(reference, "design.intervention_type"), "name": get_path(reference, "design.intervention_name"), "description": get_path(reference, "design.intervention_description"), "arm_group_label": _text((get_path(reference, "design.arms", [{}]) or [{}])[0])}] if meaningful(get_path(reference, "design.intervention_name")) else [])
+    interventions = _intervention_items(reference)
     for node, item in zip(_resize(study, "intervention", len(interventions)), interventions):
         _set(node, "intervention_type", item.get("intervention_type") or item.get("type")); _set(node, "intervention_name", item.get("intervention_name") or item.get("name"))
-        _set(node, "intervention_description/textblock", item.get("intervention_description") or item.get("description")); _set(node, "arm_group_label", item.get("arm_group_label") or item.get("armGroupLabel"))
+        _set(node, "intervention_description/textblock", item.get("intervention_description") or item.get("description"))
+        prototype = node.find("arm_group_label")
+        if prototype is not None:
+            position = list(node).index(prototype)
+            for old in node.findall("arm_group_label"):
+                node.remove(old)
+            for offset, label in enumerate(item["arm_group_labels"] or [""]):
+                child = copy.deepcopy(prototype); child.text = label
+                node.insert(position + offset, child)
     arms = _items(reference, "design.arms")
     for node, item in zip(_resize(study, "arm_group", len(arms)), arms):
         _set(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name")); _set(node, "arm_type", item.get("arm_type") or item.get("type")); _set(node, "arm_group_description/textblock", item.get("description"))
@@ -924,19 +986,14 @@ def validate_output(
                 "issue": "Generated PRS repeated-block value does not match the approved source.",
             })
 
-    interventions = _items(reference, "design.interventions")
-    if not interventions and meaningful(get_path(reference, "design.intervention_name")):
-        interventions = [{
-            "type": get_path(reference, "design.intervention_type"),
-            "name": get_path(reference, "design.intervention_name"),
-            "description": get_path(reference, "design.intervention_description"),
-            "arm_group_label": _text((get_path(reference, "design.arms", [{}]) or [{}])[0]),
-        }]
+    interventions = _intervention_items(reference)
     for index, (node, item) in enumerate(zip(study.findall("intervention"), interventions), start=1):
         require_repeated_value(node, "intervention_type", item.get("intervention_type") or item.get("type"), f"intervention[{index}].intervention_type")
         require_repeated_value(node, "intervention_name", item.get("intervention_name") or item.get("name"), f"intervention[{index}].intervention_name")
         require_repeated_value(node, "intervention_description/textblock", item.get("intervention_description") or item.get("description"), f"intervention[{index}].intervention_description")
-        require_repeated_value(node, "arm_group_label", item.get("arm_group_label") or item.get("armGroupLabel"), f"intervention[{index}].arm_group_label")
+        actual_labels = [_text(child.text) for child in node.findall("arm_group_label") if _text(child.text)]
+        if actual_labels != item["arm_group_labels"]:
+            findings.append({"category": "xml", "field": f"intervention[{index}].arm_group_label", "issue": "Generated intervention associations do not match the approved cohort links."})
 
     arms = _items(reference, "design.arms")
     for index, (node, item) in enumerate(zip(study.findall("arm_group"), arms), start=1):

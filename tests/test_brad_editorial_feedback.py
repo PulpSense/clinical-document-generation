@@ -133,7 +133,7 @@ def test_editorial_contracts_do_not_feed_other_sections_into_introduction_or_clo
     assert sections["introduction"].evidence == ("study.background",)
     assert sections["introduction"].source_coverage == "rationale_summary"
     assert sections["objectives"].evidence == ("objectives.primary", "objectives.secondary")
-    assert sections["endpoint-criteria.study-completion"].evidence == ("study.timeline",)
+    assert sections["endpoint-criteria.study-completion"].evidence == ("study.timeline", "study.completion")
 
     source = _source()
     source["statistics"]["analysis_plan"] = (

@@ -298,18 +298,18 @@ def test_hypothesis_and_endpoints_are_bound_to_the_sections_that_explain_them():
     assert {"study.hypothesis", "endpoints.primary"} <= set(icf["icf.study-purpose"].evidence)
 
 
-def test_completion_sections_require_every_approved_visit_and_time_point_without_repeating_full_inventory():
+def test_completion_sections_require_their_owned_conditions_without_repeating_visit_inventory():
     protocol = {section.section_id: section for section in protocol_contract("Prospective")}
 
     participant = protocol["endpoint-criteria.completion"]
-    assert "procedures.assessments" in participant.evidence
+    assert participant.evidence == ("procedures.completion", "study.timeline")
     assert participant.source_coverage == "concept_reference"
-    assert any("every approved visit" in item for item in participant.content_expectations)
+    assert any("participant-completion rule" in item for item in participant.content_expectations)
     assert "complete-visit-schedule" in participant.do_not_restate_concepts
 
     study = protocol["endpoint-criteria.study-completion"]
     assert study.source_coverage == "concept_reference"
-    assert study.evidence == ("study.timeline",)
+    assert study.evidence == ("study.timeline", "study.completion")
     assert any("Sections 9 and 15 own the visit schedule" in item for item in study.content_expectations)
     assert "complete-visit-schedule" in study.do_not_restate_concepts
 

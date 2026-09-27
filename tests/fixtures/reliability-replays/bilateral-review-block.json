@@ -1,0 +1,3929 @@
+{
+  "source": {
+    "meta": {
+      "document_set": [
+        "protocol_docx",
+        "icf_docx",
+        "xml"
+      ],
+      "study_type": "Prospective",
+      "icf_template": "Sterling",
+      "protocol_number": "ADM-C2586E0A9785",
+      "date": "26 Sep 2026",
+      "version": null
+    },
+    "source": {
+      "original_requested_path": "/ops/data/SYNOPSIS_Bilateral PureSee Odyssey_26Sep2026_SYNTHETIC_COMPLETE.txt",
+      "input_file": "input/SYNOPSIS_Bilateral PureSee Odyssey_26Sep2026_SYNTHETIC_COMPLETE.txt",
+      "input_sha256": "b274783302fc34f198f55ab2a08d62c4768d0f88d381af4b2a25dc64cf482b8f",
+      "provenance": "Synthetic test study only \u2014 not for clinical or regulatory use. Exact requested /ops/data path unavailable; extracted from the identical-basename file at /opt/data.",
+      "field_candidates": {},
+      "administrative_identifier": {
+        "authority": "deterministic_workflow",
+        "value": "ADM-C2586E0A9785",
+        "source_fields": [
+          "principal_investigator",
+          "sponsor",
+          "study_type",
+          "title"
+        ]
+      },
+      "source_of_truth_file": "reference/source-of-truth--adm-c2586e0a9785--visual-outcomes-and-patient-reported-symptoms-after-bilatera.md"
+    },
+    "approval": {
+      "status": "approved",
+      "approved_by": "client",
+      "approved_at": "2026-09-26T22:57:02.773048+00:00",
+      "review_file": "reference/source-of-truth--adm-c2586e0a9785--visual-outcomes-and-patient-reported-symptoms-after-bilatera.md",
+      "source_sha256": "a93e8d1527d6dee688c6351a52120f95430617189e4ace099fab4207b35e6ce5",
+      "revision_id": "r-9218b5efbaa1",
+      "source_approval_identity": "9218b5efbaa10fd3817006c61cf6f3c3f5a616caeaf3843171295912f6f26397",
+      "generation_authority_sha256": "85d1e31c4ccb3bd1c414068c4c231a1d40fe6b0fc0fe003ba02b9564ea5a1a35",
+      "governing_sha256": "85d1e31c4ccb3bd1c414068c4c231a1d40fe6b0fc0fe003ba02b9564ea5a1a35"
+    },
+    "study": {
+      "title": "Visual Outcomes and Patient-Reported Symptoms after Bilateral Implantation of an Extended Depth of Focus or a Full Range of Vision Intraocular Lens",
+      "short_title": "Bilateral PureSee or Odyssey Visual Outcomes and Symptoms",
+      "background": "The TECNIS PureSee is a non-diffractive extended depth of focus (EDOF) intraocular lens. Its design may reduce dysphotopsias and improve contrast sensitivity compared with diffractive lenses. A randomized controlled trial suggested better intermediate and near vision than a monofocal control, with similar contrast sensitivity, distance vision, and dysphotopsia profiles.1\nThe TECNIS Odyssey is a full range of vision intraocular lens. Current reports suggest high visual acuity and spectacle independence at distance, intermediate, and near.2,3\nThese reports concern the individual lens technologies. They do not establish which lens will provide better outcomes in the population proposed here. We would like to characterize vision and patient-reported symptoms in two cohorts followed using the same assessment schedule.\n1. Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8\n2. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n3. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7",
+      "hypothesis": "Bilateral implantation of PureSee or Odyssey intraocular lenses will be associated with good distance and intermediate visual outcomes and high patient satisfaction. Near vision, spectacle use, and reports of visual disturbances may differ between the two cohorts. This observational study is intended to describe those outcomes; it is not designed to establish superiority of either lens.",
+      "timeline": "Enrollment: 8 months; follow-up: 6 months after second-eye surgery; data analysis: 2 months.",
+      "completion": "Study data analysis will begin after scheduled follow-up and database checks are complete.",
+      "condition": null
+    },
+    "parties": {
+      "sponsor": {
+        "name": "Synthetic Cataract Outcomes Research Sponsor",
+        "address": "420 Test Sponsor Boulevard, Test City, New York 10012, USA"
+      },
+      "principal_investigator": {
+        "name": "Casey Taylor",
+        "title": "MD, Principal Investigator"
+      },
+      "study_coordinator": {
+        "name": "Riley Chen",
+        "title": "CRC, Study Coordinator",
+        "business_phone": "+1 202-555-0111",
+        "office_phone": "+1 202-555-0112",
+        "email": "riley.chen@synthetic-comparison.example.test"
+      },
+      "irb": {
+        "name": "Synthetic Comparison Study IRB",
+        "affiliation": "Independent ethics committee \u2014 synthetic test organization",
+        "phone": "+1 202-555-0110",
+        "email": "irb@synthetic-comparison.example.test",
+        "address": "410 Test Review Avenue, Test City, New York 10011, USA"
+      }
+    },
+    "sites": [
+      {
+        "contact": {
+          "business_phone": "+1 202-555-0111",
+          "email": "riley.chen@synthetic-comparison.example.test",
+          "name": "Riley Chen",
+          "office_phone": "+1 202-555-0112",
+          "title": "CRC, Study Coordinator"
+        },
+        "facility": {
+          "address": "430 Test Clinic Road, Test City, New York 10013, USA",
+          "city": "Test City",
+          "country": "United States",
+          "name": "Synthetic Comparative Ophthalmology Center",
+          "postal_code": "10013",
+          "state": "New York"
+        },
+        "investigators": [
+          {
+            "name": "Casey Taylor",
+            "title": "MD, Principal Investigator"
+          }
+        ]
+      }
+    ],
+    "population": {
+      "study_population": "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes, with planned bilateral TECNIS PureSee or bilateral TECNIS Odyssey implantation selected during routine care before enrollment.",
+      "sample_size": "36 subjects per cohort; 72 subjects total",
+      "sample_justification": "30 evaluable subjects per cohort are estimated sufficient for descriptive characterization of visual outcomes and patient-reported symptoms. Enrollment increases to 36 per cohort (72 total) to account for dropout or incomplete 6-month assessments. No formal power calculation for superiority testing is proposed.",
+      "minimum_age": "50 Years",
+      "inclusion_criteria": [
+        "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes.",
+        "Planned bilateral implantation of either TECNIS PureSee or TECNIS Odyssey selected during routine clinical care before enrollment.",
+        "Willing and able to attend the scheduled study assessments.",
+        "No participation in another study during the 60 days before screening."
+      ],
+      "exclusion_criteria": [
+        "Moderate-to-severe ocular disease deemed by the surgeon to increase the risk of complicated cataract surgery or prevent reliable visual-acuity testing.",
+        "Pseudoexfoliation syndrome with clinically significant zonular weakness, zonular dehiscence, prior ocular trauma affecting vision, or prior corneal refractive surgery.",
+        "Planned implantation of different lens models in the two eyes."
+      ]
+    },
+    "design": {
+      "study_design": "Prospective, observational, single-center, two-cohort study with no randomization and no masking. Cohorts are defined by lens selection already made in routine care: bilateral TECNIS PureSee or bilateral TECNIS Odyssey.",
+      "number_of_sites": "1",
+      "masking": "None",
+      "intervention_name": "Bilateral TECNIS PureSee intraocular lenses or bilateral TECNIS Odyssey intraocular lenses, according to the preexisting routine-care treatment plan.",
+      "intervention_type": "Medical device \u2014 intraocular lenses.",
+      "intervention_description": "Lens selection will already have been made by the treating surgeon and patient as part of routine care before study enrollment. Enrollment will not determine lens selection. There will be no randomization, no masking, and no change to the planned clinical treatment. Each subject will receive the same lens model in both eyes. This study does not involve mix-and-match implantation.",
+      "arms": [
+        {
+          "description": "Observational cohort; 36 subjects with bilateral TECNIS PureSee implantation selected in routine care.",
+          "name": "Bilateral TECNIS PureSee"
+        },
+        {
+          "description": "Observational comparison cohort; 36 subjects with bilateral TECNIS Odyssey implantation selected in routine care. No monofocal control cohort is planned.",
+          "name": "Bilateral TECNIS Odyssey"
+        }
+      ],
+      "methods_to_minimize_bias": "The same eligibility criteria, visual testing conditions, testing distances, and assessment schedule will be used for both cohorts. Outcomes and analysis methods will be defined before reviewing study results. Because lens selection is not randomized and the study is not masked, differences between cohorts may reflect patient selection and other factors; a descriptive difference must not be interpreted as proof that the lens caused it."
+    },
+    "objectives": {
+      "primary": [
+        "Describe and compare binocular visual outcomes, spectacle use, satisfaction, and visual disturbances after bilateral PureSee or bilateral Odyssey implantation through 6 months after second-eye surgery."
+      ]
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Mean binocular distance-corrected intermediate visual acuity (DCIVA) at 66 cm, summarized separately for each cohort",
+          "time_frame": "6 months after second-eye surgery"
+        }
+      ],
+      "secondary": [
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Mean binocular uncorrected distance visual acuity (UDVA)",
+          "time_frame": "1, 3, and 6 months after second-eye surgery"
+        },
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Mean binocular corrected distance visual acuity (CDVA)",
+          "time_frame": "1, 3, and 6 months after second-eye surgery"
+        },
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Mean binocular uncorrected intermediate visual acuity (UIVA) at 66 cm",
+          "time_frame": "1, 3, and 6 months after second-eye surgery"
+        },
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Mean binocular distance-corrected near visual acuity (DCNVA) at 40 cm",
+          "time_frame": "3 and 6 months after second-eye surgery"
+        },
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Mean binocular uncorrected near visual acuity (UNVA) at 40 cm",
+          "time_frame": "3 and 6 months after second-eye surgery"
+        },
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Binocular distance-corrected defocus curve from +1.0 D through -2.50 D",
+          "time_frame": "6 months after second-eye surgery"
+        },
+        {
+          "analysis_method": "",
+          "description": "",
+          "measure": "Percentages of responses to each Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire question, summarized separately by cohort",
+          "time_frame": "3 and 6 months after second-eye surgery"
+        }
+      ]
+    },
+    "procedures": {
+      "assessments": "Preoperative screening; operative visit for each eye; Month 1, Month 3, and Month 6 (Exit) postoperative assessments. All postoperative time points are measured from surgery on the second eye. The interval between surgeries follows routine clinical care and has no fixed study interval. See structured visit schedule for each activity.",
+      "visit_schedule": [
+        {
+          "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+          "timing": "Preoperative",
+          "visit": "Screening"
+        },
+        {
+          "procedures": "Cataract surgery and implantation of the planned lens model",
+          "timing": "One visit per eye; interval between surgeries follows routine clinical care; no fixed study interval",
+          "visit": "Operative (each eye)"
+        },
+        {
+          "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+          "timing": "1 month after second-eye surgery",
+          "visit": "Month 1"
+        },
+        {
+          "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+          "timing": "3 months after second-eye surgery",
+          "visit": "Month 3"
+        },
+        {
+          "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+          "timing": "6 months after second-eye surgery; Exit",
+          "visit": "Month 6"
+        }
+      ],
+      "minimum_days_before_screening_without_participation": "60",
+      "consent": "Informed consent at preoperative screening.",
+      "completion": "A participant completes study follow-up after the 6-month assessment following second-eye surgery and completion of the exit form. Participants may withdraw voluntarily at any time.",
+      "methods": null,
+      "unscheduled_visits": null,
+      "discontinuation": null,
+      "termination": null,
+      "study_termination": null
+    },
+    "statistics": {
+      "analysis_plan": "All enrolled subjects will be included in descriptive enrollment and safety summaries. Visual-acuity and defocus-curve outcomes will be summarized by cohort and scheduled visit using the number of evaluable observations, mean, standard deviation, median, minimum, and maximum. AIOLIS responses will be summarized by question, response category, cohort, and scheduled questionnaire visit using counts and percentages. Available observations will be analyzed; missing observations will not be imputed. The number of participants with missing data will be reported by cohort and scheduled assessment. A participant with data at an earlier visit but no Month 6 assessment may contribute to summaries of the earlier visit, but will not contribute to the Month 6 primary-endpoint summary. Adverse events and device deficiencies will be summarized by cohort, event category, seriousness, severity, relationship, action taken, and outcome. Cohort comparisons are descriptive. No inferential hypothesis test or claim of comparative superiority is planned.",
+      "methodology": null,
+      "analysis_populations": null,
+      "missing_data_handling": null
+    },
+    "safety": {
+      "monitoring": "Adverse events and device deficiencies will be collected from consent through the final study contact. Scheduled review at Months 1, 3, and 6 is not the only time an event may be reported.",
+      "general_information": null,
+      "adverse_events": null,
+      "follow_up": null
+    },
+    "confidentiality": {
+      "data_handling": null,
+      "publication": null
+    },
+    "risks_benefits": {
+      "compensation_or_reimbursement": "No payment will be provided for participation. Documented travel expenses will be reimbursed up to $25 for each completed Month 1, Month 3, and Month 6 study visit, up to $75 total per participant. Screening and operative visits are not eligible for this reimbursement. A participant who withdraws may still receive reimbursement for eligible visits already completed.",
+      "costs": "The sponsor will pay for additional vision tests and questionnaires performed solely for this research. Routine cataract surgery, the selected lenses, and ordinary clinical care will be billed as usual to the participant or insurer. No amount of insurance coverage or participant out-of-pocket cost is specified.",
+      "risks": null,
+      "risk_mitigation": null,
+      "benefits": null,
+      "alternatives": null,
+      "privacy": null,
+      "injury_handling": null
+    },
+    "regulatory": {
+      "prs": {
+        "study_type": "Observational",
+        "observational_study_design": "Cohort",
+        "provider_study_id": "ADM-C2586E0A9785",
+        "time_perspective": null,
+        "verification_date": null,
+        "start_date": null,
+        "start_date_type": null,
+        "primary_completion_date": null,
+        "primary_completion_date_type": null,
+        "study_completion_date": null,
+        "study_completion_date_type": null,
+        "patient_registry": null,
+        "target_duration_quantity": null,
+        "target_duration_units": null
+      }
+    }
+  },
+  "request": {
+    "schema_version": "hermes-request/v2",
+    "request_id": "r-9218b5efbaa1.draft.protocol-operations.initial.a1.ddd5bfa0",
+    "revision_id": "r-9218b5efbaa1",
+    "task": "section_drafting",
+    "wave": "initial",
+    "batch_id": "protocol-operations",
+    "artifact": "protocol",
+    "branch": {
+      "study_type": "Prospective",
+      "icf_template": "Sterling"
+    },
+    "topology_version": "clinical-drafting-v1",
+    "prompt_version": "section-drafting-v17-editorial-ownership",
+    "governing_resources": {
+      "approved_source_sha256": "a93e8d1527d6dee688c6351a52120f95430617189e4ace099fab4207b35e6ce5",
+      "source_evidence_coverage_map": {
+        "schema_version": "source-evidence-coverage-map/v1",
+        "study_type": "Prospective",
+        "icf_template": "Sterling",
+        "entries": [
+          {
+            "source_path": "confidentiality.data_handling",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.privacy",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "ethics.confidentiality",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "confidentiality.publication",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality-publication",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "confidentiality.retention",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality-publication",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "design.arms",
+            "approved_value_sha256": "581f64a800ae9afa041b653653d69d66bf42f214b24e502e1d168c5340e49533",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "design.intervention_description",
+            "approved_value_sha256": "9832d143dc22dc1ddf4d5a0b7cf627b3237263cc384a214a94b1ab5d3b46bb7f",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "design.intervention_name",
+            "approved_value_sha256": "04ecc3eb7c0f743a7c13a6990a455540e741a14dd83219276e9c03934b1d266d",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "design.interventions",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "design.study_design",
+            "approved_value_sha256": "35b6e1e6666b77b7b6cc52a166d3027cf7beb6bdbe51b1e92556b8591354905e",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.bias",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "endpoints.other",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "endpoints.primary",
+            "approved_value_sha256": "d0e3c6acea281176e0581c2583845fb38ce806a0bb841668f2edb2f32e4c5cd5",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.study-purpose",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "endpoints.secondary",
+            "approved_value_sha256": "5de2e714540d40381cf82d5637ced80fbdf20d5a7a8ea75261848410646bba0b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-design.design",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "ethics.confidentiality",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "ethics.confidentiality",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "meta.protocol_number",
+            "approved_value_sha256": "2a654e318a6eccb06f9b507011fe07fbc2aeb9fee8e32108335fc10cfa23f26c",
+            "destinations": [
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "objectives.primary",
+            "approved_value_sha256": "752d771c089d10eae95298c4d1cf15eb349645b42ff9b8b07106db8cbb6c798a",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.study-purpose",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "objectives",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "objectives.secondary",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "objectives",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.exclusion_criteria",
+            "approved_value_sha256": "6492558ce0cd51ced964a395870fac81f327611dd6f541246d9af6058495aede",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.exclusion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.inclusion_criteria",
+            "approved_value_sha256": "ce3b0631e6a5bce7a29bdcc888d60a8c1e0a46546c4edb7b0320add1564f2834",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.maximum_age",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.minimum_age",
+            "approved_value_sha256": "a6b3b1872b8b41a2e390d8c0bc42d491a3beb1cd67d6ab95c14251e84b81add9",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.sample_justification",
+            "approved_value_sha256": "a7e1e351b10f0ab158d4874d59c97f4222029990e2cf1847ac25767002f457e3",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.sample_size",
+            "approved_value_sha256": "c70217db0bc6f367e43c15f638444025a14f4a2acdc9eafabddd045fad842352",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.population",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "population.sample_size_evidence",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "population.study_population",
+            "approved_value_sha256": "065f0b40446be0aa556ccab5d08a20d0f02a13fd907fbf123235b130b7b5fe1f",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.population",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.assessment_details",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.assessments",
+            "approved_value_sha256": "21c0f0e332691f880d141f2c18cf239a819982ff6b9f514a15aa97c2f3e68193",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.completion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.completion",
+            "approved_value_sha256": "3f3b50ab720a8c297105c19df95347a4e1f64e77237ae8307b910136e16eccbe",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.completion",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.consent",
+            "approved_value_sha256": "ddb0579075d7136d41fcf611b145ff30cec4ff8e1566a7cfeaaf57627bba9738",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.consent",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.discontinuation",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.discontinuation",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.discontinued_subjects",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.discontinued",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.evaluation",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.intervention_management",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.methods",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.measurements",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.minimum_days_before_screening_without_participation",
+            "approved_value_sha256": "68fec0473e988a1ef1c13c4f9b9a15cc67de203de8be796ce82ae4fd7b158e64",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "subjects.inclusion",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.replacement",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.discontinuation",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.unscheduled_visits",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.unscheduled",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.visit_schedule",
+            "approved_value_sha256": "50facaf4b3655df13402d0abd9f5e6c6b8dc0eaaeaa5058fe59079aa0af18b40",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.completion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "study-procedure.visits",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "study.xml",
+                "section_id": "prs.structured",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "procedures.visit_schedule_table",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.completion",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.alternatives",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.alternatives",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.benefits",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.benefits",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "risks-benefits.benefits",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.compensation_or_reimbursement",
+            "approved_value_sha256": "1d6bce53e6422b1166790173eab56a7442ec4632c2d6c5e64e2319e985eb7266",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.payment",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "financial-injury",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.costs",
+            "approved_value_sha256": "75bcf5d67dcc13d125953b8df2e4a215595ce33cd03733c999106277b3d10b88",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.costs",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "financial-injury",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.injury_handling",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.injury",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "financial-injury",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.privacy",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.privacy",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "confidentiality",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.risk_mitigation",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.risks",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "risks-benefits.risks",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "risks_benefits.risks",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.risks",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.general",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "risks-benefits.risks",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.adverse_events",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.analysis",
+                "required": true,
+                "approved": false
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.reporting",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.follow_up",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.follow-up",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.general_information",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.general",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "safety.monitoring",
+            "approved_value_sha256": "77f09c5a7510801ad16f4bf19727ca56f355f04f1969a805c82a04cacd0b5749",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "evaluation-procedures",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.monitoring",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.analysis_plan",
+            "approved_value_sha256": "3d1451cf30a0db2f8a387ead28dc6af57a584ee1b53218adb35ed16c7e0331a8",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.considerations",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.datasets",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "quality-safety.analysis",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.analysis_populations",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.datasets",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.methodology",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.methodology",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.sample_size_evidence",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "sample-size",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "statistics.software",
+            "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+            "destinations": [
+              {
+                "artifact": "protocol.docx",
+                "section_id": "analysis-plan.considerations",
+                "required": true,
+                "approved": false
+              }
+            ]
+          },
+          {
+            "source_path": "study.background",
+            "approved_value_sha256": "b4617f67e541d9a33a23084f125d6041e6f14b545dbf6b09c2dbb54d47cb7a10",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.background",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "introduction",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "study.hypothesis",
+            "approved_value_sha256": "b25b32a268f96b001442035a93d99b541fc31c386b8da01b17c3f25ffe7d3e60",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.study-purpose",
+                "required": true,
+                "approved": true
+              }
+            ]
+          },
+          {
+            "source_path": "study.timeline",
+            "approved_value_sha256": "95c7369f3487c2cc5769076812a32ea5a460483d21e37ddfe12963121612147f",
+            "destinations": [
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.duration",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "icf.docx",
+                "section_id": "icf.key-information-summary",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.completion",
+                "required": true,
+                "approved": true
+              },
+              {
+                "artifact": "protocol.docx",
+                "section_id": "endpoint-criteria.study-completion",
+                "required": true,
+                "approved": true
+              }
+            ]
+          }
+        ]
+      },
+      "contracted_template_bundle": {
+        "schema_version": "contracted-template-bundle/v2",
+        "selection": {
+          "study_type": "Prospective",
+          "icf_family": "Sterling"
+        },
+        "contracted_templates": {
+          "protocol": {
+            "path": "assets/client-templates/docx/prospective-protocol.template.docx",
+            "sha256": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0"
+          },
+          "icf": {
+            "path": "assets/client-templates/docx/sterling-icf.template.docx",
+            "sha256": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347"
+          }
+        },
+        "client_template_authorities": {
+          "protocol": {
+            "path": "assets/client-templates/reference/protocol-reference.docx",
+            "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+          },
+          "icf": {
+            "path": "assets/client-templates/reference/sterling-icf-reference.docx",
+            "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
+          }
+        },
+        "document_section_contract": {
+          "version": "clinical-documents-v2.33-background-evidence-scope",
+          "sha256": "0f0daf31117ef5cb05ad861becbaaf91a6bf408a8cff54ce693022e747ab7ac9"
+        },
+        "fixed_clinical_boilerplate": {
+          "version": "clinical-boilerplate-v12",
+          "path": "references/fixed-clinical-boilerplate.json",
+          "sha256": "51250289d3e6215d1be6b2fe4ee506347883400eab934055340e5298a41f9758"
+        },
+        "sterling_clause_contract": {
+          "path": "references/sterling-clause-contract.json",
+          "sha256": "6312b587264e5047c250839377db95c2302446b99ec0d055b08db659230c9f99"
+        },
+        "approved_font_plan": {
+          "version": "approved-font-plan/v1",
+          "available_font_policy": "preserve",
+          "missing_font_policy": "approved_packaged_substitute",
+          "unknown_inventory_policy": "preserve_then_resolve_by_smoke_render",
+          "approved_fallbacks": {
+            "aptos": "Liberation Sans",
+            "arial": "Liberation Sans",
+            "arial unicode ms": "Liberation Sans",
+            "calibri": "Liberation Sans",
+            "courier new": "Liberation Mono",
+            "dejavu sans": "Liberation Sans",
+            "helvetica": "Liberation Sans",
+            "noto sans": "Liberation Sans",
+            "noto sans symbols": "Liberation Sans",
+            "segoe ui symbol": "Liberation Sans",
+            "symbol": "Liberation Sans",
+            "times new roman": "Liberation Serif",
+            "verdana": "Liberation Sans"
+          },
+          "packaged_families": {
+            "Liberation Mono": "LiberationMono-Regular.ttf",
+            "Liberation Sans": "LiberationSans-Regular.ttf",
+            "Liberation Serif": "LiberationSerif-Regular.ttf"
+          },
+          "packaged_font_assets": {
+            "assets/fallback-fonts/LiberationMono-Bold.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-Bold.ttf",
+              "sha256": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb"
+            },
+            "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-BoldItalic.ttf",
+              "sha256": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130"
+            },
+            "assets/fallback-fonts/LiberationMono-Italic.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-Italic.ttf",
+              "sha256": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1"
+            },
+            "assets/fallback-fonts/LiberationMono-Regular.ttf": {
+              "path": "assets/fallback-fonts/LiberationMono-Regular.ttf",
+              "sha256": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1"
+            },
+            "assets/fallback-fonts/LiberationSans-Bold.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-Bold.ttf",
+              "sha256": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173"
+            },
+            "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-BoldItalic.ttf",
+              "sha256": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee"
+            },
+            "assets/fallback-fonts/LiberationSans-Italic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-Italic.ttf",
+              "sha256": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0"
+            },
+            "assets/fallback-fonts/LiberationSans-Regular.ttf": {
+              "path": "assets/fallback-fonts/LiberationSans-Regular.ttf",
+              "sha256": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8"
+            },
+            "assets/fallback-fonts/LiberationSerif-Bold.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-Bold.ttf",
+              "sha256": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce"
+            },
+            "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf",
+              "sha256": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7"
+            },
+            "assets/fallback-fonts/LiberationSerif-Italic.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-Italic.ttf",
+              "sha256": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e"
+            },
+            "assets/fallback-fonts/LiberationSerif-Regular.ttf": {
+              "path": "assets/fallback-fonts/LiberationSerif-Regular.ttf",
+              "sha256": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74"
+            }
+          },
+          "sha256": "4a4fa12e026266c53b3e16a62033195b480b86395b158ae7f39a778e6c32f3d1"
+        },
+        "layout_preservation_baseline": {
+          "schema_version": "layout-preservation-baseline/v1",
+          "artifacts": {
+            "protocol": {
+              "contracted_template": {
+                "path": "assets/client-templates/docx/prospective-protocol.template.docx",
+                "sha256": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0"
+              },
+              "client_template_authority": {
+                "path": "assets/client-templates/reference/protocol-reference.docx",
+                "sha256": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b"
+              }
+            },
+            "icf": {
+              "contracted_template": {
+                "path": "assets/client-templates/docx/sterling-icf.template.docx",
+                "sha256": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347"
+              },
+              "client_template_authority": {
+                "path": "assets/client-templates/reference/sterling-icf-reference.docx",
+                "sha256": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357"
+              }
+            }
+          },
+          "sha256": "868f0640d45a2c5e7b94582b64b839d7fb3dece33f1c8cdf806fc33f1bce14e2"
+        },
+        "prs_authority": {
+          "generation_template": {
+            "path": "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml",
+            "sha256": "7e133378afa382ced797c14917f6e73fd5007d95b23dc6adcdac0092a05ebfab"
+          },
+          "structural_reference": {
+            "path": "assets/client-templates/reference/prs-manual-reference.xml",
+            "sha256": "0d6c2f4c1252f25509e19da12757df231a9408192987b54dbf78d32dc74c6033"
+          }
+        },
+        "resource_hashes": {
+          "assets/client-templates/docx/prospective-protocol.template.docx": "612b7cfa1fb854c4e3ad771548286e0c481411d500e5f40967add3c9684063a0",
+          "assets/client-templates/docx/sterling-icf.template.docx": "fb4ba9a95d2e62763a1c8f1bce400e64d1e2856be29cc69a167b7d0561b71347",
+          "assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml": "7e133378afa382ced797c14917f6e73fd5007d95b23dc6adcdac0092a05ebfab",
+          "assets/client-templates/reference/protocol-reference.docx": "0ff90c0edacaa095522a7fe2adbae0476b81749464f4b287b34efc35e8254e1b",
+          "assets/client-templates/reference/prs-manual-reference.xml": "0d6c2f4c1252f25509e19da12757df231a9408192987b54dbf78d32dc74c6033",
+          "assets/client-templates/reference/sterling-icf-reference.docx": "16cc3feed7cce1615c54e47add952cf15fdb6241fa801fc109afeab6f46fd357",
+          "assets/fallback-fonts/LiberationMono-Bold.ttf": "bd62a0672d0b9b6710b01df434c80ad54fa5f0835207eb7b17b7a761463067bb",
+          "assets/fallback-fonts/LiberationMono-BoldItalic.ttf": "79451f3c09fe25116098853b7a2ca6e2436220ccc11af022979adbcf195be130",
+          "assets/fallback-fonts/LiberationMono-Italic.ttf": "605c01c711b44480a7508d349dfbf3264e81fa43d69e61cfa7d10b86e764c4d1",
+          "assets/fallback-fonts/LiberationMono-Regular.ttf": "f2b83c763e8afd21709333370bed4774337fae82267937e2b5aea7e2fbd922c1",
+          "assets/fallback-fonts/LiberationSans-Bold.ttf": "788abee4c806d660e8aee46689dd8540cd4bb98da03dcc9d171ce3efd99a9173",
+          "assets/fallback-fonts/LiberationSans-BoldItalic.ttf": "698da70fc191cc5f33ad4d6d3fe830fe4624b898ea2e3169955928b7c491f1ee",
+          "assets/fallback-fonts/LiberationSans-Italic.ttf": "e5bae5c4cde31f22142753855f4f8fb86da6ff39955ed3c0a11248b0d16948b0",
+          "assets/fallback-fonts/LiberationSans-Regular.ttf": "76d04c18ea243f426b7de1f3ad208e927008f961dc5945e5aad352d0dfde8ee8",
+          "assets/fallback-fonts/LiberationSerif-Bold.ttf": "d754ba427cfe0bca54ae052384baa8f842da5bd6550ad4da024ac441e7a7d5ce",
+          "assets/fallback-fonts/LiberationSerif-BoldItalic.ttf": "f17db8af71e24d2066b587546021d4f0b296be389512b658dec3c09affeb11a7",
+          "assets/fallback-fonts/LiberationSerif-Italic.ttf": "0e3dea9f8d613e006ccfa62201f33e265d19167bd0907725c3e145368b04fc2e",
+          "assets/fallback-fonts/LiberationSerif-Regular.ttf": "058ea80864aef09a23f45cbec2bb5400bc3dfbdea01c3f10538a21fcb497fb74",
+          "references/fixed-clinical-boilerplate.json": "51250289d3e6215d1be6b2fe4ee506347883400eab934055340e5298a41f9758",
+          "references/sterling-clause-contract.json": "6312b587264e5047c250839377db95c2302446b99ec0d055b08db659230c9f99"
+        },
+        "identity_sha256": "8572b0fea92882169817a700ce349aee2cf6ffb7b806583c73e27d56972b2ab7"
+      },
+      "implementation_sha256": {
+        "scripts/contracts.py": "029a5f87b02255c4cc1422b8604332a7a69f689f217ad7a7a42b026b8b246bd6",
+        "scripts/drafting.py": "1effb491e680875a4d6cea58303ee5445cd675abf441bcbd868aa0944f21e4e4",
+        "scripts/prs_xml.py": "5383c8daa71173e43bd476e8d36a298e2ba34a0265973254aa49248e59c94bf9",
+        "scripts/quality.py": "ef21cda430d71f17d5690d6e7800856f2b1d6f1e7a1239948b0d184fd22b6e00",
+        "scripts/rendering.py": "5d20600062b514c1bd81e920ca0be3a86c04f1156f81c6739a9d42a5e7ba3cc9",
+        "scripts/workflow.py": "4a7b6a340763a22075662df803c48ce6c06d6b5ce77af8eae35ba8bdc1a0d390"
+      },
+      "topology_version": "clinical-drafting-v1",
+      "prompt_version": "section-drafting-v17-editorial-ownership",
+      "producer_policy": "nonempty-model-id"
+    },
+    "attempts": {
+      "study-procedure.consent": 1,
+      "study-procedure.visits": 1,
+      "study-procedure.measurements": 1,
+      "study-procedure.unscheduled": 1,
+      "study-procedure.discontinued": 1,
+      "evaluation-procedures": 1,
+      "endpoint-criteria.completion": 1,
+      "endpoint-criteria.discontinuation": 1,
+      "endpoint-criteria.study-completion": 1
+    },
+    "approved_input": [
+      {
+        "path": "study.title",
+        "value": "Visual Outcomes and Patient-Reported Symptoms after Bilateral Implantation of an Extended Depth of Focus or a Full Range of Vision Intraocular Lens",
+        "sha256": "4dcf596c94b0f99715abbe09a3e175dbe8530fdcd6683c0dc117737d84d857ec"
+      },
+      {
+        "path": "study.short_title",
+        "value": "Bilateral PureSee or Odyssey Visual Outcomes and Symptoms",
+        "sha256": "d1656532f7d65aeceacc32c0b76d147d3071f61e3d96db9894275c3ac42f42af"
+      },
+      {
+        "path": "study.background",
+        "value": "The TECNIS PureSee is a non-diffractive extended depth of focus (EDOF) intraocular lens. Its design may reduce dysphotopsias and improve contrast sensitivity compared with diffractive lenses. A randomized controlled trial suggested better intermediate and near vision than a monofocal control, with similar contrast sensitivity, distance vision, and dysphotopsia profiles.1\nThe TECNIS Odyssey is a full range of vision intraocular lens. Current reports suggest high visual acuity and spectacle independence at distance, intermediate, and near.2,3\nThese reports concern the individual lens technologies. They do not establish which lens will provide better outcomes in the population proposed here. We would like to characterize vision and patient-reported symptoms in two cohorts followed using the same assessment schedule.\n1. Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8\n2. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n3. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7",
+        "sha256": "b4617f67e541d9a33a23084f125d6041e6f14b545dbf6b09c2dbb54d47cb7a10"
+      },
+      {
+        "path": "study.hypothesis",
+        "value": "Bilateral implantation of PureSee or Odyssey intraocular lenses will be associated with good distance and intermediate visual outcomes and high patient satisfaction. Near vision, spectacle use, and reports of visual disturbances may differ between the two cohorts. This observational study is intended to describe those outcomes; it is not designed to establish superiority of either lens.",
+        "sha256": "b25b32a268f96b001442035a93d99b541fc31c386b8da01b17c3f25ffe7d3e60"
+      },
+      {
+        "path": "study.timeline",
+        "value": "Enrollment: 8 months; follow-up: 6 months after second-eye surgery; data analysis: 2 months.",
+        "sha256": "95c7369f3487c2cc5769076812a32ea5a460483d21e37ddfe12963121612147f"
+      },
+      {
+        "path": "study.completion",
+        "value": "Study data analysis will begin after scheduled follow-up and database checks are complete.",
+        "sha256": "64ccd1ff468b6b571f3c7c5aecd608e1e43bc0ae1011c801236b5376f953f809"
+      },
+      {
+        "path": "study.condition",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.assessments",
+        "value": "Preoperative screening; operative visit for each eye; Month 1, Month 3, and Month 6 (Exit) postoperative assessments. All postoperative time points are measured from surgery on the second eye. The interval between surgeries follows routine clinical care and has no fixed study interval. See structured visit schedule for each activity.",
+        "sha256": "21c0f0e332691f880d141f2c18cf239a819982ff6b9f514a15aa97c2f3e68193"
+      },
+      {
+        "path": "procedures.visit_schedule",
+        "value": [
+          {
+            "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+            "timing": "Preoperative",
+            "visit": "Screening"
+          },
+          {
+            "procedures": "Cataract surgery and implantation of the planned lens model",
+            "timing": "One visit per eye; interval between surgeries follows routine clinical care; no fixed study interval",
+            "visit": "Operative (each eye)"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+            "timing": "1 month after second-eye surgery",
+            "visit": "Month 1"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+            "timing": "3 months after second-eye surgery",
+            "visit": "Month 3"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+            "timing": "6 months after second-eye surgery; Exit",
+            "visit": "Month 6"
+          }
+        ],
+        "sha256": "e7f7ec0aa17581ca5468079ed9060ff7879fbcba451ea30579641311732cd75a"
+      },
+      {
+        "path": "procedures.minimum_days_before_screening_without_participation",
+        "value": "60",
+        "sha256": "68fec0473e988a1ef1c13c4f9b9a15cc67de203de8be796ce82ae4fd7b158e64"
+      },
+      {
+        "path": "procedures.consent",
+        "value": "Informed consent at preoperative screening.",
+        "sha256": "ddb0579075d7136d41fcf611b145ff30cec4ff8e1566a7cfeaaf57627bba9738"
+      },
+      {
+        "path": "procedures.completion",
+        "value": "A participant completes study follow-up after the 6-month assessment following second-eye surgery and completion of the exit form. Participants may withdraw voluntarily at any time.",
+        "sha256": "3f3b50ab720a8c297105c19df95347a4e1f64e77237ae8307b910136e16eccbe"
+      },
+      {
+        "path": "procedures.methods",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.unscheduled_visits",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.discontinuation",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.termination",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "procedures.study_termination",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "population.study_population",
+        "value": "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes, with planned bilateral TECNIS PureSee or bilateral TECNIS Odyssey implantation selected during routine care before enrollment.",
+        "sha256": "065f0b40446be0aa556ccab5d08a20d0f02a13fd907fbf123235b130b7b5fe1f"
+      },
+      {
+        "path": "population.sample_size",
+        "value": "36 subjects per cohort; 72 subjects total",
+        "sha256": "c70217db0bc6f367e43c15f638444025a14f4a2acdc9eafabddd045fad842352"
+      },
+      {
+        "path": "population.sample_justification",
+        "value": "30 evaluable subjects per cohort are estimated sufficient for descriptive characterization of visual outcomes and patient-reported symptoms. Enrollment increases to 36 per cohort (72 total) to account for dropout or incomplete 6-month assessments. No formal power calculation for superiority testing is proposed.",
+        "sha256": "a7e1e351b10f0ab158d4874d59c97f4222029990e2cf1847ac25767002f457e3"
+      },
+      {
+        "path": "population.minimum_age",
+        "value": "50 Years",
+        "sha256": "a6b3b1872b8b41a2e390d8c0bc42d491a3beb1cd67d6ab95c14251e84b81add9"
+      },
+      {
+        "path": "population.inclusion_criteria",
+        "value": [
+          "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes.",
+          "Planned bilateral implantation of either TECNIS PureSee or TECNIS Odyssey selected during routine clinical care before enrollment.",
+          "Willing and able to attend the scheduled study assessments.",
+          "No participation in another study during the 60 days before screening."
+        ],
+        "sha256": "3da1a1b04970e55a30d2e85deb490e9d34a1fbabe8c1e0c8dc91dff1ada1e37f"
+      },
+      {
+        "path": "population.exclusion_criteria",
+        "value": [
+          "Moderate-to-severe ocular disease deemed by the surgeon to increase the risk of complicated cataract surgery or prevent reliable visual-acuity testing.",
+          "Pseudoexfoliation syndrome with clinically significant zonular weakness, zonular dehiscence, prior ocular trauma affecting vision, or prior corneal refractive surgery.",
+          "Planned implantation of different lens models in the two eyes."
+        ],
+        "sha256": "5ea1761e12998f4f5b7c3a591b4a57213ac341bc1d05bbd3e2a70ef7e40990e0"
+      },
+      {
+        "path": "design.study_design",
+        "value": "Prospective, observational, single-center, two-cohort study with no randomization and no masking. Cohorts are defined by lens selection already made in routine care: bilateral TECNIS PureSee or bilateral TECNIS Odyssey.",
+        "sha256": "35b6e1e6666b77b7b6cc52a166d3027cf7beb6bdbe51b1e92556b8591354905e"
+      },
+      {
+        "path": "design.number_of_sites",
+        "value": "1",
+        "sha256": "391552c099c101b131feaf24c5795a6a15bc8ec82015424e0d2b4274a369a0bf"
+      },
+      {
+        "path": "design.masking",
+        "value": "None",
+        "sha256": "f2953d2931e36d0c55640f51865f8394ebe52194765d04e521017232558f871c"
+      },
+      {
+        "path": "design.intervention_name",
+        "value": "Bilateral TECNIS PureSee intraocular lenses or bilateral TECNIS Odyssey intraocular lenses, according to the preexisting routine-care treatment plan.",
+        "sha256": "04ecc3eb7c0f743a7c13a6990a455540e741a14dd83219276e9c03934b1d266d"
+      },
+      {
+        "path": "design.intervention_type",
+        "value": "Medical device \u2014 intraocular lenses.",
+        "sha256": "6524e13fe859082f83db6ed7fa40c4785859d3470cea4457e842b04a5ba78d71"
+      },
+      {
+        "path": "design.intervention_description",
+        "value": "Lens selection will already have been made by the treating surgeon and patient as part of routine care before study enrollment. Enrollment will not determine lens selection. There will be no randomization, no masking, and no change to the planned clinical treatment. Each subject will receive the same lens model in both eyes. This study does not involve mix-and-match implantation.",
+        "sha256": "9832d143dc22dc1ddf4d5a0b7cf627b3237263cc384a214a94b1ab5d3b46bb7f"
+      },
+      {
+        "path": "design.arms",
+        "value": [
+          {
+            "description": "Observational cohort; 36 subjects with bilateral TECNIS PureSee implantation selected in routine care.",
+            "name": "Bilateral TECNIS PureSee"
+          },
+          {
+            "description": "Observational comparison cohort; 36 subjects with bilateral TECNIS Odyssey implantation selected in routine care. No monofocal control cohort is planned.",
+            "name": "Bilateral TECNIS Odyssey"
+          }
+        ],
+        "sha256": "4ba09cf275e8930e50f13b79f9b84fe0d1ccb9bb4cddf3fd26c40984ff10e9d0"
+      },
+      {
+        "path": "design.methods_to_minimize_bias",
+        "value": "The same eligibility criteria, visual testing conditions, testing distances, and assessment schedule will be used for both cohorts. Outcomes and analysis methods will be defined before reviewing study results. Because lens selection is not randomized and the study is not masked, differences between cohorts may reflect patient selection and other factors; a descriptive difference must not be interpreted as proof that the lens caused it.",
+        "sha256": "b51d4806ae3b162f470a7af3573da213befb12d152b35a5f319e0bd4706e2b8c"
+      },
+      {
+        "path": "endpoints.primary",
+        "value": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular distance-corrected intermediate visual acuity (DCIVA) at 66 cm, summarized separately for each cohort",
+            "time_frame": "6 months after second-eye surgery"
+          }
+        ],
+        "sha256": "d5ff6e2ebd35a14967c5184af77c57d5183f81fe484d1e498f929e470083b7a0"
+      },
+      {
+        "path": "endpoints.secondary",
+        "value": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular uncorrected distance visual acuity (UDVA)",
+            "time_frame": "1, 3, and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular corrected distance visual acuity (CDVA)",
+            "time_frame": "1, 3, and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular uncorrected intermediate visual acuity (UIVA) at 66 cm",
+            "time_frame": "1, 3, and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular distance-corrected near visual acuity (DCNVA) at 40 cm",
+            "time_frame": "3 and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular uncorrected near visual acuity (UNVA) at 40 cm",
+            "time_frame": "3 and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Binocular distance-corrected defocus curve from +1.0 D through -2.50 D",
+            "time_frame": "6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Percentages of responses to each Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire question, summarized separately by cohort",
+            "time_frame": "3 and 6 months after second-eye surgery"
+          }
+        ],
+        "sha256": "81dc05f5fba853eec4375064608135825db4ded03ccecd31f57ce6e94200accc"
+      },
+      {
+        "path": "risks_benefits.compensation_or_reimbursement",
+        "value": "No payment will be provided for participation. Documented travel expenses will be reimbursed up to $25 for each completed Month 1, Month 3, and Month 6 study visit, up to $75 total per participant. Screening and operative visits are not eligible for this reimbursement. A participant who withdraws may still receive reimbursement for eligible visits already completed.",
+        "sha256": "1d6bce53e6422b1166790173eab56a7442ec4632c2d6c5e64e2319e985eb7266"
+      },
+      {
+        "path": "risks_benefits.costs",
+        "value": "The sponsor will pay for additional vision tests and questionnaires performed solely for this research. Routine cataract surgery, the selected lenses, and ordinary clinical care will be billed as usual to the participant or insurer. No amount of insurance coverage or participant out-of-pocket cost is specified.",
+        "sha256": "75bcf5d67dcc13d125953b8df2e4a215595ce33cd03733c999106277b3d10b88"
+      },
+      {
+        "path": "risks_benefits.risks",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.risk_mitigation",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.benefits",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.alternatives",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.privacy",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "risks_benefits.injury_handling",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "safety.monitoring",
+        "value": "Adverse events and device deficiencies will be collected from consent through the final study contact. Scheduled review at Months 1, 3, and 6 is not the only time an event may be reported.",
+        "sha256": "77f09c5a7510801ad16f4bf19727ca56f355f04f1969a805c82a04cacd0b5749"
+      },
+      {
+        "path": "safety.general_information",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "safety.adverse_events",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      },
+      {
+        "path": "safety.follow_up",
+        "value": null,
+        "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+      }
+    ],
+    "approved_source": {
+      "study": {
+        "title": "Visual Outcomes and Patient-Reported Symptoms after Bilateral Implantation of an Extended Depth of Focus or a Full Range of Vision Intraocular Lens",
+        "short_title": "Bilateral PureSee or Odyssey Visual Outcomes and Symptoms",
+        "background": "The TECNIS PureSee is a non-diffractive extended depth of focus (EDOF) intraocular lens. Its design may reduce dysphotopsias and improve contrast sensitivity compared with diffractive lenses. A randomized controlled trial suggested better intermediate and near vision than a monofocal control, with similar contrast sensitivity, distance vision, and dysphotopsia profiles.1\nThe TECNIS Odyssey is a full range of vision intraocular lens. Current reports suggest high visual acuity and spectacle independence at distance, intermediate, and near.2,3\nThese reports concern the individual lens technologies. They do not establish which lens will provide better outcomes in the population proposed here. We would like to characterize vision and patient-reported symptoms in two cohorts followed using the same assessment schedule.\n1. Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8\n2. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n3. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7",
+        "hypothesis": "Bilateral implantation of PureSee or Odyssey intraocular lenses will be associated with good distance and intermediate visual outcomes and high patient satisfaction. Near vision, spectacle use, and reports of visual disturbances may differ between the two cohorts. This observational study is intended to describe those outcomes; it is not designed to establish superiority of either lens.",
+        "timeline": "Enrollment: 8 months; follow-up: 6 months after second-eye surgery; data analysis: 2 months.",
+        "completion": "Study data analysis will begin after scheduled follow-up and database checks are complete.",
+        "condition": null
+      },
+      "procedures": {
+        "assessments": "Preoperative screening; operative visit for each eye; Month 1, Month 3, and Month 6 (Exit) postoperative assessments. All postoperative time points are measured from surgery on the second eye. The interval between surgeries follows routine clinical care and has no fixed study interval. See structured visit schedule for each activity.",
+        "visit_schedule": [
+          {
+            "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+            "timing": "Preoperative",
+            "visit": "Screening"
+          },
+          {
+            "procedures": "Cataract surgery and implantation of the planned lens model",
+            "timing": "One visit per eye; interval between surgeries follows routine clinical care; no fixed study interval",
+            "visit": "Operative (each eye)"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+            "timing": "1 month after second-eye surgery",
+            "visit": "Month 1"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+            "timing": "3 months after second-eye surgery",
+            "visit": "Month 3"
+          },
+          {
+            "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+            "timing": "6 months after second-eye surgery; Exit",
+            "visit": "Month 6"
+          }
+        ],
+        "minimum_days_before_screening_without_participation": "60",
+        "consent": "Informed consent at preoperative screening.",
+        "completion": "A participant completes study follow-up after the 6-month assessment following second-eye surgery and completion of the exit form. Participants may withdraw voluntarily at any time.",
+        "methods": null,
+        "unscheduled_visits": null,
+        "discontinuation": null,
+        "termination": null,
+        "study_termination": null
+      },
+      "population": {
+        "study_population": "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes, with planned bilateral TECNIS PureSee or bilateral TECNIS Odyssey implantation selected during routine care before enrollment.",
+        "sample_size": "36 subjects per cohort; 72 subjects total",
+        "sample_justification": "30 evaluable subjects per cohort are estimated sufficient for descriptive characterization of visual outcomes and patient-reported symptoms. Enrollment increases to 36 per cohort (72 total) to account for dropout or incomplete 6-month assessments. No formal power calculation for superiority testing is proposed.",
+        "minimum_age": "50 Years",
+        "inclusion_criteria": [
+          "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes.",
+          "Planned bilateral implantation of either TECNIS PureSee or TECNIS Odyssey selected during routine clinical care before enrollment.",
+          "Willing and able to attend the scheduled study assessments.",
+          "No participation in another study during the 60 days before screening."
+        ],
+        "exclusion_criteria": [
+          "Moderate-to-severe ocular disease deemed by the surgeon to increase the risk of complicated cataract surgery or prevent reliable visual-acuity testing.",
+          "Pseudoexfoliation syndrome with clinically significant zonular weakness, zonular dehiscence, prior ocular trauma affecting vision, or prior corneal refractive surgery.",
+          "Planned implantation of different lens models in the two eyes."
+        ]
+      },
+      "design": {
+        "study_design": "Prospective, observational, single-center, two-cohort study with no randomization and no masking. Cohorts are defined by lens selection already made in routine care: bilateral TECNIS PureSee or bilateral TECNIS Odyssey.",
+        "number_of_sites": "1",
+        "masking": "None",
+        "intervention_name": "Bilateral TECNIS PureSee intraocular lenses or bilateral TECNIS Odyssey intraocular lenses, according to the preexisting routine-care treatment plan.",
+        "intervention_type": "Medical device \u2014 intraocular lenses.",
+        "intervention_description": "Lens selection will already have been made by the treating surgeon and patient as part of routine care before study enrollment. Enrollment will not determine lens selection. There will be no randomization, no masking, and no change to the planned clinical treatment. Each subject will receive the same lens model in both eyes. This study does not involve mix-and-match implantation.",
+        "arms": [
+          {
+            "description": "Observational cohort; 36 subjects with bilateral TECNIS PureSee implantation selected in routine care.",
+            "name": "Bilateral TECNIS PureSee"
+          },
+          {
+            "description": "Observational comparison cohort; 36 subjects with bilateral TECNIS Odyssey implantation selected in routine care. No monofocal control cohort is planned.",
+            "name": "Bilateral TECNIS Odyssey"
+          }
+        ],
+        "methods_to_minimize_bias": "The same eligibility criteria, visual testing conditions, testing distances, and assessment schedule will be used for both cohorts. Outcomes and analysis methods will be defined before reviewing study results. Because lens selection is not randomized and the study is not masked, differences between cohorts may reflect patient selection and other factors; a descriptive difference must not be interpreted as proof that the lens caused it."
+      },
+      "endpoints": {
+        "primary": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular distance-corrected intermediate visual acuity (DCIVA) at 66 cm, summarized separately for each cohort",
+            "time_frame": "6 months after second-eye surgery"
+          }
+        ],
+        "secondary": [
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular uncorrected distance visual acuity (UDVA)",
+            "time_frame": "1, 3, and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular corrected distance visual acuity (CDVA)",
+            "time_frame": "1, 3, and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular uncorrected intermediate visual acuity (UIVA) at 66 cm",
+            "time_frame": "1, 3, and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular distance-corrected near visual acuity (DCNVA) at 40 cm",
+            "time_frame": "3 and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Mean binocular uncorrected near visual acuity (UNVA) at 40 cm",
+            "time_frame": "3 and 6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Binocular distance-corrected defocus curve from +1.0 D through -2.50 D",
+            "time_frame": "6 months after second-eye surgery"
+          },
+          {
+            "analysis_method": "",
+            "description": "",
+            "measure": "Percentages of responses to each Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire question, summarized separately by cohort",
+            "time_frame": "3 and 6 months after second-eye surgery"
+          }
+        ]
+      },
+      "risks_benefits": {
+        "compensation_or_reimbursement": "No payment will be provided for participation. Documented travel expenses will be reimbursed up to $25 for each completed Month 1, Month 3, and Month 6 study visit, up to $75 total per participant. Screening and operative visits are not eligible for this reimbursement. A participant who withdraws may still receive reimbursement for eligible visits already completed.",
+        "costs": "The sponsor will pay for additional vision tests and questionnaires performed solely for this research. Routine cataract surgery, the selected lenses, and ordinary clinical care will be billed as usual to the participant or insurer. No amount of insurance coverage or participant out-of-pocket cost is specified.",
+        "risks": null,
+        "risk_mitigation": null,
+        "benefits": null,
+        "alternatives": null,
+        "privacy": null,
+        "injury_handling": null
+      },
+      "safety": {
+        "monitoring": "Adverse events and device deficiencies will be collected from consent through the final study contact. Scheduled review at Months 1, 3, and 6 is not the only time an event may be reported.",
+        "general_information": null,
+        "adverse_events": null,
+        "follow_up": null
+      }
+    },
+    "source_evidence_coverage_map": {
+      "schema_version": "source-evidence-coverage-map/v1",
+      "study_type": "Prospective",
+      "icf_template": "Sterling",
+      "entries": [
+        {
+          "source_path": "confidentiality.data_handling",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.privacy",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics.confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "confidentiality.publication",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality-publication",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "confidentiality.retention",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality-publication",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.arms",
+          "approved_value_sha256": "581f64a800ae9afa041b653653d69d66bf42f214b24e502e1d168c5340e49533",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.intervention_description",
+          "approved_value_sha256": "9832d143dc22dc1ddf4d5a0b7cf627b3237263cc384a214a94b1ab5d3b46bb7f",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.intervention_name",
+          "approved_value_sha256": "04ecc3eb7c0f743a7c13a6990a455540e741a14dd83219276e9c03934b1d266d",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "design.interventions",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "design.study_design",
+          "approved_value_sha256": "35b6e1e6666b77b7b6cc52a166d3027cf7beb6bdbe51b1e92556b8591354905e",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.bias",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.other",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.primary",
+          "approved_value_sha256": "d0e3c6acea281176e0581c2583845fb38ce806a0bb841668f2edb2f32e4c5cd5",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.study-purpose",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "endpoints.secondary",
+          "approved_value_sha256": "5de2e714540d40381cf82d5637ced80fbdf20d5a7a8ea75261848410646bba0b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-design.design",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "ethics.confidentiality",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "ethics.confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "meta.protocol_number",
+          "approved_value_sha256": "2a654e318a6eccb06f9b507011fe07fbc2aeb9fee8e32108335fc10cfa23f26c",
+          "destinations": [
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.primary",
+          "approved_value_sha256": "752d771c089d10eae95298c4d1cf15eb349645b42ff9b8b07106db8cbb6c798a",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.study-purpose",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "objectives.secondary",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "objectives",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.exclusion_criteria",
+          "approved_value_sha256": "6492558ce0cd51ced964a395870fac81f327611dd6f541246d9af6058495aede",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.exclusion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.inclusion_criteria",
+          "approved_value_sha256": "ce3b0631e6a5bce7a29bdcc888d60a8c1e0a46546c4edb7b0320add1564f2834",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.maximum_age",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.minimum_age",
+          "approved_value_sha256": "a6b3b1872b8b41a2e390d8c0bc42d491a3beb1cd67d6ab95c14251e84b81add9",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_justification",
+          "approved_value_sha256": "a7e1e351b10f0ab158d4874d59c97f4222029990e2cf1847ac25767002f457e3",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size",
+          "approved_value_sha256": "c70217db0bc6f367e43c15f638444025a14f4a2acdc9eafabddd045fad842352",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "population.sample_size_evidence",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "population.study_population",
+          "approved_value_sha256": "065f0b40446be0aa556ccab5d08a20d0f02a13fd907fbf123235b130b7b5fe1f",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.population",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessment_details",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.assessments",
+          "approved_value_sha256": "21c0f0e332691f880d141f2c18cf239a819982ff6b9f514a15aa97c2f3e68193",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.completion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.completion",
+          "approved_value_sha256": "3f3b50ab720a8c297105c19df95347a4e1f64e77237ae8307b910136e16eccbe",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.completion",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.consent",
+          "approved_value_sha256": "ddb0579075d7136d41fcf611b145ff30cec4ff8e1566a7cfeaaf57627bba9738",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.consent",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinuation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.discontinuation",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.discontinued_subjects",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.discontinued",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.evaluation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.intervention_management",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.methods",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.measurements",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.minimum_days_before_screening_without_participation",
+          "approved_value_sha256": "68fec0473e988a1ef1c13c4f9b9a15cc67de203de8be796ce82ae4fd7b158e64",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "subjects.inclusion",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.replacement",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.discontinuation",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.unscheduled_visits",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.unscheduled",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule",
+          "approved_value_sha256": "50facaf4b3655df13402d0abd9f5e6c6b8dc0eaaeaa5058fe59079aa0af18b40",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.completion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "study-procedure.visits",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "study.xml",
+              "section_id": "prs.structured",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "procedures.visit_schedule_table",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.completion",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.alternatives",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.alternatives",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.benefits",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.benefits",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "risks-benefits.benefits",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.compensation_or_reimbursement",
+          "approved_value_sha256": "1d6bce53e6422b1166790173eab56a7442ec4632c2d6c5e64e2319e985eb7266",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.payment",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "financial-injury",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.costs",
+          "approved_value_sha256": "75bcf5d67dcc13d125953b8df2e4a215595ce33cd03733c999106277b3d10b88",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.costs",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "financial-injury",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.injury_handling",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.injury",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "financial-injury",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.privacy",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.privacy",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "confidentiality",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risk_mitigation",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.risks",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "risks-benefits.risks",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "risks_benefits.risks",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.risks",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.general",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "risks-benefits.risks",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.adverse_events",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.analysis",
+              "required": true,
+              "approved": false
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.reporting",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.follow_up",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.follow-up",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.general_information",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.general",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "safety.monitoring",
+          "approved_value_sha256": "77f09c5a7510801ad16f4bf19727ca56f355f04f1969a805c82a04cacd0b5749",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "evaluation-procedures",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.monitoring",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_plan",
+          "approved_value_sha256": "3d1451cf30a0db2f8a387ead28dc6af57a584ee1b53218adb35ed16c7e0331a8",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "quality-safety.analysis",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.analysis_populations",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.datasets",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.methodology",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.methodology",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.sample_size_evidence",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "sample-size",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "statistics.software",
+          "approved_value_sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b",
+          "destinations": [
+            {
+              "artifact": "protocol.docx",
+              "section_id": "analysis-plan.considerations",
+              "required": true,
+              "approved": false
+            }
+          ]
+        },
+        {
+          "source_path": "study.background",
+          "approved_value_sha256": "b4617f67e541d9a33a23084f125d6041e6f14b545dbf6b09c2dbb54d47cb7a10",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.background",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "introduction",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.hypothesis",
+          "approved_value_sha256": "b25b32a268f96b001442035a93d99b541fc31c386b8da01b17c3f25ffe7d3e60",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.study-purpose",
+              "required": true,
+              "approved": true
+            }
+          ]
+        },
+        {
+          "source_path": "study.timeline",
+          "approved_value_sha256": "95c7369f3487c2cc5769076812a32ea5a460483d21e37ddfe12963121612147f",
+          "destinations": [
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.duration",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "icf.docx",
+              "section_id": "icf.key-information-summary",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.completion",
+              "required": true,
+              "approved": true
+            },
+            {
+              "artifact": "protocol.docx",
+              "section_id": "endpoint-criteria.study-completion",
+              "required": true,
+              "approved": true
+            }
+          ]
+        }
+      ]
+    },
+    "evidence_checklist": [
+      {
+        "section_id": "study-procedure.consent",
+        "required_source_paths": [
+          "procedures.consent"
+        ],
+        "approved_values": {
+          "procedures.consent": "Informed consent at preoperative screening."
+        }
+      },
+      {
+        "section_id": "study-procedure.visits",
+        "required_source_paths": [
+          "procedures.assessments",
+          "procedures.visit_schedule",
+          "procedures.assessment_details",
+          "procedures.intervention_management"
+        ],
+        "approved_values": {
+          "procedures.assessments": "Preoperative screening; operative visit for each eye; Month 1, Month 3, and Month 6 (Exit) postoperative assessments. All postoperative time points are measured from surgery on the second eye. The interval between surgeries follows routine clinical care and has no fixed study interval. See structured visit schedule for each activity.",
+          "procedures.visit_schedule": [
+            {
+              "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+              "timing": "Preoperative",
+              "visit": "Screening"
+            },
+            {
+              "procedures": "Cataract surgery and implantation of the planned lens model",
+              "timing": "One visit per eye; interval between surgeries follows routine clinical care; no fixed study interval",
+              "visit": "Operative (each eye)"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+              "timing": "1 month after second-eye surgery",
+              "visit": "Month 1"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+              "timing": "3 months after second-eye surgery",
+              "visit": "Month 3"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+              "timing": "6 months after second-eye surgery; Exit",
+              "visit": "Month 6"
+            }
+          ],
+          "procedures.assessment_details": null,
+          "procedures.intervention_management": null
+        }
+      },
+      {
+        "section_id": "study-procedure.measurements",
+        "required_source_paths": [
+          "procedures.methods",
+          "procedures.assessment_details",
+          "endpoints.primary",
+          "endpoints.secondary",
+          "endpoints.other"
+        ],
+        "approved_values": {
+          "procedures.methods": null,
+          "procedures.assessment_details": null,
+          "endpoints.primary": [
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Mean binocular distance-corrected intermediate visual acuity (DCIVA) at 66 cm, summarized separately for each cohort",
+              "time_frame": "6 months after second-eye surgery"
+            }
+          ],
+          "endpoints.secondary": [
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Mean binocular uncorrected distance visual acuity (UDVA)",
+              "time_frame": "1, 3, and 6 months after second-eye surgery"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Mean binocular corrected distance visual acuity (CDVA)",
+              "time_frame": "1, 3, and 6 months after second-eye surgery"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Mean binocular uncorrected intermediate visual acuity (UIVA) at 66 cm",
+              "time_frame": "1, 3, and 6 months after second-eye surgery"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Mean binocular distance-corrected near visual acuity (DCNVA) at 40 cm",
+              "time_frame": "3 and 6 months after second-eye surgery"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Mean binocular uncorrected near visual acuity (UNVA) at 40 cm",
+              "time_frame": "3 and 6 months after second-eye surgery"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Binocular distance-corrected defocus curve from +1.0 D through -2.50 D",
+              "time_frame": "6 months after second-eye surgery"
+            },
+            {
+              "analysis_method": "",
+              "description": "",
+              "measure": "Percentages of responses to each Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire question, summarized separately by cohort",
+              "time_frame": "3 and 6 months after second-eye surgery"
+            }
+          ],
+          "endpoints.other": null
+        }
+      },
+      {
+        "section_id": "study-procedure.unscheduled",
+        "required_source_paths": [
+          "procedures.unscheduled_visits"
+        ],
+        "approved_values": {
+          "procedures.unscheduled_visits": null
+        }
+      },
+      {
+        "section_id": "study-procedure.discontinued",
+        "required_source_paths": [
+          "procedures.discontinued_subjects"
+        ],
+        "approved_values": {
+          "procedures.discontinued_subjects": null
+        }
+      },
+      {
+        "section_id": "evaluation-procedures",
+        "required_source_paths": [
+          "procedures.assessments",
+          "procedures.evaluation",
+          "procedures.visit_schedule",
+          "procedures.visit_schedule_table",
+          "safety.monitoring",
+          "safety.adverse_events",
+          "procedures.consent"
+        ],
+        "approved_values": {
+          "procedures.assessments": "Preoperative screening; operative visit for each eye; Month 1, Month 3, and Month 6 (Exit) postoperative assessments. All postoperative time points are measured from surgery on the second eye. The interval between surgeries follows routine clinical care and has no fixed study interval. See structured visit schedule for each activity.",
+          "procedures.evaluation": null,
+          "procedures.visit_schedule": [
+            {
+              "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+              "timing": "Preoperative",
+              "visit": "Screening"
+            },
+            {
+              "procedures": "Cataract surgery and implantation of the planned lens model",
+              "timing": "One visit per eye; interval between surgeries follows routine clinical care; no fixed study interval",
+              "visit": "Operative (each eye)"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+              "timing": "1 month after second-eye surgery",
+              "visit": "Month 1"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+              "timing": "3 months after second-eye surgery",
+              "visit": "Month 3"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+              "timing": "6 months after second-eye surgery; Exit",
+              "visit": "Month 6"
+            }
+          ],
+          "procedures.visit_schedule_table": null,
+          "safety.monitoring": "Adverse events and device deficiencies will be collected from consent through the final study contact. Scheduled review at Months 1, 3, and 6 is not the only time an event may be reported.",
+          "safety.adverse_events": null,
+          "procedures.consent": "Informed consent at preoperative screening."
+        }
+      },
+      {
+        "section_id": "endpoint-criteria.completion",
+        "required_source_paths": [
+          "procedures.completion",
+          "study.timeline",
+          "procedures.visit_schedule",
+          "procedures.visit_schedule_table",
+          "procedures.assessments"
+        ],
+        "approved_values": {
+          "procedures.completion": "A participant completes study follow-up after the 6-month assessment following second-eye surgery and completion of the exit form. Participants may withdraw voluntarily at any time.",
+          "study.timeline": "Enrollment: 8 months; follow-up: 6 months after second-eye surgery; data analysis: 2 months.",
+          "procedures.visit_schedule": [
+            {
+              "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+              "timing": "Preoperative",
+              "visit": "Screening"
+            },
+            {
+              "procedures": "Cataract surgery and implantation of the planned lens model",
+              "timing": "One visit per eye; interval between surgeries follows routine clinical care; no fixed study interval",
+              "visit": "Operative (each eye)"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+              "timing": "1 month after second-eye surgery",
+              "visit": "Month 1"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+              "timing": "3 months after second-eye surgery",
+              "visit": "Month 3"
+            },
+            {
+              "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+              "timing": "6 months after second-eye surgery; Exit",
+              "visit": "Month 6"
+            }
+          ],
+          "procedures.visit_schedule_table": null,
+          "procedures.assessments": "Preoperative screening; operative visit for each eye; Month 1, Month 3, and Month 6 (Exit) postoperative assessments. All postoperative time points are measured from surgery on the second eye. The interval between surgeries follows routine clinical care and has no fixed study interval. See structured visit schedule for each activity."
+        }
+      },
+      {
+        "section_id": "endpoint-criteria.discontinuation",
+        "required_source_paths": [
+          "procedures.discontinuation",
+          "procedures.replacement"
+        ],
+        "approved_values": {
+          "procedures.discontinuation": null,
+          "procedures.replacement": null
+        }
+      },
+      {
+        "section_id": "endpoint-criteria.study-completion",
+        "required_source_paths": [
+          "study.timeline"
+        ],
+        "approved_values": {
+          "study.timeline": "Enrollment: 8 months; follow-up: 6 months after second-eye surgery; data analysis: 2 months."
+        }
+      }
+    ],
+    "section_contracts": [
+      {
+        "section_id": "study-procedure.consent",
+        "number": "9.1.",
+        "title": "Informed Consent / Subject Enrollment",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft",
+          "fixed_boilerplate"
+        ],
+        "minimum_evidence": [
+          "procedures.consent"
+        ],
+        "fixed_boilerplate": [
+          {
+            "boilerplate_id": "consent",
+            "text": "Written informed consent will be obtained before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
+            "sha256": "df7706031302ff48b7cdbc77916d9684f3d92b947dfc42e26ec0d3917f40d2b5"
+          }
+        ],
+        "content_expectations": [
+          "Explain informed consent / subject enrollment using all material approved facts supplied for this section.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_evidence",
+        "evidence_scopes": [],
+        "approved_source_word_count": 5,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      },
+      {
+        "section_id": "study-procedure.visits",
+        "number": "9.2.",
+        "title": "Visits and Examinations",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft"
+        ],
+        "minimum_evidence": [
+          "procedures.assessments",
+          "procedures.visit_schedule",
+          "procedures.assessment_details",
+          "procedures.intervention_management"
+        ],
+        "fixed_boilerplate": [],
+        "content_expectations": [
+          "Account for every approved visit, time point, and visit-specific procedure.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_items",
+        "evidence_scopes": [],
+        "approved_source_word_count": 231,
+        "reference_detail_target_words": 150,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [
+            "complete-visit-schedule"
+          ],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      },
+      {
+        "section_id": "study-procedure.measurements",
+        "number": "9.3.",
+        "title": "Study Methods and Measurements",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft"
+        ],
+        "minimum_evidence": [
+          "procedures.methods",
+          "procedures.assessment_details",
+          "endpoints.primary",
+          "endpoints.secondary",
+          "endpoints.other"
+        ],
+        "fixed_boilerplate": [],
+        "content_expectations": [
+          "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_evidence",
+        "evidence_scopes": [],
+        "approved_source_word_count": 109,
+        "reference_detail_target_words": 65,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [
+            "endpoint-measurement-methods"
+          ],
+          "brief_reference_only": [
+            "complete-visit-schedule",
+            "endpoint-inventory"
+          ],
+          "do_not_restate": [
+            "complete-visit-schedule",
+            "endpoint-inventory"
+          ]
+        }
+      },
+      {
+        "section_id": "study-procedure.unscheduled",
+        "number": "9.4.",
+        "title": "Unscheduled Visits",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft",
+          "fixed_boilerplate"
+        ],
+        "minimum_evidence": [
+          "procedures.unscheduled_visits"
+        ],
+        "fixed_boilerplate": [
+          {
+            "boilerplate_id": "unscheduled",
+            "text": "An unscheduled visit may occur when an additional study-related assessment is needed. The reason for the visit, assessments performed, and resulting actions will be documented in the study records.",
+            "sha256": "8d9eb65fc39f146b7ecb858335cedb46e4625fd8b5c9af4911f180ca28bbb51b"
+          }
+        ],
+        "content_expectations": [
+          "Explain unscheduled visits using all material approved facts supplied for this section.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_evidence",
+        "evidence_scopes": [],
+        "approved_source_word_count": 0,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      },
+      {
+        "section_id": "study-procedure.discontinued",
+        "number": "9.5.",
+        "title": "Discontinued Subjects",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft",
+          "fixed_boilerplate"
+        ],
+        "minimum_evidence": [
+          "procedures.discontinued_subjects"
+        ],
+        "fixed_boilerplate": [
+          {
+            "boilerplate_id": "discontinued-subjects",
+            "text": "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements.",
+            "sha256": "ae4057ee85cbb73c27040ad7cc548602da0dfe007e09b70b81614f843b569a79"
+          }
+        ],
+        "content_expectations": [
+          "Preserve the approved operational handling for discontinued subjects, including any supplied safety follow-up.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_items",
+        "evidence_scopes": [],
+        "approved_source_word_count": 0,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      },
+      {
+        "section_id": "evaluation-procedures",
+        "number": "15.",
+        "title": "STANDARD EVALUATION PROCEDURES",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft"
+        ],
+        "minimum_evidence": [
+          "procedures.assessments",
+          "procedures.evaluation",
+          "procedures.visit_schedule",
+          "procedures.visit_schedule_table",
+          "safety.monitoring",
+          "safety.adverse_events",
+          "procedures.consent"
+        ],
+        "fixed_boilerplate": [],
+        "content_expectations": [
+          "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "table_with_notes",
+        "evidence_scopes": [],
+        "approved_source_word_count": 269,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      },
+      {
+        "section_id": "endpoint-criteria.completion",
+        "number": "18.1.",
+        "title": "Patient Completion of Study",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft",
+          "fixed_boilerplate"
+        ],
+        "minimum_evidence": [
+          "procedures.completion",
+          "study.timeline",
+          "procedures.visit_schedule",
+          "procedures.visit_schedule_table",
+          "procedures.assessments"
+        ],
+        "fixed_boilerplate": [
+          {
+            "boilerplate_id": "completion",
+            "text": "Participant completion requires fulfillment of the approved participant-completion criteria. Discontinuation is a distinct participant disposition, not completion; closeout documentation does not change that disposition.",
+            "sha256": "84afcff1b1898804efb4d70750fd8471991de5a851ee6ea745317ac7907f914b"
+          }
+        ],
+        "content_expectations": [
+          "Reference every approved visit and time point concisely when stating the participant-completion rule, without repeating the complete visit or assessment inventory owned by Section 15.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "concept_reference",
+        "evidence_scopes": [],
+        "approved_source_word_count": 269,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [
+            "complete-visit-schedule"
+          ],
+          "do_not_restate": [
+            "complete-visit-schedule"
+          ]
+        }
+      },
+      {
+        "section_id": "endpoint-criteria.discontinuation",
+        "number": "18.2.",
+        "title": "Patient Discontinuation",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft",
+          "fixed_boilerplate"
+        ],
+        "minimum_evidence": [
+          "procedures.discontinuation",
+          "procedures.replacement"
+        ],
+        "fixed_boilerplate": [
+          {
+            "boilerplate_id": "discontinuation",
+            "text": "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements.",
+            "sha256": "eae2cc4490c4ba8a61f3f3598b0a41d7c2d4323bed277026a273f80f7710f0fd"
+          }
+        ],
+        "content_expectations": [
+          "Explain patient discontinuation using all material approved facts supplied for this section.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "all_material_items",
+        "evidence_scopes": [],
+        "approved_source_word_count": 0,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [],
+          "do_not_restate": []
+        }
+      },
+      {
+        "section_id": "endpoint-criteria.study-completion",
+        "number": "18.5.",
+        "title": "Study Completion",
+        "role": "leaf",
+        "required": true,
+        "allowed_modes": [
+          "agent_draft",
+          "fixed_boilerplate"
+        ],
+        "minimum_evidence": [
+          "study.timeline"
+        ],
+        "fixed_boilerplate": [
+          {
+            "boilerplate_id": "study-completion",
+            "text": "Study closeout follows the approved timeline and any source-specified closeout requirements. Participant completion and discontinuation remain distinct dispositions in the study records.",
+            "sha256": "629bc8ec21a630a23d824d2199c195b0782ef990d34339abe4454006f673c78d"
+          }
+        ],
+        "content_expectations": [
+          "State the supplied study-level closeout timeline concisely. Define a completion trigger only when the source supplies one. Sections 9 and 15 own the visit schedule, and Section 18.1 owns participant completion.",
+          "Do not replace supplied detail with generic clinical prose."
+        ],
+        "source_coverage": "concept_reference",
+        "evidence_scopes": [],
+        "approved_source_word_count": 13,
+        "reference_detail_target_words": 0,
+        "summary_concepts": [],
+        "summary_obligations": {},
+        "concept_ownership": {
+          "owns": [],
+          "brief_reference_only": [
+            "complete-visit-schedule"
+          ],
+          "do_not_restate": [
+            "complete-visit-schedule"
+          ]
+        }
+      }
+    ],
+    "accepted_context": [],
+    "prior_target_drafts": [],
+    "findings": [],
+    "constraints": [
+      "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
+      "Use only supplied approved evidence and listed Fixed Clinical Boilerplate.",
+      "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
+      "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
+      "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims.",
+      "Return exactly one result for every requested section ID.",
+      "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
+      "Return structured section content, not a whole document or document markup.",
+      "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
+      "Use participant-facing language for ICF sections.",
+      "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
+      "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
+      "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
+      "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
+      "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and do not reproduce the endpoint inventory outside Study Design unless scientific meaning requires it.",
+      "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
+      "Write clinical content that serves the section purpose. Omit self-referential filler, generic transitions, and repeated conclusions that add no source-supported information.",
+      "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+      "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
+      "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
+      "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
+      "Every paragraph object and every list object must include at least one evidence_refs or boilerplate_refs value allowed by its section contract. If prose only introduces an already-cited list, omit that paragraph instead of returning empty reference arrays."
+    ],
+    "response_path": "hermes/responses/r-9218b5efbaa1.draft.protocol-operations.initial.a1.ddd5bfa0.json",
+    "request_sha256": "7aaf2340485c443446e382085d68c9d0af5271bb1dc0bbd4c3cc0f08b1c34259"
+  },
+  "response": {
+    "schema_version": "hermes-response/v2",
+    "request_id": "r-9218b5efbaa1.draft.protocol-operations.initial.a1.ddd5bfa0",
+    "request_sha256": "7aaf2340485c443446e382085d68c9d0af5271bb1dc0bbd4c3cc0f08b1c34259",
+    "task": "section_drafting",
+    "revision_id": "r-9218b5efbaa1",
+    "batch_id": "protocol-operations",
+    "producer": {
+      "model_id": "gpt-6-astra",
+      "reviewer_id": "protocol-operations"
+    },
+    "section_results": [
+      {
+        "section_id": "study-procedure.consent",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Written informed consent will be obtained at preoperative screening before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
+            "evidence_refs": [
+              "source:procedures.consent"
+            ],
+            "boilerplate_refs": [
+              "consent"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.visits",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Study visits comprise preoperative screening, an operative visit for each eye, and postoperative assessments at Month 1, Month 3, and Month 6 (Exit). Every postoperative time point is measured from second-eye surgery. The interval between the two operations follows routine clinical care, with no fixed study interval.",
+            "evidence_refs": [
+              "source:procedures.assessments",
+              "source:procedures.visit_schedule"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": [
+          {
+            "items": [
+              "Screening, preoperatively: obtain informed consent, collect demographics and general information including medical history, and confirm the routine-care lens selection and cohort.",
+              "Operative visit, each eye: perform cataract surgery and implant the planned lens model.",
+              "Month 1, one month after second-eye surgery: measure binocular uncorrected and corrected photopic distance visual acuity and binocular uncorrected photopic intermediate visual acuity at 66 cm; monitor for adverse events and device deficiencies.",
+              "Month 3, three months after second-eye surgery: assess binocular uncorrected and corrected photopic distance visual acuity, binocular uncorrected photopic intermediate visual acuity at 66 cm, and binocular uncorrected and distance-corrected photopic near visual acuity at 40 cm. Administer the AIOLIS questionnaire and monitor for adverse events and device deficiencies.",
+              "Month 6 (Exit), six months after second-eye surgery: obtain binocular uncorrected and corrected photopic distance visual acuity, binocular uncorrected and distance-corrected photopic intermediate visual acuity at 66 cm, and binocular uncorrected and distance-corrected photopic near visual acuity at 40 cm. Obtain the distance-corrected defocus curve, administer the AIOLIS questionnaire, monitor for adverse events and device deficiencies, and complete the exit form."
+            ],
+            "evidence_refs": [
+              "source:procedures.visit_schedule"
+            ],
+            "boilerplate_refs": []
+          }
+        ]
+      },
+      {
+        "section_id": "study-procedure.measurements",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Visual acuity measurements are binocular. Distance acuity is measured both without correction and with correction at 1, 3, and 6 months after second-eye surgery. Intermediate testing uses a distance of 66 cm: uncorrected acuity is measured at those same time points, and distance-corrected acuity is measured at 6 months to provide the primary outcome, mean DCIVA for each cohort. Near testing is performed at 40 cm, without correction and with distance correction, at 3 and 6 months.",
+            "evidence_refs": [
+              "source:endpoints.primary",
+              "source:endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "At 6 months after second-eye surgery, the binocular distance-corrected defocus curve is obtained over the range from +1.0 D through -2.50 D. Patient-reported symptoms are assessed with the Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire at 3 and 6 months. Responses are recorded for each question to support cohort-specific response percentages.",
+            "evidence_refs": [
+              "source:endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.unscheduled",
+        "outcome": "fixed_boilerplate",
+        "paragraphs": [
+          {
+            "text": "An unscheduled visit may occur when an additional study-related assessment is needed. The reason for the visit, assessments performed, and resulting actions will be documented in the study records.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "unscheduled"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.discontinued",
+        "outcome": "fixed_boilerplate",
+        "paragraphs": [
+          {
+            "text": "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "discontinued-subjects"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "evaluation-procedures",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "The Schedule of Assessments presents the study activities and their timing, from preoperative screening through the Month 6 exit assessment.",
+            "evidence_refs": [
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.completion",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "The participant pathway includes preoperative screening, an operative visit for each eye, and Month 1, Month 3, and Month 6 (Exit) follow-up measured from second-eye surgery. The operative interval is determined by routine clinical care rather than a fixed study interval. A participant completes study follow-up after the 6-month assessment and completion of the exit form; the detailed assessment schedule is provided in Section 15.",
+            "evidence_refs": [
+              "source:procedures.completion",
+              "source:procedures.assessments",
+              "source:procedures.visit_schedule",
+              "source:study.timeline"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Participants may withdraw voluntarily at any time. Withdrawal is a discontinuation disposition, not successful completion, and closeout documentation does not change that distinction.",
+            "evidence_refs": [
+              "source:procedures.completion"
+            ],
+            "boilerplate_refs": [
+              "completion"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.discontinuation",
+        "outcome": "fixed_boilerplate",
+        "paragraphs": [
+          {
+            "text": "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "discontinuation"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.study-completion",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "The study timeline provides for 8 months of enrollment, follow-up through 6 months after second-eye surgery, and 2 months of data analysis.",
+            "evidence_refs": [
+              "source:study.timeline"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      }
+    ]
+  }
+}

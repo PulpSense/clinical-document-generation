@@ -6021,13 +6021,6 @@ def validate_verifications(
                         f"passing section assessment targets={passing_finding_targets}."
                     ),
                 }, "verifier_transient"))
-            warning_ids: set[str] = set()
-            for reported in reported_findings:
-                raw_targets = reported.get("target_ids")
-                targets = [str(target) for target in raw_targets] if isinstance(raw_targets, list) else []
-                finding_id = _text(reported.get("finding_id"))
-                if finding_id and _governed_content_omission(reported, targets):
-                    warning_ids.add(finding_id)
             uncovered_sections = [
                 str(item.get("section_id") or "")
                 for item in valid_section_rows
@@ -6039,10 +6032,9 @@ def validate_verifications(
                 for item in valid_cross_rows
                 if item.get("status") != "passed"
                 and (
-                    str(item.get("check") or "") != "procedures"
-                    or not any(
+                    not any(
                         _notes_cite_finding(item.get("notes"), finding_id)
-                        for finding_id in warning_ids
+                        for finding_id in reported_ids
                     )
                 )
             ]
