@@ -41,8 +41,8 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
-from rendering import render_documents
+from quality import audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from rendering import rendered_section_snapshot, render_documents
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -7010,6 +7010,8 @@ def _recovery_action_observation(
                                 "after": texts[index + 1] if index + 1 < len(texts) else "",
                                 "style": str(paragraphs[index].style.name or ""),
                             })
+            if not accepted_path.is_file() and candidate_path.is_file() and not candidate_path.is_symlink():
+                contexts = rendered_section_snapshot(candidate_path, target)
             target_identities[f"candidate/{artifact}.docx#{target}"] = sha256_value(contexts)
 
     structural_paths = []
@@ -8393,6 +8395,11 @@ def _begin_independent_review(
     render_report: Mapping[str, Any], bundle: Mapping[str, Any], review_set: int,
 ) -> tuple[list[Path], list[dict[str, Any]]]:
     """Apply existing Sterling checks before spending independent review calls."""
+    protocol_path = revision_dir / "candidate/protocol.docx"
+    if protocol_path.is_file():
+        computed_findings = audit_computed_protocol_fields(protocol_path, reference)
+        if computed_findings:
+            return [], computed_findings
     if (
         canonical_study_type(get_path(reference, "meta.study_type")) != "Retrospective"
         and str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"

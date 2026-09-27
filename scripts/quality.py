@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, semantic_evidence_contract, sterling_clause_contract, sterling_clause_text
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, sterling_clause_contract, sterling_clause_text
 from drafting import evidence_grounded, hypothesis_claim_issues, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
@@ -3791,6 +3791,28 @@ def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
     )
 
 
+def audit_computed_protocol_fields(document: Path | Document, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Check code-owned synopsis destinations before an independent review call."""
+    document = document if hasattr(document, "tables") else Document(document)
+    expected = participant_followup_summary(reference)
+    findings = []
+    for table in document.tables:
+        for row in table.rows:
+            label = re.sub(r"[^a-z]", "", row.cells[0].text.casefold())
+            if label not in {"durationfollowup", "durationfollwup"} or len(row.cells) < 2:
+                continue
+            actual = row.cells[1].text.strip()
+            if re.sub(r"\s+", " ", actual) != re.sub(r"\s+", " ", expected):
+                findings.append(recovery_finding({
+                    "category": "content", "check": "computed_source_fidelity",
+                    "field": "general-information", "artifact": "protocol",
+                    "target_ids": ["general-information"], "source_path": "study.timeline",
+                    "issue": "The code-owned Duration / Follow-up synopsis differs from the approved participant follow-up projection.",
+                    "expected": expected, "actual": actual,
+                }, "deterministic_structure_defect"))
+    return findings
+
+
 def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Conservative source-leaf checks, not a second renderer/mapping contract.
 
@@ -4428,6 +4450,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     protocol = revision_dir / "candidate/protocol.docx"
     findings.extend(audit_docx(protocol, required_phrases=[str(get_path(reference, "study.title", ""))]))
     findings.extend(audit_source_surfaces(protocol, reference))
+    findings.extend(audit_computed_protocol_fields(protocol, reference))
     icf_path = revision_dir / "candidate/icf.docx"
     if branch != "Retrospective" and icf_path.is_file():
         findings.extend(audit_source_surfaces(icf_path, reference))
@@ -4561,10 +4584,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         ungrounded_paths = [
             path for path in section.fidelity_evidence
             if meaningful(get_path(reference, path))
-            and not evidence_grounded(
-                content,
-                get_path(reference, path),
-                all_items=section.source_coverage == "all_material_items",
+            and not source_evidence_grounded(
+                content, path,
+                section_evidence_value(section.section_id, path, get_path(reference, path), reference),
+                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other",
             )
         ]
         if ungrounded_paths:
@@ -5267,7 +5290,10 @@ def create_verification_requests(
         "defines a completion trigger only if the source provides one; it does not repeat participant visits "
         "or the exit form. Section 10.3 states an interpretation limit without repeating Section 10.2's "
         "endpoint methods. A clinically unusable section is material; minor wording preferences are "
-        "not findings."
+        "not findings. For a nonmaterial editorial_relevance finding, explicitly set material, safety_critical, "
+        "contradiction, obscures_required_information and materially_unusable to false, and give affected_passage "
+        "and recommended_action. Such findings are retained manual-review warnings; missing or true flags, "
+        "source_supported/no_invention defects and safety/rights/template safeguards remain blocking."
     )
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
         content_instructions += (
@@ -5526,6 +5552,23 @@ def _governed_content_omission(
         and finding.get("contradiction") is False
         and finding.get("obscures_required_information") is False
         and finding.get("materially_unusable") is False
+    )
+
+
+def _governed_editorial_warning(finding: Mapping[str, Any], targets: Iterable[str]) -> bool:
+    """Only explicit harmless editorial findings can pass as retained warnings."""
+    targets = list(targets)
+    return (
+        _text(finding.get("category")).casefold() == "content"
+        and _text(finding.get("check")).casefold() == "editorial_relevance"
+        and bool(targets)
+        and not any(_safety_critical_content_target(str(target)) for target in targets)
+        and all(finding.get(flag) is False for flag in (
+            "material", "safety_critical", "contradiction",
+            "obscures_required_information", "materially_unusable",
+        ))
+        and bool(_text(finding.get("affected_passage")))
+        and bool(_text(finding.get("recommended_action")))
     )
 
 
@@ -5933,7 +5976,7 @@ def validate_verifications(
                                     "publication_disposition": "warning",
                                     "action": "manual_review",
                                 })
-                        elif _governed_content_omission(source, supplied_targets):
+                        elif _governed_content_omission(source, supplied_targets) or _governed_editorial_warning(source, supplied_targets):
                             findings.append({
                                 **finding,
                                 "category": source_category,

@@ -118,7 +118,7 @@ def test_general_information_uses_complete_endpoint_synopsis_and_final_visit():
         {"visitNumber": "1", "visitName": "Preoperative screening", "timing": "Before surgery", "procedures": []},
         {"visitNumber": "2", "visitName": "3-month postoperative visit", "timing": "3 months postoperatively", "procedures": []},
     ]
-    assert _protocol_followup_summary(source) == "3-month postoperative visit"
+    assert _protocol_followup_summary(source) == "3 months"
 
 
 def test_completion_and_bias_contracts_do_not_require_repeated_design_or_visit_inventory():

@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.39-evidence-diagnostics"
+CONTRACT_VERSION = "clinical-documents-v2.40-synopsis-recovery"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -444,7 +444,8 @@ def _fidelity_evidence(section_id: str) -> tuple[str, ...]:
         "study-procedure.visits": ("procedures.assessment_details", "procedures.intervention_management"),
         "study-procedure.discontinued": ("procedures.discontinued_subjects",),
         "analysis-plan.datasets": ("statistics.analysis_populations",),
-        "analysis-plan.methodology": ("statistics.methodology", "endpoints.other"),
+        "analysis-plan.methodology": ("statistics.methodology",),
+        "study-design.design": ("endpoints.other",),
         "analysis-plan.considerations": ("statistics.software",),
         "confidentiality-publication": ("confidentiality.retention",),
         "financial-injury": ("risks_benefits.injury_handling", "risks_benefits.costs"),
@@ -1314,6 +1315,50 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     return visits
 
 
+def participant_followup_summary(reference: Mapping[str, Any]) -> str:
+    """Project participant follow-up from approved phases or canonical visits.
+
+    Explicit follow-up prose retains its surgery anchor and qualifications. Raw
+    activity rows never stand in for visits; enrollment/analysis cannot supply
+    a participant follow-up value.
+    """
+    timeline = str(get_path(reference, "study.timeline") or "").strip()
+    followup = re.search(
+        r"\bfollow[ -]?up\s*[:=]\s*(.+?)(?=[;,\n.]\s*(?:enrollment|recruitment|(?:data\s+)?analysis)\s*[:=]|$)", timeline, re.I | re.S,
+    )
+    if followup:
+        return followup.group(1).strip().rstrip(".")
+    visits = normalized_visit_records(reference)
+    if visits:
+        final = visits[-1]
+        name = str(final.get("visit") or "").strip()
+        timing = str(final.get("timing") or "").strip()
+        if re.search(r"\b(?:after|following|from|postoperativ(?:e|ely)|post[- ]surgery)\b", timing, re.I):
+            return timing
+        if "postoperative" in f"{name} {timing}".casefold() and name and not re.fullmatch(r"Visit\s+\w+", name, re.I):
+            return name
+        return timing or name
+    # A single study duration is valid as a duration summary, but a mixed
+    # phase timeline must not masquerade as participant follow-up.
+    if not re.search(r"\b(?:enrollment|recruitment|(?:data\s+)?analysis)\b", timeline, re.I):
+        return timeline
+    return ""
+
+
+def computed_study_fields(reference: Mapping[str, Any]) -> dict[str, Any]:
+    """Preview source-derived synopsis and table fields before model drafting.
+
+    This report is derived evidence, not a mutation of the approved source or
+    an additional approval/install gate. Unknown visit counts stay unknown.
+    """
+    visits = normalized_visit_records(reference)
+    return {
+        "participant_followup": participant_followup_summary(reference),
+        "visit_count": len(visits) if visits else None,
+        "assessment_table": protocol_table_contracts(reference)["schedule-of-assessments"],
+    }
+
+
 def semantic_evidence_contract(path: str, value: Any) -> dict[str, Any] | None:
     """Declare narrative meaning that the independent content reviewer must assess.
 
@@ -2029,6 +2074,7 @@ def source_contract(
         "source_gaps": source_gaps,
         "technical_findings": technical_findings,
         "normalized_reference": normalized,
+        "computed_fields": computed_study_fields(normalized) if not findings else {},
     }
 
 

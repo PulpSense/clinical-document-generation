@@ -1,7 +1,7 @@
 {
   "schema_version": "blocking-check-audit/v1",
   "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in six production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
-  "baseline_commit": "29e401a",
+  "baseline_commit": "b35761d",
   "families": {
     "source": {
       "authority": "Approved Source-of-Truth schema, branch requirements and clinical relationships",
@@ -12,7 +12,7 @@
     "evidence": {
       "authority": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
       "false_rejection_risk": "Lexical overlap is a heuristic; structural IDs, bibliography and binary cells must be excluded by the shared projection",
-      "duplicate_policy": "Drafting and Sterling consume shared projections and source_evidence_grounded; independent review still assesses meaning/relations",
+      "duplicate_policy": "Drafting, Protocol rendered fidelity and Sterling consume shared section projections; endpoint inventory stays in its Study Design owner. Independent review still assesses meaning/relations.",
       "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py"
     },
     "clinical": {
@@ -36,13 +36,13 @@
     "review": {
       "authority": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
       "false_rejection_risk": "Malformed responses or targets can look like content defects; transport and semantic findings need different routes",
-      "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; source/no-invention findings remain blocking",
+      "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; explicit harmless editorial findings can be retained warnings. Factual, safety, missing/true material flags remain blocking.",
       "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py"
     },
     "recovery": {
       "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
       "false_rejection_risk": "Counting the same response repeatedly; generic diagnostics produce identical retries; transport retry must not consume drafting streak",
-      "duplicate_policy": "workflow owns retry state and deadlines; diagnostics identify concrete evidence failure without extending retry limits",
+      "duplicate_policy": "workflow owns retry state/deadlines; code-owned sections use native rendered snapshots when no accepted AI draft exists. Progress requires changed target and candidate; a fresh full review still decides correctness.",
       "coverage": "test_reliability_maintenance.py; test_worker_readiness.py"
     },
     "installation": {
@@ -61,6 +61,12 @@
   "checks": [
     {
       "file": "scripts/contracts.py",
+      "function": "_fidelity_evidence",
+      "code_sha256": "409154e280a1d2997438a7ccf9250878dcc9eb2228b025f7d5bc673f2a32e87a",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/contracts.py",
       "function": "_canonicalize_declared_aliases",
       "code_sha256": "5a05ba017944d45236f88263b91b9ecd15ddad6b606d02e3ae1b967ffe73dd8d",
       "family": "source"
@@ -75,6 +81,18 @@
       "file": "scripts/contracts.py",
       "function": "normalized_visit_records",
       "code_sha256": "8a28261a5a87a45c55a39d008b0809e40c4dc39c550e053b7045bb2f20d79edc",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "participant_followup_summary",
+      "code_sha256": "f9e3725ac4250c38e1f37dde66b55b2db67e9d1a3a084d0c959d0ef436bba4f3",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "computed_study_fields",
+      "code_sha256": "5df66a8d2ac861750ea8b490c8b9ca3f13b37efbe39c86ab13ea60374860a179",
       "family": "structured"
     },
     {
@@ -110,7 +128,7 @@
     {
       "file": "scripts/contracts.py",
       "function": "source_contract",
-      "code_sha256": "40f159040c6296ae42510e22c1ca1f9a62413ff24f828aa7e3ae13cf17b21437",
+      "code_sha256": "259e6dc776493c766df9c006633456027ccc52153de3a5927122289e3559d99b",
       "family": "source"
     },
     {
@@ -331,6 +349,12 @@
     },
     {
       "file": "scripts/quality.py",
+      "function": "audit_computed_protocol_fields",
+      "code_sha256": "6db5ce1b14796a5edc33e1e3651b175cd75971f4f74de967f3455bba20eb9bce",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/quality.py",
       "function": "audit_source_surfaces",
       "code_sha256": "3c23f8851f0c2dbd04da8ae6f45eb380493ca26c006758b84bda86baa45397c0",
       "family": "clinical"
@@ -356,7 +380,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "876815c7dcf07d9d7ec59c25ab71ee5e2b6c1849d8e67deee97b2dd8b8471f77",
+      "code_sha256": "ed205c2611601f1c9ae184ec9baad2e4b1663b826b13059125c5eaf2bec08f7a",
       "family": "clinical"
     },
     {
@@ -391,6 +415,12 @@
     },
     {
       "file": "scripts/quality.py",
+      "function": "_governed_editorial_warning",
+      "code_sha256": "0db8a1716c034459fe1df378483bcf65048637129a1145531cc093024cb057ba",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
       "function": "verification_response_is_terminal",
       "code_sha256": "a4ec8cfd7c4c1bf23ec6cf4ea70b9d8e9e6aad329823c5dab92457b582a0a764",
       "family": "review"
@@ -398,7 +428,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "31b390b470e278cc2f51315b0f213aa2d378c91c63e451d4fc9f11bfb502865b",
+      "code_sha256": "532683261c2698e0eb2baa04417dd6edff2a0e27de272e1bd2541c8cba8cdc4f",
       "family": "review"
     },
     {
@@ -418,6 +448,18 @@
       "function": "quality_report",
       "code_sha256": "0b018c25e64873b02ea8c645f7e9930b6b44115b411b31987e8828321bc1d755",
       "family": "review"
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "protocol_section_snapshot",
+      "code_sha256": "87699bd3ffb8634e587430ca10504f12378e18488053d5279d14ff812d3ea209",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "rendered_section_snapshot",
+      "code_sha256": "ca07ab6bfd32773a6d099abf03d1f8802a53c4f2c0495994b3471d586b64a5ae",
+      "family": "recovery"
     },
     {
       "file": "scripts/rendering.py",
@@ -603,6 +645,12 @@
       "file": "scripts/workflow.py",
       "function": "_ledger_findings",
       "code_sha256": "50bed37a36ac50a7edca0a3fff4212db49d14060388f263ba4936d153d38e03f",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_recovery_action_observation",
+      "code_sha256": "eca27e2659348b738d484d1b5986fe84adc77450e3f60a0266a59ab5530d768b",
       "family": "recovery"
     },
     {

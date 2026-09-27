@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from contracts import ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 
 
@@ -229,23 +229,62 @@ def _endpoint_synopsis(reference: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def protocol_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any]]:
+    """Observe rendered protocol section content even when it has no AI draft."""
+    document = Document(path)
+    specs = [section for branch in ("Prospective", "Retrospective", "Ambispective")
+             for section in protocol_contract(branch) if section.section_id == section_id]
+    headings = {_protocol_heading_key(f"{section.number} {section.title}") for section in specs}
+    active = section_id == "title-page"
+    level = 1
+    snapshot = []
+    for element in document.element.body.iterchildren():
+        if element.tag == qn("w:p"):
+            paragraph = Paragraph(element, document)
+            paragraph_level = _heading_level(paragraph)
+            key = _protocol_heading_key(paragraph.text)
+            if key in headings:
+                active = True
+                level = paragraph_level or 1
+            elif active and paragraph_level is not None and paragraph_level <= level:
+                break
+            if active:
+                snapshot.append({"paragraph": paragraph.text, "style": paragraph.style.name})
+        elif active and element.tag == qn("w:tbl"):
+            table = Table(element, document)
+            snapshot.append({"table": [[cell.text for cell in row.cells] for row in table.rows]})
+    return snapshot
+
+
+def rendered_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any]]:
+    """Observe code-owned sections through the same native headings as rendering."""
+    if not section_id.startswith("icf."):
+        return protocol_section_snapshot(path, section_id)
+    titles = {title for sections in ICF_RETAINED_SHELL_SECTIONS.values()
+              for target, title in sections if target == section_id}
+    for mapping in (_STERLING_ICF_HEADINGS, _ADVARRA_ICF_HEADINGS):
+        if section_id in mapping:
+            titles.add(mapping[section_id])
+    keys = {_icf_heading_key(title) for title in titles}
+    document = Document(path)
+    heading = next((p for p in document.paragraphs if _icf_heading_key(p.text) in keys), None)
+    if heading is None:
+        return []
+    elements, _ = _icf_section_elements(document, heading, _STERLING_ICF_HEADING_KEYS | _ADVARRA_ICF_HEADING_KEYS)
+    snapshot = [{"heading": heading.text}]
+    for element in elements:
+        if element.tag == qn("w:p"):
+            paragraph = Paragraph(element, document)
+            snapshot.append({"paragraph": paragraph.text, "style": paragraph.style.name})
+        elif element.tag == qn("w:tbl"):
+            table = Table(element, document)
+            snapshot.append({"table": [[cell.text for cell in row.cells] for row in table.rows]})
+    return snapshot
+
+
 def _protocol_followup_summary(reference: Mapping[str, Any]) -> str:
-    """Show the last approved participant visit in the front-matter synopsis."""
-    table_visits = get_path(reference, "procedures.visit_schedule_table", [])
-    visits = [row for row in table_visits if isinstance(row, Mapping)] if isinstance(table_visits, list) else []
-    if not visits:
-        visits = normalized_visit_records(reference)
-    if visits:
-        final = visits[-1]
-        name = _text(final.get("visit") or final.get("visitName"))
-        timing = _text(final.get("timing") or final.get("visitWindow"))
-        if "postoperative" in f"{name} {timing}".casefold() and name and not re.fullmatch(r"Visit\s+\w+", name, flags=re.I):
-            return name
-        if "postoperative" in timing.casefold():
-            return timing
-        if timing or name:
-            return timing or name
-    return _text(get_path(reference, "study.timeline"))
+    """Use the same participant facts as clinical visit tables and review."""
+    return participant_followup_summary(reference)
 
 
 def _document_control_date(reference: Mapping[str, Any]) -> str:
@@ -286,7 +325,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     irb = get_path(reference, "parties.irb", {}) or {}
     facility_fields = facility_projection(facility)
     facility_city = facility_fields["city"]
-    visits = get_path(reference, "procedures.visit_schedule", []) or get_path(reference, "procedures.assessments", []) or []
+    visits = normalized_visit_records(reference)
     inclusion = _list(get_path(reference, "population.inclusion_criteria", []))
     interventions = [
         item for item in (get_path(reference, "design.interventions", []) or [])
@@ -332,7 +371,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
         "daysBeforeScreening": screening_interval.days if screening_interval else "",
-        "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if isinstance(visits, list) else "",
+        "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if visits else "",
         "AI_duration": _protocol_followup_summary(reference), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
         "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True) or "\n".join(f"• {item}" for item in inclusion),
@@ -3780,4 +3819,4 @@ def render_documents(
     }
 
 
-__all__ = ["audit_docx", "refresh_toc_from_pdf", "render_documents", "render_fields", "template_paths"]
+__all__ = ["audit_docx", "refresh_toc_from_pdf", "render_documents", "render_fields", "protocol_section_snapshot", "rendered_section_snapshot", "template_paths"]
