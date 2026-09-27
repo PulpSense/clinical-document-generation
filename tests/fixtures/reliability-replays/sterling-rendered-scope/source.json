@@ -1,0 +1,281 @@
+{
+  "meta": {
+    "document_set": [
+      "protocol_docx",
+      "icf_docx",
+      "xml"
+    ],
+    "study_type": "Prospective",
+    "icf_template": "Sterling",
+    "protocol_number": "ADM-C2586E0A9785",
+    "date": "27 Sep 2026",
+    "version": null
+  },
+  "source": {
+    "source_file": "SYNOPSIS_Bilateral PureSee Odyssey_26Sep2026_SYNTHETIC_COMPLETE.txt",
+    "source_note": "Synthetic test only; not for clinical or regulatory use",
+    "field_candidates": {},
+    "administrative_identifier": {
+      "authority": "deterministic_workflow",
+      "value": "ADM-C2586E0A9785",
+      "source_fields": [
+        "principal_investigator",
+        "sponsor",
+        "study_type",
+        "title"
+      ]
+    },
+    "source_of_truth_file": "reference/source-of-truth--adm-c2586e0a9785--visual-outcomes-and-patient-reported-symptoms-after-bilatera.md"
+  },
+  "approval": {
+    "status": "approved",
+    "approved_by": "client",
+    "approved_at": "2026-09-27T14:06:54.791667+00:00",
+    "review_file": "reference/source-of-truth--adm-c2586e0a9785--visual-outcomes-and-patient-reported-symptoms-after-bilatera.md",
+    "source_sha256": "96e473fb59e3eac7a3f0b1fb934814070092d6790b6799a94466409bed5a8b73",
+    "revision_id": "r-5c57ca737eb2",
+    "source_approval_identity": "5c57ca737eb293a226dbc6a7431bfa1a428a8d1dda98f04e35975c5d7a5313a9",
+    "generation_authority_sha256": "0f3091711be2b6547dd4d62b8e6579795c59670b5a9cba733682111804261faf",
+    "governing_sha256": "0f3091711be2b6547dd4d62b8e6579795c59670b5a9cba733682111804261faf"
+  },
+  "study": {
+    "title": "Visual Outcomes and Patient-Reported Symptoms after Bilateral Implantation of an Extended Depth of Focus or a Full Range of Vision Intraocular Lens",
+    "background": "The TECNIS PureSee is a non-diffractive extended depth of focus (EDOF) intraocular lens. Its design may reduce dysphotopsias and improve contrast sensitivity compared with diffractive lenses. A randomized controlled trial suggested better intermediate and near vision than a monofocal control, with similar contrast sensitivity, distance vision, and dysphotopsia profiles.1\n\nThe TECNIS Odyssey is a full range of vision intraocular lens. Current reports suggest high visual acuity and spectacle independence at distance, intermediate, and near.2,3\n\nThese reports concern the individual lens technologies. They do not establish which lens will provide better outcomes in the population proposed here. We would like to characterize vision and patient-reported symptoms in two cohorts followed using the same assessment schedule.\n\nThe objective is to describe and compare binocular visual outcomes, spectacle use, satisfaction, and visual disturbances after bilateral PureSee or bilateral Odyssey implantation through 6 months after second-eye surgery.\n\nLens selection will already have been made by the treating surgeon and patient as part of routine care before study enrollment. Enrollment will not determine lens selection. There will be no randomization, no masking, and no change to the planned clinical treatment. Each subject will receive the same lens model in both eyes. This study does not involve mix-and-match implantation.\n\n1. Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8\n2. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703\n3. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7",
+    "hypothesis": "The hypothesis is that bilateral implantation of PureSee or Odyssey intraocular lenses will be associated with good distance and intermediate visual outcomes and high patient satisfaction. Near vision, spectacle use, and reports of visual disturbances may differ between the two cohorts. This observational study is intended to describe those outcomes; it is not designed to establish superiority of either lens.",
+    "timeline": "Enrollment: 8M\nFollow-Up: 6M\nData Analysis: 2M; Study data analysis will begin after scheduled follow-up and database checks are complete. The study timeline allocates 8 months to enrollment, 6 months to follow-up, and 2 months to data analysis.",
+    "condition": null
+  },
+  "parties": {
+    "irb": {
+      "name": "Synthetic Comparison Study IRB",
+      "affiliation": "Independent ethics committee — synthetic test organization",
+      "phone": "+1 202-555-0110",
+      "email": "irb@synthetic-comparison.example.test",
+      "address": "410 Test Review Avenue, Test City, New York 10011, USA"
+    },
+    "sponsor": {
+      "name": "Synthetic Cataract Outcomes Research Sponsor",
+      "address": "420 Test Sponsor Boulevard, Test City, New York 10012, USA"
+    },
+    "principal_investigator": {
+      "name": "Casey Taylor",
+      "title": "MD, Principal Investigator"
+    },
+    "study_coordinator": {
+      "name": "Riley Chen",
+      "title": "CRC, Study Coordinator",
+      "business_phone": "+1 202-555-0111",
+      "office_phone": "+1 202-555-0112",
+      "email": "riley.chen@synthetic-comparison.example.test"
+    }
+  },
+  "sites": [
+    {
+      "contact": {
+        "business_phone": "+1 202-555-0111",
+        "email": "riley.chen@synthetic-comparison.example.test",
+        "name": "Riley Chen",
+        "office_phone": "+1 202-555-0112",
+        "title": "CRC, Study Coordinator"
+      },
+      "facility": {
+        "address": "430 Test Clinic Road, Test City, New York 10013, USA",
+        "city": "Test City",
+        "country": "United States",
+        "name": "Synthetic Comparative Ophthalmology Center",
+        "state": "New York",
+        "zip": "10013"
+      },
+      "investigators": [
+        {
+          "degrees": "MD",
+          "name": "Casey Taylor",
+          "title": "Principal Investigator"
+        }
+      ]
+    }
+  ],
+  "population": {
+    "study_population": "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes",
+    "sample_size": "72 subjects (36 bilateral TECNIS PureSee; 36 bilateral TECNIS Odyssey)",
+    "sample_justification": "We estimate that 30 evaluable subjects per cohort will be sufficient for descriptive characterization of visual outcomes and patient-reported symptoms. To account for dropout or incomplete 6-month assessments, enrollment will be increased to 36 subjects per cohort, for 72 subjects total. No formal power calculation for superiority testing is proposed.",
+    "minimum_age": "50 Years",
+    "inclusion_criteria": [
+      "Adults aged 50 years or older undergoing surgery for age-related cataracts in both eyes.",
+      "Planned bilateral implantation of either TECNIS PureSee or TECNIS Odyssey selected during routine clinical care before enrollment.",
+      "Willing and able to attend the scheduled study assessments.",
+      "No participation in another study during the 60 days before screening."
+    ],
+    "exclusion_criteria": [
+      "Moderate-to-severe ocular disease deemed by the surgeon to increase the risk of complicated cataract surgery or prevent reliable visual-acuity testing.",
+      "Pseudoexfoliation syndrome with clinically significant zonular weakness, zonular dehiscence, prior ocular trauma affecting vision, or prior corneal refractive surgery.",
+      "Planned implantation of different lens models in the two eyes."
+    ]
+  },
+  "design": {
+    "study_design": "Prospective, observational, single-center, two-cohort study with no randomization and no masking. Cohorts are defined by lens selection already made in routine care: bilateral TECNIS PureSee or bilateral TECNIS Odyssey.",
+    "number_of_sites": "1",
+    "masking": "None",
+    "arms": [
+      {
+        "description": "36 subjects with bilateral TECNIS PureSee implantation, selected in routine care before enrollment.",
+        "name": "Bilateral TECNIS PureSee"
+      },
+      {
+        "description": "36 subjects with bilateral TECNIS Odyssey implantation, selected in routine care before enrollment.",
+        "name": "Bilateral TECNIS Odyssey"
+      }
+    ],
+    "intervention_name": "Bilateral TECNIS PureSee intraocular lenses or bilateral TECNIS Odyssey intraocular lenses, according to the preexisting routine-care treatment plan.",
+    "intervention_type": "Medical device — intraocular lenses.",
+    "controls": "An observational comparison cohort with bilateral TECNIS Odyssey implantation. No monofocal control cohort is planned. Neither cohort is randomized.",
+    "methods_to_minimize_bias": "The same eligibility criteria, visual testing conditions, testing distances, and assessment schedule will be used for both cohorts. Outcomes and analysis methods will be defined before reviewing study results. Because lens selection is not randomized and the study is not masked, differences between cohorts may reflect patient selection and other factors; a descriptive difference must not be interpreted as proof that the lens caused it.",
+    "intervention_description": null
+  },
+  "objectives": {
+    "primary": [
+      "describe and compare binocular visual outcomes, spectacle use, satisfaction, and visual disturbances after bilateral PureSee or bilateral Odyssey implantation through 6 months after second-eye surgery."
+    ]
+  },
+  "endpoints": {
+    "primary": [
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Mean binocular distance-corrected intermediate visual acuity (DCIVA) at 66 cm at 6 months after second-eye surgery, summarized separately for each cohort.",
+        "time_point": "6 months after second-eye surgery"
+      }
+    ],
+    "secondary": [
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Mean binocular uncorrected distance visual acuity (UDVA) at 1, 3, and 6 months after second-eye surgery.",
+        "time_point": "1, 3, and 6 months after second-eye surgery"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Mean binocular corrected distance visual acuity (CDVA) at 1, 3, and 6 months after second-eye surgery.",
+        "time_point": "1, 3, and 6 months after second-eye surgery"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Mean binocular uncorrected intermediate visual acuity (UIVA) at 66 cm at 1, 3, and 6 months after second-eye surgery.",
+        "time_point": "1, 3, and 6 months after second-eye surgery"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Mean binocular distance-corrected near visual acuity (DCNVA) at 40 cm at 3 and 6 months after second-eye surgery.",
+        "time_point": "3 and 6 months after second-eye surgery"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Mean binocular uncorrected near visual acuity (UNVA) at 40 cm at 3 and 6 months after second-eye surgery.",
+        "time_point": "3 and 6 months after second-eye surgery"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Binocular distance-corrected defocus curve from +1.0 D through -2.50 D at 6 months after second-eye surgery.",
+        "time_point": "6 months after second-eye surgery"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "label": "Percentages of responses to each Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire question at 3 and 6 months after second-eye surgery, summarized separately by cohort.",
+        "time_point": "3 and 6 months after second-eye surgery"
+      }
+    ]
+  },
+  "procedures": {
+    "assessments": "• Preoperative (Screening)\n• Operative (one visit per eye)\n• 1 Month postoperative\n• 3 Month postoperative\n• 6 Month postoperative (Exit)\n\nAll postoperative time points are measured from surgery on the second eye. The interval between surgeries will follow routine clinical care; no fixed interval is specified by this study.\nActivity\tScreening\tOperative (each eye)\tMonth 1\tMonth 3\tMonth 6\nInformed Consent\tX\t\t\t\t\nDemographics\tX\t\t\t\t\nGeneral Information: Medical History\tX\t\t\t\t\nConfirm routine-care lens selection and cohort\tX\t\t\t\t\nCataract surgery and implantation of the planned lens model\t\tX\t\t\t\nUncorrected photopic distance VA (binocular)\t\t\tX\tX\tX\nCorrected photopic distance VA (binocular)\t\t\tX\tX\tX\nUncorrected photopic intermediate VA (66 cm, binocular)\t\t\tX\tX\tX\nDistance-corrected photopic intermediate VA (66 cm, binocular)\t\t\t\t\tX\nUncorrected photopic near VA (40 cm, binocular)\t\t\t\tX\tX\nDistance-corrected photopic near VA (40 cm, binocular)\t\t\t\tX\tX\nDistance-corrected defocus curve\t\t\t\t\tX\nAIOLIS questionnaire\t\t\t\tX\tX\nMonitor for Adverse Events and Device Deficiencies\t\t\tX\tX\tX\nComplete Exit Form\t\t\t\t\tX\n\nAdverse events and device deficiencies will be collected from consent through the final study contact. The X entries indicate scheduled review, not the only times an event may be reported.",
+    "visit_schedule": [
+      {
+        "procedures": "Informed Consent; Demographics; General Information: Medical History; Confirm routine-care lens selection and cohort",
+        "timing": "Preoperative (Screening)",
+        "visit": "Screening",
+        "visitNumber": "1"
+      },
+      {
+        "procedures": "Cataract surgery and implantation of the planned lens model",
+        "timing": "One visit per eye",
+        "visit": "Operative (each eye)",
+        "visitNumber": "2"
+      },
+      {
+        "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Monitor for Adverse Events and Device Deficiencies",
+        "timing": "1 month after second-eye surgery",
+        "visit": "Month 1",
+        "visitNumber": "3"
+      },
+      {
+        "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies",
+        "timing": "3 months after second-eye surgery",
+        "visit": "Month 3",
+        "visitNumber": "4"
+      },
+      {
+        "procedures": "Uncorrected photopic distance VA (binocular); Corrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS questionnaire; Monitor for Adverse Events and Device Deficiencies; Complete Exit Form",
+        "timing": "6 months after second-eye surgery",
+        "visit": "Month 6 (Exit)",
+        "visitNumber": "5"
+      }
+    ],
+    "minimum_days_before_screening_without_participation": "60",
+    "completion": "A participant completes study follow-up after the 6-month assessment following second-eye surgery and completion of the exit form. Participants may withdraw voluntarily at any time.",
+    "discontinuation": "Participants may withdraw voluntarily at any time.",
+    "safety_monitoring": "Adverse events and device deficiencies will be collected from consent through the final study contact. The X entries indicate scheduled review, not the only times an event may be reported.",
+    "methods": null,
+    "unscheduled_visits": null,
+    "termination": null,
+    "study_termination": null
+  },
+  "statistics": {
+    "analysis_plan": "All enrolled subjects will be included in descriptive enrollment and safety summaries. Visual-acuity and defocus-curve outcomes will be summarized by cohort and scheduled visit using the number of evaluable observations, mean, standard deviation, median, minimum, and maximum. AIOLIS responses will be summarized by question, response category, cohort, and scheduled questionnaire visit using counts and percentages.\n\nAvailable observations will be analyzed; missing observations will not be imputed. The number of participants with missing data will be reported by cohort and scheduled assessment. A participant with data at an earlier visit but no Month 6 assessment may contribute to summaries of the earlier visit, but will not contribute to the Month 6 primary-endpoint summary.\n\nAdverse events and device deficiencies will be summarized by cohort, event category, seriousness, severity, relationship, action taken, and outcome. Cohort comparisons are descriptive. No inferential hypothesis test or claim of comparative superiority is planned.",
+    "methodology": null,
+    "analysis_populations": null,
+    "missing_data_handling": null
+  },
+  "safety": {
+    "adverse_events": "Adverse events and device deficiencies will be collected from consent through the final study contact. The X entries indicate scheduled review, not the only times an event may be reported.",
+    "general_information": null,
+    "monitoring": null,
+    "follow_up": null
+  },
+  "confidentiality": {
+    "data_handling": null,
+    "publication": null
+  },
+  "risks_benefits": {
+    "compensation_or_reimbursement": "No payment will be provided for participation. Documented travel expenses will be reimbursed up to $25 for each completed Month 1, Month 3, and Month 6 study visit, up to $75 total per participant. Screening and operative visits are not eligible for this reimbursement. A participant who withdraws may still receive reimbursement for eligible visits already completed.",
+    "costs": "The sponsor will pay for additional vision tests and questionnaires performed solely for this research. Routine cataract surgery, the selected lenses, and ordinary clinical care will be billed as usual to the participant or insurer. No amount of insurance coverage or participant out-of-pocket cost is specified.",
+    "risks": null,
+    "risk_mitigation": null,
+    "benefits": null,
+    "alternatives": null,
+    "privacy": null,
+    "injury_handling": null
+  },
+  "regulatory": {
+    "prs": {
+      "study_type": "Observational",
+      "observational_study_design": "Cohort",
+      "provider_study_id": "ADM-C2586E0A9785",
+      "time_perspective": null,
+      "verification_date": null,
+      "start_date": null,
+      "start_date_type": null,
+      "primary_completion_date": null,
+      "primary_completion_date_type": null,
+      "study_completion_date": null,
+      "study_completion_date_type": null,
+      "patient_registry": null,
+      "target_duration_quantity": null,
+      "target_duration_units": null
+    }
+  }
+}

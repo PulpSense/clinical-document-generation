@@ -36,6 +36,7 @@ from contracts import (
     protocol_contract,
     protocol_table_contracts,
     source_evidence_coverage_map,
+    sterling_draft_word_budget,
 )
 
 
@@ -399,7 +400,7 @@ def _section_payload(
     evidence_scopes = []
     for path in section.evidence:
         value = get_path(reference, path)
-        scoped_value = _section_evidence_value(section.section_id, path, value)
+        scoped_value = section_evidence_value(section.section_id, path, value)
         if scoped_value != value:
             evidence_scopes.append({
                 "path": path, "focus_terms": [], "value": scoped_value,
@@ -429,7 +430,11 @@ def _section_payload(
         if path not in scoped_values or scoped_values[path]
     ]
     content_expectations = list(section.content_expectations)
+    maximum_draft_words = 0
     if str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling":
+        maximum_draft_words = sterling_draft_word_budget(reference, section.section_id)
+        if maximum_draft_words:
+            content_expectations.append(f"Keep generated prose to {maximum_draft_words} normalized words or fewer, reserving the remaining rendered word budget for fixed template text. Preserve all supplied material facts without repeating them.")
         if section.section_id == "icf.key-information-summary":
             content_expectations.append(
                 "Keep each summary block at 65 words or fewer. Preserve the supplied voluntary-participation "
@@ -476,6 +481,7 @@ def _section_payload(
         "minimum_evidence": minimum_evidence,
         "fixed_boilerplate": boilerplate_items,
         "content_expectations": content_expectations,
+        "maximum_draft_words": maximum_draft_words,
         "source_coverage": section.source_coverage,
         "evidence_scopes": evidence_scopes,
         "approved_source_word_count": approved_source_words,
@@ -685,7 +691,7 @@ def _clinical_evidence_text(value: str) -> str:
     return clinical
 
 
-def _section_evidence_value(section_id: str, path: str, value: Any) -> Any:
+def section_evidence_value(section_id: str, path: str, value: Any) -> Any:
     """Project explicit section-owned clauses without mutating approved source."""
     if path in {"procedures.visit_schedule", "procedures.visit_schedule_table"} and isinstance(value, list):
         # Ordinal row identifiers belong to the structured schedule. Narrative
@@ -731,6 +737,9 @@ def _section_evidence_value(section_id: str, path: str, value: Any) -> Any:
         return " ".join(methods) if methods else value
     return " ".join(population) if population else value
 
+
+# Compatibility for existing callers of the original internal test seam.
+_section_evidence_value = section_evidence_value
 
 _GROUNDING_STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "has", "have", "in", "is", "it",
@@ -1150,7 +1159,7 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
     }
     material: dict[str, Any] = {}
     for path in map(str, contract.get("minimum_evidence", [])):
-        value = scopes[path] if path in scopes else _section_evidence_value(
+        value = scopes[path] if path in scopes else section_evidence_value(
             str(contract.get("section_id") or ""), path, source.get(path),
         )
         if _leaf_texts(value):
@@ -1284,7 +1293,7 @@ def _coverage_findings(
         findings: list[dict[str, Any]] = []
         source_value = request.get("approved_source")
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
-        background = _section_evidence_value(section_id, "study.background", get_path(source, "study.background"))
+        background = section_evidence_value(section_id, "study.background", get_path(source, "study.background"))
         if "source:study.background" not in set(map(str, evidence_refs)):
             findings.append({
                 "category": "drafting", "field": section_id,
@@ -1951,6 +1960,14 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             combined_evidence,
             "\n".join(role_content_parts),
         ))
+        maximum_words = int(expected_contracts[section_id].get("maximum_draft_words") or 0)
+        actual_words = len(re.findall(r"[a-z0-9]+", combined_content.casefold()))
+        if maximum_words and actual_words > maximum_words:
+            findings.append({
+                "category": "drafting", "field": section_id, "target_ids": [section_id],
+                "issue": f"Generated prose has {actual_words} normalized words; the rendered clause permits {maximum_words} draft words after reserving fixed template text.",
+                "next_action": "Condense the aim, hypothesis and main outcome without losing supplied facts or adding template-owned enrollment text.",
+            })
         branch_value = request.get("branch")
         icf_template = (
             branch_value.get("icf_template")
@@ -2678,6 +2695,6 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
-    "evidence_grounded", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
+    "evidence_grounded", "section_evidence_value", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
     "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
 ]

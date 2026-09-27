@@ -33,7 +33,7 @@ from pypdf import PdfReader
 from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
-from drafting import evidence_grounded
+from drafting import evidence_grounded, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -4024,7 +4024,7 @@ def validate_sterling_clause_contract(
         authority = clause.get("approved_source") if isinstance(clause.get("approved_source"), Mapping) else {}
         authority_paths = [str(path) for path in authority.get("paths", [])]
         authority_records = [
-            (path, get_path(normalized_source, path))
+            (path, section_evidence_value(str(clause["section_id"]), path, get_path(normalized_source, path)))
             for path in authority_paths
             if meaningful(get_path(normalized_source, path))
         ]

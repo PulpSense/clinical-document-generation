@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.35-visit-identifier-scope"
+CONTRACT_VERSION = "clinical-documents-v2.36-shared-sterling-evidence"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -1253,6 +1253,25 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
         if not record["visit"]:
             record["visit"] = f"Visit {record['visitNumber']}"
     return visits
+
+
+def sterling_draft_word_budget(reference: Mapping[str, Any], section_id: str) -> int:
+    """Reserve client-template prose within the governed rendered word limit."""
+    clause = next((item for item in sterling_clause_contract()["clauses"] if item["section_id"] == section_id and item.get("validation", {}).get("maximum_words")), None)
+    if clause is None:
+        return 0
+    maximum = int(clause["validation"]["maximum_words"])
+    reserved = ""
+    if section_id == "icf.study-purpose":
+        template = Path(__file__).resolve().parents[1] / "assets/client-templates/docx/sterling-icf.template.docx"
+        with zipfile.ZipFile(template) as archive:
+            body = ET.fromstring(archive.read("word/document.xml"))
+        ns = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        for paragraph in body.findall(".//w:p", ns):
+            text = "".join(node.text or "" for node in paragraph.findall(".//w:t", ns))
+            if "{sampleSize}" in text:
+                reserved += text.replace("{sampleSize}", str(get_path(reference, "population.sample_size") or ""))
+    return max(1, maximum - len(re.findall(r"[a-z0-9]+", reserved.casefold())))
 
 
 def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
