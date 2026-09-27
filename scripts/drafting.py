@@ -790,7 +790,9 @@ def _leaf_texts(value: Any) -> list[str]:
         return [text for child in value.values() for text in _leaf_texts(child)]
     if isinstance(value, list):
         return [text for child in value for text in _leaf_texts(child)]
-    text = str(value or "").strip()
+    if isinstance(value, bool):
+        return ["yes" if value else "no"]
+    text = "" if value is None else str(value).strip()
     return [text] if text else []
 
 
@@ -1095,8 +1097,9 @@ def _direct_safety_role_errors(
     return errors
 
 
-def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
-    """Require observable anchors for every material scalar supplied by a cited source path."""
+def _evidence_diagnostics(content: str, value: Any, *, all_items: bool = False) -> dict[str, Any]:
+    """Evaluate anchors once and retain the concrete reasons for a rejection."""
+    report: dict[str, Any] = {"passed": True, "validation_mode": "deterministic_anchors", "unobserved_values": []}
     if isinstance(value, str):
         value = _clinical_evidence_text(value)
     if isinstance(value, str) and re.fullmatch(
@@ -1109,7 +1112,7 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
     ):
         # Exact negative payment meaning; do not infer amounts or accept partial
         # negation, conditional payment, or contradictory additional sentences.
-        return True
+        return report
     content_tokens = _grounding_tokens(content)
     def numeric_tokens(text: str) -> set[str]:
         values = set()
@@ -1134,11 +1137,14 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
     content_numbers = numeric_tokens(content)
     leaves = _leaf_texts(value)
     if not leaves:
-        return True
+        return report
     negative_source_values = {"none", "no", "n/a", "na", "not applicable"}
     negative_content_tokens = {"no", "not", "none", "without", "neither"}
     if all(leaf.casefold().strip().rstrip(".") in negative_source_values for leaf in leaves):
-        return bool(content_tokens & negative_content_tokens)
+        report["passed"] = bool(content_tokens & negative_content_tokens)
+        if not report["passed"]:
+            report["unobserved_values"].append({"source_excerpt": " ".join(leaves), "required_polarity": "negative"})
+        return report
     def grounded(leaf: str) -> bool:
         expected = _grounding_tokens(leaf)
         if not expected:
@@ -1151,15 +1157,27 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
             # cannot supply a coincidentally equal duration, dose or distance.
             numeric_leaf = re.sub(r"\b(?:two|2)\s+(groups|cohorts)\b", r"\1", numeric_leaf, flags=re.I)
         numbers = numeric_tokens(numeric_leaf)
-        if not numbers <= content_numbers:
-            return False
         required = min(12, max(1, math.ceil(len(expected) * 0.45)))
-        return len(expected & content_tokens) >= required
+        observed = len(expected & (content_tokens | content_numbers))
+        missing_numbers = sorted(numbers - content_numbers)
+        passed = not missing_numbers and observed >= required
+        if not passed:
+            report["unobserved_values"].append({
+                "source_excerpt": leaf, "missing_numbers": missing_numbers,
+                "required_anchor_count": required, "observed_anchor_count": observed,
+                "source_anchors": sorted(expected),
+            })
+        return passed
 
-    if all_items:
-        return all(grounded(leaf) for leaf in leaves)
-    combined = " ".join(leaves)
-    return grounded(combined)
+    values = leaves if all_items else [" ".join(leaves)]
+    verdicts = [grounded(leaf) for leaf in values]
+    report["passed"] = all(verdicts)
+    return report
+
+
+def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> bool:
+    """Require observable anchors; this heuristic does not prove clinical meaning."""
+    return bool(_evidence_diagnostics(content, value, all_items=all_items)["passed"])
 
 
 def hypothesis_claim_issues(content: str, value: Any) -> list[str]:
@@ -1206,13 +1224,24 @@ def hypothesis_claim_issues(content: str, value: Any) -> list[str]:
     return issues
 
 
+def source_evidence_diagnostics(content: str, path: str, value: Any, *, all_items: bool = False) -> dict[str, Any]:
+    """Shared draft/render decision and actionable feedback, never release approval."""
+    if semantic_evidence_contract(path, value):
+        issues = hypothesis_claim_issues(content, value)
+        report = {
+            "passed": bool(content.strip()) and not issues,
+            "validation_mode": "independent_content_review",
+            "source_excerpt": value, "claim_issues": issues,
+            "unobserved_values": [],
+        }
+    else:
+        report = _evidence_diagnostics(content, value, all_items=all_items)
+    return {**report, "source_path": path, "release_acceptance": False}
+
+
 def source_evidence_grounded(content: str, path: str, value: Any, *, all_items: bool = False) -> bool:
     """Check deterministic anchors, deferring declared narrative meaning to review."""
-    if semantic_evidence_contract(path, value):
-        # Provisional drafting/render validation only. The complete independent
-        # review must still assess every material hypothesis fact before release.
-        return bool(content.strip()) and not hypothesis_claim_issues(content, value)
-    return evidence_grounded(content, value, all_items=all_items)
+    return bool(source_evidence_diagnostics(content, path, value, all_items=all_items)["passed"])
 
 
 def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
@@ -1583,7 +1612,14 @@ def _coverage_findings(
             "category": "drafting",
             "field": section_id,
             "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",
-            "next_action": "Revise the section so each cited source contributes its concrete names, values, time points, criteria, or clinical concepts.",
+            "next_action": "Use evidence_diagnostics to repair the listed source facts; preserve their names, quantities, units, time points and relationships. Do not merely add citation tags or copy structural markers.",
+            "evidence_diagnostics": [
+                source_evidence_diagnostics(content, path, material[path], all_items=all_items)
+                if not (section_id == "icf.duration" and path == "study.timeline")
+                else {"source_path": path, "source_excerpt": material[path], "passed": False,
+                      "validation_mode": "phase_bound_timeline", "release_acceptance": False}
+                for path in ungrounded
+            ],
         })
     if section_id == "quality-safety" and "safety.roles" in material:
         role_records = _structured_safety_role_records(material["safety.roles"])
@@ -2775,6 +2811,6 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
-    "evidence_grounded", "source_evidence_grounded", "section_evidence_value", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
+    "evidence_grounded", "source_evidence_grounded", "source_evidence_diagnostics", "section_evidence_value", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
     "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
 ]

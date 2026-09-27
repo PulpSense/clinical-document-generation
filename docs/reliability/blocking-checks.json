@@ -1,0 +1,669 @@
+{
+  "schema_version": "blocking-check-audit/v1",
+  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in six production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
+  "baseline_commit": "29e401a",
+  "families": {
+    "source": {
+      "authority": "Approved Source-of-Truth schema, branch requirements and clinical relationships",
+      "false_rejection_risk": "Alias or source-shape differences; mixed enrollment/endpoint text needs source review before generation",
+      "duplicate_policy": "source_contract owns normalization before approval; clinical evidence remains immutable",
+      "coverage": "test_contracts.py; test_reliability_maintenance.py"
+    },
+    "evidence": {
+      "authority": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
+      "false_rejection_risk": "Lexical overlap is a heuristic; structural IDs, bibliography and binary cells must be excluded by the shared projection",
+      "duplicate_policy": "Drafting and Sterling consume shared projections and source_evidence_grounded; independent review still assesses meaning/relations",
+      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py"
+    },
+    "clinical": {
+      "authority": "Approved values plus Brad section ownership and governed template clauses",
+      "false_rejection_risk": "Overbroad keyword rules or contradictory draft/render scopes; do not promote heuristic success into clinical approval",
+      "duplicate_policy": "Shared evidence scope for sourced prose; exact legal text and placement retain separate authority",
+      "coverage": "test_sterling_rendered_scope.py; test_phase2_sterling_fidelity.py; test_brad_editorial_feedback.py; test_sterling_template_comments.py"
+    },
+    "structured": {
+      "authority": "Approved enrollment total, cohorts/interventions, endpoints, visits and PRS schema",
+      "false_rejection_risk": "Dropping keys or guessing first numbers can destroy relationships; ambiguous matrix cells must not be guessed",
+      "duplicate_policy": "contracts normalizes visit interpretation; table and narrative project that interpretation. PRS generation/validation share mapping helpers; independently asserted expected values in regression tests and full independent content review provide additional protection.",
+      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py"
+    },
+    "render": {
+      "authority": "Exact template topology, DOCX/PDF/page images and release-owned renderer",
+      "false_rejection_risk": "Host environment, font capability, page splitting or sparse page classifications; host smoke does not certify every layout",
+      "duplicate_policy": "Render defects route to layout/construction owner; complete fresh exact-artifact review follows repair",
+      "coverage": "test_duration_reference_preservation.py; test_handoff_quality.py; host installation render smoke"
+    },
+    "review": {
+      "authority": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
+      "false_rejection_risk": "Malformed responses or targets can look like content defects; transport and semantic findings need different routes",
+      "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; source/no-invention findings remain blocking",
+      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py"
+    },
+    "recovery": {
+      "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
+      "false_rejection_risk": "Counting the same response repeatedly; generic diagnostics produce identical retries; transport retry must not consume drafting streak",
+      "duplicate_policy": "workflow owns retry state and deadlines; diagnostics identify concrete evidence failure without extending retry limits",
+      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py"
+    },
+    "installation": {
+      "authority": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
+      "false_rejection_risk": "API-key profile mistaken for subscription; unsigned ordinary generation accidentally subjected to signed certification",
+      "duplicate_policy": "Installation owns provisioning/smoke; ordinary manual review does not require certification; developer offline check is not activation preflight",
+      "coverage": "test_worker_readiness.py; exact host installation integrity/render smoke; optional certification deliberately excluded"
+    },
+    "delivery": {
+      "authority": "Final complete accepted review, atomic publication and exact client bytes",
+      "false_rejection_risk": "Transient attachment access must retry the same bytes within the original deadline",
+      "duplicate_policy": "One final artifact identity; client output never substitutes an unapproved candidate",
+      "coverage": "test_reliability_maintenance.py; test_handoff_quality.py"
+    }
+  },
+  "checks": [
+    {
+      "file": "scripts/contracts.py",
+      "function": "_canonicalize_declared_aliases",
+      "code_sha256": "5a05ba017944d45236f88263b91b9ecd15ddad6b606d02e3ae1b967ffe73dd8d",
+      "family": "source"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "assessment_matrix",
+      "code_sha256": "9d73c8f7a250bd9f833f9766ba90a7eabb45b00917468af901c7f27a737a8a68",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "normalized_visit_records",
+      "code_sha256": "8a28261a5a87a45c55a39d008b0809e40c4dc39c550e053b7045bb2f20d79edc",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "semantic_evidence_contract",
+      "code_sha256": "9d28f33d1f5b83d547370e9628d38bc9adb869ba5ee8dc85730d6f5f2a880527",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "sterling_draft_word_budget",
+      "code_sha256": "abf4cf4e59fc5b3308892bfdd449fbd6ded1f4cb161cf3dc7cb70eb11d36238c",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "protocol_table_contracts",
+      "code_sha256": "f17446d4f0a0890b1f14240c23d405a6c77f2b118ac28d441a6e72c2400470de",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "timeline_findings",
+      "code_sha256": "6f99b9f6b03330b9c932c745cdf11b857b6f20340c20505a123d103d36fc9b53",
+      "family": "source"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "input_findings",
+      "code_sha256": "02f4b0495a730749e10f44ea34a8898ee0e49bc538c83c7e99b0ca4ec0cd3ebd",
+      "family": "source"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "source_contract",
+      "code_sha256": "40f159040c6296ae42510e22c1ca1f9a62413ff24f828aa7e3ae13cf17b21437",
+      "family": "source"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "repair_report",
+      "code_sha256": "eb3b9b32b98a44c84454a1771836af8b7a986160b5cc2dccd6ba68887047d42e",
+      "family": "source"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "section_evidence_value",
+      "code_sha256": "7c2d66b449aedc5044ba473eef2a26a212f783b7f2e7b60d4d20132e38511776",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_leaf_texts",
+      "code_sha256": "6f0d867e45fed943c5931b033f1cde42a7184a96c0f5b91e30e7415b65728f31",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_grounding_tokens",
+      "code_sha256": "cace76b35245ed05e3a58db6b3223f9b894b9b01c3638ae57bb23f37ff6c89a2",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_evidence_diagnostics",
+      "code_sha256": "867f06fec2efd1cca3febc4bb65782166331122d5f5ca6ac658140f93a79f8c2",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "evidence_grounded",
+      "code_sha256": "78fbb922e4cb35cfcc86999c0ebd19ca6f6be5aae390466349939ad73da9a928",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "hypothesis_claim_issues",
+      "code_sha256": "924a034ef29571b64524f14b5c02ccf0d28774eddf05c4cb73d3d8c8e0b72230",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "source_evidence_diagnostics",
+      "code_sha256": "5f33fe2c1b8ebc6b09141f725e2a859d4b675369ad5868075a3a630b2c411856",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "source_evidence_grounded",
+      "code_sha256": "9630edd9ff6edf6e99ef8e0734a9a51fa50911ed22400ada731d2b32965564ad",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_material_source",
+      "code_sha256": "518bcfdefbfebb26151673220bd823246ff654b3e82a1ba8911564f3f592fac9",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_timeline_grounded",
+      "code_sha256": "a3c01c1b471590e34797972c7a391ad7616c98661ef9a695bcf4b5e899f89dea",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_background_claim_findings",
+      "code_sha256": "0235fddf8d5fc5a03e094e07cbacd7267f5f011f64d0b40893bbeea690380e2c",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_coverage_findings",
+      "code_sha256": "2ca5fe06c1e021f4ecfa882d80b95b471fc6e1b43952f8a5fb2376654a18d553",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_validate_paragraph",
+      "code_sha256": "6faa9323ffaf4398ae5bc209a90c6479c36093f496acc637fb296380b7396452",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_validate_list",
+      "code_sha256": "f9d288491dcbcb5631dea54166e3807045a3ccd19900bc08ee9cd9c2db53fabd",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "validate_response",
+      "code_sha256": "c2e94ec86530758f02ddba93563457c30c2138250585de4b80e76a3a3024705f",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "ingest_responses",
+      "code_sha256": "66f5560b17e1cf2c1fc6ce8491735514f4288d8b258ca8d604af471b542c09a8",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "accepted_cross_section_duplicate_findings",
+      "code_sha256": "2cf3614c19e56ee9d0d9c13b70978c0b8e3327f2b8f66ececba2bda4a4402f4c",
+      "family": "evidence"
+    },
+    {
+      "file": "scripts/prs_xml.py",
+      "function": "generate",
+      "code_sha256": "042a8e9e19b92810f5e529268d3ea07cf9ce737ec352db2f5e81f434051ba618",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/prs_xml.py",
+      "function": "validate_output",
+      "code_sha256": "e684c16d5e2d7d872c3ac757e61fd5812abf05a322e8aed68575abc76f7c5b1e",
+      "family": "structured"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "verification_request_authentication_findings",
+      "code_sha256": "775cfd77463eb8774e4394457c805f19517411a8d8d58c4c48f8ab67770af08d",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "audit_format_conformance_outputs",
+      "code_sha256": "1aebd3d83456ba648345aa2aa1fdcd4edf238a6e222312786dd0c998524d7b70",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "validate_gate_ledger",
+      "code_sha256": "a71d572bcdfa375bc5c266862e33413b63e875525f7b5f76feea7d11a60134c9",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "retry_gate_ledger",
+      "code_sha256": "67d69353b0fd21f863ead97532c1c84970e93a43230e33d90f3e8957a2425632",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "advance_gate_ledger",
+      "code_sha256": "79d8af02e811c5880d620c3cdb9e0727659aeab4c552d2662e41dae2dd6844b4",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_pdfium_integrity_failure",
+      "code_sha256": "ee3230475224667f3e879e19dc65aa1abf4554a1acfd7c4e4f55be4f4c26237c",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "run_pdfium_worker",
+      "code_sha256": "1288598c368e178d8af26041c5f6064cd99c22aac1b9888fbd6e440d7bb31ac1",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "rasterize_pdf",
+      "code_sha256": "91ac8c8d153c90f3fe8d2356b043252d978119335aff792ab5abed64b49707ea",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "preflight",
+      "code_sha256": "184ee95a7e4ed663ee13b8a0595e4b03e647c776f8d4986304aa7de98859f720",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_protocol_section15_opening_findings",
+      "code_sha256": "567381329c348a2ed53b3129078b6f60202a54b7e1d0158b9b4a8b99a6750864",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "audit_final_toc_destinations",
+      "code_sha256": "1c7d061443f2dcaaf433f4f6cd8954c0ae9526d406d4d3b032351f7be6c3993a",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_sparse_pdf_pages",
+      "code_sha256": "a9850c436dffea0a51ee9d867d0448b834deb63d1be68219bdd7838fac1ca9db",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "render_pages",
+      "code_sha256": "6204dc9543c42e01faee80d321a7731cec7d3454df58d67f63daf3801a5ee673",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "render_assurance",
+      "code_sha256": "fcfc2b606e880a7a2d31f41df4070ba5d84aa53670676df1073ba4813862daa2",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_validated_candidate_structure",
+      "code_sha256": "eda4cb9e4cfe259ffb9349ef240a33e956f6b427bf8c3a665ed2e422eea433b2",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_governed_adapter_attempts",
+      "code_sha256": "84d491790619af3419610822ff74e47e094b6cc7cb8c66c31511590ea11e981b",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "audit_source_surfaces",
+      "code_sha256": "3c23f8851f0c2dbd04da8ae6f45eb380493ca26c006758b84bda86baa45397c0",
+      "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "validate_sterling_clause_contract",
+      "code_sha256": "aaf83ea81a389407b064e9e688ee77542d93b5a7912ec3e3c3f7dd9739714780",
+      "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "assess_icf_output",
+      "code_sha256": "e66ca817f68bd41c5341ebeb0e4873f963e9a3ea6de41a939dab81d5b9bfd4db",
+      "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "assess_protocol_concept_repetition",
+      "code_sha256": "e1c0780cff7bd74a5b5f7c01060d3e134943d10023cc3196d3987866ae40af27",
+      "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "deterministic_content_check",
+      "code_sha256": "876815c7dcf07d9d7ec59c25ab71ee5e2b6c1849d8e67deee97b2dd8b8471f77",
+      "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "semantic_evidence_inventory",
+      "code_sha256": "b99bf8f39a5bfa73f39edd118d591430afc06175039de9f33af5dc1f73542b4a",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_source_field_inventory",
+      "code_sha256": "30be768e9f0523ca3d358895e35fd190678890ae813a545468868fe7476c1b22",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "verification_recovery_request_findings",
+      "code_sha256": "55a6897fe789de11ee7d5938908a421198029a5c39cc1e2796531585d5a94109",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_is_publication_warning",
+      "code_sha256": "b294c537d14b7fbac37fc1f9b25379ce24c633fdff2c004a0c5c2877257b7c3a",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_deterministic_warning_findings",
+      "code_sha256": "1cbec1e88cbfdc6f088478cbb2a05ef37f79ba844f307f9be7070bf690e567cc",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "verification_response_is_terminal",
+      "code_sha256": "a4ec8cfd7c4c1bf23ec6cf4ea70b9d8e9e6aad329823c5dab92457b582a0a764",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "validate_verifications",
+      "code_sha256": "31b390b470e278cc2f51315b0f213aa2d378c91c63e451d4fc9f11bfb502865b",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_final_verification_scope_findings",
+      "code_sha256": "389939c1e47fcf399dcbb764f81eecf872a49ca633abbdf9b390c23b115acddb",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "final_exact_artifact_review_findings",
+      "code_sha256": "8a46c9d269c7ac4a0f1e25946e8d901cdab1cc883787831b8d2a7d5861394d7b",
+      "family": "delivery"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "quality_report",
+      "code_sha256": "0b018c25e64873b02ea8c645f7e9930b6b44115b411b31987e8828321bc1d755",
+      "family": "review"
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "audit_docx",
+      "code_sha256": "761e47695feb36d593054f7ab06c79abe1c42e17b0587e40284d8c91fc211841",
+      "family": "render"
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "render_documents",
+      "code_sha256": "101ac1fe98bc1610214a5290b0a22bfc5aedb94e6eb717050e3b68ab56673103",
+      "family": "render"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_manifest_integrity",
+      "code_sha256": "7a7181af0379bbf8f9ed425735807a4da3df0a28afe047e1f653a98ec45ef443",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_certification_attestation",
+      "code_sha256": "d623bfe93088b924bb91ab44e3cbd51cd168819fde3225e56242dee80c1b9bb8",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "bind_release_certification",
+      "code_sha256": "a61bd8ad5ce81d1238201a27d55f810253c2a80770f147f03afa7b96fdf82fb1",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_validate_hermes_discovery",
+      "code_sha256": "80e6ece919d79b576bca3e0cd65a6a545d7f92e72b9abb036a708e73e9897e0a",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "verify_installation",
+      "code_sha256": "ad7ec08d2f25766108f74bf3eb31bb8d128ee364bd5d791ec4050056442ea3c7",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_provision_page_renderer",
+      "code_sha256": "92748d9743d32c4e47478633ac5fd413b6cead7d7707cfbc7da32ef94a8c9de2",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "provision_render_assurance",
+      "code_sha256": "6d0cc70496bb699b58bb0b49a4959f9fcdf8c7f4a09bb69719a324bea89d3843",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_installation_smoke_result",
+      "code_sha256": "36b79486e2ae9a501f0340d006710f48f6556f41cc0727278af199401a80918e",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_recover_interrupted_activation",
+      "code_sha256": "78d71bed7976c4d3cfcb641cebc57a4a67bff67acd751cba87c24f8a4c70882d",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_manifest_era_candidate_integrity",
+      "code_sha256": "f3c6ea65426ba2e87a0c3d8bf96231df1330e2e2f7e733d2415e56d70cf6b57c",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "install_release",
+      "code_sha256": "5995e8d29154d71332776d0195c62609af7991f00cb60dc42fac73d8a97f4403",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_disposable_rollback_smoke",
+      "code_sha256": "6c5be47d5fb72c2719f7415c1503db9751bddba604885b317cc172caa8f8c77b",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_recover_interrupted_rollback",
+      "code_sha256": "6b67b6b78c74dfcdd5646c8d61a48c84df08739b30609b9cddde883ac6291036",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "rollback_release",
+      "code_sha256": "bf2d21a00ea4adf1fbdb604227900754940b97dc03a348347e6cf56459446d39",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "prepare",
+      "code_sha256": "5bbb93e230536978a1ef3d0d9d8b9eb6923ca972423c462bb4d7d04906d6dbd7",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "approve",
+      "code_sha256": "10af2ff3862cd5f07855ec97a0ac7bb71a3a5550cf7b711d43dfae35441bda9e",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "validate",
+      "code_sha256": "5aa6aee92efeafe85195101df4a450764fbf9ee2b3c1093cb3ae82920a7a569c",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_repair_block",
+      "code_sha256": "2227632b6b40667a12b1ba9d181eb117d0227a57dfac96b8c06bc8cd96e0c66f",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_merge_artifact_reports",
+      "code_sha256": "92367f7bb8810a9571ae40eb608e0806444c1ae83a4d8f47756829b047418d79",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "confirm_desktop_delivery",
+      "code_sha256": "6d0dbe702a1c78e50bc2bcb20f995f95b4f50f0e5985d1986e1ead4f59c51d5e",
+      "family": "delivery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_desktop_delivery_set_finding",
+      "code_sha256": "40a9752409c2d5b3b88d7c6898dcf7ceda4ed87a20b37fc998deb83fc1c2e4da",
+      "family": "delivery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "run_desktop_operation",
+      "code_sha256": "a98bf45548a950cae5a559577cee0eff1254bab19c2ee25112236ca053f958cd",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_production_worker_readiness",
+      "code_sha256": "b5865058ec827d5eb958af23502355db882d84adb989389380f278868c5f13cb",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_installed_release_identity",
+      "code_sha256": "4020f68e5c509c1c7128458d1fe322c4c00d82c3db9c4e36b2bd8b37d252b750",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "run_production_desktop_operation",
+      "code_sha256": "f4e3a77c3563dfb047db09c30caa9804e5e11f5b2ae25a9344ee41b15fc35251",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_bind_verification_response_payload",
+      "code_sha256": "036904cfca666e3f18a5638657cd1aea0344990f925325e5e08d414479fd926f",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_publication_evidence_findings",
+      "code_sha256": "9be165bc279f757c6ddfcb36ce07e913a03067640a5f259490c23f9bb094588e",
+      "family": "delivery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_retained_gate_predecessors",
+      "code_sha256": "274f59ebd47f34cec181a39388be55654080a713f2b95893c4b121a24e6d08bf",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_ledger_findings",
+      "code_sha256": "50bed37a36ac50a7edca0a3fff4212db49d14060388f263ba4936d153d38e03f",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_archive_failed_attempt",
+      "code_sha256": "4360a9988a51a27a18a7a5fd31ec3852969c653bc1d68f22ad06ac470a18998b",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_complete_pending_recovery_attempts",
+      "code_sha256": "6ed6c9adfb4c99c88f994dfe2ce48d3a1dcb73cbea63921efc0b003f1685133c",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_repeated_drafting_findings",
+      "code_sha256": "804f203ecb89bb9eb478527429c5c6a3a423820ca8e4f7019dc6c70af145e7f2",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_quality_retry",
+      "code_sha256": "7419482063b953e49f76879c722e93a4e3ad6bffeea70e0f4c69d90e493c5d8c",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_continue_repairable_no_progress",
+      "code_sha256": "cefa9bf0d94700dc3e906bed7eb040eb958eba63e8b8058dd876e4d513346ea5",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "generate",
+      "code_sha256": "9b6d71f9bd3224c9e6d1c5696db308388f6a7e38fa52baf51f9539e950e6020a",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "run_release_gate",
+      "code_sha256": "cb179f44079cd8e1d13633320953ea649aef90fe64720d4196038c59bc6b284c",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_run_format_conformance_in_disposable_candidate",
+      "code_sha256": "1aea16ef32672e8ab4d594ecb1e10062d010208ac55657ae508d7d88fa1df423",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "run_format_conformance",
+      "code_sha256": "87c1d66a33b451a8378e4d3b0c58c43e7f25225e7506817c12e68eca6ffc1013",
+      "family": "installation"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "main",
+      "code_sha256": "bac9cca8bddf5daacd5954f5821239440cabb3b0e16ac39719eb8ba98bdaeac7",
+      "family": "recovery"
+    }
+  ]
+}

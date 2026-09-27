@@ -33,7 +33,7 @@ from pypdf import PdfReader
 from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, semantic_evidence_contract, sterling_clause_contract, sterling_clause_text
-from drafting import evidence_grounded, hypothesis_claim_issues, source_evidence_grounded, section_evidence_value
+from drafting import evidence_grounded, hypothesis_claim_issues, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -4101,6 +4101,11 @@ def validate_sterling_clause_contract(
                 clause,
                 "sterling-clause-weakened",
                 source_fidelity_details=semantic_issues,
+                evidence_diagnostics=[
+                    source_evidence_diagnostics(raw_sections.get(section, ""), path, value)
+                    for (path, value), passed in zip(authority_records, grounding_results)
+                    if not passed
+                ],
                 missing_term_groups=[group for group in term_groups if not any(term in text for term in group)],
                 missing_source_values=[value for value in source_values if value not in text],
                 ungrounded_source_paths=[
