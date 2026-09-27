@@ -37,6 +37,7 @@ from contracts import (
     protocol_table_contracts,
     source_evidence_coverage_map,
     sterling_draft_word_budget,
+    assessment_matrix,
     semantic_evidence_contract,
 )
 
@@ -401,7 +402,7 @@ def _section_payload(
     evidence_scopes = []
     for path in section.evidence:
         value = get_path(reference, path)
-        scoped_value = section_evidence_value(section.section_id, path, value)
+        scoped_value = section_evidence_value(section.section_id, path, value, reference)
         if scoped_value != value:
             evidence_scopes.append({
                 "path": path, "focus_terms": [], "value": scoped_value,
@@ -699,8 +700,15 @@ def _clinical_evidence_text(value: str) -> str:
     return clinical
 
 
-def section_evidence_value(section_id: str, path: str, value: Any) -> Any:
+def section_evidence_value(section_id: str, path: str, value: Any, reference: Mapping[str, Any] | None = None) -> Any:
     """Project explicit section-owned clauses without mutating approved source."""
+    if path in {"procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table"}:
+        decoded = assessment_matrix(value, get_path(reference or {}, "procedures.visits", []) or [])
+        if decoded is not None:
+            # Narrative evidence owns activity labels and clinical visit facts,
+            # not the matrix's binary membership glyphs. Empty-activity rows
+            # remain evidence instead of disappearing from the projection.
+            return {"visits": decoded["visits"], "activities": decoded["activities"]}
     if path in {"procedures.visit_schedule", "procedures.visit_schedule_table"} and isinstance(value, list):
         # Ordinal row identifiers belong to the structured schedule. Narrative
         # grounding checks the visit name, timing and procedures; a number that
@@ -1221,7 +1229,7 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
     material: dict[str, Any] = {}
     for path in map(str, contract.get("minimum_evidence", [])):
         value = scopes[path] if path in scopes else section_evidence_value(
-            str(contract.get("section_id") or ""), path, source.get(path),
+            str(contract.get("section_id") or ""), path, source.get(path), request.get("approved_source"),
         )
         if _leaf_texts(value):
             material[path] = value

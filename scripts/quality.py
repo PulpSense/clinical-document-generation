@@ -4024,7 +4024,7 @@ def validate_sterling_clause_contract(
         authority = clause.get("approved_source") if isinstance(clause.get("approved_source"), Mapping) else {}
         authority_paths = [str(path) for path in authority.get("paths", [])]
         authority_records = [
-            (path, section_evidence_value(str(clause["section_id"]), path, get_path(normalized_source, path)))
+            (path, section_evidence_value(str(clause["section_id"]), path, get_path(normalized_source, path), normalized_source))
             for path in authority_paths
             if meaningful(get_path(normalized_source, path))
         ]
@@ -5225,7 +5225,11 @@ def create_verification_requests(
         "target_ids, contradiction true for changed meaning, and exact source/passage evidence. A recognized "
         "semantic defect is blocking; do not recategorize it as an ordinary substantive warning. "
         "Audit each supplied source field in source_field_inventory against its applicable document surfaces, "
-        "not only accepted drafts or protocol_table_contracts. Check full site-address components and sponsor/funder "
+        "not only accepted drafts or protocol_table_contracts. In activity-by-visit source matrices, X or other "
+        "declared binary marks encode activity-to-visit relationships; verify those relationships in the schedule "
+        "tables and clinical prose rather than requiring marker glyphs in prose. Blank cells do not assign an "
+        "activity to that visit; retain unallocated activity requirements as notes without inventing assignments. "
+        "Check full site-address components and sponsor/funder "
         "roles, duplication and concatenation on front matter. Independently reconcile narrative assessments, "
         "safety duties and structured visit IDs, timing and procedures with both schedule tables. Preserve "
         "unallocated assessment requirements as notes without inventing visit assignments. Cite the source path "

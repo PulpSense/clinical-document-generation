@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.37-hypothesis-fidelity"
+CONTRACT_VERSION = "clinical-documents-v2.38-assessment-matrix"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -1189,6 +1189,64 @@ def _sample_size_evidence_rows(reference: Mapping[str, Any]) -> list[Mapping[str
     return [row for _path, _index, row in _sample_size_evidence_records(reference)]
 
 
+def assessment_matrix(value: Any, visit_order: Iterable[str] = ()) -> dict[str, Any] | None:
+    """Decode explicit activity-by-visit cells without altering source evidence.
+
+    Only a rectangular matrix of named activities and declared binary marks
+    is accepted. Unknown cells or record metadata keep their original shape.
+    """
+    if not isinstance(value, list) or not value or not all(isinstance(row, Mapping) for row in value):
+        return None
+    activity_key = next((key for key in value[0] if str(key).casefold() == "activity"), None)
+    if activity_key is None or not all(isinstance(row.get(activity_key), str) and row[activity_key].strip() for row in value):
+        return None
+    columns = [key for key in value[0] if key != activity_key]
+    inventory = list(visit_order)
+    def supported_header(column: Any) -> bool:
+        name = str(column).strip()
+        if not name:
+            return False
+        if re.search(
+            r"\b(?:screening|baseline|operative|preoperative|postoperative|surgery|exit|eot|eos)\b"
+            r"|\bfollow[ -]?up\b|\bend of (?:the )?study\b|\bvisit\s+[a-z0-9]+\b"
+            r"|\b(?:day|week|month|year)s?\s*\d+\b|\b\d+\s*(?:day|week|month|year)s?\b", name, re.I,
+        ):
+            return True
+        terms = set(re.findall(r"[a-z0-9]+", name.casefold()))
+        return bool(terms) and sum(
+            terms <= set(re.findall(r"[a-z0-9]+", str(visit).casefold())) for visit in inventory
+        ) == 1
+    if not all(supported_header(column) for column in columns):
+        return None
+    positive = {"x", "yes", "true", "1", "✓", "✔"}
+    negative = {"", "no", "false", "0", "-", "—", "n/a"}
+    if not columns or not all(
+        set(row) == set(value[0])
+        and all(str(row[key] if row[key] is not None else "").strip().casefold() in positive | negative for key in columns)
+        for row in value
+    ):
+        return None
+    # An explicit visit inventory can retain the clinical order when source
+    # serialization sorted matrix object keys. Match only unique header terms.
+    ordered = []
+    for visit in inventory:
+        terms = set(re.findall(r"[a-z0-9]+", str(visit).casefold()))
+        matches = [column for column in columns if column not in ordered and
+                   (set(re.findall(r"[a-z0-9]+", str(column).casefold())) - {"each", "eye", "per", "visit", "one"}) <= terms]
+        if len(matches) == 1:
+            ordered.append(matches[0])
+    ordered.extend(column for column in columns if column not in ordered)
+    activities = [row[activity_key].strip() for row in value]
+    return {
+        "activities": activities,
+        "visits": [{
+            "visit": str(column), "timing": str(column),
+            "procedures": [activity for row, activity in zip(value, activities)
+                           if str(row[column] if row[column] is not None else "").strip().casefold() in positive],
+        } for column in ordered],
+    }
+
+
 def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Combine the approved visit inventory and procedure relationships.
 
@@ -1200,7 +1258,8 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     table_count = 0
     for path in ("procedures.visit_schedule_table", "procedures.visit_schedule"):
         raw = get_path(reference, path, [])
-        source_rows = [row for row in raw if isinstance(row, Mapping)] if isinstance(raw, list) else []
+        decoded = assessment_matrix(raw, get_path(reference, "procedures.visits", []) or [])
+        source_rows = decoded["visits"] if decoded is not None else [row for row in raw if isinstance(row, Mapping)] if isinstance(raw, list) else []
         source_keys = [
             (str(row.get("visit") or row.get("visitName") or "").strip(),
              str(row.get("timing") or row.get("visitWindow") or "").strip())
@@ -1337,8 +1396,13 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         if isinstance(value, Mapping):
             inventory.append({"record": copy.deepcopy(dict(value)), "source_path": path})
         elif isinstance(value, list):
-            for index, child in enumerate(value):
-                inventory_items(child, f"{path}.{index}")
+            decoded = assessment_matrix(value, get_path(reference, "procedures.visits", []) or [])
+            if decoded is not None:
+                for index, activity in enumerate(decoded["activities"]):
+                    inventory.append({"activity": activity, "source_path": f"{path}.{index}"})
+            else:
+                for index, child in enumerate(value):
+                    inventory_items(child, f"{path}.{index}")
         elif meaningful(value):
             # An exact duplicate of the explicitly owned completion rule is not
             # an assessment. Its source remains untouched for Section 18.
