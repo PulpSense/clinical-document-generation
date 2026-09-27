@@ -37,13 +37,14 @@ from contracts import (
     protocol_table_contracts,
     source_evidence_coverage_map,
     sterling_draft_word_budget,
+    semantic_evidence_contract,
 )
 
 
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v17-editorial-ownership"
+PROMPT_VERSION = "section-drafting-v18-semantic-hypothesis"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -429,7 +430,13 @@ def _section_payload(
         path for path in section.evidence
         if path not in scoped_values or scoped_values[path]
     ]
+    semantic_evidence = [
+        obligation for path in minimum_evidence
+        if (obligation := semantic_evidence_contract(path, get_path(reference, path)))
+    ]
     content_expectations = list(section.content_expectations)
+    for obligation in semantic_evidence:
+        content_expectations.extend(obligation["requirements"])
     maximum_draft_words = 0
     if str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling":
         maximum_draft_words = sterling_draft_word_budget(reference, section.section_id)
@@ -482,6 +489,7 @@ def _section_payload(
         "fixed_boilerplate": boilerplate_items,
         "content_expectations": content_expectations,
         "maximum_draft_words": maximum_draft_words,
+        "semantic_evidence": semantic_evidence,
         "source_coverage": section.source_coverage,
         "evidence_scopes": evidence_scopes,
         "approved_source_word_count": approved_source_words,
@@ -1146,6 +1154,59 @@ def evidence_grounded(content: str, value: Any, *, all_items: bool = False) -> b
     return grounded(combined)
 
 
+def hypothesis_claim_issues(content: str, value: Any) -> list[str]:
+    """Catch explicit qualification reversals; semantic review covers other wording."""
+    if not semantic_evidence_contract("study.hypothesis", value):
+        return []
+    issues = []
+    # Explicitly negated or uncertain statements are not affirmative claims.
+    # Ambiguous constructions belong to semantic review.
+    affirmative = [
+        sentence for sentence in re.split(r"(?<=[.!?])\s+|\n+", content)
+        if not re.search(r"\b(?:not|no|never|cannot|uncertain|unknown|whether|may|might|could)\b|can't", sentence, re.I)
+    ]
+    comparison_words = {"all", "both", "cohort", "group", "two", "between", "differ", "may", "might", "could", "will"}
+    possible_comparisons = [
+        _grounding_tokens(clause.split(match.group(0), 1)[0]) - comparison_words
+        for clause in re.split(r"(?<=[.!?;])\s+|\n+", value)
+        if (match := re.search(r"\b(?:may|might|could)\s+differ\b", clause, re.I))
+    ]
+    strengthened = False
+    for sentence in affirmative:
+        predicate = re.search(
+            r"\b(?:will|definitely|certainly)\s+differ\s+(?:between|among)\s+(?:the\s+)?"
+            r"(?:(?:two|both|\d+)\s+)?(?:groups|cohorts)\b", sentence, re.I,
+        )
+        if not predicate:
+            continue
+        subject = sentence[:predicate.start()]
+        if re.search(r"\b(?:schedule|design|method|assessment|procedure|measurement|protocol)s?\b", subject, re.I):
+            continue
+        if any(anchors & _grounding_tokens(subject) for anchors in possible_comparisons):
+            strengthened = True
+    if strengthened:
+        issues.append("Hypothesis uncertainty is strengthened from a possible difference to a definite difference.")
+    source_limit = re.search(
+        r"\bnot\s+designed\s+to\s+(?:establish|prove|demonstrate)\b.{0,100}\bsuperior(?:ity)?\b", value, re.I,
+    )
+    positive_superiority = any(re.search(
+        r"\b(?:designed|intended)\s+to\s+(?:establish|prove|demonstrate)\b.{0,100}\bsuperior(?:ity)?\b"
+        r"|\b(?:will|can)\s+(?:establish|prove|demonstrate)\b.{0,100}\bsuperior(?:ity)?\b", sentence, re.I,
+    ) for sentence in affirmative)
+    if source_limit and positive_superiority:
+        issues.append("The hypothesis reverses the supplied limitation on establishing superiority.")
+    return issues
+
+
+def source_evidence_grounded(content: str, path: str, value: Any, *, all_items: bool = False) -> bool:
+    """Check deterministic anchors, deferring declared narrative meaning to review."""
+    if semantic_evidence_contract(path, value):
+        # Provisional drafting/render validation only. The complete independent
+        # review must still assess every material hypothesis fact before release.
+        return bool(content.strip()) and not hypothesis_claim_issues(content, value)
+    return evidence_grounded(content, value, all_items=all_items)
+
+
 def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
     source = {
         str(item.get("path")): item.get("value")
@@ -1463,7 +1524,7 @@ def _coverage_findings(
                     })
             ungrounded = [
                 path for path, value in material.items()
-                if f"source:{path}" in cited and not evidence_grounded(content, value)
+                if f"source:{path}" in cited and not source_evidence_grounded(content, path, value)
             ]
             if ungrounded:
                 findings.append({
@@ -1506,7 +1567,7 @@ def _coverage_findings(
         and not (
             _timeline_grounded(content, value)
             if section_id == "icf.duration" and path == "study.timeline"
-            else evidence_grounded(content, value, all_items=all_items)
+            else source_evidence_grounded(content, path, value, all_items=all_items)
         )
     ]
     if ungrounded:
@@ -1960,6 +2021,16 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             combined_evidence,
             "\n".join(role_content_parts),
         ))
+        for path in expected_contracts[section_id].get("minimum_evidence", []):
+            if path != "study.hypothesis":
+                continue
+            value = get_path(request.get("approved_source", {}), path)
+            for issue in hypothesis_claim_issues(combined_content, value):
+                findings.append({
+                    "category": "drafting", "field": section_id, "target_ids": [section_id],
+                    "issue": issue,
+                    "next_action": f"Preserve the source qualification in an accurate paraphrase. Approved {path}: {value}",
+                })
         maximum_words = int(expected_contracts[section_id].get("maximum_draft_words") or 0)
         actual_words = len(re.findall(r"[a-z0-9]+", combined_content.casefold()))
         if maximum_words and actual_words > maximum_words:
@@ -2058,13 +2129,14 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                         })
                         continue
                     def cited_fact_is_observable(ref: str) -> bool:
-                        value = source_values.get(ref.removeprefix("source:"))
+                        path = ref.removeprefix("source:")
+                        value = source_values.get(path)
                         if concept == "participation-duration" and ref == "source:study.timeline":
                             # This participant summary owns follow-up duration, not
                             # recruitment and analysis phases from the same field.
                             value = _approved_followup_value(value)
-                            return bool(value) and evidence_grounded(text, value)
-                        return evidence_grounded(text, value)
+                            return bool(value) and source_evidence_grounded(text, path, value)
+                        return source_evidence_grounded(text, path, value)
 
                     if cited_sources and not any(
                         cited_fact_is_observable(ref) for ref in cited_sources
@@ -2695,6 +2767,6 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
 
 __all__ = [
     "accepted_cross_section_duplicate_findings", "accepted_draft", "create_drafting_request", "ingest_responses",
-    "evidence_grounded", "section_evidence_value", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
+    "evidence_grounded", "source_evidence_grounded", "section_evidence_value", "governing_resources", "invalidate_accepted_targets", "merged_drafts", "missing_drafts", "pending_requests", "response_template",
     "recorded_acceptance_response", "retry_attempts", "schedule_requests", "sha256_file", "sha256_value", "validate_response",
 ]

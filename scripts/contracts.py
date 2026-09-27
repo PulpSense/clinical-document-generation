@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.36-shared-sterling-evidence"
+CONTRACT_VERSION = "clinical-documents-v2.37-hypothesis-fidelity"
 BOILERPLATE_VERSION = "clinical-boilerplate-v12"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -1253,6 +1253,28 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
         if not record["visit"]:
             record["visit"] = f"Visit {record['visitNumber']}"
     return visits
+
+
+def semantic_evidence_contract(path: str, value: Any) -> dict[str, Any] | None:
+    """Declare narrative meaning that the independent content reviewer must assess.
+
+    Word overlap and incidental numbers in narrative hypotheses cannot prove
+    fidelity. Concrete endpoint, population and procedure fields retain their
+    deterministic checks; this obligation is not a delivery acceptance decision.
+    """
+    if path != "study.hypothesis" or not isinstance(value, str) or not meaningful(value):
+        return None
+    return {
+        "source_path": path,
+        "source_excerpt": value,
+        "validation_mode": "independent_content_review",
+        "requirements": [
+            "Preserve the supplied material expectations and their outcome-to-population or group relationships within the section's concept ownership; accurate participant-facing paraphrases and concise summaries are allowed.",
+            "Preserve uncertainty and distinguish the researchers' hypothesis from established results; do not strengthen may, suggested or expected into a definite result.",
+            "Preserve supplied negations, observational limitations and limits on superiority conclusions.",
+            "Assess clinical quantities and named groups in context against the approved source; wording such as between groups need not repeat an incidental two when the two named groups are clear.",
+        ],
+    }
 
 
 def sterling_draft_word_budget(reference: Mapping[str, Any], section_id: str) -> int:

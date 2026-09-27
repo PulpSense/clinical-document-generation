@@ -32,8 +32,8 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
-from drafting import evidence_grounded, section_evidence_value
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, semantic_evidence_contract, sterling_clause_contract, sterling_clause_text
+from drafting import evidence_grounded, hypothesis_claim_issues, source_evidence_grounded, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -4028,7 +4028,6 @@ def validate_sterling_clause_contract(
             for path in authority_paths
             if meaningful(get_path(normalized_source, path))
         ]
-        authority_values = [value for _path, value in authority_records]
         unsupported_markers = [
             _normalized_substantive_text(str(value))
             for value in validation.get("unsupported_markers", [])
@@ -4052,9 +4051,13 @@ def validate_sterling_clause_contract(
             (
                 re.search(r"\b(?:no|not|without|will not|none)\b", text) is not None
                 if isinstance(value, str) and value.strip().casefold() == "none"
-                else evidence_grounded(raw_sections.get(section, ""), value)
+                else source_evidence_grounded(raw_sections.get(section, ""), path, value)
             )
-            for value in authority_values
+            for path, value in authority_records
+        ]
+        semantic_issues = [
+            issue for path, value in authority_records if path == "study.hypothesis"
+            for issue in hypothesis_claim_issues(raw_sections.get(section, ""), value)
         ]
         grounding_ok = (
             any(grounding_results)
@@ -4078,7 +4081,7 @@ def validate_sterling_clause_contract(
         block_ok = block_count >= int(validation.get("minimum_substantive_blocks", 0) or 0)
         maximum = int(validation.get("maximum_words", 0) or 0)
         maximum_ok = not maximum or word_count <= maximum
-        if has_body and exact_ok and terms_ok and sources_ok and grounding_ok and not contradiction and length_ok and block_ok and maximum_ok:
+        if has_body and exact_ok and terms_ok and sources_ok and grounding_ok and not semantic_issues and not contradiction and length_ok and block_ok and maximum_ok:
             continue
 
         # Exact or safeguard-bearing text in another governed section is a
@@ -4097,11 +4100,12 @@ def validate_sterling_clause_contract(
             add(
                 clause,
                 "sterling-clause-weakened",
+                source_fidelity_details=semantic_issues,
                 missing_term_groups=[group for group in term_groups if not any(term in text for term in group)],
                 missing_source_values=[value for value in source_values if value not in text],
                 ungrounded_source_paths=[
                     path for path, value in authority_records
-                    if not evidence_grounded(raw_sections.get(section, ""), value)
+                    if not source_evidence_grounded(raw_sections.get(section, ""), path, value)
                     and not (isinstance(value, str) and value.strip().casefold() == "none" and re.search(r"\b(?:no|not|without|will not|none)\b", text))
                 ],
                 contradiction=contradiction,
@@ -4800,6 +4804,28 @@ def content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]
     return sections
 
 
+def semantic_evidence_inventory(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Bind shared narrative obligations to the existing full content review."""
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    sections = list(protocol_contract(branch))
+    if branch != "Retrospective":
+        sections.extend(icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))))
+    records: dict[str, dict[str, Any]] = {}
+    for section in sections:
+        if not section_applies(reference, section) or section.section_id == "introduction":
+            continue
+        for path in section.evidence:
+            obligation = semantic_evidence_contract(path, get_path(reference, path))
+            if not obligation:
+                continue
+            record = records.setdefault(path, {
+                **obligation, "target_ids": [],
+                "scope": "Follow section concept ownership: complete facts in their owner sections, concise references or summaries elsewhere; preserve qualifications wherever an expectation is asserted.",
+            })
+            record["target_ids"].append(section.section_id)
+    return list(records.values())
+
+
 def _source_field_inventory(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Inventory supplied leaves directly, independent of drafting/table mappings."""
     inventory: list[dict[str, Any]] = []
@@ -4927,6 +4953,7 @@ def verification_recovery_request_findings(
             ] != expected_artifacts
             or list(request.get("checks") or []) != list(CONTENT_CHECKS)
             or list(request.get("cross_document_checks") or []) != expected_cross_document_checks
+            or request.get("semantic_evidence") != semantic_evidence_inventory(reference)
             or request.get("approved_source") != reference
         ):
             return issue("verification_request_incomplete_scope", "The declared content verification request is not the unique complete package-wide request for the current branch and review set.")
@@ -5190,6 +5217,13 @@ def create_verification_requests(
         "applicable Fixed Clinical Boilerplate and retained template language; authorization is not a blanket "
         "exemption from source fidelity. Fail expanded decision authority, added termination grounds, and "
         "conflation of completion with withdrawal or discontinuation, even in verbatim boilerplate. "
+        "Assess semantic_evidence requirements against their exact source excerpts under source_supported and no_invention. "
+        "Meaning is mandatory; source word overlap or an incidental group-count word is not proof of fidelity. "
+        "Do not reject accurate paraphrases merely for omitting purpose/objective wording under a PURPOSE heading. "
+        "Verify that PURPOSE actually explains the aim, hypothesis and main outcome. Reject missing material hypothesis "
+        "facts and strengthened qualifications or reversed negations with category content, check source_supported, "
+        "target_ids, contradiction true for changed meaning, and exact source/passage evidence. A recognized "
+        "semantic defect is blocking; do not recategorize it as an ordinary substantive warning. "
         "Audit each supplied source field in source_field_inventory against its applicable document surfaces, "
         "not only accepted drafts or protocol_table_contracts. Check full site-address components and sponsor/funder "
         "roles, duplication and concatenation on front matter. Independently reconcile narrative assessments, "
@@ -5252,6 +5286,7 @@ def create_verification_requests(
         "artifacts": content_files,
         "approved_source": reference,
         "source_field_inventory": _source_field_inventory(reference),
+        "semantic_evidence": semantic_evidence_inventory(reference),
         "protocol_concept_ownership": protocol_concept_ownership(branch),
         "authorized_boilerplate": authorized_boilerplate,
         "sterling_clause_contract": (
@@ -6083,6 +6118,7 @@ def validate_verifications(
             "page_renderer": request.get("page_renderer"),
             "artifacts": request.get("artifacts", []),
             "sections": request.get("sections", []),
+            "semantic_evidence": request.get("semantic_evidence", []),
             "checks": request.get("checks", []),
             "cross_document_checks": request.get("cross_document_checks", []),
             "contracted_template_bundle": request.get("contracted_template_bundle"),
@@ -6123,7 +6159,8 @@ def _final_verification_scope_findings(
         }
         expected_cross = set(CROSS_DOCUMENT_CHECKS) if len(expected_names) > 1 else set()
         if (
-            content_paths != expected_paths
+            content[0].get("semantic_evidence") != semantic_evidence_inventory(reference)
+            or content_paths != expected_paths
             or content_sections != expected_sections
             or set(content[0].get("checks") or []) != set(CONTENT_CHECKS)
             or set(content[0].get("cross_document_checks") or []) != expected_cross
