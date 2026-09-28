@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import quality
 import workflow
 
 
@@ -28,6 +29,46 @@ def test_readiness_checks_exact_worker_profile_and_never_records_credentials(tmp
     assert captured["timeout"] <= 20
     assert result["status"] == ("passed" if logged_in else "blocked")
     assert "secret-not-for-logs" not in json.dumps(result)
+
+
+def test_study_operation_finds_renderer_that_passed_installation_smoke(tmp_path, monkeypatch):
+    root = tmp_path / "profile/skills/clinical-document-generation"
+    root.mkdir(parents=True)
+    office_bin = tmp_path / "clinical-office-runtime/bin"
+    office_bin.mkdir(parents=True)
+    executable = office_bin / "libreoffice"
+    executable.write_text("#!/bin/sh\nprintf 'LibreOffice 25.2.7.2\\n'\n", encoding="utf-8")
+    executable.chmod(0o755)
+    (root / "INSTALLATION-ASSURANCE.json").write_text(json.dumps({
+        "schema_version": "installation-assurance/v2",
+        "status": "passed",
+        "active_path_smoke": {
+            "status": "passed",
+            "active_root": str(root.resolve()),
+            "assurance": {
+                "status": "passed",
+                "renderer": {"kind": "LibreOffice", "path": str(executable)},
+            },
+        },
+    }), encoding="utf-8")
+    monkeypatch.setenv("PATH", f"{office_bin}:/usr/bin:/bin")
+    monkeypatch.setattr(quality.platform, "system", lambda: "Linux")
+
+    smoke_renderers = quality.renderers(environment=dict(workflow.os.environ))
+    study_renderers = quality.renderers(
+        environment=workflow._production_subprocess_environment(root), skill_root=root,
+    )
+
+    assert smoke_renderers and smoke_renderers[0]["path"] == str(executable)
+    assert study_renderers and study_renderers[0]["path"] == str(executable)
+
+    installation = json.loads((root / "INSTALLATION-ASSURANCE.json").read_text(encoding="utf-8"))
+    installation["active_path_smoke"]["active_root"] = str(tmp_path / "other-release")
+    (root / "INSTALLATION-ASSURANCE.json").write_text(json.dumps(installation), encoding="utf-8")
+    stale_candidates = quality.renderers(
+        environment=workflow._production_subprocess_environment(root), skill_root=root,
+    )
+    assert all(item["path"] != str(executable) for item in stale_candidates)
 
 
 def test_logged_out_worker_stops_before_creating_the_deadline(tmp_path, monkeypatch):

@@ -301,6 +301,12 @@
     },
     {
       "file": "scripts/quality.py",
+      "function": "renderers",
+      "code_sha256": "a6b7980f5ccf47ea704fb5479da82978dc287df86315568e61f1e249ee531d7c",
+      "family": "render"
+    },
+    {
+      "file": "scripts/quality.py",
       "function": "preflight",
       "code_sha256": "b9f6510553a65fbbbbb566879b913efb8cca162a1af30cded17862151c6d8f5f",
       "family": "render"

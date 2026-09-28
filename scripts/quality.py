@@ -2430,7 +2430,6 @@ def renderers(
     clock: Any = time.monotonic,
 ) -> list[dict[str, Any]]:
     """List supported host DOCX renderers in governed fidelity order."""
-    del skill_root
     search_path = (environment or {}).get("PATH") if environment is not None else None
     system = platform.system()
     identities: list[dict[str, Any]] = []
@@ -2456,7 +2455,29 @@ def renderers(
             pass
     if system == "Darwin" and Path("/Applications/Microsoft Word.app").exists():
         append({"kind": "Microsoft Word", "path": "/Applications/Microsoft Word.app", "version": "installed macOS application", "platform": "Darwin", "source": "host application"})
-    office_candidates = list(_executable_candidates(("libreoffice", "soffice"), environment=environment))
+    office_candidates: list[tuple[Path, str]] = []
+    if skill_root is not None:
+        assurance_path = skill_root / "INSTALLATION-ASSURANCE.json"
+        try:
+            if assurance_path.is_file() and not assurance_path.is_symlink():
+                installation = json.loads(assurance_path.read_text(encoding="utf-8"))
+                active_smoke = installation.get("active_path_smoke") or {}
+                smoke_assurance = active_smoke.get("assurance") or {}
+                smoke_renderer = smoke_assurance.get("renderer") or {}
+                renderer_path = Path(str(smoke_renderer.get("path") or ""))
+                if (
+                    installation.get("status") == "passed"
+                    and active_smoke.get("status") == "passed"
+                    and active_smoke.get("active_root") == str(skill_root.resolve())
+                    and smoke_assurance.get("status") == "passed"
+                    and smoke_renderer.get("kind") == "LibreOffice"
+                    and renderer_path.is_absolute()
+                    and not renderer_path.is_symlink()
+                ):
+                    office_candidates.append((renderer_path, "active installation smoke"))
+        except (OSError, ValueError, AttributeError, TypeError, json.JSONDecodeError):
+            pass
+    office_candidates.extend(_executable_candidates(("libreoffice", "soffice"), environment=environment))
     if system == "Darwin":
         office_candidates.append((Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"), "macOS application"))
     for candidate, source in office_candidates:
