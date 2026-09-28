@@ -466,7 +466,7 @@ def _section_payload(
             design_text,
             re.I,
         ))
-        if not has_bias_control:
+        if meaningful(get_path(reference, "statistics.bias_minimization")) or not has_bias_control:
             minimum_evidence = [path for path in minimum_evidence if path != "design.study_design"]
     if section.section_id == "endpoint-criteria.completion" and meaningful(get_path(reference, "procedures.completion")):
         minimum_evidence = [path for path in minimum_evidence if path == "procedures.completion"]
@@ -746,13 +746,18 @@ def section_evidence_value(section_id: str, path: str, value: Any, reference: Ma
     if section_id not in {"analysis-plan.methodology", "analysis-plan.datasets"}:
         return value
     clauses = re.split(r"(?<=[.!?])\s+|\n+", value)
-    population = [c for c in clauses if re.match(
-        r"\s*(?:the\s+)?(?:analysis\s+population|analysis\s+data\s*sets?|analysed\s+population|analyzed\s+population)\b"
-        r"\s+(?:(?:will|shall)\s+)?(?:include|includes|comprise|comprises|consist|consists|is defined|are defined)\b",
-        c, re.I,
-    ) and not re.search(
-        r"\b(?:mean|median|standard deviation|confidence|regression|hypothesis test|percentages?)\b",
-        c, re.I,
+    population = [c for c in clauses if (
+        (re.match(
+            r"\s*(?:the\s+)?(?:analysis\s+population|analysis\s+data\s*sets?|analysed\s+population|analyzed\s+population)\b"
+            r"\s+(?:(?:will|shall)\s+)?(?:include|includes|comprise|comprises|consist|consists|is defined|are defined)\b",
+            c, re.I,
+        ) and not re.search(
+            r"\b(?:mean|median|standard deviation|confidence|regression|hypothesis test|percentages?)\b",
+            c, re.I,
+        ))
+        or re.match(r"\s*All enrolled (?:participants|subjects|patients)\b", c, re.I)
+        or (re.search(r"\bearlier[- ]visit\b|\bat an earlier visit\b", c, re.I)
+            and re.search(r"\bcontribut(?:e|es|ion)\b|\bsummar(?:y|ies)\b", c, re.I))
     )]
     if section_id == "analysis-plan.methodology":
         methods = [c for c in clauses if c not in population and not re.fullmatch(

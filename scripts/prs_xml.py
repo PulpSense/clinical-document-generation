@@ -214,6 +214,17 @@ def _normalize_participation_scope(value: str) -> str:
     return re.sub(r"\bstudies\b$", "study", normalized)
 
 
+def _equivalent_screening_criterion(value: str, requirement: ScreeningIntervalRequirement) -> bool:
+    """Recognize an already supplied interval before adding its PRS wording."""
+    text = re.sub(r"\s+", " ", value).strip().casefold()
+    days = re.escape(requirement.days)
+    scope = re.escape(requirement.participation_scope.casefold())
+    return bool(
+        re.search(rf"\b(?:no|without) participation in {scope} (?:during|within|in) (?:the )?{days} days? before screening\b", text)
+        or re.search(rf"\bat least {days} days? without participation in {scope} before screening\b", text)
+    )
+
+
 def screening_interval_requirement(
     reference: Mapping[str, Any],
 ) -> ScreeningIntervalRequirement | None:
@@ -359,6 +370,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
     exclusion = [_text(item) for item in get_path(reference, "population.exclusion_criteria", []) or []]
     screening_interval = screening_interval_requirement(reference)
     if screening_interval:
+        inclusion = [item for item in inclusion if not _equivalent_screening_criterion(item, screening_interval)]
         inclusion.append(
             f"At least {screening_interval.days} days without participation in "
             f"{screening_interval.participation_scope} before screening"
@@ -508,6 +520,20 @@ def _set(node: ET.Element, path: str, value: Any) -> None:
     if target is not None: target.text = _text(value)
 
 
+def _matched_candidate_indices(text: str, candidates: list[str]) -> set[int]:
+    """Prefer the longest named cohort when labels overlap in intervention text."""
+    matches = [
+        (match.start(), match.end(), index)
+        for index, name in enumerate(candidates) if name
+        for match in re.finditer(r"(?<!\w)" + re.escape(name) + r"(?!\w)", text, re.I)
+    ]
+    accepted: list[tuple[int, int, int]] = []
+    for start, end, index in sorted(matches, key=lambda item: item[1] - item[0], reverse=True):
+        if not any(start < previous_end and end > previous_start for previous_start, previous_end, _ in accepted):
+            accepted.append((start, end, index))
+    return {index for _, _, index in accepted}
+
+
 def _intervention_items(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     explicit = _items(reference, "design.interventions")
     items = explicit or ([{
@@ -515,7 +541,19 @@ def _intervention_items(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         "name": get_path(reference, "design.intervention_name"),
         "description": get_path(reference, "design.intervention_description"),
     }] if meaningful(get_path(reference, "design.intervention_name")) else [])
-    arms = [_text(item.get("arm_group_label") or item.get("label") or item.get("name")) for item in _items(reference, "design.arms")]
+    arm_items = _items(reference, "design.arms")
+    arms = [_text(item.get("arm_group_label") or item.get("label") or item.get("name")) for item in arm_items]
+    if not explicit and len(arm_items) > 1 and len(items) == 1:
+        combined_name = _text(items[0].get("name"))
+        names = [re.sub(r"\s+(?:cohort|group|arm)$", "", label, flags=re.I).strip() for label in arms]
+        if all(names) and len({name.casefold() for name in names}) == len(names):
+            if _matched_candidate_indices(combined_name, names) == set(range(len(arm_items))):
+                return [{
+                    "name": name,
+                    "type": "Device" if _text(items[0].get("type")).casefold().startswith("medical device") else items[0].get("type"),
+                    "description": arm.get("description"),
+                    "arm_group_labels": [label],
+                } for name, arm, label in zip(names, arm_items, arms)]
     result = []
     for original in items:
         item = dict(original)
@@ -525,17 +563,9 @@ def _intervention_items(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         elif not explicit:
             # Infer only exact cohort names present in the supplied combined
             # intervention name. Never link an unrelated comparator by position.
-            name = _text(item.get("intervention_name") or item.get("name")).casefold()
-            matches = [
-                (match.start(), match.end(), arm)
-                for arm in arms if arm
-                for match in re.finditer(r"(?<!\w)" + re.escape(arm.casefold()) + r"(?!\w)", name)
-            ]
-            accepted: list[tuple[int, int, str]] = []
-            for start, end, arm in sorted(matches, key=lambda item: item[1] - item[0], reverse=True):
-                if not any(start < previous_end and end > previous_start for previous_start, previous_end, _ in accepted):
-                    accepted.append((start, end, arm))
-            labels = [arm for arm in arms if any(matched_arm == arm for _, _, matched_arm in accepted)]
+            name = _text(item.get("intervention_name") or item.get("name"))
+            matched = _matched_candidate_indices(name, arms)
+            labels = [arm for index, arm in enumerate(arms) if index in matched]
             if not labels and len(arms) == 1:
                 labels = arms
         else:
@@ -587,8 +617,7 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
 
 
 def expected_counts(reference: Mapping[str, Any]) -> dict[str, int]:
-    interventions = _items(reference, "design.interventions")
-    if not interventions and meaningful(get_path(reference, "design.intervention_name")): interventions = [{}]
+    interventions = _intervention_items(reference)
     return {"intervention": len(interventions), "arm_group": len(_items(reference, "design.arms")), "primary_outcome": len(_items(reference, "endpoints.primary")), "secondary_outcome": len(_items(reference, "endpoints.secondary")), "other_outcome": len(_items(reference, "endpoints.other")), "location": len(get_path(reference, "sites", []) or [])}
 
 

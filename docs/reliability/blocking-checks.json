@@ -140,7 +140,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "section_evidence_value",
-      "code_sha256": "b4aa4b97f75ff780735c2c658230b118919617fdabe3863317b468c903a2520a",
+      "code_sha256": "fed1c95e1285dc8313e6ab081c82532964d25b1ff08884a01045d2193d52529a",
       "family": "evidence"
     },
     {

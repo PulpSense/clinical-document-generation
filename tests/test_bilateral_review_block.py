@@ -51,10 +51,12 @@ def test_actual_prs_maps_and_validates_total_and_both_cohort_links(tmp_path):
     assert study.findtext('enrollment') == '72'
     labels = [n.text for n in study.findall('intervention/arm_group_label')]
     assert labels == ['Bilateral TECNIS PureSee', 'Bilateral TECNIS Odyssey']
+    assert len(study.findall('intervention')) == 2
     assert not prs_xml.compare_structure(TEMPLATE, output)
     assert not prs_xml.validate_output(output, ref, TEMPLATE)
     study.find('enrollment').text = '36'
-    study.find('intervention').remove(study.findall('intervention/arm_group_label')[-1])
+    second_intervention = study.findall('intervention')[1]
+    second_intervention.remove(second_intervention.find('arm_group_label'))
     tree.write(output, encoding='utf-8', xml_declaration=True)
     findings = prs_xml.validate_output(output, ref, TEMPLATE)
     assert any(f['field'] == 'enrollment' for f in findings)
@@ -198,7 +200,7 @@ def test_longer_compound_cohort_name_does_not_imply_shorter_cohort():
     ref['design']['intervention_name'] = 'Device A Plus'
     assert prs_xml._intervention_items(ref)[0]['arm_group_labels'] == ['Device A Plus']
     ref['design']['intervention_name'] = 'Device A or Device A Plus'
-    assert prs_xml._intervention_items(ref)[0]['arm_group_labels'] == ['Device A', 'Device A Plus']
+    assert [item['arm_group_labels'] for item in prs_xml._intervention_items(ref)] == [['Device A'], ['Device A Plus']]
 
 
 def test_decimal_completion_interval_does_not_require_a_different_integer():

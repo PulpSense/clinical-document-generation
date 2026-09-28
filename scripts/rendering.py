@@ -197,7 +197,7 @@ def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primar
         active_category = ""
         for item in get_path(reference, f"endpoints.{kind}", []) or []:
             label = _text(item)
-            timepoint = _text(item.get("time_point") or item.get("time_frame")) if isinstance(item, Mapping) else ""
+            timepoint = _text(item.get("time_point") or item.get("time_frame") or item.get("outcome_time_frame")) if isinstance(item, Mapping) else ""
             if label:
                 category = _text(item.get("category")) if isinstance(item, Mapping) else ""
                 category = category or default_categories[kind]
@@ -209,23 +209,19 @@ def _endpoint_text(reference: Mapping[str, Any], kinds: Iterable[str] = ("primar
 
 
 def _endpoint_synopsis(reference: Mapping[str, Any]) -> str:
-    """Return a compact General Information endpoint synopsis."""
-    primary = list(get_path(reference, "endpoints.primary", []) or [])
-    secondary = list(get_path(reference, "endpoints.secondary", []) or [])
-    other = list(get_path(reference, "endpoints.other", []) or [])
-    lines = []
-    if primary:
-        item = primary[0]
-        label = _text(item.get("outcome_measure") or item) if isinstance(item, Mapping) else _text(item)
-        label = label.rstrip(".")
-        timepoint = _text(item.get("time_point") or item.get("time_frame")) if isinstance(item, Mapping) else ""
-        lines.append(f"Primary endpoint: {label}{f' ({timepoint})' if timepoint else ''}.")
-        if len(primary) > 1:
-            lines.append(f"{len(primary) - 1} additional primary endpoint(s); see Section 8.1.")
-    if secondary:
-        lines.append(f"{len(secondary)} secondary endpoint(s); see Section 8.1.")
-    if other:
-        lines.append(f"{len(other)} exploratory endpoint(s); see Section 8.1.")
+    """List the approved endpoints in General Information without a redirect."""
+    lines: list[str] = []
+    for kind, singular in (("primary", "Primary endpoint"), ("secondary", "Secondary endpoint"), ("other", "Exploratory endpoint")):
+        items = list(get_path(reference, f"endpoints.{kind}", []) or [])
+        if not items:
+            continue
+        lines.append(f"{singular if len(items) == 1 else singular + 's'}:")
+        for item in items:
+            label = _text(item.get("outcome_measure") or item.get("measure") or item.get("label")) if isinstance(item, Mapping) else _text(item)
+            label = label.rstrip(". ")
+            timepoint = _text(item.get("time_point") or item.get("time_frame") or item.get("outcome_time_frame")) if isinstance(item, Mapping) else ""
+            if label:
+                lines.append(f"• {label}{f' ({timepoint})' if timepoint and timepoint.casefold() not in label.casefold() else ''}")
     return "\n".join(lines)
 
 
@@ -307,7 +303,14 @@ def _protocol_short_title(reference: Mapping[str, Any]) -> str:
         return title[:1].upper() + title[1:]
     boundary = title.rfind(" ", 0, 73)
     concise = title[:boundary] if boundary > 35 else title[:72]
-    concise = re.sub(r"\s+(?:a|an|and|for|in|of|the|to|with)$", "", concise, flags=re.I)
+    concise = re.sub(r"\s+(?:a|after|an|and|before|for|in|of|the|to|with|without)$", "", concise, flags=re.I)
+    # A length cap can otherwise leave a dangling phrase such as "after Bilateral".
+    trailing_modifier = re.search(
+        r"\s+(?:after|before|for|in|with|without|among|receiving|undergoing|following)\s+([^\s]+)$",
+        concise, flags=re.I,
+    )
+    if trailing_modifier and trailing_modifier.start() >= 35:
+        concise = concise[:trailing_modifier.start()]
     return concise[:1].upper() + concise[1:]
 
 
@@ -367,7 +370,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "sterlingSecondaryPhone": _text(coordinator.get("office_phone")),
         "objective": "; ".join(_list(get_path(reference, "objectives.primary", []))),
         "studyDesignShort": _text(get_path(reference, "design.study_design_summary") or get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
-        "sampleSize": _text(get_path(reference, "population.sample_size")),
+        "sampleSize": _text(get_path(reference, "population.sample_size")).rstrip(". "),
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
         "daysBeforeScreening": screening_interval.days if screening_interval else "",

@@ -34,6 +34,46 @@ def test_generated_xml_preserves_client_template_structure(tmp_path):
     assert compare_structure(TEMPLATE, output) == []
 
 
+def test_two_source_named_cohorts_follow_client_intervention_links(tmp_path):
+    reference = fixture()
+    reference["design"].pop("interventions", None)
+    reference["design"]["intervention_name"] = (
+        "Bilateral TECNIS PureSee intraocular lenses or bilateral TECNIS Odyssey intraocular lenses, "
+        "according to the routine-care treatment plan."
+    )
+    reference["design"]["intervention_type"] = "Medical device — intraocular lenses."
+    reference["design"]["arms"] = [
+        {"name": "TECNIS PureSee cohort", "description": "36 subjects with bilateral TECNIS PureSee implantation."},
+        {"name": "TECNIS Odyssey cohort", "description": "36 subjects with bilateral TECNIS Odyssey implantation."},
+    ]
+    output = tmp_path / "study.xml"
+    generate(TEMPLATE, output, reference, {"brief_summary": "Summary.", "detailed_description": "Description."})
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+    interventions = study.findall("intervention")
+    assert [(node.findtext("intervention_name"), node.findtext("arm_group_label")) for node in interventions] == [
+        ("TECNIS PureSee", "TECNIS PureSee cohort"),
+        ("TECNIS Odyssey", "TECNIS Odyssey cohort"),
+    ]
+    assert all(node.findtext("intervention_type") == "Device" for node in interventions)
+    assert compare_structure(MANUAL_REFERENCE, output) == []
+    assert validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE) == []
+
+
+def test_existing_screening_interval_is_not_repeated_in_prs_eligibility(tmp_path):
+    reference = fixture()
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = "60"
+    reference["population"]["inclusion_criteria"].append(
+        "No participation in another study during the 60 days before screening."
+    )
+    output = tmp_path / "study.xml"
+    generate(TEMPLATE, output, reference, {"brief_summary": "Summary.", "detailed_description": "Description."})
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+    criteria = study.findtext("eligibility/criteria/textblock") or ""
+    assert criteria.count("60 days") == 1
+    assert "At least 60 days without participation in another study before screening" in criteria
+    assert validate_output(output, reference, TEMPLATE) == []
+
+
 def test_interventional_xml_uses_its_template_branch_while_preserving_manual_outer_structure(tmp_path):
     reference = fixture()
     reference["regulatory"]["prs"].update({

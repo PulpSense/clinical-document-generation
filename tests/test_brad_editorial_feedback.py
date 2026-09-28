@@ -8,7 +8,7 @@ from docx import Document
 from contracts import batch_plan, input_findings, protocol_contract
 from drafting import _coverage_findings, _section_payload, create_drafting_request
 from quality import create_verification_requests
-from rendering import _endpoint_synopsis, _protocol_followup_summary, _protocol_short_title, render_documents
+from rendering import _endpoint_synopsis, _protocol_followup_summary, _protocol_short_title, render_documents, render_fields
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,6 +44,8 @@ def test_objectives_request_asks_for_purpose_without_endpoint_inventory(tmp_path
 
 def test_methods_and_schedule_requests_do_not_demand_irrelevant_restatement():
     sections = {item.section_id: item for item in protocol_contract("Prospective")}
+    assert "endpoint-inventory" in sections["general-information"].owned_concepts
+    assert "endpoint-inventory" not in sections["general-information"].do_not_restate_concepts
     assert "study.hypothesis" not in sections["study-procedure.measurements"].evidence
     assert sections["evaluation-procedures"].source_coverage == "table_with_notes"
     assert "statistics.analysis_plan" in sections["analysis-plan.considerations"].evidence
@@ -111,7 +113,9 @@ def test_general_information_uses_complete_endpoint_synopsis_and_final_visit():
     source = _source()
     synopsis = _endpoint_synopsis(source)
     assert "Primary endpoint:" in synopsis
-    assert "Section 8.1" in synopsis
+    assert "Primary outcome (Month 3)" in synopsis
+    assert "Safety outcome (Month 3)" in synopsis
+    assert "Section 8.1" not in synopsis
     assert "Section 6" not in synopsis
     source["study"]["timeline"] = "Enrollment: 6 months; follow-up: 3 months; data analysis: 1 month."
     source["procedures"]["visit_schedule_table"] = [
@@ -121,11 +125,92 @@ def test_general_information_uses_complete_endpoint_synopsis_and_final_visit():
     assert _protocol_followup_summary(source) == "3 months"
 
 
+def test_variables_lists_every_approved_endpoint_for_future_protocols():
+    source = _source()
+    source["endpoints"]["primary"].append({"label": "Additional primary measure", "time_point": "Month 6"})
+    source["endpoints"]["secondary"].append({"label": "Participant symptoms", "time_point": "Month 6"})
+    lines = _endpoint_synopsis(source).splitlines()
+    assert lines == [
+        "Primary endpoints:",
+        "• Primary outcome (Month 3)",
+        "• Additional primary measure (Month 6)",
+        "Secondary endpoints:",
+        "• Safety outcome (Month 3)",
+        "• Participant symptoms (Month 6)",
+    ]
+
+
+def test_variables_accepts_prs_endpoint_time_frame_field():
+    source = _source()
+    source["endpoints"]["primary"] = [{"outcome_measure": "Visual acuity", "outcome_time_frame": "6 months"}]
+    assert "Visual acuity (6 months)" in _endpoint_synopsis(source)
+
+
+def test_long_title_fallback_ends_at_a_complete_phrase():
+    source = _source()
+    source["study"].pop("short_title", None)
+    source["study"]["title"] = (
+        "Visual Outcomes and Patient-Reported Symptoms after Bilateral Implantation "
+        "of an Extended Depth of Focus or a Full Range of Vision Intraocular Lens"
+    )
+    assert _protocol_short_title(source) == "Visual Outcomes and Patient-Reported Symptoms"
+    source["study"]["title"] = (
+        "Clinical Evaluation of Visual Acuity and Patient Satisfaction after Surgery "
+        "with TECNIS PureSee Intraocular Lenses"
+    )
+    assert _protocol_short_title(source) == "Clinical Evaluation of Visual Acuity and Patient Satisfaction"
+    source["study"]["title"] = (
+        "A Study of Visual Acuity and Patient Satisfaction in Patients with Bilateral "
+        "Intraocular Lens Implantation"
+    )
+    assert _protocol_short_title(source) == "A Study of Visual Acuity and Patient Satisfaction"
+    source["study"]["title"] = (
+        "Visual Acuity and Patient Satisfaction in Adults Receiving Bilateral "
+        "TECNIS PureSee Intraocular Lens Implantation"
+    )
+    assert _protocol_short_title(source) == "Visual Acuity and Patient Satisfaction in Adults"
+
+
+def test_icf_sample_size_does_not_duplicate_template_sentence_period():
+    source = _source()
+    source["population"]["sample_size"] = "72 subjects total; 36 per cohort."
+    assert render_fields(source, {})["sampleSize"] == "72 subjects total; 36 per cohort"
+
+
 def test_completion_and_bias_contracts_do_not_require_repeated_design_or_visit_inventory():
     sections = {item.section_id: item for item in protocol_contract("Prospective")}
     assert "every approved visit" not in " ".join(sections["endpoint-criteria.study-completion"].content_expectations)
     assert "no masking" not in " ".join(sections["study-design.bias"].content_expectations)
     assert "study.timeline" in sections["endpoint-criteria.study-completion"].evidence
+
+
+def test_design_and_analysis_requests_keep_each_fact_in_its_own_section():
+    source = _source()
+    source["design"]["treatment_assignment"] = (
+        "The treating surgeon and patient selected the lens before enrollment. "
+        "Enrollment does not determine lens selection or change planned treatment."
+    )
+    source["statistics"]["bias_minimization"] = (
+        "Both cohorts use the same testing conditions and assessment schedule. "
+        "Differences may reflect patient selection."
+    )
+    source["statistics"]["analysis_plan"] = (
+        "All enrolled participants enter safety summaries. Outcome data are summarized by cohort. "
+        "Available observations will be analyzed without imputation. A participant with earlier-visit "
+        "data but no Month 6 assessment contributes to earlier summaries, not to the Month 6 endpoint."
+    )
+    sections = {item.section_id: item for item in protocol_contract("Prospective")}
+    boilerplate = json.loads((ROOT / "references/fixed-clinical-boilerplate.json").read_text())["sections"]
+    design = _section_payload(sections["study-design.design"], boilerplate, source)
+    bias = _section_payload(sections["study-design.bias"], boilerplate, source)
+    method = _section_payload(sections["analysis-plan.methodology"], boilerplate, source)
+    assert "design.treatment_assignment" in design["minimum_evidence"]
+    assert "design.study_design" not in bias["minimum_evidence"]
+    assert "before enrollment" in " ".join(design["content_expectations"])
+    assert "do not repeat" in " ".join(bias["content_expectations"]).casefold()
+    method_scope = next(item["value"] for item in method["evidence_scopes"] if item["path"] == "statistics.analysis_plan")
+    assert "without imputation" in method_scope
+    assert "earlier-visit" not in method_scope
 
 
 def test_editorial_contracts_do_not_feed_other_sections_into_introduction_or_closeout():
@@ -222,3 +307,6 @@ def test_generated_header_and_schedule_activity_follow_reviewed_case(tmp_path):
     assert source["study"]["title"] not in headers
     matrix = next(table for table in document.tables if any(cell.text == "Demographics" for row in table.rows for cell in row.cells))
     assert any(row.cells[0].text == "Demographics" for row in matrix.rows)
+    variables = next(row.cells[1].text for table in document.tables for row in table.rows if row.cells[0].text.strip() == "Variables")
+    assert "Primary outcome" in variables and "Safety outcome" in variables
+    assert "see Section" not in variables
