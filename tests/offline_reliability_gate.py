@@ -34,7 +34,9 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
     """
     records = []
     for path in sorted((root / 'scripts').glob('*.py')):
-        tree = ast.parse(path.read_text(encoding='utf-8'))
+        source = path.read_text(encoding='utf-8')
+        lines = source.splitlines(keepends=True)
+        tree = ast.parse(source)
         for node in tree.body:
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
@@ -52,9 +54,13 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
             }
             if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:
                 continue
+            # AST dumps change when Python adds fields (for example, type_params in
+            # 3.12). Hash the source instead so one audit works on every runtime.
+            first_line = min([node.lineno, *(decorator.lineno for decorator in node.decorator_list)])
+            function_source = ''.join(lines[first_line - 1:node.end_lineno])
             records.append({
                 'file': path.relative_to(root).as_posix(), 'function': node.name,
-                'code_sha256': hashlib.sha256(ast.dump(node, include_attributes=False).encode()).hexdigest(),
+                'code_sha256': hashlib.sha256(function_source.encode('utf-8')).hexdigest(),
             })
     return records
 

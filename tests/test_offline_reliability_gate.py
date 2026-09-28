@@ -29,3 +29,31 @@ def test_new_blocking_producer_requires_developer_audit(tmp_path):
     audit.parent.mkdir(parents=True)
     audit.write_text('{"checks": []}')
     assert gate.audit_findings(tmp_path) == ['Blocking-check audit requires review: scripts/example.py:check']
+
+
+def test_blocking_fingerprints_do_not_depend_on_python_ast_dump_format(monkeypatch):
+    before = gate.blocking_check_inventory()
+    monkeypatch.setattr(gate.ast, 'dump', lambda *args, **kwargs: 'runtime-specific-AST-format')
+    assert gate.blocking_check_inventory() == before
+
+
+def test_blocking_fingerprint_includes_function_decorators(tmp_path):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    target = scripts / 'example.py'
+    target.write_text('@first\ndef check():\n    return {"status": "blocked"}\n')
+    before = gate.blocking_check_inventory(tmp_path)
+    target.write_text('@second\ndef check():\n    return {"status": "blocked"}\n')
+    after = gate.blocking_check_inventory(tmp_path)
+    assert before[0]['code_sha256'] != after[0]['code_sha256']
+
+
+def test_blocking_fingerprint_detects_a_changed_function_body(tmp_path):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    target = scripts / 'example.py'
+    target.write_text('def check():\n    return {"status": "blocked"}\n')
+    before = gate.blocking_check_inventory(tmp_path)
+    target.write_text('def check():\n    return {"status": "blocked", "reason": "changed"}\n')
+    after = gate.blocking_check_inventory(tmp_path)
+    assert before[0]['code_sha256'] != after[0]['code_sha256']

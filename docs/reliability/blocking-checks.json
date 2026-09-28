@@ -1,5 +1,5 @@
 {
-  "schema_version": "blocking-check-audit/v1",
+  "schema_version": "blocking-check-audit/v2",
   "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in six production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
   "baseline_commit": "b35761d",
   "families": {
@@ -62,668 +62,669 @@
     {
       "file": "scripts/contracts.py",
       "function": "_fidelity_evidence",
-      "code_sha256": "409154e280a1d2997438a7ccf9250878dcc9eb2228b025f7d5bc673f2a32e87a",
+      "code_sha256": "78a60eb6fe5f35c9c63ee1837c2228b70090f1d716cb5d27c916da21294dbf61",
       "family": "evidence"
     },
     {
       "file": "scripts/contracts.py",
       "function": "_canonicalize_declared_aliases",
-      "code_sha256": "5a05ba017944d45236f88263b91b9ecd15ddad6b606d02e3ae1b967ffe73dd8d",
+      "code_sha256": "60876656bef28950eab8618ab5233e785acdcc44df8f296e15a87be514c11b1c",
       "family": "source"
     },
     {
       "file": "scripts/contracts.py",
       "function": "assessment_matrix",
-      "code_sha256": "9d73c8f7a250bd9f833f9766ba90a7eabb45b00917468af901c7f27a737a8a68",
+      "code_sha256": "47798c4eff332d378810eda2d64f94afbf35388d86d5e7e586642f74d776d868",
       "family": "structured"
     },
     {
       "file": "scripts/contracts.py",
       "function": "normalized_visit_records",
-      "code_sha256": "8a28261a5a87a45c55a39d008b0809e40c4dc39c550e053b7045bb2f20d79edc",
+      "code_sha256": "f286381f50b265d14cdef752b7168225f0592df9c8c1189bceecc3fab2529bfe",
       "family": "structured"
     },
     {
       "file": "scripts/contracts.py",
       "function": "participant_followup_summary",
-      "code_sha256": "f9e3725ac4250c38e1f37dde66b55b2db67e9d1a3a084d0c959d0ef436bba4f3",
+      "code_sha256": "f42f5a2390c70f252a11d1add202d5047fabb95aab41a7c7b84c7a873f93e19b",
       "family": "structured"
     },
     {
       "file": "scripts/contracts.py",
       "function": "computed_study_fields",
-      "code_sha256": "5df66a8d2ac861750ea8b490c8b9ca3f13b37efbe39c86ab13ea60374860a179",
+      "code_sha256": "c2d6b80c6ae38bb81a943552e4ba201ed9d98a7372451b7df44652e64eba17b2",
       "family": "structured"
     },
     {
       "file": "scripts/contracts.py",
       "function": "semantic_evidence_contract",
-      "code_sha256": "9d28f33d1f5b83d547370e9628d38bc9adb869ba5ee8dc85730d6f5f2a880527",
+      "code_sha256": "b9fe749ac93aa97c6fdd9c9d75d7ac588d56688b67a2bd2ef1c1fed14eac6bc5",
       "family": "evidence"
     },
     {
       "file": "scripts/contracts.py",
       "function": "sterling_draft_word_budget",
-      "code_sha256": "abf4cf4e59fc5b3308892bfdd449fbd6ded1f4cb161cf3dc7cb70eb11d36238c",
+      "code_sha256": "8e21c89c6c6dff99d9527f0d846264616164fcaa98e4245c7eefc91d049ba730",
       "family": "evidence"
     },
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
-      "code_sha256": "f17446d4f0a0890b1f14240c23d405a6c77f2b118ac28d441a6e72c2400470de",
+      "code_sha256": "6bbe22621eb9da5ebdb197f35f13c0f257ea3d74fa974ed421a67c5da050cfd5",
       "family": "structured"
     },
     {
       "file": "scripts/contracts.py",
       "function": "timeline_findings",
-      "code_sha256": "6f99b9f6b03330b9c932c745cdf11b857b6f20340c20505a123d103d36fc9b53",
+      "code_sha256": "bcf4a7025f532743b9d90cbbdde05a214f3b5a7567f1f576e16e30179022b644",
       "family": "source"
     },
     {
       "file": "scripts/contracts.py",
       "function": "input_findings",
-      "code_sha256": "02f4b0495a730749e10f44ea34a8898ee0e49bc538c83c7e99b0ca4ec0cd3ebd",
+      "code_sha256": "f9e743c6b096901219fb1908f79720ab4c886c1093ec52cec970f15bb0f56d79",
       "family": "source"
     },
     {
       "file": "scripts/contracts.py",
       "function": "source_contract",
-      "code_sha256": "259e6dc776493c766df9c006633456027ccc52153de3a5927122289e3559d99b",
+      "code_sha256": "866f9cd57fe763dd9a8522441bc1c29df98f4abe371d7f0f0b768b07e8677b0f",
       "family": "source"
     },
     {
       "file": "scripts/contracts.py",
       "function": "repair_report",
-      "code_sha256": "eb3b9b32b98a44c84454a1771836af8b7a986160b5cc2dccd6ba68887047d42e",
+      "code_sha256": "64566c43e985cdcd71e3526df41f5f71796b3259e495f86bb0e3eb1c22447ed7",
       "family": "source"
     },
     {
       "file": "scripts/drafting.py",
       "function": "section_evidence_value",
-      "code_sha256": "1da2823e4cdba8edb90c38499d96f555fa98d4fa8703b715bd3a521cb19e7bc0",
+      "code_sha256": "b4aa4b97f75ff780735c2c658230b118919617fdabe3863317b468c903a2520a",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_leaf_texts",
-      "code_sha256": "6f0d867e45fed943c5931b033f1cde42a7184a96c0f5b91e30e7415b65728f31",
+      "code_sha256": "8d8b4d99fb56c423784e98bd3361e4ef1db0b0a894354525274e9c2d2c33d736",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_grounding_tokens",
-      "code_sha256": "cace76b35245ed05e3a58db6b3223f9b894b9b01c3638ae57bb23f37ff6c89a2",
+      "code_sha256": "a497a34680362f50a927b483bf7c65a863a376398a3f9d9bcffe99f6f4e415dd",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_evidence_diagnostics",
-      "code_sha256": "867f06fec2efd1cca3febc4bb65782166331122d5f5ca6ac658140f93a79f8c2",
+      "code_sha256": "d8190cf0779c1ee288f1413c9a561554b8a17d244e85a1b6c2924b506e5d45df",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "evidence_grounded",
-      "code_sha256": "78fbb922e4cb35cfcc86999c0ebd19ca6f6be5aae390466349939ad73da9a928",
+      "code_sha256": "b77e679fb41e400e8653948f7d208a4780ccd8dab5a6aa1bff1b58ef18213030",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "hypothesis_claim_issues",
-      "code_sha256": "924a034ef29571b64524f14b5c02ccf0d28774eddf05c4cb73d3d8c8e0b72230",
+      "code_sha256": "6213c4a50e70e9689c6ca997fda27e75faa27af37c7fb65d4d8c92ccd90ed02b",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "source_evidence_diagnostics",
-      "code_sha256": "5f33fe2c1b8ebc6b09141f725e2a859d4b675369ad5868075a3a630b2c411856",
+      "code_sha256": "e1b25c05dd152edb13aeb300ee21b5f9088b144403ab801e174d766fc8c51819",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "source_evidence_grounded",
-      "code_sha256": "9630edd9ff6edf6e99ef8e0734a9a51fa50911ed22400ada731d2b32965564ad",
+      "code_sha256": "2bef509e849baed504aa25a7c3779282d3d2133cef1858a99057b61d81bd13dc",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_material_source",
-      "code_sha256": "518bcfdefbfebb26151673220bd823246ff654b3e82a1ba8911564f3f592fac9",
+      "code_sha256": "5cccf1fa31146d6ea059b8b9706c20514edf18996a79fcc24acb15715446ad0a",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_timeline_grounded",
-      "code_sha256": "a3c01c1b471590e34797972c7a391ad7616c98661ef9a695bcf4b5e899f89dea",
+      "code_sha256": "642e73aa397043316f0e6b9fdc63322f36484c946020e7a24d1109e52c420735",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_background_claim_findings",
-      "code_sha256": "0235fddf8d5fc5a03e094e07cbacd7267f5f011f64d0b40893bbeea690380e2c",
+      "code_sha256": "0df8a96b584c138c69931bc8c171331c821c3a60e3ae753c358791167ace8a9c",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "2ca5fe06c1e021f4ecfa882d80b95b471fc6e1b43952f8a5fb2376654a18d553",
+      "code_sha256": "96815553a41bd7f92c36ddd7a0806ab30a081a5bc1ca77ef470a2ba57726ff69",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_validate_paragraph",
-      "code_sha256": "6faa9323ffaf4398ae5bc209a90c6479c36093f496acc637fb296380b7396452",
+      "code_sha256": "d5e1fb2b3d2beac8ee5be5966b17c6529beee4c25b4ce6581fd7da1c5a70ca85",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_validate_list",
-      "code_sha256": "f9d288491dcbcb5631dea54166e3807045a3ccd19900bc08ee9cd9c2db53fabd",
+      "code_sha256": "74ffbfc269153baf39e4bd9096246f1e6b67e318f6596d01005de1f56ab50792",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "c2e94ec86530758f02ddba93563457c30c2138250585de4b80e76a3a3024705f",
+      "code_sha256": "278d4df3e63921b04030adaa5ba1f460012a478634d836610148820ef54c630a",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "66f5560b17e1cf2c1fc6ce8491735514f4288d8b258ca8d604af471b542c09a8",
+      "code_sha256": "f49eb26f240b05daff066c0017ecf03ebcd53ac1f1d43a4f6ca6bed6ea13c934",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "accepted_cross_section_duplicate_findings",
-      "code_sha256": "2cf3614c19e56ee9d0d9c13b70978c0b8e3327f2b8f66ececba2bda4a4402f4c",
+      "code_sha256": "b7213acc5c6d896e5532080c4efb4bed8d302688e7fd6c0aba7681a4763be432",
       "family": "evidence"
     },
     {
       "file": "scripts/prs_xml.py",
       "function": "generate",
-      "code_sha256": "042a8e9e19b92810f5e529268d3ea07cf9ce737ec352db2f5e81f434051ba618",
+      "code_sha256": "b0040c04222f79c3a11836c16fe9047df8399895fad7520cf603e9f47cc445e6",
       "family": "structured"
     },
     {
       "file": "scripts/prs_xml.py",
       "function": "validate_output",
-      "code_sha256": "e684c16d5e2d7d872c3ac757e61fd5812abf05a322e8aed68575abc76f7c5b1e",
+      "code_sha256": "a8495cb69d43f09c791afdb4dac2f3dda37b3be95a5ae9c03bb9c0cfac23950e",
       "family": "structured"
     },
     {
       "file": "scripts/quality.py",
       "function": "verification_request_authentication_findings",
-      "code_sha256": "775cfd77463eb8774e4394457c805f19517411a8d8d58c4c48f8ab67770af08d",
+      "code_sha256": "c7dfa659136fc67e9581294d21200718ceb8d16873629c781e8642a177097fd3",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_format_conformance_outputs",
-      "code_sha256": "1aebd3d83456ba648345aa2aa1fdcd4edf238a6e222312786dd0c998524d7b70",
+      "code_sha256": "480de3f16bc4ccc199c651d1ba0acb6d692cdfb3bf32b8b5ccb2c32903adf5ca",
       "family": "installation"
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_gate_ledger",
-      "code_sha256": "a71d572bcdfa375bc5c266862e33413b63e875525f7b5f76feea7d11a60134c9",
+      "code_sha256": "2b4c9f189843e13d6b9f8f9270483fb0d48108629d4ca0b150f6b9007ba65713",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "retry_gate_ledger",
-      "code_sha256": "67d69353b0fd21f863ead97532c1c84970e93a43230e33d90f3e8957a2425632",
+      "code_sha256": "c15bf9c008348be1216a4a86fcef768b2a4261d4dc67417090271e25ae97d38c",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "advance_gate_ledger",
-      "code_sha256": "79d8af02e811c5880d620c3cdb9e0727659aeab4c552d2662e41dae2dd6844b4",
+      "code_sha256": "9e87ea099ff7fc98cbe1e1ce7d31550bc1cc543be57c5b762ba74822a469cd8a",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_pdfium_integrity_failure",
-      "code_sha256": "ee3230475224667f3e879e19dc65aa1abf4554a1acfd7c4e4f55be4f4c26237c",
+      "code_sha256": "914f67287edc6b20d7384d13b8f36a29c4c85c00eca79f7c6a58ca8fdc551a9d",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "run_pdfium_worker",
-      "code_sha256": "1288598c368e178d8af26041c5f6064cd99c22aac1b9888fbd6e440d7bb31ac1",
+      "code_sha256": "fcf2094c1e86461b35c35279616aa438aee0f68eb305c7f6980577be6d1ecced",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "rasterize_pdf",
-      "code_sha256": "91ac8c8d153c90f3fe8d2356b043252d978119335aff792ab5abed64b49707ea",
+      "code_sha256": "2805c9e45e642314b6baae2b36528f6be930c9b3c4714284243bea083ebf76d4",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "preflight",
-      "code_sha256": "184ee95a7e4ed663ee13b8a0595e4b03e647c776f8d4986304aa7de98859f720",
+      "code_sha256": "b9f6510553a65fbbbbb566879b913efb8cca162a1af30cded17862151c6d8f5f",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "_protocol_section15_opening_findings",
-      "code_sha256": "567381329c348a2ed53b3129078b6f60202a54b7e1d0158b9b4a8b99a6750864",
+      "code_sha256": "ae30168c9d1cf3bbce89e34ba0e01ee017623560236459705dd591ba3d0ee572",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_final_toc_destinations",
-      "code_sha256": "1c7d061443f2dcaaf433f4f6cd8954c0ae9526d406d4d3b032351f7be6c3993a",
+      "code_sha256": "0d51f7b90a46917561e22f758a45f117e00bb55db08296a7237667c135ac13a6",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "_sparse_pdf_pages",
-      "code_sha256": "a9850c436dffea0a51ee9d867d0448b834deb63d1be68219bdd7838fac1ca9db",
+      "code_sha256": "a2a2b558392ca4e2bee432057113c54e5785d10098a4fe410463ae8967ec13c4",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "render_pages",
-      "code_sha256": "6204dc9543c42e01faee80d321a7731cec7d3454df58d67f63daf3801a5ee673",
+      "code_sha256": "4d247311f683afba8a212e3e1c5851376d8fd590c55802debe7a1c9a915a5081",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "render_assurance",
-      "code_sha256": "fcfc2b606e880a7a2d31f41df4070ba5d84aa53670676df1073ba4813862daa2",
+      "code_sha256": "de0d14d93ac03ff226629030d42ae5983b1133332436b928bf1a87e6056941d3",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "_validated_candidate_structure",
-      "code_sha256": "eda4cb9e4cfe259ffb9349ef240a33e956f6b427bf8c3a665ed2e422eea433b2",
+      "code_sha256": "5f1ad37c7716c828ddb8144f2e4825136d9aba8d36e42237cca9b50d6bd61925",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "_governed_adapter_attempts",
-      "code_sha256": "84d491790619af3419610822ff74e47e094b6cc7cb8c66c31511590ea11e981b",
+      "code_sha256": "6c7573f48fb8ed2293d0f665b66a1965d759059ec4eba73b293659c10f81aef3",
       "family": "render"
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_computed_protocol_fields",
-      "code_sha256": "6db5ce1b14796a5edc33e1e3651b175cd75971f4f74de967f3455bba20eb9bce",
+      "code_sha256": "563a0ffb11820efb34d494a3b2f2d3d9aabfacf3e3403137e252c9767547abea",
       "family": "structured"
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_source_surfaces",
-      "code_sha256": "3c23f8851f0c2dbd04da8ae6f45eb380493ca26c006758b84bda86baa45397c0",
+      "code_sha256": "2a5466b87931fd01089bcacca9aa0f362c8ddc919ade87938e6bcdc5bc90955c",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "aaf83ea81a389407b064e9e688ee77542d93b5a7912ec3e3c3f7dd9739714780",
+      "code_sha256": "7d4dadedb0b04b9799195baea7fa0c82c895fbdaeeaa3ed9d6121ca82eabbd00",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "assess_icf_output",
-      "code_sha256": "e66ca817f68bd41c5341ebeb0e4873f963e9a3ea6de41a939dab81d5b9bfd4db",
+      "code_sha256": "b9cf0eca71f700b3f51043aea32112d059db8384e35c02a8edeb603f78972112",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "assess_protocol_concept_repetition",
-      "code_sha256": "e1c0780cff7bd74a5b5f7c01060d3e134943d10023cc3196d3987866ae40af27",
+      "code_sha256": "2d852d2efcc84d4fa384c5c4c44ca845288acc381ac144048c28e8113f9eb554",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "ed205c2611601f1c9ae184ec9baad2e4b1663b826b13059125c5eaf2bec08f7a",
+      "code_sha256": "4ca7727377953fba52c017064968398a8fdf309644f7d36fd7b8cff2cca70fcf",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "semantic_evidence_inventory",
-      "code_sha256": "b99bf8f39a5bfa73f39edd118d591430afc06175039de9f33af5dc1f73542b4a",
+      "code_sha256": "8c6c138ce6eec15511e6f08af4175f2e9ffe5e7c1445b5f193fa6a1cacd46e85",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_source_field_inventory",
-      "code_sha256": "30be768e9f0523ca3d358895e35fd190678890ae813a545468868fe7476c1b22",
+      "code_sha256": "a321d8fcb3b0795d9101d0077a35df5599d09c42f100a6cf98261057bba504a6",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "verification_recovery_request_findings",
-      "code_sha256": "55a6897fe789de11ee7d5938908a421198029a5c39cc1e2796531585d5a94109",
+      "code_sha256": "066bb3c29c202bbf87a29e7fc4c416194dbf9afa8d56a7e255c499e2bdecfaea",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_is_publication_warning",
-      "code_sha256": "b294c537d14b7fbac37fc1f9b25379ce24c633fdff2c004a0c5c2877257b7c3a",
+      "code_sha256": "d7a47892a679361098897905791e4e67e3cceadf10770102de0d1c9b8280c94c",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_deterministic_warning_findings",
-      "code_sha256": "1cbec1e88cbfdc6f088478cbb2a05ef37f79ba844f307f9be7070bf690e567cc",
+      "code_sha256": "d9a3cfa1a41e9f6b0562a0feb593cf414200786cff83eb3b151a26c753dd11a6",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_governed_editorial_warning",
-      "code_sha256": "0db8a1716c034459fe1df378483bcf65048637129a1145531cc093024cb057ba",
+      "code_sha256": "6e51f835850812d5f1e22ccac62c56687359cd5d5ec0238dd54e5f88a4e24998",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "verification_response_is_terminal",
-      "code_sha256": "a4ec8cfd7c4c1bf23ec6cf4ea70b9d8e9e6aad329823c5dab92457b582a0a764",
+      "code_sha256": "1bf0a690ba7c85ddbb38505844baaec79eecfd7da96c05c1c4fcecf63f5d87ad",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "532683261c2698e0eb2baa04417dd6edff2a0e27de272e1bd2541c8cba8cdc4f",
+      "code_sha256": "62dce400d52c9b507d4f53ada9e3bb4502b05d32c5a3ccf9c951d3d32866e276",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_final_verification_scope_findings",
-      "code_sha256": "389939c1e47fcf399dcbb764f81eecf872a49ca633abbdf9b390c23b115acddb",
+      "code_sha256": "4c8a1a8da31613a3d4fe6e68ab9eae42d5dd80fcb7e9b03f4b14da2060f2ab95",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "8a46c9d269c7ac4a0f1e25946e8d901cdab1cc883787831b8d2a7d5861394d7b",
+      "code_sha256": "76ba52fa584a5dc951b59b78d2fb0b5875b20257780acbe2d5a33fc124b4691e",
       "family": "delivery"
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "0b018c25e64873b02ea8c645f7e9930b6b44115b411b31987e8828321bc1d755",
+      "code_sha256": "22443908be787ca36cd1aa670ef4a89859b647c15034a3aff72185ab9cd0281c",
       "family": "review"
     },
     {
       "file": "scripts/rendering.py",
       "function": "protocol_section_snapshot",
-      "code_sha256": "87699bd3ffb8634e587430ca10504f12378e18488053d5279d14ff812d3ea209",
+      "code_sha256": "2cc98c3fe61dc85f18fee91c51c8666e633a1320f10f18a67ee513aa32e3633b",
       "family": "recovery"
     },
     {
       "file": "scripts/rendering.py",
       "function": "rendered_section_snapshot",
-      "code_sha256": "ca07ab6bfd32773a6d099abf03d1f8802a53c4f2c0495994b3471d586b64a5ae",
+      "code_sha256": "03516291abc0584a65f2aa3664ae887b044370c81168bd6445718932dec73152",
       "family": "recovery"
     },
     {
       "file": "scripts/rendering.py",
       "function": "_rendered_heading_text",
-      "code_sha256": "6a8b184b2a1114016f147874ab1f9420efdcc8edc674bc10242c376169ed3321",
+      "code_sha256": "7b9728b26ec1597985524cb3f59b1e7261b1c90b7bc9b1dba3de3ef1474eae46",
       "family": "render"
     },
     {
       "file": "scripts/rendering.py",
       "function": "_target_heading",
-      "code_sha256": "0852ffadedcd97f399321b2c9da60951fd6eb4be3c3530d014f01eb80e9dc45d",
+      "code_sha256": "e0736763683f7abe507634772b701276a0b7d71a025e0bdb186650239dbefb5d",
       "family": "render"
     },
     {
       "file": "scripts/rendering.py",
       "function": "audit_docx",
-      "code_sha256": "761e47695feb36d593054f7ab06c79abe1c42e17b0587e40284d8c91fc211841",
+      "code_sha256": "3911c418ce15bcbfe9f216180b52d51866c11fd5855960d96d4d6fe4354d658b",
       "family": "render"
     },
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "101ac1fe98bc1610214a5290b0a22bfc5aedb94e6eb717050e3b68ab56673103",
+      "code_sha256": "21b36dbc7df8d42feef516152cb271698de959cd35ae1c84eded2c8cd00c2d28",
       "family": "render"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_manifest_integrity",
-      "code_sha256": "7a7181af0379bbf8f9ed425735807a4da3df0a28afe047e1f653a98ec45ef443",
+      "code_sha256": "1f0c2c8a9b8f32b36824408a361ed875ec0fc7fb14f0d0b419801c11714053cc",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_certification_attestation",
-      "code_sha256": "d623bfe93088b924bb91ab44e3cbd51cd168819fde3225e56242dee80c1b9bb8",
+      "code_sha256": "2aeed1c2c720f842f7d0ed4ac2c594d8cce8c67f5eba98f4622cefdfe1163c7b",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "bind_release_certification",
-      "code_sha256": "a61bd8ad5ce81d1238201a27d55f810253c2a80770f147f03afa7b96fdf82fb1",
+      "code_sha256": "239337aa485ab448eeef93bd08dece0cd88fe669846d0b1aa0f36c038c8d895f",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_validate_hermes_discovery",
-      "code_sha256": "80e6ece919d79b576bca3e0cd65a6a545d7f92e72b9abb036a708e73e9897e0a",
+      "code_sha256": "b598814a7dda4f8eec9cda0a4f6a4ea580320de87f93b5231718a923643d7f80",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "verify_installation",
-      "code_sha256": "ad7ec08d2f25766108f74bf3eb31bb8d128ee364bd5d791ec4050056442ea3c7",
+      "code_sha256": "e5b155119ae3db9f4812abe6c1e6f60f7553aa06be0cd68e19d19f50c7002724",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_provision_page_renderer",
-      "code_sha256": "92748d9743d32c4e47478633ac5fd413b6cead7d7707cfbc7da32ef94a8c9de2",
+      "code_sha256": "ae16acd53ff634b8f5b3b25937f4a7c6b1eef8da051797b4065b99b471cc3f3d",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "provision_render_assurance",
-      "code_sha256": "6d0cc70496bb699b58bb0b49a4959f9fcdf8c7f4a09bb69719a324bea89d3843",
+      "code_sha256": "879a98dc21f5a252e52eaa0a31da17ac48550cd8db84fe83dfa5a4acd730f8eb",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_installation_smoke_result",
-      "code_sha256": "36b79486e2ae9a501f0340d006710f48f6556f41cc0727278af199401a80918e",
+      "code_sha256": "733e56055a010baf6f8d4ffeaf48e6dacabe8b622406d063c46b80d6b0260952",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_recover_interrupted_activation",
-      "code_sha256": "78d71bed7976c4d3cfcb641cebc57a4a67bff67acd751cba87c24f8a4c70882d",
+      "code_sha256": "201dfcdaca2107c70f472915385c30920138173cd2339938cdc52ddc8c1b2987",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_manifest_era_candidate_integrity",
-      "code_sha256": "f3c6ea65426ba2e87a0c3d8bf96231df1330e2e2f7e733d2415e56d70cf6b57c",
+      "code_sha256": "af9607844f1823beb1dc73cc229ca43c6e1c79e1ecf96b45864cf42bfa5bacfe",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "install_release",
-      "code_sha256": "5995e8d29154d71332776d0195c62609af7991f00cb60dc42fac73d8a97f4403",
+      "code_sha256": "ee54364ac658443092131d64b9c67df6429304aff4dd837b32e85da5cc9dfa0b",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_disposable_rollback_smoke",
-      "code_sha256": "6c5be47d5fb72c2719f7415c1503db9751bddba604885b317cc172caa8f8c77b",
+      "code_sha256": "f51021d808af31eed45aff005753b63fc784a685a1a9b3203c587d818f55fb3b",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_recover_interrupted_rollback",
-      "code_sha256": "6b67b6b78c74dfcdd5646c8d61a48c84df08739b30609b9cddde883ac6291036",
+      "code_sha256": "163a13beacad5930f10c4794de23a84e49cd8ed62d0ee177eb5d307ead8a0072",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "rollback_release",
-      "code_sha256": "bf2d21a00ea4adf1fbdb604227900754940b97dc03a348347e6cf56459446d39",
+      "code_sha256": "5f48720c5c54de890adf4eb25ec5d1f7c0d1b1ddb50bf2de641322621f5d9155",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "prepare",
-      "code_sha256": "5bbb93e230536978a1ef3d0d9d8b9eb6923ca972423c462bb4d7d04906d6dbd7",
+      "code_sha256": "3f29cf472c713f3110981e489f5cc3166dcd321a47571d1cd4412529f8531815",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "approve",
-      "code_sha256": "10af2ff3862cd5f07855ec97a0ac7bb71a3a5550cf7b711d43dfae35441bda9e",
+      "code_sha256": "c22101216b4417fd163a45ffc6524fecc29504e5331e00b3b6ab32e6379f99fa",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "validate",
-      "code_sha256": "5aa6aee92efeafe85195101df4a450764fbf9ee2b3c1093cb3ae82920a7a569c",
+      "code_sha256": "5eb5488595afd9fa2da1b803863546b1876fb55639091c9ccc39e5ce88fd6334",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_repair_block",
-      "code_sha256": "2227632b6b40667a12b1ba9d181eb117d0227a57dfac96b8c06bc8cd96e0c66f",
+      "code_sha256": "fc0d0cf4e977cdbd63b70a486484a8fbc324e7a7b07c60a765048da14fb1771b",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_merge_artifact_reports",
-      "code_sha256": "92367f7bb8810a9571ae40eb608e0806444c1ae83a4d8f47756829b047418d79",
+      "code_sha256": "3ade83da0d3436d25653ae1e614e00bf8a2b4a201904ff564a247424d09b6251",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "confirm_desktop_delivery",
-      "code_sha256": "6d0dbe702a1c78e50bc2bcb20f995f95b4f50f0e5985d1986e1ead4f59c51d5e",
+      "code_sha256": "a82a85a960446b85af7bc7cb6c7e026753e5d9b1200923612383acb9d55d285f",
       "family": "delivery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_desktop_delivery_set_finding",
-      "code_sha256": "40a9752409c2d5b3b88d7c6898dcf7ceda4ed87a20b37fc998deb83fc1c2e4da",
+      "code_sha256": "e0e29e399cedc6c2aac2f710bb15422b1a16be12bf63524992ccf4dfe199de9b",
       "family": "delivery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "a98bf45548a950cae5a559577cee0eff1254bab19c2ee25112236ca053f958cd",
+      "code_sha256": "47e10e9739f90862ea79e18a9ef37bac801ebf8063f1d80ba70cc4ee15f27842",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_production_worker_readiness",
-      "code_sha256": "b5865058ec827d5eb958af23502355db882d84adb989389380f278868c5f13cb",
+      "code_sha256": "5d3734ae4c9582c2ca8bc627157da676dd48899ee6c999ba9367e9e5d6a9ff30",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_installed_release_identity",
-      "code_sha256": "4020f68e5c509c1c7128458d1fe322c4c00d82c3db9c4e36b2bd8b37d252b750",
+      "code_sha256": "9b7240ec4a162d74a117a1f7036bb1cabeadffe5896c526bf3e59754bb6520f0",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_production_desktop_operation",
-      "code_sha256": "f4e3a77c3563dfb047db09c30caa9804e5e11f5b2ae25a9344ee41b15fc35251",
+      "code_sha256": "c463ae46b433e0cc69db4d55feb34c120d38d2209927e0da094ef5213ba3b036",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_bind_verification_response_payload",
-      "code_sha256": "036904cfca666e3f18a5638657cd1aea0344990f925325e5e08d414479fd926f",
+      "code_sha256": "c1faeafd89b10836fa9d4a352f16a7bd333d24a37d91faafef7ce81e868b78f7",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_publication_evidence_findings",
-      "code_sha256": "9be165bc279f757c6ddfcb36ce07e913a03067640a5f259490c23f9bb094588e",
+      "code_sha256": "1615a8f824547f221df07a947f5b2c730fc45cf7fd274927198b1577be1ce834",
       "family": "delivery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_retained_gate_predecessors",
-      "code_sha256": "274f59ebd47f34cec181a39388be55654080a713f2b95893c4b121a24e6d08bf",
+      "code_sha256": "3ac87fcb88129330244a94d44f4758da82f5cf8b00e53c0a9b26ad1c2d9083cf",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_ledger_findings",
-      "code_sha256": "50bed37a36ac50a7edca0a3fff4212db49d14060388f263ba4936d153d38e03f",
+      "code_sha256": "32d504c1603db886d2c7c9ba24ea07b77b5727bf8b9a75fa8f357b411edadb87",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
-      "code_sha256": "eca27e2659348b738d484d1b5986fe84adc77450e3f60a0266a59ab5530d768b",
+      "code_sha256": "34d7f1c96fd422300c74c6ca2dddfe97cc7834c7f28757a285edef4b16e2d940",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_archive_failed_attempt",
-      "code_sha256": "4360a9988a51a27a18a7a5fd31ec3852969c653bc1d68f22ad06ac470a18998b",
+      "code_sha256": "b45c32957a58cbe30c1d8f72004b75884db78656dad67cb12edadd5a0a159e3d",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_complete_pending_recovery_attempts",
-      "code_sha256": "6ed6c9adfb4c99c88f994dfe2ce48d3a1dcb73cbea63921efc0b003f1685133c",
+      "code_sha256": "8fec4e97cbcaf1edd47637f76ab426d6f5940becbb17e96a8f52c601b3f7ba0a",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_repeated_drafting_findings",
-      "code_sha256": "804f203ecb89bb9eb478527429c5c6a3a423820ca8e4f7019dc6c70af145e7f2",
+      "code_sha256": "e4210dea139a2f4c1601b4992068a388f71c81fa411a8915bd4c0de1fa04503b",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "7419482063b953e49f76879c722e93a4e3ad6bffeea70e0f4c69d90e493c5d8c",
+      "code_sha256": "3b87e0f02d13aa661920ed188172e4cd23e1e99f4d4fd12726d7d4765d3f849f",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_continue_repairable_no_progress",
-      "code_sha256": "cefa9bf0d94700dc3e906bed7eb040eb958eba63e8b8058dd876e4d513346ea5",
+      "code_sha256": "04b820c0443ecf183c205096222abd57e1439b0e38e407fd34a7567444f7f137",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "9b6d71f9bd3224c9e6d1c5696db308388f6a7e38fa52baf51f9539e950e6020a",
+      "code_sha256": "2559e0ec4809994213fe7b66621c40cc80d4164b0b846eba7b010787892d8768",
       "family": "recovery"
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_release_gate",
-      "code_sha256": "cb179f44079cd8e1d13633320953ea649aef90fe64720d4196038c59bc6b284c",
+      "code_sha256": "ccf6ba058bf9c2b92b10b1064f8f2c9082bebac422ab81f8e9f9a9e6d333c111",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "_run_format_conformance_in_disposable_candidate",
-      "code_sha256": "1aea16ef32672e8ab4d594ecb1e10062d010208ac55657ae508d7d88fa1df423",
+      "code_sha256": "a2214646186832e6db29c192861f2fcf30d22a9dfa316036412d593850c1f81f",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_format_conformance",
-      "code_sha256": "87c1d66a33b451a8378e4d3b0c58c43e7f25225e7506817c12e68eca6ffc1013",
+      "code_sha256": "a4bbbdc37de09db669f8803614ecb5ccc996fc479f0dce7827d9c8ef8f3145a8",
       "family": "installation"
     },
     {
       "file": "scripts/workflow.py",
       "function": "main",
-      "code_sha256": "bac9cca8bddf5daacd5954f5821239440cabb3b0e16ac39719eb8ba98bdaeac7",
+      "code_sha256": "a0580a1fc7306aa3747a9b66466f94cc4ce1ae137af72fd127d78a883ce5176d",
       "family": "recovery"
     }
-  ]
+  ],
+  "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format"
 }
