@@ -16,7 +16,7 @@ AUDIT = ROOT / 'docs/reliability/blocking-checks.json'
 # Explicit selection prevents accidental execution of live certification/corpora.
 TEST_FILES = (
     'test_evidence_diagnostics.py', 'test_evidence_variations.py', 'test_offline_reliability_gate.py',
-    'test_synopsis_recovery.py',
+    'test_synopsis_recovery.py', 'test_layout_field_corrections.py', 'test_run07_reliability.py',
     'test_assessment_matrix.py', 'test_hypothesis_fidelity.py', 'test_sterling_rendered_scope.py',
     'test_visit_identifier_scope.py', 'test_bilateral_review_block.py', 'test_section_background_scope.py',
     'test_run04_background_regressions.py', 'test_phase2_sterling_fidelity.py', 'test_sterling_template_comments.py',
@@ -46,6 +46,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'section_evidence_value', 'semantic_evidence_contract', 'assessment_matrix',
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',
+                '_rendered_heading_text', '_target_heading',
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',
                 'semantic_evidence_inventory', '_source_field_inventory',
             }

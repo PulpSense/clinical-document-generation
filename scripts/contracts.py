@@ -361,7 +361,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and keep the two groups distinct.",
         "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied. Identify every approved primary, secondary, and exploratory endpoint once in a grouped, readable account of what the design evaluates.",
-        "study-design.bias": "State the source-supported bias controls directly. If none are supplied, use the listed concise boilerplate. Study Design already describes design, setting, arms, and masking.",
+        "study-design.bias": "State the source-supported bias controls directly, including supplied common testing conditions, predefined outcomes and analysis methods, and limits on interpreting nonrandomized cohort differences. If none are supplied, use the listed concise boilerplate. Study Design already describes design, setting, arms, and masking.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
         "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
@@ -390,7 +390,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         ),
         "icf.study-purpose": "State the study purpose, hypothesis, and primary endpoint concisely in participant-facing language. Keep enrollment counts in KEY INFORMATION or DURATION. Do not repeat the lens descriptions, comparative evidence, unmet evidence gap, or complete rationale owned by BACKGROUND.",
         "icf.key-information-summary": "Give five concise participant-facing summary blocks covering the study purpose, expected participation and duration, principal risks, possible benefit or absence of direct benefit, and alternatives plus voluntary participation. When the timeline also contains enrollment or analysis phases, summarize only participant follow-up here. Paraphrase sparse risk and benefit boilerplate in plain language so the summary does not copy its detailed-section sentence.",
-        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence.",
+        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence. If the approved source provides continuous adverse-event or device-deficiency reporting, tell participants that problems can be reported between scheduled visits and state the approved collection period.",
         "icf.duration": "State the approved participation duration and relevant time points.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
@@ -520,7 +520,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.intervention_description", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("study-design", "intervention-assignment", "endpoint-inventory")),
-    _section_spec("study-design.bias", "8.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design",), "bias"),
+    _section_spec("study-design.bias", "8.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "bias"),
     _section_spec(
         "study-design.assignment",
         "8.3.",
@@ -574,7 +574,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria")),
     _section_spec("study-design", "7.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design",)),
-    _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design",), "retrospective-bias"),
+    _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "retrospective-bias"),
     _section_spec("study-procedure", "8.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline"), "retrospective-consent"),
     _section_spec("analysis-plan", "9.", "ANALYSIS PLAN", role="container"),
@@ -604,7 +604,7 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
         boilerplate_keys=("icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"),
     ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-purpose", "study-hypothesis", "primary-endpoint"), do_not_restate_concepts=("clinical-background", "comparative-evidence", "study-rationale")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.adverse_events", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline",)),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
@@ -771,7 +771,7 @@ def batch_plan(study_type: str, icf_template: str = "Advarra") -> tuple[BatchSpe
     sections = protocol_contract(branch or "")
     plans = []
     for batch_id, families in (
-        ("protocol-foundations", ("study", "objectives", "population", "design", "endpoints", "procedures")),
+        ("protocol-foundations", ("study", "objectives", "population", "design", "endpoints", "procedures", "statistics")),
         ("protocol-operations", ("study", "procedures", "population", "design", "endpoints", "risks_benefits", "safety")),
         ("protocol-analysis-and-oversight", ("statistics", "safety", "ethics", "confidentiality", "risks_benefits", "endpoints", "procedures", "population", "parties")),
     ):

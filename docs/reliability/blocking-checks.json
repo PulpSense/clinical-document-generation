@@ -140,7 +140,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "section_evidence_value",
-      "code_sha256": "7c2d66b449aedc5044ba473eef2a26a212f783b7f2e7b60d4d20132e38511776",
+      "code_sha256": "1da2823e4cdba8edb90c38499d96f555fa98d4fa8703b715bd3a521cb19e7bc0",
       "family": "evidence"
     },
     {
@@ -460,6 +460,18 @@
       "function": "rendered_section_snapshot",
       "code_sha256": "ca07ab6bfd32773a6d099abf03d1f8802a53c4f2c0495994b3471d586b64a5ae",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "_rendered_heading_text",
+      "code_sha256": "6a8b184b2a1114016f147874ab1f9420efdcc8edc674bc10242c376169ed3321",
+      "family": "render"
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "_target_heading",
+      "code_sha256": "0852ffadedcd97f399321b2c9da60951fd6eb4be3c3530d014f01eb80e9dc45d",
+      "family": "render"
     },
     {
       "file": "scripts/rendering.py",

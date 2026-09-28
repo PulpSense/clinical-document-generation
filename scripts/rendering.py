@@ -2976,6 +2976,15 @@ def _layout_target_key(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip().casefold()
 
 
+def _rendered_heading_text(paragraph: Paragraph) -> str:
+    """Read visible OOXML text, including runs nested in template smart tags.
+
+    python-docx's Paragraph.text omits w:r children of w:smartTag even though
+    LibreOffice and Word render them. Layout evidence names rendered headings.
+    """
+    return "".join(node.text or "" for node in paragraph._p.xpath(".//w:t"))
+
+
 def _target_heading(document: Document, target: str, *, protocol: bool) -> Paragraph:
     target_key = _protocol_heading_key(target) if protocol else _layout_target_key(target)
     headings = [
@@ -2983,7 +2992,8 @@ def _target_heading(document: Document, target: str, *, protocol: bool) -> Parag
         for paragraph in document.paragraphs
         if _heading_level(paragraph) is not None
         and (
-            _protocol_heading_key(paragraph.text) if protocol else _layout_target_key(paragraph.text)
+            _protocol_heading_key(_rendered_heading_text(paragraph))
+            if protocol else _layout_target_key(_rendered_heading_text(paragraph))
         ) == target_key
     ]
     if len(headings) != 1:

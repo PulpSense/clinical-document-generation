@@ -481,3 +481,37 @@ def test_facility_front_matter_preserves_sibling_locality_without_duplication(st
     rendering._normalize_icf_front_matter(doc, reference)
     assert table.cell(0, 1).text == '123 Example Lane, Example City, EX, Example Country'
     assert not any(character.isdigit() for character in table.cell(0, 1).text.split('Lane')[1])
+
+
+def test_layout_repair_matches_rendered_smart_tag_heading_without_alias_guessing():
+    """Sterling's visible SIDE token is nested in a Word smartTag."""
+    document = Document()
+    heading = document.add_paragraph(style='Heading 1')
+    heading.add_run('POTENTIAL RISKS, ')
+    smart_tag = OxmlElement('w:smartTag')
+    smart_tag.set(qn('w:uri'), 'urn:schemas-microsoft-com:office:smarttags')
+    smart_tag.set(qn('w:element'), 'stockticker')
+    nested_run = OxmlElement('w:r')
+    nested_text = OxmlElement('w:t')
+    nested_text.text = 'SIDE'
+    nested_run.append(nested_text)
+    smart_tag.append(nested_run)
+    heading._p.append(smart_tag)
+    heading.add_run(' EFFECTS, DISCOMFORTS, INCONVENIENCES')
+    document.add_paragraph('Study risk information.')
+
+    assert 'SIDE' not in heading.text
+    target = 'POTENTIAL RISKS, SIDE EFFECTS, DISCOMFORTS, INCONVENIENCES'
+    rendering._repair_heading_cohesion(document, target, protocol=False)
+    assert heading.paragraph_format.keep_with_next is True
+    with pytest.raises(rendering.LayoutRepairTargetError):
+        rendering._repair_heading_cohesion(document, target + ' EXTRA', protocol=False)
+
+
+def test_packaged_sterling_risk_heading_matches_its_rendered_word_text():
+    document = Document(ROOT / 'assets/client-templates/docx/sterling-icf.template.docx')
+    target = 'POTENTIAL RISKS, SIDE EFFECTS, DISCOMFORTS, INCONVENIENCES'
+    headings = [paragraph for paragraph in document.paragraphs
+                if rendering._rendered_heading_text(paragraph) == target]
+    assert len(headings) == 1
+    assert 'SIDE' not in headings[0].text  # python-docx omits the smartTag text.

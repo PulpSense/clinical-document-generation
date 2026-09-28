@@ -430,6 +430,8 @@ def _section_payload(
     minimum_evidence = [
         path for path in section.evidence
         if path not in scoped_values or scoped_values[path]
+        if path not in {"statistics.bias_minimization", "procedures.adverse_events"}
+        or meaningful(get_path(reference, path))
     ]
     semantic_evidence = [
         obligation for path in minimum_evidence
@@ -702,6 +704,15 @@ def _clinical_evidence_text(value: str) -> str:
 
 def section_evidence_value(section_id: str, path: str, value: Any, reference: Mapping[str, Any] | None = None) -> Any:
     """Project explicit section-owned clauses without mutating approved source."""
+    if section_id == "icf.procedures" and path == "procedures.adverse_events" and isinstance(value, str):
+        # The visit schedule owns the numbered review visits. Preserve this
+        # field's continuous collection/reporting obligation without forcing
+        # the ICF to repeat those visit numbers solely for lexical grounding.
+        return re.sub(
+            r"\b(?:at|during)\s+(?:Months?|Weeks?|Visits?)\s+\d+(?:\s*,\s*\d+)*(?:\s*,?\s*(?:and|or)\s*\d+)?\b"
+            r"(?=\s+(?:is|are)\s+not\s+(?:the\s+)?only\b)",
+            "", value, flags=re.I,
+        )
     if path in {"procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table"}:
         decoded = assessment_matrix(value, get_path(reference or {}, "procedures.visits", []) or [])
         if decoded is not None:
