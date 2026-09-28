@@ -176,6 +176,39 @@ def test_observational_scalar_fields_map_without_changing_manual_structure(tmp_p
     assert compare_structure(TEMPLATE, output) == []
 
 
+def test_prospective_observational_prs_timing_uses_approved_study_type(tmp_path):
+    reference = fixture()
+    reference["regulatory"]["prs"]["time_perspective"] = None
+    output = tmp_path / "study.xml"
+
+    generate(TEMPLATE, output, reference, {"brief_summary": "Summary.", "detailed_description": "Description."})
+    tree = ET.parse(output)
+    study = next(tree.getroot().iter("clinical_study"))
+
+    assert study.findtext("study_design/observational_design/timing") == "Prospective"
+    assert compare_structure(MANUAL_REFERENCE, output) == []
+    assert validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE) == []
+    study.find("study_design/observational_design/timing").text = ""
+    tree.write(output, encoding="utf-8", xml_declaration=True)
+    assert any(
+        item["field"].endswith("/timing")
+        for item in validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE)
+    )
+
+
+def test_ambispective_branch_does_not_guess_prs_timing(tmp_path):
+    reference = fixture()
+    reference["meta"]["study_type"] = "Ambispective"
+    reference["regulatory"]["prs"]["time_perspective"] = None
+    output = tmp_path / "study.xml"
+
+    generate(TEMPLATE, output, reference, {"brief_summary": "Summary.", "detailed_description": "Description."})
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+
+    assert study.findtext("study_design/observational_design/timing") == ""
+    assert compare_structure(MANUAL_REFERENCE, output) == []
+
+
 def test_screening_washout_is_included_in_prs_eligibility(tmp_path):
     reference = fixture(); output = tmp_path / "study.xml"
     generate(TEMPLATE, output, reference, {"brief_summary": {"text": "This approved prospective study evaluates recovery outcomes."}, "detailed_description": {"text": "This approved study evaluates recovery and safety outcomes over the planned follow-up period."}})

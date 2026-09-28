@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
-from contracts import facility_projection, get_path, meaningful
+from contracts import canonical_study_type, facility_projection, get_path, meaningful
 
 
 TOKEN = re.compile(r"\{[#/^]?([A-Za-z_][A-Za-z0-9_.\-\[\]()&]*)\}")
@@ -25,6 +25,18 @@ def _prs_country(value: Any) -> str:
     if raw.casefold().rstrip(".") in {"usa", "us", "u.s.a", "united states of america"}:
         return "United States"
     return raw
+
+
+def _observational_timing(reference: Mapping[str, Any]) -> str:
+    supplied = _text(get_path(reference, "regulatory.prs.time_perspective"))
+    if supplied:
+        return supplied
+    if (
+        _text(get_path(reference, "regulatory.prs.study_type")).casefold() == "observational"
+        and canonical_study_type(get_path(reference, "meta.study_type")) == "Prospective"
+    ):
+        return "Prospective"
+    return ""
 
 
 @dataclass(frozen=True)
@@ -418,7 +430,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "primaryCompletionDate": _text(get_path(reference, "regulatory.prs.primary_completion_date")),
         "primaryCompletionDateType": _text(get_path(reference, "regulatory.prs.primary_completion_date_type")), "studyType": study_type,
         "observationalStudyDesign": observational,
-        "studyTiming": _text(get_path(reference, "regulatory.prs.time_perspective")),
+        "studyTiming": _observational_timing(reference),
         "patientRegistry": _text(get_path(reference, "regulatory.prs.patient_registry")),
         "targetDurationQuantity": _text(get_path(reference, "regulatory.prs.target_duration_quantity")),
         "targetDurationUnits": _text(get_path(reference, "regulatory.prs.target_duration_units")),
