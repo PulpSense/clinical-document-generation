@@ -84,3 +84,34 @@ def test_icf_event_evidence_does_not_force_duplicate_scheduled_months():
     scoped = section_evidence_value('icf.procedures', 'procedures.adverse_events', source)
     assert '1, 3, and 6' not in scoped
     assert source_evidence_diagnostics(patient_text, 'procedures.adverse_events', scoped)['passed']
+
+
+import pytest
+
+
+@pytest.mark.parametrize('case', (
+    'retrospective', 'prospective-advarra', 'prospective-sterling',
+    'ambispective-advarra', 'ambispective-sterling',
+))
+def test_every_generated_template_heading_resolves_for_exact_layout_repair(case, tmp_path):
+    """Any visible reviewer heading must resolve to its unique editable Word block."""
+    import json
+    from pathlib import Path
+    from docx import Document
+    import rendering
+
+    root = Path(__file__).resolve().parents[1]
+    source = json.loads((root / 'tests/fixtures/release-certification' / case / 'approved-reference.json').read_text())
+    artifacts = {'protocol'} if case == 'retrospective' else {'protocol', 'icf'}
+    rendering.render_documents(root, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names=artifacts)
+    total = 0
+    for artifact in sorted(artifacts):
+        document = Document(tmp_path / 'candidate' / f'{artifact}.docx')
+        headings = [p for p in document.paragraphs if rendering._heading_level(p) is not None]
+        assert headings
+        for heading in headings:
+            rendered_text = rendering._rendered_heading_text(heading)
+            resolved = rendering._target_heading(document, rendered_text, protocol=artifact == 'protocol')
+            assert resolved._p is heading._p
+        total += len(headings)
+    assert total >= 20
