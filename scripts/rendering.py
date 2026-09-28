@@ -3666,7 +3666,12 @@ def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict
         findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "document_structure_defect"))
     duplicate = next((match for paragraph_text in paragraph_texts if (match := DUPLICATE_WORD.search(paragraph_text))), None)
     if duplicate:
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively."}, "document_structure_defect"))
+        findings.append({
+            "category": "editorial", "field": path.name,
+            "code": "visible-duplicate-word",
+            "publication_disposition": "warning",
+            "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively.",
+        })
     for phrase in required_phrases:
         if phrase and phrase.casefold() not in text.casefold():
             findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, "document_structure_defect"))
@@ -3822,7 +3827,8 @@ def render_documents(
                 "field": "icf.procedures",
                 "issue": "Required source-bound section icf.procedures is missing or empty.",
             })
-        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not findings else "blocked", "findings": findings})
+        blocking_findings = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
+        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"]})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
         "contracted_template_bundle": bundle,

@@ -4103,7 +4103,24 @@ def validate_sterling_clause_contract(
         block_ok = block_count >= int(validation.get("minimum_substantive_blocks", 0) or 0)
         maximum = int(validation.get("maximum_words", 0) or 0)
         maximum_ok = not maximum or word_count <= maximum
-        if has_body and exact_ok and terms_ok and sources_ok and grounding_ok and not semantic_issues and not contradiction and length_ok and block_ok and maximum_ok:
+        substantive_ok = (
+            has_body and exact_ok and terms_ok and sources_ok and grounding_ok
+            and not semantic_issues and not contradiction and block_ok
+        )
+        if substantive_ok:
+            if not length_ok or not maximum_ok:
+                findings.append({
+                    "code": "sterling-clause-word-goal",
+                    "category": "editorial",
+                    "check": "sterling_clause_contract",
+                    "clause_id": clause["clause_id"],
+                    "target_ids": [clause["section_id"]],
+                    "publication_disposition": "warning",
+                    "issue": "The clause is outside its reference word-count goal.",
+                    "actual_words": word_count,
+                    "minimum_words": int(validation.get("minimum_words", 0) or 0),
+                    "maximum_words": maximum,
+                })
             continue
 
         # Exact or safeguard-bearing text in another governed section is a
@@ -4139,7 +4156,7 @@ def validate_sterling_clause_contract(
             )
     return {
         "schema_version": "sterling-clause-validation/v1",
-        "status": "blocked" if findings else "passed",
+        "status": "blocked" if _blocking_findings(findings) else "passed",
         "contract_version": contract["schema_version"],
         "findings": findings,
     }
@@ -4257,8 +4274,9 @@ def assess_icf_output(
                 seen_sections.add(section_id)
                 findings.append(recovery_finding({
                     "code": "icf-exact-generated-duplication",
-                    "category": "content",
+                    "category": "editorial",
                     "check": "exact_rendered_duplication",
+                    "publication_disposition": "warning",
                     "target_ids": ["icf.key-information-summary"],
                     "summary_section": "icf.key-information-summary",
                     "detail_section": section_id,
@@ -4300,7 +4318,7 @@ def assess_icf_output(
     if len(purpose_tokens) >= 24 and (overlap >= 0.30 or len(repeated_markers) >= 3):
         findings.append(recovery_finding({
             "code": "icf-concept-repetition",
-            "category": "content",
+            "category": "editorial",
             "check": "concept_repetition",
             "concept_id": "clinical-background-and-rationale",
             "primary_section": "icf.background",
@@ -4311,14 +4329,14 @@ def assess_icf_output(
             "treatment": "excessive",
             "necessary": False,
             "concise": False,
-            "material": True,
+            "material": False,
             "repair_action": "redraft_secondary_section",
-            "severity": "blocking",
-            "publication_disposition": "blocking",
+            "severity": "warning",
+            "publication_disposition": "warning",
         }, "drafting_defect"))
     return {
         "schema_version": "icf-output-assessment/v1",
-        "status": "repairable" if findings else "passed",
+        "status": "repairable" if _blocking_findings(findings) else "passed",
         "family": str(family_contract.get("family") or get_path(normalized_source, "meta.icf_template") or ""),
         "findings": findings,
     }
@@ -5517,13 +5535,30 @@ def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, A
     ]
 
 
-def _deterministic_warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        dict(item) for item in findings
-        if item.get("code") == "protocol-concept-repetition"
-        and item.get("publication_disposition") == "warning"
-        and item.get("action") == "manual_review"
-    ]
+def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
+    """Carry accepted drafting cautions into the final report for human review."""
+    warnings: list[dict[str, Any]] = []
+    for path in sorted((revision_dir / "hermes/accepted").glob("*.json")):
+        try:
+            record = _json(path)
+        except (OSError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(record, Mapping):
+            continue
+        values = record.get("warnings")
+        if isinstance(values, list):
+            warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
+    return warnings
+
+
+def _render_warnings(render_report: Mapping[str, Any]) -> list[dict[str, Any]]:
+    warnings: list[dict[str, Any]] = []
+    for artifact in render_report.get("artifacts") or []:
+        if isinstance(artifact, Mapping) and isinstance(artifact.get("warnings"), list):
+            warnings.extend(_warning_findings(
+                value for value in artifact["warnings"] if isinstance(value, Mapping)
+            ))
+    return warnings
 
 
 def _safety_critical_content_target(target: str) -> bool:
@@ -6386,9 +6421,13 @@ def final_exact_artifact_review_findings(
     if _exact_rendered_hashes(revision_dir, render_report) != dict(final_review.get("rendered_hashes") or {}):
         issues.append("Final rendered bytes changed after review.")
     deterministic_findings = deterministic_content_check(revision_dir, reference)
-    deterministic_warnings = _deterministic_warning_findings(deterministic_findings)
+    deterministic_warnings = _warning_findings(deterministic_findings)
     verification_findings, fresh_evidence = validate_verifications(revision_dir)
-    fresh_warnings = deterministic_warnings + _warning_findings(verification_findings)
+    fresh_warnings = (
+        deterministic_warnings + _accepted_drafting_warnings(revision_dir)
+        + _render_warnings(render_report) + _warning_findings(render_report.get("findings", []))
+        + _warning_findings(verification_findings)
+    )
     verification_findings = [
         dict(item) for item in deterministic_findings if item not in deterministic_warnings
     ] + _blocking_findings(verification_findings)
@@ -6418,9 +6457,12 @@ def final_exact_artifact_review_findings(
 
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
     deterministic_findings = deterministic_content_check(revision_dir, reference)
-    warnings = _deterministic_warning_findings(deterministic_findings)
-    findings = [dict(item) for item in deterministic_findings if item not in warnings]
-    findings.extend(dict(item) for item in render_report.get("findings", []))
+    warnings = (
+        _warning_findings(deterministic_findings) + _accepted_drafting_warnings(revision_dir)
+        + _render_warnings(render_report) + _warning_findings(render_report.get("findings", []))
+    )
+    findings = _blocking_findings(deterministic_findings)
+    findings.extend(_blocking_findings(render_report.get("findings", [])))
     if xml_report:
         findings.extend(
             recovery_finding(

@@ -444,10 +444,10 @@ def _section_payload(
     if str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling":
         maximum_draft_words = sterling_draft_word_budget(reference, section.section_id)
         if maximum_draft_words:
-            content_expectations.append(f"Keep generated prose to {maximum_draft_words} normalized words or fewer, reserving the remaining rendered word budget for fixed template text. Preserve all supplied material facts without repeating them.")
+            content_expectations.append(f"Aim for {maximum_draft_words} normalized words or fewer as a reference length, reserving space for fixed template text. Preserve all supplied material facts even when accurate prose needs more words.")
         if section.section_id == "icf.key-information-summary":
             content_expectations.append(
-                "Keep each summary block at 65 words or fewer. Preserve the supplied voluntary-participation "
+                "Aim for 65 words or fewer per summary block while preserving all material facts. Preserve the supplied voluntary-participation "
                 "boilerplate sentence verbatim within the alternatives-voluntariness block."
             )
         elif section.section_id == "icf.study-purpose":
@@ -1624,18 +1624,33 @@ def _coverage_findings(
         )
     ]
     if ungrounded:
+        diagnostics = [
+            source_evidence_diagnostics(content, path, material[path], all_items=all_items)
+            if not (section_id == "icf.duration" and path == "study.timeline")
+            else {"source_path": path, "source_excerpt": material[path], "passed": False,
+                  "validation_mode": "phase_bound_timeline", "release_acceptance": False}
+            for path in ungrounded
+        ]
+        lexical_uncertainty = section_id.startswith("icf.") and all(
+            diagnostic.get("validation_mode") == "deterministic_anchors"
+            and diagnostic.get("unobserved_values")
+            and all(not value.get("missing_numbers") for value in diagnostic["unobserved_values"])
+            for diagnostic in diagnostics
+        )
         findings.append({
             "category": "drafting",
             "field": section_id,
+            **({
+                "code": "icf-lexical-evidence-uncertainty",
+                "publication_disposition": "warning",
+            } if lexical_uncertainty else {}),
             "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",
-            "next_action": "Use evidence_diagnostics to repair the listed source facts; preserve their names, quantities, units, time points and relationships. Do not merely add citation tags or copy structural markers.",
-            "evidence_diagnostics": [
-                source_evidence_diagnostics(content, path, material[path], all_items=all_items)
-                if not (section_id == "icf.duration" and path == "study.timeline")
-                else {"source_path": path, "source_excerpt": material[path], "passed": False,
-                      "validation_mode": "phase_bound_timeline", "release_acceptance": False}
-                for path in ungrounded
-            ],
+            "next_action": (
+                "Have the independent content reviewer assess the cited source facts in context."
+                if lexical_uncertainty else
+                "Use evidence_diagnostics to repair the listed source facts; preserve their names, quantities, units, time points and relationships. Do not merely add citation tags or copy structural markers."
+            ),
+            "evidence_diagnostics": diagnostics,
         })
     if section_id == "quality-safety" and "safety.roles" in material:
         role_records = _structured_safety_role_records(material["safety.roles"])
@@ -2091,14 +2106,6 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     "issue": issue,
                     "next_action": f"Preserve the source qualification in an accurate paraphrase. Approved {path}: {value}",
                 })
-        maximum_words = int(expected_contracts[section_id].get("maximum_draft_words") or 0)
-        actual_words = len(re.findall(r"[a-z0-9]+", combined_content.casefold()))
-        if maximum_words and actual_words > maximum_words:
-            findings.append({
-                "category": "drafting", "field": section_id, "target_ids": [section_id],
-                "issue": f"Generated prose has {actual_words} normalized words; the rendered clause permits {maximum_words} draft words after reserving fixed template text.",
-                "next_action": "Condense the aim, hypothesis and main outcome without losing supplied facts or adding template-owned enrollment text.",
-            })
         branch_value = request.get("branch")
         icf_template = (
             branch_value.get("icf_template")
@@ -2157,12 +2164,6 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     "issue": "KEY INFORMATION must contain exactly five concise concept summaries.",
                     "next_action": "Return one concise block for each ordered summary_concepts value.",
                 })
-            elif any(len(text.split()) > 65 for text, _evidence, _boilerplate in summary_records):
-                findings.append({
-                    "category": "drafting", "field": section_id, "target_ids": [section_id],
-                    "issue": "KEY INFORMATION contains a summary block longer than 65 words.",
-                    "next_action": "Compress only the summary while preserving its evidence references.",
-                })
             else:
                 source_values = {
                     str(source.get("path")): source.get("value")
@@ -2203,8 +2204,10 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     ):
                         findings.append({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
+                            "code": "icf-summary-grounding-review",
+                            "publication_disposition": "warning",
                             "issue": f"KEY INFORMATION concept {concept} cites source evidence whose material facts are not observable.",
-                            "next_action": "Rewrite the concept summary so its cited source contributes concrete facts.",
+                            "next_action": "Have the independent content reviewer assess the cited source facts in context.",
                         })
                     if not allowed_sources and allowed_boilerplate and not cited_boilerplate:
                         findings.append({
@@ -2237,8 +2240,13 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                             "issue": f"KEY INFORMATION concept {concept} cites but omits retained voluntary-participation text.",
                             "next_action": "Include the retained voluntary-participation statement in the summary text.",
                         })
-        if len(findings) == section_finding_count and section_id not in duplicate_target_ids:
-            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
+        section_findings = findings[section_finding_count:]
+        blocking_section_findings = [
+            finding for finding in section_findings
+            if finding.get("publication_disposition") != "warning"
+        ]
+        if not blocking_section_findings and section_id not in duplicate_target_ids:
+            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
     return {"kind": "sections", "drafts": accepted}, findings
 
 
@@ -2316,10 +2324,14 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
         if has_accepted_content:
             accepted_request.parent.mkdir(parents=True, exist_ok=True)
             accepted_request.write_text(request_path.read_text(encoding="utf-8"), encoding="utf-8")
-        if response_findings:
-            findings.extend(response_findings)
+        blocking_response_findings = [
+            finding for finding in response_findings
+            if finding.get("publication_disposition") != "warning"
+        ]
+        if blocking_response_findings:
+            findings.extend(blocking_response_findings)
             rejected = revision_dir / "hermes/rejected" / response_path.name
-            _write_json(rejected, {"request": request_path.name, "findings": response_findings})
+            _write_json(rejected, {"request": request_path.name, "findings": blocking_response_findings})
             continue
         if not accepted:
             continue

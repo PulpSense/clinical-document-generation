@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import zipfile
+from xml.etree import ElementTree
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, datetime, timezone
@@ -34,6 +35,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from docx import Document
+from docx.opc.exceptions import PackageNotFoundError
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
@@ -3759,6 +3761,97 @@ def _candidate_outputs(revision_dir: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose a complete candidate for review without approving it."""
+    if str(result.get("status")) != "blocked" or str(result.get("stage")) in {
+        "approval", "approval_gate", "source_integrity", "integrity", "revision",
+        "worker_readiness", "worker_authentication", "delivery",
+        "terminal_delivery_validation",
+    }:
+        return {}
+    try:
+        _, reference = _reference(run_dir)
+        revision_id = str(reference.get("approval", {}).get("revision_id") or "")
+        if not revision_id or Path(revision_id).name != revision_id:
+            return {}
+        revision_dir = run_dir / "revisions" / revision_id
+        bundle = contracted_template_bundle(SCRIPT_DIR.parent, reference)
+        approved, _ = _approval_valid(run_dir, reference, contracted_bundle=bundle)
+        if not approved:
+            return {}
+        candidate_dir = revision_dir / "candidate"
+        if candidate_dir.is_symlink() or not candidate_dir.is_dir():
+            return {}
+        expected_names = set(document_set(get_path(reference, "meta.study_type")))
+        expected_paths = {f"candidate/{name}" for name in expected_names}
+        actual_paths = {
+            f"candidate/{path.name}" for path in candidate_dir.iterdir() if path.is_file()
+        }
+        if actual_paths != expected_paths:
+            return {}
+        build_path = revision_dir / "candidate-build.json"
+        snapshot_path = build_path if build_path.is_file() else revision_dir / "candidate-structure.json"
+        if not snapshot_path.is_file():
+            return {}
+        records = list(_read(snapshot_path).get("candidate_files") or [])
+        paths = {str(item.get("path") or ""): item for item in records if isinstance(item, Mapping)}
+        if set(paths) != expected_paths or len(records) != len(paths):
+            return {}
+        for relative in expected_paths:
+            path = revision_dir / relative
+            if path.is_symlink() or not path.is_file():
+                return {}
+            if sha256_file(path) != paths[relative].get("sha256"):
+                return {}
+            if path.suffix.casefold() == ".docx":
+                Document(path)
+            elif path.suffix.casefold() == ".xml":
+                ElementTree.parse(path)
+    except (OSError, ValueError, KeyError, ContractedTemplateBundleError, PackageNotFoundError, zipfile.BadZipFile, ElementTree.ParseError):
+        return {}
+
+    destination = run_dir / "review-output"
+    if destination.exists():
+        return {}
+    staging = Path(tempfile.mkdtemp(prefix=".review-output-", dir=run_dir))
+    try:
+        outputs = []
+        for relative in sorted(expected_paths):
+            source = revision_dir / relative
+            target = staging / f"REVIEW-ONLY-{source.name}"
+            shutil.copy2(source, target)
+            outputs.append({
+                "path": f"review-output/{target.name}",
+                "sha256": sha256_file(target),
+                "bytes": target.stat().st_size,
+                "delivery_status": "review_only_not_client_ready",
+            })
+        _write(staging / "findings.json", {
+            "status": "review_only_not_client_ready",
+            "stage": result.get("stage"),
+            "findings": list(result.get("findings") or []),
+            "candidate_revision": revision_id,
+            "candidate_evidence": snapshot_path.name,
+            "files": outputs,
+        })
+        (staging / "READ-ME-FIRST.txt").write_text(
+            "REVIEW COPY — NOT CLIENT READY\n"
+            "These documents did not pass every publication check. "
+            "Read findings.json before using or sharing them.\n",
+            encoding="utf-8",
+        )
+        os.replace(staging, destination)
+        return {
+            "review_outputs": outputs,
+            "review_findings": "review-output/findings.json",
+        }
+    except OSError as exc:
+        return {"review_copy_error": str(exc)}
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+
+
 def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | None = None) -> dict[str, Any]:
     """Build the supported file-link payload for the final Desktop reply.
 
@@ -4039,7 +4132,7 @@ def run_desktop_operation(
     approval_matches = same_source_approval(recorded_approval_identity, current_approval_identity)
     if isinstance(recorded_release_identity, Mapping) and dict(recorded_release_identity) != current_release_identity:
         if (
-            persisted.get("status") == "blocked"
+            persisted.get("status") in {"blocked", "review_required"}
             and isinstance(recorded_approval_identity, Mapping)
             and isinstance(current_approval_identity, Mapping)
             and approval_matches
@@ -4079,7 +4172,7 @@ def run_desktop_operation(
             "client_outputs": [],
         }
 
-    terminal = persisted.get("status") in {"passed", "blocked", "timeout"}
+    terminal = persisted.get("status") in {"passed", "blocked", "review_required", "timeout"}
     if terminal and isinstance(persisted.get("result"), Mapping):
         prior_result = dict(persisted["result"])
         current_reference = operation_reference
@@ -4294,6 +4387,14 @@ def run_desktop_operation(
             "runtime": current_runtime,
             "release_identity": current_release_identity,
         }
+        if measured.get("status") == "blocked":
+            try:
+                review_copy = _review_copy(run_dir, measured)
+            except Exception as exc:
+                review_copy = {"review_copy_error": f"{type(exc).__name__}: {exc}"}
+            measured.update(review_copy)
+            if review_copy.get("review_outputs"):
+                measured["status"] = "review_required"
         if elapsed > persisted_budget and measured.get("status") == "passed":
             current_stage = "cleanup"
             measured.update({
@@ -5674,7 +5775,7 @@ def run_production_desktop_operation(
     identity = {**identity, "managed_hermes_identity": managed_hermes_identity}
     state_path = desktop_operation_state_path(run_dir, operation_id)
     prior_state = _read(state_path) if state_path.is_file() else {}
-    if prior_state.get("status") not in {"passed", "timeout"}:
+    if prior_state.get("status") not in {"passed", "review_required", "timeout"}:
         readiness = _production_worker_readiness(root)
         _write(run_dir / "logs/worker-readiness.json", readiness)
         if readiness["status"] != "passed":
@@ -6300,7 +6401,7 @@ def _publish(
     manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(revision_dir, build, quality, published, expected_attempts)}
     manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
-    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
+    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "warnings": list(quality.get("warnings") or []), "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
 
 
 def _clear_verification_responses(
@@ -8407,8 +8508,9 @@ def _begin_independent_review(
         findings = validate_sterling_clause_contract(
             revision_dir / "candidate/icf.docx", reference,
         )["findings"]
-        if findings:
-            return [], findings
+        blocking = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
+        if blocking:
+            return [], blocking
     paths = create_verification_requests(
         revision_dir, reference, render_report,
         contracted_bundle=bundle, review_set=review_set,

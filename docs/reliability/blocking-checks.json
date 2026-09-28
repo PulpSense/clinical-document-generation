@@ -206,7 +206,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "96815553a41bd7f92c36ddd7a0806ab30a081a5bc1ca77ef470a2ba57726ff69",
+      "code_sha256": "b5ece25c215585af14fdc80ff69ae21897875d2e3742f67f0c8794fc79ae229d",
       "family": "evidence"
     },
     {
@@ -224,13 +224,13 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "278d4df3e63921b04030adaa5ba1f460012a478634d836610148820ef54c630a",
+      "code_sha256": "78acc7282802314012fd673adb258df067311e9dc84167a7f8a8d613b879d026",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "f49eb26f240b05daff066c0017ecf03ebcd53ac1f1d43a4f6ca6bed6ea13c934",
+      "code_sha256": "83d03965a26b50b060e0f3a161119bd7258870a5649455692bc3586dcd7e8577",
       "family": "evidence"
     },
     {
@@ -362,13 +362,13 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "7d4dadedb0b04b9799195baea7fa0c82c895fbdaeeaa3ed9d6121ca82eabbd00",
+      "code_sha256": "11e06ab0ab3743f7fc91f3728dafcd85ab4999ed092bbb1c71a7497048465e5f",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "assess_icf_output",
-      "code_sha256": "b9cf0eca71f700b3f51043aea32112d059db8384e35c02a8edeb603f78972112",
+      "code_sha256": "3764e2cbff89d48cb6abd2e46d078737e64c9464084797bebc5a7292c600783d",
       "family": "clinical"
     },
     {
@@ -409,8 +409,14 @@
     },
     {
       "file": "scripts/quality.py",
-      "function": "_deterministic_warning_findings",
-      "code_sha256": "d9a3cfa1a41e9f6b0562a0feb593cf414200786cff83eb3b151a26c753dd11a6",
+      "function": "_accepted_drafting_warnings",
+      "code_sha256": "5ca1270d7248cb71f1c7890f67e29947aebcc0c35ee64f6a449d74ebfb0f4963",
+      "family": "review"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_render_warnings",
+      "code_sha256": "40d29981ee53123141a20c1c8efe2bc49c2b6917175f473ba80e1f105351419e",
       "family": "review"
     },
     {
@@ -440,13 +446,13 @@
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "76ba52fa584a5dc951b59b78d2fb0b5875b20257780acbe2d5a33fc124b4691e",
+      "code_sha256": "af0b22a0fcf7938b54ed28949823512521b6be6e4c1dba6313f22791d06b9e02",
       "family": "delivery"
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "22443908be787ca36cd1aa670ef4a89859b647c15034a3aff72185ab9cd0281c",
+      "code_sha256": "650acc6ef83936327e64a382ab3e8b6d528bbd4864465ee58f7907a52fc8531f",
       "family": "review"
     },
     {
@@ -476,13 +482,13 @@
     {
       "file": "scripts/rendering.py",
       "function": "audit_docx",
-      "code_sha256": "3911c418ce15bcbfe9f216180b52d51866c11fd5855960d96d4d6fe4354d658b",
+      "code_sha256": "9d177d987ac2b0a3835a2582062c8485c9fe7579d0e761c906c9c6acc37b310a",
       "family": "render"
     },
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "21b36dbc7df8d42feef516152cb271698de959cd35ae1c84eded2c8cd00c2d28",
+      "code_sha256": "ac29b68eaa3b110a939b4340ae90a76952ce9e7dbb14330d56d986bde47a2aae",
       "family": "render"
     },
     {
@@ -601,6 +607,12 @@
     },
     {
       "file": "scripts/workflow.py",
+      "function": "_review_copy",
+      "code_sha256": "1b28eb95f247c92160c8573da593859777d738125e756b96c63df70bf11586ec",
+      "family": "delivery"
+    },
+    {
+      "file": "scripts/workflow.py",
       "function": "confirm_desktop_delivery",
       "code_sha256": "a82a85a960446b85af7bc7cb6c7e026753e5d9b1200923612383acb9d55d285f",
       "family": "delivery"
@@ -614,7 +626,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "47e10e9739f90862ea79e18a9ef37bac801ebf8063f1d80ba70cc4ee15f27842",
+      "code_sha256": "80b26e3697fd3635f1da7cdb2405c14ddadb62d08de2e69318b096d30f965888",
       "family": "recovery"
     },
     {
@@ -632,7 +644,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_production_desktop_operation",
-      "code_sha256": "c463ae46b433e0cc69db4d55feb34c120d38d2209927e0da094ef5213ba3b036",
+      "code_sha256": "a64046518467420f7d13c844d3e57d5ccaffaaa30840e35740b676ec9710ab6a",
       "family": "recovery"
     },
     {
@@ -694,6 +706,12 @@
       "function": "_continue_repairable_no_progress",
       "code_sha256": "04b820c0443ecf183c205096222abd57e1439b0e38e407fd34a7567444f7f137",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_begin_independent_review",
+      "code_sha256": "38794dbed8337e8ac491d0a252c5d6ee09f464d3767b25242017bcca85e7e91f",
+      "family": "review"
     },
     {
       "file": "scripts/workflow.py",

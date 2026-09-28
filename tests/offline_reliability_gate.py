@@ -50,6 +50,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',
                 '_rendered_heading_text', '_target_heading',
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',
+                '_accepted_drafting_warnings', '_render_warnings',
                 'semantic_evidence_inventory', '_source_field_inventory',
             }
             if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:

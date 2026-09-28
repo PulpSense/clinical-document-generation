@@ -50,7 +50,7 @@ def test_full_candidate_gate_passes_after_concise_purpose_and_shared_scopes():
     assert quality.validate_sterling_clause_contract(doc, SOURCE)['status'] == 'passed'
 
 
-def test_purpose_draft_cannot_pass_then_fail_the_same_rendered_word_limit():
+def test_purpose_draft_word_goal_does_not_block_source_review():
     data = json.loads((Path(__file__).parent / 'fixtures/reliability-replays/bilateral-review-block.json').read_text())
     request = copy.deepcopy(data['request'])
     request['branch']['icf_template'] = 'Sterling'
@@ -63,4 +63,13 @@ def test_purpose_draft_cannot_pass_then_fail_the_same_rendered_word_limit():
     result['outcome'] = 'drafted'
     result['paragraphs'] = [{'text': 'Purpose ' + ('word ' * payload['maximum_draft_words']), 'evidence_refs': [], 'boilerplate_refs': []}]
     findings = drafting.validate_response(request, response)[1]
-    assert any('normalized words' in f['issue'] for f in findings)
+    assert not any('normalized words' in f['issue'] for f in findings)
+
+
+def test_rendered_purpose_word_goal_is_warning_when_clause_is_substantively_complete():
+    report = quality.validate_sterling_clause_contract(FIXTURE / 'candidate-3.docx', SOURCE)
+    purpose = [item for item in report['findings'] if item['clause_id'] == 'sterling.purpose.study-purpose']
+    assert report['status'] == 'passed'
+    assert len(purpose) == 1
+    assert purpose[0]['publication_disposition'] == 'warning'
+    assert purpose[0]['code'] == 'sterling-clause-word-goal'

@@ -62,11 +62,14 @@ python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 
 When the result is `awaiting_hermes`, complete every returned JSON request at
 its declared response path and rerun `generate`. Continue until `passed` or a
-truthful blocker is returned.
+truthful blocker is returned. The enclosing Desktop operation may convert a
+blocked result with a complete, verified candidate into `review_required`.
 
 This loop is internal. The next reviewer-facing response after approval must be
-the complete `client_outputs` package, or one consolidated technical repair
-blocker after all automatic retries are exhausted.
+the complete `client_outputs` package, the complete `review_outputs` package
+with its findings report, or one consolidated technical repair blocker.
 
 Return only `client_outputs` after `status: passed`. Never deliver partial
 documents, PDFs, page PNGs, drafts, or logs.
+For `status: review_required`, return every labeled review-only document and
+the findings report together. State that the review copy is not client-ready.

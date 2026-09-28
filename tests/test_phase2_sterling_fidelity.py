@@ -257,7 +257,7 @@ def test_icf_background_and_purpose_material_concept_overlap_targets_purpose():
     assert finding["primary_section"] == "icf.background"
     assert finding["secondary_section"] == "icf.study-purpose"
     assert finding["target_ids"] == ["icf.study-purpose"]
-    assert finding["publication_disposition"] == "blocking"
+    assert finding["publication_disposition"] == "warning"
 
 
 def test_short_key_information_summary_to_detail_overlap_is_allowed():

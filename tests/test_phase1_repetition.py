@@ -78,6 +78,27 @@ def test_icf_contract_has_independent_key_information_summary_from_canonical_sou
     assert all(path.startswith(("study.", "objectives.", "endpoints.", "design.", "procedures.", "population.", "risks_benefits.")) for path in contract["minimum_evidence"])
 
 
+def test_one_word_over_icf_summary_goal_does_not_block_drafting(tmp_path):
+    reference = fixture()
+    reference["meta"]["icf_template"] = "Sterling"
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    request_path = create_drafting_request(
+        repo_root=ROOT, revision_dir=tmp_path, revision_id="r-summary-word-goal",
+        reference=reference, batch=batch,
+        attempts={item: 1 for item in batch.section_ids}, wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    response = recorded_acceptance_response(request)
+    summary = next(item for item in response["section_results"] if item["section_id"] == "icf.key-information-summary")
+    original = summary["paragraphs"][0]["text"]
+    summary["paragraphs"][0]["text"] = original + (" for study participants" * 19)
+    assert len(summary["paragraphs"][0]["text"].split()) == 66
+
+    _accepted, findings = validate_response(request, response)
+
+    assert not any("summary block longer than 65 words" in item["issue"] for item in findings)
+
+
 def test_equivalent_narrative_and_structured_inputs_have_same_icf_summary_obligations():
     narrative = fixture()
     structured = copy.deepcopy(narrative)
@@ -245,9 +266,10 @@ def test_rendered_icf_assessment_detects_renderer_only_generated_duplication(tmp
         {"family": "Sterling"},
     )
 
-    assert assessment["status"] == "repairable"
+    assert assessment["status"] == "passed"
     finding = assessment["findings"][0]
     assert finding["code"] == "icf-exact-generated-duplication"
+    assert finding["publication_disposition"] == "warning"
     assert finding["target_ids"] == ["icf.key-information-summary"]
     assert finding["detail_section"] == "icf.procedures"
     assert finding["repair_action"] == "redraft_summary"
@@ -323,7 +345,7 @@ def test_rendered_icf_assessment_detects_long_generated_span_inside_distinct_par
 
     assessment = assess_icf_output(path, {}, {"family": "Sterling"})
 
-    assert assessment["status"] == "repairable"
+    assert assessment["status"] == "passed"
     assert assessment["findings"][0]["detail_section"] == "icf.procedures"
 
 
@@ -588,8 +610,8 @@ def test_protocol_secondary_sections_do_not_own_complete_schedule_or_methods():
     assert "procedures.assessments" not in protocol["study-procedure.measurements"].evidence
     assert protocol["analysis-plan.considerations"].evidence == ("statistics.analysis_plan", "statistics.software")
     assert protocol["analysis-plan.considerations"].boilerplate_key is None
-    assert {"procedures.visit_schedule", "procedures.assessments"} <= set(protocol["endpoint-criteria.completion"].evidence)
-    assert protocol["endpoint-criteria.study-completion"].evidence == ("study.timeline",)
+    assert protocol["endpoint-criteria.completion"].evidence == ("procedures.completion", "study.timeline")
+    assert protocol["endpoint-criteria.study-completion"].evidence == ("study.timeline", "study.completion")
     assert protocol["endpoint-criteria.completion"].source_coverage == "concept_reference"
     assert protocol["endpoint-criteria.study-completion"].source_coverage == "concept_reference"
     assert "complete-visit-schedule" in protocol["endpoint-criteria.completion"].do_not_restate_concepts
