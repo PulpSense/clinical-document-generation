@@ -5333,7 +5333,12 @@ def create_verification_requests(
         "or a speculative claim that the untested study combination outperforms alternatives even when that "
         "prediction appears in the approved background. The Introduction should establish the relevant "
         "prior evidence and the gap, without restating the title, hypothesis, or endpoint definition. "
-        "a hypothesis repeated as a measurement method, a cross-reference-only statistical consideration, "
+        "a hypothesis repeated as a measurement method, an endpoint restatement in Section 9.3 "
+        "that names no source-supplied assessment activity, a cross-reference-only statistical consideration, "
+        "paired-summary repetition in Section 10.3 without a distinct interpretation point, "
+        "tautological participant-completion prose that never identifies the anticipated end of planned "
+        "follow-up, and Section 11 prose that repeats its sample-size evidence table or exposes an internal "
+        "source label, "
         "duplicated schedule prose below the Section 15 table, and generic Section 16 privacy prose that "
         "omits supplied operational detail. Section 18.5 states the source-supplied closeout timeline and "
         "defines a completion trigger only if the source provides one; it does not repeat participant visits "
@@ -5347,8 +5352,9 @@ def create_verification_requests(
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
         content_instructions += (
             " The approved source provides no participant-completion criterion for Protocol Section 18.1. "
-            "Do not treat the visit schedule or exit form as a completion rule; flag any affirmative claim that does so. "
-            "A source-grounded follow-up period and a distinction between completion and discontinuation are appropriate."
+            "Do not treat the visit schedule or exit form as a formal completion rule; flag any affirmative claim that does so. "
+            "A concise description of the anticipated end of planned follow-up and a distinction from early "
+            "discontinuation are appropriate when grounded in the supplied timeline."
         )
     if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling":
         content_instructions += (

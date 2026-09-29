@@ -243,6 +243,7 @@ class SectionSpec:
     evidence: tuple[str, ...] = ()
     boilerplate_key: str | None = None
     required: bool = True
+    table_evidence: tuple[str, ...] = ()
     content_expectations: tuple[str, ...] = ()
     source_coverage: str = "all_material_evidence"
     fidelity_evidence: tuple[str, ...] = ()
@@ -363,17 +364,17 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied. When supplied, identify who selected treatment before enrollment and state whether enrollment changes treatment. Identify every approved primary, secondary, and exploratory endpoint once in a grouped, readable account of what the design evaluates.",
         "study-design.bias": "State the source-supported bias controls directly, including supplied common testing conditions, predefined outcomes and analysis methods, and limits on interpreting nonrandomized cohort differences. If none are supplied, use the listed concise boilerplate. Do not repeat the design, setting, arms, or masking account already given in Study Design.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
-        "study-procedure.measurements": "Explain what is measured, when, and how in operational language. Group related endpoints where scientific meaning is preserved; do not reproduce the Objectives endpoint inventory or the complete visit schedule, and do not invent an instrument, scoring rule, denominator, or definition absent from the source.",
+        "study-procedure.measurements": "Explain the approved measurement activities in operational language. Connect each measure to the source-supplied assessment activities and relevant time point, such as chart abstraction, score review, device download, or questionnaire when those activities are approved. When the source gives no instrument, scoring rule, denominator, or detailed method, state only the observable activity; an endpoint restatement such as 'the endpoint will be evaluated' is not a measurement method. Group related measures without repeating the complete visit schedule or inventing details.",
         "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
         "evaluation-procedures": "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
         "endpoint-criteria.completion": "State the supplied participant-completion rule and distinguish completion from discontinuation. Do not repeat the visit inventory or study-wide timeline; Sections 9 and 15 own the schedule and Section 18.5 owns study closeout.",
         "endpoint-criteria.study-completion": "State the supplied study-level closeout timeline concisely. Define a completion trigger only when the source supplies one. Sections 9 and 15 own the visit schedule, and Section 18.1 owns participant completion.",
         "analysis-plan.datasets": "Identify which observations enter each source-supported analysis population or data set. Do not reproduce the endpoint inventory owned by Objectives.",
         "analysis-plan.methodology": "Explain the approved analysis method for each endpoint group. State shared methods once per outcome group. Cite the supplied primary and secondary endpoint paths in evidence_refs without adding Study Design cross-references to the prose. Do not repeat Section 10.1's analysis-population or earlier-visit eligibility rule. Section 10.3 owns the approved interpretation qualification, such as no planned inferential test.",
-        "analysis-plan.considerations": "State only the source-supported interpretation limit or analysis qualification, such as descriptive-only analysis or no planned inferential test. Section 10.2 owns the endpoint methods and Section 10.1 owns dataset inclusion. Keep this section to one short paragraph.",
+        "analysis-plan.considerations": "Give one concise, source-supported qualification for interpreting the results. When the approved plan supports only descriptive analysis, say that interpretation is descriptive without repeating endpoint methods or the paired-summary method. Do not repeat Section 10.1's data-set eligibility or Section 10.2's paired-summary details. If the source supplies no further limitation, use the descriptive scope of the approved analysis rather than a self-referential statement about summaries. Do not assert that hypothesis tests are absent unless the source says so.",
         "icf.duration": "Describe approved participation timing; Purpose and Key Information own enrollment and control-group counts.",
         "icf.payment": "State the complete approved compensation and reimbursement fact once in patient-readable language; do not add a duplicate formal source sentence.",
-        "sample-size": "State the approved sample size and explain its approved justification.",
+        "sample-size": "State the approved sample size once and explain its approved justification. When a sample-size evidence table follows, let the table carry the evidence row and source label; do not narrate the row again or insert internal source labels into the prose.",
         "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
         "ethics.confidentiality": "Keep this ethics subsection to a concise cross-reference to Section 16. If the approved ethics.confidentiality field supplies a distinct oversight rule, state that rule briefly. Section 16 owns the operational privacy procedures; do not restate them here.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
@@ -485,6 +486,7 @@ def _section_spec(
     brief_reference_concepts: Iterable[str] = (),
     do_not_restate_concepts: Iterable[str] = (),
     boilerplate_keys: Iterable[str] = (),
+    table_evidence: Iterable[str] = (),
     content_expectations: Iterable[str] | None = None,
 ) -> SectionSpec:
     return SectionSpec(
@@ -496,6 +498,7 @@ def _section_spec(
         tuple(evidence),
         boilerplate,
         required,
+        table_evidence=tuple(table_evidence),
         content_expectations=tuple(content_expectations) if content_expectations is not None else _content_expectations(section_id, title),
         source_coverage=_source_coverage(section_id),
         fidelity_evidence=_fidelity_evidence(section_id),
@@ -540,7 +543,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("analysis-plan.datasets", "10.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.analysis_populations"), owned_concepts=("analysis-populations",), brief_reference_concepts=("endpoint-inventory",), do_not_restate_concepts=("endpoint-inventory",)),
     _section_spec("analysis-plan.methodology", "10.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("statistical-methods",), brief_reference_concepts=("primary-endpoint", "secondary-endpoints", "endpoint-inventory"), do_not_restate_concepts=("endpoint-inventory",)),
     _section_spec("analysis-plan.considerations", "10.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.software"), brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
-    _section_spec("sample-size", "11.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification", "population.sample_size_evidence", "statistics.sample_size_evidence")),
+    _section_spec("sample-size", "11.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification", "population.sample_size_evidence", "statistics.sample_size_evidence"), table_evidence=("population.sample_size_evidence", "statistics.sample_size_evidence")),
     _section_spec("confidentiality-publication", "12.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("confidentiality.publication", "confidentiality.retention"), "publication"),
     _section_spec("quality-safety", "13.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", role="container"),
     _section_spec("quality-safety.general", "13.1.", "General Information", "protocol-analysis-and-oversight", ("safety.general_information", "risks_benefits.risks"), "safety-general", owned_concepts=("ae-sae-definitions",)),

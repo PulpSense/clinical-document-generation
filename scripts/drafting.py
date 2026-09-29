@@ -433,6 +433,9 @@ def _section_payload(
         if path not in {"statistics.bias_minimization", "procedures.adverse_events"}
         or meaningful(get_path(reference, path))
     ]
+    # Structured table rows are governed by the same section contract, but
+    # their exact values are inserted and verified outside the prose draft.
+    minimum_evidence = [path for path in minimum_evidence if path not in section.table_evidence]
     semantic_evidence = [
         obligation for path in minimum_evidence
         if (obligation := semantic_evidence_contract(path, get_path(reference, path)))
@@ -478,10 +481,11 @@ def _section_payload(
         boilerplate_items = []
         allowed = ["agent_draft"]
         content_expectations = [
-            "State concisely that participant completion and discontinuation are distinct dispositions. "
-            "Use the approved timeline as context without restating the study-wide timeline, follow-up duration, "
-            "month labels, or visit schedule owned by Sections 9, 15, and 18.5. No participant-completion "
-            "criterion was supplied; do not derive one from the scheduled visits or exit form."
+            "Describe the anticipated end of planned participant follow-up using the source-supplied final "
+            "time point, if available, and distinguish this from early discontinuation. No formal completion "
+            "criterion was supplied; do not turn the final visit or exit form into one. Keep this to one "
+            "sentence without repeating the study-wide timeline, follow-up duration, or visit inventory "
+            "owned by Sections 9, 15, and 18.5."
         ]
     return {
         "section_id": section.section_id,
@@ -491,6 +495,7 @@ def _section_payload(
         "required": section.required,
         "allowed_modes": allowed,
         "minimum_evidence": minimum_evidence,
+        "table_evidence": list(section.table_evidence),
         "fixed_boilerplate": boilerplate_items,
         "content_expectations": content_expectations,
         "maximum_draft_words": maximum_draft_words,

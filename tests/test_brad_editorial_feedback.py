@@ -214,6 +214,32 @@ def test_ambispective_privacy_and_completion_requests_keep_distinct_section_owne
     assert "ethics.confidentiality" in ethics_with_rule["minimum_evidence"]
 
 
+def test_sparse_ambispective_requests_keep_methods_interpretation_and_completion_useful():
+    source = json.loads((ROOT / "tests/fixtures/release-certification/ambispective-sterling/approved-reference.json").read_text())
+    source["procedures"]["methods"] = ""
+    source["procedures"]["completion"] = ""
+    source["study"]["timeline"] = "Historical record review plus prospective baseline through Month 3 follow-up."
+    source["statistics"]["analysis_plan"] = "Descriptive summaries of historical and prospective observations."
+    sections = {item.section_id: item for item in protocol_contract("Ambispective")}
+    boilerplate = json.loads((ROOT / "references/fixed-clinical-boilerplate.json").read_text())["sections"]
+
+    measurements = _section_payload(sections["study-procedure.measurements"], boilerplate, source)
+    considerations = _section_payload(sections["analysis-plan.considerations"], boilerplate, source)
+    completion = _section_payload(sections["endpoint-criteria.completion"], boilerplate, source)
+    sample_size = _section_payload(sections["sample-size"], boilerplate, source)
+
+    assert "assessment activities" in " ".join(measurements["content_expectations"]).casefold()
+    assert "endpoint restatement" in " ".join(measurements["content_expectations"]).casefold()
+    assert "paired-summary" in " ".join(considerations["content_expectations"]).casefold()
+    assert "descriptive" in " ".join(considerations["content_expectations"]).casefold()
+    assert "anticipated end" in " ".join(completion["content_expectations"]).casefold()
+    assert "no formal completion criterion" in " ".join(completion["content_expectations"]).casefold()
+    assert "population.sample_size_evidence" not in sample_size["minimum_evidence"]
+    assert "statistics.sample_size_evidence" not in sample_size["minimum_evidence"]
+    assert sample_size["table_evidence"] == ["population.sample_size_evidence", "statistics.sample_size_evidence"]
+    assert "sample-size evidence table" in " ".join(sample_size["content_expectations"]).casefold()
+
+
 def test_design_and_analysis_requests_keep_each_fact_in_its_own_section():
     source = _source()
     source["design"]["treatment_assignment"] = (
