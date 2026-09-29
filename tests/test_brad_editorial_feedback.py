@@ -115,6 +115,15 @@ def test_content_review_explicitly_checks_section_purpose_and_editorial_relevanc
     assert "speculative claim that the untested study combination outperforms alternatives" in instructions
 
 
+def test_content_review_preserves_template_copy_sequence_and_flags_conditional_privacy_scope(tmp_path):
+    request = json.loads(create_verification_requests(tmp_path, _source(), {"artifacts": []})[0].read_text())
+    instructions = request["instructions"].casefold()
+    assert "copy of all pages" in instructions
+    assert "signed and dated copy" in instructions
+    assert "existing-record collection" in instructions
+    assert "privacy" in instructions
+
+
 def test_optional_short_title_never_blocks_intake_and_long_titles_get_header_fallback():
     source = _source()
     source["study"].pop("short_title")

@@ -1,5 +1,5 @@
 {
-  "version": "clinical-boilerplate-v12",
+  "version": "clinical-boilerplate-v13",
   "sections": {
     "bias": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
     "consent": "Written informed consent will be obtained before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
@@ -15,14 +15,14 @@
     "ethics": "The study will be conducted under the approved protocol, applicable institutional review board requirements, and applicable ethical and privacy protections.",
     "ethics-confidentiality": "The study will be conducted under the approved protocol, applicable institutional review board requirements, and applicable ethical and privacy protections. Study records will use appropriate identifiers and access controls. Identifiable information will be available only to authorized personnel and oversight bodies as permitted by the approved protocol and applicable law.",
     "confidentiality-cross-reference": "Confidentiality protections for study records and participant information are described in Section 16.",
-    "confidentiality": "Study records will use appropriate identifiers and access controls. Identifiable information will be available only to authorized personnel and oversight bodies as permitted by the approved protocol and applicable law.",
+    "confidentiality": "Study records will be kept confidential.",
     "injury": "If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. The study team will explain available care and any responsibility for related costs. Signing this form does not waive your legal rights.",
     "completion": "Participant completion requires fulfillment of the approved participant-completion criteria. Discontinuation is a distinct participant disposition, not completion; closeout documentation does not change that disposition.",
     "study-completion": "Study closeout follows the approved timeline and any source-specified closeout requirements. Participant completion and discontinuation remain distinct dispositions in the study records.",
     "termination": "The investigator may end an individual participant's study participation when continued participation is unsafe, eligibility is no longer met, required follow-up cannot be completed, or the approved protocol otherwise requires termination.",
     "study-termination": "Study termination follows the decision-making authority and grounds specified in the approved study-termination provisions. Applicable notification and closeout requirements remain in effect; closeout does not confer additional termination authority.",
-    "retrospective-bias": "Bias will be limited through predefined record-selection criteria, consistent abstraction methods, prespecified variables, and the approved analysis plan.",
-    "retrospective-consent": "This retrospective study uses existing records. Any consent or authorization waiver will be determined by the reviewing institutional review board before records are accessed for research.",
+    "retrospective-bias": "Historical records may be incomplete or inconsistent, which can limit interpretation of this retrospective review.",
+    "retrospective-consent": "This retrospective study uses existing records.",
     "retrospective-confidentiality": "Only the approved existing-record data will be abstracted. Direct identifiers will be handled under the approved privacy plan, and reports will not identify individual patients.",
     "retrospective-safety": "The study does not assign an intervention. Safety information will be abstracted only when it is part of the approved data set; no new clinical safety procedure is introduced by the record review.",
     "costs": "Before you sign this form, the study team will explain whether any costs are associated with the research activities and which costs, if any, are your responsibility.",
@@ -41,7 +41,7 @@
     ,"icf-voluntary": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled."
     ,"icf-new-findings": "The study team will tell you about significant new information that may affect your willingness to continue in the study."
     ,"icf-leaving": "You may stop participating at any time. Tell the study doctor if you decide to leave so the study team can explain any final steps needed for your safety and records."
-    ,"icf-privacy-authorization": "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research, including information from existing records when applicable and information collected during future study activities. Records will use appropriate identifiers and access controls. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you."
+    ,"icf-privacy-authorization": "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you."
     ,"icf-withdrawal": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements."
     ,"icf-consent-statement": "By signing below, you confirm that you have read this form, had the opportunity to ask questions, received satisfactory answers, voluntarily agree to participate, and authorize the collection, use, and disclosure described above."
     ,"icf-no-sign": "If you do not agree with the statement above, you should not sign this informed consent document."

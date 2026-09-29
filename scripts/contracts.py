@@ -19,8 +19,8 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.40-synopsis-recovery"
-BOILERPLATE_VERSION = "clinical-boilerplate-v12"
+CONTRACT_VERSION = "clinical-documents-v2.41-content-fidelity"
+BOILERPLATE_VERSION = "clinical-boilerplate-v13"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
@@ -365,7 +365,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "study-design.bias": "State the source-supported bias controls directly, including supplied common testing conditions, predefined outcomes and analysis methods, and limits on interpreting nonrandomized cohort differences. If none are supplied, use the listed concise boilerplate. Do not repeat the design, setting, arms, or masking account already given in Study Design.",
         "study-procedure.visits": "Account for every approved visit, time point, and visit-specific procedure.",
         "study-procedure.measurements": "Explain the approved measurement activities in operational language. Connect each measure to the source-supplied assessment activities and relevant time point, such as chart abstraction, score review, device download, or questionnaire when those activities are approved. When the source gives no instrument, scoring rule, denominator, or detailed method, state only the observable activity; an endpoint restatement such as 'the endpoint will be evaluated' is not a measurement method. Group related measures without repeating the complete visit schedule or inventing details.",
-        "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline.",
+        "study-procedure.enrollment": "Describe the approved record-review or enrollment sequence, time points, and timeline. Preserve supplied retention, withdrawal, and replacement facts without implying that retrospective chart abstraction includes participant contact unless the source establishes it. Do not invent an IRB waiver or its timing.",
         "evaluation-procedures": "Introduce the Schedule of Assessments table briefly. The source-derived table and its supplemental notes carry the visit, timing, assessment, and safety detail; do not narrate its rows or repeat its notes below the table.",
         "endpoint-criteria.completion": "State the supplied participant-completion rule and distinguish completion from discontinuation. Do not repeat the visit inventory or study-wide timeline; Sections 9 and 15 own the schedule and Section 18.5 owns study closeout.",
         "endpoint-criteria.study-completion": "State the supplied study timeline without saying when the study is complete or closed unless study.completion supplies that trigger. Sections 9 and 15 own the visit schedule, and Section 18.1 owns participant completion.",
@@ -375,7 +375,8 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.duration": "Describe approved participation timing; Purpose and Key Information own enrollment and control-group counts.",
         "icf.payment": "State the complete approved compensation and reimbursement fact once in patient-readable language; do not add a duplicate formal source sentence.",
         "sample-size": "State the approved sample size once and explain its approved justification. When a sample-size evidence table follows, let the table carry the evidence row and source label; do not narrate the row again or insert internal source labels into the prose.",
-        "confidentiality": "Explain the source-supported handling of identifiable data, access, storage or retention, and disclosures in operational detail where supplied. Do not substitute generic privacy assurances for approved procedures.",
+        "confidentiality": "Explain source-supported operational detail for handling identifiable data, access, storage or retention, and disclosures where supplied. A general commitment to confidential storage does not establish an identifier plan, access controls, or disclosure recipients.",
+        "financial-injury": "State source-supported compensation, costs, insurance, and injury-handling terms in protocol voice. Participant-facing instructions and consent-form signing language belong only in the ICF. When the source leaves a term unspecified, do not supply a policy or promise for it.",
         "ethics.confidentiality": "Keep this ethics subsection to a concise cross-reference to Section 16. If the approved ethics.confidentiality field supplies a distinct oversight rule, state that rule briefly. Section 16 owns the operational privacy procedures; do not restate them here.",
         "confidentiality-publication": "Preserve the approved publication, records, and retention requirements without substituting generic policy language.",
         "risks-benefits.benefits": "Describe only source-supported potential benefits or absence of direct benefit. Payment and reimbursement belong in Section 17.",
@@ -385,6 +386,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "with the exact approved party name, state only that party's approved safety-event responsibilities, "
             "and name no other responsible party; also explain the approved risks and safety boundary."
         ),
+        "ethics": "Identify the designated ethics review body and preserve supplied participant-impact facts, including any absence of direct benefit, compensation terms, and how research-related concerns are reported. Do not invent a waiver, injury-care payment, or additional oversight policy.",
         "quality-safety.analysis": (
             "Explain only the approved adverse-event or safety-analysis facts supplied for this subsection; "
             "do not restate unrelated efficacy endpoints, confidence intervals, sensor outcomes, usability, "
@@ -392,7 +394,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         ),
         "icf.study-purpose": "State the study purpose, hypothesis, and primary endpoint concisely in participant-facing language. Keep enrollment counts in KEY INFORMATION or DURATION. Do not repeat the lens descriptions, comparative evidence, unmet evidence gap, or complete rationale owned by BACKGROUND.",
         "icf.key-information-summary": "Give five concise participant-facing summary blocks covering the study purpose, expected participation and duration, principal risks, possible benefit or absence of direct benefit, and alternatives plus voluntary participation. When the timeline also contains enrollment or analysis phases, summarize only participant follow-up here. Paraphrase sparse risk and benefit boilerplate in plain language so the summary does not copy its detailed-section sentence.",
-        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence. If the approved source provides continuous adverse-event or device-deficiency reporting, tell participants that problems can be reported between scheduled visits and state the approved collection period.",
+        "icf.procedures": "Explain every approved eligibility criterion and age bound, visit, procedure, intervention location, research-measurement role, non-treatment boundary, and minimum interval without participation in another study before screening in participant-facing sequence. When the source places consent and device initiation at the same visit, state consent before device initiation and other study-specific activities. If the approved source provides continuous adverse-event or device-deficiency reporting, tell participants that problems can be reported between scheduled visits and state the approved collection period.",
         "icf.duration": "State the approved participation duration and relevant time points.",
         "icf.risks": "Disclose every approved risk or discomfort and every approved risk-mitigation instruction without minimizing, inventing, or hiding safeguards.",
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
@@ -555,7 +557,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("ethics.confidentiality", "14.1.", "Confidentiality", "protocol-analysis-and-oversight", ("ethics.confidentiality",), "confidentiality-cross-reference"),
     _section_spec("evaluation-procedures", "15.", "STANDARD EVALUATION PROCEDURES", "protocol-operations", ("procedures.assessments", "procedures.evaluation", "procedures.visit_schedule", "procedures.visit_schedule_table", "safety.monitoring", "safety.adverse_events", "procedures.consent")),
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),
-    _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.costs", "risks_benefits.injury_handling"), "injury"),
+    _section_spec("financial-injury", "17.", "FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES", "protocol-analysis-and-oversight", ("risks_benefits.compensation_or_reimbursement", "risks_benefits.costs", "risks_benefits.injury_handling")),
     _section_spec("endpoint-criteria", "18.", "STUDY ENDPOINT CRITERIA", role="container"),
     _section_spec("endpoint-criteria.completion", "18.1.", "Patient Completion of Study", "protocol-operations", ("procedures.completion", "study.timeline"), "completion", brief_reference_concepts=("complete-visit-schedule",), do_not_restate_concepts=("complete-visit-schedule",)),
     _section_spec("endpoint-criteria.discontinuation", "18.2.", "Patient Discontinuation", "protocol-operations", ("procedures.discontinuation", "procedures.replacement"), "discontinuation"),
@@ -575,20 +577,20 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary"), owned_concepts=("study-objectives", "endpoint-inventory"), brief_reference_concepts=("clinical-rationale", "primary-endpoint"), do_not_restate_concepts=("clinical-rationale",)),
     _section_spec("subjects", "6.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
-    _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria")),
+    _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("study-design", "7.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design",)),
     _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "retrospective-bias"),
     _section_spec("study-procedure", "8.", "STUDY PROCEDURE", role="container"),
-    _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline"), "retrospective-consent"),
+    _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline", "procedures.retention", "procedures.discontinuation", "procedures.replacement"), "retrospective-consent"),
     _section_spec("analysis-plan", "9.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "9.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
     _section_spec("analysis-plan.methodology", "9.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan"), owned_concepts=("statistical-methods",)),
     _section_spec("analysis-plan.considerations", "9.3.", "General Statistical Considerations", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "statistics.software"), brief_reference_concepts=("statistical-methods", "endpoint-inventory"), do_not_restate_concepts=("statistical-methods", "endpoint-inventory")),
     _section_spec("sample-size", "10.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification")),
-    _section_spec("confidentiality", "11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("risks_benefits.privacy", "confidentiality.data_handling"), "retrospective-confidentiality"),
+    _section_spec("confidentiality", "11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("risks_benefits.privacy", "confidentiality.data_handling"), "confidentiality"),
     _section_spec("quality-safety", "12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", "protocol-analysis-and-oversight", ("risks_benefits.risks", "safety.roles"), "retrospective-safety"),
-    _section_spec("ethics", "13.", "GCP, ICH AND ETHICAL CONSIDERATIONS", "protocol-analysis-and-oversight", ("parties.irb.name",), "ethics"),
+    _section_spec("ethics", "13.", "GCP, ICH AND ETHICAL CONSIDERATIONS", "protocol-analysis-and-oversight", ("parties.irb.name", "risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement", "risks_benefits.injury_handling"), "ethics"),
 )
 
 ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (

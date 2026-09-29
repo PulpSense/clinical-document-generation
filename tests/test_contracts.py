@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from contracts import ContractedTemplateBundleError, ICF_STUDY_SECTIONS, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, DOCUMENT_SETS, batch_plan, contracted_template_bundle, icf_contract, icf_retained_sections, input_findings, parse_source_truth, protocol_contract, protocol_table_contracts, source_contract, source_truth_markdown
+from drafting import load_boilerplate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -268,6 +269,56 @@ def test_screening_washout_is_contractually_bound_to_protocol_and_icf():
     } <= set(
         icf["icf.procedures"].evidence
     )
+
+
+def test_protocol_sections_keep_source_facts_without_consent_only_boilerplate():
+    prospective = {section.section_id: section for section in protocol_contract("Prospective")}
+    retrospective = {section.section_id: section for section in protocol_contract("Retrospective")}
+    icf = {section.section_id: section for section in ICF_STUDY_SECTIONS}
+
+    assert prospective["financial-injury"].boilerplate_key is None
+    assert prospective["confidentiality"].boilerplate_key == "confidentiality"
+    assert icf["icf.injury"].boilerplate_key == "injury"
+    assert icf["icf.privacy"].boilerplate_key == "icf-privacy-authorization"
+    icf_privacy = load_boilerplate(ROOT, fixture("retrospective-acceptance-source.json"))["icf-privacy-authorization"].casefold()
+    assert "existing records" not in icf_privacy
+    assert "access controls" not in icf_privacy
+    assert "sponsor" in icf_privacy and "ethics committee" in icf_privacy
+
+    eligibility = retrospective["subjects.eligibility"]
+    enrollment = retrospective["study-procedure.enrollment"]
+    assert "procedures.minimum_days_before_screening_without_participation" in eligibility.evidence
+    assert {"procedures.retention", "procedures.replacement", "procedures.discontinuation"} <= set(enrollment.evidence)
+    assert enrollment.boilerplate_key == "retrospective-consent"
+    assert retrospective["confidentiality"].boilerplate_key == "confidentiality"
+    consent_fallback = load_boilerplate(ROOT, fixture("retrospective-acceptance-source.json"))["retrospective-consent"].casefold()
+    assert "existing records" in consent_fallback
+    assert "waiver" not in consent_fallback
+    privacy_fallback = load_boilerplate(ROOT, fixture("retrospective-acceptance-source.json"))["confidentiality"].casefold()
+    assert "kept confidential" in privacy_fallback
+    assert "access controls" not in privacy_fallback
+    assert "approved privacy plan" not in privacy_fallback
+    assert {
+        "risks_benefits.benefits",
+        "risks_benefits.compensation_or_reimbursement",
+        "risks_benefits.injury_handling",
+    } <= set(retrospective["ethics"].evidence)
+
+
+def test_icf_procedures_state_consent_precedes_study_device_activity():
+    icf = {section.section_id: section for section in ICF_STUDY_SECTIONS}
+
+    expectations = " ".join(icf["icf.procedures"].content_expectations).casefold()
+    assert "consent before" in expectations
+    assert "device" in expectations
+
+
+def test_retrospective_bias_fallback_describes_limit_without_claiming_unprovided_controls():
+    reference = fixture("retrospective-acceptance-source.json")
+    clause = load_boilerplate(ROOT, reference)["retrospective-bias"].casefold()
+    assert "historical records" in clause
+    assert "will be limited through" not in clause
+    assert "predefined record-selection" not in clause
 
 
 def test_operational_safeguards_costs_and_device_role_are_bound_to_their_target_sections():
