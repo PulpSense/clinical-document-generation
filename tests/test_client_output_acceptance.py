@@ -460,6 +460,65 @@ def test_retrospective_eligibility_preserves_approved_criteria_verbatim(tmp_path
     )
 
 
+def test_retrospective_eligibility_renders_approved_age_bounds(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/retrospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["population"]["inclusion_criteria"] = ["Adults with the target condition."]
+    reference["population"]["minimum_age"] = "18 Years"
+    reference["population"]["maximum_age"] = "80 Years"
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}}, artifact_names={"protocol"})
+    visible = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
+    assert "Eligible age range: 18 Years to 80 Years." in visible
+
+
+def test_retrospective_enrollment_preserves_approved_withdrawal_right(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/retrospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["procedures"]["discontinuation"] = "Participants may withdraw at any time."
+    render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}}, artifact_names={"protocol"})
+    visible = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
+    assert "Participants may withdraw at any time." in visible
+
+
+@pytest.mark.parametrize("family", ["Advarra", "Sterling"])
+def test_source_retention_contact_is_rendered_in_protocol_and_icf(tmp_path, family):
+    reference = json.loads((
+        ROOT / "tests/fixtures/prospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = family
+    reference["procedures"]["retention"] = "Reminder calls support follow-up."
+    model = {
+        "protocol": [],
+        "icf": {"icf.procedures": {
+            "paragraphs": [{"text": "You will attend scheduled study visits."}], "lists": [],
+        }},
+        "prs": {},
+    }
+    render_documents(ROOT, tmp_path, reference, model)
+    for name in ("protocol", "icf"):
+        visible = _visible_text(Document(tmp_path / f"candidate/{name}.docx"))
+        assert "Reminder calls support follow-up." in visible
+
+
+def test_timeline_does_not_become_unsupplied_study_closeout_trigger(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/prospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["study"]["timeline"] = "3 months"
+    reference["study"]["completion"] = ""
+    model = {"protocol": [{
+        "section_id": "endpoint-criteria.study-completion",
+        "paragraphs": [{"text": "Study closeout follows the planned 3-month study timeline."}],
+        "lists": [],
+    }], "icf": {}, "prs": {}}
+    render_documents(ROOT, tmp_path, reference, model, artifact_names={"protocol"})
+    visible = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
+    assert "The planned study timeline is 3 months." in visible
+    assert "Study closeout follows" not in visible
+
+
 @pytest.mark.parametrize(
     "minimum_interval",
     (90, "90 days", "90 days before screening", "At least 90 days before screening"),

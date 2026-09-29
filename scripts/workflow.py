@@ -7753,6 +7753,18 @@ def _repeated_drafting_findings(
     return stalled
 
 
+def _draftable_review_targets(targets: Sequence[str], draftable_sections: set[str]) -> list[str]:
+    """Keep editable children named alongside a non-editable parent heading."""
+    return [
+        target for target in targets
+        if target in draftable_sections
+        or not any(
+            child.startswith(target + ".") and child in draftable_sections
+            for child in targets
+        )
+    ]
+
+
 def _quality_retry(
     run_dir: Path,
     reference_path: Path,
@@ -7867,6 +7879,10 @@ def _quality_retry(
                 targets = [f"layout:{artifact}"]
             elif recovery_class == "verifier_transient":
                 targets = ["verification:content"]
+        # A reviewer may name a heading and its editable subsection together.
+        # The heading is a container, not a separate draft target.
+        if recovery_class == "drafting_defect":
+            targets = _draftable_review_targets(targets, draftable_sections)
         finding["target_ids"] = targets
         normalized.append(finding)
 

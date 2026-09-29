@@ -922,15 +922,29 @@ def _retrospective_eligibility_blocks(
 ) -> list[tuple[str, bool]]:
     """Render approved retrospective criteria verbatim instead of paraphrasing them."""
     blocks: list[tuple[str, bool]] = []
+    age_limits = [
+        str(get_path(reference, path, "") or "").strip()
+        for path in ("population.minimum_age", "population.maximum_age")
+    ]
     for label, path in (
         ("Inclusion criteria:", "population.inclusion_criteria"),
         ("Exclusion criteria:", "population.exclusion_criteria"),
     ):
         items = _list(get_path(reference, path, []))
-        if not items:
+        if not items and not (path == "population.inclusion_criteria" and any(age_limits)):
             continue
         blocks.append((label, False))
         blocks.extend((item, True) for item in items)
+        if path == "population.inclusion_criteria" and any(age_limits):
+            existing = " ".join(items).casefold()
+            if not all(age.casefold() in existing for age in age_limits if age):
+                lower, upper = age_limits
+                if lower and upper:
+                    blocks.append((f"Eligible age range: {lower} to {upper}.", True))
+                elif lower:
+                    blocks.append((f"Minimum eligible age: {lower}.", True))
+                else:
+                    blocks.append((f"Maximum eligible age: {upper}.", True))
     return blocks
 
 
@@ -1074,6 +1088,23 @@ def _replace_protocol_leaf_bodies(
             blocks = [("The approved visits and assessments are summarized in Table 15.1.", False)]
         if branch == "Retrospective" and section.section_id == "subjects.eligibility":
             blocks = _retrospective_eligibility_blocks(reference)
+        if branch == "Retrospective" and section.section_id == "study-procedure.enrollment":
+            withdrawal = str(get_path(reference, "procedures.discontinuation", "") or "").strip()
+            if withdrawal and withdrawal.casefold().rstrip(".") not in " ".join(
+                text.casefold() for text, _is_list in blocks
+            ):
+                blocks.append((withdrawal, False))
+        if section.section_id == "study-procedure.visits":
+            retention = str(get_path(reference, "procedures.retention", "") or "").strip()
+            if retention and retention.casefold().rstrip(".") not in " ".join(
+                text.casefold() for text, _is_list in blocks
+            ):
+                blocks.append((retention, False))
+        if section.section_id == "endpoint-criteria.study-completion":
+            completion = str(get_path(reference, "study.completion", "") or "").strip()
+            timeline = str(get_path(reference, "study.timeline", "") or "").strip().rstrip(".")
+            if not completion and timeline:
+                blocks = [(f"The planned study timeline is {timeline}.", False)]
         if not blocks:
             continue
         expected = _protocol_heading_key(f"{section.number} {section.title}")
@@ -1899,7 +1930,9 @@ def _icf_section_elements(document: Document, heading: Paragraph, heading_texts:
     return elements, exemplar
 
 
-def _populate_icf_sections(document: Document, model: Mapping[str, Any], *, sterling: bool) -> None:
+def _populate_icf_sections(
+    document: Document, model: Mapping[str, Any], reference: Mapping[str, Any], *, sterling: bool,
+) -> None:
     """Keep the client shell while ensuring every accepted ICF section is visible."""
     headings = _STERLING_ICF_HEADINGS if sterling else _ADVARRA_ICF_HEADINGS
     retained_headings = _STERLING_RETAINED_HEADINGS if sterling else _ADVARRA_RETAINED_HEADINGS
@@ -1919,6 +1952,12 @@ def _populate_icf_sections(document: Document, model: Mapping[str, Any], *, ster
     for section_id in source_bound_sections:
         heading = heading_by_id.get(section_id)
         blocks = _icf_blocks(model, section_id)
+        if section_id == "icf.procedures":
+            retention = str(get_path(reference, "procedures.retention", "") or "").strip()
+            if retention and retention.casefold().rstrip(".") not in " ".join(
+                text.casefold() for text, _is_list in blocks
+            ):
+                blocks.append((retention, False))
         if heading is None:
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)
@@ -3441,7 +3480,7 @@ def _template_document(
     if icf:
         if sterling:
             _repair_sterling_footer_page_fields(document)
-        _populate_icf_sections(document, model, sterling=sterling)
+        _populate_icf_sections(document, model, reference, sterling=sterling)
         if not sterling:
             _remove_advarra_example_study_prose(document)
         if sterling:

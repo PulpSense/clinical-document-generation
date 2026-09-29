@@ -1584,7 +1584,18 @@ def _coverage_findings(
                     })
             ungrounded = [
                 path for path, value in material.items()
-                if f"source:{path}" in cited and not source_evidence_grounded(content, path, value)
+                if f"source:{path}" in cited
+                and not (
+                    section_id == "analysis-plan.considerations"
+                    and path == "statistics.analysis_plan"
+                    and re.search(r"\bdescriptiv(?:e|ely)\b", str(value), re.I)
+                    and not re.search(
+                        r"\b(?:no inferential|hypothesis test|limitations?|bias|caution|exploratory)\b",
+                        str(value), re.I,
+                    )
+                    and re.search(r"\bdescriptiv(?:e|ely)\b", content, re.I)
+                )
+                and not source_evidence_grounded(content, path, value)
             ]
             if ungrounded:
                 findings.append({
@@ -2674,7 +2685,14 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
                     if follow_up else ""
                 ) + "Participant completion and discontinuation are distinct dispositions."
             elif section_id == "endpoint-criteria.study-completion":
-                prose = f"The study is complete after the approved overall timeline of {timeline}."
+                completion = value_text(source.get("study.completion")).rstrip(".")
+                prose = (
+                    f"{completion}." if completion else
+                    f"The approved study timeline is {timeline}." if timeline else
+                    "No separate study-completion criterion is specified."
+                )
+                if completion and timeline and timeline.casefold() not in completion.casefold():
+                    prose += f" The approved study timeline is {timeline}."
             else:
                 prose = f"A participant completes the study after the approved sequence: {visit_text}."
                 if timeline:

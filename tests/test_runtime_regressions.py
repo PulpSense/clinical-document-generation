@@ -23,6 +23,17 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_review_target_with_parent_heading_routes_to_named_draftable_child():
+    draftable = {"subjects.eligibility", "study-procedure.enrollment"}
+    assert workflow._draftable_review_targets(
+        ["subjects", "subjects.eligibility"], draftable,
+    ) == ["subjects.eligibility"]
+    assert workflow._draftable_review_targets(
+        ["study-procedure", "study-procedure.enrollment"], draftable,
+    ) == ["study-procedure.enrollment"]
+    assert workflow._draftable_review_targets(["subjects"], draftable) == ["subjects"]
+
+
 def _source():
     return json.loads(
         (

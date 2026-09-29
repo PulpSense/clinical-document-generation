@@ -57,6 +57,38 @@ def test_methods_and_schedule_requests_do_not_demand_irrelevant_restatement():
     assert "unscheduled contact" not in boilerplate["sections"]["unscheduled"].casefold()
 
 
+def test_ambispective_descriptive_considerations_do_not_require_method_repetition():
+    plan = (
+        "Descriptive summaries for historical and prospective measures; paired summaries "
+        "for participants with both baseline and Month 3 data."
+    )
+    request = {"approved_source": {"statistics": {"analysis_plan": plan}}}
+    contract = {
+        "section_id": "analysis-plan.considerations",
+        "source_coverage": "concept_reference",
+        "minimum_evidence": ["statistics.analysis_plan"],
+        "evidence_scopes": [{"path": "statistics.analysis_plan", "value": plan}],
+    }
+    assert not _coverage_findings(
+        request, contract, "analysis-plan.considerations",
+        "Interpretation of historical and prospective measures is descriptive.",
+        ["source:statistics.analysis_plan"],
+    )
+    assert _coverage_findings(
+        request, contract, "analysis-plan.considerations",
+        "Interpretation will follow the approved plan.",
+        ["source:statistics.analysis_plan"],
+    )
+    qualified = "Descriptive summaries are planned; no inferential hypothesis test is planned."
+    request["approved_source"]["statistics"]["analysis_plan"] = qualified
+    contract["evidence_scopes"][0]["value"] = qualified
+    assert _coverage_findings(
+        request, contract, "analysis-plan.considerations",
+        "Results will be interpreted descriptively.",
+        ["source:statistics.analysis_plan"],
+    )
+
+
 def test_schedule_prose_accepts_brief_table_introduction():
     source = _source()
     request = {"approved_source": source}
