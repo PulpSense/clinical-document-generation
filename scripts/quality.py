@@ -416,10 +416,16 @@ def canonical_evidence_sha256(value: Any) -> str:
 
 def _normalized_ooxml_hash(element: ET._Element, *, redact_text: bool = True) -> str:
     clone = ET.fromstring(ET.tostring(element))
+    font_attributes = {"ascii", "hAnsi", "eastAsia", "cs", "font", "name", "typeface"}
     for node in clone.iter():
         for attribute in list(node.attrib):
-            if ET.QName(attribute).localname.startswith("rsid"):
+            local_name = ET.QName(attribute).localname
+            if local_name.startswith("rsid"):
                 del node.attrib[attribute]
+            elif local_name in font_attributes:
+                font = node.attrib[attribute].casefold()
+                if font in APPROVED_PACKAGED_FONT_FALLBACKS:
+                    node.attrib[attribute] = APPROVED_PACKAGED_FONT_FALLBACKS[font]
         if redact_text and ET.QName(node).localname in {"t", "delText"}:
             node.text = "#TEXT" if node.text else ""
     return hashlib.sha256(ET.tostring(clone, method="c14n")).hexdigest()

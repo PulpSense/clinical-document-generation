@@ -24,17 +24,17 @@
       ],
       "styles": {
         "count": 83,
-        "semantic_sha256": "a8a3cbd246370108f774bb0947fd485f2a7f26028b01d5302bfcb03b2d199881"
+        "semantic_sha256": "253e1950435856799a1d70a50e05a45d591a043fbff2587c1a196bffb4c77009"
       },
       "numbering": {
         "abstract_count": 11,
         "number_count": 11,
-        "semantic_sha256": "8e683e6493e6c97db4775b5aec9c8cadd9a347049b2a6ab19e782e75cdcce4fe"
+        "semantic_sha256": "f6d40f1f54a4d637ce0daff6f98fc2a20e3f2788096a1847ea560fe5d1aec7ca"
       },
       "headers_footers": [
         {
           "part": "word/footer1.xml",
-          "semantic_sha256": "776001fdff89bf146c1e1d2b706cf54d8441ab8b14390608ba6d6ecd8900b7a9",
+          "semantic_sha256": "0866dbed4beb965a39734118a20baf04ff4b15e2c4c36d9cfd4e54e2835c4cf3",
           "fields": [
             "PAGE \\* arabic \\* MERGEFORMAT",
             "NUMPAGES \\* arabic \\* MERGEFORMAT"
@@ -43,7 +43,7 @@
         },
         {
           "part": "word/footer2.xml",
-          "semantic_sha256": "9e357f04e76628f6878fd6e8b09aa7bc83d34a22862271d56b9cd023f595a337",
+          "semantic_sha256": "5360fe9e9de374aaf5a6e212bb335891a39d8436667368e39f77ca2358b59af4",
           "fields": [
             "PAGE \\* arabic \\* MERGEFORMAT",
             "NUMPAGES \\* arabic \\* MERGEFORMAT"
@@ -52,13 +52,13 @@
         },
         {
           "part": "word/header1.xml",
-          "semantic_sha256": "8b6235e7291e604775aa00e19b8778822ee45bb3523acec82fccea5f6864ff60",
+          "semantic_sha256": "5d132aaf29fb39ec02cbf52dc8669d445af371e66a2cc7054824ec17acb8ad60",
           "fields": [],
           "table_count": 0
         },
         {
           "part": "word/header2.xml",
-          "semantic_sha256": "a5c2befdca06ee4e900e9b5c0e863a9059835c70091990ef8106f215de15b88a",
+          "semantic_sha256": "695f20a3be9df7364a33675c9e54ed2988eace3cbd732b9344174e589b7a0c94",
           "fields": [],
           "table_count": 0
         }
@@ -303,7 +303,7 @@
       ],
       "paragraph_rhythm": {
         "paragraph_count": 130,
-        "semantic_sha256": "3e7763cfff42c7e1e25cadcf475df2f82fcc5167e79da0924925a9dfde08b3d4"
+        "semantic_sha256": "04350a8d73b6a3aa78409284c653d180d0f5ef6b7605bc7cae47b4ab8349d922"
       },
       "pagination_relations": {
         "headings": [
@@ -475,12 +475,12 @@
       ],
       "styles": {
         "count": 63,
-        "semantic_sha256": "c02dd0fd0385ec2d1575cddd2c267d42ef547597fe0322c2668c4f3c4a83e72e"
+        "semantic_sha256": "2a7fb6cfe8d030c8993a71647b3f76085b34cc563bb51f2190da8a026949b448"
       },
       "numbering": {
         "abstract_count": 2,
         "number_count": 2,
-        "semantic_sha256": "d332081854f9e8170e5f62528544092e8761d6ec15828391b1dc2b814381a5d5"
+        "semantic_sha256": "26ae4201e1b6e7ae080948f9923c51f129bf83e639e681922394e98f7e87be5e"
       },
       "headers_footers": [
         {
@@ -503,7 +503,7 @@
         },
         {
           "part": "word/header1.xml",
-          "semantic_sha256": "d649e9cce45e5697b4cc76af766b6413954eb9c8c6d312342cb452fcb688e524",
+          "semantic_sha256": "3a1763e010519d9c61cb96d5aa461d781d1ea871252d520d055fc3d4afc18c5b",
           "fields": [
             "PAGE",
             "NUMPAGES"
@@ -618,7 +618,7 @@
           "row_count": 5,
           "repeating_header_rows": 5,
           "non_splitting_rows": 5,
-          "semantic_sha256": "eac2ec13f32cc2355d2cc33babadb0a8ac39f982cc12ead18026d45128cd1a06"
+          "semantic_sha256": "561ae518027142f9e2135432f1c1cbd3f28429402dd62a9cf9e5a81c815eb0d3"
         },
         {
           "grid_widths": [
@@ -629,7 +629,7 @@
           "row_count": 2,
           "repeating_header_rows": 1,
           "non_splitting_rows": 2,
-          "semantic_sha256": "04ae63e8c1292abd6659205c21dbd64af3f0eb9f839b6bcaadc54b930208bd8d"
+          "semantic_sha256": "637b1c0d4b5a63f24c0894c87f13d4d43996e6c12bff47e6167ef84aa1b5a40f"
         },
         {
           "grid_widths": [
@@ -654,7 +654,7 @@
           "row_count": 4,
           "repeating_header_rows": 2,
           "non_splitting_rows": 4,
-          "semantic_sha256": "0fc4989903bde8bf4b3acef3438cbaee70ed28cd14ff4e61271f6b42202e1882"
+          "semantic_sha256": "a0982a756502b3260d1b1b9a934b3c01f57f99f490f22cc544043c0dd15865dd"
         }
       ],
       "signature_blocks": [
@@ -825,7 +825,7 @@
       ],
       "paragraph_rhythm": {
         "paragraph_count": 260,
-        "semantic_sha256": "4d7e20dfd2ce76eb2d4cac771836711d9e09504e394b730fdc66d0b430ab298b"
+        "semantic_sha256": "240a7cbb999a232d9572bb43bdb670cde5d5594cbb24b739e648128357f08625"
       },
       "pagination_relations": {
         "headings": [

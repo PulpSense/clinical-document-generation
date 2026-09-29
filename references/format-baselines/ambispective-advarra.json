@@ -22,17 +22,17 @@
       ],
       "styles": {
         "count": 29,
-        "semantic_sha256": "9a66e9cba3ab2fde7a8aa0157ecd36bc7ace4d8aa4b49199157cb90bc7cc8b31"
+        "semantic_sha256": "5a703e07666e7ad4f8ab142dc4f9a79515d5f304591c3560a45700a2d943c020"
       },
       "numbering": {
         "abstract_count": 5,
         "number_count": 5,
-        "semantic_sha256": "df07a0e1edb169d1f8f6166b936ccb39af41510d20f92ea227c59b693c465121"
+        "semantic_sha256": "eb23f1a320134b5637dee5cfd75828ce65e0eda5b7445acffc5eee8430a942ba"
       },
       "headers_footers": [
         {
           "part": "word/footer1.xml",
-          "semantic_sha256": "cb99b4279100b3db4162348c62245f717cd1a1944a1ea2f24ae58d8a8035cf44",
+          "semantic_sha256": "211e5fc72df834da502f3504fe96f63876da0621c3583cd0a50d08c5a1657203",
           "fields": [],
           "table_count": 0
         },
@@ -50,7 +50,7 @@
         },
         {
           "part": "word/header1.xml",
-          "semantic_sha256": "434c2eb7780f487a919d8f4ff478db132fb389047c2f2e54c94e94fddf8b659f",
+          "semantic_sha256": "c0f8bc791898c8350f00873e9397c1fc28dfb2f154da0643afe0be0a3763273d",
           "fields": [
             "PAGE",
             "NUMPAGES"
@@ -88,7 +88,7 @@
           "row_count": 5,
           "repeating_header_rows": 5,
           "non_splitting_rows": 5,
-          "semantic_sha256": "d24981eae4fdeb6d4b255a32373094f969a1ca2a5fb540bf9cdc4857dd8bb0d6"
+          "semantic_sha256": "eb6e87d3d89bee9de3fad19c9a742de4b887bd80ea409b57986e63570b176b32"
         }
       ],
       "signature_blocks": [
@@ -260,7 +260,7 @@
       ],
       "paragraph_rhythm": {
         "paragraph_count": 111,
-        "semantic_sha256": "c06d7a4f27c7f2459021b455dbbf8ab64a544f1c5497471a46593763d299b076"
+        "semantic_sha256": "12e0e9a7db543443e20379c1af2ecf0ed806b09f6cc79220e913866fd5e46206"
       },
       "pagination_relations": {
         "headings": [
@@ -418,12 +418,12 @@
       ],
       "styles": {
         "count": 63,
-        "semantic_sha256": "c02dd0fd0385ec2d1575cddd2c267d42ef547597fe0322c2668c4f3c4a83e72e"
+        "semantic_sha256": "2a7fb6cfe8d030c8993a71647b3f76085b34cc563bb51f2190da8a026949b448"
       },
       "numbering": {
         "abstract_count": 2,
         "number_count": 2,
-        "semantic_sha256": "d332081854f9e8170e5f62528544092e8761d6ec15828391b1dc2b814381a5d5"
+        "semantic_sha256": "26ae4201e1b6e7ae080948f9923c51f129bf83e639e681922394e98f7e87be5e"
       },
       "headers_footers": [
         {
@@ -446,7 +446,7 @@
         },
         {
           "part": "word/header1.xml",
-          "semantic_sha256": "d649e9cce45e5697b4cc76af766b6413954eb9c8c6d312342cb452fcb688e524",
+          "semantic_sha256": "3a1763e010519d9c61cb96d5aa461d781d1ea871252d520d055fc3d4afc18c5b",
           "fields": [
             "PAGE",
             "NUMPAGES"
@@ -561,7 +561,7 @@
           "row_count": 4,
           "repeating_header_rows": 4,
           "non_splitting_rows": 4,
-          "semantic_sha256": "2e34bc2d9c8f541e98c7a1a76e2c8f8c595e5966c110d181282228dc46f13b21"
+          "semantic_sha256": "2600a4dc6ecd5dffd484bbb750b8971a8e6f9ddee0476c269793850254bc89e9"
         },
         {
           "grid_widths": [
@@ -572,7 +572,7 @@
           "row_count": 2,
           "repeating_header_rows": 1,
           "non_splitting_rows": 2,
-          "semantic_sha256": "04ae63e8c1292abd6659205c21dbd64af3f0eb9f839b6bcaadc54b930208bd8d"
+          "semantic_sha256": "637b1c0d4b5a63f24c0894c87f13d4d43996e6c12bff47e6167ef84aa1b5a40f"
         },
         {
           "grid_widths": [
@@ -596,7 +596,7 @@
           "row_count": 4,
           "repeating_header_rows": 2,
           "non_splitting_rows": 4,
-          "semantic_sha256": "5ae967b726e7a524567834115fcde64f4d21a3f41e468c74a42b5c84c4f94b21"
+          "semantic_sha256": "285a76f8e6a30c07da8cba1e3d18e35e9f9157f18c76b6812c9e4563af787126"
         }
       ],
       "signature_blocks": [
@@ -767,7 +767,7 @@
       ],
       "paragraph_rhythm": {
         "paragraph_count": 249,
-        "semantic_sha256": "b29c16cdfe7bbd9922fa1c3943f9ddb4e08686ceb25cad3e6c39e3bb9f28cd15"
+        "semantic_sha256": "32162df3dae8d2a70d20e855fe56fe7b8f6ceff746508e49a81ed51f7990df51"
       },
       "pagination_relations": {
         "headings": [

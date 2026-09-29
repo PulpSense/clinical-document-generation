@@ -76,7 +76,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/retrospective-protocol.json",
-        "sha256": "60eb1ad8eebc1146dab89ecaaa64c3cc1a27a56aee026fc7eb7cd3065ed1ab5a"
+        "sha256": "cfdec37f85062109212e08af916a3a3d5690ff9501fd5fad133212221dd1543a"
       },
       "baselines": [
         {
@@ -122,7 +122,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-advarra.json",
-        "sha256": "5889bb3c6c2c13b190c9f99db3eabfef8a1ba450fe02f10845fede5b8b200d8c"
+        "sha256": "558b372ba51a9ef37a222f190ffe8bb08758c837eeb0aa090814f8bde50abad6"
       },
       "baselines": [
         {
@@ -180,7 +180,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/prospective-sterling.json",
-        "sha256": "33c0d005fd6969b36ac77e7b0b60bf1fe818ac0b212c9fd5ac3fa12012f0333a"
+        "sha256": "23df2c97e33721c29f21ced0bf632c573c0d56b29f194937b5d955f127497fe9"
       },
       "baselines": [
         {
@@ -238,7 +238,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-advarra.json",
-        "sha256": "e3b142d247bfac900d5a86fd35175536c8f7610b915771ea878044c0ad2722fd"
+        "sha256": "74b46a36b74c49c71ee4ca6ae75ed59b2ee95c4cf0e9f551218cefd9be647a2f"
       },
       "baselines": [
         {
@@ -296,7 +296,7 @@
       },
       "approved_output_baseline": {
         "path": "references/format-baselines/ambispective-sterling.json",
-        "sha256": "244589cdfb944d3afaf2f09c88abc2124914c9f491aa002820cfde2a70389c2a"
+        "sha256": "ef197813546dc6fa298e7063f79d96b2dcc3c4effc8a76819a7e236aa3c3cd85"
       },
       "baselines": [
         {
@@ -345,5 +345,5 @@
       ]
     }
   ],
-  "matrix_sha256": "0e5439db7f5d0fa2b03985d3acc87baf419da877a4644a95dd53ace3a30f45ea"
+  "matrix_sha256": "58c64a98c034b1c26ad1c7297a866b5b82ec5b975a9c476f285d3c35de2da2f8"
 }

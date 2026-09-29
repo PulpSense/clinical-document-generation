@@ -10,10 +10,62 @@ from docx.shared import Inches, Pt
 import quality
 import workflow
 import drafting
-from contracts import batch_plan
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, batch_plan
+from rendering import _apply_font_substitutions
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("template", [
+    "retrospective-protocol", "prospective-protocol", "ambispective-protocol",
+    "prospective-icf", "ambispective-icf", "sterling-icf",
+])
+def test_approved_font_fallback_keeps_format_signature(template, tmp_path):
+    source = ROOT / "assets/client-templates/docx" / f"{template}.template.docx"
+    target_name = "protocol.docx" if "protocol" in template else "icf.docx"
+    original = tmp_path / "original" / target_name
+    fallback = tmp_path / "fallback" / target_name
+    original.parent.mkdir()
+    fallback.parent.mkdir()
+    original.write_bytes(source.read_bytes())
+    document = Document(source)
+    substitutions = {
+        font: APPROVED_PACKAGED_FONT_FALLBACKS[font.casefold()]
+        for font in quality._template_fonts(source)
+        if font.casefold() in APPROVED_PACKAGED_FONT_FALLBACKS
+    }
+    assert _apply_font_substitutions(document, substitutions) > 0
+    document.save(fallback)
+    assert quality.normalized_docx_format_signature(original) == quality.normalized_docx_format_signature(fallback)
+
+
+def test_font_normalization_does_not_hide_non_font_change(tmp_path):
+    source = ROOT / "assets/client-templates/docx/prospective-protocol.template.docx"
+    original = tmp_path / "original" / "protocol.docx"
+    changed = tmp_path / "changed" / "protocol.docx"
+    original.parent.mkdir()
+    changed.parent.mkdir()
+    original.write_bytes(source.read_bytes())
+    document = Document(source)
+    normal = next(style for style in document.styles if style.style_id == "Normal")
+    normal.paragraph_format.left_indent = Inches(0.5)
+    document.save(changed)
+    assert quality.normalized_docx_format_signature(original) != quality.normalized_docx_format_signature(changed)
+
+
+def test_unapproved_font_change_remains_visible(tmp_path):
+    source = ROOT / "assets/client-templates/docx/prospective-protocol.template.docx"
+    original = tmp_path / "original" / "protocol.docx"
+    changed = tmp_path / "changed" / "protocol.docx"
+    original.parent.mkdir()
+    changed.parent.mkdir()
+    original.write_bytes(source.read_bytes())
+    document = Document(source)
+    normal = next(style for style in document.styles if style.style_id == "Normal")
+    normal.font.name = "Unapproved Test Font"
+    document.save(changed)
+    assert quality.normalized_docx_format_signature(original) != quality.normalized_docx_format_signature(changed)
 
 
 def test_recorded_sterling_purpose_names_primary_outcome(tmp_path):

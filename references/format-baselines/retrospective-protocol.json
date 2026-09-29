@@ -22,12 +22,12 @@
       ],
       "styles": {
         "count": 64,
-        "semantic_sha256": "18175950a0c21d4d56cfe698efbc90febb37ea04f264cab6ca9ee1b6948d6947"
+        "semantic_sha256": "67a359af22185e3274790bf8c6cdcc75938ac0a550cfb00199c2e615f7f48900"
       },
       "numbering": {
         "abstract_count": 1,
         "number_count": 1,
-        "semantic_sha256": "fd859ddf4f10a72ba383094488eb688e5367bce957a945b803b3d936dfd48d49"
+        "semantic_sha256": "ca474d3a15d9e1325582ca94e5955a8f2529ae6067d8697f962efa085e43bf46"
       },
       "headers_footers": [
         {
@@ -50,7 +50,7 @@
         },
         {
           "part": "word/header1.xml",
-          "semantic_sha256": "97ebb1fa5d66fa888f94464c61b67592bd3906f6f0a80100fe97f3c8ffd12f50",
+          "semantic_sha256": "b144847a5c9da9dfbff7ca9ae4e7ec7053b55ee151fd6b4c0d17ba1143be2517",
           "fields": [
             "PAGE",
             "NUMPAGES"
@@ -221,7 +221,7 @@
       ],
       "paragraph_rhythm": {
         "paragraph_count": 111,
-        "semantic_sha256": "52f37cc84f56b182203f033137f267a42f627b37d82b43998f94bd984ac45189"
+        "semantic_sha256": "6c2e158127c98fd99a451b2f6b74617ffb582830ec8ddd65c6b6da16b42e6d2a"
       },
       "pagination_relations": {
         "headings": [
