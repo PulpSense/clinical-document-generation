@@ -153,6 +153,25 @@ def _icf_procedure_parts(model: Mapping[str, Any]) -> tuple[str, str]:
     return _overview_and_detail(_icf_text(model, "icf.procedures"))
 
 
+def _icf_duration_text(reference: Mapping[str, Any], model: Mapping[str, Any]) -> str:
+    """Keep the Advarra duration and expected-enrollment heading complete."""
+    duration = _icf_text(model, "icf.duration")
+    if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() != "advarra":
+        return duration
+    enrollment = _text(get_path(reference, "population.sample_size")).strip().rstrip(".")
+    if not enrollment:
+        return duration
+    expected_numbers = set(re.findall(r"\b\d+\b", enrollment))
+    count_context = all(
+        re.search(rf"\b{re.escape(number)}\b[^.!?]{{0,60}}\b(?:participants?|patients?|subjects?|people)\b", duration, re.I)
+        for number in expected_numbers
+    ) if expected_numbers else False
+    if enrollment.casefold() in duration.casefold() or count_context:
+        return duration
+    sentence = f"The study plans to enroll {enrollment}."
+    return " ".join(part for part in (duration, sentence) if part)
+
+
 def _icf_summary_parts(model: Mapping[str, Any]) -> tuple[str, str, str, str, str]:
     """Return the five independently drafted KEY INFORMATION concept blocks."""
     draft = model.get("icf", {}).get("icf.key-information-summary", {})
@@ -395,7 +414,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "AI_keyPurpose": key_purpose, "AI_keyParticipation": key_participation,
         "AI_keyRisks": key_risks, "AI_keyBenefits": key_benefits, "AI_keyAlternatives": key_alternatives,
         "AI_studyPurpose": _icf_text(model, "icf.study-purpose"), "AI_icfVisitsOverview": icf_visits_overview,
-        "AI_visitsDetails": icf_visit_details, "AI_visitsAndLength": _icf_text(model, "icf.duration"),
+        "AI_visitsDetails": icf_visit_details, "AI_visitsAndLength": _icf_duration_text(reference, model),
         "AI_interventionPossibleSideEffects": _icf_text(model, "icf.risks"), "AI_payment": _icf_text(model, "icf.payment"),
         "AI_costs": _icf_text(model, "icf.costs"), "AI_alternatives": _icf_text(model, "icf.alternatives"),
         "AI_privacy": _icf_text(model, "icf.privacy"), "AI_injuryCompensation": _icf_text(model, "icf.injury"),
@@ -1079,13 +1098,10 @@ def _replace_protocol_leaf_bodies(
                 block for block in blocks
                 if _layout_target_key(block[0]) not in caption_keys
             ]
-        if section.section_id == "evaluation-procedures" and sum(
-            len(text.split()) for text, _is_list in blocks
-        ) > 24:
-            # The source-derived matrix and notes own the visit inventory.
-            # Keep a long draft from repeating it ahead of a near-full-page
-            # table; the short connective states no new clinical fact.
-            blocks = [("The approved visits and assessments are summarized in Table 15.1.", False)]
+        if section.section_id == "evaluation-procedures":
+            # The source-derived matrix and notes own the activity and timing
+            # detail. A neutral introduction cannot misdescribe table columns.
+            blocks = [("The scheduled visits and study activities are shown in Table 15.1.", False)]
         if branch == "Retrospective" and section.section_id == "subjects.eligibility":
             blocks = _retrospective_eligibility_blocks(reference)
         if branch == "Retrospective" and section.section_id == "study-procedure.enrollment":
@@ -1958,6 +1974,19 @@ def _populate_icf_sections(
                 text.casefold() for text, _is_list in blocks
             ):
                 blocks.append((retention, False))
+            visible = " ".join(text.casefold() for text, _is_list in blocks)
+            missing_windows = [
+                (str(visit.get("visit") or "").strip(), str(visit.get("timing") or "").strip())
+                for visit in normalized_visit_records(reference)
+                if str(visit.get("timing") or "").strip()
+                and str(visit.get("timing") or "").strip().casefold() not in visible
+            ]
+            if missing_windows:
+                windows = "; ".join(
+                    f"{name} ({timing})" if name else timing
+                    for name, timing in missing_windows
+                )
+                blocks.append((f"Scheduled visit windows: {windows}.", False))
         if heading is None:
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)

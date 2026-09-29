@@ -519,6 +519,36 @@ def test_timeline_does_not_become_unsupplied_study_closeout_trigger(tmp_path):
     assert "Study closeout follows" not in visible
 
 
+def test_advarra_duration_and_procedures_preserve_enrollment_and_visit_windows(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/prospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["meta"]["icf_template"] = "Advarra"
+    reference["population"]["sample_size"] = "40 participants"
+    reference["procedures"]["visit_schedule_table"] = [
+        {"visitNumber": "1", "visitName": "Baseline", "visitWindow": "Day 0", "CRFnumber": "BL"},
+        {"visitNumber": "2", "visitName": "Month 1", "visitWindow": "Day 30 +/- 7", "CRFnumber": "M1"},
+        {"visitNumber": "3", "visitName": "Month 3", "visitWindow": "Day 90 +/- 7", "CRFnumber": "M3"},
+    ]
+    model = {
+        "protocol": [{"section_id": "evaluation-procedures", "paragraphs": [{
+            "text": "The table lists case report form identifiers and supplemental notes."
+        }], "lists": []}],
+        "icf": {
+            "icf.duration": {"paragraphs": [{"text": "Your participation will last 3 months."}], "lists": []},
+            "icf.procedures": {"paragraphs": [{"text": "Assessments occur at baseline, Month 1, and Month 3."}], "lists": []},
+        },
+        "prs": {},
+    }
+    render_documents(ROOT, tmp_path, reference, model)
+    icf = _visible_text(Document(tmp_path / "candidate/icf.docx"))
+    protocol = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
+    assert "The study plans to enroll 40 participants." in icf
+    assert "Month 1 (Day 30 +/- 7)" in icf
+    assert "Month 3 (Day 90 +/- 7)" in icf
+    assert "The scheduled visits and study activities are shown in Table 15.1." in protocol
+
+
 @pytest.mark.parametrize(
     "minimum_interval",
     (90, "90 days", "90 days before screening", "At least 90 days before screening"),
