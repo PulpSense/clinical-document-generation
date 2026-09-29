@@ -2477,6 +2477,16 @@ def renderers(
                     office_candidates.append((renderer_path, "active installation smoke"))
         except (OSError, ValueError, AttributeError, TypeError, json.JSONDecodeError):
             pass
+        if system == "Linux" and skill_root.parent.name == "skills":
+            profile_root = skill_root.parent.parent.resolve()
+            for name in ("libreoffice", "soffice"):
+                candidate = profile_root / "clinical-office-runtime/bin" / name
+                try:
+                    resolved = candidate.resolve(strict=True)
+                    if resolved.is_relative_to(profile_root) and resolved.is_file():
+                        office_candidates.append((resolved, "Hermes profile office runtime"))
+                except (OSError, ValueError):
+                    pass
     office_candidates.extend(_executable_candidates(("libreoffice", "soffice"), environment=environment))
     if system == "Darwin":
         office_candidates.append((Path("/Applications/LibreOffice.app/Contents/MacOS/soffice"), "macOS application"))

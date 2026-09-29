@@ -71,6 +71,28 @@ def test_study_operation_finds_renderer_that_passed_installation_smoke(tmp_path,
     assert all(item["path"] != str(executable) for item in stale_candidates)
 
 
+def test_unsigned_manual_review_discovers_profile_office_with_restricted_worker_path(tmp_path, monkeypatch):
+    profile = tmp_path / "profile"
+    root = profile / "skills/clinical-document-generation"
+    root.mkdir(parents=True)
+    office_bin = profile / "clinical-office-runtime/bin"
+    office_bin.mkdir(parents=True)
+    executable = office_bin / "libreoffice"
+    executable.write_text("#!/bin/sh\nprintf 'LibreOffice 25.2.7.2\\n'\n", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{office_bin}:/usr/bin:/bin")
+    monkeypatch.setattr(quality.platform, "system", lambda: "Linux")
+
+    smoke = quality.renderers(environment=dict(workflow.os.environ), skill_root=root)
+    worker_environment = workflow._production_subprocess_environment(root)
+    worker = quality.renderers(environment=worker_environment, skill_root=root)
+
+    assert not (root / "INSTALLATION-ASSURANCE.json").exists()
+    assert worker_environment["PATH"] == "/usr/bin:/bin:/usr/sbin:/sbin"
+    assert smoke and smoke[0]["path"] == str(executable)
+    assert any(item["path"] == str(executable) for item in worker)
+
+
 def test_logged_out_worker_stops_before_creating_the_deadline(tmp_path, monkeypatch):
     root = tmp_path / "profile/skills/clinical-document-generation"
     root.mkdir(parents=True)

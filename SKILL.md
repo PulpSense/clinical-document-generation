@@ -75,6 +75,12 @@ smoke-tests the exact DOCX-to-PDF-to-page-image path through the host's Word or
 LibreOffice installation. Do not use `--install-release` for this unsigned
 drop-in path. That command remains reserved for a signed, fully certified
 archive.
+`--verify-installation` returns a smoke report; do not write that report as
+`INSTALLATION-ASSURANCE.json` or create `PROMOTION-RECORD.json` for an unsigned
+candidate. Those files are governed promotion state. On the Hermes host, a
+rootless office launcher under the profile's `clinical-office-runtime/bin`
+is discoverable during manual review even when isolated workers use a restricted
+`PATH`.
 
 The release carries its pinned Linux x86_64 PDFium page renderer. Microsoft
 Word or LibreOffice remains the host prerequisite for DOCX-to-PDF rendering.
