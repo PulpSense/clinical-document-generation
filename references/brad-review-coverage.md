@@ -32,3 +32,7 @@ This release narrows the Introduction and Objectives evidence, adds a background
 ## Completion gate
 
 After receiving the study input, generate Protocol and ICF from the same approved source. Inspect every comment target in the rendered Protocol, compare the ICF with the selected template, run exact-artifact content and page review, and record pass or a specific remaining defect for each row above. Prompt and unit-test coverage alone cannot mark Brad's prose comments verified.
+
+## 29 September Ambispective privacy test
+
+The synthetic Ambispective Sentinel Patch input supplied study-ID assignment, access restrictions, storage, retention, and disclosure procedures. The delivered Protocol Section 16 and ICF privacy language preserved those facts, demonstrating that Brad comment 13 can be satisfied when the approved source contains operational detail. The same Protocol repeated most Section 16 detail in Section 14.1 and restated the approximately 14-week follow-up in Sections 18.1 and 18.5. Section 14.1 now owns only distinct approved ethics rules and a short cross-reference; when no participant-completion rule is supplied, Section 18.1 requests the completion/discontinuation distinction without repeating the study timeline. These are drafting-request corrections, not a claim that a new model-generated run has verified their effect.

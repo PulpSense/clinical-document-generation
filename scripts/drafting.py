@@ -472,14 +472,16 @@ def _section_payload(
         minimum_evidence = [path for path in minimum_evidence if path == "procedures.completion"]
     if section.section_id == "endpoint-criteria.completion" and not meaningful(get_path(reference, "procedures.completion")):
         # A visit itinerary and follow-up duration do not establish a formal
-        # participant-completion rule. The source still supplies that context
-        # to the batch, but Section 18.1 owns only the approved timeline here.
+        # participant-completion rule. Keep the approved timeline available as
+        # context, while Section 18.5 owns its study-level recital.
         minimum_evidence = [path for path in minimum_evidence if path == "study.timeline"]
         boilerplate_items = []
         allowed = ["agent_draft"]
         content_expectations = [
-            "Describe only the approved participant follow-up period and distinguish completion from discontinuation. "
-            "No participant-completion criterion was supplied; do not derive one from the scheduled visits or exit form."
+            "State concisely that participant completion and discontinuation are distinct dispositions. "
+            "Use the approved timeline as context without restating the study-wide timeline, follow-up duration, "
+            "month labels, or visit schedule owned by Sections 9, 15, and 18.5. No participant-completion "
+            "criterion was supplied; do not derive one from the scheduled visits or exit form."
         ]
     return {
         "section_id": section.section_id,

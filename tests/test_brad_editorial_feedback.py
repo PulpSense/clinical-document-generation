@@ -184,6 +184,36 @@ def test_completion_and_bias_contracts_do_not_require_repeated_design_or_visit_i
     assert "study.timeline" in sections["endpoint-criteria.study-completion"].evidence
 
 
+def test_ambispective_privacy_and_completion_requests_keep_distinct_section_owners():
+    source = json.loads((ROOT / "tests/fixtures/release-certification/ambispective-sterling/approved-reference.json").read_text())
+    source["confidentiality"]["data_handling"] = (
+        "Study IDs replace names in the analysis dataset. The identity link is encrypted and "
+        "restricted to the investigator. Records are retained for three years after closeout."
+    )
+    source["study"]["timeline"] = (
+        "Historical record review plus prospective baseline through Month 3 follow-up, "
+        "with prospective participation lasting approximately 14 weeks."
+    )
+    sections = {item.section_id: item for item in protocol_contract("Ambispective")}
+    boilerplate = json.loads((ROOT / "references/fixed-clinical-boilerplate.json").read_text())["sections"]
+
+    ethics = _section_payload(sections["ethics.confidentiality"], boilerplate, source)
+    privacy = _section_payload(sections["confidentiality"], boilerplate, source)
+    participant = _section_payload(sections["endpoint-criteria.completion"], boilerplate, source)
+    study = _section_payload(sections["endpoint-criteria.study-completion"], boilerplate, source)
+
+    assert "confidentiality.data_handling" not in ethics["minimum_evidence"]
+    assert "confidentiality.data_handling" in privacy["minimum_evidence"]
+    assert participant["minimum_evidence"] == ["study.timeline"]
+    assert "study.timeline" in study["minimum_evidence"]
+    assert "do not restate" in " ".join(ethics["content_expectations"]).casefold()
+    assert "study-wide timeline" in " ".join(participant["content_expectations"]).casefold()
+
+    source["ethics"] = {"confidentiality": "The ethics committee may inspect source records on site."}
+    ethics_with_rule = _section_payload(sections["ethics.confidentiality"], boilerplate, source)
+    assert "ethics.confidentiality" in ethics_with_rule["minimum_evidence"]
+
+
 def test_design_and_analysis_requests_keep_each_fact_in_its_own_section():
     source = _source()
     source["design"]["treatment_assignment"] = (
