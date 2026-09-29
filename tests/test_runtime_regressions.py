@@ -4092,6 +4092,33 @@ def test_mixed_no_progress_continues_all_unresolved_repairable_companions(tmp_pa
     assert observed["findings"] == [drafting, visual]
 
 
+def test_repeated_no_progress_same_strategy_is_exhausted(tmp_path, monkeypatch):
+    finding = {
+        "strategy_id": "drafting_defect:retry_drafting_target:sterling_clause_contract:icf.study-purpose",
+        "target_ids": ["icf.study-purpose"],
+        "recovery_class": "drafting_defect",
+    }
+    history = [dict(finding, recovery_attempt_path=f"attempts/recovery-no-progress-a{index:02d}") for index in range(1, 4)]
+    stalled = workflow._repeated_no_progress_findings(history, [finding])
+    assert len(stalled) == 1
+    assert stalled[0]["field"] == "repeated_no_progress"
+    assert stalled[0]["no_progress_attempts"] == 3
+    assert not workflow._repeated_no_progress_findings(history[:2], [finding])
+    monkeypatch.setattr(workflow, "_candidate_outputs", lambda revision: [])
+    monkeypatch.setattr(
+        workflow, "_repair_block",
+        lambda run, stage, findings, **kwargs: {"status": "blocked", "stage": stage, "findings": findings},
+    )
+    result = workflow._continue_repairable_no_progress(
+        tmp_path, tmp_path / "reference.json", {"generation": {"no_progress_history": history}},
+        _source(), tmp_path / "revisions/r-test", {}, [finding], contracted_bundle={},
+        operation_deadline=None, clock=lambda: 0.0, stage_observer=None,
+        require_promoted_runtime=False,
+    )
+    assert result["status"] == "blocked"
+    assert result["stage"] == "internal_recovery_stalled"
+
+
 def test_shared_prs_record_progress_is_measured_per_target(tmp_path):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"

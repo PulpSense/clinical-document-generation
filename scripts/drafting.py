@@ -2781,7 +2781,14 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
                 exclusion = value_text(source.get("population.exclusion_criteria")).rstrip(".")
                 prose = f"Participants must meet these inclusion criteria: {inclusion}. Participants are excluded when these criteria apply: {exclusion}."
             elif section_id.endswith("exclusion"): prose = f"Eligibility will be determined using these criteria: {value.rstrip('.')} ."
-            elif section_id == "icf.study-purpose": prose = f"The purpose of this study is to {value.rstrip('.').removesuffix(' outcomes').casefold()} outcomes."
+            elif section_id == "icf.study-purpose":
+                prose = f"The purpose of this study is to {value.rstrip('.').removesuffix(' outcomes').casefold()} outcomes."
+                hypothesis = value_text(source.get("study.hypothesis")).rstrip(".")
+                endpoint = value_text(source.get("endpoints.primary")).rstrip(".")
+                if hypothesis:
+                    prose += f" The researchers' hypothesis is: {hypothesis}."
+                if endpoint:
+                    prose += f" The primary endpoint, or main outcome, is {endpoint}."
             elif section_id == "icf.procedures": prose = f"If you choose to take part, the study team will complete these assessments: {value.rstrip('.')} ."
             elif section_id == "icf.duration": prose = f"Your participation is expected to last {value.rstrip('.')} ."
             elif section_id == "icf.risks": prose = f"The possible risks or discomforts include {value.rstrip('.').casefold()}."

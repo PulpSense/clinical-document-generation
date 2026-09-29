@@ -8422,6 +8422,36 @@ def _internalize_no_progress_findings(
     return normalized
 
 
+def _repeated_no_progress_findings(
+    history: Sequence[Mapping[str, Any]],
+    current: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Bound unchanged recovery attempts for one exact strategy and target."""
+    stalled = []
+    for finding in current:
+        strategy = str(finding.get("strategy_id") or "")
+        targets = tuple(sorted(str(item) for item in finding.get("target_ids", [])))
+        attempts = {
+            str(item.get("recovery_attempt_path"))
+            for item in history
+            if str(item.get("strategy_id") or "") == strategy
+            and tuple(sorted(str(target) for target in item.get("target_ids", []))) == targets
+            and item.get("recovery_attempt_path")
+        }
+        if strategy and len(attempts) >= 3:
+            stalled.append({
+                **dict(finding),
+                "category": "recovery",
+                "field": "repeated_no_progress",
+                "no_progress_attempts": len(attempts),
+                "issue": (
+                    "The same recovery strategy made no candidate change across "
+                    "three distinct completed attempts."
+                ),
+            })
+    return stalled
+
+
 def _continue_repairable_no_progress(
     run_dir: Path,
     reference_path: Path,
@@ -8460,6 +8490,17 @@ def _continue_repairable_no_progress(
         )
     if not all(item.get("recovery_class") in {"visual_defect", "drafting_defect"} for item in findings):
         return None
+    stalled = _repeated_no_progress_findings(
+        list(get_path(working_reference, "generation.no_progress_history", []) or []),
+        findings,
+    )
+    if stalled:
+        return _repair_block(
+            run_dir,
+            "internal_recovery_stalled",
+            stalled,
+            candidate_outputs=_candidate_outputs(revision_dir),
+        )
     try:
         continuation_findings = _internalize_no_progress_findings(
             revision_dir, working_reference, findings,

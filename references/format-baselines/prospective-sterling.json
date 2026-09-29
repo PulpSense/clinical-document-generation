@@ -1,400 +1,11 @@
 {
   "artifacts": {
     "icf.docx": {
-      "consent_legal_placement": [
-        {
-          "categories": [
-            "consent"
-          ],
-          "paragraph": 0,
-          "style": "HeadingICFSection",
-          "text_sha256": "080c572a58e0e204c1a419dddeb21223ab0465df277b6a9dc7120426c5275b4e"
-        },
-        {
-          "categories": [
-            "authorization"
-          ],
-          "paragraph": 1,
-          "style": "HeadingICFSection",
-          "text_sha256": "40d8ba603e48457db92a8615123ab158ee877eeb0b8269b162eba31a1c567484"
-        },
-        {
-          "categories": [
-            "consent",
-            "voluntary"
-          ],
-          "paragraph": 20,
-          "style": "",
-          "text_sha256": "2747cd0b21cbdd529532b6514f221865df6ff618953ab89ab33b936f5fd94e73"
-        },
-        {
-          "categories": [
-            "consent"
-          ],
-          "paragraph": 22,
-          "style": "",
-          "text_sha256": "80cd90cd10820bdc7ba3af6c55d5b25fae83257a593d651480e8c1756ef6c56b"
-        },
-        {
-          "categories": [
-            "consent",
-            "privacy"
-          ],
-          "paragraph": 30,
-          "style": "",
-          "text_sha256": "6e86c38312b33e8d390a988d8f680bfc7979014837cd3163799fbc67eca54322"
-        },
-        {
-          "categories": [
-            "voluntary"
-          ],
-          "paragraph": 32,
-          "style": "",
-          "text_sha256": "9b1ce940d06ef753bf0cbd9bd34cfbb4413c4e7c658c12af63b8f89eac3d23ed"
-        },
-        {
-          "categories": [
-            "consent"
-          ],
-          "paragraph": 56,
-          "style": "",
-          "text_sha256": "1e448bae9d45fef8178656220e19e02a186245079c0e848897ce43b645722fbe"
-        },
-        {
-          "categories": [
-            "consent"
-          ],
-          "paragraph": 60,
-          "style": "",
-          "text_sha256": "e7b1c40ffe0df8fa37e92b3e4fa4dff723855e32611b5c1c5f4443ffe486234c"
-        },
-        {
-          "categories": [
-            "privacy"
-          ],
-          "paragraph": 61,
-          "style": "",
-          "text_sha256": "eeaa23f8229809b3f700310f58af564c11bac1e0c1b2e082fd8f063793804f58"
-        },
-        {
-          "categories": [
-            "voluntary"
-          ],
-          "paragraph": 69,
-          "style": "",
-          "text_sha256": "9b1ce940d06ef753bf0cbd9bd34cfbb4413c4e7c658c12af63b8f89eac3d23ed"
-        },
-        {
-          "categories": [
-            "compensation"
-          ],
-          "paragraph": 74,
-          "style": "HeadingICFSection",
-          "text_sha256": "9659368ad5802c6609519a9d8db84874fb4c512d7ed4de4b667fb81ada323047"
-        },
-        {
-          "categories": [
-            "compensation"
-          ],
-          "paragraph": 75,
-          "style": "",
-          "text_sha256": "57d25c251436680882c1c9e35f14f3033f8783a4d8bba5ad3a711e3d4f2b58fc"
-        },
-        {
-          "categories": [
-            "withdraw",
-            "voluntary"
-          ],
-          "paragraph": 81,
-          "style": "HeadingICFSection",
-          "text_sha256": "d9481562ba3d7336e6a7d9218cb80aaa2d5112d380bede471b7e61ec96d115bb"
-        },
-        {
-          "categories": [
-            "consent",
-            "withdraw",
-            "voluntary"
-          ],
-          "paragraph": 83,
-          "style": "",
-          "text_sha256": "7536e82da9434b6b33c6a169fa076f676d20374f84346c1ad635d3dadc552d15"
-        },
-        {
-          "categories": [
-            "compensation"
-          ],
-          "paragraph": 84,
-          "style": "HeadingICFSection",
-          "text_sha256": "e566edd09bf713ef4c6e66e865534586e2f854bfcb75895d4313737a87a2f4f1"
-        },
-        {
-          "categories": [
-            "injury"
-          ],
-          "paragraph": 86,
-          "style": "",
-          "text_sha256": "2eec53f4741ab820569de18be0fb6d0505712b7b1cb11157bc985dffdf529477"
-        },
-        {
-          "categories": [
-            "injury"
-          ],
-          "paragraph": 87,
-          "style": "",
-          "text_sha256": "c42eb7656e102ef4e2abc6c794c3d8574dbf86e62297a2e5217c6f2a8743c34a"
-        },
-        {
-          "categories": [
-            "authorization",
-            "confidential"
-          ],
-          "paragraph": 89,
-          "style": "HeadingICFSection",
-          "text_sha256": "2fe1f94fe7af6179eec60c1ff27dfd4affc9c9bd50b9043c5513282b7c71ed2e"
-        },
-        {
-          "categories": [
-            "privacy",
-            "confidential"
-          ],
-          "paragraph": 92,
-          "style": "",
-          "text_sha256": "7c1f400f686c1006903dd10c0499a10af3f690869ddb4f803006580ea0425256"
-        },
-        {
-          "categories": [
-            "authorization"
-          ],
-          "paragraph": 98,
-          "style": "HeadingICFSection",
-          "text_sha256": "4727ac5d580f7596404fa3b7f290b3d12d33769618602a2af62bf6c92047322c"
-        },
-        {
-          "categories": [
-            "consent",
-            "authorization"
-          ],
-          "paragraph": 100,
-          "style": "",
-          "text_sha256": "52a8280198417d9555bee20bd772964477b8c47558402fad4113ebe978402a83"
-        },
-        {
-          "categories": [
-            "consent"
-          ],
-          "paragraph": 118,
-          "style": "",
-          "text_sha256": "91a13e490a9965f56f30d4f84e9890ab4734259c7f24e1df9908cd7d57df7482"
-        }
-      ],
-      "fields_toc": {
-        "codes": [],
-        "update_fields": true
-      },
-      "headers_footers": [
-        {
-          "fields": [
-            "PAGE \\* arabic \\* MERGEFORMAT",
-            "NUMPAGES \\* arabic \\* MERGEFORMAT"
-          ],
-          "part": "word/footer1.xml",
-          "semantic_sha256": "776001fdff89bf146c1e1d2b706cf54d8441ab8b14390608ba6d6ecd8900b7a9",
-          "table_count": 0
-        },
-        {
-          "fields": [
-            "PAGE \\* arabic \\* MERGEFORMAT",
-            "NUMPAGES \\* arabic \\* MERGEFORMAT"
-          ],
-          "part": "word/footer2.xml",
-          "semantic_sha256": "9e357f04e76628f6878fd6e8b09aa7bc83d34a22862271d56b9cd023f595a337",
-          "table_count": 0
-        },
-        {
-          "fields": [],
-          "part": "word/header1.xml",
-          "semantic_sha256": "8b6235e7291e604775aa00e19b8778822ee45bb3523acec82fccea5f6864ff60",
-          "table_count": 0
-        },
-        {
-          "fields": [],
-          "part": "word/header2.xml",
-          "semantic_sha256": "a5c2befdca06ee4e900e9b5c0e863a9059835c70091990ef8106f215de15b88a",
-          "table_count": 0
-        }
-      ],
-      "numbering": {
-        "abstract_count": 11,
-        "number_count": 11,
-        "semantic_sha256": "8e683e6493e6c97db4775b5aec9c8cadd9a347049b2a6ab19e782e75cdcce4fe"
-      },
-      "page_furniture": {
-        "footer_count": 2,
-        "header_count": 2,
-        "page_field_count": 4
-      },
-      "pagination_relations": {
-        "all_headings_keep_with_next": true,
-        "first_numbered_body_paragraph": null,
-        "headings": [
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 0,
-            "style": "HeadingICFSection",
-            "text": "PARTICIPANT INFORMED CONSENT FORM AND"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 1,
-            "style": "HeadingICFSection",
-            "text": "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 7,
-            "style": "HeadingICFSection",
-            "text": "STUDY"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 8,
-            "style": "HeadingICFSection",
-            "text": "INVESTIGATOR"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 15,
-            "style": "HeadingICFSection",
-            "text": "TELEPHONE:555-0101"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 24,
-            "style": "HeadingICFSection",
-            "text": "KEY INFORMATION"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 34,
-            "style": "HeadingICFSection",
-            "text": "BACKGROUND"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 38,
-            "style": "HeadingICFSection",
-            "text": "PURPOSE"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 44,
-            "style": "HeadingICFSection",
-            "text": "DURATION"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 52,
-            "style": "HeadingICFSection",
-            "text": "PROCEDURES"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 58,
-            "style": "HeadingICFSection",
-            "text": "POTENTIAL RISKS, SIDE EFFECTS, DISCOMFORTS, INCONVENIENCES"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 63,
-            "style": "HeadingICFSection",
-            "text": "POTENTIAL BENEFITS"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 67,
-            "style": "HeadingICFSection",
-            "text": "ALTERNATIVE TREATMENTS"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 71,
-            "style": "HeadingICFSection",
-            "text": "NEW INFORMATION"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 74,
-            "style": "HeadingICFSection",
-            "text": "COMPENSATION TO YOU"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 77,
-            "style": "HeadingICFSection",
-            "text": "COSTS TO YOU"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 81,
-            "style": "HeadingICFSection",
-            "text": "VOLUNTARY PARTICIPATION/WITHDRAWAL"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 84,
-            "style": "HeadingICFSection",
-            "text": "STUDY COMPLICATIONS AND COMPENSATION"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 89,
-            "style": "HeadingICFSection",
-            "text": "CONFIDENTIALITY AND AUTHORIZATION TO COLLECT, USE AND DISCLOSE YOUR MEDICAL INFORMATION"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 94,
-            "style": "HeadingICFSection",
-            "text": "QUESTIONS"
-          },
-          {
-            "keep_with_next": true,
-            "page_break_before": false,
-            "paragraph": 98,
-            "style": "HeadingICFSection",
-            "text": "PARTICIPANT STATEMENT AND AUTHORIZATION"
-          }
-        ],
-        "numbered_body_has_no_artificial_starts": true
-      },
-      "paragraph_rhythm": {
-        "paragraph_count": 127,
-        "semantic_sha256": "f62ff968d3f3b066f65424ff1aee8c88db0986aeec98d492b84ec2415aa58ab8"
-      },
       "section_geometry": [
         {
-          "cols": {
-            "space": "720"
+          "pgSz": {
+            "h": "15840",
+            "w": "12240"
           },
           "pgMar": {
             "bottom": "1800",
@@ -405,45 +16,442 @@
             "right": "1440",
             "top": "1939"
           },
-          "pgSz": {
-            "h": "15840",
-            "w": "12240"
+          "cols": {
+            "space": "720"
           },
           "type": null
-        }
-      ],
-      "signature_blocks": [
-        {
-          "paragraph": 22,
-          "style": "",
-          "text_sha256": "80cd90cd10820bdc7ba3af6c55d5b25fae83257a593d651480e8c1756ef6c56b"
-        },
-        {
-          "paragraph": 102,
-          "style": "",
-          "text_sha256": "41a7751eb5a04ddcef36950751442198e713bf63ffd7b8c30755367fb09c4d83"
-        },
-        {
-          "paragraph": 114,
-          "style": "",
-          "text_sha256": "873d9eb1999b7d96bd1d21828ffb95bec923f0301a6a3a180a7c227dfbfb820f"
-        },
-        {
-          "paragraph": 122,
-          "style": "",
-          "text_sha256": "d69c833698d4a35883cbfb4ced45d2b55f5cd9c44cd36e79187b0763a6bf53a1"
-        },
-        {
-          "paragraph": 126,
-          "style": "",
-          "text_sha256": "24f4c02f848219bc00c66d3acc01d00c55f52a14846995a9e9c4efc8393fdec1"
         }
       ],
       "styles": {
         "count": 83,
         "semantic_sha256": "a8a3cbd246370108f774bb0947fd485f2a7f26028b01d5302bfcb03b2d199881"
       },
-      "table_geometry": []
+      "numbering": {
+        "abstract_count": 11,
+        "number_count": 11,
+        "semantic_sha256": "8e683e6493e6c97db4775b5aec9c8cadd9a347049b2a6ab19e782e75cdcce4fe"
+      },
+      "headers_footers": [
+        {
+          "part": "word/footer1.xml",
+          "semantic_sha256": "776001fdff89bf146c1e1d2b706cf54d8441ab8b14390608ba6d6ecd8900b7a9",
+          "fields": [
+            "PAGE \\* arabic \\* MERGEFORMAT",
+            "NUMPAGES \\* arabic \\* MERGEFORMAT"
+          ],
+          "table_count": 0
+        },
+        {
+          "part": "word/footer2.xml",
+          "semantic_sha256": "9e357f04e76628f6878fd6e8b09aa7bc83d34a22862271d56b9cd023f595a337",
+          "fields": [
+            "PAGE \\* arabic \\* MERGEFORMAT",
+            "NUMPAGES \\* arabic \\* MERGEFORMAT"
+          ],
+          "table_count": 0
+        },
+        {
+          "part": "word/header1.xml",
+          "semantic_sha256": "8b6235e7291e604775aa00e19b8778822ee45bb3523acec82fccea5f6864ff60",
+          "fields": [],
+          "table_count": 0
+        },
+        {
+          "part": "word/header2.xml",
+          "semantic_sha256": "a5c2befdca06ee4e900e9b5c0e863a9059835c70091990ef8106f215de15b88a",
+          "fields": [],
+          "table_count": 0
+        }
+      ],
+      "fields_toc": {
+        "codes": [],
+        "update_fields": true
+      },
+      "page_furniture": {
+        "header_count": 2,
+        "footer_count": 2,
+        "page_field_count": 4
+      },
+      "table_geometry": [],
+      "signature_blocks": [
+        {
+          "paragraph": 22,
+          "text_sha256": "80cd90cd10820bdc7ba3af6c55d5b25fae83257a593d651480e8c1756ef6c56b",
+          "style": ""
+        },
+        {
+          "paragraph": 105,
+          "text_sha256": "41a7751eb5a04ddcef36950751442198e713bf63ffd7b8c30755367fb09c4d83",
+          "style": ""
+        },
+        {
+          "paragraph": 117,
+          "text_sha256": "873d9eb1999b7d96bd1d21828ffb95bec923f0301a6a3a180a7c227dfbfb820f",
+          "style": ""
+        },
+        {
+          "paragraph": 125,
+          "text_sha256": "d69c833698d4a35883cbfb4ced45d2b55f5cd9c44cd36e79187b0763a6bf53a1",
+          "style": ""
+        },
+        {
+          "paragraph": 129,
+          "text_sha256": "24f4c02f848219bc00c66d3acc01d00c55f52a14846995a9e9c4efc8393fdec1",
+          "style": ""
+        }
+      ],
+      "consent_legal_placement": [
+        {
+          "paragraph": 0,
+          "text_sha256": "080c572a58e0e204c1a419dddeb21223ab0465df277b6a9dc7120426c5275b4e",
+          "style": "HeadingICFSection",
+          "categories": [
+            "consent"
+          ]
+        },
+        {
+          "paragraph": 1,
+          "text_sha256": "40d8ba603e48457db92a8615123ab158ee877eeb0b8269b162eba31a1c567484",
+          "style": "HeadingICFSection",
+          "categories": [
+            "authorization"
+          ]
+        },
+        {
+          "paragraph": 20,
+          "text_sha256": "2747cd0b21cbdd529532b6514f221865df6ff618953ab89ab33b936f5fd94e73",
+          "style": "",
+          "categories": [
+            "consent",
+            "voluntary"
+          ]
+        },
+        {
+          "paragraph": 22,
+          "text_sha256": "80cd90cd10820bdc7ba3af6c55d5b25fae83257a593d651480e8c1756ef6c56b",
+          "style": "",
+          "categories": [
+            "consent"
+          ]
+        },
+        {
+          "paragraph": 29,
+          "text_sha256": "c9ed3166e66e4a70aff1899f77c2d8f9e2657994336197712b33cf3a708a51af",
+          "style": "",
+          "categories": [
+            "consent"
+          ]
+        },
+        {
+          "paragraph": 30,
+          "text_sha256": "bce786fc37cc614dc5dd3e53b5247c08bb6b2fd825533dfb41138ca2f793e79c",
+          "style": "",
+          "categories": [
+            "privacy"
+          ]
+        },
+        {
+          "paragraph": 32,
+          "text_sha256": "c9fdb74f2ba400f5092e54bcf4ab60cc35580380701049e84c46d4146eee23ae",
+          "style": "",
+          "categories": [
+            "voluntary"
+          ]
+        },
+        {
+          "paragraph": 52,
+          "text_sha256": "d21cbd9320be08209b3197d9a9facab337bb84b45de17e8131b8888a48da90af",
+          "style": "",
+          "categories": [
+            "consent"
+          ]
+        },
+        {
+          "paragraph": 61,
+          "text_sha256": "e7b1c40ffe0df8fa37e92b3e4fa4dff723855e32611b5c1c5f4443ffe486234c",
+          "style": "",
+          "categories": [
+            "consent"
+          ]
+        },
+        {
+          "paragraph": 62,
+          "text_sha256": "eeaa23f8229809b3f700310f58af564c11bac1e0c1b2e082fd8f063793804f58",
+          "style": "",
+          "categories": [
+            "privacy"
+          ]
+        },
+        {
+          "paragraph": 71,
+          "text_sha256": "9b1ce940d06ef753bf0cbd9bd34cfbb4413c4e7c658c12af63b8f89eac3d23ed",
+          "style": "",
+          "categories": [
+            "voluntary"
+          ]
+        },
+        {
+          "paragraph": 76,
+          "text_sha256": "9659368ad5802c6609519a9d8db84874fb4c512d7ed4de4b667fb81ada323047",
+          "style": "HeadingICFSection",
+          "categories": [
+            "compensation"
+          ]
+        },
+        {
+          "paragraph": 77,
+          "text_sha256": "57d25c251436680882c1c9e35f14f3033f8783a4d8bba5ad3a711e3d4f2b58fc",
+          "style": "",
+          "categories": [
+            "compensation"
+          ]
+        },
+        {
+          "paragraph": 83,
+          "text_sha256": "d9481562ba3d7336e6a7d9218cb80aaa2d5112d380bede471b7e61ec96d115bb",
+          "style": "HeadingICFSection",
+          "categories": [
+            "withdraw",
+            "voluntary"
+          ]
+        },
+        {
+          "paragraph": 85,
+          "text_sha256": "8f1eefec25c3bb03ff1a61ae02bbd8c125a53d5f0d8f17872f9d557f2b1901f8",
+          "style": "",
+          "categories": [
+            "consent",
+            "withdraw",
+            "voluntary"
+          ]
+        },
+        {
+          "paragraph": 86,
+          "text_sha256": "e4307e9e84d85ef54c11d7db0bc465fc589fc6beb031f8c2bac8188c9bf57f97",
+          "style": "",
+          "categories": [
+            "withdraw"
+          ]
+        },
+        {
+          "paragraph": 87,
+          "text_sha256": "e566edd09bf713ef4c6e66e865534586e2f854bfcb75895d4313737a87a2f4f1",
+          "style": "HeadingICFSection",
+          "categories": [
+            "compensation"
+          ]
+        },
+        {
+          "paragraph": 89,
+          "text_sha256": "2eec53f4741ab820569de18be0fb6d0505712b7b1cb11157bc985dffdf529477",
+          "style": "",
+          "categories": [
+            "injury"
+          ]
+        },
+        {
+          "paragraph": 90,
+          "text_sha256": "c42eb7656e102ef4e2abc6c794c3d8574dbf86e62297a2e5217c6f2a8743c34a",
+          "style": "",
+          "categories": [
+            "injury"
+          ]
+        },
+        {
+          "paragraph": 92,
+          "text_sha256": "2fe1f94fe7af6179eec60c1ff27dfd4affc9c9bd50b9043c5513282b7c71ed2e",
+          "style": "HeadingICFSection",
+          "categories": [
+            "authorization",
+            "confidential"
+          ]
+        },
+        {
+          "paragraph": 95,
+          "text_sha256": "7c1f400f686c1006903dd10c0499a10af3f690869ddb4f803006580ea0425256",
+          "style": "",
+          "categories": [
+            "privacy",
+            "confidential"
+          ]
+        },
+        {
+          "paragraph": 101,
+          "text_sha256": "4727ac5d580f7596404fa3b7f290b3d12d33769618602a2af62bf6c92047322c",
+          "style": "HeadingICFSection",
+          "categories": [
+            "authorization"
+          ]
+        },
+        {
+          "paragraph": 103,
+          "text_sha256": "52a8280198417d9555bee20bd772964477b8c47558402fad4113ebe978402a83",
+          "style": "",
+          "categories": [
+            "consent",
+            "authorization"
+          ]
+        },
+        {
+          "paragraph": 121,
+          "text_sha256": "91a13e490a9965f56f30d4f84e9890ab4734259c7f24e1df9908cd7d57df7482",
+          "style": "",
+          "categories": [
+            "consent"
+          ]
+        }
+      ],
+      "paragraph_rhythm": {
+        "paragraph_count": 130,
+        "semantic_sha256": "3e7763cfff42c7e1e25cadcf475df2f82fcc5167e79da0924925a9dfde08b3d4"
+      },
+      "pagination_relations": {
+        "headings": [
+          {
+            "paragraph": 0,
+            "text": "PARTICIPANT INFORMED CONSENT FORM AND",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 1,
+            "text": "AUTHORIZATION TO USE AND DISCLOSE MEDICAL INFORMATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 7,
+            "text": "STUDY",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 8,
+            "text": "INVESTIGATOR",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 24,
+            "text": "KEY INFORMATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 34,
+            "text": "BACKGROUND",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 42,
+            "text": "PURPOSE",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 48,
+            "text": "DURATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 50,
+            "text": "PROCEDURES",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 59,
+            "text": "POTENTIAL RISKS, SIDE EFFECTS, DISCOMFORTS, INCONVENIENCES",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 64,
+            "text": "POTENTIAL BENEFITS",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 69,
+            "text": "ALTERNATIVE TREATMENTS",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 73,
+            "text": "NEW INFORMATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 76,
+            "text": "COMPENSATION TO YOU",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 79,
+            "text": "COSTS TO YOU",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 83,
+            "text": "VOLUNTARY PARTICIPATION/WITHDRAWAL",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 87,
+            "text": "STUDY COMPLICATIONS AND COMPENSATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 92,
+            "text": "CONFIDENTIALITY AND AUTHORIZATION TO COLLECT, USE AND DISCLOSE YOUR MEDICAL INFORMATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 97,
+            "text": "QUESTIONS",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          },
+          {
+            "paragraph": 101,
+            "text": "PARTICIPANT STATEMENT AND AUTHORIZATION",
+            "style": "HeadingICFSection",
+            "page_break_before": false,
+            "keep_with_next": true
+          }
+        ],
+        "first_numbered_body_paragraph": null,
+        "numbered_body_has_no_artificial_starts": true,
+        "all_headings_keep_with_next": true
+      }
     },
     "protocol.docx": {
       "section_geometry": [
@@ -516,13 +524,59 @@
         }
       ],
       "fields_toc": {
-        "codes": [],
+        "codes": [
+          "TOC \\o \"1-2\" \\h \\z \\u",
+          "PAGEREF _ClinicalTOC47 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC48 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC49 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC50 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC51 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC52 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC53 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC54 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC55 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC56 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC57 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC58 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC59 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC60 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC61 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC62 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC63 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC64 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC65 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC66 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC67 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC68 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC69 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC70 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC71 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC72 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC73 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC74 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC75 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC76 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC77 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC78 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC79 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC80 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC81 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC82 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC83 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC84 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC85 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC86 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC87 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC88 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC89 \\h \\* arabic \\* MERGEFORMAT",
+          "PAGEREF _ClinicalTOC90 \\h \\* arabic \\* MERGEFORMAT"
+        ],
         "update_fields": true
       },
       "page_furniture": {
         "header_count": 3,
         "footer_count": 3,
-        "page_field_count": 2
+        "page_field_count": 46
       },
       "table_geometry": [
         {
@@ -530,10 +584,10 @@
             "2898",
             "5940"
           ],
-          "row_count": 8,
-          "repeating_header_rows": 8,
-          "non_splitting_rows": 8,
-          "semantic_sha256": "d6e179a1920e47ae9a7eb28913676d0f9112245197105bf9717025c65a3f992a"
+          "row_count": 9,
+          "repeating_header_rows": 9,
+          "non_splitting_rows": 9,
+          "semantic_sha256": "7cee4c06f679e35d98e47045c44c98363ab8445798b22034e558fd99466d636f"
         },
         {
           "grid_widths": [
@@ -549,10 +603,10 @@
             "2178",
             "6552"
           ],
-          "row_count": 10,
-          "repeating_header_rows": 10,
-          "non_splitting_rows": 10,
-          "semantic_sha256": "a080d4b25fa84154460bc40e5136f2903c352c09acb84791ef2656491cc14da8"
+          "row_count": 11,
+          "repeating_header_rows": 11,
+          "non_splitting_rows": 11,
+          "semantic_sha256": "4ae23e22bece2084e742a264bec34940470eba73c79ab3698bfb899b6b7d3722"
         },
         {
           "grid_widths": [
@@ -575,7 +629,7 @@
           "row_count": 2,
           "repeating_header_rows": 1,
           "non_splitting_rows": 2,
-          "semantic_sha256": "0e05d4617e8a0e093ba804731f95838e9d5d46d754e3ee36a3591eeb079f70de"
+          "semantic_sha256": "04ae63e8c1292abd6659205c21dbd64af3f0eb9f839b6bcaadc54b930208bd8d"
         },
         {
           "grid_widths": [
@@ -591,23 +645,26 @@
         },
         {
           "grid_widths": [
-            "4752",
-            "3888"
+            "2160",
+            "1620",
+            "1620",
+            "1620",
+            "1620"
           ],
           "row_count": 4,
           "repeating_header_rows": 2,
           "non_splitting_rows": 4,
-          "semantic_sha256": "441628e18a1f4a4d063351226153ad6df218038ff16f36f1ef3d2eac5e37086d"
+          "semantic_sha256": "0fc4989903bde8bf4b3acef3438cbaee70ed28cd14ff4e61271f6b42202e1882"
         }
       ],
       "signature_blocks": [
         {
-          "paragraph": 28,
+          "paragraph": 30,
           "text_sha256": "13ad9af3ab9eda7f7276186a3006ef584bad8b6431873e43ef859d8430ad949e",
           "style": ""
         },
         {
-          "paragraph": 30,
+          "paragraph": 32,
           "text_sha256": "7978d521261cec2db3a62a2b5189caff7a603ee94069c8d0e0408ed02e5b6f21",
           "style": ""
         },
@@ -619,7 +676,7 @@
       ],
       "consent_legal_placement": [
         {
-          "paragraph": 24,
+          "paragraph": 26,
           "text_sha256": "82789d7b248ecebb80a05a01412a68ba2a4bfc2bfebbc03a6f239e79c68c76aa",
           "style": "",
           "categories": [
@@ -627,7 +684,7 @@
           ]
         },
         {
-          "paragraph": 26,
+          "paragraph": 28,
           "text_sha256": "38b5ebd9fe03de51a66dbe694e1416f65aef30a1900cac3dfbab3ec544ee0e6b",
           "style": "ListParagraph",
           "categories": [
@@ -635,7 +692,7 @@
           ]
         },
         {
-          "paragraph": 73,
+          "paragraph": 77,
           "text_sha256": "5b0bb40f57f89367dc217c5a9231f61046bd58a4923807326ce0fda3be6844f0",
           "style": "TOC2",
           "categories": [
@@ -667,15 +724,7 @@
           ]
         },
         {
-          "paragraph": 160,
-          "text_sha256": "7013b601b960873e650cb09e16fa853b57861fb3514917025cd1bacc864bb5cc",
-          "style": "Title",
-          "categories": [
-            "consent"
-          ]
-        },
-        {
-          "paragraph": 167,
+          "paragraph": 165,
           "text_sha256": "3b91d38c9b2af17b5a33d20b8391f2288d026c3f8db9e788f860ae3586330a1a",
           "style": "",
           "categories": [
@@ -684,7 +733,7 @@
           ]
         },
         {
-          "paragraph": 195,
+          "paragraph": 187,
           "text_sha256": "c1028664dab64ac07002bf65abb436c05b3f612aad1f7790199bb5c9e6121f00",
           "style": "",
           "categories": [
@@ -692,7 +741,7 @@
           ]
         },
         {
-          "paragraph": 197,
+          "paragraph": 189,
           "text_sha256": "895ad5a3587c454c40ea01c07125eabc47d8ea09e7baf7b34536ea537204efe9",
           "style": "",
           "categories": [
@@ -700,7 +749,7 @@
           ]
         },
         {
-          "paragraph": 218,
+          "paragraph": 210,
           "text_sha256": "b61c64c0ee7fd7b7c2dc8ac5cfce007151c399549fd3c3a93031f7a10f8d3e10",
           "style": "",
           "categories": [
@@ -708,15 +757,7 @@
           ]
         },
         {
-          "paragraph": 224,
-          "text_sha256": "debf62db449749e5750e8ec7502a1d9739cafd9a12a911dcbd72b0dbec73a988",
-          "style": "Normal",
-          "categories": [
-            "consent"
-          ]
-        },
-        {
-          "paragraph": 231,
+          "paragraph": 228,
           "text_sha256": "d37e0cd00f18a366f040d864a3fa641b54039aab8f55f60e09a1f11fde972caf",
           "style": "TableText",
           "categories": [
@@ -724,7 +765,7 @@
           ]
         },
         {
-          "paragraph": 237,
+          "paragraph": 241,
           "text_sha256": "c630aef2c649940aa668fa0d74b8eaa60bd3325d1a913494bf6d77e61ec01e8c",
           "style": "",
           "categories": [
@@ -733,7 +774,7 @@
           ]
         },
         {
-          "paragraph": 239,
+          "paragraph": 243,
           "text_sha256": "2eec53f4741ab820569de18be0fb6d0505712b7b1cb11157bc985dffdf529477",
           "style": "",
           "categories": [
@@ -741,7 +782,7 @@
           ]
         },
         {
-          "paragraph": 240,
+          "paragraph": 244,
           "text_sha256": "c3a07bd8749151453042e1166158c8080c53fd07f67297b915de80330e010f1f",
           "style": "",
           "categories": [
@@ -749,7 +790,7 @@
           ]
         },
         {
-          "paragraph": 241,
+          "paragraph": 245,
           "text_sha256": "ec384cb3b2e737da7eee90fc4572606ed45c9fa5d03bbe6fd1cad48d7dc27612",
           "style": "",
           "categories": [
@@ -757,15 +798,7 @@
           ]
         },
         {
-          "paragraph": 246,
-          "text_sha256": "7a327f4ac618de1897ac68c020c1828fc1420859b1871d74c9983ead3a5e2908",
-          "style": "Normal",
-          "categories": [
-            "consent"
-          ]
-        },
-        {
-          "paragraph": 249,
+          "paragraph": 250,
           "text_sha256": "9b78eea615fdef85650181f216d2d85820226bde0a1175329117e47bcf325b50",
           "style": "Normal",
           "categories": [
@@ -774,7 +807,7 @@
           ]
         },
         {
-          "paragraph": 250,
+          "paragraph": 251,
           "text_sha256": "151f74e88294da345a06ef81cbb78a9172f9b89bd42d9fd8f7149e70d8b7e261",
           "style": "Normal",
           "categories": [
@@ -782,41 +815,17 @@
           ]
         },
         {
-          "paragraph": 254,
-          "text_sha256": "519be10903c5bad969062434b718f72512551c775b16f941da7d1e66780f11c7",
-          "style": "",
-          "categories": [
-            "privacy"
-          ]
-        },
-        {
-          "paragraph": 260,
-          "text_sha256": "fbc04445421619215002873bf7d4b88a658066f4bea5eb348bfb4795b25b82bd",
-          "style": "",
-          "categories": [
-            "consent"
-          ]
-        },
-        {
-          "paragraph": 265,
+          "paragraph": 258,
           "text_sha256": "43e4e7302ecdd9a28ae40b160387cc414ed2e6089898280c233c7c6f570135c7",
           "style": "Normal",
           "categories": [
             "privacy"
           ]
-        },
-        {
-          "paragraph": 269,
-          "text_sha256": "c3d2243bcf327c48d9b6b8153050dbfa9ff335ceb9da885ee0ee62edfeae945d",
-          "style": "Normal",
-          "categories": [
-            "compensation"
-          ]
         }
       ],
       "paragraph_rhythm": {
-        "paragraph_count": 270,
-        "semantic_sha256": "25f0fb6c4a3a478bee8be98d81a8d4a29b093c298ef08cb42b8e6d273af21270"
+        "paragraph_count": 262,
+        "semantic_sha256": "298c2a8a4902f8910f0b93826041e4e2f377c65cc430cc33f27ff91b025db6f4"
       },
       "pagination_relations": {
         "headings": [
@@ -829,7 +838,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 23,
+            "paragraph": 25,
             "text": "2. INVESTIGATOR AGREEMENT",
             "style": "Heading1",
             "page_break_before": false,
@@ -837,15 +846,15 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 37,
+            "paragraph": 39,
             "text": "3. GENERAL INFORMATION",
             "style": "Heading1",
-            "page_break_before": false,
-            "effective_page_boundary": false,
+            "page_break_before": true,
+            "effective_page_boundary": true,
             "keep_with_next": true
           },
           {
-            "paragraph": 58,
+            "paragraph": 62,
             "text": "4. TABLE OF CONTENTS",
             "style": "Heading1",
             "page_break_before": true,
@@ -853,7 +862,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 107,
+            "paragraph": 109,
             "text": "5. INTRODUCTION",
             "style": "Heading1",
             "page_break_before": false,
@@ -861,7 +870,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 112,
+            "paragraph": 111,
             "text": "6. OBJECTIVE(S)",
             "style": "Heading1",
             "page_break_before": false,
@@ -869,7 +878,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 116,
+            "paragraph": 113,
             "text": "7. SUBJECTS",
             "style": "Heading1",
             "page_break_before": false,
@@ -877,7 +886,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 117,
+            "paragraph": 114,
             "text": "7.1. Subject Population",
             "style": "Heading2",
             "page_break_before": false,
@@ -885,7 +894,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 120,
+            "paragraph": 117,
             "text": "7.2. Inclusion Criteria",
             "style": "Heading2",
             "page_break_before": false,
@@ -893,7 +902,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 123,
+            "paragraph": 122,
             "text": "7.3. Exclusion Criteria",
             "style": "Heading2",
             "page_break_before": false,
@@ -901,7 +910,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 125,
+            "paragraph": 124,
             "text": "8. STUDY DESIGN",
             "style": "Heading1",
             "page_break_before": false,
@@ -909,7 +918,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 126,
+            "paragraph": 125,
             "text": "8.1. Study Design",
             "style": "Heading2",
             "page_break_before": false,
@@ -917,7 +926,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 128,
+            "paragraph": 129,
             "text": "8.2. Methods Used to Minimize Bias",
             "style": "Heading2",
             "page_break_before": false,
@@ -949,7 +958,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 158,
+            "paragraph": 159,
             "text": "9.3. Study Methods and Measurements",
             "style": "Heading2",
             "page_break_before": false,
@@ -957,7 +966,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 164,
+            "paragraph": 162,
             "text": "9.4. Unscheduled Visits",
             "style": "Heading2",
             "page_break_before": false,
@@ -965,7 +974,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 166,
+            "paragraph": 164,
             "text": "9.5. Discontinued Subjects",
             "style": "Heading2",
             "page_break_before": false,
@@ -973,7 +982,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 168,
+            "paragraph": 166,
             "text": "10. ANALYSIS PLAN",
             "style": "Heading1",
             "page_break_before": false,
@@ -981,7 +990,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 169,
+            "paragraph": 167,
             "text": "10.1. Analysis Data Sets",
             "style": "Heading2",
             "page_break_before": false,
@@ -989,7 +998,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 173,
+            "paragraph": 169,
             "text": "10.2. Statistical Methodology",
             "style": "Heading2",
             "page_break_before": false,
@@ -997,7 +1006,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 177,
+            "paragraph": 171,
             "text": "10.3. General Statistical Considerations",
             "style": "Heading2",
             "page_break_before": false,
@@ -1005,7 +1014,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 180,
+            "paragraph": 173,
             "text": "11. SAMPLE SIZE JUSTIFICATION",
             "style": "Heading1",
             "page_break_before": false,
@@ -1013,7 +1022,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 190,
+            "paragraph": 182,
             "text": "12. CONFIDENTIALITY/PUBLICATION OF THE STUDY",
             "style": "Heading1",
             "page_break_before": false,
@@ -1021,7 +1030,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 192,
+            "paragraph": 184,
             "text": "13. QUALITY COMPLAINTS AND ADVERSE EVENTS",
             "style": "Heading1",
             "page_break_before": false,
@@ -1029,7 +1038,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 193,
+            "paragraph": 185,
             "text": "13.1. General Information",
             "style": "Heading2",
             "page_break_before": false,
@@ -1037,7 +1046,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 196,
+            "paragraph": 188,
             "text": "13.2. Monitoring for Adverse Events",
             "style": "Heading2",
             "page_break_before": false,
@@ -1045,7 +1054,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 198,
+            "paragraph": 190,
             "text": "13.3. Procedures for Recording and Reporting AEs and SAEs",
             "style": "Heading2",
             "page_break_before": false,
@@ -1053,7 +1062,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 212,
+            "paragraph": 204,
             "text": "13.4. Follow-Up of Adverse Events and Quality Complaints",
             "style": "Heading2",
             "page_break_before": false,
@@ -1061,7 +1070,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 214,
+            "paragraph": 206,
             "text": "13.5. Safety Analyses",
             "style": "Heading2",
             "page_break_before": false,
@@ -1069,7 +1078,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 217,
+            "paragraph": 209,
             "text": "14. GCP, ICH and ETHICAL CONSIDERATIONS",
             "style": "Heading1",
             "page_break_before": false,
@@ -1077,7 +1086,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 219,
+            "paragraph": 211,
             "text": "14.1 Confidentiality",
             "style": "Heading2",
             "page_break_before": false,
@@ -1085,15 +1094,15 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 222,
+            "paragraph": 214,
             "text": "15. STANDARD EVALUATION PROCEDURES",
             "style": "Heading1",
             "page_break_before": false,
-            "effective_page_boundary": true,
+            "effective_page_boundary": false,
             "keep_with_next": true
           },
           {
-            "paragraph": 225,
+            "paragraph": 216,
             "text": "Table 15.1. Proposed Visits and Study Assessments",
             "style": "Heading2",
             "page_break_before": false,
@@ -1101,7 +1110,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 235,
+            "paragraph": 239,
             "text": "16. CONFIDENTIALITY",
             "style": "Heading1",
             "page_break_before": false,
@@ -1109,7 +1118,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 238,
+            "paragraph": 242,
             "text": "17. FINANCIAL AND INSURANCE INFORMATION/STUDY RELATED INJURIES",
             "style": "Heading1",
             "page_break_before": false,
@@ -1117,7 +1126,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 242,
+            "paragraph": 246,
             "text": "18. STUDY ENDPOINT CRITERIA",
             "style": "Heading1",
             "page_break_before": false,
@@ -1125,7 +1134,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 243,
+            "paragraph": 247,
             "text": "18.1. Patient Completion of Study",
             "style": "Heading2",
             "page_break_before": false,
@@ -1133,7 +1142,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 248,
+            "paragraph": 249,
             "text": "18.2. Patient Discontinuation",
             "style": "Heading2",
             "page_break_before": false,
@@ -1141,23 +1150,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 252,
-            "text": "18.3. Patient Termination",
-            "style": "Heading2",
-            "page_break_before": false,
-            "effective_page_boundary": false,
-            "keep_with_next": true
-          },
-          {
-            "paragraph": 255,
-            "text": "18.4. Study Termination",
-            "style": "Heading2",
-            "page_break_before": false,
-            "effective_page_boundary": false,
-            "keep_with_next": true
-          },
-          {
-            "paragraph": 257,
+            "paragraph": 253,
             "text": "18.5. Study Completion",
             "style": "Heading2",
             "page_break_before": false,
@@ -1165,7 +1158,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 262,
+            "paragraph": 255,
             "text": "19. SUMMARY OF RISKS AND BENEFITS",
             "style": "Heading1",
             "page_break_before": false,
@@ -1173,7 +1166,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 263,
+            "paragraph": 256,
             "text": "19.1. Summary of risks",
             "style": "Heading2",
             "page_break_before": false,
@@ -1181,7 +1174,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 266,
+            "paragraph": 259,
             "text": "19.2. Summary of benefits",
             "style": "Heading2",
             "page_break_before": false,
@@ -1189,7 +1182,7 @@
             "keep_with_next": true
           }
         ],
-        "first_numbered_body_paragraph": 107,
+        "first_numbered_body_paragraph": 109,
         "numbered_body_has_no_artificial_starts": true,
         "all_headings_keep_with_next": true
       }

@@ -9,9 +9,39 @@ from docx.shared import Inches, Pt
 
 import quality
 import workflow
+import drafting
+from contracts import batch_plan
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_recorded_sterling_purpose_names_primary_outcome(tmp_path):
+    source = json.loads(
+        (ROOT / "tests/fixtures/reliability-replays/sterling-rendered-scope/source.json").read_text()
+    )
+    batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
+    path = drafting.create_drafting_request(
+        repo_root=ROOT, revision_dir=tmp_path, revision_id="r-test",
+        reference=source, batch=batch, attempts={"icf.study-purpose": 1},
+        wave="initial", target_ids=("icf.study-purpose",),
+    )
+    response = drafting.recorded_acceptance_response(json.loads(path.read_text()))
+    purpose = next(item for item in response["section_results"] if item["section_id"] == "icf.study-purpose")
+    text = " ".join(item["text"] for item in purpose["paragraphs"]).casefold()
+    assert "main outcome" in text or "primary endpoint" in text
+
+
+def test_section_three_respects_governed_front_matter_boundary():
+    pages = [
+        "2 investigator agreement signature of investigator location of facility",
+        "3 general information objective study population variables",
+    ]
+    assert quality._natural_section_three_flow(pages, explicit_break_before=False)
+    assert quality._natural_section_three_flow(pages, explicit_break_before=True)
+    assert not quality._natural_section_three_flow(
+        ["2 investigator agreement 3 general information"], explicit_break_before=True,
+    )
 
 
 def test_layout_corpus_runs_only_the_five_baseline_cases(tmp_path, monkeypatch):

@@ -590,6 +590,21 @@ def normalized_docx_format_signature(path: Path) -> dict[str, Any]:
     }
 
 
+def _natural_section_three_flow(
+    pages: Sequence[str], *, explicit_break_before: bool,
+) -> bool:
+    """Check the contracted front-matter boundary without demanding one page."""
+    body_pages = [page for page in pages if "table of contents" not in page]
+    section_two = next((index for index, page in enumerate(body_pages) if "2 investigator agreement" in page), None)
+    section_three = next((index for index, page in enumerate(body_pages) if "3 general information" in page), None)
+    if section_two is None or section_three is None:
+        return False
+    return (
+        section_three == section_two + 1 if explicit_break_before
+        else section_three in {section_two, section_two + 1}
+    )
+
+
 def _rendered_pagination_relations(docx_path: Path, pdf_path: Path) -> dict[str, Any]:
     document = Document(docx_path)
     pages = [
@@ -672,9 +687,15 @@ def _rendered_pagination_relations(docx_path: Path, pdf_path: Path) -> dict[str,
     section_three = next((paragraph.text.strip() for paragraph in headings if "GENERAL INFORMATION" in paragraph.text.upper()), None)
     section_three_flow = True
     if section_three:
-        marker = " ".join(re.findall(r"[a-z0-9]+", section_three.casefold()))
-        section_three_page = next((page for page in pages if marker in page and "table of contents" not in page), "")
-        section_three_flow = "2 investigator agreement" in section_three_page
+        signature = normalized_docx_format_signature(docx_path)
+        explicit_break = any(
+            item["page_break_before"]
+            for item in signature["pagination_relations"]["headings"]
+            if "GENERAL INFORMATION" in item["text"].upper()
+        )
+        section_three_flow = _natural_section_three_flow(
+            pages, explicit_break_before=explicit_break,
+        )
     return {
         "pdf_sha256": sha256_file(pdf_path),
         "heading_cohesion": cohesion,

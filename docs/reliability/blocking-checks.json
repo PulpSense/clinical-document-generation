@@ -709,8 +709,14 @@
     },
     {
       "file": "scripts/workflow.py",
+      "function": "_repeated_no_progress_findings",
+      "code_sha256": "0b8b5727410ff89fd7d5209c5904197cdf3df34ee4a7c5a171fc1c3771e79228",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
       "function": "_continue_repairable_no_progress",
-      "code_sha256": "04b820c0443ecf183c205096222abd57e1439b0e38e407fd34a7567444f7f137",
+      "code_sha256": "42c3a5302be36daf4d52ef49d81ee4d795b7fb049c219a78b61165488727a463",
       "family": "recovery"
     },
     {
