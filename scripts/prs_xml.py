@@ -128,6 +128,18 @@ def _items(reference: Mapping[str, Any], path: str) -> list[Mapping[str, Any]]:
     return [item if isinstance(item, Mapping) else {"label": _text(item)} for item in value] if isinstance(value, list) else []
 
 
+def _observational_cohorts(reference: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    arms = _items(reference, "design.arms")
+    if arms:
+        return arms
+    if _text(get_path(reference, "regulatory.prs.study_type")).casefold() != "observational":
+        return []
+    design = _text(get_path(reference, "design.study_design"))
+    if re.search(r"\b(?:single|one)[ -]+(?:observational[ -]+)?(?:cohort|group)\b", design, re.I):
+        return [{"name": "Single observational cohort", "description": design}]
+    return []
+
+
 def _source_value(reference: Mapping[str, Any], *paths: str) -> str:
     for path in paths:
         value = get_path(reference, path)
@@ -437,7 +449,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "allocation": _text(get_path(reference, "regulatory.prs.allocation")),
         "interventionModel": _text(get_path(reference, "regulatory.prs.intervention_model")), "primaryPurpose": _text(get_path(reference, "regulatory.prs.primary_purpose")),
         "masking": _text(get_path(reference, "design.masking")), "numberOfArms": str(len(_items(reference, "design.arms"))),
-        "numberOfGroups": str(len(_items(reference, "design.arms"))), "condition": _text(get_path(reference, "study.condition")),
+        "numberOfGroups": str(len(_observational_cohorts(reference))), "condition": _text(get_path(reference, "study.condition")),
         "sharingIPD": _text(get_path(reference, "regulatory.prs.ipd_sharing")), "sharingIpd": _text(get_path(reference, "regulatory.prs.ipd_sharing")),
         "studyUid": _stable_study_uid(reference), "nctId": _text(get_path(reference, "regulatory.prs.nct_id")),
     }
@@ -553,7 +565,7 @@ def _intervention_items(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         "name": get_path(reference, "design.intervention_name"),
         "description": get_path(reference, "design.intervention_description"),
     }] if meaningful(get_path(reference, "design.intervention_name")) else [])
-    arm_items = _items(reference, "design.arms")
+    arm_items = _observational_cohorts(reference)
     arms = [_text(item.get("arm_group_label") or item.get("label") or item.get("name")) for item in arm_items]
     if not explicit and len(arm_items) > 1 and len(items) == 1:
         combined_name = _text(items[0].get("name"))
@@ -580,6 +592,8 @@ def _intervention_items(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
             labels = [arm for index, arm in enumerate(arms) if index in matched]
             if not labels and len(arms) == 1:
                 labels = arms
+        elif len(arms) == 1 and not _items(reference, "design.arms"):
+            labels = arms
         else:
             labels = []
         item["arm_group_labels"] = list(dict.fromkeys(labels))
@@ -600,7 +614,7 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
             for offset, label in enumerate(item["arm_group_labels"] or [""]):
                 child = copy.deepcopy(prototype); child.text = label
                 node.insert(position + offset, child)
-    arms = _items(reference, "design.arms")
+    arms = _observational_cohorts(reference)
     for node, item in zip(_resize(study, "arm_group", len(arms)), arms):
         _set(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name")); _set(node, "arm_type", item.get("arm_type") or item.get("type")); _set(node, "arm_group_description/textblock", item.get("description"))
     for tag, path in (("primary_outcome", "endpoints.primary"), ("secondary_outcome", "endpoints.secondary"), ("other_outcome", "endpoints.other")):
@@ -630,7 +644,7 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
 
 def expected_counts(reference: Mapping[str, Any]) -> dict[str, int]:
     interventions = _intervention_items(reference)
-    return {"intervention": len(interventions), "arm_group": len(_items(reference, "design.arms")), "primary_outcome": len(_items(reference, "endpoints.primary")), "secondary_outcome": len(_items(reference, "endpoints.secondary")), "other_outcome": len(_items(reference, "endpoints.other")), "location": len(get_path(reference, "sites", []) or [])}
+    return {"intervention": len(interventions), "arm_group": len(_observational_cohorts(reference)), "primary_outcome": len(_items(reference, "endpoints.primary")), "secondary_outcome": len(_items(reference, "endpoints.secondary")), "other_outcome": len(_items(reference, "endpoints.other")), "location": len(get_path(reference, "sites", []) or [])}
 
 
 def repeated_counts(path: Path) -> dict[str, int]:
@@ -1036,7 +1050,7 @@ def validate_output(
         if actual_labels != item["arm_group_labels"]:
             findings.append({"category": "xml", "field": f"intervention[{index}].arm_group_label", "issue": "Generated intervention associations do not match the approved cohort links."})
 
-    arms = _items(reference, "design.arms")
+    arms = _observational_cohorts(reference)
     for index, (node, item) in enumerate(zip(study.findall("arm_group"), arms), start=1):
         require_repeated_value(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name"), f"arm_group[{index}].arm_group_label")
         require_repeated_value(node, "arm_type", item.get("arm_type") or item.get("type"), f"arm_group[{index}].arm_type")

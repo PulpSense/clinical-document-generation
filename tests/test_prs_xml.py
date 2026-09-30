@@ -59,6 +59,32 @@ def test_two_source_named_cohorts_follow_client_intervention_links(tmp_path):
     assert validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE) == []
 
 
+def test_explicit_single_observational_cohort_without_arms_maps_one_prs_group(tmp_path):
+    reference = fixture()
+    reference["design"].pop("arms", None)
+    reference["design"]["study_design"] = (
+        "Prospective, observational, single-cohort study with no control arm and no masking."
+    )
+    reference["design"]["interventions"] = [
+        {"name": "TECNIS PureSee", "type": "Device"},
+        {"name": "TECNIS Odyssey", "type": "Device"},
+    ]
+    output = tmp_path / "study.xml"
+
+    report = generate(TEMPLATE, output, reference, {"brief_summary": "Summary.", "detailed_description": "Description."})
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+
+    assert report["status"] == "passed"
+    assert study.findtext("study_design/observational_design/number_of_groups") == "1"
+    assert [node.findtext("arm_group_label") for node in study.findall("arm_group")] == [
+        "Single observational cohort"
+    ]
+    assert [node.findtext("arm_group_label") for node in study.findall("intervention")] == [
+        "Single observational cohort", "Single observational cohort"
+    ]
+    assert validate_output(output, reference, TEMPLATE) == []
+
+
 def test_existing_screening_interval_is_not_repeated_in_prs_eligibility(tmp_path):
     reference = fixture()
     reference["procedures"]["minimum_days_before_screening_without_participation"] = "60"

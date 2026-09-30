@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 from xml.etree import ElementTree
+from zipfile import ZipFile
 
 from docx import Document
 
@@ -104,6 +105,12 @@ def test_desktop_operation_finishes_with_review_required_and_keeps_client_output
     assert result["status"] == "review_required"
     assert result["client_outputs"] == []
     assert len(result["review_outputs"]) == 3
+    archive_path = run_dir / result["diagnostic_archive"]["path"]
+    assert archive_path == run_dir / "output/BLOCKED-RUN-DIAGNOSTICS.zip"
+    with ZipFile(archive_path) as bundle:
+        assert bundle.testzip() is None
+        assert "review-output/findings.json" in bundle.namelist()
+        assert "logs/desktop-operation.json" in bundle.namelist()
     resumed = workflow.run_desktop_operation(
         run_dir, handoff_runner=lambda _handoffs, _remaining: None,
         opener=lambda _path: b"unused", budget_seconds=30.0,

@@ -9,6 +9,7 @@ import socketserver
 import subprocess
 import sys
 import threading
+from zipfile import ZipFile
 
 import pytest
 
@@ -1787,6 +1788,7 @@ def test_hard_ceiling_preserves_the_exact_pending_stage_and_completed_candidates
     assert result["pending_stage"] == pending_stage
     assert result["candidate_outputs"] == retained
     assert state["stage"] == pending_stage
+    assert (tmp_path / result["diagnostic_archive"]["path"]).is_file()
 
 
 def test_stage_soft_budget_triggers_diagnostics_without_ending_the_operation(tmp_path, monkeypatch):
@@ -1829,6 +1831,14 @@ def test_stage_soft_budget_triggers_diagnostics_without_ending_the_operation(tmp
         "elapsed_seconds": 6.0,
         "action": "record_diagnostic",
     }]
+    archive = tmp_path / "output/BLOCKED-RUN-DIAGNOSTICS.zip"
+    assert result["diagnostic_archive"]["path"] == "output/BLOCKED-RUN-DIAGNOSTICS.zip"
+    assert archive.is_file()
+    assert sorted(path.name for path in (tmp_path / "output").iterdir()) == [archive.name]
+    with ZipFile(archive) as bundle:
+        assert bundle.testzip() is None
+        assert "logs/desktop-operation.json" in bundle.namelist()
+        assert "diagnostic-inventory.json" in bundle.namelist()
 
 
 def test_synchronous_candidate_stage_records_timing_and_soft_budget_diagnostic(tmp_path, monkeypatch):

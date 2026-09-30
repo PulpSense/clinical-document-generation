@@ -3852,6 +3852,37 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
             shutil.rmtree(staging)
 
 
+def _terminal_diagnostic_archive(run_dir: Path) -> dict[str, Any]:
+    """Keep a blocked run's evidence together without labeling it a deliverable."""
+    output = run_dir / "output"
+    output.mkdir(parents=True, exist_ok=True)
+    destination = output / "BLOCKED-RUN-DIAGNOSTICS.zip"
+    with tempfile.NamedTemporaryFile(prefix=".diagnostics-", suffix=".zip", dir=output, delete=False) as pending:
+        temporary = Path(pending.name)
+    try:
+        inventory = []
+        files = sorted(
+            path for path in run_dir.rglob("*")
+            if path.is_file() and not path.is_symlink()
+            and path.relative_to(run_dir).parts[0] != "output"
+        )
+        with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
+            for path in files:
+                relative = path.relative_to(run_dir).as_posix()
+                archive.write(path, relative)
+                inventory.append({"path": relative, "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+            archive.writestr("diagnostic-inventory.json", json.dumps({"files": inventory}, indent=2))
+        os.replace(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return {
+        "path": destination.relative_to(run_dir).as_posix(),
+        "sha256": sha256_file(destination),
+        "bytes": destination.stat().st_size,
+        "delivery_status": "diagnostic_only_not_client_ready",
+    }
+
+
 def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | None = None) -> dict[str, Any]:
     """Build the supported file-link payload for the final Desktop reply.
 
@@ -4408,7 +4439,15 @@ def run_desktop_operation(
                 "client_outputs": [],
             })
             measured.pop("desktop_reply", None)
-        return save(str(measured.get("status", "blocked")), measured)
+        terminal_status = str(measured.get("status", "blocked"))
+        saved = save(terminal_status, measured)
+        if terminal_status in {"blocked", "review_required", "timeout"}:
+            try:
+                measured["diagnostic_archive"] = _terminal_diagnostic_archive(run_dir)
+            except Exception as exc:
+                measured["diagnostic_archive_error"] = f"{type(exc).__name__}: {exc}"
+            saved = save(terminal_status, measured)
+        return saved
 
     def record_timing(stage: str, elapsed: float) -> None:
         timing = stage_timings.setdefault(stage, {"elapsed_seconds": 0.0, "invocations": 0})
@@ -5779,11 +5818,17 @@ def run_production_desktop_operation(
         readiness = _production_worker_readiness(root)
         _write(run_dir / "logs/worker-readiness.json", readiness)
         if readiness["status"] != "passed":
-            return {
+            blocked = {
                 "status": "blocked", "stage": "worker_readiness",
                 "findings": [{"category": "environment", "field": "worker_authentication", "issue": readiness["issue"]}],
                 "client_outputs": [], "worker_readiness": readiness,
             }
+            _write(run_dir / "logs/operation-preflight.json", blocked)
+            try:
+                blocked["diagnostic_archive"] = _terminal_diagnostic_archive(run_dir)
+            except Exception as exc:
+                blocked["diagnostic_archive_error"] = f"{type(exc).__name__}: {exc}"
+            return blocked
     parent_review_record: dict[str, Any] | None = None
 
     def revision_dir() -> Path:

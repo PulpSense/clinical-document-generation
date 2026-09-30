@@ -110,6 +110,7 @@ def test_logged_out_worker_stops_before_creating_the_deadline(tmp_path, monkeypa
     )
     assert result["stage"] == "worker_readiness"
     assert not (tmp_path / "run/logs/desktop-operation.json").exists()
+    assert (tmp_path / "run" / result["diagnostic_archive"]["path"]).is_file()
 
 
 @pytest.mark.parametrize("visual_fallback", [False, True])
