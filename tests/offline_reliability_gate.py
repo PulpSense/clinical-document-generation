@@ -6,8 +6,10 @@ import argparse
 import ast
 import hashlib
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -82,6 +84,37 @@ def test_command(python: str = sys.executable) -> list[str]:
     return [python, '-m', 'pytest', *[f'tests/{name}' for name in TEST_FILES], '-q']
 
 
+def test_environment(office_alias_dir: Path) -> tuple[dict[str, str], str | None]:
+    """Pass the office installation discoverable by an installation smoke to pytest.
+
+    Hermes background workers need not source terminal shell init files, so their
+    inherited PATH may omit the profile's already-installed LibreOffice.
+    Resolve it through the same renderer discovery as the installation smoke.
+    """
+    scripts = str(ROOT / 'scripts')
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from quality import renderer
+
+    environment = os.environ.copy()
+    home = environment.get('HERMES_HOME')
+    skill_root = Path(home) / 'skills/clinical-document-generation' if home else ROOT
+    selected = renderer(environment=environment, skill_root=skill_root)
+    if selected and selected['kind'] == 'LibreOffice':
+        office = Path(selected['path'])
+        # Tests look up either name; bind both to the smoke-selected executable,
+        # even when another launcher is installed alongside it.
+        if os.name == 'nt':
+            directory = office.parent
+        else:
+            for name in ('libreoffice', 'soffice'):
+                (office_alias_dir / name).symlink_to(office)
+            directory = office_alias_dir
+        environment['PATH'] = str(directory) + os.pathsep + environment.get('PATH', '')
+        return environment, str(office)
+    return environment, None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--list', action='store_true', help='Show selected local tests without executing them')
@@ -101,7 +134,10 @@ def main() -> int:
     code = 1
     if not findings:
         try:
-            completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=args.timeout)
+            with tempfile.TemporaryDirectory(prefix='clinical-offline-office-') as directory:
+                environment, office = test_environment(Path(directory))
+                result['renderer_path_for_pytest'] = office
+                completed = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=args.timeout, env=environment)
             code = completed.returncode
             result.update(stdout=completed.stdout, stderr=completed.stderr)
         except subprocess.TimeoutExpired as exc:
