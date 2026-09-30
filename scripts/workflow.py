@@ -3834,10 +3834,22 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
             "candidate_evidence": snapshot_path.name,
             "files": outputs,
         })
+        finding_lines = []
+        for finding in result.get("findings") or []:
+            if not isinstance(finding, Mapping):
+                continue
+            issue = " ".join(str(finding.get("issue") or "").split())
+            field = " ".join(str(finding.get("field") or "").split())
+            if issue:
+                finding_lines.append(f"- {field}: {issue}" if field else f"- {issue}")
         (staging / "READ-ME-FIRST.txt").write_text(
             "REVIEW COPY — NOT CLIENT READY\n"
-            "These documents did not pass every publication check. "
-            "Read findings.json before using or sharing them.\n",
+            "The automated publication checks flagged the following concern(s):\n"
+            + ("\n".join(finding_lines) if finding_lines else "- See findings.json for the exact result.")
+            + "\n\nAn automated check can sometimes flag a valid document. "
+            "Compare each concern with the approved source and the relevant document passage. "
+            "These files remain review copies until the concern is resolved; they are not confirmed client-ready. "
+            "See findings.json for the complete findings.\n",
             encoding="utf-8",
         )
         os.replace(staging, destination)

@@ -56,6 +56,10 @@ def test_content_block_exports_complete_review_only_documents_and_findings(tmp_p
     assert not (run_dir / "output").exists()
     report = json.loads((run_dir / result["review_findings"]).read_text())
     assert report["findings"] == [{"issue": "Required consent language is absent."}]
+    readme = (run_dir / "review-output/READ-ME-FIRST.txt").read_text()
+    assert "Required consent language is absent." in readme
+    assert "automated check" in readme.casefold()
+    assert "review" in readme.casefold()
     for item in result["review_outputs"]:
         source = candidate / Path(item["path"]).name.removeprefix("REVIEW-ONLY-")
         assert workflow.sha256_file(run_dir / item["path"]) == workflow.sha256_file(source)

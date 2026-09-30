@@ -90,6 +90,25 @@ def test_facility_projection_is_central_and_postal_appears_once():
     assert fields["studySiteAddress"].count("02110") == 1
 
 
+def test_facility_projection_preserves_supplied_us_state_abbreviation_without_duplication():
+    projection = contracts.facility_projection({
+        "address": "300 Test Clinic Road, Test City, NY 10003, USA",
+        "city": "Test City", "state": "New York", "postal_code": "10003",
+        "country": "United States",
+    })
+    assert projection["street"] == "300 Test Clinic Road"
+    assert projection["address"] == "300 Test Clinic Road, Test City, NY 10003, USA"
+
+
+def test_facility_projection_preserves_unicode_country_without_duplication():
+    projection = contracts.facility_projection({
+        "address": "5 Rue Example, Abidjan, Côte d'Ivoire",
+        "city": "Abidjan", "country": "Côte d'Ivoire",
+    })
+    assert projection["street"] == "5 Rue Example"
+    assert projection["address"] == "5 Rue Example, Abidjan, Côte d'Ivoire"
+
+
 def test_recovery_findings_declare_the_owning_seam():
     finding = contracts.recovery_finding(
         {"category": "visual", "field": "icf", "target_ids": ["layout:icf"]},

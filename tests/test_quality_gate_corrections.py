@@ -216,6 +216,86 @@ def test_direct_source_surface_audit_catches_front_matter_omissions(tmp_path, br
         assert quality.audit_source_surfaces(icf, source) == []
 
 
+@pytest.mark.parametrize("source_country,shown_country", [
+    ("United States", "USA"),
+    ("United States", "U.S.A."),
+    ("USA", "United States"),
+    ("United States of America", "US"),
+])
+@pytest.mark.parametrize("branch", ["Prospective", "Ambispective"])
+def test_advarra_address_audit_accepts_equivalent_us_country_names(
+    tmp_path, branch, source_country, shown_country,
+):
+    source = {"meta": {"study_type": branch, "icf_template": "Advarra"},
+              "sites": [{"facility": {"address": "300 Test Clinic Road",
+                                      "city": "Test City", "state": "New York",
+                                      "postal_code": "10003", "country": source_country}}]}
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Study Site Address:"
+    table.cell(0, 1).text = f"300 Test Clinic Road, Test City, New York 10003, {shown_country}"
+    path = tmp_path / "icf.docx"
+    document.save(path)
+
+    assert quality.audit_source_surfaces(path, source) == []
+
+    table.cell(0, 1).text = "300 Test Clinic Road, Test City, New York 10003, Canada"
+    document.save(path)
+    assert {finding["field"] for finding in quality.audit_source_surfaces(path, source)} == {
+        "sites[0].facility.country"
+    }
+
+
+@pytest.mark.parametrize("branch", ["Prospective", "Ambispective"])
+def test_advarra_address_audit_accepts_us_state_name_or_postal_code(tmp_path, branch):
+    source = {"meta": {"study_type": branch, "icf_template": "Advarra"},
+              "sites": [{"facility": {"address": "300 Test Clinic Road",
+                                      "city": "Test City", "state": "New York",
+                                      "postal_code": "10003", "country": "United States"}}]}
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Study Site Address:"
+    table.cell(0, 1).text = "300 Test Clinic Road, Test City, NY 10003, USA"
+    path = tmp_path / "icf.docx"
+    document.save(path)
+    assert quality.audit_source_surfaces(path, source) == []
+
+    table.cell(0, 1).text = "300 Test Clinic Road, Test City, CA 10003, USA"
+    document.save(path)
+    assert {finding["field"] for finding in quality.audit_source_surfaces(path, source)} == {
+        "sites[0].facility.state"
+    }
+
+
+def test_advarra_address_audit_uses_nested_country_for_state_alias(tmp_path):
+    source = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"},
+              "sites": [{"facility": {"address": {
+                  "line1": "300 Test Clinic Road", "city": "Test City",
+                  "state": "New York", "postal_code": "10003",
+                  "country": "United States",
+              }}}]}
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Study Site Address:"
+    table.cell(0, 1).text = "300 Test Clinic Road, Test City, NY 10003, USA"
+    path = tmp_path / "icf.docx"
+    document.save(path)
+    assert quality.audit_source_surfaces(path, source) == []
+
+
+def test_advarra_address_audit_preserves_unicode_country_names(tmp_path):
+    source = {"meta": {"study_type": "Prospective", "icf_template": "Advarra"},
+              "sites": [{"facility": {"address": "5 Rue Example",
+                                      "city": "Abidjan", "country": "Côte d'Ivoire"}}]}
+    document = Document()
+    table = document.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = "Study Site Address:"
+    table.cell(0, 1).text = "5 Rue Example, Abidjan, Côte d'Ivoire"
+    path = tmp_path / "icf.docx"
+    document.save(path)
+    assert quality.audit_source_surfaces(path, source) == []
+
+
 @pytest.mark.parametrize("branch,family", CASES)
 def test_review_requires_source_precedence_and_independent_field_inventory(tmp_path, branch, family):
     source = {"meta": {"study_type": branch, "icf_template": family},

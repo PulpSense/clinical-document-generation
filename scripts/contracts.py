@@ -938,6 +938,51 @@ def sterling_clause_text(clause_id: str, repo_root: Path | None = None) -> str:
     return text
 
 
+def _location_identity(value: str) -> str:
+    return " ".join("".join(char if char.isalnum() else " " for char in str(value).casefold()).split())
+
+
+def country_name_aliases(value: str) -> set[str]:
+    """Return exact normalized country names accepted in a site address."""
+    normalized = _location_identity(value)
+    us_names = {"usa", "us", "u s", "u s a", "united states", "united states of america"}
+    return us_names if normalized in us_names else {normalized} if normalized else set()
+
+
+_US_POSTAL_SUBDIVISIONS = {
+    # USPS Publication 28, Appendix B: state/possession abbreviations.
+    "alabama": "al", "alaska": "ak", "american samoa": "as", "arizona": "az",
+    "arkansas": "ar", "california": "ca", "colorado": "co", "connecticut": "ct",
+    "delaware": "de", "district of columbia": "dc", "federated states of micronesia": "fm",
+    "florida": "fl", "georgia": "ga", "guam": "gu", "hawaii": "hi", "idaho": "id",
+    "illinois": "il", "indiana": "in", "iowa": "ia", "kansas": "ks",
+    "kentucky": "ky", "louisiana": "la", "maine": "me", "marshall islands": "mh",
+    "maryland": "md", "massachusetts": "ma", "michigan": "mi", "minnesota": "mn",
+    "mississippi": "ms", "missouri": "mo", "montana": "mt", "nebraska": "ne",
+    "nevada": "nv", "new hampshire": "nh", "new jersey": "nj", "new mexico": "nm",
+    "new york": "ny", "north carolina": "nc", "north dakota": "nd",
+    "northern mariana islands": "mp", "ohio": "oh", "oklahoma": "ok",
+    "oregon": "or", "palau": "pw", "pennsylvania": "pa", "puerto rico": "pr",
+    "rhode island": "ri", "south carolina": "sc", "south dakota": "sd",
+    "tennessee": "tn", "texas": "tx", "utah": "ut", "vermont": "vt",
+    "virgin islands": "vi", "virginia": "va", "washington": "wa",
+    "west virginia": "wv", "wisconsin": "wi", "wyoming": "wy",
+}
+
+
+def state_name_aliases(value: str, country: str) -> set[str]:
+    """Recognize USPS name/code pairs only for a supplied US site."""
+    normalized = _location_identity(value)
+    if not normalized:
+        return set()
+    if "united states" not in country_name_aliases(country):
+        return {normalized}
+    for name, code in _US_POSTAL_SUBDIVISIONS.items():
+        if normalized in {name, code}:
+            return {name, code}
+    return {normalized}
+
+
 def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
     """Project flat or nested facility aliases into one artifact-neutral model."""
     def text(value: Any) -> str:
@@ -958,18 +1003,16 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
         return ""
 
     def identity(value: str) -> str:
-        return " ".join("".join(c.casefold() if c.isalnum() else " " for c in value).split())
+        return _location_identity(value)
 
-    country_identities = {identity(first("country", "country_name"))}
-    us_identities = {"usa", "us", "u s a", "united states", "united states of america"}
-    if country_identities & us_identities:
-        country_identities.update(us_identities)
+    country_identities = country_name_aliases(first("country", "country_name"))
 
     name = text(facility.get("name") or facility.get("facility_name"))
     city = first("city", "locality", "town")
     state = first("state", "region", "province")
     postal_code = first("zip", "postal_code", "postalCode", "postcode", "zip_code")
     country = first("country", "country_name")
+    state_identities = state_name_aliases(state, country)
     # A complete, comma-delimited US address is common in approved source
     # packets. Decompose only its unambiguous final components; retain the
     # original display address below. Other formats need explicit components.
@@ -993,8 +1036,9 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
     else:
         raw_segments = [part.strip() for part in re.split(r"[,;\n]", text(address)) if part.strip()]
         known_components = [name, *locality_parts]
-        known_identities = {identity(part) for part in known_components if part} | country_identities
+        known_identities = {identity(part) for part in known_components if part} | country_identities | state_identities
         known_tokens = {token for part in known_components for token in identity(part).split()}
+        known_tokens.update(token for alias in state_identities for token in alias.split())
         street_parts = []
         for segment in raw_segments:
             marker = identity(segment)
@@ -1020,14 +1064,17 @@ def facility_projection(facility: Mapping[str, Any]) -> dict[str, str]:
         supplied_tokens = set(identity(" ".join(supplied_segments)).split())
         required_tokens = {
             token
-            for part in locality_parts[:-1]
+            for part in (city, postal_code)
             if part
             for token in identity(part).split()
         }
+        state_present = not state or any(
+            set(marker.split()) <= supplied_tokens for marker in state_identities if marker
+        )
         country_present = not country or any(
             set(marker.split()) <= supplied_tokens for marker in country_identities if marker
         )
-        if supplied_segments and required_tokens and required_tokens <= supplied_tokens and country_present:
+        if supplied_segments and required_tokens and required_tokens <= supplied_tokens and state_present and country_present:
             display_address = ", ".join(supplied_segments)
     return {
         "name": name,
@@ -2580,7 +2627,7 @@ __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES", "STERLING_CLAUSE_CONTRACT_VERSION", "STERLING_CLAUSE_CONTRACT_RESOURCE",
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
-    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "document_set",
-    "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map",
+    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "country_name_aliases", "document_set",
+    "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
 ]

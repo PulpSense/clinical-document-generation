@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, sterling_clause_contract, sterling_clause_text
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
 from drafting import evidence_grounded, hypothesis_claim_issues, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
@@ -3924,14 +3924,33 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
                     elif collecting and text.strip():
                         break
             normalized = " ".join(re.findall(r"\w+", "\n".join(address_blocks).casefold()))
-            for item in _source_field_inventory(reference):
+            inventory = _source_field_inventory(reference)
+            source_country = next((
+                str(item["value"]) for item in inventory
+                if item["source_path"] in {
+                    "sites[0].facility.country", "sites[0].facility.address.country"
+                }
+            ), "")
+            for item in inventory:
                 field = item["source_path"]
                 if not re.fullmatch(
                     r"sites\[0\]\.facility\.(?:address(?:\.(?:line1|line2|address_line1|address_line2|street|city|state|country|zip|postal_code))?|city|state|country|zip|postal_code)", field
                 ):
                     continue
                 value = " ".join(re.findall(r"\w+", str(item["value"]).casefold()))
-                if value and not re.search(r"(?<!\w)" + re.escape(value) + r"(?!\w)", normalized):
+                aliases = (
+                    country_name_aliases(str(item["value"]))
+                    if field.endswith(".country")
+                    else state_name_aliases(
+                        str(item["value"]), source_country,
+                    ) if field.endswith(".state")
+                    else {value}
+                )
+                present = any(
+                    alias and re.search(r"(?<!\w)" + re.escape(alias) + r"(?!\w)", normalized)
+                    for alias in aliases
+                )
+                if value and not present:
                     findings.append({"category": "content", "field": field,
                                      "target_ids": ["layout:icf"],
                                      "issue": f"ICF omits supplied site-address component {field}: {item['value']}"})
