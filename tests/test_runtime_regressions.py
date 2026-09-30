@@ -5289,6 +5289,36 @@ def test_retrospective_timeline_coverage_accepts_faithful_record_window():
     assert not quality._timeline_covered(approved, visible.replace("review uses existing care records", "study runs"))
 
 
+def test_retrospective_lexical_checks_warn_on_paraphrase_but_block_missing_numbers():
+    criterion = "Age 18 to 80 at knee replacement and an existing baseline and Week 12 pain score."
+    paraphrase = "Adults aged 18–80 at knee replacement need baseline and Week 12 pain scores."
+    warning = quality._retrospective_lexical_coverage_finding(
+        criterion, paraphrase, field="subjects.eligibility",
+        issue="Retrospective eligibility omits approved source content.",
+    )
+    assert warning is not None
+    assert warning["publication_disposition"] == "warning"
+    assert warning["action"] == "manual_review"
+    assert quality._retrospective_lexical_coverage_finding(
+        criterion, criterion, field="subjects.eligibility",
+        issue="Retrospective eligibility omits approved source content.",
+    ) is None
+    missing_week = quality._retrospective_lexical_coverage_finding(
+        criterion, "Adults aged 18–80 at knee replacement need baseline pain scores.",
+        field="subjects.eligibility",
+        issue="Retrospective eligibility omits approved source content.",
+    )
+    assert missing_week is not None
+    assert missing_week.get("publication_disposition") != "warning"
+    assert "12" in missing_week["missing_numbers"]
+
+    visit = quality._retrospective_lexical_coverage_finding(
+        "Historical chart abstraction", "Existing charts will be reviewed and abstracted.",
+        field="study-procedure.enrollment", issue="Retrospective study procedure omits approved visit.",
+    )
+    assert visit is not None and visit["publication_disposition"] == "warning"
+
+
 def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"

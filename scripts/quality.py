@@ -3866,6 +3866,40 @@ def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
     )
 
 
+def _retrospective_lexical_coverage_finding(
+    approved: Any, visible_text: str, *, field: str, issue: str,
+) -> dict[str, Any] | None:
+    """Keep a paraphrase from becoming a retry loop; retain missing numbers as blockers."""
+    expected = re.sub(r"\s+", " ", _text(approved)).strip().casefold().rstrip(".")
+    visible = re.sub(r"\s+", " ", visible_text).strip().casefold()
+    if not expected or expected in visible:
+        return None
+    diagnostic = source_evidence_diagnostics(visible, field, approved, all_items=True)
+    missing_numbers = sorted({
+        str(number)
+        for value in diagnostic.get("unobserved_values", [])
+        for number in value.get("missing_numbers", [])
+    })
+    finding: dict[str, Any] = {
+        "category": "content", "field": field, "target_ids": [field],
+        "issue": issue,
+    }
+    if missing_numbers:
+        finding["missing_numbers"] = missing_numbers
+        return finding
+    return {
+        **finding,
+        "code": "retrospective-lexical-evidence-uncertainty",
+        "publication_disposition": "warning",
+        "action": "manual_review",
+        "issue": (
+            "Automated text matching could not confirm the approved wording; "
+            "independent content review must assess whether the fact is present."
+        ),
+        "source_excerpt": _text(approved),
+    }
+
+
 def audit_computed_protocol_fields(document: Path | Document, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Check code-owned synopsis destinations before an independent review call."""
     document = document if hasattr(document, "tables") else Document(document)
@@ -4766,18 +4800,24 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             value = get_path(reference, field, [])
             items = value if isinstance(value, list) else [value]
             for item in items:
-                expected = re.sub(r"\s+", " ", _text(item)).strip().casefold().rstrip(".")
-                if expected and expected not in normalized_visible:
-                    findings.append({"category": "content", "field": "subjects.eligibility", "target_ids": ["subjects.eligibility"], "issue": f"Retrospective eligibility omits approved source content from {field}."})
+                finding = _retrospective_lexical_coverage_finding(
+                    item, normalized_visible, field="subjects.eligibility",
+                    issue=f"Retrospective eligibility omits approved source content from {field}.",
+                )
+                if finding:
+                    findings.append(finding)
         timeline = get_path(reference, "study.timeline")
         if timeline and not _timeline_covered(timeline, normalized_visible):
             findings.append({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": "Retrospective study procedure omits the approved study timeline."})
         schedule = get_path(reference, "procedures.visit_schedule_table", []) or []
         visit_names = [item.get("visitName") or item.get("visit") for item in schedule if isinstance(item, Mapping)]
         for visit_name in visit_names:
-            expected = re.sub(r"\s+", " ", _text(visit_name)).strip().casefold()
-            if expected and expected not in normalized_visible:
-                findings.append({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": f"Retrospective study procedure omits approved visit {visit_name}."})
+            finding = _retrospective_lexical_coverage_finding(
+                visit_name, normalized_visible, field="study-procedure.enrollment",
+                issue=f"Retrospective study procedure omits approved visit {visit_name}.",
+            )
+            if finding:
+                findings.append(finding)
     if branch != "Retrospective":
         icf = revision_dir / "candidate/icf.docx"
         required_icf_title = (
