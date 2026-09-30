@@ -75,7 +75,7 @@ LAYOUT_REPAIR_RULES = {
     "protocol": (
         "heading_cohesion", "heading_whitespace_cohesion",
         "heading_page_boundary", "table_pagination", "table_page_boundary",
-        "section15_table_opening",
+        "section15_table_opening", "retrospective_terminal_ethics_spacing",
     ),
     "icf": (
         "heading_cohesion", "heading_whitespace_cohesion",

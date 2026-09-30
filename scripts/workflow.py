@@ -6607,6 +6607,14 @@ def _layout_repair_plan(
         )
         if section15_table_opening:
             disposition = "repair:section15_table_opening"
+        retrospective_terminal_ethics = (
+            family == "retrospective-protocol"
+            and check == "artificial_pagination"
+            and target.casefold().rstrip(" .:")
+            == "13. gcp, ich and ethical considerations"
+        )
+        if retrospective_terminal_ethics:
+            disposition = "repair:retrospective_terminal_ethics_spacing"
         if disposition.startswith("prevention:"):
             unsupported.append({
                 **finding,

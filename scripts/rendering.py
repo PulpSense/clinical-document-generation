@@ -3020,6 +3020,32 @@ def _normalize_protocol_section_pagination(document: Document, branch: str = "")
             boundary.paragraph_format.page_break_before = True
 
 
+def _repair_retrospective_terminal_ethics_spacing(document: Document, target: str) -> None:
+    """Recover the last Retrospective page by tightening only its final headings."""
+    expected = "13. GCP, ICH and ETHICAL CONSIDERATIONS"
+    if _protocol_heading_key(target) != _protocol_heading_key(expected):
+        raise LayoutRepairTargetError(f"Unexpected Retrospective ethics repair target: {target}")
+    headings = []
+    for number, title in (
+        (11, "CONFIDENTIALITY/PUBLICATION OF THE STUDY"),
+        (12, "QUALITY COMPLAINTS AND ADVERSE EVENTS"),
+        (13, "GCP, ICH and ETHICAL CONSIDERATIONS"),
+    ):
+        key = _protocol_heading_key(f"{number}. {title}")
+        matches = [
+            paragraph for paragraph in document.paragraphs
+            if _heading_level(paragraph) is not None
+            and _protocol_heading_key(paragraph.text) == key
+        ]
+        if len(matches) != 1:
+            raise LayoutRepairTargetError(
+                f"Retrospective ethics spacing requires one exact heading {number}; found {len(matches)}"
+            )
+        headings.append(matches[0])
+    for heading in headings:
+        heading.paragraph_format.space_before = Pt(6)
+
+
 def _protect_protocol_heading_content(document: Document) -> None:
     """Keep each body heading and intervening template spacers with content."""
     blocks = list(document.element.body.iterchildren())
@@ -3588,6 +3614,10 @@ def _template_document(
                 section15_repairs.append("15. STANDARD EVALUATION PROCEDURES")
         elif rule == "sterling_study_site_alignment":
             _align_sterling_study_site_continuations(document, reference)
+        elif rule == "retrospective_terminal_ethics_spacing":
+            if icf or branch != "Retrospective":
+                raise LayoutRepairTargetError("Retrospective ethics spacing requires a Retrospective Protocol")
+            _repair_retrospective_terminal_ethics_spacing(document, target)
     # This repair owns the complete opening. Apply it after earlier caption or
     # table rules so their page breaks cannot split the unit again.
     for target in dict.fromkeys(section15_repairs):

@@ -438,6 +438,50 @@ def test_artificial_pagination_fails_closed_instead_of_removing_template_breaks(
     }]
 
 
+def test_retrospective_terminal_ethics_page_routes_to_local_spacing_repair():
+    finding = {
+        "category": "visual",
+        "artifact": "protocol",
+        "check": "artificial_pagination",
+        "element": "13. GCP, ICH and ETHICAL CONSIDERATIONS",
+        "target_ids": ["layout:protocol"],
+        "issue": "Final ethics paragraph alone on a sixth page.",
+    }
+
+    plan, unsupported = workflow._layout_repair_plan([finding], study_type="Retrospective")
+
+    assert unsupported == []
+    assert plan == {"protocol": [{
+        "rule": "retrospective_terminal_ethics_spacing",
+        "target": finding["element"],
+    }]}
+    assert workflow._layout_repair_plan([finding], study_type="Prospective")[1]
+
+
+def test_retrospective_terminal_ethics_spacing_changes_only_last_three_headings():
+    document = Document()
+    for number in range(9, 14):
+        title = {
+            11: "CONFIDENTIALITY/PUBLICATION OF THE STUDY",
+            12: "QUALITY COMPLAINTS AND ADVERSE EVENTS",
+            13: "GCP, ICH and ETHICAL CONSIDERATIONS",
+        }.get(number, f"SECTION {number}")
+        document.add_paragraph(f"{number}. {title}", style="Heading 1")
+        document.add_paragraph(f"Section {number} body.", style="Normal")
+    before = [paragraph._p.xml for paragraph in document.paragraphs]
+
+    rendering._repair_retrospective_terminal_ethics_spacing(
+        document, "13. GCP, ICH and ETHICAL CONSIDERATIONS"
+    )
+
+    assert document.paragraphs[0]._p.xml == before[0]
+    assert document.paragraphs[1]._p.xml == before[1]
+    for index in (4, 6, 8):
+        assert document.paragraphs[index].paragraph_format.space_before.pt == 6
+    for index in (5, 7, 9):
+        assert document.paragraphs[index]._p.xml == before[index]
+
+
 def test_visual_disposition_authority_covers_every_check_for_every_layout_family():
     assert set(VISUAL_CHECK_DISPOSITIONS) == set(LAYOUT_FAMILY_ARTIFACTS)
     assert set(LAYOUT_FAMILY_ARTIFACTS) == {
