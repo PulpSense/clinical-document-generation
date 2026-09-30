@@ -259,7 +259,7 @@ Apply these rules:
 8. Keep verified deliverables in `<run-folder>/output/` and labeled review copies in `<run-folder>/review-output/`. A terminal failed Desktop operation writes only the diagnostic ZIP to `output/`; report its path and terminal findings without presenting it as a deliverable. `client_outputs` lists only passed deliverables; `review_outputs` lists only review copies.
 9. Never generate files directly in `/opt/data`, inside this installed skill, or inside another study's run folder.
 10. Never delete or alter an earlier study-run folder.
-11. At completion, report the approved study title, study type, creation date, complete run-folder path, `output` path, and final deliverable filenames.
+11. At completion, report the approved study title, study type, creation date, complete run-folder path, `output` path, final deliverable filenames, and total generation time in minutes and seconds. Use the operation result's recorded `elapsed_seconds` (also persisted in the Desktop operation state); do not estimate it from chat timestamps.
 
 Folder selection is complete only after confirming the proposed path does not
 already exist and the chosen path is the first available collision-safe name.

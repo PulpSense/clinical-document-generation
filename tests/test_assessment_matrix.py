@@ -53,6 +53,32 @@ def test_unallocated_matrix_activity_is_retained_without_inventing_a_visit():
     assert not any(row[0] == 'Unscheduled blood draw at 5 mL' for row in table['rows'][2:])
 
 
+def test_fully_allocated_multivisit_narrative_is_not_repeated_below_section_15_table():
+    note = ('Preoperative screening, operative visit for each eye, and 3-month postoperative assessment. '
+            'Screening: informed consent, demographics, and medical history. Month 3: binocular uncorrected '
+            'photopic distance, intermediate (66 cm), and near (40 cm) visual acuity; binocular distance-corrected '
+            'photopic distance, intermediate (66 cm), and near (40 cm) visual acuity; distance-corrected defocus '
+            'curve; AIOLIS; monitor for adverse events and device deficiencies; complete exit form.')
+    source = {'procedures': {'assessments': note, 'visit_schedule': [
+        {'visit': 'Preoperative (Screening)', 'timing': 'Preoperative',
+         'procedures': 'Informed consent; Demographics; Medical history'},
+        {'visit': 'Operative (one visit per eye)', 'timing': 'Operative',
+         'procedures': 'Cataract surgery; PureSee in dominant eye and Odyssey in non-dominant eye'},
+        {'visit': '3 Month postoperative', 'timing': '3 months postoperatively',
+         'procedures': ('Uncorrected photopic distance VA (binocular); Uncorrected photopic intermediate VA '
+                        '(66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); '
+                        'Distance-corrected photopic distance VA (binocular); Distance-corrected photopic '
+                        'intermediate VA (66 cm, binocular); Distance-corrected photopic near VA '
+                        '(40 cm, binocular); Distance-corrected defocus curve; AIOLIS; Monitor for adverse '
+                        'events and device deficiencies; Complete exit form')},
+    ]}}
+    table = contracts.protocol_table_contracts(source)['schedule-of-assessments']
+    assert table['supplemental_notes'] == []
+    assert len(table['rows']) == 17
+    source['procedures']['assessments'] += ' Unscheduled blood draw at 5 mL.'
+    assert contracts.protocol_table_contracts(source)['schedule-of-assessments']['supplemental_notes']
+
+
 @pytest.mark.parametrize('field', ['assessments', 'visit_schedule', 'visit_schedule_table'])
 def test_projection_preserves_clinical_facts_but_not_binary_glyphs(field):
     raw = [{'activity': 'Blood sample at 5 mL', 'Week 2': 'X', 'Week 6': ''}]

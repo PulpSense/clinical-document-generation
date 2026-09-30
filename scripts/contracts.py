@@ -1468,9 +1468,25 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
     represented.update(visit["timing"].casefold() for visit in visits if visit["timing"])
 
     def fully_allocated_visit_note(note: str) -> bool:
-        """Suppress a prose inventory only when one visit's matrix already owns every term."""
+        """Suppress prose only when the matrix already contains every stated fact."""
         if not matrix:
             return False
+        # A narrative itinerary can summarize several columns. Keep any
+        # restriction or new fact, but omit an inventory made solely of the
+        # visits and activities already visible in the matrix.
+        if not re.search(r"\b(?:only|not|never|before|after|within|optional|required|at least|up to)\b", note, re.I):
+            def inventory_tokens(value: str) -> set[str]:
+                value = re.sub(r"\bvisual acuity\b", "VA", value, flags=re.I)
+                value = re.sub(r"\beach eye\b", "per eye", value, flags=re.I)
+                return {
+                    {"assessments": "assessment", "postoperatively": "postoperative"}.get(word, word)
+                    for word in re.findall(r"[a-z]+|\d+", value.casefold())
+                    if word not in {"a", "an", "and", "of", "the", "for", "at", "in", "assessment", "assessments"}
+                }
+
+            allocated = " ".join(" ".join(str(cell) for cell in row) for row in assessment_rows)
+            if inventory_tokens(note) and inventory_tokens(note) <= inventory_tokens(allocated):
+                return True
         match = re.fullmatch(r"\s*([^:]+):\s*(.+?)\s*", note)
         if not match:
             return False
