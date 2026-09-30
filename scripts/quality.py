@@ -3831,6 +3831,23 @@ def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
     visible = re.sub(r"\s+", " ", _text(visible_text)).strip().casefold()
     if not approved or approved in visible:
         return True
+    month_year = (
+        r"(?:january|february|march|april|may|june|july|august|"
+        r"september|october|november|december)\s+\d{4}"
+    )
+    dates = re.findall(month_year, approved)
+    if (
+        len(dates) == 2
+        and re.search(r"\breview\b[^.;]{0,100}\brecords\b", approved)
+        and "no new participant visits" in approved
+    ):
+        historical_window = (
+            rf"\breview\b[^.;]{{0,100}}\brecords\b[^.;]{{0,80}}"
+            rf"\b{re.escape(dates[0])}\b[^.;]{{0,80}}\b{re.escape(dates[1])}\b"
+            rf"[^.;]{{0,100}};?\s*no new participant visits\b"
+        )
+        if re.search(historical_window, visible):
+            return True
     clauses = [clause.strip(" .") for clause in approved.split(";") if clause.strip(" .")]
     pairs: list[tuple[str, str]] = []
     for clause in clauses:

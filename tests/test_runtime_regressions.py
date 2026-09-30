@@ -5271,6 +5271,24 @@ def test_timeline_coverage_allows_grammar_but_preserves_milestone_pairing():
     assert not quality._timeline_covered(approved, swapped)
 
 
+def test_retrospective_timeline_coverage_accepts_faithful_record_window():
+    approved = (
+        "Review of existing care records from January 2024 through December 2025; "
+        "no new participant visits."
+    )
+    visible = (
+        "The review uses existing care records dated January 2024 through December 2025; "
+        "no new participant visits are planned."
+    )
+    assert quality._timeline_covered(approved, visible)
+    assert not quality._timeline_covered(
+        approved, visible.replace("January 2024 through December 2025", "December 2025 through January 2024")
+    )
+    assert not quality._timeline_covered(approved, visible.replace(" through December 2025", ""))
+    assert not quality._timeline_covered(approved, visible.replace("no new participant visits", "new participant visits"))
+    assert not quality._timeline_covered(approved, visible.replace("review uses existing care records", "study runs"))
+
+
 def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
