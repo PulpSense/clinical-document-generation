@@ -18,6 +18,40 @@ def _source():
     return json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text())
 
 
+def test_retrospective_design_requires_supplied_cohort_and_masking():
+    source = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text())
+    section = next(item for item in protocol_contract("Retrospective") if item.section_id == "study-design.design")
+    boilerplate = json.loads((ROOT / "references/fixed-clinical-boilerplate.json").read_text())["sections"]
+    contract = _section_payload(section, boilerplate, source)
+    assert {"design.study_design", "design.arms", "design.masking"} <= set(contract["minimum_evidence"])
+    assert "arms" in " ".join(contract["content_expectations"]).casefold()
+    assert "masking" in " ".join(contract["content_expectations"]).casefold()
+    request = {
+        "approved_source": source,
+        "approved_input": [
+            {"path": path, "value": source["design"][path.split(".")[1]]}
+            for path in ("design.study_design", "design.arms", "design.masking")
+        ],
+    }
+    assert _coverage_findings(
+        request, contract, "study-design.design",
+        "This is a retrospective, single-center observational study based on historical record abstraction.",
+        ["source:design.study_design", "source:design.arms", "source:design.masking"],
+    )
+    assert _coverage_findings(
+        request, contract, "study-design.design",
+        "This is a retrospective, single-center observational study based on historical record abstraction. "
+        "The Sentinel Patch is the single observational cohort.",
+        ["source:design.study_design", "source:design.arms", "source:design.masking"],
+    )
+    assert not _coverage_findings(
+        request, contract, "study-design.design",
+        "This is a retrospective, single-center observational study based on historical record abstraction. "
+        "The Sentinel Patch is the single observational cohort. There is no masking.",
+        ["source:design.study_design", "source:design.arms", "source:design.masking"],
+    )
+
+
 def test_objectives_request_asks_for_purpose_without_endpoint_inventory(tmp_path):
     source = _source()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations")

@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.41-content-fidelity"
+CONTRACT_VERSION = "clinical-documents-v2.42-retrospective-design"
 BOILERPLATE_VERSION = "clinical-boilerplate-v13"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -579,7 +579,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
     _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("study-design", "7.", "STUDY DESIGN", role="container"),
-    _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design",)),
+    _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.arms", "design.masking")),
     _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "retrospective-bias"),
     _section_spec("study-procedure", "8.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline", "procedures.retention", "procedures.discontinuation", "procedures.replacement"), "retrospective-consent"),
