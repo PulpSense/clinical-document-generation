@@ -3844,7 +3844,8 @@ def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
         historical_window = (
             rf"\breview\b[^.;]{{0,100}}\brecords\b[^.;]{{0,80}}"
             rf"\b{re.escape(dates[0])}\b[^.;]{{0,80}}\b{re.escape(dates[1])}\b"
-            rf"[^.;]{{0,100}};?\s*no new participant visits\b"
+            rf".{{0,160}}\bno(?:\s+new participant visits|"
+            rf"\s+participant contact(?:,| or)\s*new participant visits)\b"
         )
         if re.search(historical_window, visible):
             return True

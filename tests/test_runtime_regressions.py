@@ -5289,6 +5289,25 @@ def test_retrospective_timeline_coverage_accepts_faithful_record_window():
     assert not quality._timeline_covered(approved, visible.replace("review uses existing care records", "study runs"))
 
 
+def test_retrospective_timeline_coverage_accepts_source_bound_review_copy_wording():
+    approved = (
+        "Review of existing care records from January 2024 through December 2025; "
+        "no new participant visits."
+    )
+    visible = (
+        "The review covers existing care records dated January 2024 through December 2025. "
+        "No participant contact, new participant visits, or new study procedures will occur."
+    )
+    assert quality._timeline_covered(approved, visible)
+    assert not quality._timeline_covered(
+        approved, visible.replace("January 2024 through December 2025", "January 2024 through November 2025")
+    )
+    assert not quality._timeline_covered(
+        approved, visible.replace("No participant contact, new participant visits, or new study procedures will occur.",
+                                  "No participant contact; new participant visits will occur.")
+    )
+
+
 def test_retrospective_lexical_checks_warn_on_paraphrase_but_block_missing_numbers():
     criterion = "Age 18 to 80 at knee replacement and an existing baseline and Week 12 pain score."
     paraphrase = "Adults aged 18–80 at knee replacement need baseline and Week 12 pain scores."
