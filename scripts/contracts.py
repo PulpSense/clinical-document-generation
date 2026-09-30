@@ -1478,8 +1478,13 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
             def inventory_tokens(value: str) -> set[str]:
                 value = re.sub(r"\bvisual acuity\b", "VA", value, flags=re.I)
                 value = re.sub(r"\beach eye\b", "per eye", value, flags=re.I)
+                equivalent = {
+                    "event": "event", "events": "event",
+                    "deficiency": "deficiency", "deficiencies": "deficiency",
+                    "monitoring": "monitor", "monitors": "monitor",
+                }
                 return {
-                    {"assessments": "assessment", "postoperatively": "postoperative"}.get(word, word)
+                    equivalent.get(word, {"postoperatively": "postoperative"}.get(word, word))
                     for word in re.findall(r"[a-z]+|\d+", value.casefold())
                     if word not in {"a", "an", "and", "of", "the", "for", "at", "in", "assessment", "assessments"}
                 }

@@ -75,6 +75,12 @@ def test_fully_allocated_multivisit_narrative_is_not_repeated_below_section_15_t
     table = contracts.protocol_table_contracts(source)['schedule-of-assessments']
     assert table['supplemental_notes'] == []
     assert len(table['rows']) == 17
+    source['procedures']['assessments'] = (
+        '3 months postoperative: binocular uncorrected and distance-corrected distance, intermediate '
+        '(66 cm), and near (40 cm) visual acuity; binocular distance-corrected defocus curve; '
+        'AIOLIS; adverse event and device deficiency monitoring; exit form.'
+    )
+    assert contracts.protocol_table_contracts(source)['schedule-of-assessments']['supplemental_notes'] == []
     source['procedures']['assessments'] += ' Unscheduled blood draw at 5 mL.'
     assert contracts.protocol_table_contracts(source)['schedule-of-assessments']['supplemental_notes']
 
