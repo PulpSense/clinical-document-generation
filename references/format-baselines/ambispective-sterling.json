@@ -765,6 +765,14 @@
           ]
         },
         {
+          "paragraph": 238,
+          "text_sha256": "9dd2766b125b0fc25379eef11ed2d1192e7253bd75b6b2d804986a20679c5621",
+          "style": "",
+          "categories": [
+            "confidential"
+          ]
+        },
+        {
           "paragraph": 239,
           "text_sha256": "c630aef2c649940aa668fa0d74b8eaa60bd3325d1a913494bf6d77e61ec01e8c",
           "style": "",
@@ -775,22 +783,14 @@
         },
         {
           "paragraph": 241,
-          "text_sha256": "2eec53f4741ab820569de18be0fb6d0505712b7b1cb11157bc985dffdf529477",
-          "style": "",
-          "categories": [
-            "injury"
-          ]
-        },
-        {
-          "paragraph": 242,
-          "text_sha256": "c3a07bd8749151453042e1166158c8080c53fd07f67297b915de80330e010f1f",
+          "text_sha256": "69356801b1baa74b96cb7413fc59cb2d426eb16a335531a2b0344829364faa74",
           "style": "",
           "categories": [
             "compensation"
           ]
         },
         {
-          "paragraph": 243,
+          "paragraph": 242,
           "text_sha256": "ec384cb3b2e737da7eee90fc4572606ed45c9fa5d03bbe6fd1cad48d7dc27612",
           "style": "",
           "categories": [
@@ -798,7 +798,7 @@
           ]
         },
         {
-          "paragraph": 248,
+          "paragraph": 247,
           "text_sha256": "9b78eea615fdef85650181f216d2d85820226bde0a1175329117e47bcf325b50",
           "style": "Normal",
           "categories": [
@@ -807,7 +807,7 @@
           ]
         },
         {
-          "paragraph": 249,
+          "paragraph": 248,
           "text_sha256": "151f74e88294da345a06ef81cbb78a9172f9b89bd42d9fd8f7149e70d8b7e261",
           "style": "Normal",
           "categories": [
@@ -815,7 +815,7 @@
           ]
         },
         {
-          "paragraph": 256,
+          "paragraph": 255,
           "text_sha256": "43e4e7302ecdd9a28ae40b160387cc414ed2e6089898280c233c7c6f570135c7",
           "style": "Normal",
           "categories": [
@@ -824,8 +824,8 @@
         }
       ],
       "paragraph_rhythm": {
-        "paragraph_count": 260,
-        "semantic_sha256": "240a7cbb999a232d9572bb43bdb670cde5d5594cbb24b739e648128357f08625"
+        "paragraph_count": 259,
+        "semantic_sha256": "499c0948ab109b0089da67ea420911d751f3b0aced2cc737b93172416e555869"
       },
       "pagination_relations": {
         "headings": [
@@ -1126,7 +1126,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 244,
+            "paragraph": 243,
             "text": "18. STUDY ENDPOINT CRITERIA",
             "style": "Heading1",
             "page_break_before": false,
@@ -1134,7 +1134,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 245,
+            "paragraph": 244,
             "text": "18.1. Patient Completion of Study",
             "style": "Heading2",
             "page_break_before": false,
@@ -1142,7 +1142,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 247,
+            "paragraph": 246,
             "text": "18.2. Patient Discontinuation",
             "style": "Heading2",
             "page_break_before": false,
@@ -1150,7 +1150,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 251,
+            "paragraph": 250,
             "text": "18.5. Study Completion",
             "style": "Heading2",
             "page_break_before": false,
@@ -1158,7 +1158,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 253,
+            "paragraph": 252,
             "text": "19. SUMMARY OF RISKS AND BENEFITS",
             "style": "Heading1",
             "page_break_before": false,
@@ -1166,7 +1166,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 254,
+            "paragraph": 253,
             "text": "19.1. Summary of risks",
             "style": "Heading2",
             "page_break_before": false,
@@ -1174,7 +1174,7 @@
             "keep_with_next": true
           },
           {
-            "paragraph": 257,
+            "paragraph": 256,
             "text": "19.2. Summary of benefits",
             "style": "Heading2",
             "page_break_before": false,
