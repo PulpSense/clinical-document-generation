@@ -6,13 +6,14 @@ from xml.etree import ElementTree
 from zipfile import ZipFile
 
 from docx import Document
+import pytest
 
 import drafting
 import quality
 import workflow
 
 
-def _candidate_run(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
+def _candidate_run(tmp_path: Path, monkeypatch, study_type: str = "Prospective") -> tuple[Path, Path]:
     monkeypatch.setattr(workflow, "contracted_template_bundle", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(workflow, "_approval_valid", lambda *_args, **_kwargs: (True, ""))
     run_dir = tmp_path / "run"
@@ -20,17 +21,19 @@ def _candidate_run(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     reference_path.parent.mkdir(parents=True)
     reference_path.write_text(json.dumps({
         "approval": {"revision_id": "r-approved"},
-        "meta": {"study_type": "Prospective"},
+        "meta": {"study_type": study_type},
     }), encoding="utf-8")
     candidate = run_dir / "revisions/r-approved/candidate"
     candidate.mkdir(parents=True)
-    for name in ("protocol.docx", "icf.docx"):
+    for name in workflow.document_set(study_type):
+        if name.endswith(".xml"):
+            ElementTree.ElementTree(ElementTree.Element("clinical_study")).write(
+                candidate / name, encoding="utf-8", xml_declaration=True,
+            )
+            continue
         document = Document()
         document.add_paragraph(name)
         document.save(candidate / name)
-    ElementTree.ElementTree(ElementTree.Element("clinical_study")).write(
-        candidate / "study.xml", encoding="utf-8", xml_declaration=True,
-    )
     records = [
         {"path": f"candidate/{path.name}", "sha256": workflow.sha256_file(path)}
         for path in sorted(candidate.iterdir())
@@ -44,18 +47,22 @@ def _candidate_run(tmp_path: Path, monkeypatch) -> tuple[Path, Path]:
     return run_dir, candidate
 
 
-def test_content_block_exports_complete_review_only_documents_and_findings(tmp_path, monkeypatch):
-    run_dir, candidate = _candidate_run(tmp_path, monkeypatch)
+@pytest.mark.parametrize("study_type", ["Prospective", "Ambispective", "Retrospective"])
+def test_content_block_exports_complete_review_only_documents_and_findings(tmp_path, monkeypatch, study_type):
+    run_dir, candidate = _candidate_run(tmp_path, monkeypatch, study_type)
     result = workflow._review_copy(run_dir, {
         "status": "blocked", "stage": "quality",
         "findings": [{"issue": "Required consent language is absent."}],
     })
 
-    assert len(result["review_outputs"]) == 3
+    assert len(result["review_outputs"]) == len(workflow.document_set(study_type))
     assert all(item["delivery_status"] == "review_only_not_client_ready" for item in result["review_outputs"])
     assert not (run_dir / "output").exists()
     report = json.loads((run_dir / result["review_findings"]).read_text())
-    assert report["findings"] == [{"issue": "Required consent language is absent."}]
+    assert report["findings"] == [{
+        "issue": "Required consent language is absent.",
+        "document_locations": ["Document location not specified by the check"],
+    }]
     readme = (run_dir / "review-output/READ-ME-FIRST.txt").read_text()
     assert "Required consent language is absent." in readme
     assert "automated check" in readme.casefold()
@@ -63,6 +70,38 @@ def test_content_block_exports_complete_review_only_documents_and_findings(tmp_p
     for item in result["review_outputs"]:
         source = candidate / Path(item["path"]).name.removeprefix("REVIEW-ONLY-")
         assert workflow.sha256_file(run_dir / item["path"]) == workflow.sha256_file(source)
+
+
+def test_review_copy_names_exact_protocol_icf_and_xml_locations(tmp_path, monkeypatch):
+    run_dir, _candidate = _candidate_run(tmp_path, monkeypatch)
+    result = workflow._review_copy(run_dir, {
+        "status": "blocked", "stage": "quality",
+        "findings": [
+            {"target_ids": ["quality-safety.reporting"], "issue": "A safety detail needs review."},
+            {"target_ids": ["icf.risks"], "issue": "A risk statement needs review."},
+            {"target_ids": ["prs.eligibility"], "issue": "An XML criterion needs review."},
+        ],
+    })
+    report = json.loads((run_dir / result["review_findings"]).read_text())
+    locations = [item["document_locations"] for item in report["findings"]]
+    assert locations == [
+        ["Protocol §13.3 — Procedures for Recording and Reporting AEs and SAEs"],
+        ["ICF — Risks and discomforts"],
+        ["PRS XML — prs.eligibility"],
+    ]
+    readme = (run_dir / "review-output/READ-ME-FIRST.txt").read_text()
+    for location in locations:
+        assert location[0] in readme
+
+    retrospective = workflow._review_finding_locations(
+        {"meta": {"study_type": "Retrospective"}},
+        {"target_ids": ["study-procedure.enrollment"]},
+    )
+    assert retrospective == ["Protocol §8.1 — Informed Consent / Subject Enrollment"]
+    assert workflow._review_finding_locations(
+        {"meta": {"study_type": "Prospective"}},
+        {"field": "quality-safety.reporting"},
+    ) == ["Protocol §13.3 — Procedures for Recording and Reporting AEs and SAEs"]
 
 
 def test_tampered_candidate_cannot_be_exported_for_review(tmp_path, monkeypatch):

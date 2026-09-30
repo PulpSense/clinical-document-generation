@@ -3761,6 +3761,38 @@ def _candidate_outputs(revision_dir: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _review_finding_locations(reference: Mapping[str, Any], finding: Mapping[str, Any]) -> list[str]:
+    """Name only document sections identified by the finding's governed targets."""
+    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
+    protocol_sections = {section.section_id: section for section in protocol_contract(branch)}
+    icf_sections = {
+        section.section_id: section
+        for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra")))
+    } if branch != "Retrospective" else {}
+    locations: list[str] = []
+    targets = finding.get("target_ids") or [finding.get("field")]
+    for raw in targets:
+        target = str(raw)
+        if target in protocol_sections:
+            section = protocol_sections[target]
+            location = f"Protocol §{section.number.rstrip('.')} — {section.title}"
+        elif target in icf_sections:
+            location = f"ICF — {icf_sections[target].title}"
+        elif target.startswith("prs."):
+            location = f"PRS XML — {target}"
+        elif target == "layout:protocol":
+            location = "Protocol layout (section unspecified)"
+        elif target == "layout:icf":
+            location = "ICF layout (section unspecified)"
+        elif target == "layout:xml":
+            location = "PRS XML (field unspecified)"
+        else:
+            continue
+        if location not in locations:
+            locations.append(location)
+    return locations or ["Document location not specified by the check"]
+
+
 def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
     """Expose a complete candidate for review without approving it."""
     if str(result.get("status")) != "blocked" or str(result.get("stage")) in {
@@ -3826,22 +3858,27 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
                 "bytes": target.stat().st_size,
                 "delivery_status": "review_only_not_client_ready",
             })
+        located_findings = [
+            {**dict(finding), "document_locations": _review_finding_locations(reference, finding)}
+            if isinstance(finding, Mapping) else finding
+            for finding in result.get("findings") or []
+        ]
         _write(staging / "findings.json", {
             "status": "review_only_not_client_ready",
             "stage": result.get("stage"),
-            "findings": list(result.get("findings") or []),
+            "findings": located_findings,
             "candidate_revision": revision_id,
             "candidate_evidence": snapshot_path.name,
             "files": outputs,
         })
         finding_lines = []
-        for finding in result.get("findings") or []:
+        for finding in located_findings:
             if not isinstance(finding, Mapping):
                 continue
             issue = " ".join(str(finding.get("issue") or "").split())
-            field = " ".join(str(finding.get("field") or "").split())
+            location = "; ".join(str(item) for item in finding.get("document_locations") or [])
             if issue:
-                finding_lines.append(f"- {field}: {issue}" if field else f"- {issue}")
+                finding_lines.append(f"- {location}: {issue}" if location else f"- {issue}")
         (staging / "READ-ME-FIRST.txt").write_text(
             "REVIEW COPY — NOT CLIENT READY\n"
             "The automated publication checks flagged the following concern(s):\n"
