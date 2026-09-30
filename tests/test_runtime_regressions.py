@@ -5306,6 +5306,11 @@ def test_retrospective_timeline_coverage_accepts_source_bound_review_copy_wordin
         approved, visible.replace("No participant contact, new participant visits, or new study procedures will occur.",
                                   "No participant contact; new participant visits will occur.")
     )
+    second_review_copy = (
+        "Study activities consist of historical chart abstraction from existing care records dated "
+        "January 2024 through December 2025. This review does not involve new participant visits."
+    )
+    assert quality._timeline_covered(approved, second_review_copy)
 
 
 def test_retrospective_lexical_checks_warn_on_paraphrase_but_block_missing_numbers():

@@ -14,7 +14,7 @@ from pypdf import PdfReader, PdfWriter
 from lxml import etree as LET
 
 from contracts import batch_plan
-from drafting import create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
+from drafting import _coverage_findings, create_drafting_request, evidence_grounded, recorded_acceptance_response, validate_response
 from prs_xml import generate as generate_prs_xml
 from quality import deterministic_content_check, render_pages, sha256_file
 from rendering import _has_page_boundary_before, _normalize_protocol_section_pagination, refresh_toc_from_pdf, render_documents, render_fields
@@ -480,6 +480,31 @@ def test_retrospective_enrollment_preserves_approved_withdrawal_right(tmp_path):
     render_documents(ROOT, tmp_path, reference, {"protocol": [], "icf": {}, "prs": {}}, artifact_names={"protocol"})
     visible = _visible_text(Document(tmp_path / "candidate/protocol.docx"))
     assert "Participants may withdraw at any time." in visible
+
+
+def test_retrospective_enrollment_requires_supplied_consent_authority(tmp_path):
+    reference = json.loads((
+        ROOT / "tests/fixtures/retrospective-acceptance-source.json"
+    ).read_text(encoding="utf-8"))
+    reference["procedures"]["consent"] = (
+        "An IRB-approved waiver of consent authorizes this historical-record review. "
+        "No participant contact or new study procedure will occur."
+    )
+    batch = next(item for item in batch_plan("Retrospective") if item.batch_id == "protocol-operations")
+    request_path = create_drafting_request(
+        repo_root=ROOT, revision_dir=tmp_path, revision_id="r-consent-authority",
+        reference=reference, batch=batch, target_ids=["study-procedure.enrollment"],
+        attempts={"study-procedure.enrollment": 1}, wave="initial",
+    )
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    contract = request["section_contracts"][0]
+    assert "procedures.consent" in contract["minimum_evidence"]
+    incomplete = "Historical chart abstraction uses existing care records. No new participant visits occur."
+    findings = _coverage_findings(
+        request, contract, "study-procedure.enrollment", incomplete,
+        ["source:procedures.assessments", "source:study.timeline"],
+    )
+    assert any("procedures.consent" in finding["issue"] for finding in findings)
 
 
 @pytest.mark.parametrize("family", ["Advarra", "Sterling"])
