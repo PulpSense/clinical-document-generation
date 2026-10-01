@@ -13,7 +13,7 @@
       "authority": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
       "false_rejection_risk": "Lexical overlap is a heuristic; structural IDs, bibliography and binary cells must be excluded by the shared projection",
       "duplicate_policy": "Drafting, Protocol rendered fidelity and Sterling consume shared section projections; endpoint inventory stays in its Study Design owner. Independent review still assesses meaning/relations.",
-      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py"
+      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py"
     },
     "clinical": {
       "authority": "Approved values plus Brad section ownership and governed template clauses",
@@ -25,7 +25,7 @@
       "authority": "Approved enrollment total, cohorts/interventions, endpoints, visits and PRS schema",
       "false_rejection_risk": "Dropping keys or guessing first numbers can destroy relationships; ambiguous matrix cells must not be guessed",
       "duplicate_policy": "contracts normalizes visit interpretation; table and narrative project that interpretation. PRS generation/validation share mapping helpers; independently asserted expected values in regression tests and full independent content review provide additional protection.",
-      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py"
+      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py; test_mixed_visit_representations.py"
     },
     "render": {
       "authority": "Exact template topology, DOCX/PDF/page images and release-owned renderer",
@@ -43,7 +43,7 @@
       "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
       "false_rejection_risk": "Counting the same response repeatedly; generic diagnostics produce identical retries; transport retry must not consume drafting streak",
       "duplicate_policy": "workflow owns retry state/deadlines; code-owned sections use native rendered snapshots when no accepted AI draft exists. Progress requires changed target and candidate; a fresh full review still decides correctness.",
-      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py"
+      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py"
     },
     "installation": {
       "authority": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
@@ -78,9 +78,21 @@
       "family": "structured"
     },
     {
+      "family": "structured",
+      "file": "scripts/contracts.py",
+      "function": "_schedule_activity_identity",
+      "code_sha256": "9d8f37ec0eefa482bbf3caa68a092e91ede3d6e3469d6ad6f59c081a6c1b57f1"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/contracts.py",
+      "function": "_matrix_visit_alias",
+      "code_sha256": "3fa7a89607f8fe43d1554bfa2006581a37b1c1151644bdd5e4450c932907c9a0"
+    },
+    {
       "file": "scripts/contracts.py",
       "function": "normalized_visit_records",
-      "code_sha256": "f286381f50b265d14cdef752b7168225f0592df9c8c1189bceecc3fab2529bfe",
+      "code_sha256": "d2b82e87211979a0d91ff8c603ccbc34caf1da8e8792276159318f2945cd4a66",
       "family": "structured"
     },
     {
@@ -186,6 +198,12 @@
       "family": "evidence"
     },
     {
+      "family": "evidence",
+      "file": "scripts/drafting.py",
+      "function": "lexical_evidence_uncertainty",
+      "code_sha256": "6769e87b5e86e7b23d172283b6e770d1c518dfbec5b6239214d1be4714576ffc"
+    },
+    {
       "file": "scripts/drafting.py",
       "function": "_material_source",
       "code_sha256": "5cccf1fa31146d6ea059b8b9706c20514edf18996a79fcc24acb15715446ad0a",
@@ -206,7 +224,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "7fdbe59ea600426ec6e6093b01d585cd3a552231d8529cf7ef530b4dace70453",
+      "code_sha256": "a5abf58186ac8f2db8b49c0fb6398f97839a1d3cc9b7f8b008b89280790f75b2",
       "family": "evidence"
     },
     {
@@ -355,15 +373,15 @@
     },
     {
       "file": "scripts/quality.py",
-      "function": "audit_computed_protocol_fields",
-      "code_sha256": "563a0ffb11820efb34d494a3b2f2d3d9aabfacf3e3403137e252c9767547abea",
-      "family": "structured"
-    },
-    {
-      "file": "scripts/quality.py",
       "function": "_retrospective_lexical_coverage_finding",
       "code_sha256": "7f3c4831aca01eaf6adb31cec390cd577a7c9fe618140544059cf7d096801be3",
       "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "audit_computed_protocol_fields",
+      "code_sha256": "563a0ffb11820efb34d494a3b2f2d3d9aabfacf3e3403137e252c9767547abea",
+      "family": "structured"
     },
     {
       "file": "scripts/quality.py",
@@ -374,7 +392,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "11e06ab0ab3743f7fc91f3728dafcd85ab4999ed092bbb1c71a7497048465e5f",
+      "code_sha256": "db74474dbc942c9b901ba4db57e4ab0a7351c0e96fcbf4c76484c949a97d36a3",
       "family": "clinical"
     },
     {
@@ -392,7 +410,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "692174333c730d593652f656a9684f19ed3fe05e20e6286abc55a640ec66f93a",
+      "code_sha256": "7dbbc982992b4c05061a43f401bf6a672de26035bc8b77aa467200796badd205",
       "family": "clinical"
     },
     {
@@ -414,6 +432,12 @@
       "family": "review"
     },
     {
+      "family": "review",
+      "file": "scripts/quality.py",
+      "function": "create_verification_requests",
+      "code_sha256": "5e8fc62b90c02ec44823236ab3862367875f33259fae56e8ae12a4c7e685ae32"
+    },
+    {
       "file": "scripts/quality.py",
       "function": "_is_publication_warning",
       "code_sha256": "d7a47892a679361098897905791e4e67e3cceadf10770102de0d1c9b8280c94c",
@@ -424,6 +448,18 @@
       "function": "_accepted_drafting_warnings",
       "code_sha256": "5ca1270d7248cb71f1c7890f67e29947aebcc0c35ee64f6a449d74ebfb0f4963",
       "family": "review"
+    },
+    {
+      "family": "review",
+      "file": "scripts/quality.py",
+      "function": "_lexical_review_cautions",
+      "code_sha256": "9dc71a2593494cb771fd766f143178c430f29e34a2aa03b6ea96514ff49a632c"
+    },
+    {
+      "family": "review",
+      "file": "scripts/quality.py",
+      "function": "_reviewed_lexical_warnings",
+      "code_sha256": "3c7d66995b6071d589c390c2d8d5b57d628f94ea13eae99c8504a6bc046063b7"
     },
     {
       "file": "scripts/quality.py",
@@ -446,7 +482,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "62dce400d52c9b507d4f53ada9e3bb4502b05d32c5a3ccf9c951d3d32866e276",
+      "code_sha256": "7dee4c4b0b1e9a97fa0d12ed2265c0058ea5a5c3ecade2b92d3be528c27e3db7",
       "family": "review"
     },
     {
@@ -458,13 +494,13 @@
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "af0b22a0fcf7938b54ed28949823512521b6be6e4c1dba6313f22791d06b9e02",
+      "code_sha256": "5546e4f3cade3508f70a8d493aadbc95affc312407a4332269e93f4ac2e4a082",
       "family": "delivery"
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "650acc6ef83936327e64a382ab3e8b6d528bbd4864465ee58f7907a52fc8531f",
+      "code_sha256": "0926d02934bf4afd6b735e637bcf34c24dd856f0b40e857f87751aca4f60f0e4",
       "family": "review"
     },
     {
@@ -686,7 +722,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
-      "code_sha256": "34d7f1c96fd422300c74c6ca2dddfe97cc7834c7f28757a285edef4b16e2d940",
+      "code_sha256": "7e864688008d8cf71f6bd64ceb5e2bac29477e1826bfdebe7bdd7fa055854ee3",
       "family": "recovery"
     },
     {
@@ -710,7 +746,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "c711c3fae32826d050f77ffebbaed3b63b5795bfc77537bc1b4fe2677a5af558",
+      "code_sha256": "d0e60629831c7b4645c7a9bd0d8247cd2b815b31c3a0a61ef020a4cc6b359825",
       "family": "recovery"
     },
     {

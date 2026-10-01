@@ -7213,7 +7213,7 @@ def _recovery_action_observation(
                                 "after": texts[index + 1] if index + 1 < len(texts) else "",
                                 "style": str(paragraphs[index].style.name or ""),
                             })
-            if not accepted_path.is_file() and candidate_path.is_file() and not candidate_path.is_symlink():
+            if (not accepted_path.is_file() or finding.get("surface") == "table") and candidate_path.is_file() and not candidate_path.is_symlink():
                 contexts = rendered_section_snapshot(candidate_path, target)
             target_identities[f"candidate/{artifact}.docx#{target}"] = sha256_value(contexts)
 
@@ -8138,6 +8138,7 @@ def _quality_retry(
             original for index, original in enumerate(original_findings)
             if index not in blocked_indexes
         ]
+        result["findings"].extend(result["preserved_companion_findings"])
         return result
 
     if route_errors:
@@ -8175,6 +8176,36 @@ def _quality_retry(
                     ),
                 })
         if prearchive_unsupported:
+            # A prose/table reconstruction may remove the reported layout symptom.
+            # Preserve the old exact finding, but inspect the rebuilt artifact before
+            # concluding that this layout family has no usable repair strategy.
+            rebuild_artifacts = {
+                str(item.get("artifact") or (
+                    "icf" if any(str(target).startswith("icf.") for target in item.get("target_ids", []))
+                    else "protocol"
+                )).removesuffix(".docx")
+                for item in findings
+                if item.get("recovery_class") in {"drafting_defect", "deterministic_structure_defect"}
+            }
+            deferred_artifacts = {str(item.get("artifact") or "").removesuffix(".docx")
+                                  for item in prearchive_unsupported}
+            if (deferred_artifacts and deferred_artifacts <= rebuild_artifacts
+                    and all(item.get("disposition") == "fail_closed" for item in prearchive_unsupported)):
+                deferred = [item for item in findings if item.get("recovery_class") == "visual_defect"
+                            and str(item.get("artifact") or "").removesuffix(".docx") in deferred_artifacts]
+                actionable = [item for item in findings if item not in deferred]
+                generation_state.setdefault("deferred_visual_findings", []).append({
+                    "status": "requires_fresh_exact_artifact_review",
+                    "review_set": current_review_set, "findings": deferred,
+                })
+                _write(reference_path, working_reference)
+                return _quality_retry(
+                    run_dir, reference_path, working_reference, approved_reference,
+                    revision_dir, prior_attempts, actionable, stage,
+                    contracted_bundle=contracted_bundle, operation_deadline=operation_deadline,
+                    clock=clock, stage_observer=stage_observer,
+                    require_promoted_runtime=require_promoted_runtime,
+                )
             unsupported_indexes = {
                 index
                 for index, finding in enumerate(findings)
@@ -8313,9 +8344,12 @@ def _quality_retry(
         for target in finding["target_ids"]
     }
     section_targets = {
-        target.target_id
-        for target in targets
-        if target.category == "section" and target.target_id in draftable_sections
+        RetryTarget.parse(str(target)).target_id
+        for finding in normalized
+        if finding.get("recovery_class") == "drafting_defect"
+        for target in finding.get("target_ids", [])
+        if RetryTarget.parse(str(target)).category == "section"
+        and RetryTarget.parse(str(target)).target_id in draftable_sections
     }
     deterministic_targets = {
         RetryTarget.parse(str(target)).target_id

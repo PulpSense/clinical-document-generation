@@ -1301,18 +1301,47 @@ def assessment_matrix(value: Any, visit_order: Iterable[str] = ()) -> dict[str, 
     }
 
 
+def _schedule_activity_identity(value: str) -> tuple[str, ...]:
+    """Ignore typography, retaining quantities, units and their order."""
+    return tuple(re.findall(r"[^\W\d_]+|\d+(?:\.\d+)?|[<>≤≥±%+/=°]|[−-](?=\d)|(?<=\d)[–,](?=\d)",
+                            unicodedata.normalize("NFKC", value).casefold()))
+
+
+def _matrix_visit_alias(matrix: Mapping[str, Any], narrative: Mapping[str, Any]) -> bool:
+    """Recognize a uniquely qualified matrix header, never fuzzy clinical similarity."""
+    header = _schedule_activity_identity(str(matrix.get("visit") or ""))
+    name = _schedule_activity_identity(str(narrative.get("visit") or narrative.get("visitName") or ""))
+    if not header or not name or not set(header) <= set(name):
+        return False
+    # A generic header can gain qualification, but cannot acquire another time point.
+    duration = re.compile(r"\b(?:(\d+(?:\.\d+)?)\s*(day|week|month|year)s?|(day|week|month|year)s?\s*(\d+(?:\.\d+)?))\b", re.I)
+    def times(value: str) -> set[tuple[str, str]]:
+        return {(m.group(2) or m.group(3), m.group(1) or m.group(4)) for m in duration.finditer(value.casefold())}
+    header_times = times(str(matrix.get("visit") or ""))
+    timing = str(narrative.get("timing") or narrative.get("visitWindow") or "")
+    supplied_times = times(timing) | times(str(narrative.get("visit") or narrative.get("visitName") or ""))
+    return not header_times or not supplied_times or header_times == supplied_times
+
+
 def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Combine the approved visit inventory and procedure relationships.
 
     The explicit schedule table owns row order; extra procedure-schedule visits
     follow it. Merge only unambiguous equal name/timing rows with compatible
-    supplied IDs/fields. Never turn narrative assessments into numbered visits.
+    supplied IDs/fields. A matrix header may match a unique qualified narrative
+    visit; the narrative then supplies clinical order and precise timing. Never
+    turn narrative assessments into numbered visits or merge ambiguous contacts.
     """
     visits: list[dict[str, Any]] = []
     table_count = 0
+    matrix_table = False
+    matched_table: set[int] = set()
+    narrative_order: list[dict[str, Any]] = []
     for path in ("procedures.visit_schedule_table", "procedures.visit_schedule"):
         raw = get_path(reference, path, [])
         decoded = assessment_matrix(raw, get_path(reference, "procedures.visits", []) or [])
+        if path.endswith("visit_schedule_table"):
+            matrix_table = decoded is not None
         source_rows = decoded["visits"] if decoded is not None else [row for row in raw if isinstance(row, Mapping)] if isinstance(raw, list) else []
         source_keys = [
             (str(row.get("visit") or row.get("visitName") or "").strip(),
@@ -1342,20 +1371,42 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
                                or candidate[key] == value
                                for key, value in record.items()
                                if key not in {"procedures", "visitName", "visitWindow"})]
+            alias = False
+            if not matches and matrix_table and decoded is None:
+                matches = [candidate for candidate in visits[:table_count]
+                           if _matrix_visit_alias(candidate, record)
+                           and sum(_matrix_visit_alias(candidate, other) for other in source_rows) == 1]
+                alias = len(matches) == 1
             # A unique table candidate is insufficient when multiple contacts
             # in the other source could match it. Retain ambiguous rows rather
             # than silently collapsing separate approved contacts.
             source_key = (record["visit"], record["timing"])
             if len(matches) == 1 and source_keys.count(source_key) == 1:
                 candidate = matches[0]
+                matched_table.add(id(candidate))
+                if alias:
+                    candidate["visit"] = record["visit"]
+                    if meaningful(record["timing"]):
+                        candidate["timing"] = record["timing"]
                 for key, value in record.items():
                     if not meaningful(candidate.get(key)):
                         candidate[key] = value
-                candidate["procedures"] = list(dict.fromkeys(candidate["procedures"] + record["procedures"]))
+                activities = {_schedule_activity_identity(value) for value in candidate["procedures"]}
+                for value in record["procedures"]:
+                    identity = _schedule_activity_identity(value)
+                    if identity not in activities:
+                        candidate["procedures"].append(value)
+                        activities.add(identity)
+                if path.endswith("visit_schedule"):
+                    narrative_order.append(candidate)
             else:
                 visits.append(record)
+                if path.endswith("visit_schedule"):
+                    narrative_order.append(record)
         if path.endswith("visit_schedule_table"):
             table_count = len(visits)
+    if matrix_table and narrative_order and all(id(row) in matched_table for row in visits[:table_count]):
+        visits = narrative_order
     used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
     for index, record in enumerate(visits, 1):
         if not meaningful(record.get("visitNumber")):

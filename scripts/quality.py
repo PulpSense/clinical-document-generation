@@ -33,7 +33,7 @@ from pypdf import PdfReader
 from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
-from drafting import evidence_grounded, hypothesis_claim_issues, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
+from drafting import evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -4253,6 +4253,21 @@ def validate_sterling_clause_contract(
                 })
             continue
 
+        grounding_diagnostics = [source_evidence_diagnostics(raw_sections.get(section, ""), path, value)
+                                 for (path, value), passed in zip(authority_records, grounding_results)
+                                 if not passed]
+        if (has_body and exact_ok and terms_ok and sources_ok and block_ok
+                and not semantic_issues and not contradiction
+                and lexical_evidence_uncertainty(grounding_diagnostics)):
+            findings.append({
+                "code": "icf-lexical-evidence-uncertainty", "category": "content",
+                "field": clause["section_id"], "target_ids": [clause["section_id"]],
+                "clause_id": clause["clause_id"], "publication_disposition": "warning",
+                "evidence_diagnostics": grounding_diagnostics,
+                "issue": "Sterling source wording needs independent meaning review; its exact safeguards remain intact.",
+            })
+            continue
+
         # Exact or safeguard-bearing text in another governed section is a
         # deterministic placement defect; preserve its bytes and move it.
         marker_values = placement_markers
@@ -4739,10 +4754,18 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             )
         ]
         if ungrounded_paths:
+            diagnostics = [source_evidence_diagnostics(
+                content, path,
+                section_evidence_value(section.section_id, path, get_path(reference, path), reference),
+                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other",
+            ) for path in ungrounded_paths]
             findings.append({
                 "category": "content",
                 "field": section.section_id,
                 "target_ids": [section.section_id],
+                "evidence_diagnostics": diagnostics,
+                **({"code": "lexical-evidence-uncertainty", "publication_disposition": "warning"}
+                   if lexical_evidence_uncertainty(diagnostics) else {}),
                 "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
             })
     benefits_text = "\n".join(section_paragraphs.get("risks-benefits.benefits", []))
@@ -5400,8 +5423,16 @@ def create_verification_requests(
         "exemption from source fidelity. Fail expanded decision authority, added termination grounds, and "
         "conflation of completion with withdrawal or discontinuation, even in verbatim boilerplate. "
         "Assess semantic_evidence requirements against their exact source excerpts under source_supported and no_invention. "
+        "Assess every lexical_review_caution in its named section against the approved facts and exact artifact. "
+        "These are unresolved word-matching cautions, not established omissions. A faithful paraphrase may pass "
+        "its section assessment; explain its source-supported meaning in the assessment notes. A real omission, "
+        "changed quantity-to-procedure relationship, reversed negation or strengthened claim must be a "
+        "source_supported or no_invention finding, with exact passage and source evidence. "
         "Meaning is mandatory; source word overlap or an incidental group-count word is not proof of fidelity. "
         "Do not reject accurate paraphrases merely for omitting purpose/objective wording under a PURPOSE heading. "
+        "Separate prose defects from code-owned table defects. For a Protocol table finding, set surface to "
+        "table and table_ids to the affected canonical IDs from code_owned_tables; use their owner section IDs "
+        "in target_ids. These table values are reconstructed from approved facts, not repaired by rewriting prose. "
         "Verify that PURPOSE actually explains the aim, hypothesis and main outcome. Reject missing material hypothesis "
         "facts and strengthened qualifications or reversed negations with category content, check source_supported, "
         "target_ids, contradiction true for changed meaning, and exact source/passage evidence. A recognized "
@@ -5497,6 +5528,12 @@ def create_verification_requests(
             else None
         ),
         "sections": sections,
+        "lexical_review_cautions": _lexical_review_cautions(revision_dir, reference, render_report),
+        "code_owned_tables": ({
+            "visit-schedule": {"section_id": "study-procedure.visits", "caption": "Table 9.2-1: Visit Schedule"},
+            **{name: {"section_id": table["section_id"], "caption": table["caption"]}
+               for name, table in protocol_table_contracts(reference).items()},
+        } if branch != "Retrospective" else {}),
         "checks": list(CONTENT_CHECKS),
         "cross_document_checks": cross_document_checks,
         "instructions": content_instructions,
@@ -5698,6 +5735,60 @@ def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
         if isinstance(values, list):
             warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
     return warnings
+
+
+def _lexical_review_cautions(
+    revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Expose heuristic uncertainty to the existing independent review, without a new gate."""
+    warnings = _accepted_drafting_warnings(revision_dir) + _render_warnings(render_report)
+    protocol = revision_dir / "candidate/protocol.docx"
+    if protocol.is_file():
+        try:
+            warnings += _warning_findings(deterministic_content_check(revision_dir, reference))
+        except (OSError, ValueError, zipfile.BadZipFile):
+            # Construction/package checks own malformed candidates; no caution can approve them.
+            pass
+    codes = {"lexical-evidence-uncertainty", "icf-lexical-evidence-uncertainty",
+             "retrospective-lexical-evidence-uncertainty"}
+    records = {}
+    for warning in warnings:
+        if warning.get("code") not in codes:
+            continue
+        identity = canonical_evidence_sha256(warning)
+        section = str(warning.get("field") or (warning.get("target_ids") or [""])[0])
+        records[identity] = {
+            "caution_sha256": identity, "section_id": section,
+            "artifact": "icf" if section.startswith("icf.") else "protocol",
+            "caution": warning,
+        }
+    return list(records.values())
+
+
+def _reviewed_lexical_warnings(
+    warnings: list[dict[str, Any]], evidence: Mapping[str, Any], findings: Iterable[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Clear only cautions explicitly presented to an authenticated exact-artifact review."""
+    if _blocking_findings(findings):
+        return warnings, []
+    content = [record for record in evidence.values()
+               if record.get("task") == "clinical_content_verification"]
+    if len(content) != 1:
+        return warnings, []
+    record = content[0]
+    passing_sections = {(row.get("artifact"), row.get("section_id"))
+                        for row in record.get("section_assessments", [])
+                        if row.get("status") == "passed" and set(row.get("checks", [])) == set(CONTENT_CHECKS)}
+    reviewed = {item["caution_sha256"] for item in record.get("lexical_review_cautions", [])
+                if (item.get("artifact"), item.get("section_id")) in passing_sections}
+    retained, resolved = [], []
+    for warning in warnings:
+        if canonical_evidence_sha256(warning) in reviewed:
+            resolved.append({"caution": warning, "resolution": "independent_content_review_passed",
+                             "verification_request_id": record["request_id"]})
+        else:
+            retained.append(warning)
+    return retained, resolved
 
 
 def _render_warnings(render_report: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -6032,6 +6123,7 @@ def validate_verifications(
                     "safety_critical",
                     "contradiction", "obscures_required_information", "materially_unusable",
                     "disposition",
+                    "surface", "table_ids",
                 ):
                     if key in source: finding[key] = source[key]
                 if category == "visual":
@@ -6193,9 +6285,24 @@ def validate_verifications(
                                 (_text(source.get("artifact")), target) in code_owned_targets
                                 for target in supplied_targets
                             )
+                            table_ids = source.get("table_ids")
+                            tables = request.get("code_owned_tables") or {}
+                            table_finding = (
+                                source.get("surface") == "table"
+                                and _text(source.get("artifact")) == "protocol"
+                                and isinstance(table_ids, list) and bool(table_ids)
+                                and all(isinstance(table_id, str) and table_id in tables for table_id in table_ids)
+                                and set(supplied_targets) == {tables[table_id]["section_id"] for table_id in table_ids}
+                            )
+                            if source.get("surface") == "table" and not table_finding:
+                                findings.append(recovery_finding({
+                                    **finding, "target_ids": [verification_target],
+                                    "issue": "The table finding does not identify its canonical table and owner section; re-localize the exact surface.",
+                                }, "verifier_transient"))
+                                continue
                             recovery_class = (
                                 "deterministic_structure_defect"
-                                if set(supplied_targets) == {"prs.structured"} or code_owned_finding
+                                if set(supplied_targets) == {"prs.structured"} or code_owned_finding or table_finding
                                 else "drafting_defect"
                             )
                             findings.append(recovery_finding({
@@ -6355,6 +6462,8 @@ def validate_verifications(
             "artifacts": request.get("artifacts", []),
             "sections": request.get("sections", []),
             "semantic_evidence": request.get("semantic_evidence", []),
+            "lexical_review_cautions": request.get("lexical_review_cautions", []),
+            "section_assessments": response.get("section_assessments", []) if request.get("task") == "clinical_content_verification" else [],
             "checks": request.get("checks", []),
             "cross_document_checks": request.get("cross_document_checks", []),
             "contracted_template_bundle": request.get("contracted_template_bundle"),
@@ -6585,6 +6694,7 @@ def final_exact_artifact_review_findings(
             revision_dir, reference, render_report, fresh_evidence
         )
     )
+    fresh_warnings, fresh_resolutions = _reviewed_lexical_warnings(fresh_warnings, fresh_evidence, verification_findings)
     if (
         canonical_evidence_sha256(fresh_evidence)
         != final_review.get("verification_evidence_sha256")
@@ -6594,6 +6704,8 @@ def final_exact_artifact_review_findings(
         issues.append("Final request or reviewer evidence changed after review.")
     if fresh_warnings != list(quality.get("warnings") or []):
         issues.append("Final verification warnings changed after review.")
+    if fresh_resolutions != list(quality.get("resolved_evidence_cautions") or []):
+        issues.append("Final evidence-caution resolutions changed after review.")
     return [
         recovery_finding({
             "category": "verification",
@@ -6624,6 +6736,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     warnings.extend(_warning_findings(verification_findings))
     findings.extend(_blocking_findings(verification_findings))
     findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
+    warnings, resolutions = _reviewed_lexical_warnings(warnings, evidence, findings)
     candidate_hashes = {
         path.relative_to(revision_dir).as_posix(): sha256_file(path)
         for path in sorted((revision_dir / "candidate").glob("*"))
@@ -6644,7 +6757,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
         "every_page": not findings,
         "section_three_and_orphan_heading_checks": not findings,
     }
-    return {"status": final_review["status"], "findings": findings, "warnings": warnings, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
+    return {"status": final_review["status"], "findings": findings, "warnings": warnings, "resolved_evidence_cautions": resolutions, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
 __all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "content_review_sections", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_authentication_findings", "verification_request_hash_valid", "verification_request_ledger_record", "verification_recovery_request_findings", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

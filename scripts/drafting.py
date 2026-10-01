@@ -1267,6 +1267,22 @@ def source_evidence_grounded(content: str, path: str, value: Any, *, all_items: 
     return bool(source_evidence_diagnostics(content, path, value, all_items=all_items)["passed"])
 
 
+def lexical_evidence_uncertainty(diagnostics: Iterable[Mapping[str, Any]]) -> bool:
+    """Word-overlap failure needs meaning review; missing quantities/polarity do not."""
+    records = list(diagnostics)
+    return bool(records) and all(
+        record.get("validation_mode") == "deterministic_anchors"
+        and record.get("unobserved_values")
+        and all(
+            "required_anchor_count" in value
+            and not value.get("missing_numbers")
+            and not value.get("required_polarity")
+            for value in record["unobserved_values"]
+        )
+        for record in records
+    )
+
+
 def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
     source = {
         str(item.get("path")): item.get("value")
@@ -1649,17 +1665,12 @@ def _coverage_findings(
                   "validation_mode": "phase_bound_timeline", "release_acceptance": False}
             for path in ungrounded
         ]
-        lexical_uncertainty = section_id.startswith("icf.") and all(
-            diagnostic.get("validation_mode") == "deterministic_anchors"
-            and diagnostic.get("unobserved_values")
-            and all(not value.get("missing_numbers") for value in diagnostic["unobserved_values"])
-            for diagnostic in diagnostics
-        )
+        lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
         findings.append({
             "category": "drafting",
             "field": section_id,
             **({
-                "code": "icf-lexical-evidence-uncertainty",
+                "code": "icf-lexical-evidence-uncertainty" if section_id.startswith("icf.") else "lexical-evidence-uncertainty",
                 "publication_disposition": "warning",
             } if lexical_uncertainty else {}),
             "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",

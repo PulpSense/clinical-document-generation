@@ -1,0 +1,302 @@
+{
+  "meta": {
+    "document_set": [
+      "protocol_docx",
+      "icf_docx",
+      "xml"
+    ],
+    "study_type": "Prospective",
+    "icf_template": "Sterling",
+    "protocol_number": "ADM-75D3979883C0",
+    "date": "01 Oct 2026",
+    "version": null
+  },
+  "source": {
+    "description": "Synthetic test synopsis and appendix; not for clinical or regulatory use",
+    "file": "input/SYNOPSIS_PureSee Odyssey_23Jun2026_SYNTHETIC_COMPLETE.txt",
+    "administrative_identifier": {
+      "authority": "deterministic_workflow",
+      "value": "ADM-75D3979883C0",
+      "source_fields": [
+        "principal_investigator",
+        "sponsor",
+        "study_type",
+        "title"
+      ]
+    },
+    "source_of_truth_file": "reference/source-of-truth--adm-75d3979883c0--visual-and-patient-reported-outcomes-after-mix-and-match-imp.md"
+  },
+  "approval": {
+    "status": "approved",
+    "approved_by": "client",
+    "approved_at": "2026-10-01T10:44:42.607542+00:00",
+    "review_file": "reference/source-of-truth--adm-75d3979883c0--visual-and-patient-reported-outcomes-after-mix-and-match-imp.md",
+    "source_sha256": "e24f4cc75ef36e14160878766490ce48f056cee381b2a86eb32350ddad9882b0",
+    "revision_id": "r-a05f0ebdf09d",
+    "source_approval_identity": "a05f0ebdf09d847e0f2bf81303c1ac01a13e36058da0921777d0545f108cc357",
+    "generation_authority_sha256": "8f7a0b42cf06d21b8c0c0afa419fdbcbaafd624db5855f2155c2023364411d94",
+    "governing_sha256": "8f7a0b42cf06d21b8c0c0afa419fdbcbaafd624db5855f2155c2023364411d94"
+  },
+  "study": {
+    "title": "Visual and Patient-Reported Outcomes after Mix-and-Match Implantation of an Extended Depth of Focus and a Trifocal Intraocular Lens",
+    "background": "The TECNIS Odyssey is a new full range of vision IOL, with current reports suggesting high visual acuity and spectacle independence at distance, intermediate, and near. The TECNIS PureSee is a new non-diffractive extended depth of focus (EDOF) IOL. The non-diffractive design may reduce reports of dysphotopsias and improve contrast sensitivity compared to diffractive IOLs. A large randomized control trial suggests better intermediate and near vision with the PureSee IOL compared to a monofocal control, and similar contrast sensitivity, distance vision, and dysphotopsia profile. Mix-and-match implantation of an EDOF IOL in the dominant eye and multifocal IOL in the non-dominant eye may enable better range of vision and fewer visual disturbances compared to bilateral implantation of the EDOF or trifocal IOLs alone. To date there are minimal data on visual outcomes, patient satisfaction, and patient-reported dysphotopsias using mix-and-match implantation of the PureSee (dominant eye) and the Odyssey (non-dominant eye). References: 1. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703; 2. Bissen-Miyajima H, Midorikawa M, Fujisaki R, Ota Y, Minami K, Honda R. Early Clinical Results of a Newly Developed Continuous Range of Vision Intraocular Lens. Ophthalmol Ther. 2025;14(11):2937-2945. doi:10.1007/s40123-025-01235-7; 3. Corbett D, Black D, Roberts TV, Cronin B, Gunn D, Bala C, Versace P, Tsai L, Papadatou E, Alarcon A, Vilupuru S. Quality of vision clinical outcomes for a new fully-refractive extended depth of focus Intraocular Lens. Eye. 2024;38(S1):9-14. doi:10.1038/s41433-024-03039-8",
+    "hypothesis": "Mix-and-match implantation of the PureSee and Odyssey intraocular lenses (IOLs) will result in excellent visual outcomes at distance, intermediate, and near, high patient satisfaction, and low reports of visual disturbances.",
+    "timeline": "Enrollment: 6 months; Follow-up: 3 months postoperatively; Data analysis: 1 month. Screening is preoperative, surgery has one operative visit per eye, and the postoperative assessment is at Month 3.",
+    "condition": null
+  },
+  "parties": {
+    "irb": {
+      "name": "Synthetic Test IRB",
+      "affiliation": "Independent ethics committee \u2014 synthetic test organization",
+      "phone": "+1 202-555-0100",
+      "email": "irb@synthetic-example.test",
+      "address": "100 Test Review Avenue, Test City, New York 10001, USA"
+    },
+    "sponsor": {
+      "name": "Synthetic Vision Research Sponsor",
+      "address": "200 Test Sponsor Boulevard, Test City, New York 10002, USA"
+    },
+    "principal_investigator": {
+      "name": "Avery Morgan",
+      "title": "MD, Principal Investigator"
+    },
+    "study_coordinator": {
+      "name": "Jordan Lee",
+      "title": "CRC, Study Coordinator",
+      "business_phone": "+1 202-555-0101",
+      "office_phone": "+1 202-555-0102",
+      "email": "jordan.lee@synthetic-example.test"
+    }
+  },
+  "sites": [
+    {
+      "contact": {
+        "business_phone": "+1 202-555-0101",
+        "email": "jordan.lee@synthetic-example.test",
+        "name": "Jordan Lee",
+        "office_phone": "+1 202-555-0102",
+        "title": "CRC, Study Coordinator"
+      },
+      "facility": {
+        "address": "300 Test Clinic Road, Test City, New York 10003, USA",
+        "name": "Synthetic Ophthalmology Research Center"
+      },
+      "investigator": {
+        "name": "Avery Morgan",
+        "title": "MD, Principal Investigator"
+      }
+    }
+  ],
+  "population": {
+    "sample_size": "40",
+    "sample_justification": "We estimate that 35 subjects will be sufficient to characterize the performance of the mix-and-match approach using PureSee and Odyssey. To account for dropout, the sample size will be increased to 40. Hacopian AG, Brunson PB, Hall B. Patient Reported Outcomes and Visual Acuity After Bilateral Implantation of a Next Generation Presbyopia Correcting Intraocular Lens. OPTH. 2026;20:1-8. doi:10.2147/OPTH.S572703",
+    "inclusion_criteria": [
+      "Adult patients undergoing age-related cataract surgery."
+    ],
+    "exclusion_criteria": [
+      "Moderate-severe any disease state (deemed by the surgeon) that could increase risk of complicated cataract surgery (ie, pseudoexfoliation syndrome, zonular dehiscence, history of eye trauma, and prior refractive surgery)."
+    ]
+  },
+  "design": {
+    "study_design": "Prospective, observational, single-center, single-cohort bilateral study with no control arm and no masking.",
+    "intervention_name": "TECNIS PureSee intraocular lens in the dominant eye and TECNIS Odyssey intraocular lens in the non-dominant eye.",
+    "intervention_type": "Medical device \u2014 intraocular lenses.",
+    "number_of_sites": "1",
+    "treatment_assignment": "PureSee in the dominant eye and Odyssey in the non-dominant eye; no control arm.",
+    "intervention_description": null
+  },
+  "objectives": {
+    "primary": "To test whether mix-and-match implantation of PureSee and Odyssey IOLs results in excellent visual outcomes at distance, intermediate, and near, high patient satisfaction, and low reports of visual disturbances."
+  },
+  "endpoints": {
+    "primary": [
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Binocular distance-corrected intermediate visual acuity (DCIVA; 66 cm)",
+        "time_frame": "3 months postoperatively"
+      }
+    ],
+    "secondary": [
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Mean binocular corrected distance visual acuity (CDVA)",
+        "time_frame": "3 months postoperatively"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Mean binocular uncorrected intermediate visual acuity (UIVA; 66 cm)",
+        "time_frame": "3 months postoperatively"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Mean binocular uncorrected distance visual acuity (UDVA)",
+        "time_frame": "3 months postoperatively"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Mean binocular distance-corrected near visual acuity (DCNVA; 40 cm)",
+        "time_frame": "3 months postoperatively"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Mean binocular uncorrected near visual acuity (UNVA; 40 cm)",
+        "time_frame": "3 months postoperatively"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Binocular distance-corrected defocus curve (+1.0 D through -2.50 D)",
+        "time_frame": "3 months postoperatively"
+      },
+      {
+        "analysis_method": "",
+        "description": "",
+        "measure": "Percentages of subject responses to each AIOLIS questionnaire question",
+        "time_frame": "3 months postoperatively"
+      }
+    ]
+  },
+  "procedures": {
+    "minimum_days_before_screening_without_participation": "90 days before screening.",
+    "assessments": "Preoperative screening: informed consent, demographics, and medical history. One operative visit per eye. At 3 months postoperatively: binocular uncorrected photopic distance, intermediate (66 cm), and near (40 cm) visual acuity; binocular distance-corrected photopic distance, intermediate (66 cm), and near (40 cm) visual acuity; distance-corrected defocus curve; AIOLIS; monitoring for adverse events and device deficiencies; and exit form.",
+    "visit_schedule": [
+      {
+        "procedures": "Informed consent; Demographics; General information: medical history",
+        "timing": "Preoperative",
+        "visit": "Preoperative screening"
+      },
+      {
+        "procedures": "",
+        "timing": "One visit per eye",
+        "visit": "Operative visit for each eye"
+      },
+      {
+        "procedures": "Uncorrected photopic distance VA (binocular); Uncorrected photopic intermediate VA (66 cm, binocular); Uncorrected photopic near VA (40 cm, binocular); Distance-corrected photopic distance VA (binocular); Distance-corrected photopic intermediate VA (66 cm, binocular); Distance-corrected photopic near VA (40 cm, binocular); Distance-corrected defocus curve; AIOLIS; Monitor for adverse events and device deficiencies; Complete exit form",
+        "timing": "3 months postoperatively",
+        "visit": "Month 3 postoperative"
+      }
+    ],
+    "visit_schedule_table": [
+      {
+        "Activity": "Informed Consent",
+        "Month 3": "",
+        "Screening": "X"
+      },
+      {
+        "Activity": "Demographics",
+        "Month 3": "",
+        "Screening": "X"
+      },
+      {
+        "Activity": "General Information: Medical History",
+        "Month 3": "",
+        "Screening": "X"
+      },
+      {
+        "Activity": "Uncorrected photopic distance VA (binocular)",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Uncorrected photopic intermediate VA (66cm, binocular)",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Uncorrected photopic near VA (40cm, binocular)",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Distance corrected photopic distance VA (binocular)",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Distance corrected photopic intermediate VA (66cm, binocular)",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Distance corrected photopic near VA (40cm, binocular)",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Distance corrected defocus curve",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "AIOLIS",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Monitor for Adverse Events and Device Deficiencies",
+        "Month 3": "X",
+        "Screening": ""
+      },
+      {
+        "Activity": "Complete Exit Form1",
+        "Month 3": "X",
+        "Screening": ""
+      }
+    ],
+    "methods": null,
+    "unscheduled_visits": null,
+    "discontinuation": null,
+    "termination": null,
+    "study_termination": null
+  },
+  "statistics": {
+    "analysis_plan": "The analysis population will include participants who complete the Month 3 postoperative assessment and have evaluable outcome data. Continuous visual-acuity and defocus-curve outcomes will be summarized descriptively using sample size, mean, standard deviation, median, minimum, and maximum. AIOLIS questionnaire responses will be summarized by response category using counts and percentages. Adverse events and device deficiencies will be summarized descriptively by event category, seriousness, severity, relationship, action taken, and outcome. No inferential hypothesis test is planned for this descriptive observational study.",
+    "methodology": null,
+    "analysis_populations": null,
+    "missing_data_handling": null
+  },
+  "safety": {
+    "general_information": null,
+    "monitoring": null,
+    "adverse_events": null,
+    "follow_up": null
+  },
+  "confidentiality": {
+    "data_handling": null,
+    "publication": null
+  },
+  "risks_benefits": {
+    "compensation_or_reimbursement": "No compensation or reimbursement will be provided to participants for study participation.",
+    "risks": null,
+    "risk_mitigation": null,
+    "benefits": null,
+    "costs": null,
+    "alternatives": null,
+    "privacy": null,
+    "injury_handling": null
+  },
+  "regulatory": {
+    "prs": {
+      "study_type": "Observational",
+      "provider_study_id": "ADM-75D3979883C0",
+      "observational_study_design": null,
+      "time_perspective": null,
+      "verification_date": null,
+      "start_date": null,
+      "start_date_type": null,
+      "primary_completion_date": null,
+      "primary_completion_date_type": null,
+      "study_completion_date": null,
+      "study_completion_date_type": null,
+      "patient_registry": null,
+      "target_duration_quantity": null,
+      "target_duration_units": null
+    }
+  }
+}

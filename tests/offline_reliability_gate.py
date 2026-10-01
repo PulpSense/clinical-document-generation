@@ -25,6 +25,8 @@ TEST_FILES = (
     'test_duration_reference_preservation.py', 'test_brad_editorial_feedback.py', 'test_contracts.py',
     'test_handoff_quality.py', 'test_visit_inventory_review.py', 'test_reliability_maintenance.py',
     'test_prs_quality_corrections.py', 'test_prs_xml.py', 'test_worker_readiness.py',
+    'test_mixed_visit_representations.py', 'test_semantic_evidence_recovery.py',
+    'test_owner_aware_recovery.py',
 )
 
 
@@ -49,12 +51,14 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'hypothesis_claim_issues', '_timeline_grounded', '_material_source',
                 'section_evidence_value', 'semantic_evidence_contract', 'assessment_matrix',
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
+                '_matrix_visit_alias', '_schedule_activity_identity', 'lexical_evidence_uncertainty',
+                '_lexical_review_cautions', '_reviewed_lexical_warnings',
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',
                 '_rendered_heading_text', '_target_heading',
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',
                 '_accepted_drafting_warnings', '_render_warnings',
                 'renderers',
-                'semantic_evidence_inventory', '_source_field_inventory',
+                'semantic_evidence_inventory', '_source_field_inventory', 'create_verification_requests',
             }
             if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:
                 continue
