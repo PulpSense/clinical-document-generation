@@ -556,7 +556,11 @@ time and its runtime classification. A 10–20 minute result meets the normal
 target; a successful result above 20 minutes is diagnostic evidence but remains
 within the operation until the 45-minute correctness ceiling.
 If a passed result contains `warnings`, deliver the complete package and briefly
-name the cautions; do not describe them as failed publication checks.
+name each caution with its `document_locations` and plain-language concern.
+Minor editorial findings publish normal filenames with this delivery note;
+they do not require another drafting attempt or a review-only label. If a check
+did not identify a location, say so instead of guessing a section. Keep the
+caution in the delivery message, outside the documents.
 
 If `status: review_required`, make every file in `review_outputs` individually accessible to the recipient; list each exact path or attach each file. Include the `review_findings` path. For each flagged concern, quote its `document_locations` from that report beside a plain-language explanation (for example, “Protocol §13.3 — Procedures for Recording and Reporting AEs and SAEs”). If the check supplied no document location, say so instead of guessing a section. The diagnostic ZIP is additional evidence, not a substitute for the individual review files. State that automated checks can sometimes flag a valid document, and ask the recipient to compare each concern with the approved source and relevant passage. Label the files as review copies until the concern is resolved; they are not client-ready deliverables. If `status: blocked` without review outputs, report the diagnostic ZIP, one consolidated technical blocker, and the repair report; state that no complete review files were produced. Never present partial or unbound candidates as usable documents.
 

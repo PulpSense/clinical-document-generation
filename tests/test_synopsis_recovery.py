@@ -60,6 +60,7 @@ def test_factual_or_safety_findings_remain_blocking(tmp_path, check, target):
     finding = {**REPLAY['finding'],'material':False,'check':check,'target_ids':[target]}
     if target.startswith('icf.'):
         finding['artifact']='icf'
+        finding['safety_critical']=True
     findings,_ = review_result(tmp_path,finding)
     assert any(item.get('issue') == finding['issue'] and item.get('publication_disposition') != 'warning' for item in findings)
 

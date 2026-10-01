@@ -3971,11 +3971,14 @@ def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | Non
             "mime_type": "application/xml" if filename.lower().endswith(".xml") else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "link": f"[{filename}](<{absolute_path}>)",
         })
-    return {
+    reply = {
         "type": "desktop_file_attachments",
         "attachments": attachments,
         "client_outputs_only": True,
     }
+    if manifest.get("delivery_warnings"):
+        reply["cautions"] = list(manifest["delivery_warnings"])
+    return reply
 
 
 def confirm_desktop_delivery(
@@ -6493,9 +6496,15 @@ def _publish(
         for source in sources
     ]
     manifest = {"status": "passed", "revision_id": revision_dir.name, "study_type": canonical_study_type(reference.get("meta", {}).get("study_type")), "approved_source_sha256": reference.get("approval", {}).get("source_sha256"), "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"), "candidate_build_sha256": sha256_file(build_path) if build_path.is_file() else None, "contracted_template_bundle": build.get("contracted_template_bundle", {}), "governing_resources": build.get("governing_resources", {}), "drafting_evidence": _drafting_evidence(revision_dir), "quality": quality, "client_outputs": published, "gate_ledger": _prepared_gate_ledger(revision_dir, build, quality, published, expected_attempts)}
+    # Delivery annotations are separate from the exact reviewed quality record.
+    # Adding locations must not mutate warning identities bound by final review.
+    manifest["delivery_warnings"] = [
+        {**dict(finding), "document_locations": _review_finding_locations(reference, finding)}
+        for finding in quality.get("warnings") or []
+    ]
     manifest["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir)
     _write(revision_dir / "delivery-manifest.json", manifest); _write(run_dir / "logs/generation-report.json", manifest)
-    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "warnings": list(quality.get("warnings") or []), "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
+    return {"status": "passed", "stage": "delivery", "revision_id": revision_dir.name, "contracted_template_bundle": manifest["contracted_template_bundle"], "client_outputs": [item["path"] for item in published], "warnings": manifest["delivery_warnings"], "desktop_reply": manifest["desktop_reply"], "delivery_status": "prepared_unconfirmed", "manifest": (revision_dir / "delivery-manifest.json").relative_to(run_dir).as_posix()}
 
 
 def _clear_verification_responses(

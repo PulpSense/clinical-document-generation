@@ -5464,7 +5464,7 @@ def create_verification_requests(
         "must identify concept_id, primary_section, secondary_section, relevant primary_paragraphs and "
         "secondary_paragraphs, classify the secondary treatment as necessary, concise, or excessive, and set "
         "necessary and concise to explicit booleans. Route a confirmed excessive repetition only to the secondary "
-        "section unless the primary section is incomplete. For manual review, explicitly set material, contradiction, "
+        "section unless the primary section is incomplete. For manual review, explicitly set material, safety_critical, contradiction, "
         "obscures_required_information, and materially_unusable to false. Treat ordinary noncontradictory concept "
         "repetition as manual review; omitted or true material-harm flags remain blocking."
         " Check each section purpose and editorial relevance: flag prose that answers another section's "
@@ -5490,7 +5490,9 @@ def create_verification_requests(
         "not findings. For a nonmaterial editorial_relevance finding, explicitly set material, safety_critical, "
         "contradiction, obscures_required_information and materially_unusable to false, and give affected_passage "
         "and recommended_action. Such findings are retained manual-review warnings; missing or true flags, "
-        "source_supported/no_invention defects and safety/rights/template safeguards remain blocking."
+        "source_supported/no_invention defects and safety/rights/template safeguards remain blocking. "
+        "An editorial finding in a safety-related section is still a warning when all five flags are explicitly "
+        "false; identify an actual missing safeguard or unsupported claim using the corresponding content check."
     )
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
         content_instructions += (
@@ -5837,7 +5839,6 @@ def _governed_editorial_warning(finding: Mapping[str, Any], targets: Iterable[st
         _text(finding.get("category")).casefold() == "content"
         and _text(finding.get("check")).casefold() == "editorial_relevance"
         and bool(targets)
-        and not any(_safety_critical_content_target(str(target)) for target in targets)
         and all(finding.get(flag) is False for flag in (
             "material", "safety_critical", "contradiction",
             "obscures_required_information", "materially_unusable",
@@ -6190,10 +6191,11 @@ def validate_verifications(
                         finding["target_ids"] = supplied_targets
                         source_category = _text(source.get("category")).casefold()
                         source_check = _text(source.get("check")).casefold()
-                        protocol_repetition = (
+                        legacy_repetition = (
                             _text(source.get("code")) == "protocol-concept-repetition"
                             and _text(source.get("disposition")).casefold() == "manual_review"
                         )
+                        protocol_repetition = source_check == "concept_repetition" or legacy_repetition
                         if protocol_repetition:
                             required = (
                                 "concept_id", "primary_section", "secondary_section",
@@ -6224,7 +6226,16 @@ def validate_verifications(
                                 "material", "contradiction",
                                 "obscures_required_information", "materially_unusable",
                             )
-                            explicitly_nonmaterial = all(source.get(key) is False for key in material_flags)
+                            # The previous structured contract required four harm
+                            # flags. Retain valid legacy warnings without turning
+                            # a newly requested field into a publication blocker.
+                            safety_nonmaterial = source.get("safety_critical") is False or (
+                                legacy_repetition and "safety_critical" not in source
+                            )
+                            explicitly_nonmaterial = (
+                                all(source.get(key) is False for key in material_flags)
+                                and safety_nonmaterial
+                            )
                             if (
                                 any(not source.get(key) for key in required)
                                 or not governed_pair

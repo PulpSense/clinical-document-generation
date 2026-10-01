@@ -37,7 +37,7 @@
       "authority": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
       "false_rejection_risk": "Malformed responses or targets can look like content defects; transport and semantic findings need different routes",
       "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; explicit harmless editorial findings can be retained warnings. Factual, safety, missing/true material flags remain blocking.",
-      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py"
+      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py"
     },
     "recovery": {
       "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
@@ -435,7 +435,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "5e8fc62b90c02ec44823236ab3862367875f33259fae56e8ae12a4c7e685ae32"
+      "code_sha256": "6968c984117d6bb8639ab5b72a17e5b6279e027023ef5e3c6ea8d2c2ef6aff79"
     },
     {
       "file": "scripts/quality.py",
@@ -470,7 +470,7 @@
     {
       "file": "scripts/quality.py",
       "function": "_governed_editorial_warning",
-      "code_sha256": "6e51f835850812d5f1e22ccac62c56687359cd5d5ec0238dd54e5f88a4e24998",
+      "code_sha256": "2d7da1381110f6ee605a8ecf1b51e6838fb9f6723e5b86776fa505f9d8d620fa",
       "family": "review"
     },
     {
@@ -482,7 +482,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "7dee4c4b0b1e9a97fa0d12ed2265c0058ea5a5c3ecade2b92d3be528c27e3db7",
+      "code_sha256": "209f4e918681907197f1cb883f3ce35c81b850352c5f2c26a4292a42cafcaa96",
       "family": "review"
     },
     {

@@ -27,6 +27,7 @@ TEST_FILES = (
     'test_prs_quality_corrections.py', 'test_prs_xml.py', 'test_worker_readiness.py',
     'test_mixed_visit_representations.py', 'test_semantic_evidence_recovery.py',
     'test_owner_aware_recovery.py',
+    'test_editorial_publication.py', 'test_phase1_repetition.py',
 )
 
 

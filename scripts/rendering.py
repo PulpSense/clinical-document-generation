@@ -1119,7 +1119,24 @@ def _replace_protocol_leaf_bodies(
         if section.section_id == "endpoint-criteria.study-completion":
             completion = str(get_path(reference, "study.completion", "") or "").strip()
             timeline = str(get_path(reference, "study.timeline", "") or "").strip().rstrip(".")
-            if not completion and timeline:
+            # An accepted timeline-only repair owns this body. Preserve it rather
+            # than copying visit detail back out of the raw timeline. The source
+            # still supplies the fallback for an absent draft or an unsupplied
+            # completion/closeout assertion.
+            completion_text = re.sub(
+                r"\bno(?: separate)? study[\s-]+(?:completion|closeout|closure)"
+                r"(?: (?:criterion|criteria|date|trigger))? is (?:specified|supplied|provided|defined)\b",
+                "", " ".join(text for text, _ in blocks), flags=re.I,
+            )
+            completion_language = re.search(
+                r"\bstudy[\s-]+(?:completion|closeout|closure)\b"
+                r"|\b(?:completion|closeout|closure)\s+of\s+(?:the\s+)?study\b"
+                r"|\b(?:complete|close|conclude|finish|end)(?:s|d)?\s+(?:the\s+)?study\b"
+                r"|\bstudy\s+(?:(?:is|was|will|shall|be|considered|deemed|declared|has|been|to)\s+)*"
+                r"(?:complete(?:d)?|closed|concluded|finished|ends?|ended)\b",
+                completion_text, re.I,
+            )
+            if not completion and timeline and (not blocks or completion_language):
                 blocks = [(f"The planned study timeline is {timeline}.", False)]
         if not blocks:
             continue
