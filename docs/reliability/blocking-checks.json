@@ -110,7 +110,7 @@
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
-      "code_sha256": "6bbe22621eb9da5ebdb197f35f13c0f257ea3d74fa974ed421a67c5da050cfd5",
+      "code_sha256": "0d6ffdd70dd2d760650ca5695a8454ba2039cdfd05ab123182089a0be7dc4ebe",
       "family": "structured"
     },
     {
@@ -248,7 +248,7 @@
     {
       "file": "scripts/prs_xml.py",
       "function": "validate_output",
-      "code_sha256": "a8495cb69d43f09c791afdb4dac2f3dda37b3be95a5ae9c03bb9c0cfac23950e",
+      "code_sha256": "acaab964bdb3fab0798755c64047aadcd162420d991091b85d3a14690658a8f0",
       "family": "structured"
     },
     {
@@ -361,8 +361,14 @@
     },
     {
       "file": "scripts/quality.py",
+      "function": "_retrospective_lexical_coverage_finding",
+      "code_sha256": "7f3c4831aca01eaf6adb31cec390cd577a7c9fe618140544059cf7d096801be3",
+      "family": "clinical"
+    },
+    {
+      "file": "scripts/quality.py",
       "function": "audit_source_surfaces",
-      "code_sha256": "2a5466b87931fd01089bcacca9aa0f362c8ddc919ade87938e6bcdc5bc90955c",
+      "code_sha256": "c6e935cb815a7e300ab21b6f3c89373fcafdf18d0145048b9be96f40295580ac",
       "family": "clinical"
     },
     {
@@ -386,7 +392,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "4ca7727377953fba52c017064968398a8fdf309644f7d36fd7b8cff2cca70fcf",
+      "code_sha256": "692174333c730d593652f656a9684f19ed3fe05e20e6286abc55a640ec66f93a",
       "family": "clinical"
     },
     {
@@ -632,7 +638,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "80b26e3697fd3635f1da7cdb2405c14ddadb62d08de2e69318b096d30f965888",
+      "code_sha256": "776967f38e5a99a6d214e43c2376eca96e2199393c44ece1c9f88661ec821c59",
       "family": "recovery"
     },
     {
@@ -650,7 +656,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_production_desktop_operation",
-      "code_sha256": "a64046518467420f7d13c844d3e57d5ccaffaaa30840e35740b676ec9710ab6a",
+      "code_sha256": "cb28297475bb8acf3fbb009d383553a8bb81c7f8a82d5a223fa38e11c3475910",
       "family": "recovery"
     },
     {

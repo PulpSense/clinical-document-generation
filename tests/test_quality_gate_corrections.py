@@ -164,10 +164,19 @@ def test_sparse_geometry_flags_forced_break_prose_without_blocking_consent(tmp_p
 
 
 def test_visual_request_retains_unknown_toc_and_sparse_context(tmp_path):
-    artifact = {"artifact": "protocol", "toc_destinations": {"status": "unknown", "destinations": [
+    rendered = tmp_path / "rendered"
+    rendered.mkdir()
+    document = Document()
+    document.add_paragraph("1. PURPOSE")
+    document.save(rendered / "protocol.docx")
+    write_pdf(rendered / "protocol.pdf", [[("1. PURPOSE", 72, 710)]])
+    (rendered / "page-1.png").write_bytes(b"fixture-page")
+    artifact = {"artifact": "protocol", "docx": "rendered/protocol.docx", "pdf": "rendered/protocol.pdf",
+        "toc_destinations": {"status": "unknown", "destinations": [
         {"heading": "1. PURPOSE", "status": "unknown"}]},
         "sparse_body_context": [{"page": 2, "blocking": False, "forced_break_after": True}],
-        "pages": [{"page": 1, "sha256": "test-bound-hash", "path": "rendered/page-1.png"}]}
+        "pages": [{"page": 1, "sha256": quality.sha256_file(rendered / "page-1.png"),
+                   "path": "rendered/page-1.png"}]}
     paths = quality.create_verification_requests(tmp_path, {"meta": {"study_type": "Retrospective"}}, {"artifacts": [artifact]})
     visual = json.loads(paths[1].read_text())
     assert visual["artifacts"][0] == artifact
@@ -202,6 +211,15 @@ def test_direct_source_surface_audit_catches_front_matter_omissions(tmp_path, br
     if branch != "Retrospective":
         icf = tmp_path / "icf.docx"
         document = Document()
+        if family == "Sterling":
+            document.add_paragraph("STUDY SITE:\t«Company_Name»\n«Address»\n«City_State_ZIP»")
+            document.save(icf)
+            assert quality.audit_source_surfaces(icf, source) == []
+            document.paragraphs[0].text = "STUDY SITE:\t«Company_Name»\n«City_State_ZIP»"
+            document.save(icf)
+            findings = quality.audit_source_surfaces(icf, source)
+            assert {item["field"] for item in findings} == {"sites[0].facility.address"}
+            return
         document.add_paragraph("Study site: 101 Example Road")
         document.save(icf)
         findings = quality.audit_source_surfaces(icf, source)

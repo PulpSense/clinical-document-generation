@@ -419,6 +419,7 @@ def _canonical_recovery_content_request(revision: Path) -> tuple[dict, dict]:
         "approved_source": reference,
         "checks": list(CONTENT_CHECKS),
         "cross_document_checks": list(quality.CROSS_DOCUMENT_CHECKS),
+        "semantic_evidence": quality.semantic_evidence_inventory(reference),
     }
     request["request_sha256"] = verification_request_sha256(request)
     path = revision / "hermes/verification-requests" / f"{request_id}.json"
