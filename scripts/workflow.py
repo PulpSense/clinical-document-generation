@@ -83,7 +83,7 @@ PDF_PAGE_RENDERER = {
     "platform": "manylinux_2_17_x86_64",
 }
 PRODUCTION_MODULES = {
-    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
+    "contracts.py", "drafting.py", "finding_policy.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
@@ -366,7 +366,7 @@ def _package_release_tree(
     actual_modules = {path.name for path in (repo_root / "scripts").glob("*.py")}
     if actual_modules != PRODUCTION_MODULES:
         raise ValueError(
-            "Release packaging requires exactly the six production Python modules: "
+            "Release packaging requires the declared production Python modules: "
             + ", ".join(sorted(PRODUCTION_MODULES))
         )
     exact_files = {"SKILL.md", "README.md", "CONTEXT.md", "requirements.txt", "agents/openai.yaml"}
@@ -3550,7 +3550,7 @@ def _candidate_fingerprint(
     font_substitutions: Mapping[str, str] | None = None,
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    implementation_files = [repo_root / "scripts" / name for name in ("workflow.py", "contracts.py", "drafting.py", "rendering.py", "quality.py", "prs_xml.py")]
+    implementation_files = [repo_root / "scripts" / name for name in ("workflow.py", "contracts.py", "drafting.py", "finding_policy.py", "rendering.py", "quality.py", "prs_xml.py")]
     accepted_files = sorted((revision_dir / "hermes/accepted").glob("*.json"))
     payload = {
         "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"),

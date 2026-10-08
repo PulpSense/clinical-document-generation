@@ -1,6 +1,6 @@
 {
   "schema_version": "blocking-check-audit/v2",
-  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in six production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
+  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in the production modules, including the shared finding policy; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
   "baseline_commit": "b35761d",
   "families": {
     "source": {
@@ -224,7 +224,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "a14dfde1c8a52de44908e6246b02361ab54cf2ffffc6f5dafc40e3f74280459b",
+      "code_sha256": "59a0abc99d62599791199a41a1e66f5cbe632d25ab3cb6755c9416386c9cb29c",
       "family": "evidence"
     },
     {
@@ -242,13 +242,13 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "78acc7282802314012fd673adb258df067311e9dc84167a7f8a8d613b879d026",
+      "code_sha256": "c6ff98b96d63d04261af1e7cd6bf6608e8dca61dd807b13167f912273b725e64",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "83d03965a26b50b060e0f3a161119bd7258870a5649455692bc3586dcd7e8577",
+      "code_sha256": "d5db4ebaa862354e3fac53a44687c119290906d1049c5a6dda91ccdc122bc041",
       "family": "evidence"
     },
     {
@@ -256,6 +256,24 @@
       "function": "accepted_cross_section_duplicate_findings",
       "code_sha256": "b7213acc5c6d896e5532080c4efb4bed8d302688e7fd6c0aba7681a4763be432",
       "family": "evidence"
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "classify_finding",
+      "code_sha256": "5f76bf19b5a2577a49710789639b61d02fa063505781570c4cb67aa7a5072975",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "blocks_construction",
+      "code_sha256": "01e238b6b7a311559c51422709ee969ed7357e8995084391c2a4bea36c205195",
+      "family": "recovery"
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "blocks_publication",
+      "code_sha256": "3521992c39213b736d4076a9c7fe61132198f158b6e7b6ba883e1037f292b3f5",
+      "family": "recovery"
     },
     {
       "file": "scripts/prs_xml.py",
@@ -459,7 +477,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_reviewed_lexical_warnings",
-      "code_sha256": "3c7d66995b6071d589c390c2d8d5b57d628f94ea13eae99c8504a6bc046063b7"
+      "code_sha256": "18d8451248d65f4f3fd05341312992ce7ab4fbe2baf858591c6bc543d2fc2e6c"
     },
     {
       "file": "scripts/quality.py",
@@ -494,13 +512,13 @@
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "5546e4f3cade3508f70a8d493aadbc95affc312407a4332269e93f4ac2e4a082",
+      "code_sha256": "ea5454abd8ecd7e296d6ad2d66c41df880fbbc338e9ef6f6d59d8f8c8262a57d",
       "family": "delivery"
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "0926d02934bf4afd6b735e637bcf34c24dd856f0b40e857f87751aca4f60f0e4",
+      "code_sha256": "8ff65d7401dc6059037b7349f47c9c404a537391f69f91a9d44f7498e45f2607",
       "family": "review"
     },
     {
