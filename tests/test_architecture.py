@@ -235,7 +235,10 @@ def test_disclosed_release_safeguards_and_ordinary_delivery_remain_explicit():
                       "1,024 members", "atomic", "activation journal",
                       "previous verified release", "rollback journal", "explicit authorization"):
         assert safeguard in " ".join(release.split())
-    for guide in ("approval-loop", "intake-workflow", "local-handoff"):
+    for guide in ("approval-loop", "intake-workflow", "local-handoff",
+                  "reference-schema", "template-contract", "prs-xml",
+                  "n8n-prospective-protocol-icf-xml", "n8n-ambispective-protocol-icf-xml",
+                  "n8n-retrospective-protocol"):
         instructions = (ROOT / f"references/{guide}.md").read_text(encoding="utf-8")
         assert "SKILL.md" in instructions
         assert "--stage generate" not in instructions

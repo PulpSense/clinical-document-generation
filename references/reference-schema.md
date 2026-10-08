@@ -112,16 +112,21 @@ contract, binds its SHA-256, and creates a write-once revision containing:
 
 Changing reviewer-controlled study inputs after approval blocks generation and
 requires a new prepare/approve cycle. Runtime `generation` attempt state is not
-part of the clinical approval payload, but exhausted targets remain blocked
-until a new approved revision is created.
+part of the clinical approval payload. Supported repair and resume retain the
+same approval and original deadline; a technical or no-progress failure does
+not require fabricated source edits or a new clinical approval.
 
 ## Generation boundary
 
-After approval, use only:
+After approval, follow [the production Desktop operation](../SKILL.md#post-approval-desktop-operation):
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 ```
+
+A standalone inner generation pass is not client-ready success. Require
+`status: passed`, `stage: desktop_delivery`, `delivery.confirmed: true` and
+actual opener confirmation of every exact reviewed attachment.
 
 Hermes returns section drafting and independent verification JSON when the
 workflow requests it. Python maps accepted content into Word and PRS XML. Never

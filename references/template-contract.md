@@ -109,15 +109,17 @@ when they contain a running header, footer, or page number.
 
 ## Public lifecycle
 
-Run templates only through:
+Follow [ordinary generation](../SKILL.md) using the provisioned absolute Python:
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
-python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
-python3 scripts/workflow.py --run-dir <run-dir> --stage validate
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 ```
 
-Continue `generate` whenever it returns `awaiting_hermes`, placing each exact
-JSON response at the request's declared `response_path`. Publish only the paths
-returned in `client_outputs` after `status: passed`.
+Use optional reviewer metadata only if already supplied. The adapter owns
+bound worker handoffs, supported cause-specific repair and complete independent
+review within the original deadline. Client-ready delivery requires
+`status: passed`, `stage: desktop_delivery`, `delivery.confirmed: true` and
+actual opener byte/hash confirmation of the complete branch set. A passing
+inner generate result is insufficient.
