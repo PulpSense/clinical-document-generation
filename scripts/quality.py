@@ -5708,6 +5708,11 @@ def pending_verifications(revision_dir: Path) -> list[Path]:
 
 
 def _is_publication_warning(finding: Mapping[str, Any]) -> bool:
+    classification = finding_classification(finding)
+    if classification is not None:
+        # Semantic concerns enter final review, but blocks_publication still
+        # rejects them until authenticated exact-artifact review resolves them.
+        return classification in {"editorial_warning", "semantic_uncertainty"}
     return finding.get("publication_disposition") == "warning"
 
 
@@ -5734,7 +5739,10 @@ def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
             continue
         values = record.get("warnings")
         if isinstance(values, list):
-            warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
+            # Do not discard a migrated essential/technical record just because
+            # it was stored in a legacy warnings array. The final policy check
+            # must see and reject that inconsistent accepted-draft evidence.
+            warnings.extend(dict(value) for value in values if isinstance(value, Mapping))
     return warnings
 
 
