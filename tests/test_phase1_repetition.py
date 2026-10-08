@@ -151,14 +151,18 @@ def test_key_information_participant_duration_uses_followup_not_whole_study_time
     _accepted, findings = validate_response(request, response)
 
     assert not any(
-        "participation-duration cites source evidence whose material facts are not observable" in item["issue"]
+        item.get("code") == "icf-summary-grounding-review" and "participation-duration" in item["issue"]
         for item in findings
     )
 
     summary["paragraphs"][1]["text"] = "You will attend screening and follow-up over two months."
     _accepted, wrong_duration_findings = validate_response(request, response)
     assert any(
-        "participation-duration cites source evidence whose material facts are not observable" in item["issue"]
+        item.get("code") == "icf-summary-grounding-review"
+        and "participation-duration" in item["issue"]
+        and item["finding_policy"]["classification"] == "essential_defect"
+        and any("3" in value.get("missing_numbers", [])
+                for diagnostics in item["evidence_diagnostics"] for value in diagnostics["unobserved_values"])
         for item in wrong_duration_findings
     )
 
@@ -496,7 +500,7 @@ def test_protocol_concept_repetition_allows_concise_completion_visit_reference()
     assert findings == []
 
 
-def test_exact_protocol_repetition_across_sections_blocks_and_targets_secondary_only(tmp_path):
+def test_exact_protocol_repetition_across_sections_requires_review_of_secondary_only(tmp_path):
     duplicate = (
         "Existing treatment leaves an unmet need because recovery is slow and outcomes remain variable. "
         "The study evaluates a new approach intended to address that evidence gap."
@@ -519,8 +523,9 @@ def test_exact_protocol_repetition_across_sections_blocks_and_targets_secondary_
 
     assert len(repeated) == 1
     assert repeated[0]["target_ids"] == ["objectives"]
-    assert repeated[0]["recovery_class"] == "drafting_defect"
-    assert repeated[0]["action"] == contracts.RECOVERY_POLICIES["drafting_defect"]
+    assert repeated[0]["finding_policy"]["classification"] == "semantic_uncertainty"
+    assert repeated[0]["finding_policy"]["repair_owner"] == "independent_review"
+    assert repeated[0]["action"] == "manual_review"
 
 
 def test_protocol_concept_ownership_is_included_in_drafting_contract(tmp_path):
@@ -1056,3 +1061,22 @@ def test_production_icf_assessment_receives_explicit_fixed_boilerplate_exemption
     )["sections"]
 
     assert boilerplate["icf-voluntary"] in captured["required_static_text"]
+
+
+def test_heuristic_endpoint_overlap_requires_review_before_materiality_is_proven():
+    paragraph = (
+        "The primary endpoint concerns visual acuity at Month 3. Secondary endpoints "
+        "include symptom score and questionnaire responses for distance, intermediate, "
+        "and near vision at each planned study visit, with outcomes summarized in the approved report."
+    )
+    findings = assess_protocol_concept_repetition(
+        {"study-design.design": [paragraph], "objectives": [paragraph]},
+        protocol_concept_ownership("Prospective"),
+    )
+    assert len(findings) == 1
+    assert findings[0]["material"] is True  # retained heuristic concern
+    assert findings[0]["finding_policy"]["classification"] == "semantic_uncertainty"
+    assert findings[0]["finding_policy"]["repair_owner"] == "independent_review"
+    assert findings[0]["publication_disposition"] == "warning"
+    assert "recovery_class" not in findings[0]
+    assert "owner" not in findings[0]

@@ -36,3 +36,19 @@ def test_spelled_numbers_preserve_values_without_accepting_a_wrong_quantity(numb
     value = f'Blood draw at {number} mL'
     assert drafting.evidence_grounded(f'Blood draw at {word} mL', value)
     assert not drafting.evidence_grounded(f'Blood draw at {number+1} mL', value)
+
+
+def test_bibliography_bracket_label_is_not_a_clinical_quantity():
+    source = "Participants have three months of follow-up.[7]\nReferences:\n7. Doe A. Monitoring study. 2026;20:1-8. doi:10.1234/example."
+    assert drafting.evidence_grounded("Participants have three months of follow-up.", source)
+    assert not drafting.evidence_grounded("Participants have two months of follow-up.", source)
+
+
+@pytest.mark.parametrize("number,word", [(13, "thirteen"), (40, "forty"), (35, "thirty-five"), (99, "ninety nine")])
+def test_larger_spelled_clinical_numbers_preserve_values(number, word):
+    assert drafting.evidence_grounded(f"Blood draw at {word} mL", f"Blood draw at {number} mL")
+    assert not drafting.evidence_grounded(f"Blood draw at {number + 1} mL", f"Blood draw at {word} mL")
+
+
+def test_separate_number_words_do_not_combine_quantities_across_punctuation():
+    assert drafting.evidence_grounded("Dose levels are 40, 3 mL.", "Dose levels are forty, three mL.")
