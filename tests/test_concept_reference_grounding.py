@@ -1,4 +1,5 @@
 """Brief source references can proceed to review without copying owning sections."""
+from finding_policy import blocks_construction
 
 import json
 from pathlib import Path
@@ -72,7 +73,7 @@ def test_descriptive_interpretation_without_literal_source_keyword_is_accepted(t
         "analysis-plan.considerations"
     ]
     assert findings
-    assert all(item.get("publication_disposition") == "warning" for item in findings)
+    assert all(not blocks_construction(item) for item in findings)
     assert accepted["drafts"][0]["warnings"] == findings
 
 
@@ -109,7 +110,7 @@ def test_missing_or_unrelated_citation_still_rejects_concept_draft(tmp_path, cit
     accepted, findings = drafting.validate_response(request, response)
 
     assert accepted["drafts"] == []
-    assert any(item.get("publication_disposition") != "warning" for item in findings)
+    assert any(blocks_construction(item) for item in findings)
 
 
 def test_missing_explicit_quantity_is_not_downgraded_to_wording_warning(tmp_path):
@@ -123,7 +124,7 @@ def test_missing_explicit_quantity_is_not_downgraded_to_wording_warning(tmp_path
     assert accepted["drafts"] == []
     assert any(
         "statistics.analysis_plan" in item["issue"]
-        and item.get("publication_disposition") != "warning"
+        and blocks_construction(item)
         for item in findings
     )
 

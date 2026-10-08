@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from finding_policy import declare_finding, normalize_finding, blocks_construction
+
 import base64
 import binascii
 import hashlib
@@ -285,14 +287,14 @@ def verification_request_authentication_findings(
     )
 
     def finding(code: str, issue: str) -> dict[str, Any]:
-        return recovery_finding({
+        return recovery_finding(declare_finding({
             "category": "verification",
             "field": "canonical_request_ledger",
             "code": code,
             "target_ids": [target],
             "verification_request_id": request_id,
             "issue": issue,
-        }, "document_structure_defect")
+        }, classification="technical_failure", reason="quality.finding.4a502846d0", repair_owner="integrity"), "document_structure_defect")
 
     if not isinstance(request_id, str) or not request_id or Path(request_id).name != request_id:
         return [finding(
@@ -1670,13 +1672,13 @@ def _executable_candidates(
 
 
 def _pdfium_integrity_failure(code: str, path: str, issue: str) -> dict[str, Any]:
-    return {"status": "blocked", "finding": {
+    return {"status": "blocked", "finding": declare_finding({
         "category": "renderer",
         "field": "page_renderer",
         "code": code,
         "path": path,
         "issue": issue,
-    }}
+    }, classification="technical_failure", reason="quality._pdfium_integrity_failure.4a502846d0", repair_owner="integrity")}
 
 
 def _pdfium_runtime_integrity(
@@ -2311,12 +2313,12 @@ def run_pdfium_worker(request_path: Path) -> dict[str, Any]:
         if not separator or not code.startswith("renderer.pdfium_"):
             code = "renderer.pdfium_worker_crashed"
             issue = message or type(exc).__name__
-        return {"status": "blocked", "findings": [{
+        return {"status": "blocked", "findings": [declare_finding({
             "category": "renderer",
             "field": "page_renderer",
             "code": code,
             "issue": issue,
-        }]}
+        }, classification="technical_failure", reason="quality.run_pdfium_worker.4a502846d0", repair_owner="runtime")]}
 
 
 def _pdfium_worker_command(request_path: Path) -> list[str]:
@@ -2986,7 +2988,7 @@ def preflight(
                 "Every supported office renderer failed its smoke render."
             )
             field = "preflight"
-        findings.append({"category": "renderer", "field": field, "issue": issue})
+        findings.append(declare_finding({"category": "renderer", "field": field, "issue": issue}, classification="technical_failure", reason="quality.preflight.4a502846d0", repair_owner="runtime"))
         smoke = {"status": "blocked", "issue": issue}
     else:
         for font, result in font_results.items():
@@ -2994,11 +2996,11 @@ def preflight(
                 result["resolution"] = "render_verified"
     elapsed = clock() - started
     if elapsed > deadline_seconds and identity is None:
-        findings.append({"category": "renderer", "field": "preflight", "issue": f"Renderer preflight exceeded its {deadline_seconds:.1f}s deadline ({elapsed:.3f}s)."})
+        findings.append(declare_finding({"category": "renderer", "field": "preflight", "issue": f"Renderer preflight exceeded its {deadline_seconds:.1f}s deadline ({elapsed:.3f}s)."}, classification="technical_failure", reason="quality.preflight.3b1b636438", repair_owner="runtime"))
     ordered_renderers = ([identity] if identity else []) + [candidate for candidate in renderer_candidates if candidate != identity]
     ordered_page_renderers = ([page_identity] if page_identity else []) + [candidate for candidate in page_candidates if candidate != page_identity]
     return {
-        "status": "passed" if not findings else "blocked",
+        "status": "blocked" if any(blocks_construction(item) for item in findings) else "passed",
         "contracted_template_bundle": dict(bundle),
         "renderer": identity,
         "renderer_candidates": ordered_renderers,
@@ -3086,7 +3088,7 @@ def _protocol_section15_opening_findings(docx_path: Path, pdf_path: Path) -> lis
     ), None)
     if heading_page == caption_page and table_page in {None, caption_page}:
         return []
-    return [{
+    return [declare_finding({
         "category": "visual",
         "field": "protocol",
         "artifact": "protocol",
@@ -3098,7 +3100,7 @@ def _protocol_section15_opening_findings(docx_path: Path, pdf_path: Path) -> lis
             "Section 15 heading, introduction, caption, and assessment-table opening "
             "must appear together on one rendered page."
         ),
-    }]
+    }, classification="essential_defect", reason="quality._protocol_section15_opening_findings.3972552d6d", repair_owner="rendering")]
 
 
 def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, Any]:
@@ -3133,7 +3135,7 @@ def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, A
         page_lines = [[key(line) for line in (page.extract_text() or "").splitlines() if key(line)]
                       for page in PdfReader(pdf_path).pages]
     except (OSError, ValueError, TypeError, AttributeError, KeyError) as exc:
-        return {"status": "unknown", "destinations": [], "findings": [], "issue": str(exc)}
+        return declare_finding({"status": "unknown", "destinations": [], "findings": [], "issue": str(exc)}, classification="essential_defect", reason="quality.audit_final_toc_destinations.a9b6404ad3", repair_owner="rendering")
     destinations, findings = [], []
     for heading in headings:
         marker = key(heading)
@@ -3172,12 +3174,12 @@ def audit_final_toc_destinations(docx_path: Path, pdf_path: Path) -> dict[str, A
                "rendered_toc_candidates": toc_values, "status": status}
         destinations.append(row)
         if status == "mismatch":
-            findings.append({"category": "visual", "field": docx_path.stem,
+            findings.append(declare_finding({"category": "visual", "field": docx_path.stem,
                              "artifact": docx_path.stem, "check": "toc_mismatch",
                              "element": heading, "page": rendered,
                              "target_ids": [f"layout:{docx_path.stem}"],
-                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, visible TOC {toc_values}, rendered page {rendered}."})
-    status = "mismatch" if findings else ("passed" if destinations and all(
+                             "issue": f"Final TOC destination mismatch for {heading}: cached {cached}, visible TOC {toc_values}, rendered page {rendered}."}, classification="essential_defect", reason="quality.audit_final_toc_destinations.3498646905", repair_owner="rendering"))
+    status = "mismatch" if any(blocks_construction(item) for item in findings) else ("passed" if destinations and all(
         row["status"] == "passed" for row in destinations) else "unknown")
     return {"status": status, "destinations": destinations, "findings": findings}
 
@@ -3338,7 +3340,7 @@ def render_pages(
         allow_pending_activation=allow_pending_activation,
     )
     if not renderer_candidates:
-        return {"status": "blocked", "findings": [{"category": "renderer", "field": "renderer", "issue": "No supported Microsoft Word or LibreOffice renderer is available."}]}
+        return {"status": "blocked", "findings": [declare_finding({"category": "renderer", "field": "renderer", "issue": "No supported Microsoft Word or LibreOffice renderer is available."}, classification="technical_failure", reason="quality.render_pages.7755efd15a", repair_owner="runtime")]}
     if not page_candidates:
         if page_renderer_identities is None and page_renderer_identity is None:
             integrity = _pdfium_runtime_integrity(
@@ -3352,7 +3354,7 @@ def render_pages(
                     "renderer": renderer_candidates[0],
                     "findings": [integrity["finding"]],
                 }
-        return {"status": "blocked", "renderer": renderer_candidates[0], "findings": [{"category": "renderer", "field": "page_renderer", "issue": "No supported PDF page renderer is available."}]}
+        return {"status": "blocked", "renderer": renderer_candidates[0], "findings": [declare_finding({"category": "renderer", "field": "page_renderer", "issue": "No supported PDF page renderer is available."}, classification="technical_failure", reason="quality.render_pages.05edee7f5c", repair_owner="runtime")]}
 
     renderer_attempts: list[dict[str, Any]] = []
     page_attempts: list[dict[str, Any]] = []
@@ -3427,14 +3429,14 @@ def render_pages(
                 "status": "blocked",
                 "renderer_attempts": renderer_attempts,
                 "page_renderer_attempts": page_attempts,
-                "findings": [{
+                "findings": [declare_finding({
                     "category": "renderer",
                     "field": "rendering",
                     "code": terminal_code,
                     "issue": terminal_issue,
                     "recovery_class": "adapter_fault",
                     "action": "stop",
-                }],
+                }, classification="technical_failure", reason="quality.render_pages.2467cc0b95", repair_owner="runtime")],
             }
 
         findings: list[dict[str, Any]] = []
@@ -3455,14 +3457,14 @@ def render_pages(
                 shutil.copy2(source_page, page)
                 pages.append(page)
             for page_number in find_blank_pages(pdf):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "visual",
                     "field": docx.stem,
                     "artifact": docx.stem,
                     "page": page_number,
                     "target_ids": [f"layout:{docx.stem}"],
                     "issue": f"Rendered {docx.stem} contains a textless page at page {page_number}.",
-                })
+                }, classification="technical_failure", reason="quality.render_pages.08bf9f975e", repair_owner="runtime"))
             if docx.stem == "protocol":
                 findings.extend(_protocol_section15_opening_findings(docx, pdf))
             toc_destinations = audit_final_toc_destinations(docx, pdf)
@@ -3485,7 +3487,7 @@ def render_pages(
             })
         renderer_attempts.append({"renderer": identity, "status": "passed"})
         return {
-            "status": "passed" if not findings else "blocked",
+            "status": "blocked" if any(blocks_construction(item) for item in findings) else "passed",
             "renderer": identity,
             "renderer_attempts": renderer_attempts,
             "page_renderer": selected_page_renderer,
@@ -3497,7 +3499,7 @@ def render_pages(
         "status": "blocked",
         "renderer_attempts": renderer_attempts,
         "page_renderer_attempts": page_attempts,
-        "findings": [{"category": "renderer", "field": "rendering", "issue": "Every local renderer/page-renderer combination failed."}],
+        "findings": [declare_finding({"category": "renderer", "field": "rendering", "issue": "Every local renderer/page-renderer combination failed."}, classification="technical_failure", reason="quality.render_pages.d83275eda8", repair_owner="runtime")],
     }
 
 
@@ -3543,11 +3545,11 @@ def render_assurance(
         if not selected_artifacts or path.stem in selected_artifacts
     ]
     if structural_finding is not None or not candidate_paths:
-        finding = structural_finding or recovery_finding({
+        finding = structural_finding or recovery_finding(declare_finding({
                 "category": "document-structure",
                 "field": "candidate",
                 "issue": "Render Assurance requires a complete structurally validated DOCX candidate.",
-            }, "document_structure_defect")
+            }, classification="essential_defect", reason="quality.render_assurance.78e9ea4716", repair_owner="construction"), "document_structure_defect")
         return {
             "schema_version": "render-assurance/v1",
             "status": "blocked",
@@ -3602,11 +3604,11 @@ def render_assurance(
             }
     if substitutions != prior_substitutions:
         if rebuild_candidate is None:
-            finding = recovery_finding({
+            finding = recovery_finding(declare_finding({
                 "category": "document-structure",
                 "field": "font_substitutions",
                 "issue": "The candidate must be rebuilt with the selected approved font substitutions before rendering.",
-            }, "document_structure_defect")
+            }, classification="essential_defect", reason="quality.render_assurance.2989c4b1e9", repair_owner="construction"), "document_structure_defect")
             return {
                 "schema_version": "render-assurance/v1",
                 "status": "blocked",
@@ -3618,11 +3620,11 @@ def render_assurance(
             }
         rebuild_report = rebuild_candidate(substitutions)
         if rebuild_report.get("status") != "passed":
-            findings = [recovery_finding(finding, "document_structure_defect") for finding in (rebuild_report.get("findings") or [{
+            findings = [recovery_finding(finding, "document_structure_defect") for finding in (rebuild_report.get("findings") or [declare_finding({
                 "category": "document-structure",
                 "field": "font_substitutions",
                 "issue": "The candidate could not be rebuilt with approved font substitutions.",
-            }])]
+            }, classification="essential_defect", reason="quality.render_assurance.457f02cef4", repair_owner="construction")])]
             return {
                 "schema_version": "render-assurance/v1",
                 "status": "blocked",
@@ -3649,11 +3651,11 @@ def render_assurance(
         )
         structural_evidence["revalidated_after_substitution"] = structural_finding is None
         if structural_finding is not None or not candidate_paths:
-            finding = structural_finding or recovery_finding({
+            finding = structural_finding or recovery_finding(declare_finding({
                 "category": "document-structure",
                 "field": "candidate",
                 "issue": "The rebuilt candidate does not contain the selected DOCX artifacts.",
-            }, "document_structure_defect")
+            }, classification="essential_defect", reason="quality.render_assurance.4f09155abc", repair_owner="construction"), "document_structure_defect")
             return {
                 "schema_version": "render-assurance/v1",
                 "status": "blocked",
@@ -3791,11 +3793,11 @@ def _validated_candidate_structure(
     )
     if complete:
         return evidence, None
-    return evidence, recovery_finding({
+    return evidence, recovery_finding(declare_finding({
         "category": "document-structure",
         "field": "candidate",
         "issue": "Render Assurance requires the complete structurally validated Branch Document Set with matching hashes.",
-    }, "document_structure_defect")
+    }, classification="essential_defect", reason="quality._validated_candidate_structure.0957402f9a", repair_owner="construction"), "document_structure_defect")
 
 
 def _governed_adapter_attempts(
@@ -3884,24 +3886,24 @@ def _retrospective_lexical_coverage_finding(
         for value in diagnostic.get("unobserved_values", [])
         for number in value.get("missing_numbers", [])
     })
-    finding: dict[str, Any] = {
+    finding: dict[str, Any] = declare_finding({
         "category": "content", "field": field, "target_ids": [field],
         "issue": issue,
-    }
+    }, classification="essential_defect", reason="quality._retrospective_lexical_coverage_finding.4a502846d0", repair_owner="construction")
     if missing_numbers:
         finding["missing_numbers"] = missing_numbers
         return finding
-    return {
+    return declare_finding({
         **finding,
         "code": "retrospective-lexical-evidence-uncertainty",
-        "publication_disposition": "warning",
+
         "action": "manual_review",
         "issue": (
             "Automated text matching could not confirm the approved wording; "
             "independent content review must assess whether the fact is present."
         ),
         "source_excerpt": _text(approved),
-    }
+    }, classification="essential_defect", reason="quality._retrospective_lexical_coverage_finding.e4a45e1a0a", repair_owner="construction")
 
 
 def audit_computed_protocol_fields(document: Path | Document, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -3916,13 +3918,13 @@ def audit_computed_protocol_fields(document: Path | Document, reference: Mapping
                 continue
             actual = row.cells[1].text.strip()
             if re.sub(r"\s+", " ", actual) != re.sub(r"\s+", " ", expected):
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(declare_finding({
                     "category": "content", "check": "computed_source_fidelity",
                     "field": "general-information", "artifact": "protocol",
                     "target_ids": ["general-information"], "source_path": "study.timeline",
                     "issue": "The code-owned Duration / Follow-up synopsis differs from the approved participant follow-up projection.",
                     "expected": expected, "actual": actual,
-                }, "deterministic_structure_defect"))
+                }, classification="essential_defect", reason="quality.audit_computed_protocol_fields.8c9986d99d", repair_owner="construction"), "deterministic_structure_defect"))
     return findings
 
 
@@ -3954,12 +3956,12 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
                 ("sites[0].facility.address.location", "«City_State_ZIP»"),
             ):
                 if site_block.count(marker) != 1:
-                    findings.append({
+                    findings.append(declare_finding({
                         "category": "template_contract",
                         "field": field,
                         "target_ids": ["layout:icf"],
                         "issue": f"Sterling first-page merge field {marker} must appear exactly once in the STUDY SITE block.",
-                    })
+                    }, classification="essential_defect", reason="quality.audit_source_surfaces.17e8f7b212", repair_owner="construction"))
         else:
             # Inspect the address destination, never an unrelated later mention.
             address_blocks = []
@@ -4006,9 +4008,9 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
                     for alias in aliases
                 )
                 if value and not present:
-                    findings.append({"category": "content", "field": field,
+                    findings.append(declare_finding({"category": "content", "field": field,
                                      "target_ids": ["layout:icf"],
-                                     "issue": f"ICF omits supplied site-address component {field}: {item['value']}"})
+                                     "issue": f"ICF omits supplied site-address component {field}: {item['value']}"}, classification="essential_defect", reason="quality.audit_source_surfaces.aa6879fb7b", repair_owner="construction"))
     if path.stem == "protocol":
         sponsor_name = str(get_path(reference, "parties.sponsor.name", "") or "").strip()
         if sponsor_name:
@@ -4018,9 +4020,9 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
                         continue
                     value = "\n".join(cell.text for cell in row.cells[1:])
                     if re.search(r"\w" + re.escape(sponsor_name) + r"|" + re.escape(sponsor_name) + r"\w", value, re.I):
-                        findings.append({"category": "content", "field": "parties.sponsor.name",
+                        findings.append(declare_finding({"category": "content", "field": "parties.sponsor.name",
                                          "target_ids": ["title-page"],
-                                         "issue": "Sponsor name is concatenated with adjacent front-matter text without a separator."})
+                                         "issue": "Sponsor name is concatenated with adjacent front-matter text without a separator."}, classification="essential_defect", reason="quality.audit_source_surfaces.f8617fdc81", repair_owner="construction"))
     return findings
 
 
@@ -4119,7 +4121,7 @@ def validate_sterling_clause_contract(
             "sterling-clause-unsupported": "unsupported",
             "sterling-clause-misplaced": "misplaced",
         }[code], "blocking"))
-        finding = {
+        finding = declare_finding({
             "code": code,
             "category": "content",
             "check": "sterling_clause_contract",
@@ -4128,7 +4130,7 @@ def validate_sterling_clause_contract(
             "target_ids": [clause["section_id"]],
             "expected_section": clause["section"],
             "severity": severity,
-            "publication_disposition": "blocking",
+
             "safety_critical": bool(clause.get("safety_critical")) or any(
                 marker in str(clause["clause_id"])
                 for marker in ("risk", "injury", "voluntary", "rights", "authorization", "privacy")
@@ -4140,7 +4142,7 @@ def validate_sterling_clause_contract(
                 "sterling-clause-misplaced": "Governed Sterling clause is outside its required section.",
             }[code],
             **extra,
-        }
+        }, classification="essential_defect", reason="quality.add.4f14a818e6", repair_owner="construction")
         recovery = (
             "deterministic_structure_defect"
             if code == "sterling-clause-misplaced"
@@ -4241,19 +4243,19 @@ def validate_sterling_clause_contract(
         )
         if substantive_ok:
             if not length_ok or not maximum_ok:
-                findings.append({
+                findings.append(declare_finding({
                     "code": "sterling-clause-word-goal",
                     **classify_finding({}, classification="editorial_warning", reason="icf-word-goal", repair_owner="none"),
                     "category": "editorial",
                     "check": "sterling_clause_contract",
                     "clause_id": clause["clause_id"],
                     "target_ids": [clause["section_id"]],
-                    "publication_disposition": "warning",
+
                     "issue": "The clause is outside its reference word-count goal.",
                     "actual_words": word_count,
                     "minimum_words": int(validation.get("minimum_words", 0) or 0),
                     "maximum_words": maximum,
-                })
+                }, classification="editorial_warning", reason="quality.validate_sterling_clause_contract.e4cb0cadd7", repair_owner="none"))
             continue
 
         grounding_diagnostics = [source_evidence_diagnostics(raw_sections.get(section, ""), path, value)
@@ -4262,14 +4264,14 @@ def validate_sterling_clause_contract(
         if (has_body and exact_ok and terms_ok and sources_ok and block_ok
                 and not semantic_issues and not contradiction
                 and lexical_evidence_uncertainty(grounding_diagnostics)):
-            findings.append({
+            findings.append(declare_finding({
                 "code": "icf-lexical-evidence-uncertainty", "category": "content",
                 **classify_finding({}, classification="semantic_uncertainty", reason="icf-lexical-evidence-uncertainty", repair_owner="independent_review"),
                 "field": clause["section_id"], "target_ids": [clause["section_id"]],
-                "clause_id": clause["clause_id"], "publication_disposition": "warning",
+                "clause_id": clause["clause_id"],
                 "evidence_diagnostics": grounding_diagnostics,
                 "issue": "Sterling source wording needs independent meaning review; its exact safeguards remain intact.",
-            })
+            }, classification="essential_defect", reason="quality.validate_sterling_clause_contract.08fb106316", repair_owner="construction"))
             continue
 
         # Exact or safeguard-bearing text in another governed section is a
@@ -4426,7 +4428,7 @@ def assess_icf_output(
                     **classify_finding({}, classification="editorial_warning", reason="icf-generated-repetition", repair_owner="none"),
                     "category": "editorial",
                     "check": "exact_rendered_duplication",
-                    "publication_disposition": "warning",
+
                     "target_ids": ["icf.key-information-summary"],
                     "summary_section": "icf.key-information-summary",
                     "detail_section": section_id,
@@ -4483,7 +4485,7 @@ def assess_icf_output(
             "material": False,
             "repair_action": "redraft_secondary_section",
             "severity": "warning",
-            "publication_disposition": "warning",
+
         }, "drafting_defect"))
     return {
         "schema_version": "icf-output-assessment/v1",
@@ -4596,7 +4598,7 @@ def assess_protocol_concept_repetition(
                     "repair_action": "redraft_secondary_section",
                     "disposition": "manual_review",
                     "severity": "warning",
-                    "publication_disposition": "warning",
+
                     "action": "manual_review",
                 })
                 break
@@ -4665,7 +4667,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         expected = heading_key(f"{section.number} {section.title}")
         count = headings.count(expected)
         if count != 1:
-            findings.append({"category": "content", "field": section.section_id, "target_ids": [section.section_id], "issue": f"Protocol section heading must appear exactly once; found {count}: {section.number} {section.title}"})
+            findings.append(declare_finding({"category": "content", "field": section.section_id, "target_ids": [section.section_id], "issue": f"Protocol section heading must appear exactly once; found {count}: {section.number} {section.title}"}, classification="essential_defect", reason="quality.deterministic_content_check.eda4d445f3", repair_owner="drafting"))
 
     def normalized_matrix(table: Table) -> list[list[str]]:
         return [
@@ -4689,12 +4691,12 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             and re.sub(r"\s+", " ", table.rows[0].cells[0].text).strip() == expected_rows[0][0]
         ]
         if len(matches) != 1 or normalized_matrix(matches[0]) != expected_rows:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "content",
                 "field": "procedures.visit_schedule" if table_id == "schedule-of-assessments" else "statistics.sample_size_evidence",
                 "target_ids": [str(table_contract["section_id"])],
                 "issue": f"{table_contract['caption']} does not preserve the contracted headers, row order, column order, cell values, and allowed blanks.",
-            })
+            }, classification="essential_defect", reason="quality.deterministic_content_check.e2b4d4f3f8", repair_owner="drafting"))
     stale_protocol_claims = {
         "an investigator-initiated clinical trial": "title-page",
         "all subjects will be monitored for adverse events": "quality-safety",
@@ -4704,7 +4706,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
     }
     for phrase, target in stale_protocol_claims.items():
         if phrase in normalized_visible and phrase not in source_visible:
-            findings.append({"category": "content", "field": target, "target_ids": [target], "issue": f"Protocol contains unsupported client-template study language: {phrase}"})
+            findings.append(declare_finding({"category": "content", "field": target, "target_ids": [target], "issue": f"Protocol contains unsupported client-template study language: {phrase}"}, classification="essential_defect", reason="quality.deterministic_content_check.6fe16e9326", repair_owner="drafting"))
 
     blocks: list[Paragraph | Table] = []
     for child in document.element.body.iterchildren():
@@ -4750,12 +4752,12 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             continue
         content = section_content(section)
         if content is not None and not content.strip():
-            findings.append({
+            findings.append(declare_finding({
                 "category": "content",
                 "field": section.section_id,
                 "target_ids": [section.section_id],
                 "issue": f"Protocol section has no substantive content after its heading: {section.number} {section.title}",
-            })
+            }, classification="essential_defect", reason="quality.deterministic_content_check.a765406104", repair_owner="drafting"))
             continue
         if content is None:
             continue
@@ -4769,12 +4771,12 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         if section.role == "source":
             approved = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), "")
             if re.sub(r"\s+", " ", _text(approved)).strip().casefold() not in re.sub(r"\s+", " ", content).strip().casefold():
-                findings.append({
+                findings.append(declare_finding({
                     "category": "content",
                     "field": section.section_id,
                     "target_ids": [section.section_id],
                     "issue": f"Source-mode Protocol section does not preserve its approved source text exactly: {section.number} {section.title}",
-                })
+                }, classification="essential_defect", reason="quality.deterministic_content_check.f0aad1a143", repair_owner="drafting"))
             continue
         ungrounded_paths = [
             path for path in section.fidelity_evidence
@@ -4791,7 +4793,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 section_evidence_value(section.section_id, path, get_path(reference, path), reference),
                 all_items=section.source_coverage == "all_material_items" or path == "endpoints.other",
             ) for path in ungrounded_paths]
-            findings.append({
+            findings.append(declare_finding({
                 "category": "content",
                 "field": section.section_id,
                 "target_ids": [section.section_id],
@@ -4799,15 +4801,15 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review")
                    if lexical_evidence_uncertainty(diagnostics) else {}),
                 "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
-            })
+            }, classification="essential_defect", reason="quality.deterministic_content_check.589f00c4b6", repair_owner="drafting"))
     benefits_text = "\n".join(section_paragraphs.get("risks-benefits.benefits", []))
     if re.search(r"\b(?:compensat\w*|reimburs\w*|payment\w*)\b|\$\s*\d", benefits_text, re.I):
-        findings.append({
+        findings.append(declare_finding({
             "category": "content",
             "field": "risks-benefits.benefits",
             "target_ids": ["risks-benefits.benefits"],
             "issue": "Protocol benefits section includes payment or reimbursement terms owned by Section 17.",
-        })
+        }, classification="essential_defect", reason="quality.deterministic_content_check.54d7bedc80", repair_owner="drafting"))
     concept_findings = assess_protocol_concept_repetition(
         section_paragraphs,
         protocol_concept_ownership(branch),
@@ -4824,9 +4826,9 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         key = text.casefold()
         if len(text.split()) >= 8 and key in seen:
             if seen[key] == current_section:
-                findings.append(classify_finding({"code": "protocol-exact-repetition", "action": "manual_review", "category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."}, classification="semantic_uncertainty", reason="Exact wording overlap does not alone prove unusable repetition.", repair_owner="independent_review"))
+                findings.append(classify_finding(declare_finding({"code": "protocol-exact-repetition", "action": "manual_review", "category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."}, classification="essential_defect", reason="quality.deterministic_content_check.4ec19b4e10", repair_owner="drafting"), classification="semantic_uncertainty", reason="Exact wording overlap does not alone prove unusable repetition.", repair_owner="independent_review"))
             else:
-                findings.append(classify_finding({
+                findings.append(classify_finding(declare_finding({
                     "code": "protocol-exact-repetition",
                     "category": "content",
                     "check": "concept_repetition",
@@ -4842,17 +4844,17 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     "severity": "warning",
                     "action": "manual_review",
                     "issue": f"Exact paragraph is repeated from Protocol section {seen[key]} in secondary section {current_section}.",
-                }, classification="semantic_uncertainty", reason="Exact wording overlap requires assessment of section ownership and materiality.", repair_owner="independent_review"))
+                }, classification="essential_defect", reason="quality.deterministic_content_check.b4957b1431", repair_owner="drafting"), classification="semantic_uncertainty", reason="Exact wording overlap requires assessment of section ownership and materiality.", repair_owner="independent_review"))
         elif len(text.split()) >= 8:
             seen[key] = current_section
     if branch == "Retrospective":
         if "approved visit schedule table is" in normalized_visible:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "content",
                 "field": "study-procedure.enrollment",
                 "target_ids": ["study-procedure.enrollment"],
                 "issue": "Retrospective study procedure contains flattened visit-schedule serialization instead of readable client-facing content.",
-            })
+            }, classification="essential_defect", reason="quality.deterministic_content_check.22f090cb6d", repair_owner="drafting"))
         for field in ("population.inclusion_criteria", "population.exclusion_criteria"):
             value = get_path(reference, field, [])
             items = value if isinstance(value, list) else [value]
@@ -4865,7 +4867,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     findings.append(finding)
         timeline = get_path(reference, "study.timeline")
         if timeline and not _timeline_covered(timeline, normalized_visible):
-            findings.append({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": "Retrospective study procedure omits the approved study timeline."})
+            findings.append(declare_finding({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": "Retrospective study procedure omits the approved study timeline."}, classification="essential_defect", reason="quality.deterministic_content_check.927f900b30", repair_owner="drafting"))
         schedule = get_path(reference, "procedures.visit_schedule_table", []) or []
         visit_names = [item.get("visitName") or item.get("visit") for item in schedule if isinstance(item, Mapping)]
         for visit_name in visit_names:
@@ -4902,20 +4904,20 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         icf_visible = re.sub(r"\s+", " ", " ".join(paragraph.text for paragraph in icf_document.paragraphs)).casefold()
         for section_id, title in icf_retained_sections(branch, icf_template):
             if title.casefold() not in icf_visible:
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(declare_finding({
                     "category": "content",
                     "field": section_id,
                     "target_ids": ["layout:icf"],
                     "issue": f"Required retained ICF section is missing from the client shell: {title}",
-                }, "document_structure_defect"))
+                }, classification="essential_defect", reason="quality.deterministic_content_check.e8a6d5fd23", repair_owner="construction"), "document_structure_defect"))
         signature_marker = "signature of participant"
         if signature_marker not in icf_visible:
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(declare_finding({
                 "category": "content",
                 "field": "icf.signature-block",
                 "target_ids": ["layout:icf"],
                 "issue": "Required participant signature block is missing from the ICF.",
-            }, "document_structure_defect"))
+            }, classification="essential_defect", reason="quality.deterministic_content_check.7c5914d8ff", repair_owner="construction"), "document_structure_defect"))
         injury_or_costs = (
             "icf.injury" if "icf.injury" in draftable_sections
             else "icf.costs" if "icf.costs" in draftable_sections
@@ -4933,27 +4935,27 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         }
         for phrase, target in stale_icf_claims.items():
             if phrase in icf_visible and phrase not in source_visible:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "content",
                     "field": target,
                     "target_ids": [target],
                     "issue": f"ICF contains example-study prose that is not supported by the approved source: {phrase}",
-                })
+                }, classification="essential_defect", reason="quality.deterministic_content_check.c0316ba144", repair_owner="drafting"))
         if _text(get_path(reference, "regulatory.prs.study_type")).casefold() == "observational" and "clinical trial" in icf_visible and "clinical trial" not in source_visible:
-            findings.append({"category": "content", "field": "icf.study-purpose", "target_ids": ["icf.study-purpose"], "issue": "Observational ICF retains interventional clinical-trial language."})
+            findings.append(declare_finding({"category": "content", "field": "icf.study-purpose", "target_ids": ["icf.study-purpose"], "issue": "Observational ICF retains interventional clinical-trial language."}, classification="essential_defect", reason="quality.deterministic_content_check.aca8fb5943", repair_owner="drafting"))
         minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
         if minimum_days:
             screening_interval = screening_interval_requirement(reference)
             if screening_interval is None:
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(declare_finding({
                     "category": "quality-gate", "field": "screening-interval-validator",
                     "target_ids": ["quality-gate:prs-screening-interval"],
                     "issue": "The approved screening interval cannot be represented by the canonical projection; maintenance is required.",
-                }, "capability_gap"))
+                }, classification="technical_failure", reason="quality.deterministic_content_check.05fb19a059", repair_owner="construction"), "capability_gap"))
             else:
                 for text, target, artifact in ((visible, "subjects.inclusion", "Protocol"), (icf_visible, "icf.procedures", "ICF")):
                     if not screening_interval_in_text(text, screening_interval):
-                        findings.append({"category": "content", "field": target, "target_ids": [target], "issue": f"{artifact} omits or changes the approved interval, participation scope or before-screening relation."})
+                        findings.append(declare_finding({"category": "content", "field": target, "target_ids": [target], "issue": f"{artifact} omits or changes the approved interval, participation scope or before-screening relation."}, classification="essential_defect", reason="quality.deterministic_content_check.2b4062e206", repair_owner="drafting"))
 
         consent_to_sign = any(phrase in icf_visible for phrase in (
             "should not sign",
@@ -4961,29 +4963,27 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             "if you agree to participate, you will be asked to sign",
         ))
         if not consent_to_sign:
-            findings.append(recovery_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, "document_structure_defect"))
+            findings.append(recovery_finding(declare_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, classification="essential_defect", reason="quality.deterministic_content_check.b4594fae6f", repair_owner="construction"), "document_structure_defect"))
     findings.extend(prs_candidate_findings(revision_dir, reference))
     governed = []
     for item in findings:
         if (
-            item.get("publication_disposition") == "warning"
-            and item.get("action") == "manual_review"
+            not blocks_construction(item)
         ):
             governed.append(item)
             continue
         if item.get("recovery_class") in RECOVERY_POLICIES:
             governed.append(item)
             continue
-        targets = item.get("target_ids") if isinstance(item.get("target_ids"), list) else []
-        unlocalized = not targets or any(
-            str(target).strip().casefold() in {"", "protocol", "icf"}
-            or str(target) not in draftable_sections
-            for target in targets
-        )
-        governed.append(recovery_finding(
-            item,
-            "document_structure_defect" if unlocalized else "drafting_defect",
-        ))
+        item = normalize_finding(item, producer="quality.deterministic_content_check")
+        owner = item["finding_policy"]["repair_owner"]
+        if owner not in {"drafting", "construction", "rendering"}:
+            governed.append(item)
+            continue
+        governed.append(recovery_finding(item, {
+            "drafting": "drafting_defect", "construction": "document_structure_defect",
+            "rendering": "visual_defect",
+        }[owner]))
     return governed
 
 
@@ -5092,7 +5092,7 @@ def verification_recovery_request_findings(
             records.append((path, request))
 
     def issue(code: str, text: str) -> list[dict[str, str]]:
-        return [{"code": code, "issue": text}]
+        return [declare_finding({"code": code, "issue": text}, classification="technical_failure", reason="quality.issue.982d9e3eb9", repair_owner="review_response")]
 
     if malformed_inventory:
         return issue("verification_request_invalid_inventory", "The active verification request inventory contains an unreadable or non-object entry.")
@@ -5734,16 +5734,17 @@ def pending_verifications(revision_dir: Path) -> list[Path]:
 
 
 def _is_publication_warning(finding: Mapping[str, Any]) -> bool:
-    classification = finding_classification(finding)
+    classification = finding_classification(normalize_finding(finding, producer="quality.warning-decision"))
     if classification is not None:
         # Semantic concerns enter final review, but blocks_publication still
         # rejects them until authenticated exact-artifact review resolves them.
         return classification in {"editorial_warning", "semantic_uncertainty"}
-    return finding.get("publication_disposition") == "warning"
+    return False
 
 
 def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return [dict(finding) for finding in findings if not _is_publication_warning(finding)]
+    return [item for finding in findings
+            if not _is_publication_warning(item := normalize_finding(finding, producer="quality.blocking-findings"))]
 
 
 def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -5768,7 +5769,7 @@ def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
             # Do not discard a migrated essential/technical record just because
             # it was stored in a legacy warnings array. The final policy check
             # must see and reject that inconsistent accepted-draft evidence.
-            warnings.extend(dict(value) for value in values if isinstance(value, Mapping))
+            warnings.extend(normalize_finding(value, producer="quality.accepted-drafting-warnings") for value in values if isinstance(value, Mapping))
     return warnings
 
 
@@ -5838,9 +5839,8 @@ def _render_warnings(render_report: Mapping[str, Any]) -> list[dict[str, Any]]:
     warnings: list[dict[str, Any]] = []
     for artifact in render_report.get("artifacts") or []:
         if isinstance(artifact, Mapping) and isinstance(artifact.get("warnings"), list):
-            warnings.extend(_warning_findings(
-                value for value in artifact["warnings"] if isinstance(value, Mapping)
-            ))
+            warnings.extend(normalize_finding(value, producer="quality.render-warnings")
+                            for value in artifact["warnings"] if isinstance(value, Mapping))
     return warnings
 
 
@@ -5939,12 +5939,12 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
             continue
         active_request_id = str(active_request.get("request_id") or "")
         request_id_counts[active_request_id] = request_id_counts.get(active_request_id, 0) + 1
-    if verification_request_authentication_findings(
+    if any(blocks_construction(item) for item in verification_request_authentication_findings(
         revision_dir,
         request_path,
         request,
         request_id_counts=request_id_counts,
-    ):
+    )):
         return False
     if any(
         response.get(key) != expected
@@ -5994,14 +5994,14 @@ def validate_verifications(
     active_entries = sorted(request_root.iterdir()) if request_root.is_dir() else []
     for path in active_entries:
         if path.suffix != ".json" or path.is_symlink() or not path.is_file():
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(classify_finding({
                 "category": "verification",
                 "field": "verification_request_inventory",
                 "code": "verification_request_invalid_inventory",
                 "target_ids": ["verification:content"],
                 "verification_request_id": None,
                 "issue": f"Unexpected noncanonical verification request entry: {path.name}",
-            }, "document_structure_defect"))
+            }, classification="essential_defect", reason="quality.validate_verifications.8e223a2e8c", repair_owner="construction"), "document_structure_defect"))
     selected_paths = sorted(
         request_paths
         if request_paths is not None
@@ -6020,12 +6020,12 @@ def validate_verifications(
             active_request = _json(active_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             if active_path not in selected_paths:
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(classify_finding({
                     "category": "verification", "field": "verification_request",
                     "code": "verification_request_invalid_json",
                     "target_ids": ["verification:content"], "verification_request_id": None,
                     "issue": f"Verification request is not a readable JSON object: {exc}",
-                }, "document_structure_defect"))
+                }, classification="essential_defect", reason="quality.validate_verifications.1281a61039", repair_owner="construction"), "document_structure_defect"))
             continue
         active_requests[active_path] = active_request
         active_request_id = str(active_request.get("request_id") or "")
@@ -6034,13 +6034,13 @@ def validate_verifications(
         if active_path in selected_paths:
             continue
         if any(key not in active_request or active_request.get(key) in (None, "") for key in required_bindings):
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(classify_finding({
                 "category": "verification", "field": "verification_request",
                 "code": "verification_request_missing_binding",
                 "target_ids": ["verification:content"],
                 "verification_request_id": active_request.get("request_id"),
                 "issue": "Companion verification request is missing a required binding.",
-            }, "document_structure_defect"))
+            }, classification="essential_defect", reason="quality.validate_verifications.7f877edb34", repair_owner="construction"), "document_structure_defect"))
             continue
         findings.extend(verification_request_authentication_findings(
             revision_dir, active_path, active_request,
@@ -6051,18 +6051,18 @@ def validate_verifications(
         try:
             request = _json(request_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(classify_finding({
                 "category": "verification",
                 "field": "verification_request",
                 "code": "verification_request_invalid_json",
                 "target_ids": ["verification:content"],
                 "verification_request_id": None,
                 "issue": f"Verification request is not a readable JSON object: {exc}",
-            }, "document_structure_defect"))
+            }, classification="essential_defect", reason="quality.validate_verifications.1281a61039", repair_owner="construction"), "document_structure_defect"))
             continue
         required_bindings = ("request_id", "task", "revision_id", "review_set", "response_path")
         if any(key not in request or request.get(key) in (None, "") for key in required_bindings):
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(classify_finding({
                 "category": "verification",
                 "field": "verification_request",
                 "code": "verification_request_missing_binding",
@@ -6073,7 +6073,7 @@ def validate_verifications(
                 ],
                 "verification_request_id": request.get("request_id"),
                 "issue": "Verification request is missing a required identity, task, revision, review-set, or response-path binding.",
-            }, "document_structure_defect"))
+            }, classification="essential_defect", reason="quality.validate_verifications.aa47cce5aa", repair_owner="construction"), "document_structure_defect"))
             continue
         request_records.append((request_path, request))
     task_counts: dict[str, int] = {}
@@ -6089,43 +6089,43 @@ def validate_verifications(
             request,
             request_id_counts=active_request_id_counts,
         )
-        if authentication_findings:
+        if any(blocks_construction(item) for item in authentication_findings):
             findings.extend(authentication_findings)
             continue
         response_path = revision_dir / request["response_path"]
         if not _revision_owned_nonsymlink_path(revision_dir, response_path):
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(classify_finding({
                 "category": "verification",
                 "field": request["task"],
                 "code": "verification_response_noncanonical_path",
                 "target_ids": [verification_target],
                 "verification_request_id": request["request_id"],
                 "issue": "Independent Hermes verification response path is not revision-owned canonical evidence.",
-            }, "document_structure_defect"))
+            }, classification="essential_defect", reason="quality.validate_verifications.9098399422", repair_owner="construction"), "document_structure_defect"))
             continue
         if not response_path.is_file():
-            findings.append(recovery_finding({"category": "verification", "field": request["task"], "code": "verification_response_missing", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
+            findings.append(recovery_finding(classify_finding({"category": "verification", "field": request["task"], "code": "verification_response_missing", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Independent Hermes verification response is missing."}, classification="technical_failure", reason="quality.validate_verifications.3d9cf9eb3b", repair_owner="review_response"), "verifier_transient")); continue
         try: response = _json(response_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
+            findings.append(recovery_finding(classify_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, classification="technical_failure", reason="quality.validate_verifications.db61ff0261", repair_owner="review_response"), "verifier_transient")); continue
         malformed_response = False
         for key, expected in (("schema_version", RESPONSE_SCHEMA), ("request_id", request["request_id"]), ("request_sha256", request["request_sha256"]), ("task", request["task"]), ("revision_id", request.get("revision_id"))):
             if response.get(key) != expected:
                 malformed_response = True
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(classify_finding({
                     "category": "reviewer-transient",
                     "field": key,
                     "target_ids": [verification_target],
                     "verification_request_id": request["request_id"],
                     "issue": f"Verification response binding mismatch for {key}.",
-                }, "verifier_transient"))
+                }, classification="technical_failure", reason="quality.validate_verifications.b92b392dd6", repair_owner="review_response"), "verifier_transient"))
         producer = response.get("producer") if isinstance(response.get("producer"), Mapping) else {}
         if not _text(producer.get("model_id")):
             malformed_response = True
-            findings.append(recovery_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier model identity is missing."}, "verifier_transient"))
+            findings.append(recovery_finding(classify_finding({"category": "verification", "field": "producer.model_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier model identity is missing."}, classification="technical_failure", reason="quality.validate_verifications.5a0383d879", repair_owner="review_response"), "verifier_transient"))
         if not _text(producer.get("reviewer_id")):
             malformed_response = True
-            findings.append(recovery_finding({"category": "verification", "field": "producer.reviewer_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier reviewer identity is missing."}, "verifier_transient"))
+            findings.append(recovery_finding(classify_finding({"category": "verification", "field": "producer.reviewer_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier reviewer identity is missing."}, classification="technical_failure", reason="quality.validate_verifications.059838202e", repair_owner="review_response"), "verifier_transient"))
         if malformed_response:
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "malformed", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
@@ -6135,13 +6135,13 @@ def validate_verifications(
             "api_unavailable", "connection_error", "rate_limit", "timeout", "service_unavailable"
         }
         if transient:
-            findings.append(recovery_finding({
+            findings.append(recovery_finding(classify_finding({
                 "category": "reviewer-transient",
                 "field": request["task"],
                 "target_ids": [verification_target],
                 "verification_request_id": request["request_id"],
                 "issue": _text(error.get("message")) or "Independent Hermes verifier reported a transient API failure.",
-            }, "verifier_transient"))
+            }, classification="technical_failure", reason="quality.validate_verifications.ab379dfddf", repair_owner="review_response"), "verifier_transient"))
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
         raw_issues = response.get("findings")
@@ -6155,13 +6155,13 @@ def validate_verifications(
             for item in issues or [{"issue": "Verifier did not pass the artifact."}]:
                 source = item if isinstance(item, Mapping) else {"issue": item}
                 category = "visual" if request["task"] == "rendered_page_visual_verification" else "verification"
-                finding = {
+                finding = classify_finding({
                     "category": category,
                     "field": request["task"],
                     "verification_request_id": request["request_id"],
                     "verification_source_finding": dict(source),
                     "issue": _text(source.get("issue")),
-                }
+                }, classification="essential_defect", reason="authenticated-essential_defect", repair_owner="drafting")
                 for key in (
                     "target_ids", "artifact", "page", "check", "element", "code",
                     "concept_id", "primary_section", "secondary_section",
@@ -6182,12 +6182,12 @@ def validate_verifications(
                     or not _valid_finding_id(finding_id)
                     or finding_id_counts.get(finding_id) != 1
                 ):
-                    findings.append(recovery_finding(classify_finding({
+                    findings.append(recovery_finding(classify_finding(classify_finding({
                         **finding,
                         "code": "verification_finding_invalid_identity",
                         "target_ids": [verification_target],
                         "issue": "Reviewer finding requires one unique valid finding_id. " + finding["issue"],
-                    }, classification="technical_failure", reason="Malformed finding identity cannot authorize a clinical repair.",
+                    }, classification="technical_failure", reason="quality.validate_verifications.47e7d0ec7e", repair_owner="review_response"), classification="technical_failure", reason="Malformed finding identity cannot authorize a clinical repair.",
                         repair_owner="review_response"), "verifier_transient"))
                     continue
                 if category == "visual":
@@ -6223,15 +6223,15 @@ def validate_verifications(
                         or check not in VISUAL_CHECKS
                         or not element
                     ):
-                        findings.append(recovery_finding({
+                        findings.append(recovery_finding(classify_finding({
                             **finding,
                             "target_ids": [verification_target],
                             "verification_request_id": request["request_id"],
                             "issue": f"Verifier finding is missing governed visual repair routing. {finding['issue']}".strip(),
-                        }, "verifier_transient"))
+                        }, classification="technical_failure", reason="quality.validate_verifications.0d0ce42452", repair_owner="review_response"), "verifier_transient"))
                     else:
                         finding["target_ids"] = [f"layout:{artifact}"]
-                        findings.append(recovery_finding(finding, "visual_defect"))
+                        findings.append(recovery_finding(classify_finding(finding, classification="essential_defect", reason="authenticated-visual-defect", repair_owner="rendering"), "visual_defect"))
                 else:
                     supplied_targets = [
                         str(target) for target in source.get("target_ids", []) if str(target).strip()
@@ -6244,12 +6244,12 @@ def validate_verifications(
                     if any(str(artifact.get("path", "")).endswith("study.xml") for artifact in request.get("artifacts", []) if isinstance(artifact, Mapping)):
                         permitted_targets.update(("prs.brief-summary", "prs.detailed-description", "prs.structured"))
                     if not supplied_targets or any(target not in permitted_targets for target in supplied_targets):
-                        findings.append(recovery_finding({
+                        findings.append(recovery_finding(classify_finding({
                             **finding,
                             "target_ids": [verification_target],
                             "verification_request_id": request["request_id"],
                             "issue": f"Verifier finding is missing a governed section target. {finding['issue']}".strip(),
-                        }, "verifier_transient"))
+                        }, classification="technical_failure", reason="quality.validate_verifications.b9be81ed3b", repair_owner="review_response"), "verifier_transient"))
                     else:
                         finding["target_ids"] = supplied_targets
                         source_category = _text(source.get("category")).casefold()
@@ -6304,30 +6304,30 @@ def validate_verifications(
                                 or not governed_pair
                                 or not structured_routing_valid
                             ):
-                                findings.append(recovery_finding({
+                                findings.append(recovery_finding(classify_finding({
                                     **finding,
                                     "target_ids": [verification_target],
                                     "issue": f"Protocol repetition finding has invalid structured evidence or warning routing. {finding['issue']}".strip(),
-                                }, "verifier_transient"))
+                                }, classification="technical_failure", reason="quality.validate_verifications.29d4caa38d", repair_owner="review_response"), "verifier_transient"))
                             elif not explicitly_nonmaterial:
                                 findings.append(recovery_finding({
-                                    **finding,
+                                    **classify_finding(finding, classification="essential_defect", reason="authenticated-material-repetition", repair_owner="drafting"),
                                     "category": source_category,
                                     "check": source_check,
                                     "verification_request_id": request["request_id"],
                                 }, "drafting_defect"))
                             else:
-                                findings.append({
+                                findings.append(classify_finding({
                                     **finding,
                                     "category": source_category or "content",
                                     "check": source_check or "concept_repetition",
                                     "verification_request_id": request["request_id"],
                                     "severity": "warning",
-                                    "publication_disposition": "warning",
+
                                     "action": "manual_review",
-                                })
+                                }, classification="editorial_warning", reason="authenticated-editorial_warning", repair_owner="none"))
                         elif _governed_content_omission(source, supplied_targets) or _governed_editorial_warning(source, supplied_targets):
-                            findings.append({
+                            findings.append(classify_finding({
                                 **finding,
                                 "category": source_category,
                                 "check": source_check,
@@ -6337,9 +6337,9 @@ def validate_verifications(
                                     if _text(source.get("recommended_action")) else {}
                                 ),
                                 "severity": "warning",
-                                "publication_disposition": "warning",
+
                                 "action": "manual_review",
-                            })
+                            }, classification="editorial_warning", reason="authenticated-editorial_warning", repair_owner="none"))
                         else:
                             approved_source = request.get("approved_source") or {}
                             branch = str(get_path(approved_source, "meta.study_type") or "")
@@ -6369,10 +6369,10 @@ def validate_verifications(
                                 and set(supplied_targets) == {tables[table_id]["section_id"] for table_id in table_ids}
                             )
                             if source.get("surface") == "table" and not table_finding:
-                                findings.append(recovery_finding({
+                                findings.append(recovery_finding(classify_finding({
                                     **finding, "target_ids": [verification_target],
                                     "issue": "The table finding does not identify its canonical table and owner section; re-localize the exact surface.",
-                                }, "verifier_transient"))
+                                }, classification="technical_failure", reason="quality.validate_verifications.b14301961a", repair_owner="review_response"), "verifier_transient"))
                                 continue
                             recovery_class = (
                                 "deterministic_structure_defect"
@@ -6380,7 +6380,7 @@ def validate_verifications(
                                 else "drafting_defect"
                             )
                             findings.append(recovery_finding({
-                                **finding,
+                                **classify_finding(finding, classification="essential_defect", reason="authenticated-content-defect", repair_owner="construction" if recovery_class == "deterministic_structure_defect" else "drafting"),
                                 **({"category": source_category} if source_category else {}),
                                 **({"check": source_check} if source_check else {}),
                                 "verification_request_id": request["request_id"],
@@ -6403,16 +6403,16 @@ def validate_verifications(
                     and _content_sha256(path) == artifact.get("content_sha256")
                 )
                 if not exact_matches or not content_matches:
-                    findings.append(recovery_finding({"category": "verification", "field": request["task"], "artifact": artifact.get("artifact"), "artifact_path": artifact.get("path"), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Verification request is stale for {artifact.get('path')}."}, "document_structure_defect"))
+                    findings.append(recovery_finding(classify_finding({"category": "verification", "field": request["task"], "artifact": artifact.get("artifact"), "artifact_path": artifact.get("path"), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Verification request is stale for {artifact.get('path')}."}, classification="essential_defect", reason="quality.validate_verifications.659f45c8be", repair_owner="construction"), "document_structure_defect"))
             else:
                 for key in ("docx", "pdf"):
                     path = revision_dir / str(artifact.get(key))
                     if not path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, path) or sha256_file(path) != artifact.get(f"{key}_sha256"):
-                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", key), "artifact": artifact.get("artifact"), "artifact_path": artifact.get(key), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Visual verification request is stale for {artifact.get(key)}."}, "document_structure_defect"))
+                        findings.append(recovery_finding(classify_finding({"category": "verification", "field": artifact.get("artifact", key), "artifact": artifact.get("artifact"), "artifact_path": artifact.get(key), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Visual verification request is stale for {artifact.get(key)}."}, classification="essential_defect", reason="quality.validate_verifications.7967e20c37", repair_owner="construction"), "document_structure_defect"))
                 for page in artifact.get("pages", []):
                     path = revision_dir / str(page.get("path"))
                     if not path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, path) or sha256_file(path) != page.get("sha256"):
-                        findings.append(recovery_finding({"category": "verification", "field": artifact.get("artifact", "page"), "artifact": artifact.get("artifact"), "artifact_path": page.get("path"), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Visual verification request is stale for {page.get('path')}."}, "document_structure_defect"))
+                        findings.append(recovery_finding(classify_finding({"category": "verification", "field": artifact.get("artifact", "page"), "artifact": artifact.get("artifact"), "artifact_path": page.get("path"), "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Visual verification request is stale for {page.get('path')}."}, classification="essential_defect", reason="quality.validate_verifications.fb05d25307", repair_owner="construction"), "document_structure_defect"))
         if request["task"] == "clinical_content_verification":
             expected_sections = {(item["artifact"], item["section_id"]) for item in request.get("sections", [])}
             valid_section_rows = [
@@ -6423,7 +6423,7 @@ def validate_verifications(
             ]
             assessed_sections = {(item.get("artifact"), item.get("section_id")) for item in valid_section_rows}
             if expected_sections != assessed_sections or len(valid_section_rows) != len(expected_sections):
-                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every contracted section and content check must be explicitly assessed; expected {len(expected_sections)}, accepted {len(assessed_sections)}."}, "verifier_transient"))
+                findings.append(recovery_finding(classify_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every contracted section and content check must be explicitly assessed; expected {len(expected_sections)}, accepted {len(assessed_sections)}."}, classification="technical_failure", reason="quality.validate_verifications.4cf55a0dc2", repair_owner="review_response"), "verifier_transient"))
             expected_cross = set(request.get("cross_document_checks", []))
             valid_cross_rows = [
                 item for item in response.get("cross_document_assessments", [])
@@ -6432,7 +6432,7 @@ def validate_verifications(
             ]
             assessed_cross = {item.get("check") for item in valid_cross_rows}
             if expected_cross != assessed_cross or len(valid_cross_rows) != len(expected_cross):
-                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, "verifier_transient"))
+                findings.append(recovery_finding(classify_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every cross-document check must be explicitly assessed; expected {len(expected_cross)}, accepted {len(assessed_cross)}."}, classification="technical_failure", reason="quality.validate_verifications.51352005fb", repair_owner="review_response"), "verifier_transient"))
             reported_findings = [item for item in issues if isinstance(item, Mapping)]
             reported_ids = [_text(item.get("finding_id")) for item in reported_findings]
             if (
@@ -6440,13 +6440,13 @@ def validate_verifications(
                 or any(not _valid_finding_id(finding_id) for finding_id in reported_ids)
                 or len(set(reported_ids)) != len(reported_ids)
             ):
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(classify_finding({
                     "category": "verification",
                     "field": request["task"],
                     "target_ids": [verification_target],
                     "verification_request_id": request["request_id"],
                     "issue": "Every content finding must have a unique valid finding_id.",
-                }, "verifier_transient"))
+                }, classification="technical_failure", reason="quality.validate_verifications.a0d7b23bcf", repair_owner="review_response"), "verifier_transient"))
             reported_targets: set[str] = set()
             for reported in reported_findings:
                 raw_targets = reported.get("target_ids")
@@ -6463,7 +6463,7 @@ def validate_verifications(
                 if section_status.get(target) == "passed"
             )
             if passing_finding_targets:
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(classify_finding({
                     "category": "verification",
                     "field": request["task"],
                     "target_ids": [verification_target],
@@ -6472,7 +6472,7 @@ def validate_verifications(
                         "Reported findings contradict passing section assessments; "
                         f"passing section assessment targets={passing_finding_targets}."
                     ),
-                }, "verifier_transient"))
+                }, classification="technical_failure", reason="quality.validate_verifications.4b17bed24e", repair_owner="review_response"), "verifier_transient"))
             uncovered_sections = [
                 str(item.get("section_id") or "")
                 for item in valid_section_rows
@@ -6491,7 +6491,7 @@ def validate_verifications(
                 )
             ]
             if uncovered_sections or uncovered_cross:
-                findings.append(recovery_finding({
+                findings.append(recovery_finding(classify_finding({
                     "category": "verification",
                     "field": request["task"],
                     "target_ids": [verification_target],
@@ -6500,11 +6500,11 @@ def validate_verifications(
                         "Every non-passing assessment must be covered by a reported finding; "
                         f"uncovered sections={uncovered_sections}, uncovered cross-document checks={uncovered_cross}."
                     ),
-                }, "verifier_transient"))
+                }, classification="technical_failure", reason="quality.validate_verifications.f443ae89d9", repair_owner="review_response"), "verifier_transient"))
             if response.get("status") == "passed" and any(
                 item.get("status") != "passed" for item in [*valid_section_rows, *valid_cross_rows]
             ):
-                findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing content response contains a non-passing section or cross-document assessment."}, "verifier_transient"))
+                findings.append(recovery_finding(classify_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing content response contains a non-passing section or cross-document assessment."}, classification="technical_failure", reason="quality.validate_verifications.96bf9cd452", repair_owner="review_response"), "verifier_transient"))
         if request["task"] == "rendered_page_visual_verification":
             expected_pages = {(a["artifact"], p["page"], p["sha256"]) for a in request.get("artifacts", []) for p in a.get("pages", [])}
             valid_page_rows = [
@@ -6514,11 +6514,11 @@ def validate_verifications(
                 and set(p.get("checks", [])) == set(VISUAL_CHECKS)
             ]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
-            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))
+            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding(classify_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, classification="technical_failure", reason="quality.validate_verifications.05e21e5c28", repair_owner="review_response"), "verifier_transient"))
             if response.get("status") == "passed" and any(
                 page.get("status") != "passed" for page in valid_page_rows
             ):
-                findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing visual response contains a non-passing page assessment."}, "verifier_transient"))
+                findings.append(recovery_finding(classify_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing visual response contains a non-passing page assessment."}, classification="technical_failure", reason="quality.validate_verifications.6c38743352", repair_owner="review_response"), "verifier_transient"))
         evidence[evidence_key] = {
             "task": request.get("task"),
             "request_id": request.get("request_id"),
@@ -6663,13 +6663,13 @@ def _final_verification_scope_findings(
         "Every final response must bind request, reviewer, model, and response identity.": "review_response_identity",
     }
     return [
-        recovery_finding({
+        recovery_finding(declare_finding({
             "category": "verification",
             "field": "final_exact_artifact_review",
             "code": response_scope_codes.get(issue, "final_scope_integrity"),
             "target_ids": ["verification:content"],
             "issue": issue,
-        }, "document_structure_defect")
+        }, classification="technical_failure", reason="quality._final_verification_scope_findings.4a502846d0", repair_owner="integrity"), "document_structure_defect")
         for issue in issues
     ]
 
@@ -6731,11 +6731,11 @@ def final_exact_artifact_review_findings(
     """Revalidate the non-bypassable final review against current exact bytes."""
     final_review = quality.get("final_exact_artifact_review")
     if not isinstance(final_review, Mapping):
-        return [recovery_finding({
+        return [recovery_finding(declare_finding({
             "category": "verification",
             "field": "final_exact_artifact_review",
             "issue": "Final Exact-Artifact Review is required.",
-        }, "document_structure_defect")]
+        }, classification="technical_failure", reason="quality.final_exact_artifact_review_findings.9772626d08", repair_owner="integrity"), "document_structure_defect")]
     expected_values = {
         "schema_version": FINAL_REVIEW_SCHEMA,
         "scope": FINAL_REVIEW_SCOPE,
@@ -6777,7 +6777,7 @@ def final_exact_artifact_review_findings(
     )
     fresh_warnings, fresh_resolutions = _reviewed_lexical_warnings(fresh_warnings, fresh_evidence, verification_findings)
     verification_findings.extend(dict(item) for item in fresh_warnings
-                                 if finding_classification(item) is not None and blocks_publication(item))
+                                 if blocks_publication(item))
     if (
         canonical_evidence_sha256(fresh_evidence)
         != final_review.get("verification_evidence_sha256")
@@ -6790,11 +6790,11 @@ def final_exact_artifact_review_findings(
     if fresh_resolutions != list(quality.get("resolved_evidence_cautions") or []):
         issues.append("Final evidence-caution resolutions changed after review.")
     return [
-        recovery_finding({
+        recovery_finding(declare_finding({
             "category": "verification",
             "field": "final_exact_artifact_review",
             "issue": issue,
-        }, "document_structure_defect")
+        }, classification="technical_failure", reason="quality.final_exact_artifact_review_findings.4a502846d0", repair_owner="integrity"), "document_structure_defect")
         for issue in issues
     ] + verification_findings
 
@@ -6830,7 +6830,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     findings.extend(item for item in scope_findings if item not in deferred_scope)
     warnings, resolutions = _reviewed_lexical_warnings(warnings, evidence, findings)
     findings.extend(dict(item) for item in warnings
-                    if finding_classification(item) is not None and blocks_publication(item))
+                    if blocks_publication(item))
     candidate_hashes = {
         path.relative_to(revision_dir).as_posix(): sha256_file(path)
         for path in sorted((revision_dir / "candidate").glob("*"))
@@ -6841,7 +6841,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     final_review = {
         "schema_version": FINAL_REVIEW_SCHEMA,
         "scope": FINAL_REVIEW_SCOPE,
-        "status": "passed" if not findings else "blocked",
+        "status": "blocked" if any(blocks_publication(item) for item in findings) else "passed",
         "branch_document_set": sorted(document_set(get_path(reference, "meta.study_type"))),
         "candidate_hashes": candidate_hashes,
         "rendered_hashes": rendered_hashes,

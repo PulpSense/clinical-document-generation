@@ -1,3 +1,4 @@
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -134,7 +135,7 @@ def test_reported_missing_hypothesis_facts_remain_blocking_at_review(tmp_path):
     findings, evidence = quality.validate_verifications(tmp_path, request_paths=[request_path])
     defect = next(item for item in findings if 'omits the supplied expectation' in item['issue'])
     assert defect['action'] == 'retry_drafting_target'
-    assert defect.get('publication_disposition') != 'warning'
+    assert blocks_construction(defect)
     assert not any(item['recovery_class'] == 'verifier_transient' for item in findings)
     assert next(iter(evidence.values()))['semantic_evidence'] == request['semantic_evidence']
 

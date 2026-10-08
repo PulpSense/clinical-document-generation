@@ -1,4 +1,5 @@
 """Minor review findings must not turn a complete package into review copies."""
+from finding_policy import blocks_construction
 import json
 from pathlib import Path
 
@@ -81,7 +82,7 @@ def test_structured_minor_repetition_needs_no_optional_magic_labels(tmp_path, br
     path, _, _ = repetition_review(tmp_path, branch, template)
     findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
     assert len(findings) == 1
-    assert findings[0]["publication_disposition"] == "warning"
+    assert not blocks_construction(findings[0])
     assert findings[0]["target_ids"] == ["analysis-plan.considerations"]
     assert quality.verification_response_is_complete(tmp_path, path)
 

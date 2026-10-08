@@ -3,6 +3,7 @@
 Real ingestion, construction, exact-artifact checks and Desktop publication run.
 Controlled responders provide no independent clinical or visual certification.
 """
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -24,14 +25,22 @@ TEXTS = (
 )
 
 
-def _run(tmp_path, branch, family):
-    text = TEXTS[0]
+def _run(tmp_path, branch, family, profile=None):
+    text = "Interpret results descriptively." if profile == "sparse" else TEXTS[0]
     run = tmp_path / "controlled-replay"
     reference_path = run / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
     source = json.loads((ROOT / f"tests/fixtures/{branch.lower()}-acceptance-source.json").read_text())
     source["meta"]["icf_template"] = family
     source["statistics"].update(analysis_plan=ANALYSIS_PLAN, software=None)
+    if profile == "rich":
+        source["study"]["background"] += " Personnel collect observations during scheduled visits and use reminder calls to support follow-up.[7]\nReferences:\n7. Doe A. Monitoring study. 2026;20:1-8. doi:10.1234/example."
+        source["procedures"]["retention"] = "Personnel will telephone enrolled participants to remind them about scheduled follow-up appointments."
+        source["statistics"]["analysis_plan"] += " Interpret results cautiously because the sample size is 40."
+        text = "Interpret results cautiously because the sample size is forty."
+        if branch != "Retrospective":
+            source["procedures"]["minimum_days_before_screening_without_participation"] = "ninety days"
+            source["population"]["inclusion_criteria"].append("No participation in other research for ninety days before screening.")
     source["approval"] = {"status": "draft"}
     reference_path.write_text(json.dumps(source))
     assert workflow.prepare(run)["status"] == "awaiting_approval"
@@ -41,6 +50,23 @@ def _run(tmp_path, branch, family):
     approval = copy.deepcopy(approved["approval"])
     observed = {"draft_attempts": 0, "review_cautions": []}
 
+    def review(request):
+        response = acceptance_verification(request)
+        if profile and request["task"] == "clinical_content_verification":
+            response["status"] = "blocked"
+            for row in response["section_assessments"]:
+                if row["section_id"] == "objectives":
+                    row["status"] = "blocked"
+            response["findings"] = [{
+                "finding_id": "controlled-editorial", "category": "content", "check": "editorial_relevance",
+                "artifact": "protocol", "target_ids": ["objectives"],
+                "issue": "The source-derived synopsis is concise but repetitive.",
+                "affected_passage": "Study synopsis", "recommended_action": "Optional wording improvement",
+                "material": False, "safety_critical": False, "contradiction": False,
+                "obscures_required_information": False, "materially_unusable": False,
+            }]
+        return response
+
     def runner(handoffs, _remaining):
         for handoff in handoffs:
             request_path = revision / handoff["request_path"]
@@ -48,7 +74,7 @@ def _run(tmp_path, branch, family):
             if "verification-requests" in handoff["request_path"]:
                 if request["task"] == "clinical_content_verification":
                     observed["review_cautions"].extend(request["lexical_review_cautions"])
-                workflow._save_verification_response(revision, request_path, acceptance_verification)
+                workflow._save_verification_response(revision, request_path, review)
                 continue
             response = drafting.recorded_acceptance_response(request)
             for item in list(response.get("section_results", [])):
@@ -75,7 +101,8 @@ def _run(tmp_path, branch, family):
     assert sorted(p.name for p in (run / "output").iterdir()) == [Path(p).name for p in expected]
     assert result["desktop_reply"]["delivery_status"] == "confirmed"
     assert result["desktop_reply"]["message"].startswith("Complete verified Branch Document Set delivered.")
-    assert "Reviewer-resolved wording uncertainty — Protocol" in result["desktop_reply"]["message"]
+    if observed["review_cautions"]:
+        assert "Reviewer-resolved wording uncertainty — Protocol" in result["desktop_reply"]["message"]
     assert json.loads(reference_path.read_text())["approval"] == approval
     state = json.loads((run / "logs/desktop-operation-synthetic-blocked-wording.json").read_text())
     assert state["deadline_at_epoch"] - state["started_at_epoch"] == 2700
@@ -101,7 +128,7 @@ def _run(tmp_path, branch, family):
         assert "voluntary" in consent_text
         assert "lexical-evidence-uncertainty" not in consent_text
     assert quality.deterministic_content_check(revision, source) == [] or all(
-        f.get("publication_disposition") == "warning"
+        not blocks_construction(f)
         for f in quality.deterministic_content_check(revision, source)
     )
     return result, observed, manifest
@@ -117,3 +144,15 @@ def test_complete_verified_branch_set_and_truthful_message(tmp_path, governed_pd
     assert manifest["quality"]["resolved_evidence_cautions"]
     assert any(c.get("resolution") == "independent_content_review_passed"
                for c in result["desktop_reply"]["cautions"])
+
+
+@pytest.mark.parametrize("branch,family", [("Retrospective", "Advarra"), ("Prospective", "Advarra"),
+    ("Prospective", "Sterling"), ("Ambispective", "Advarra"), ("Ambispective", "Sterling")])
+@pytest.mark.parametrize("profile", ["sparse", "rich"])
+def test_sparse_and_rich_complete_sources_deliver_with_controlled_editorial_review(tmp_path, governed_pdfium, branch, family, profile):
+    result, observed, manifest = _run(tmp_path, branch, family, profile=profile)
+    assert observed["draft_attempts"] == 1
+    assert any(c.get("check") == "editorial_relevance" for c in result["desktop_reply"]["cautions"])
+    assert manifest["quality"]["final_exact_artifact_review"]["every_page"] is True
+    if profile != "rich":
+        assert manifest["quality"]["resolved_evidence_cautions"]

@@ -3,6 +3,7 @@
 Real ingestion, construction, exact-artifact checks and Desktop publication run.
 Controlled responders provide no independent clinical or visual certification.
 """
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -139,7 +140,7 @@ def _run(tmp_path, text, mutation=None, branch="Prospective", variant=None):
         assert "voluntary" in consent_text
         assert "lexical-evidence-uncertainty" not in consent_text
     assert quality.deterministic_content_check(revision, source) == [] or all(
-        f.get("publication_disposition") == "warning"
+        not blocks_construction(f)
         for f in quality.deterministic_content_check(revision, source)
     )
     return result, observed, manifest

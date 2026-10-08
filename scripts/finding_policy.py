@@ -1,8 +1,8 @@
 """Explicit ordinary-generation finding decisions during expand–contract migration.
 
 Producers classify findings from evidence at their own boundary. This module
-never guesses severity from prose, section names, or absent metadata. Unmigrated
-findings retain their existing publication_disposition behavior.
+never guesses severity from prose, section names, or absent metadata. Unknown or malformed records retain their evidence as a code-owned
+classification failure; they cannot authorize construction or publication.
 """
 from __future__ import annotations
 
@@ -24,11 +24,7 @@ def classify_finding(
     policy = {"classification": classification, "reason": reason, "repair_owner": repair_owner}
     _validate(policy)
     result = {**finding, "finding_policy": policy}
-    # Keep legacy consumers compatible during producer-by-producer migration.
-    if classification in {"editorial_warning", "semantic_uncertainty"}:
-        result["publication_disposition"] = "warning"
-    else:
-        result.pop("publication_disposition", None)
+    result.pop("publication_disposition", None)
     return result
 
 
@@ -59,14 +55,57 @@ def finding_classification(finding: Mapping[str, Any]) -> str | None:
 
 
 def blocks_construction(finding: Mapping[str, Any]) -> bool:
-    classification = finding_classification(finding)
-    if classification is None:
-        return finding.get("publication_disposition") != "warning"
+    classification = finding_classification(normalize_finding(finding, producer="stage-decision"))
     return classification in {"essential_defect", "technical_failure"}
 
 
 def blocks_publication(finding: Mapping[str, Any]) -> bool:
-    classification = finding_classification(finding)
-    if classification is None:
-        return finding.get("publication_disposition") != "warning"
+    classification = finding_classification(normalize_finding(finding, producer="stage-decision"))
     return classification != "editorial_warning"
+
+
+def normalize_finding(finding: Mapping[str, Any], *, producer: str) -> dict[str, Any]:
+    """Validate an ordinary record, preserving unknown evidence for maintenance."""
+    try:
+        classification = finding_classification(finding)
+        if classification is None:
+            raise ValueError("Producer did not declare a finding policy.")
+        # Recovery metadata is a separate transport contract. A declared repair
+        # may not silently send a proven cause to a different clinical owner.
+        route_owners = {
+            "drafting_defect": {"drafting"},
+            "deterministic_structure_defect": {"construction"},
+            "document_structure_defect": {"construction", "integrity"},
+            "visual_defect": {"rendering"},
+            "verifier_transient": {"review_response", "integrity"},
+            "transport_fault": {"runtime"},
+            "adapter_fault": {"runtime"},
+            "font_capability_uncertainty": {"runtime"},
+            "capability_gap": {"construction", "runtime", "integrity"},
+        }
+        recovery_class = finding.get("recovery_class")
+        if classification in {"essential_defect", "technical_failure"} and recovery_class in route_owners:
+            if finding["finding_policy"]["repair_owner"] not in route_owners[recovery_class]:
+                raise ValueError("Finding repair owner contradicts its declared Recovery Class.")
+    except (ValueError, TypeError) as exc:
+        return classify_finding({
+            "category": "recovery-classification", "code": "finding-policy-classification",
+            "field": producer, "issue": "The ordinary finding classification requires code maintenance.",
+            "classification_error": str(exc), "original_finding": dict(finding),
+            "recovery_class": "capability_gap", "action": "preserve_and_stop", "owner": "capability_gap",
+        }, classification="technical_failure", reason="finding-policy-classification", repair_owner="construction")
+    result = dict(finding)
+    result.pop("publication_disposition", None)
+    return result
+
+
+def declare_finding(finding: Mapping[str, Any], *, classification: str, reason: str, repair_owner: str) -> dict[str, Any]:
+    """Complete a producer's explicit conditional policy without losing its caution.
+
+    Existing policies are produced by trusted branch-specific code. External
+    reviewer metadata never supplies this contract. Invalid policies are retained
+    as classification failures rather than exceptions or invented clinical flaws.
+    """
+    if "finding_policy" in finding:
+        return normalize_finding(finding, producer=reason)
+    return classify_finding(finding, classification=classification, reason=reason, repair_owner=repair_owner)

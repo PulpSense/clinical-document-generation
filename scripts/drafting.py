@@ -8,6 +8,8 @@ acceptance-test adapter, not a production drafting path.
 
 from __future__ import annotations
 
+from finding_policy import declare_finding, normalize_finding, blocks_construction
+
 import copy
 import hashlib
 import json
@@ -1407,21 +1409,21 @@ def _background_claim_findings(
                 trial_result.group(0), re.I,
             )
         ):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting", "field": section_id, "target_ids": [section_id],
                 "issue": "The section strengthens qualified trial evidence into a definitive comparative result.",
                 "next_action": "Keep the source's suggested qualification in the same trial sentence.",
-            })
+            }, classification="essential_defect", reason="drafting._background_claim_findings.5d6b57c028", repair_owner="drafting"))
         if (
             combination_unproven
             and re.search(r"\b(?:mix.and.match|combination|combined|pairing|paired)\b|\bdominant eye\b.{0,100}\bnon.dominant eye\b", sentence, re.I)
             and re.search(r"\b(?:may|might|could|expected to|will)\b.{0,180}\b(?:better|broader|wider|fewer|less|more)\b.{0,180}\b(?:than|compared (?:with|to)|relative to)\b", sentence, re.I)
         ):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting", "field": section_id, "target_ids": [section_id],
                 "issue": "The section predicts comparative superiority for an untested combination.",
                 "next_action": "Describe the documented prior lens evidence and the combination's evidence gap without a comparative advantage claim.",
-            })
+            }, classification="essential_defect", reason="drafting._background_claim_findings.a408f68ebb", repair_owner="drafting"))
     return findings
 
 
@@ -1452,48 +1454,48 @@ def _coverage_findings(
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
         background = section_evidence_value(section_id, "study.background", get_path(source, "study.background"))
         if "source:study.background" not in set(map(str, evidence_refs)):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting", "field": section_id,
                 "issue": "Introduction does not cite the approved background.",
                 "next_action": "Summarize the approved clinical context and evidence gap from study.background.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.32d04387eb", repair_owner="drafting"))
         elif background and not evidence_grounded(content, background):
             diagnostics = source_evidence_diagnostics(content, "study.background", background)
-            findings.append({
+            findings.append(declare_finding({
                 **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_evidence_uncertainty([diagnostics]) else {}),
                 "evidence_diagnostics": [diagnostics],
                 "category": "drafting", "field": section_id,
                 "issue": "Introduction cites the background without conveying its concrete clinical context.",
                 "next_action": "Name the source-supported setting and specific evidence gap in concise clinical language.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.9c2801135a", repair_owner="drafting"))
         if re.search(r"\b(?:the\s+)?(?:study\s+)?hypothes(?:is|izes)\b|\bprimary endpoint\b", content, re.I):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting", "field": section_id,
                 **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
                 "issue": "Introduction repeats the hypothesis or endpoint definition instead of closing on the evidence gap.",
                 "next_action": "End with the source-supported evidence gap and rationale; leave hypothesis and endpoint definitions to Study Design.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.e77175dc81", repair_owner="drafting"))
         for sentence in re.split(r"(?<=[.!?])\s+|\n+", content):
             comparison = re.search(r"\b(?:may|might|could|expected to|will)\b.{0,180}\b(?:better|broader|wider|fewer|less|more)\b.{0,180}\b(?:than|compared with|relative to)\b", sentence, re.I)
             study_combination = re.search(r"\b(?:mix.and.match|combination|combined|study intervention)\b|\bdominant eye\b.{0,100}\bnon.dominant eye\b", sentence, re.I)
             if comparison and study_combination:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id,
                     "issue": "Introduction presents speculative superiority of the untested study combination as background evidence.",
                     "next_action": "Summarize prior evidence and the specific evidence gap; leave the combination's expected benefit as a hypothesis in Study Design.",
-                })
+                }, classification="essential_defect", reason="drafting._coverage_findings.f2bfba154e", repair_owner="drafting"))
                 break
         return findings + [classify_finding(item, classification="essential_defect",
             reason="The draft strengthens a qualified approved source claim.", repair_owner="drafting")
             for item in _background_claim_findings(section_id, content, source)]
     if section_id == "objectives" and "endpoint-inventory" not in set(contract.get("concept_ownership", {}).get("owns", [])):
         if re.search(r"\b(?:primary|secondary) endpoint(?:s)?\b", content, re.I):
-            return [{
+            return [declare_finding({
                 "category": "drafting", "field": section_id,
                 **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
                 "issue": "Objectives repeats an endpoint definition owned by Study Design.",
                 "next_action": "State the approved purpose and objectives without naming the primary or secondary endpoint inventory.",
-            }]
+            }, classification="essential_defect", reason="drafting._coverage_findings.5266803315", repair_owner="drafting")]
     if section_id == "icf.key-information-summary":
         # Ordered concept-to-block grounding is validated after each paragraph
         # has been normalized; aggregate citation coverage is insufficient.
@@ -1509,11 +1511,11 @@ def _coverage_findings(
                 "source:study.timeline" not in set(map(str, evidence_refs))
                 or (bool(follow_up_value) and not evidence_grounded(content, follow_up_value))
             ):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id,
                     "issue": "Section omits the approved participant follow-up period.",
                     "next_action": "State the approved follow-up period without inventing a completion criterion.",
-                })
+                }, classification="essential_defect", reason="drafting._coverage_findings.1598aadf97", repair_owner="drafting"))
             visit_labels = tuple(
                 label.casefold()
                 for visit in normalized_visit_records(source)
@@ -1529,11 +1531,11 @@ def _coverage_findings(
                         or any(label in normalized for label in visit_labels)
                     )
                 ):
-                    findings.append({
+                    findings.append(declare_finding({
                         "category": "drafting", "field": section_id,
                         "issue": "Section states a participant-completion criterion that the approved source does not provide.",
                         "next_action": "Describe the approved follow-up period and distinguish completion from discontinuation; do not treat scheduled visits as a completion rule.",
-                    })
+                    }, classification="essential_defect", reason="drafting._coverage_findings.d1b8a08ac1", repair_owner="drafting"))
                     break
             return findings
     if contract.get("source_coverage") == "table_with_notes":
@@ -1550,12 +1552,12 @@ def _coverage_findings(
         material = _material_source(request, contract)
         cited = set(map(str, evidence_refs))
         missing = [path for path in material if f"source:{path}" not in cited]
-        findings = [{
+        findings = [declare_finding({
             "category": "drafting",
             "field": section_id,
             "issue": f"Statistical Methodology omits method-group evidence references: {', '.join(missing)}.",
             "next_action": "Cite each approved method and endpoint group while describing shared methods once; Study Design owns the full endpoint inventory.",
-        }] if missing else []
+        }, classification="essential_defect", reason="drafting._coverage_findings.1ac08e4aea", repair_owner="drafting")] if missing else []
         ungrounded_methods = [
             path for path, value in material.items()
             if path.startswith("statistics.") and f"source:{path}" in cited
@@ -1563,7 +1565,7 @@ def _coverage_findings(
         ]
         if ungrounded_methods:
             diagnostics = [source_evidence_diagnostics(content, path, material[path]) for path in ungrounded_methods]
-            findings.append({
+            findings.append(declare_finding({
                 **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_evidence_uncertainty(diagnostics) else {}),
                 "evidence_diagnostics": diagnostics,
                 "category": "drafting",
@@ -1571,7 +1573,7 @@ def _coverage_findings(
                 "issue": "Statistical Methodology does not preserve the approved analysis method: "
                 + ", ".join(ungrounded_methods) + ".",
                 "next_action": "State the approved methods for each outcome group without repeating endpoint names and time points.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.6e7a81e3f1", repair_owner="drafting"))
         return findings
     if contract.get("source_coverage") == "concept_reference":
         source_value = request.get("approved_source")
@@ -1583,12 +1585,12 @@ def _coverage_findings(
             interpretation = str(material.get("statistics.analysis_plan") or "")
             software = material.get("statistics.software")
             if interpretation and len(interpretation.split()) <= 30 and not software and len(content.split()) > 60:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id,
                     **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
                 "issue": "General Statistical Considerations expands a short interpretation qualification into a methods recap.",
                     "next_action": "State the approved interpretation qualification in one short paragraph; Section 10.2 owns endpoint methods.",
-                })
+                }, classification="essential_defect", reason="drafting._coverage_findings.273ed11e9b", repair_owner="drafting"))
         if section_id == "endpoint-criteria.study-completion":
             timeline = _normalized_prose(get_path(source, "study.timeline"))
             mentioned_visits = [
@@ -1599,37 +1601,37 @@ def _coverage_findings(
                 and _normalized_prose(visit.get("visit")) not in timeline
             ]
             if mentioned_visits or re.search(r"\bexit form\b", content, re.I):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id,
                     **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
                 "issue": "Study Completion repeats a participant visit or assessment instead of the study-level timeline.",
                     "next_action": "State the approved closeout timeline only; keep visits and the exit form in Sections 9, 15, and 18.1.",
-                })
+                }, classification="essential_defect", reason="drafting._coverage_findings.335d7e46d4", repair_owner="drafting"))
         missing = [path for path in material if f"source:{path}" not in cited]
         if missing:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting", "field": section_id,
                 "issue": f"Section omits approved reference evidence: {', '.join(missing)}.",
                 "next_action": "Cite the evidence while referencing its owning section concisely.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.4dea61044f", repair_owner="drafting"))
         if section_id == "endpoint-criteria.completion":
             completion = material.get("procedures.completion")
             missing_conditions = [item for item in _completion_condition_items(completion) if not evidence_grounded(content, item)]
             if completion and (not evidence_grounded(content, completion) or missing_conditions):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id,
                     "issue": "Section omits the approved participant-completion condition.",
                     "next_action": "Preserve the supplied completion condition and its timing without repeating the full visit schedule. Missing conditions: " + "; ".join(missing_conditions),
-                })
+                }, classification="essential_defect", reason="drafting._coverage_findings.4c45f7a0e3", repair_owner="drafting"))
         else:
             if section_id == "endpoint-criteria.study-completion":
                 missing_conditions = [item for item in _completion_condition_items(material.get("study.completion")) if not evidence_grounded(content, item)]
                 if missing_conditions:
-                    findings.append({
+                    findings.append(declare_finding({
                         "category": "drafting", "field": section_id,
                         "issue": "Study Completion omits a supplied closeout prerequisite: " + "; ".join(missing_conditions),
                         "next_action": "Preserve every supplied prerequisite for study closeout or starting analysis.",
-                    })
+                    }, classification="essential_defect", reason="drafting._coverage_findings.37b5e423a3", repair_owner="drafting"))
             ungrounded = [
                 path for path, value in material.items()
                 if f"source:{path}" in cited
@@ -1654,11 +1656,11 @@ def _coverage_findings(
                     for path in ungrounded
                 ]
                 lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id,
                     **({
                         "code": "lexical-evidence-uncertainty",
-                        "publication_disposition": "warning",
+
                         **classify_finding({}, classification="semantic_uncertainty",
                                            reason="lexical-evidence-uncertainty",
                                            repair_owner="independent_review"),
@@ -1670,7 +1672,7 @@ def _coverage_findings(
                         "Preserve the supplied reference value without restating concepts owned elsewhere."
                     ),
                     "evidence_diagnostics": diagnostics,
-                })
+                }, classification="essential_defect", reason="drafting._coverage_findings.bc7ae04c65", repair_owner="drafting"))
         return findings
     source_value = request.get("approved_source")
     approved_source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
@@ -1691,12 +1693,12 @@ def _coverage_findings(
     ]
     findings: list[dict[str, Any]] = []
     if missing:
-        findings.append({
+        findings.append(declare_finding({
             "category": "drafting",
             "field": section_id,
             "issue": f"Section omits material approved evidence: {', '.join(missing)}.",
             "next_action": "Cover every material minimum_evidence value; do not replace supplied detail with generic prose.",
-        })
+        }, classification="essential_defect", reason="drafting._coverage_findings.9a731c2c1f", repair_owner="drafting"))
     all_items = contract.get("source_coverage") == "all_material_items"
     ungrounded = [
         path
@@ -1718,13 +1720,13 @@ def _coverage_findings(
             for path in ungrounded
         ]
         lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
-        findings.append({
+        findings.append(declare_finding({
             "category": "drafting",
             "field": section_id,
             **({
                 "code": "icf-lexical-evidence-uncertainty" if section_id.startswith("icf.") else "lexical-evidence-uncertainty",
-                "publication_disposition": "warning",
-                **(classify_finding({}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if not section_id.startswith("icf.") else {}),
+
+                **classify_finding({}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review"),
             } if lexical_uncertainty else {}),
             "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",
             "next_action": (
@@ -1733,23 +1735,23 @@ def _coverage_findings(
                 "Use evidence_diagnostics to repair the listed source facts; preserve their names, quantities, units, time points and relationships. Do not merely add citation tags or copy structural markers."
             ),
             "evidence_diagnostics": diagnostics,
-        })
+        }, classification="essential_defect", reason="drafting._coverage_findings.c203966771", repair_owner="drafting"))
     if section_id == "quality-safety" and "safety.roles" in material:
         role_records = _structured_safety_role_records(material["safety.roles"])
         if not role_records:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting",
                 "field": section_id,
                 "issue": "Approved safety roles are not structured party/responsibility records.",
                 "next_action": "Return to Source Review and record every responsible party separately from its responsibilities.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.f3f683eda6", repair_owner="drafting"))
         missing_assignments = _direct_safety_role_errors(
             content if role_content is None else role_content,
             role_records,
             material.get("risks_benefits.risks"),
         )
         if missing_assignments:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting",
                 "field": section_id,
                 "issue": (
@@ -1758,7 +1760,7 @@ def _coverage_findings(
                     + "."
                 ),
                 "next_action": "Name every approved party and state each assigned safety responsibility in that party's sentence.",
-            })
+            }, classification="essential_defect", reason="drafting._coverage_findings.c36a5b6bb1", repair_owner="drafting"))
     return findings + claim_findings
 
 
@@ -1803,19 +1805,19 @@ def _validate_paragraph(
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     if not isinstance(paragraph, Mapping):
-        return None, [{"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}]
+        return None, [declare_finding({"category": "drafting", "field": section_id, "issue": "A paragraph result is not an object.", "next_action": "Return paragraphs with text and evidence_refs."}, classification="essential_defect", reason="drafting._validate_paragraph.b60ae283de", repair_owner="drafting")]
     text = str(paragraph.get("text") or "").strip()
     evidence_refs = _canonical_evidence_refs(request, paragraph.get("evidence_refs")) if isinstance(paragraph.get("evidence_refs"), list) else []
     boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
     if len(text.split()) < 5:
-        finding = {"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."}
+        finding = declare_finding({"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."}, classification="essential_defect", reason="drafting._validate_paragraph.2deed4e27b", repair_owner="drafting")
         if text and request.get("artifact") == "protocol":
-            finding = classify_finding({**finding, "code": "protocol-concise-prose", "issue": "Section prose is shorter than the preferred sentence length.", "next_action": "Assess substantive meaning against the cited source."}, classification="semantic_uncertainty",
+            finding = classify_finding(declare_finding({**finding, "code": "protocol-concise-prose", "issue": "Section prose is shorter than the preferred sentence length.", "next_action": "Assess substantive meaning against the cited source."}, classification="essential_defect", reason="drafting._validate_paragraph.264f5f76c9", repair_owner="drafting"), classification="semantic_uncertainty",
                                        reason="Word count alone does not establish a substantive omission.", repair_owner="independent_review")
         findings.append(finding)
     lowered = text.casefold()
     if PLACEHOLDER.search(text) or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE):
-        findings.append({"category": "drafting", "field": section_id, "issue": "Section contains a placeholder or internal drafting language.", "next_action": "Replace it with supported client-facing prose."})
+        findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "Section contains a placeholder or internal drafting language.", "next_action": "Replace it with supported client-facing prose."}, classification="essential_defect", reason="drafting._validate_paragraph.ed54c68b6d", repair_owner="drafting"))
     request_evidence = _allowed_evidence(request)
     section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
     invalid_evidence = sorted(set(map(str, evidence_refs)) - request_evidence)
@@ -1823,13 +1825,13 @@ def _validate_paragraph(
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
     invalid_boilerplate = sorted(set(map(str, boilerplate_refs)) - allowed_boilerplate)
     if invalid_evidence:
-        findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported evidence references: {', '.join(invalid_evidence)}", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)})
+        findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": f"Unsupported evidence references: {', '.join(invalid_evidence)}", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)}, classification="essential_defect", reason="drafting._validate_paragraph.fc75f414f1", repair_owner="drafting"))
     elif unrelated_evidence:
-        findings.append({"category": "drafting", "field": section_id, "issue": f"Evidence is not approved for this section: {', '.join(unrelated_evidence)}", "next_action": "Cite the section's listed evidence or Fixed Clinical Boilerplate."})
+        findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": f"Evidence is not approved for this section: {', '.join(unrelated_evidence)}", "next_action": "Cite the section's listed evidence or Fixed Clinical Boilerplate."}, classification="essential_defect", reason="drafting._validate_paragraph.f8c4818f52", repair_owner="drafting"))
     if invalid_boilerplate:
-        findings.append({"category": "drafting", "field": section_id, "issue": f"Unsupported boilerplate references: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
+        findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": f"Unsupported boilerplate references: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."}, classification="essential_defect", reason="drafting._validate_paragraph.929fcaabe3", repair_owner="drafting"))
     if not evidence_refs and not boilerplate_refs:
-        findings.append({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)})
+        findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "Paragraph has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="Paragraph", position=position)}, classification="essential_defect", reason="drafting._validate_paragraph.c1cc884915", repair_owner="drafting"))
     return {"text": text, "evidence_refs": list(map(str, evidence_refs)), "boilerplate_refs": list(map(str, boilerplate_refs))}, findings
 
 
@@ -1841,19 +1843,19 @@ def _validate_list(
     position: int = 1,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     if not isinstance(group, Mapping):
-        return None, [{"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}]
+        return None, [declare_finding({"category": "drafting", "field": section_id, "issue": "A list result is not an object.", "next_action": "Return items with evidence_refs and boilerplate_refs."}, classification="essential_defect", reason="drafting._validate_list.b40beb0035", repair_owner="drafting")]
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
     evidence_refs = _canonical_evidence_refs(request, group.get("evidence_refs") or []); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
     findings: list[dict[str, Any]] = []
     if not items or any(not _substantive_list_item(item) for item in items):
-        findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
+        findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."}, classification="essential_defect", reason="drafting._validate_list.12841e7025", repair_owner="drafting"))
     section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
     invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
     invalid_boilerplate = sorted(set(boilerplate_refs) - allowed_boilerplate)
-    if invalid_evidence or unrelated: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported section evidence: {', '.join(invalid_evidence or unrelated)}", "next_action": "Cite only listed section evidence."})
-    if invalid_boilerplate: findings.append({"category": "drafting", "field": section_id, "issue": f"List uses unsupported boilerplate: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."})
-    if not evidence_refs and not boilerplate_refs: findings.append({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="List", position=position)})
+    if invalid_evidence or unrelated: findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": f"List uses unsupported section evidence: {', '.join(invalid_evidence or unrelated)}", "next_action": "Cite only listed section evidence."}, classification="essential_defect", reason="drafting._validate_list.ee2d9fadc6", repair_owner="drafting"))
+    if invalid_boilerplate: findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": f"List uses unsupported boilerplate: {', '.join(invalid_boilerplate)}", "next_action": "Use only listed Fixed Clinical Boilerplate."}, classification="essential_defect", reason="drafting._validate_list.2a1a4fc58a", repair_owner="drafting"))
+    if not evidence_refs and not boilerplate_refs: findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "List has no approved evidence or boilerplate reference.", "next_action": _reference_next_action(request, contract, content_type="List", position=position)}, classification="essential_defect", reason="drafting._validate_list.61dc798fa4", repair_owner="drafting"))
     return {"items": items, "evidence_refs": evidence_refs, "boilerplate_refs": boilerplate_refs}, findings
 
 
@@ -1999,11 +2001,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
     for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
         expected = RESPONSE_SCHEMA if field == "schema_version" else request.get(field)
         if response.get(field) != expected:
-            findings.append({"category": "drafting", "field": field, "issue": f"Response binding mismatch for {field}.", "next_action": "Return the exact request identifiers and schema."})
+            findings.append(declare_finding({"category": "drafting", "field": field, "issue": f"Response binding mismatch for {field}.", "next_action": "Return the exact request identifiers and schema."}, classification="essential_defect", reason="drafting.validate_response.17f9fbdfb1", repair_owner="drafting"))
     producer = response.get("producer")
     if not isinstance(producer, Mapping) or not str(producer.get("model_id") or "").strip():
-        findings.append({"category": "drafting", "field": "producer.model_id", "issue": "Response does not identify the producing model.", "next_action": "Record the actual model identity."})
-    if findings:
+        findings.append(declare_finding({"category": "drafting", "field": "producer.model_id", "issue": "Response does not identify the producing model.", "next_action": "Record the actual model identity."}, classification="essential_defect", reason="drafting.validate_response.e5f7670e9f", repair_owner="drafting"))
+    if any(blocks_construction(item) for item in findings):
         return None, findings
     if request.get("task") == "prs_narrative_drafting":
         narrative = response.get("narrative")
@@ -2011,29 +2013,29 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         contracts = {str(item.get("section_id")): item for item in request.get("section_contracts", []) if isinstance(item, Mapping)}
         expected_keys = {key for key, section_id in section_ids.items() if section_id in contracts}
         if not isinstance(narrative, Mapping) or set(narrative) != expected_keys:
-            findings.append({"category": "drafting", "field": "prs-narrative", "target_ids": sorted(contracts), "issue": f"PRS response must contain exactly the requested narrative values: {sorted(expected_keys)}.", "next_action": "Return only the requested narrative fields."})
+            findings.append(declare_finding({"category": "drafting", "field": "prs-narrative", "target_ids": sorted(contracts), "issue": f"PRS response must contain exactly the requested narrative values: {sorted(expected_keys)}.", "next_action": "Return only the requested narrative fields."}, classification="essential_defect", reason="drafting.validate_response.45bee21b36", repair_owner="drafting"))
             return None, findings
         clean: dict[str, Any] = {}
         for key, item in narrative.items():
             section_id = section_ids[key]
             section_finding_count = len(findings)
             if not isinstance(item, Mapping):
-                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative item is not an object.", "next_action": "Return text and evidence_refs."})
+                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative item is not an object.", "next_action": "Return text and evidence_refs."}, classification="essential_defect", reason="drafting.validate_response.68c5cce8c6", repair_owner="drafting"))
                 continue
             text = str(item.get("text") or "").strip()
             if re.search(r"</?[A-Za-z_][^>]*>", text) or len(text.split()) < 8:
-                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty, too short, or contains XML markup.", "next_action": "Return source-grounded prose only."})
+                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty, too short, or contains XML markup.", "next_action": "Return source-grounded prose only."}, classification="essential_defect", reason="drafting.validate_response.ce942b65c2", repair_owner="drafting"))
             evidence_refs = _canonical_evidence_refs(request, item.get("evidence_refs") or [])
             contract = contracts.get(section_id, {})
             invalid = sorted(set(evidence_refs) - _allowed_evidence(request))
             target_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
             unrelated = sorted(set(evidence_refs) - target_evidence)
             if invalid:
-                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"PRS narrative cites unsupported evidence: {', '.join(invalid)}", "next_action": "Cite only approved request evidence."})
+                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"PRS narrative cites unsupported evidence: {', '.join(invalid)}", "next_action": "Cite only approved request evidence."}, classification="essential_defect", reason="drafting.validate_response.2f0f75ee1b", repair_owner="drafting"))
             elif unrelated:
-                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"Evidence is not approved for this target: {', '.join(unrelated)}", "next_action": "Cite only the target's listed minimum_evidence."})
+                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"Evidence is not approved for this target: {', '.join(unrelated)}", "next_action": "Cite only the target's listed minimum_evidence."}, classification="essential_defect", reason="drafting.validate_response.b2ca126543", repair_owner="drafting"))
             elif not evidence_refs:
-                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative lacks valid approved evidence references.", "next_action": "Cite the target's listed minimum_evidence."})
+                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative lacks valid approved evidence references.", "next_action": "Cite the target's listed minimum_evidence."}, classification="essential_defect", reason="drafting.validate_response.4a0cfb54e2", repair_owner="drafting"))
             findings.extend(_coverage_findings(request, contract, section_id, text, evidence_refs))
             for finding in findings[section_finding_count:]:
                 finding["target_ids"] = [section_id]
@@ -2050,14 +2052,14 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
     expected_contracts = {item["section_id"]: item for item in request.get("section_contracts", [])}
     results = response.get("section_results")
     if not isinstance(results, list):
-        return None, findings + [{"category": "drafting", "field": request.get("batch_id"), "issue": "Response has no section_results list.", "next_action": "Return one result per requested section."}]
+        return None, findings + [declare_finding({"category": "drafting", "field": request.get("batch_id"), "issue": "Response has no section_results list.", "next_action": "Return one result per requested section."}, classification="essential_defect", reason="drafting.validate_response.b9a05275ba", repair_owner="drafting")]
     result_ids = [str(item.get("section_id")) for item in results if isinstance(item, Mapping)]
     if len(result_ids) != len(set(result_ids)):
-        findings.append({"category": "drafting", "field": request.get("batch_id"), "issue": "Response repeats a section ID.", "next_action": "Return each requested section exactly once."})
+        findings.append(declare_finding({"category": "drafting", "field": request.get("batch_id"), "issue": "Response repeats a section ID.", "next_action": "Return each requested section exactly once."}, classification="essential_defect", reason="drafting.validate_response.8b651466ec", repair_owner="drafting"))
     missing = sorted(set(expected_contracts) - set(result_ids))
     unknown = sorted(set(result_ids) - set(expected_contracts))
     if missing or unknown:
-        findings.append({"category": "drafting", "field": request.get("batch_id"), "issue": f"Section response mismatch; missing={missing}, unknown={unknown}.", "next_action": "Return exactly the requested section IDs."})
+        findings.append(declare_finding({"category": "drafting", "field": request.get("batch_id"), "issue": f"Section response mismatch; missing={missing}, unknown={unknown}.", "next_action": "Return exactly the requested section IDs."}, classification="essential_defect", reason="drafting.validate_response.ba5edbfe6d", repair_owner="drafting"))
     for item in results:
         if not isinstance(item, Mapping) or str(item.get("section_id")) not in expected_contracts:
             continue
@@ -2065,22 +2067,22 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         contract = expected_contracts[section_id]
         outcome = str(item.get("outcome") or "")
         if outcome == "drafted" and "agent_draft" not in contract.get("allowed_modes", []):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting",
                 "field": section_id,
                 "target_ids": [section_id],
                 "issue": "The section contract does not authorize the drafted outcome.",
                 "next_action": "Use only a mode explicitly authorized by the section contract.",
-            })
+            }, classification="essential_defect", reason="drafting.validate_response.72292994fe", repair_owner="drafting"))
         elif outcome == "fixed_boilerplate" and not _fixed_outcome_is_authorized(item, contract):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "drafting",
                 "field": section_id,
                 "target_ids": [section_id],
                 "issue": "The section contract does not authorize the fixed_boilerplate outcome or the returned content is not its exact authorized boilerplate.",
                 "next_action": "Use the exact listed Fixed Clinical Boilerplate with its matching boilerplate reference, or return an authorized agent draft.",
-            })
-    has_blocking_contract_findings = bool(findings)
+            }, classification="essential_defect", reason="drafting.validate_response.5ada4685f3", repair_owner="drafting"))
+    has_blocking_contract_findings = any(blocks_construction(item) for item in findings)
     results_by_id = {
         str(item.get("section_id") or ""): item
         for item in results if isinstance(item, Mapping)
@@ -2110,14 +2112,14 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         preserved_section = section_id if target_section == prior_section else prior_section
         if request.get("artifact") != "protocol" and not target_section.startswith("icf."):
             duplicate_target_ids.add(target_section)
-        finding = {
+        finding = declare_finding({
             **(classify_finding({}, classification="editorial_warning", reason="icf-generated-repetition", repair_owner="none") if target_section.startswith("icf.") else {}),
             "category": "drafting",
             "field": target_section,
             "target_ids": [target_section],
             "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
             "next_action": f"Rewrite only {target_section} with independent source-grounded prose; preserve {preserved_section}.",
-        }
+        }, classification="essential_defect", reason="drafting.validate_response.00675c0082", repair_owner="drafting")
         if request.get("artifact") == "protocol":
             finding = classify_finding({**finding, "code": "protocol-exact-repetition"},
                 classification="semantic_uncertainty", reason="Text overlap alone does not establish material repetition or loss of section ownership.", repair_owner="independent_review")
@@ -2132,10 +2134,10 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         section_finding_count = len(findings)
         outcome = str(item.get("outcome") or "")
         if outcome == "source_gap":
-            findings.append({"category": "drafting", "field": section_id, "issue": "Post-approval drafting attempted to reopen source intake.", "required": ", ".join(map(str, expected_contracts[section_id].get("minimum_evidence") or [])), "next_action": "Retry from the approved evidence and listed Fixed Clinical Boilerplate without requesting more reviewer input."})
+            findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "Post-approval drafting attempted to reopen source intake.", "required": ", ".join(map(str, expected_contracts[section_id].get("minimum_evidence") or [])), "next_action": "Retry from the approved evidence and listed Fixed Clinical Boilerplate without requesting more reviewer input."}, classification="essential_defect", reason="drafting.validate_response.b9c7cdce9f", repair_owner="drafting"))
             continue
         if outcome not in {"drafted", "fixed_boilerplate"}:
-            findings.append({"category": "drafting", "field": section_id, "issue": "Unknown section outcome.", "next_action": "Use drafted or fixed_boilerplate."})
+            findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "Unknown section outcome.", "next_action": "Use drafted or fixed_boilerplate."}, classification="essential_defect", reason="drafting.validate_response.e427245d32", repair_owner="drafting"))
             continue
         paragraphs = item.get("paragraphs") if isinstance(item.get("paragraphs"), list) else []
         clean_paragraphs: list[dict[str, Any]] = []
@@ -2193,11 +2195,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 continue
             value = get_path(request.get("approved_source", {}), path)
             for issue in hypothesis_claim_issues(combined_content, value):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id, "target_ids": [section_id],
                     "issue": issue,
                     "next_action": f"Preserve the source qualification in an accurate paraphrase. Approved {path}: {value}",
-                })
+                }, classification="essential_defect", reason="drafting.validate_response.4a502846d0", repair_owner="drafting"))
         branch_value = request.get("branch")
         icf_template = (
             branch_value.get("icf_template")
@@ -2219,16 +2221,16 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                        source_evidence_diagnostics(approved_enrollment, "population.sample_size", claim)["unobserved_values"])
             ]
             if unsupported_counts:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id, "target_ids": [section_id],
                     "code": "icf-enrollment-quantity",
                     **classify_finding({}, classification="essential_defect", reason="icf-enrollment-quantity", repair_owner="drafting"),
                     "issue": "PURPOSE states an enrollment quantity absent from the approved sample size.",
                     "unsupported_claims": unsupported_counts,
                     "next_action": "Preserve the approved enrollment quantity wherever it is stated.",
-                })
+                }, classification="essential_defect", reason="drafting.validate_response.dca3204b3e", repair_owner="drafting"))
             elif enrollment_claims:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting",
                     "field": section_id,
                     "target_ids": [section_id],
@@ -2236,7 +2238,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     **classify_finding({}, classification="editorial_warning", reason="icf-enrollment-placement", repair_owner="none"),
                     "issue": "Enrollment counts also appear in PURPOSE; placement is an editorial preference.",
                     "next_action": "Optionally keep enrollment detail in KEY INFORMATION or DURATION for brevity.",
-                })
+                }, classification="essential_defect", reason="drafting.validate_response.0ae484f2ff", repair_owner="drafting"))
             approved_source = request.get("approved_source")
             background = get_path(
                 approved_source if isinstance(approved_source, Mapping) else {},
@@ -2247,7 +2249,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             union = purpose_tokens | background_tokens
             overlap = len(purpose_tokens & background_tokens) / len(union) if union else 0.0
             if len(purpose_tokens) >= 24 and overlap >= 0.30:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting",
                     "field": section_id,
                     "target_ids": [section_id],
@@ -2257,9 +2259,9 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     "secondary_section": section_id,
                     "issue": "PURPOSE overlaps with BACKGROUND; lexical similarity alone does not establish material harm.",
                     "next_action": "Optionally shorten PURPOSE while preserving its required study facts and BACKGROUND.",
-                })
+                }, classification="essential_defect", reason="drafting.validate_response.249fb699c5", repair_owner="drafting"))
         if not clean_paragraphs and not lists:
-            findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
+            findings.append(declare_finding({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."}, classification="essential_defect", reason="drafting.validate_response.32a3e9b3cc", repair_owner="drafting"))
         if section_id == "icf.key-information-summary":
             summary_records = [
                 (paragraph["text"], paragraph.get("evidence_refs", []), paragraph.get("boilerplate_refs", []))
@@ -2270,11 +2272,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 for value in group["items"]
             ]
             if len(summary_records) != 5:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "drafting", "field": section_id, "target_ids": [section_id],
                     "issue": "KEY INFORMATION must contain exactly five concise concept summaries.",
                     "next_action": "Return one concise block for each ordered summary_concepts value.",
-                })
+                }, classification="essential_defect", reason="drafting.validate_response.5e2e19cecd", repair_owner="drafting"))
             else:
                 source_values = {
                     str(source.get("path")): source.get("value")
@@ -2294,11 +2296,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                         (obligations.get(concept) or {}).get("required_boilerplate_refs") or [],
                     ))
                     if allowed_sources and not cited_sources:
-                        findings.append({
+                        findings.append(declare_finding({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
                             "issue": f"KEY INFORMATION concept {concept} lacks its canonical source evidence.",
                             "next_action": "Use the ordered concept's canonical evidence references and observable source facts.",
-                        })
+                        }, classification="essential_defect", reason="drafting.validate_response.0e083a3b85", repair_owner="drafting"))
                         continue
                     def cited_fact_is_observable(ref: str) -> bool:
                         path = ref.removeprefix("source:")
@@ -2321,7 +2323,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                                 value = _approved_followup_value(value)
                             diagnostics.append(source_evidence_diagnostics(text, path, value))
                         lexical_only = lexical_evidence_uncertainty(diagnostics)
-                        findings.append({
+                        findings.append(declare_finding({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
                             "code": "icf-summary-grounding-review",
                             **classify_finding({}, classification="semantic_uncertainty" if lexical_only else "essential_defect",
@@ -2333,20 +2335,20 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                                 if lexical_only else
                                 "Restore the approved clinical quantities and required facts in this summary."
                             ),
-                        })
+                        }, classification="essential_defect", reason="drafting.validate_response.301f618b9a", repair_owner="drafting"))
                     if not allowed_sources and allowed_boilerplate and not cited_boilerplate:
-                        findings.append({
+                        findings.append(declare_finding({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
                             "issue": f"KEY INFORMATION concept {concept} lacks its authorized fallback boilerplate.",
                             "next_action": "Use only the ordered concept's listed Fixed Clinical Boilerplate.",
-                        })
+                        }, classification="essential_defect", reason="drafting.validate_response.b6be568e3a", repair_owner="drafting"))
                     missing_required_boilerplate = required_boilerplate - set(map(str, boilerplate_refs))
                     if missing_required_boilerplate:
-                        findings.append({
+                        findings.append(declare_finding({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
                             "issue": f"KEY INFORMATION concept {concept} omits required voluntary-participation language.",
                             "next_action": "Retain the authorized voluntary-participation consent requirement alongside source-grounded alternatives.",
-                        })
+                        }, classification="essential_defect", reason="drafting.validate_response.e35c63207a", repair_owner="drafting"))
                     required_text = {
                         str(item.get("boilerplate_id")): str(item.get("text") or "")
                         for item in expected_contracts[section_id].get("fixed_boilerplate", [])
@@ -2360,11 +2362,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                         not in _normalized_prose(text)
                     ]
                     if missing_required_text:
-                        findings.append({
+                        findings.append(declare_finding({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
                             "issue": f"KEY INFORMATION concept {concept} cites but omits retained voluntary-participation text.",
                             "next_action": "Include the retained voluntary-participation statement in the summary text.",
-                        })
+                        }, classification="essential_defect", reason="drafting.validate_response.70b28286e7", repair_owner="drafting"))
         section_findings = findings[section_finding_count:]
         if request.get("artifact") == "protocol":
             section_findings += [finding for finding in findings[:section_finding_count]
@@ -2373,8 +2375,8 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             finding for finding in section_findings
             if blocks_construction(finding)
         ]
-        if not blocking_section_findings and section_id not in duplicate_target_ids:
-            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
+        if not any(blocks_construction(item) for item in blocking_section_findings) and section_id not in duplicate_target_ids:
+            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if not blocks_construction(finding)], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
     return {"kind": "sections", "drafts": accepted}, findings
 
 
@@ -2388,24 +2390,24 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             continue
         target_ids = [str(item.get("section_id")) for item in request.get("section_contracts", []) if isinstance(item, Mapping)]
         if not _trusted_request_valid(revision_dir, request, expected_governing):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "request-integrity",
                 "field": str(request.get("batch_id") or request_path.stem),
                 "target_ids": target_ids,
                 "issue": "Drafting request content does not match the trusted hash recorded when the request was created.",
                 "required": "Restore the deterministic request or create a new approved revision.",
-            })
+            }, classification="essential_defect", reason="drafting.ingest_responses.9a5dfec133", repair_owner="drafting"))
             continue
         if accepted_request.is_file():
             recorded = _read_json(accepted_request)
             if not _trusted_request_valid(revision_dir, recorded, expected_governing) or _canonical(recorded) != _canonical(request):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "request-integrity",
                     "field": str(request.get("batch_id") or request_path.stem),
                     "target_ids": target_ids,
                     "issue": "Accepted drafting request no longer matches the immutable request record.",
                     "required": "Restore the accepted request or create a new approved revision.",
-                })
+                }, classification="essential_defect", reason="drafting.ingest_responses.dea9be4851", repair_owner="drafting"))
             continue
         response_path = _response_path(revision_dir, request)
         if not response_path.is_file():
@@ -2416,12 +2418,12 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             response = _read_json(response_path)
             accepted, response_findings = validate_response(request, response)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
-            accepted, response_findings = None, [{
+            accepted, response_findings = None, [declare_finding({
                 "category": "drafting",
                 "field": request.get("batch_id", "unknown"),
                 "issue": f"Hermes response could not be read: {exc}",
                 "next_action": "Replace it with valid response JSON.",
-            }]
+            }, classification="essential_defect", reason="drafting.ingest_responses.f121eb0209", repair_owner="drafting")]
         for finding in response_findings:
             field = str(finding.get("field") or "")
             explicit_targets = [
@@ -2456,7 +2458,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             finding for finding in response_findings
             if blocks_construction(finding)
         ]
-        if blocking_response_findings:
+        if any(blocks_construction(item) for item in blocking_response_findings):
             findings.extend(blocking_response_findings)
             rejected = revision_dir / "hermes/rejected" / response_path.name
             _write_json(rejected, {"request": request_path.name, "findings": blocking_response_findings})
@@ -2599,14 +2601,14 @@ def accepted_cross_section_duplicate_findings(
         )
         records.append((section.section_id, draft, contract))
     findings = [
-        {
+        declare_finding({
             "category": "content",
             "field": current,
             "target_ids": [current],
             "issue": f"Exact prose is duplicated across authenticated Protocol sections {prior} and {current} before rendering.",
             "recovery_class": "drafting_defect",
             "action": "retry_drafting_target",
-        }
+        }, classification="essential_defect", reason="drafting.accepted_cross_section_duplicate_findings.be64fbadcf", repair_owner="drafting")
         for prior, current in _cross_section_duplicate_pairs(records)
     ]
     icf_records = [
@@ -2622,7 +2624,7 @@ def accepted_cross_section_duplicate_findings(
     for summary, detail in _icf_summary_detail_sentence_pairs(
         icf_records, repeatable_text=repeatable_icf_text,
     ):
-        findings.append({
+        findings.append(declare_finding({
             "category": "content",
             "field": summary,
             "target_ids": [summary],
@@ -2630,7 +2632,7 @@ def accepted_cross_section_duplicate_findings(
             "issue": f"A generated ICF summary sentence is duplicated in {detail} before rendering.",
             "recovery_class": "drafting_defect",
             "action": "retry_drafting_target",
-        })
+        }, classification="essential_defect", reason="drafting.accepted_cross_section_duplicate_findings.c8db372b28", repair_owner="drafting"))
     return findings
 
 

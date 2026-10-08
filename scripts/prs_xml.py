@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from finding_policy import declare_finding, normalize_finding, blocks_construction
+
 import copy
 import hashlib
 import json
@@ -805,7 +807,7 @@ def generate(
         structural_template or template_path,
         generation_template=template_path,
     )
-    return {"artifact": "xml", "path": output_path.name, "status": "passed" if not findings else "blocked", "findings": findings, "counts": repeated_counts(output_path), **quality_report(output_path, reference)}
+    return {"artifact": "xml", "path": output_path.name, "status": "blocked" if any(blocks_construction(item) for item in findings) else "passed", "findings": findings, "counts": repeated_counts(output_path), **quality_report(output_path, reference)}
 
 
 def validate_output(
@@ -818,11 +820,11 @@ def validate_output(
     findings = []
     try:
         raw = path.read_text(encoding="utf-8"); _study(ET.parse(path).getroot())
-    except (OSError, ET.ParseError, ValueError) as exc: return [{"category": "xml", "field": path.name, "issue": f"Invalid XML: {exc}"}]
-    if TOKEN.search(raw): findings.append({"category": "xml", "field": path.name, "issue": "Unresolved template token remains."})
+    except (OSError, ET.ParseError, ValueError) as exc: return [declare_finding({"category": "xml", "field": path.name, "issue": f"Invalid XML: {exc}"}, classification="essential_defect", reason="prs_xml.validate_output.d98b9d5c9b", repair_owner="construction")]
+    if TOKEN.search(raw): findings.append(declare_finding({"category": "xml", "field": path.name, "issue": "Unresolved template token remains."}, classification="essential_defect", reason="prs_xml.validate_output.0902b2d915", repair_owner="construction"))
     actual, expected = repeated_counts(path), expected_counts(reference)
     for tag, count in expected.items():
-        if actual[tag] != count: findings.append({"category": "xml", "field": tag, "issue": f"Expected {count} source-derived blocks; generated {actual[tag]}."})
+        if actual[tag] != count: findings.append(declare_finding({"category": "xml", "field": tag, "issue": f"Expected {count} source-derived blocks; generated {actual[tag]}."}, classification="essential_defect", reason="prs_xml.validate_output.eedfee42aa", repair_owner="construction"))
     structure_differences = compare_structure(structural_template, path)
     if generation_template is not None:
         try:
@@ -857,7 +859,7 @@ def validate_output(
                 )
         except (OSError, ET.ParseError, ValueError) as exc:
             structure_differences.append(f"PRS XML branch-template parse error: {exc}")
-    for difference in structure_differences: findings.append({"category": "xml", "field": "structure", "issue": difference})
+    for difference in structure_differences: findings.append(declare_finding({"category": "xml", "field": "structure", "issue": difference}, classification="essential_defect", reason="prs_xml.validate_output.69ea741e98", repair_owner="construction"))
     study = _study(ET.parse(path).getroot())
     screening_interval_source = get_path(
         reference,
@@ -870,7 +872,7 @@ def validate_output(
         or expected_screening_interval is None
         or canonical_screening_interval != expected_screening_interval
     ):
-        findings.append({
+        findings.append(declare_finding({
             "category": "internal",
             "field": "quality_gate.screening_interval",
             "code": "screening_interval_validator_inconsistency",
@@ -878,11 +880,11 @@ def validate_output(
                 "The approved screening interval is meaningful but the canonical quality-gate "
                 "parser cannot represent it."
             ),
-        })
+        }, classification="technical_failure", reason="prs_xml.validate_output.6af47165b0", repair_owner="construction"))
     elif expected_screening_interval is not None:
         actual_screening_interval = _screening_interval_requirement_from_xml(study)
         if actual_screening_interval != expected_screening_interval:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "xml",
                 "field": "eligibility/criteria",
                 "code": "screening_interval_semantic_mismatch",
@@ -890,7 +892,7 @@ def validate_output(
                     "Generated PRS eligibility does not preserve the approved minimum interval "
                     "and participation scope before screening."
                 ),
-            })
+            }, classification="essential_defect", reason="prs_xml.validate_output.2bf8df2763", repair_owner="construction"))
     # Independent upload-documentation vocabulary oracle, NOT XSD enum
     # validation. These are string elements in ProtocolRecordSchema.xsd
     # (2018.05.08), https://cdn.clinicaltrials.gov/documents/xsd/prs/ProtocolRecordSchema.xsd
@@ -908,13 +910,13 @@ def validate_output(
         # Yes/No casing in governed templates is preserved; validate the token.
         checked = value.casefold() if target_path == "eligibility/healthy_volunteers" else value
         if value and checked not in allowed:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "transport_vocabulary", "field": target_path,
                 "issue": f"Value {value!r} is outside the documented PRS upload vocabulary: {', '.join(sorted(allowed))}. This is not an XSD-enumeration check.",
-            })
+            }, classification="essential_defect", reason="prs_xml.validate_output.90d9c3c887", repair_owner="construction"))
     for tag in ("provider_study_id", "org_name", "brief_title", "official_title", "brief_summary", "detailed_description", "enrollment", "study_type"):
         node = study.find(f".//{tag}")
-        if node is None or not _text("".join(node.itertext())): findings.append({"category": "xml", "field": tag, "issue": "Required PRS value is empty."})
+        if node is None or not _text("".join(node.itertext())): findings.append(declare_finding({"category": "xml", "field": tag, "issue": "Required PRS value is empty."}, classification="essential_defect", reason="prs_xml.validate_output.f3a5fede27", repair_owner="construction"))
     scalar_template = generation_template or structural_template
     narrative = {
         "brief_summary": {"text": _text(study.findtext("brief_summary/textblock"))},
@@ -941,11 +943,11 @@ def validate_output(
         else:
             values_match = actual_value == expected_value
         if not values_match:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "xml",
                 "field": target_path,
                 "issue": f"Generated PRS scalar value does not match source mapping {token_name}.",
-            })
+            }, classification="essential_defect", reason="prs_xml.validate_output.7a44d3c6c2", repair_owner="construction"))
     scalar_sources = {
         "uid": _stable_study_uid(reference),
         "id_info/provider_study_id": _source_value(reference, "regulatory.prs.provider_study_id", "meta.protocol_number"),
@@ -968,11 +970,11 @@ def validate_output(
             continue
         actual_value = study.findtext(target_path)
         if _text(actual_value) != _expected_transport_value(target_path, expected_value):
-            findings.append({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": "Generated PRS value does not match the approved source."})
+            findings.append(declare_finding({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": "Generated PRS value does not match the approved source."}, classification="essential_defect", reason="prs_xml.validate_output.2de167e180", repair_owner="construction"))
     for target_path, source_paths in SOURCE_SCALAR_BINDINGS.items():
         expected_value = _expected_transport_value(target_path, _source_value(reference, *source_paths))
         if expected_value and _text(study.findtext(target_path)) != expected_value:
-            findings.append({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": f"Generated PRS value does not preserve approved source field {source_paths[0]}."})
+            findings.append(declare_finding({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": f"Generated PRS value does not preserve approved source field {source_paths[0]}."}, classification="essential_defect", reason="prs_xml.validate_output.a6fabffe7a", repair_owner="construction"))
     responsible = _merged_mapping(
         reference,
         "regulatory.prs.responsible_party",
@@ -995,11 +997,11 @@ def validate_output(
     }
     for target_path, expected_value in responsible_sources.items():
         if expected_value and _text(study.findtext(target_path)) != expected_value:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "xml",
                 "field": target_path.rsplit("/", 1)[-1],
                 "issue": "Generated PRS value does not preserve approved source field parties.responsible_party/regulatory.prs.responsible_party.",
-            })
+            }, classification="essential_defect", reason="prs_xml.validate_output.86c9701a62", repair_owner="construction"))
     overall_contact_backup = _merged_mapping(
         reference,
         "regulatory.prs.overall_contact_backup",
@@ -1011,11 +1013,11 @@ def validate_output(
     for field, expected_value in _contact_fields(overall_contact_backup).items():
         target_path = f"overall_contact_backup/{field}"
         if expected_value and _text(study.findtext(target_path)) != expected_value:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "xml",
                 "field": field,
                 "issue": "Generated PRS value does not preserve approved source field regulatory.prs.overall_contact_backup/contact alias.",
-            })
+            }, classification="essential_defect", reason="prs_xml.validate_output.df96a332d9", repair_owner="construction"))
     source_sites = [item for item in get_path(reference, "sites", []) or [] if isinstance(item, Mapping)]
     generated_locations = study.findall("location")
     for index, site in enumerate(source_sites, start=1):
@@ -1024,19 +1026,19 @@ def validate_output(
         location = generated_locations[index - 1]
         for field, expected_value in _contact_fields(_site_backup_contact(site)).items():
             if expected_value and _text(location.findtext(f"contact_backup/{field}")) != expected_value:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "xml",
                     "field": f"location[{index}].contact_backup.{field}",
                     "issue": f"Generated PRS value does not preserve approved source field sites[{index - 1}].contact_backup/contact alias.",
-                })
+                }, classification="essential_defect", reason="prs_xml.validate_output.6a6262dc9b", repair_owner="construction"))
 
     def require_repeated_value(node: ET.Element, target_path: str, expected_value: Any, field: str) -> None:
         if meaningful(expected_value) and _text(node.findtext(target_path)) != _text(expected_value):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "xml",
                 "field": field,
                 "issue": "Generated PRS repeated-block value does not match the approved source.",
-            })
+            }, classification="essential_defect", reason="prs_xml.require_repeated_value.959a7d0c5f", repair_owner="construction"))
 
     interventions = _intervention_items(reference)
     for index, (node, item) in enumerate(zip(study.findall("intervention"), interventions), start=1):
@@ -1045,7 +1047,7 @@ def validate_output(
         require_repeated_value(node, "intervention_description/textblock", item.get("intervention_description") or item.get("description"), f"intervention[{index}].intervention_description")
         actual_labels = [_text(child.text) for child in node.findall("arm_group_label") if _text(child.text)]
         if actual_labels != item["arm_group_labels"]:
-            findings.append({"category": "xml", "field": f"intervention[{index}].arm_group_label", "issue": "Generated intervention associations do not match the approved cohort links."})
+            findings.append(declare_finding({"category": "xml", "field": f"intervention[{index}].arm_group_label", "issue": "Generated intervention associations do not match the approved cohort links."}, classification="essential_defect", reason="prs_xml.validate_output.ccd9d380a6", repair_owner="construction"))
 
     arms = _observational_cohorts(reference)
     for index, (node, item) in enumerate(zip(study.findall("arm_group"), arms), start=1):
@@ -1083,22 +1085,22 @@ def validate_output(
             require_repeated_value(node, f"investigator/{field}", expected_value, f"location[{index}].investigator.{field}")
     expected_enrollment = _enrollment_count(get_path(reference, "population.sample_size"))
     if expected_enrollment and _text(study.findtext("enrollment")) != expected_enrollment:
-        findings.append({"category": "xml", "field": "enrollment", "issue": "Generated enrollment does not match the approved total sample size."})
+        findings.append(declare_finding({"category": "xml", "field": "enrollment", "issue": "Generated enrollment does not match the approved total sample size."}, classification="essential_defect", reason="prs_xml.validate_output.a82b421fa7", repair_owner="construction"))
     for tag, source_path in (("primary_outcome", "endpoints.primary"), ("secondary_outcome", "endpoints.secondary"), ("other_outcome", "endpoints.other")):
         source_items = get_path(reference, source_path, [])
         if tag == "primary_outcome" and (not isinstance(source_items, list) or not source_items):
-            findings.append({"category": "xml", "field": source_path, "issue": "Primary outcomes must be supplied as a non-empty structured list."})
+            findings.append(declare_finding({"category": "xml", "field": source_path, "issue": "Primary outcomes must be supplied as a non-empty structured list."}, classification="essential_defect", reason="prs_xml.validate_output.8d708b5ab7", repair_owner="construction"))
         elif source_items not in (None, "", []) and not isinstance(source_items, list):
-            findings.append({"category": "xml", "field": source_path, "issue": "Outcome source data must be a structured list."})
+            findings.append(declare_finding({"category": "xml", "field": source_path, "issue": "Outcome source data must be a structured list."}, classification="essential_defect", reason="prs_xml.validate_output.e1878aa1e9", repair_owner="construction"))
         for index, node in enumerate(study.findall(tag), start=1):
             for child in ("outcome_measure", "outcome_time_frame"):
                 target = node.find(child)
                 if target is None or not _text("".join(target.itertext())):
-                    findings.append({"category": "xml", "field": f"{tag}[{index}].{child}", "issue": "Required outcome value is empty."})
+                    findings.append(declare_finding({"category": "xml", "field": f"{tag}[{index}].{child}", "issue": "Required outcome value is empty."}, classification="essential_defect", reason="prs_xml.validate_output.90da17d22c", repair_owner="construction"))
             expected_uid = _stable_study_uid(reference)
             target = node.find("uid")
             if target is None or _text("".join(target.itertext())) != expected_uid:
-                findings.append({"category": "xml", "field": f"{tag}[{index}].uid", "issue": "Stable shared outcome UID was not populated."})
+                findings.append(declare_finding({"category": "xml", "field": f"{tag}[{index}].uid", "issue": "Stable shared outcome UID was not populated."}, classification="essential_defect", reason="prs_xml.validate_output.d2e1eb643e", repair_owner="construction"))
     return findings
 
 

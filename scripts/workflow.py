@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from finding_policy import classify_finding, declare_finding, normalize_finding, blocks_construction
+
 import argparse
 import base64
 import binascii
@@ -3439,10 +3441,10 @@ def approve(run_dir: Path, *, approved_by: str = "client", source_md: Path | Non
     approved_source_path = revision_dir / "approved-source.md"
     if revision_dir.exists():
         if not snapshot_path.is_file() or not approved_source_path.is_file():
-            return {"status": "blocked", "stage": "approval", "findings": [{"category": "revision", "field": revision_id, "issue": "An incomplete revision already occupies the approved source hash."}], "client_outputs": []}
+            return {"status": "blocked", "stage": "approval", "findings": [declare_finding({"category": "revision", "field": revision_id, "issue": "An incomplete revision already occupies the approved source hash."}, classification="technical_failure", reason="workflow.approve.fbadd8de75", repair_owner="integrity")], "client_outputs": []}
         existing = _read(snapshot_path)
         if _approved_payload(existing) != _approved_payload(reference) or sha256_file(approved_source_path) != digest:
-            return {"status": "blocked", "stage": "approval", "findings": [{"category": "revision", "field": revision_id, "issue": "A different write-once revision already occupies the approved source hash."}], "client_outputs": []}
+            return {"status": "blocked", "stage": "approval", "findings": [declare_finding({"category": "revision", "field": revision_id, "issue": "A different write-once revision already occupies the approved source hash."}, classification="technical_failure", reason="workflow.approve.8d73e344a2", repair_owner="integrity")], "client_outputs": []}
         reference["approval"] = dict(existing.get("approval", approval))
     else:
         revision_dir.mkdir(parents=True)
@@ -3457,8 +3459,8 @@ def validate(run_dir: Path, **_: Any) -> dict[str, Any]:
     run_dir = run_dir.resolve(); _, reference = _reference(run_dir)
     contract = source_contract(reference); approved, approval_issue = _approval_valid(run_dir, reference)
     findings = list(contract["blocking_findings"])
-    if not approved: findings.append({"category": "approval", "field": "approval", "issue": approval_issue})
-    return {"status": "passed" if not findings else "blocked", "stage": "readiness", "study_type": contract.get("study_type"), "findings": findings, "client_outputs": []}
+    if not approved: findings.append(declare_finding({"category": "approval", "field": "approval", "issue": approval_issue}, classification="technical_failure", reason="workflow.validate.a45a04b24b", repair_owner="integrity"))
+    return {"status": "blocked" if any(blocks_construction(item) for item in findings) else "passed", "stage": "readiness", "study_type": contract.get("study_type"), "findings": findings, "client_outputs": []}
 
 
 def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
@@ -3518,7 +3520,7 @@ def _document_report_failure(
     findings = []
     for item in document_report.get("artifacts", []):
         for raw in item.get("findings", []):
-            finding = dict(raw)
+            finding = normalize_finding(raw, producer="workflow.document-report")
             governed = (
                 finding.get("recovery_class") in RECOVERY_POLICIES
                 and finding.get("action") == RECOVERY_POLICIES.get(str(finding.get("recovery_class")))
@@ -4022,8 +4024,8 @@ def confirm_desktop_delivery(
         return tuple(item.get(key) for key in ("filename", "path", "sha256", "bytes"))
 
     if not isinstance(actual, list) or [identity(item) for item in actual if isinstance(item, Mapping)] != [identity(item) for item in expected]:
-        findings.append(recovery_finding({"category": "delivery", "field": "attachments", "issue": "Desktop reply attachments do not match the immutable Generation Manifest."}, "transport_fault"))
-    if findings:
+        findings.append(recovery_finding(declare_finding({"category": "delivery", "field": "attachments", "issue": "Desktop reply attachments do not match the immutable Generation Manifest."}, classification="technical_failure", reason="workflow.confirm_desktop_delivery.9cf84e4184", repair_owner="runtime"), "transport_fault"))
+    if any(blocks_construction(item) for item in findings):
         return {"status": "blocked", "confirmed": False, "findings": findings, "attempts": 0}
     opened = []
     total_attempts = 0
@@ -4064,11 +4066,11 @@ def confirm_desktop_delivery(
         else:
             last_issue = last_issue or "Desktop file transfer failed."
         if not opened_current:
-            findings.append(recovery_finding({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."}, "transport_fault"))
+            findings.append(recovery_finding(declare_finding({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."}, classification="technical_failure", reason="workflow.confirm_desktop_delivery.fd15860e75", repair_owner="runtime"), "transport_fault"))
             break
     return {
-        "status": "confirmed" if not findings else "blocked",
-        "confirmed": not findings,
+        "status": "blocked" if any(blocks_construction(item) for item in findings) else "confirmed",
+        "confirmed": not any(blocks_construction(item) for item in findings),
         "opened": opened,
         "attempts": total_attempts,
         "findings": findings,
@@ -4091,11 +4093,11 @@ def _desktop_delivery_set_finding(
     }
     if manifest.get("status") == "passed" and actual_outputs == expected_outputs:
         return None
-    return {
+    return declare_finding({
         "category": "delivery",
         "field": "client_outputs",
         "issue": f"Desktop delivery requires the exact Branch Document Set; expected={sorted(expected_outputs)}, actual={sorted(actual_outputs)}.",
-    }
+    }, classification="technical_failure", reason="workflow._desktop_delivery_set_finding.279bb8c81d", repair_owner="runtime")
 
 
 def _handoff_response_is_bound(
@@ -4254,22 +4256,22 @@ def run_desktop_operation(
             return {
                 "status": "blocked",
                 "stage": "release_identity",
-                "findings": [{
+                "findings": [declare_finding({
                     "category": "release",
                     "field": "release_identity",
                     "issue": "Desktop operation evidence belongs to a different Promoted Release or governed configuration identity.",
-                }],
+                }, classification="technical_failure", reason="workflow.run_desktop_operation.2c031304d3", repair_owner="integrity")],
                 "client_outputs": [],
             }
     if isinstance(recorded_approval_identity, Mapping) and not approval_matches:
         return {
             "status": "blocked",
             "stage": "approval_identity",
-            "findings": [{
+            "findings": [declare_finding({
                 "category": "approval",
                 "field": "approval_identity",
                 "issue": "Desktop operation evidence belongs to a different approved immutable revision.",
-            }],
+            }, classification="technical_failure", reason="workflow.run_desktop_operation.8ccd10cb0e", repair_owner="integrity")],
             "client_outputs": [],
         }
 
@@ -4286,7 +4288,7 @@ def run_desktop_operation(
             return {
                 "status": "blocked",
                 "stage": "contracted_template_bundle",
-                "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted passing Desktop evidence lacks a complete Contracted Template Bundle identity."}],
+                "findings": [declare_finding({"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted passing Desktop evidence lacks a complete Contracted Template Bundle identity."}, classification="technical_failure", reason="workflow.run_desktop_operation.4a7083ab84", repair_owner="integrity")],
                 "client_outputs": [],
             }
         if requires_bundle_validation:
@@ -4297,14 +4299,14 @@ def run_desktop_operation(
                 return {
                     "status": "blocked",
                     "stage": "contracted_template_bundle",
-                    "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": f"Persisted Desktop evidence cannot be validated against the current governed bundle: {exc}"}],
+                    "findings": [declare_finding({"category": "contract", "field": "contracted_template_bundle", "issue": f"Persisted Desktop evidence cannot be validated against the current governed bundle: {exc}"}, classification="technical_failure", reason="workflow.run_desktop_operation.b3d7b1b41d", repair_owner="integrity")],
                     "client_outputs": [],
                 }
             if current_bundle.get("identity_sha256") != recorded_bundle.get("identity_sha256"):
                 return {
                     "status": "blocked",
                     "stage": "contracted_template_bundle",
-                    "findings": [{"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted Desktop delivery evidence belongs to a stale Contracted Template Bundle."}],
+                    "findings": [declare_finding({"category": "contract", "field": "contracted_template_bundle", "issue": "Persisted Desktop delivery evidence belongs to a stale Contracted Template Bundle."}, classification="technical_failure", reason="workflow.run_desktop_operation.26d40443fa", repair_owner="integrity")],
                     "client_outputs": [],
                 }
         if requires_bundle_validation and not (
@@ -4314,11 +4316,11 @@ def run_desktop_operation(
             return {
                 "status": "blocked",
                 "stage": "release_identity",
-                "findings": [{
+                "findings": [declare_finding({
                     "category": "release",
                     "field": "package_fingerprint",
                     "issue": "Persisted passing Desktop evidence lacks a Promoted Release fingerprint.",
-                }],
+                }, classification="technical_failure", reason="workflow.run_desktop_operation.ef90bfdb13", repair_owner="integrity")],
                 "client_outputs": [],
             }
         if requires_bundle_validation:
@@ -4360,11 +4362,11 @@ def run_desktop_operation(
                 return {
                     "status": "blocked",
                     "stage": "terminal_delivery_validation",
-                    "findings": [{
+                    "findings": [declare_finding({
                         "category": "delivery",
                         "field": "terminal_result",
                         "issue": f"Persisted Desktop success no longer has accessible hash-matching outputs: {exc}",
-                    }],
+                    }, classification="technical_failure", reason="workflow.run_desktop_operation.f6e095fa92", repair_owner="runtime")],
                     "client_outputs": [],
                 }
         return prior_result
@@ -4501,11 +4503,11 @@ def run_desktop_operation(
             measured.update({
                 "status": "timeout",
                 "stage": "cleanup",
-                "findings": [{
+                "findings": [declare_finding({
                     "category": "timeout",
                     "field": "cleanup",
                     "issue": "The persisted Desktop operation deadline expired during cleanup.",
-                }],
+                }, classification="technical_failure", reason="workflow.finish.120283389b", repair_owner="runtime")],
                 "client_outputs": [],
             })
             measured.pop("desktop_reply", None)
@@ -4578,7 +4580,7 @@ def run_desktop_operation(
                 "stage": "desktop_operation",
                 "pending_stage": current_stage if current_stage != "approved" else "generate",
                 "deadline_at_epoch": deadline_at_epoch,
-                "findings": [{"category": "timeout", "field": "operation", "issue": "The post-approval Desktop operation deadline expired."}],
+                "findings": [declare_finding({"category": "timeout", "field": "operation", "issue": "The post-approval Desktop operation deadline expired."}, classification="technical_failure", reason="workflow.run_desktop_operation.6a9bf307a7", repair_owner="runtime")],
                 "candidate_outputs": retained,
                 "pending_result": last_result,
                 "client_outputs": [],
@@ -4640,11 +4642,11 @@ def run_desktop_operation(
                     return finish({
                         "status": "blocked",
                         "stage": "hermes_handoff_integrity",
-                        "findings": [{
+                        "findings": [declare_finding({
                             "category": "hermes",
                             "field": str(handoff.get("request_path") or "handoff"),
                             "issue": "A missing worker response was replaced by a changed request instead of redispatching the exact original request.",
-                        }],
+                        }, classification="technical_failure", reason="workflow.run_desktop_operation.39c24ffa34", repair_owner="runtime")],
                         "client_outputs": [],
                     })
             handoffs = [
@@ -4764,13 +4766,13 @@ def run_desktop_operation(
                     return {
                         "status": "blocked",
                         "stage": "parent_visual_review",
-                        "findings": [{
+                        "findings": [declare_finding({
                             "category": "verification",
                             "field": str(item.get("response_path") or "parent_visual_review"),
                             "code": "missing_parent_visual_review_response",
                             "verification_request_id": item.get("request_id"),
                             "issue": issue,
-                        } for item in pending],
+                        }, classification="technical_failure", reason="workflow.run_bounded_parent_review.4a502846d0", repair_owner="review_response") for item in pending],
                         "client_outputs": [],
                     }
 
@@ -4824,7 +4826,7 @@ def run_desktop_operation(
                 if isinstance(exc, WorkerAuthenticationError):
                     return finish({
                         "status": "blocked", "stage": "worker_authentication",
-                        "findings": [{"category": "environment", "field": "worker_authentication", "issue": str(exc)}],
+                        "findings": [declare_finding({"category": "environment", "field": "worker_authentication", "issue": str(exc)}, classification="technical_failure", reason="workflow.run_desktop_operation.a9b6404ad3", repair_owner="runtime")],
                         "client_outputs": [],
                     })
                 revision_id = str(result.get("revision_id") or "")
@@ -4851,7 +4853,7 @@ def run_desktop_operation(
                 return finish({
                     "status": "timeout",
                     "stage": "hermes_handoff",
-                    "findings": [{"category": "timeout", "field": "handoff", "issue": str(exc)}],
+                    "findings": [declare_finding({"category": "timeout", "field": "handoff", "issue": str(exc)}, classification="technical_failure", reason="workflow.run_desktop_operation.a9b6404ad3", repair_owner="runtime")],
                     "client_outputs": [],
                 })
             unresolved_handoffs = [
@@ -4878,7 +4880,7 @@ def run_desktop_operation(
             return finish({
                 "status": "blocked",
                 "stage": "desktop_delivery",
-                "findings": [{"category": "delivery", "field": "manifest", "issue": str(exc)}],
+                "findings": [declare_finding({"category": "delivery", "field": "manifest", "issue": str(exc)}, classification="technical_failure", reason="workflow.run_desktop_operation.a9b6404ad3", repair_owner="runtime")],
                 "client_outputs": [],
             })
         if set_finding := _desktop_delivery_set_finding(run_dir, manifest):
@@ -4920,13 +4922,13 @@ def run_desktop_operation(
         prepared_ledger = manifest.get("gate_ledger")
         if isinstance(prepared_ledger, Mapping):
             gate_findings = [
-                {
+                declare_finding({
                     "code": "EXACT_BYTE_ATOMIC_DELIVERY_FAILED",
                     "target": str(finding.get("field") or "desktop_delivery"),
                     "evidence_sha256": canonical_evidence_sha256(dict(finding)),
                     "retry_owner": "desktop_transport",
                     "terminal_status": "blocked",
-                }
+                }, classification="technical_failure", reason="ordinary-gate-failure", repair_owner="integrity")
                 for finding in delivery.get("findings", [])
                 if isinstance(finding, Mapping)
             ]
@@ -5716,8 +5718,10 @@ def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
     )):
         raise ValueError("The installed release root and profile must not contain symlinks.")
     skill_root = untrusted_root.resolve()
-    findings = _manifest_integrity(skill_root, allow_runtime_state=True)
-    if findings:
+    findings = [classify_finding(item, classification="technical_failure",
+        reason="installed-release-integrity", repair_owner="integrity")
+        for item in _manifest_integrity(skill_root, allow_runtime_state=True)]
+    if any(blocks_construction(item) for item in findings):
         raise ValueError(
             "Production Desktop adapter requires an intact packaged release: "
             + "; ".join(str(item.get("issue") or "") for item in findings)
@@ -5892,7 +5896,7 @@ def run_production_desktop_operation(
         if readiness["status"] != "passed":
             blocked = {
                 "status": "blocked", "stage": "worker_readiness",
-                "findings": [{"category": "environment", "field": "worker_authentication", "issue": readiness["issue"]}],
+                "findings": [declare_finding({"category": "environment", "field": "worker_authentication", "issue": readiness["issue"]}, classification="technical_failure", reason="workflow.run_production_desktop_operation.120bbdd510", repair_owner="runtime")],
                 "client_outputs": [], "worker_readiness": readiness,
             }
             _write(run_dir / "logs/operation-preflight.json", blocked)
@@ -6337,7 +6341,7 @@ def _publication_evidence_findings(
         inventory_valid = False
     findings = []
     if not inventory_valid:
-        findings.append({
+        findings.append(declare_finding({
             "code": "INCOMPLETE_PUBLICATION_EVIDENCE_INVENTORY",
             "target": "candidate-build.json",
             "evidence_sha256": canonical_evidence_sha256({
@@ -6350,7 +6354,7 @@ def _publication_evidence_findings(
             "declared_render_artifacts": declared_render_artifacts,
             "retry_owner": "render_assurance",
             "terminal_status": "blocked",
-        })
+        }, classification="technical_failure", reason="publication-byte-integrity", repair_owner="integrity"))
     for relative_text, expected_sha256 in sorted(expected.items()):
         relative = PurePosixPath(relative_text)
         valid_path = (
@@ -6362,23 +6366,23 @@ def _publication_evidence_findings(
         target = revision_dir / relative if valid_path else revision_dir
         actual_sha256 = quality_sha256(target) if valid_path and target.is_file() else None
         if not re.fullmatch(r"[0-9a-f]{64}", expected_sha256) or actual_sha256 != expected_sha256:
-            findings.append({
+            findings.append(declare_finding({
                 "code": "STALE_PUBLICATION_EVIDENCE",
                 "target": relative_text or "candidate-build.json",
                 "evidence_sha256": expected_sha256,
                 "actual_sha256": actual_sha256,
                 "retry_owner": "render_assurance",
                 "terminal_status": "blocked",
-            })
+            }, classification="technical_failure", reason="publication-byte-integrity", repair_owner="integrity"))
     if not expected:
-        findings.append({
+        findings.append(declare_finding({
             "code": "MISSING_PUBLICATION_EVIDENCE",
             "target": "candidate-build.json",
             "evidence_sha256": quality_sha256(revision_dir / "candidate-build.json") if (revision_dir / "candidate-build.json").is_file() else "",
             "actual_sha256": None,
             "retry_owner": "render_assurance",
             "terminal_status": "blocked",
-        })
+        }, classification="technical_failure", reason="publication-byte-integrity", repair_owner="integrity"))
     return findings
 
 
@@ -6994,20 +6998,20 @@ def _ledger_findings(
 ) -> list[dict[str, Any]]:
     result = []
     for item in findings:
-        result.append({
+        result.append(declare_finding({
             "code": f"{gate_id.upper()}_FAILED",
             "target": str(item.get("artifact") or item.get("field") or item.get("check") or "attempt"),
             "evidence_sha256": canonical_evidence_sha256(item),
             "retry_owner": retry_owner,
             "terminal_status": "blocked",
-        })
-    return result or [{
+        }, classification="technical_failure", reason="ordinary-gate-failure", repair_owner="integrity"))
+    return result or [declare_finding({
         "code": f"{gate_id.upper()}_FAILED",
         "target": "attempt",
         "evidence_sha256": canonical_evidence_sha256([]),
         "retry_owner": retry_owner,
         "terminal_status": "blocked",
-    }]
+    }, classification="technical_failure", reason="ordinary-gate-failure", repair_owner="integrity")]
 
 
 def _candidate_evidence_sha256(path: Path) -> str:
@@ -7690,7 +7694,7 @@ def _complete_pending_recovery_attempts(
                 }
                 and not made_progress
             ):
-                no_progress.append({
+                no_progress.append(declare_finding({
                     **finding,
                     "strategy_id": action.get("strategy_id"),
                     "recovery_attempt_path": relative,
@@ -7700,7 +7704,7 @@ def _complete_pending_recovery_attempts(
                         "The governed recovery strategy did not materially change "
                         "the implicated candidate bytes; a new review set is not eligible."
                     ),
-                })
+                }, classification="technical_failure", reason="workflow._complete_pending_recovery_attempts.191e02989c", repair_owner="integrity"))
     generation["gate_attempts"] = entries
     generation.pop("pending_recovery_attempts", None)
     generation.pop("pending_recovery_plan", None)
@@ -7866,10 +7870,11 @@ def _repeated_drafting_findings(
         if epoch not in sets:
             sets.append(epoch)
         if len(sets) >= 3:
-            stalled.append({
+            stalled.append(classify_finding({
                 **dict(finding),
                 "category": "recovery",
                 "field": "repeated_drafting_finding",
+                "recovery_class": "capability_gap", "action": "preserve_and_stop", "owner": "capability_gap",
                 "code": "drafting_validation_stalled" if stage == "drafting" else "drafting_repair_stalled",
                 "drafting_attempts" if stage == "drafting" else "review_sets": list(sets),
                 "unsatisfied_condition": dict(finding),
@@ -7880,7 +7885,7 @@ def _repeated_drafting_findings(
                 ) + (
                     "The installed drafting route needs maintenance for this target."
                 ),
-            })
+            }, classification="technical_failure", reason="workflow._repeated_drafting_findings.f3f0f03c27", repair_owner="construction"))
     return stalled
 
 
@@ -7917,15 +7922,15 @@ def _quality_retry(
         return {
             "status": "timeout",
             "stage": stage,
-            "findings": [{
+            "findings": [declare_finding({
                 "category": "timeout",
                 "field": "operation",
                 "issue": "The persisted Desktop operation deadline expired before recovery mutation.",
-            }],
+            }, classification="technical_failure", reason="workflow._quality_retry.ac33e5ad4e", repair_owner="runtime")],
             "candidate_outputs": _candidate_outputs(revision_dir),
             "client_outputs": [],
         }
-    findings = [dict(item) for item in findings]
+    findings = [normalize_finding(item, producer="workflow.recovery") for item in findings]
     original_findings = [dict(item) for item in findings]
     generation_state = working_reference.setdefault("generation", {})
     expected_target_category = {
@@ -7991,12 +7996,12 @@ def _quality_retry(
                 and record.get("caution_sha256") == canonical_evidence_sha256(finding)
                 for record in request.get("lexical_review_cautions", [])
             ):
-                finding = recovery_finding({
+                finding = recovery_finding(declare_finding({
                     "category": "reviewer-transient", "field": "clinical_content_verification",
                     "verification_request_id": request_id, "target_ids": ["verification:content"],
                     "issue": finding["issue"], "review_caution": finding,
                     "finding_policy": finding["finding_policy"],
-                }, "verifier_transient")
+                }, classification="technical_failure", reason="workflow._quality_retry.433e238f54", repair_owner="review_response"), "verifier_transient")
         recovery_class = str(finding.get("recovery_class") or "")
         if (
             recovery_class not in RECOVERY_POLICIES
@@ -8004,7 +8009,7 @@ def _quality_retry(
         ):
             normalized.append(finding)
             route_error_indexes.add(index)
-            route_errors.append({
+            route_errors.append(declare_finding({
                 "category": "recovery-classification",
                 "field": "recovery_class",
                 "artifact": finding.get("artifact"),
@@ -8015,7 +8020,7 @@ def _quality_retry(
                 ),
                 "issue": "The governed recovery route is missing or malformed.",
                 "original_finding": original_findings[index],
-            })
+            }, classification="technical_failure", reason="workflow._quality_retry.fa896837b9", repair_owner="construction"))
             continue
         raw_targets = finding.get("target_ids")
         targets = [
@@ -8154,13 +8159,13 @@ def _quality_retry(
                     ),
                     originating_finding=finding,
                 )
-                if authority_findings:
+                if any(blocks_construction(item) for item in authority_findings):
                     unsupported_targets.append(parsed_targets[0].target_id if parsed_targets else None)
                     routing_failure_code = str(authority_findings[0].get("code") or "verification_request_canonical_mismatch")
                     routing_failure = str(authority_findings[0].get("issue") or "Verification request authority validation failed.")
         if unsupported_targets:
             route_error_indexes.add(index)
-            route_errors.append({
+            route_errors.append(declare_finding({
                 "category": "recovery-classification",
                 "field": "target_ids",
                 "artifact": finding.get("artifact"),
@@ -8171,7 +8176,7 @@ def _quality_retry(
                 ),
                 "issue": "The governed recovery target cannot be routed without silently dropping or inventing it.",
                 "original_finding": original_findings[index],
-            })
+            }, classification="technical_failure", reason="workflow._quality_retry.9303df0fef", repair_owner="construction"))
     findings = normalized
 
     def prearchive_block(
@@ -8460,7 +8465,7 @@ def _quality_retry(
                     verification_attempts[retry_key] = int(verification_attempts.get(retry_key, 0)) + 1
                     if request_id:
                         request_ids.add(request_id)
-                    transient_findings.append(recovery_finding({
+                    transient_findings.append(recovery_finding(classify_finding({
                         **dict(item),
                         "category": "reviewer-transient",
                         "field": retry_key,
@@ -8470,7 +8475,7 @@ def _quality_retry(
                             "safe Word-native repair for the localized target. Reinspect the exact "
                             "rendered pages and return a more precise localized finding if it remains."
                         ),
-                    }, "verifier_transient"))
+                    }, classification="technical_failure", reason="workflow._quality_retry.ff80304fa9", repair_owner="review_response"), "verifier_transient"))
                 _write(reference_path, working_reference)
                 _restore_verification_requests_for_retry(
                     revision_dir,
@@ -8627,16 +8632,18 @@ def _repeated_no_progress_findings(
             and item.get("recovery_attempt_path")
         }
         if strategy and len(attempts) >= 3:
-            stalled.append({
+            stalled.append(classify_finding({
                 **dict(finding),
                 "category": "recovery",
                 "field": "repeated_no_progress",
+                "recovery_class": "capability_gap", "action": "preserve_and_stop", "owner": "capability_gap",
                 "no_progress_attempts": len(attempts),
+                "unsatisfied_condition": dict(finding),
                 "issue": (
                     "The same recovery strategy made no candidate change across "
                     "three distinct completed attempts."
                 ),
-            })
+            }, classification="technical_failure", reason="workflow._repeated_no_progress_findings.39fd6a7b04", repair_owner="construction"))
     return stalled
 
 
@@ -8660,14 +8667,14 @@ def _continue_repairable_no_progress(
         return None
     if all(item.get("recovery_class") == "deterministic_structure_defect" for item in findings):
         capability_findings = [
-            recovery_finding({
+            recovery_finding(classify_finding({
                 **dict(item),
                 "category": "capability-gap",
                 "issue": (
                     "The deterministic reconstruction completed without a semantic candidate change. "
                     "No stronger governed construction strategy is registered for this exact target."
                 ),
-            }, "capability_gap")
+            }, classification="technical_failure", reason="workflow._continue_repairable_no_progress.c73f9fab91", repair_owner="construction"), "capability_gap")
             for item in findings
         ]
         return _repair_block(
@@ -8697,7 +8704,7 @@ def _continue_repairable_no_progress(
         return _repair_block(
             run_dir,
             "integrity",
-            [{"category": "integrity", "field": "recovery_no_progress", "issue": str(exc)}],
+            [declare_finding({"category": "integrity", "field": "recovery_no_progress", "issue": str(exc)}, classification="technical_failure", reason="workflow._continue_repairable_no_progress.a9b6404ad3", repair_owner="integrity")],
             candidate_outputs=_candidate_outputs(revision_dir),
         )
     return _quality_retry(
@@ -8744,12 +8751,12 @@ def _begin_independent_review(
     # Catch code-owned XML defects before refreshing immutable review requests.
     # The ordinary repair route archives prior bindings and advances review_set.
     xml_findings = prs_candidate_findings(revision_dir, reference, contracted_bundle=bundle)
-    if xml_findings:
+    if any(blocks_construction(item) for item in xml_findings):
         return [], xml_findings
     protocol_path = revision_dir / "candidate/protocol.docx"
     if protocol_path.is_file():
         computed_findings = audit_computed_protocol_fields(protocol_path, reference)
-        if computed_findings:
+        if any(blocks_construction(item) for item in computed_findings):
             return [], computed_findings
     if (
         canonical_study_type(get_path(reference, "meta.study_type")) != "Retrospective"
@@ -8758,7 +8765,7 @@ def _begin_independent_review(
         findings = validate_sterling_clause_contract(
             revision_dir / "candidate/icf.docx", reference,
         )["findings"]
-        blocking = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
+        blocking = [finding for finding in findings if blocks_construction(finding)]
         if blocking:
             return [], blocking
     paths = create_verification_requests(
@@ -8794,11 +8801,11 @@ def generate(
         return {
             "status": "timeout",
             "stage": "generation",
-            "findings": [{
+            "findings": [declare_finding({
                 "category": "timeout",
                 "field": "operation",
                 "issue": "The persisted Desktop operation deadline expired before generation mutation.",
-            }],
+            }, classification="technical_failure", reason="workflow.generate.d6904aa236", repair_owner="runtime")],
             "candidate_outputs": _candidate_outputs(revision_dir),
             "client_outputs": [],
         }
@@ -8811,22 +8818,22 @@ def generate(
     contract = source_contract(reference)
     if contract["status"] != "passed" or not approved:
         findings = list(contract["blocking_findings"])
-        if not approved: findings.append({"category": "approval", "field": "approval", "issue": approval_issue})
+        if not approved: findings.append(declare_finding({"category": "approval", "field": "approval", "issue": approval_issue}, classification="technical_failure", reason="workflow.generate.a45a04b24b", repair_owner="integrity"))
         if approved:
             return _repair_block(run_dir, "approval_gate", findings)
         return {"status": "blocked", "stage": "approval_gate", "findings": findings, "client_outputs": []}
     reference = contract["normalized_reference"]
-    if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [{"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}], "client_outputs": []}
+    if not revision_id or not revision_dir.is_dir(): return {"status": "blocked", "stage": "revision", "findings": [declare_finding({"category": "revision", "field": "revision_id", "issue": "Approved immutable revision is missing."}, classification="technical_failure", reason="workflow.generate.dd6ca394d6", repair_owner="integrity")], "client_outputs": []}
     state = working_reference.setdefault("generation", {})
     try:
         _validate_generation_authority_attempts(revision_dir, state)
         _reconcile_pending_recovery_attempts(revision_dir, reference_path, working_reference)
     except ValueError as exc:
-        return _repair_block(run_dir, "integrity", [{
+        return _repair_block(run_dir, "integrity", [declare_finding({
             "category": "integrity",
             "field": "gate_attempts",
             "issue": str(exc),
-        }], candidate_outputs=_candidate_outputs(revision_dir))
+        }, classification="technical_failure", reason="workflow.generate.a9b6404ad3", repair_owner="integrity")], candidate_outputs=_candidate_outputs(revision_dir))
     expected_governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     governing_sha256 = sha256_value(expected_governing)
     if _rebind_generation_authority(revision_dir, working_reference, governing_sha256):
@@ -8860,7 +8867,7 @@ def generate(
         else recovery_finding(finding, "drafting_defect")
         for finding in ingest_responses(revision_dir, expected_governing)
     ]
-    if drafting_findings:
+    if any(blocks_construction(item) for item in drafting_findings):
         source_gaps = [item for item in drafting_findings if item.get("category") in {"source-evidence", "request-integrity"}]
         retryable = [item for item in drafting_findings if item not in source_gaps]
         if source_gaps:
@@ -8904,13 +8911,13 @@ def generate(
         _finalize_pending_recovery_for_terminal(
             revision_dir, reference_path, working_reference,
         )
-        return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
+        return {"status": "blocked", "stage": "drafting", "findings": [declare_finding({"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."}, classification="essential_defect", reason="workflow.generate.296d2d1cc1", repair_owner="drafting") for item in missing], "client_outputs": []}
     duplicate_findings = accepted_cross_section_duplicate_findings(
         revision_dir,
         reference,
         expected_governing,
     )
-    if duplicate_findings:
+    if any(blocks_construction(item) for item in duplicate_findings):
         return _quality_retry(
             run_dir,
             reference_path,
@@ -8956,7 +8963,7 @@ def generate(
     # must archive those bytes and allocate a fresh review identity for the repair.
     if prior_build and (revision_dir / "hermes/verification-requests").is_dir():
         current_xml_findings = prs_candidate_findings(revision_dir, reference, contracted_bundle=bundle)
-        if current_xml_findings:
+        if any(blocks_construction(item) for item in current_xml_findings):
             return _quality_retry(
                 run_dir, reference_path, working_reference, reference, revision_dir,
                 attempts, current_xml_findings, "quality", contracted_bundle=bundle,
@@ -9081,7 +9088,7 @@ def generate(
             return {
                 "status": "timeout",
                 "stage": "render_assurance",
-                "findings": [{"category": "timeout", "field": "operation", "issue": "The persisted Desktop operation deadline expired before Render Assurance."}],
+                "findings": [declare_finding({"category": "timeout", "field": "operation", "issue": "The persisted Desktop operation deadline expired before Render Assurance."}, classification="technical_failure", reason="workflow.generate.52d27f8217", repair_owner="runtime")],
                 "candidate_outputs": _candidate_outputs(revision_dir),
                 "client_outputs": [],
             }
@@ -9219,7 +9226,7 @@ def generate(
     _, early_findings = _begin_independent_review(
         revision_dir, reference, render_report, bundle, review_set,
     )
-    if early_findings:
+    if any(blocks_construction(item) for item in early_findings):
         return _quality_retry(
             run_dir, reference_path, working_reference, reference, revision_dir,
             attempts, early_findings, "drafting", contracted_bundle=bundle,
@@ -9248,7 +9255,7 @@ def generate(
         return {
             "status": "timeout",
             "stage": "delivery",
-            "findings": [{"category": "timeout", "field": "operation", "issue": str(exc)}],
+            "findings": [declare_finding({"category": "timeout", "field": "operation", "issue": str(exc)}, classification="technical_failure", reason="workflow.generate.a9b6404ad3", repair_owner="runtime")],
             "candidate_outputs": _candidate_outputs(revision_dir),
             "client_outputs": [],
         }

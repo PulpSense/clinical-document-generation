@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from finding_policy import declare_finding, normalize_finding, blocks_construction
+
 import copy
 import hashlib
 import json
@@ -3766,41 +3768,41 @@ def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict
     text = "\n".join(paragraph_texts)
     findings = [
         recovery_finding(
-            {"category": "rendering", "field": path.name, "issue": f"Unresolved template token: {token}"},
+            declare_finding({"category": "rendering", "field": path.name, "issue": f"Unresolved template token: {token}"}, classification="essential_defect", reason="rendering.audit_docx.4c80e29aa7", repair_owner="construction"),
             "document_structure_defect",
         )
         for token in sorted(set(TOKEN.findall(text)))
     ]
     if INTERNAL_LANGUAGE.search(text) or "evidence_refs" in text or "{\"" in text:
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, "document_structure_defect"))
+        findings.append(recovery_finding(declare_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, classification="essential_defect", reason="rendering.audit_docx.4f31def4f8", repair_owner="construction"), "document_structure_defect"))
     if AUTHORING_LANGUAGE.search(text):
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "document_structure_defect"))
+        findings.append(recovery_finding(declare_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, classification="essential_defect", reason="rendering.audit_docx.a81ad1cf1e", repair_owner="construction"), "document_structure_defect"))
     duplicate = next((match for paragraph_text in paragraph_texts if (match := DUPLICATE_WORD.search(paragraph_text))), None)
     if duplicate:
-        findings.append({
+        findings.append(declare_finding({
             "category": "editorial", "field": path.name,
             "code": "visible-duplicate-word",
-            "publication_disposition": "warning",
+
             "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively.",
-        })
+        }, classification="editorial_warning", reason="rendering.audit_docx.55be2085b4", repair_owner="none"))
     for phrase in required_phrases:
         if phrase and phrase.casefold() not in text.casefold():
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, "document_structure_defect"))
+            findings.append(recovery_finding(declare_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, classification="essential_defect", reason="rendering.audit_docx.a09ffaef07", repair_owner="construction"), "document_structure_defect"))
     with zipfile.ZipFile(path) as package:
         names = set(package.namelist())
         if names & _REVIEW_PARTS:
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Comments or reviewer identity parts remain in the DOCX package."}, "document_structure_defect"))
+            findings.append(recovery_finding(declare_finding({"category": "rendering", "field": path.name, "issue": "Comments or reviewer identity parts remain in the DOCX package."}, classification="essential_defect", reason="rendering.audit_docx.8e90b259e6", repair_owner="construction"), "document_structure_defect"))
         review_xml = "\n".join(
             package.read(name).decode("utf-8", errors="ignore")
             for name in names
             if name.endswith((".xml", ".rels"))
         )
     if any(marker in review_xml for marker in ("trackRevisions", "commentRangeStart", "commentReference", "<w:del", "<w:moveFrom")):
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Tracked changes, comments, or hidden review markup remain in the DOCX package."}, "document_structure_defect"))
+        findings.append(recovery_finding(declare_finding({"category": "rendering", "field": path.name, "issue": "Tracked changes, comments, or hidden review markup remain in the DOCX package."}, classification="essential_defect", reason="rendering.audit_docx.e549b149e4", repair_owner="construction"), "document_structure_defect"))
     if path.stem == "icf":
         non_heading = [paragraph.text.strip() for paragraph in document.paragraphs if _is_icf_heading(paragraph) and not paragraph.style.name.casefold().startswith("heading")]
         if non_heading:
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "target_ids": ["layout:icf"], "issue": f"Visible ICF headings lack Word heading styles: {non_heading}"}, "visual_defect"))
+            findings.append(recovery_finding(declare_finding({"category": "rendering", "field": path.name, "target_ids": ["layout:icf"], "issue": f"Visible ICF headings lack Word heading styles: {non_heading}"}, classification="essential_defect", reason="rendering.audit_docx.8e83807ea0", repair_owner="rendering"), "visual_defect"))
     return findings
 
 
@@ -3897,7 +3899,7 @@ def render_documents(
         if template is None or kind not in selected: continue
         authority = repo_root / str(bundle["client_template_authorities"][kind]["path"])
         if not template.is_file():
-            results.append({"artifact": kind, "path": "", "status": "blocked", "findings": [{"category": "rendering", "field": kind, "issue": f"Contracted client template is missing: {template}"}]})
+            results.append({"artifact": kind, "path": "", "status": "blocked", "findings": [declare_finding({"category": "rendering", "field": kind, "issue": f"Contracted client template is missing: {template}"}, classification="essential_defect", reason="rendering.render_documents.a932f6355b", repair_owner="construction")]})
             continue
         try:
             document = _template_document(
@@ -3914,12 +3916,12 @@ def render_documents(
                 "artifact": kind,
                 "path": "",
                 "status": "blocked",
-                "findings": [{
+                "findings": [declare_finding({
                     "category": "layout-repair-classification",
                     "field": kind,
                     "artifact": kind,
                     "issue": str(exc),
-                }],
+                }, classification="technical_failure", reason="rendering.render_documents.a9b6404ad3", repair_owner="construction")],
             })
             continue
         if kind == "icf":
@@ -3933,13 +3935,13 @@ def render_documents(
         )
         findings = audit_docx(path, required_phrases=phrases)
         if kind == "icf" and not _icf_blocks(model, "icf.procedures"):
-            findings.insert(0, {
+            findings.insert(0, declare_finding({
                 "category": "rendering",
                 "field": "icf.procedures",
                 "issue": "Required source-bound section icf.procedures is missing or empty.",
-            })
-        blocking_findings = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
-        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"]})
+            }, classification="essential_defect", reason="rendering.render_documents.a7eba2d2f7", repair_owner="construction"))
+        blocking_findings = [finding for finding in findings if blocks_construction(finding)]
+        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "blocked" if any(blocks_construction(item) for item in blocking_findings) else "passed", "findings": blocking_findings, "warnings": [finding for finding in findings if not blocks_construction(finding)]})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
         "contracted_template_bundle": bundle,

@@ -27,9 +27,94 @@ TEST_FILES = (
     'test_prs_quality_corrections.py', 'test_prs_xml.py', 'test_worker_readiness.py',
     'test_mixed_visit_representations.py', 'test_semantic_evidence_recovery.py',
     'test_concept_reference_grounding.py',
-    'test_owner_aware_recovery.py',
+    'test_owner_aware_recovery.py', 'test_cause_aware_recovery.py',
+    'test_complete_delivery_policy.py', 'test_complete_delivery_replay.py',
+    'test_complete_delivery_icf.py', 'test_complete_delivery_publication.py', 'test_complete_delivery_message.py',
     'test_editorial_publication.py', 'test_phase1_repetition.py',
 )
+
+
+def _functions(tree, prefix=""):
+    """Discover methods and conditional/nested producers, using stable names."""
+    parents = {child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)}
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        scope = []
+        cursor = parents.get(node)
+        while cursor is not None:
+            if isinstance(cursor, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                scope.append(cursor.name)
+            cursor = parents.get(cursor)
+        yield prefix + ".".join([*reversed(scope), node.name]), node
+
+
+def _policy_calls(node):
+    return [item for item in ast.walk(node) if isinstance(item, ast.Call)
+            and isinstance(item.func, ast.Name) and item.func.id in {"classify_finding", "declare_finding"}]
+
+
+def policy_declarations(node):
+    """Record each explicit producer reason separately from code fingerprints."""
+    result = []
+    for call in _policy_calls(node):
+        values = {kw.arg: ast.unparse(kw.value) for kw in call.keywords}
+        result.append({key: values.get(key) for key in ("classification", "reason", "repair_owner")})
+    return sorted(result, key=lambda row: json.dumps(row, sort_keys=True))
+
+
+def policy_findings(root: Path = ROOT) -> list[str]:
+    """Developer-only contract checks; never imported by ordinary generation."""
+    audit = json.loads((root / AUDIT.relative_to(ROOT)).read_text())
+    declarations = {(row["file"], row["function"]): row for row in audit["checks"]}
+    result = []
+    for path in sorted((root / "scripts").glob("*.py")):
+        tree = ast.parse(path.read_text())
+        relative = path.relative_to(root).as_posix()
+        for name, node in _functions(tree):
+            record = declarations.get((relative, name))
+            if record is None or record.get("scope") == "separate":
+                continue
+            location = f"{relative}:{name}"
+            parents = {child: item for item in ast.walk(node) for child in ast.iter_child_nodes(item)}
+            calls = _policy_calls(node)
+            for call in calls:
+                keys = {kw.arg for kw in call.keywords}
+                if not {"classification", "reason", "repair_owner"} <= keys:
+                    result.append(f"Incomplete finding policy: {location}")
+            if "policy_declarations" in record and policy_declarations(node) != record["policy_declarations"]:
+                result.append(f"Finding reason/classification/owner audit requires review: {location}")
+            for item in ast.walk(node):
+                if isinstance(item, ast.Dict):
+                    keys = {k.value for k in item.keys if isinstance(k, ast.Constant)}
+                    if "issue" not in keys:
+                        continue
+                    signature = hashlib.sha256(ast.unparse(item).encode()).hexdigest()
+                    if signature in record.get("diagnostic_record_sites", {}):
+                        continue
+                    cursor = parents.get(item)
+                    classified = any(isinstance(value, ast.Call) and value in calls for value in item.values)
+                    while cursor is not None and not isinstance(cursor, (ast.Assign, ast.Return, ast.Expr)):
+                        classified |= cursor in calls
+                        cursor = parents.get(cursor)
+                    if not classified and "finding_policy" not in keys:
+                        result.append(f"Unclassified finding producer: {location}:{item.lineno}")
+                if isinstance(item, ast.Call) and isinstance(item.func, ast.Attribute) and item.func.attr == "get":
+                    if item.args and isinstance(item.args[0], ast.Constant) and item.args[0].value == "publication_disposition":
+                        result.append(f"Raw finding decision: {location}:{item.lineno}")
+                if record.get("role") == "decision" and isinstance(item, (ast.If, ast.IfExp)):
+                    inputs = set(record.get("decision_inputs", []))
+                    def raw_presence(test):
+                        if isinstance(test, ast.BoolOp):
+                            return any(raw_presence(value) for value in test.values)
+                        if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+                            return raw_presence(test.operand)
+                        if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "bool" and len(test.args) == 1:
+                            return raw_presence(test.args[0])
+                        return isinstance(test, ast.Name) and test.id in inputs
+                    if raw_presence(item.test):
+                        result.append(f"Raw finding decision: {location}:{item.lineno}")
+    return sorted(set(result))
 
 
 def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
@@ -43,11 +128,11 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
         source = path.read_text(encoding='utf-8')
         lines = source.splitlines(keepends=True)
         tree = ast.parse(source)
-        for node in tree.body:
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                continue
+        for qualified_name, node in _functions(tree):
             strings = {item.value for item in ast.walk(node) if isinstance(item, ast.Constant) and isinstance(item.value, str)}
             shared_helpers = {
+                'classify_finding', 'declare_finding', 'normalize_finding', 'recovery_finding',
+                '_validate', 'finding_classification', 'blocks_construction', 'blocks_publication',
                 '_leaf_texts', '_grounding_tokens', '_evidence_diagnostics',
                 'evidence_grounded', 'source_evidence_diagnostics', 'source_evidence_grounded',
                 'hypothesis_claim_issues', '_timeline_grounded', '_material_source',
@@ -65,14 +150,14 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_validation_screening_interval_requirement', '_screening_interval_requirement_from_xml',
                 'semantic_evidence_inventory', '_source_field_inventory', 'create_verification_requests',
             }
-            if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:
+            if not {'issue', 'blocked', 'publication_disposition', 'finding_policy', 'terminal_status'} & strings and node.name not in shared_helpers:
                 continue
             # AST dumps change when Python adds fields (for example, type_params in
             # 3.12). Hash the source instead so one audit works on every runtime.
             first_line = min([node.lineno, *(decorator.lineno for decorator in node.decorator_list)])
             function_source = ''.join(lines[first_line - 1:node.end_lineno])
             records.append({
-                'file': path.relative_to(root).as_posix(), 'function': node.name,
+                'file': path.relative_to(root).as_posix(), 'function': qualified_name,
                 'code_sha256': hashlib.sha256(function_source.encode('utf-8')).hexdigest(),
             })
     return records
@@ -86,7 +171,7 @@ def audit_findings(root: Path = ROOT) -> list[str]:
     for key in sorted(expected.keys() | actual.keys()):
         if expected.get(key) != actual.get(key):
             findings.append(f'Blocking-check audit requires review: {key[0]}:{key[1]}')
-    return findings
+    return findings + policy_findings(root)
 
 
 def test_command(python: str = sys.executable) -> list[str]:

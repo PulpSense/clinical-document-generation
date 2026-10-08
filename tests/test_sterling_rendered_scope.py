@@ -1,3 +1,4 @@
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -71,5 +72,5 @@ def test_rendered_purpose_word_goal_is_warning_when_clause_is_substantively_comp
     purpose = [item for item in report['findings'] if item['clause_id'] == 'sterling.purpose.study-purpose']
     assert report['status'] == 'passed'
     assert len(purpose) == 1
-    assert purpose[0]['publication_disposition'] == 'warning'
+    assert not blocks_construction(purpose[0])
     assert purpose[0]['code'] == 'sterling-clause-word-goal'

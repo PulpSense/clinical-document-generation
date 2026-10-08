@@ -1,3 +1,4 @@
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -40,7 +41,7 @@ def test_explicitly_nonmaterial_editorial_review_is_a_retained_warning(tmp_path)
     finding = {**REPLAY['finding'],'material':False}
     findings,evidence = review_result(tmp_path,finding)
     warning = next(item for item in findings if item.get('check') == 'editorial_relevance')
-    assert warning['publication_disposition'] == 'warning'
+    assert not blocks_construction(warning)
     assert warning['action'] == 'manual_review'
     assert evidence
 
@@ -52,7 +53,7 @@ import pytest
 def test_material_or_uncertain_editorial_findings_cannot_become_warnings(tmp_path, flag):
     finding = {**REPLAY['finding'],'material':False,flag:True}
     findings,_ = review_result(tmp_path,finding)
-    assert any(item.get('check') == 'editorial_relevance' and item.get('publication_disposition') != 'warning' for item in findings)
+    assert any(item.get('check') == 'editorial_relevance' and blocks_construction(item) for item in findings)
 
 
 @pytest.mark.parametrize('check,target', [('source_supported','general-information'),('no_invention','general-information'),('editorial_relevance','icf.risks')])
@@ -62,7 +63,7 @@ def test_factual_or_safety_findings_remain_blocking(tmp_path, check, target):
         finding['artifact']='icf'
         finding['safety_critical']=True
     findings,_ = review_result(tmp_path,finding)
-    assert any(item.get('issue') == finding['issue'] and item.get('publication_disposition') != 'warning' for item in findings)
+    assert any(item.get('issue') == finding['issue'] and blocks_construction(item) for item in findings)
 
 
 def test_computed_synopsis_is_checked_before_independent_review(tmp_path):
@@ -83,7 +84,7 @@ def test_incomplete_editorial_severity_evidence_remains_blocking(tmp_path, omitt
     finding={**REPLAY['finding'],'material':False}
     finding.pop(omitted)
     findings,_=review_result(tmp_path,finding)
-    assert not any(item.get('publication_disposition') == 'warning' for item in findings)
+    assert not any(not blocks_construction(item) for item in findings)
 
 
 @pytest.mark.parametrize('timeline,expected', [

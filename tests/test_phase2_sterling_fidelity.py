@@ -1,3 +1,4 @@
+from finding_policy import blocks_construction, blocks_publication
 import copy
 import json
 from pathlib import Path
@@ -257,7 +258,7 @@ def test_icf_background_and_purpose_material_concept_overlap_targets_purpose():
     assert finding["primary_section"] == "icf.background"
     assert finding["secondary_section"] == "icf.study-purpose"
     assert finding["target_ids"] == ["icf.study-purpose"]
-    assert finding["publication_disposition"] == "warning"
+    assert not blocks_construction(finding)
 
 
 def test_short_key_information_summary_to_detail_overlap_is_allowed():
@@ -304,7 +305,7 @@ def test_protocol_endpoint_inventory_repetition_targets_secondary_sections():
         "analysis-plan.methodology",
     }
     assert all(item["target_ids"] == [item["secondary_section"]] for item in findings)
-    assert all(item["publication_disposition"] == "blocking" for item in findings)
+    assert all(not blocks_construction(item) and blocks_publication(item) for item in findings)
 
 
 def test_legitimate_endpoint_references_with_section_specific_roles_are_allowed():
@@ -373,7 +374,7 @@ def test_protocol_termination_authority_is_source_mode_and_absent_when_unsupport
     assert "18.4. Study Termination" not in visible
 
 
-def test_exact_substantive_protocol_duplication_remains_blocking(tmp_path):
+def test_exact_substantive_protocol_duplication_requires_meaning_review(tmp_path):
     duplicate = (
         "The primary endpoint is intermediate visual acuity at month 3 and all secondary endpoints are "
         "evaluated at that same postoperative visit using the specified study assessments."
@@ -394,6 +395,7 @@ def test_exact_substantive_protocol_duplication_remains_blocking(tmp_path):
     )
 
     finding = next(item for item in findings if item.get("code") == "protocol-exact-repetition")
-    assert finding["publication_disposition"] == "blocking"
-    assert finding["recovery_class"] == "drafting_defect"
+    assert not blocks_construction(finding) and blocks_publication(finding)
+    assert finding["finding_policy"]["repair_owner"] == "independent_review"
+    assert "recovery_class" not in finding
     assert finding["target_ids"] == ["study-procedure.measurements"]

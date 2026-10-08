@@ -7,6 +7,8 @@ not a workflow entrypoint.
 
 from __future__ import annotations
 
+from finding_policy import declare_finding, normalize_finding, blocks_construction
+
 import copy
 import hashlib
 import json
@@ -275,12 +277,12 @@ class ContractedTemplateBundleError(ValueError):
 
     def __init__(self, problems: Iterable[str]):
         details = tuple(dict.fromkeys(str(problem) for problem in problems if str(problem)))
-        self.finding = {
+        self.finding = declare_finding({
             "category": "contract",
             "field": "contracted_template_bundle",
             "issue": "Contracted Template Bundle is incomplete or inconsistent: " + "; ".join(details),
             "required": "Restore one complete contracted resource set and retry before drafting.",
-        }
+        }, classification="technical_failure", reason="contracts.__init__.c4d47ec21d", repair_owner="integrity")
         super().__init__(self.finding["issue"])
 
 
@@ -1138,13 +1140,13 @@ def _canonicalize_declared_aliases(reference: dict[str, Any]) -> list[dict[str, 
         signatures = {_candidate_signature(value) for _path, value in supplied}
         signatures.discard(None)
         if len(signatures) > 1:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "source-evidence",
                 "field": canonical,
                 "issue": "Required Source Input has conflicting declared aliases.",
                 "required": "Select one source-supported value.",
                 "source_values": {path: copy.deepcopy(value) for path, value in supplied},
-            })
+            }, classification="essential_defect", reason="contracts._canonicalize_declared_aliases.ff50e9e3bb", repair_owner="source"))
             continue
         alias_values = [(path, value) for path, value in supplied if path != canonical]
         if (canonical_value is missing or not _valid_required_value(canonical, canonical_value)) and alias_values:
@@ -1153,7 +1155,7 @@ def _canonicalize_declared_aliases(reference: dict[str, Any]) -> list[dict[str, 
     if provenance:
         source = reference.setdefault("source", {})
         if not isinstance(source, dict):
-            findings.append({"category": "technical", "field": "source", "issue": "Source metadata must be an object."})
+            findings.append(declare_finding({"category": "technical", "field": "source", "issue": "Source metadata must be an object."}, classification="essential_defect", reason="contracts._canonicalize_declared_aliases.2a71b9c085", repair_owner="source"))
         else:
             existing = source.get("alias_provenance")
             source["alias_provenance"] = {**(existing if isinstance(existing, dict) else {}), **provenance}
@@ -1896,12 +1898,12 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
             scheduled = max(durations)
             tolerance = max(1.0, stated * 0.02)
             if abs(stated - scheduled) > tolerance:
-                return [{"category": "source-evidence", "field": "study.timeline",
+                return [declare_finding({"category": "source-evidence", "field": "study.timeline",
                          "issue": f"The baseline-relative timeline ({relative.group(0)}) conflicts with the nominal scheduled interval of {scheduled / 7:g} weeks after baseline.",
                          "required": "Reconcile the conflicting approved temporal anchors; do not silently rewrite either source statement.",
                          "source_values": {"study.timeline": copy.deepcopy(timeline),
                                            "procedures.visit_schedule": copy.deepcopy(get_path(reference, "procedures.visit_schedule")),
-                                           "procedures.visit_schedule_table": copy.deepcopy(get_path(reference, "procedures.visit_schedule_table"))}}]
+                                           "procedures.visit_schedule_table": copy.deepcopy(get_path(reference, "procedures.visit_schedule_table"))}}, classification="essential_defect", reason="contracts.timeline_findings.f4f767b459", repair_owner="source")]
     if relatives:
         return []
     participant_clauses = [clause for clause in re.split(r"[;.!?]|,(?=\s*(?:follow|participant|final))", text, flags=re.I)
@@ -1910,7 +1912,7 @@ def timeline_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     scheduled_days = _scheduled_duration_days(reference)
     tolerance = max(1.0, timeline_days * 0.02) if timeline_days is not None else 0.0
     if timeline_days is not None and scheduled_days is not None and scheduled_days > timeline_days + tolerance:
-        return [{"category": "source-evidence", "field": "study.timeline", "issue": "The approved visit/outcome schedule extends beyond the stated study timeline.", "required": "A timeline at least as long as the latest approved visit or outcome time point.", "source_values": {"study.timeline": copy.deepcopy(timeline)}}]
+        return [declare_finding({"category": "source-evidence", "field": "study.timeline", "issue": "The approved visit/outcome schedule extends beyond the stated study timeline.", "required": "A timeline at least as long as the latest approved visit or outcome time point.", "source_values": {"study.timeline": copy.deepcopy(timeline)}}, classification="essential_defect", reason="contracts.timeline_findings.a226bc4c2b", repair_owner="source")]
     return []
 
 
@@ -1941,26 +1943,26 @@ def _safety_party_identity(value: str) -> str:
 def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     branch = canonical_study_type(get_path(reference, "meta.study_type"))
     if not branch:
-        return [{"category": "source-evidence", "field": "meta.study_type", "issue": "Study type must be Prospective, Ambispective, or Retrospective.", "required": "One supported study type."}]
+        return [declare_finding({"category": "source-evidence", "field": "meta.study_type", "issue": "Study type must be Prospective, Ambispective, or Retrospective.", "required": "One supported study type."}, classification="essential_defect", reason="contracts.input_findings.0edb1de130", repair_owner="source")]
     requirements = RETROSPECTIVE_REQUIRED if branch == "Retrospective" else PROSPECTIVE_REQUIRED
     findings: list[dict[str, Any]] = []
     candidates = get_path(reference, "source.field_candidates", {})
     candidates = candidates if isinstance(candidates, Mapping) else {}
     for requirement in requirements:
         if not _valid_required_value(requirement.field, required_input_value(reference, requirement)):
-            findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input is missing.", "required": requirement.label or requirement.field})
+            findings.append(declare_finding({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input is missing.", "required": requirement.label or requirement.field}, classification="essential_defect", reason="contracts.input_findings.f80f9f283a", repair_owner="source"))
         signatures = {_candidate_signature(value) for value in candidates.get(requirement.field, []) if _candidate_signature(value)}
         if len(signatures) > 1:
-            findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input has conflicting source candidates.", "required": "One reviewer-selected value."})
+            findings.append(declare_finding({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input has conflicting source candidates.", "required": "One reviewer-selected value."}, classification="essential_defect", reason="contracts.input_findings.e777578320", repair_owner="source"))
     if branch != "Retrospective":
         prs_study_type = get_path(reference, "regulatory.prs.study_type")
         if meaningful(prs_study_type) and str(prs_study_type) not in PRS_STUDY_TYPES.values():
-            findings.append({
+            findings.append(declare_finding({
                 "category": "source-evidence",
                 "field": "regulatory.prs.study_type",
                 "issue": "PRS study type must be Observational or Interventional.",
                 "required": "Observational or Interventional.",
-            })
+            }, classification="essential_defect", reason="contracts.input_findings.41b43fd2af", repair_owner="source"))
         for index, site in enumerate(get_path(reference, "sites", []) or []):
             if not isinstance(site, Mapping):
                 continue
@@ -1972,22 +1974,22 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                 continue
             projection = facility_projection(facility)
             if not projection["city"] or not projection["country"]:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "source-evidence",
                     "field": f"sites[{index}].facility.address",
                     "issue": "Supplied site address cannot be separated into PRS location components.",
                     "required": "Provide the site city and country as explicit facility fields; include state and postal code when supplied.",
-                })
+                }, classification="essential_defect", reason="contracts.input_findings.53981bb78f", repair_owner="source"))
     sample_size = _sample_size_signature(get_path(reference, "population.sample_size"))
     for evidence_path in ("population.sample_size_evidence", "statistics.sample_size_evidence"):
         rows = get_path(reference, evidence_path, [])
         if meaningful(rows) and not isinstance(rows, list):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "source-evidence",
                 "field": evidence_path,
                 "issue": "Sample-size evidence must be a list of typed row objects.",
                 "required": "A list using only the approved sample-size evidence columns.",
-            })
+            }, classification="essential_defect", reason="contracts.input_findings.44ce95c49e", repair_owner="source"))
             continue
         if not isinstance(rows, list):
             continue
@@ -1998,21 +2000,21 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         }
         for index, row in enumerate(rows):
             if not isinstance(row, Mapping):
-                findings.append({
+                findings.append(declare_finding({
                     "category": "source-evidence",
                     "field": f"{evidence_path}.{index}",
                     "issue": "Sample-size evidence rows must be typed objects.",
                     "required": "One object using only the approved sample-size evidence columns.",
-                })
+                }, classification="essential_defect", reason="contracts.input_findings.42b320f0a3", repair_owner="source"))
                 continue
             unsupported = sorted(str(key) for key in set(row) - allowed_keys)
             if unsupported:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "source-evidence",
                     "field": f"{evidence_path}.{index}",
                     "issue": "Sample-size evidence contains unsupported columns that cannot be rendered without data loss: " + ", ".join(unsupported),
                     "required": "Use the approved sample-size evidence schema or extend the versioned contract before approval.",
-                })
+                }, classification="essential_defect", reason="contracts.input_findings.c0cbb6595d", repair_owner="source"))
             for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS:
                 values = {
                     str(row[candidate]).strip()
@@ -2020,15 +2022,15 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     if meaningful(row.get(candidate))
                 }
                 if len(values) > 1:
-                    findings.append({
+                    findings.append(declare_finding({
                         "category": "source-evidence",
                         "field": f"{evidence_path}.{index}.{key}",
                         "issue": "Sample-size evidence aliases contain conflicting values.",
                         "required": "One approved value for the column.",
-                    })
+                    }, classification="essential_defect", reason="contracts.input_findings.7526e35a2e", repair_owner="source"))
         evidence_sizes = {_sample_size_signature(row) for row in rows if _sample_size_signature(row)}
         if sample_size and any(value != sample_size for value in evidence_sizes):
-            findings.append({"category": "source-evidence", "field": evidence_path, "issue": "Sample-size evidence conflicts with the approved planned sample size.", "required": "Evidence rows that use the same participant count as population.sample_size."})
+            findings.append(declare_finding({"category": "source-evidence", "field": evidence_path, "issue": "Sample-size evidence conflicts with the approved planned sample size.", "required": "Evidence rows that use the same participant count as population.sample_size."}, classification="essential_defect", reason="contracts.input_findings.14c3948e4e", repair_owner="source"))
     combined_records = _sample_size_evidence_records(reference)
     combined_evidence = [row for _path, _index, row in combined_records]
     if branch != "Retrospective" and combined_evidence:
@@ -2042,19 +2044,19 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
         schema = DETAILED_SAMPLE_SIZE_COLUMNS if detailed_present else LEGACY_SAMPLE_SIZE_COLUMNS
         missing = [column for column in schema if column not in present_columns]
         if missing:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "source-evidence",
                 "field": "statistics.sample_size_evidence",
                 "issue": "Sample-size evidence is missing required table columns: " + ", ".join(missing),
                 "required": "A complete detailed evidence schema or the complete approved legacy evidence schema.",
-            })
+            }, classification="essential_defect", reason="contracts.input_findings.14bfb8632f", repair_owner="source"))
         if detailed_present and legacy_present:
-            findings.append({
+            findings.append(declare_finding({
                 "category": "source-evidence",
                 "field": "statistics.sample_size_evidence",
                 "issue": "Sample-size evidence mixes detailed and legacy table schemas.",
                 "required": "Use one complete approved sample-size evidence schema per study.",
-            })
+            }, classification="essential_defect", reason="contracts.input_findings.ef9ab4d6e3", repair_owner="source"))
         column_aliases = {
             key: aliases for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
         }
@@ -2072,12 +2074,12 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                 and not _table_value(row, column, column_aliases[column])
             ]
             if row_missing:
-                findings.append({
+                findings.append(declare_finding({
                     "category": "source-evidence",
                     "field": f"{evidence_path}.{source_index}",
                     "issue": "Sample-size evidence row is missing required values: " + ", ".join(row_missing),
                     "required": "Populate every required cell; only aggregate rows may leave timepoint and SE blank.",
-                })
+                }, classification="essential_defect", reason="contracts.input_findings.1651f1b30b", repair_owner="source"))
     for path in ("procedures.visit_schedule", "procedures.visit_schedule_table"):
         raw_visits = get_path(reference, path, [])
         seen_ids: set[str] = set()
@@ -2086,33 +2088,33 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                 continue
             identifier = str(visit["visitNumber"])
             if identifier in seen_ids:
-                findings.append({"category": "source-evidence", "field": f"{path}.{index}.visitNumber",
+                findings.append(declare_finding({"category": "source-evidence", "field": f"{path}.{index}.visitNumber",
                                  "issue": f"Duplicate supplied visitNumber: {identifier}.",
                                  "required": "Reconcile duplicate approved visit identifiers; do not silently renumber.",
-                                 "source_values": {path: copy.deepcopy(raw_visits)}})
+                                 "source_values": {path: copy.deepcopy(raw_visits)}}, classification="essential_defect", reason="contracts.input_findings.2661dee226", repair_owner="source"))
             seen_ids.add(identifier)
     findings.extend(timeline_findings(reference))
     if branch != "Retrospective":
         choice = str(get_path(reference, "meta.icf_template", "")).strip().casefold()
         if choice not in {"advarra", "sterling"}:
-            findings.append({"category": "source-evidence", "field": "meta.icf_template", "issue": "ICF Template Choice is unresolved.", "required": "Advarra or Sterling."})
+            findings.append(declare_finding({"category": "source-evidence", "field": "meta.icf_template", "issue": "ICF Template Choice is unresolved.", "required": "Advarra or Sterling."}, classification="essential_defect", reason="contracts.input_findings.d13d448a7c", repair_owner="source"))
         for outcome_kind in ("primary", "secondary", "other"):
             value = get_path(reference, f"endpoints.{outcome_kind}", [])
             if outcome_kind == "primary" and (not isinstance(value, list) or not value):
-                findings.append({"category": "source-evidence", "field": "endpoints.primary", "issue": "Primary outcomes must be a non-empty structured list.", "required": "One or more outcome rows with measure and time frame."})
+                findings.append(declare_finding({"category": "source-evidence", "field": "endpoints.primary", "issue": "Primary outcomes must be a non-empty structured list.", "required": "One or more outcome rows with measure and time frame."}, classification="essential_defect", reason="contracts.input_findings.2cbfede812", repair_owner="source"))
                 continue
             if value in (None, "", []):
                 continue
             if not isinstance(value, list) or any(not isinstance(item, Mapping) for item in value):
-                findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}", "issue": "Outcome data must be a structured list, not free text.", "required": "Outcome rows with measure and time frame."})
+                findings.append(declare_finding({"category": "source-evidence", "field": f"endpoints.{outcome_kind}", "issue": "Outcome data must be a structured list, not free text.", "required": "Outcome rows with measure and time frame."}, classification="essential_defect", reason="contracts.input_findings.5d355eab6e", repair_owner="source"))
                 continue
             for index, item in enumerate(value):
                 measure = item.get("outcome_measure") or item.get("measure") or item.get("label")
                 time_frame = item.get("outcome_time_frame") or item.get("time_frame") or item.get("time_point")
                 if not meaningful(measure):
-                    findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.measure", "issue": "Outcome measure is missing.", "required": "Reviewer-approved outcome measure."})
+                    findings.append(declare_finding({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.measure", "issue": "Outcome measure is missing.", "required": "Reviewer-approved outcome measure."}, classification="essential_defect", reason="contracts.input_findings.4c8d6bbee6", repair_owner="source"))
                 if not meaningful(time_frame):
-                    findings.append({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.time_frame", "issue": "Outcome time frame is missing.", "required": "Reviewer-approved outcome time frame."})
+                    findings.append(declare_finding({"category": "source-evidence", "field": f"endpoints.{outcome_kind}.{index}.time_frame", "issue": "Outcome time frame is missing.", "required": "Reviewer-approved outcome time frame."}, classification="essential_defect", reason="contracts.input_findings.9c0fabd7c5", repair_owner="source"))
     else:
         safety_roles = get_path(reference, "safety.roles")
         if meaningful(safety_roles) and (
@@ -2120,7 +2122,7 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
             or any(not _valid_safety_role_record(item) for item in safety_roles)
             or len({_safety_party_identity(item["party"]) for item in safety_roles if isinstance(item, Mapping)}) != len(safety_roles)
         ):
-            findings.append({
+            findings.append(declare_finding({
                 "category": "source-evidence",
                 "field": "safety.roles",
                 "issue": "Retrospective safety roles must be structured party/responsibility records.",
@@ -2128,7 +2130,7 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "One or more exact {party, responsibilities} text records; responsibilities use "
                     "semicolon-separated assess_safety_events/report_safety_events concepts."
                 ),
-            })
+            }, classification="essential_defect", reason="contracts.input_findings.2ec745388c", repair_owner="source"))
     count = get_path(reference, "design.number_of_sites")
     sites = _site_group(reference, "site_facilities")
     try:
@@ -2136,12 +2138,12 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     except (TypeError, ValueError):
         count_number = None
     if branch != "Retrospective" and count_number is not None and sites and count_number != len(sites):
-        findings.append({"category": "source-evidence", "field": "design.number_of_sites", "issue": f"Site count is {count_number}, but {len(sites)} facility entries were approved.", "required": "Consistent site count and facility rows."})
+        findings.append(declare_finding({"category": "source-evidence", "field": "design.number_of_sites", "issue": f"Site count is {count_number}, but {len(sites)} facility entries were approved.", "required": "Consistent site count and facility rows."}, classification="essential_defect", reason="contracts.input_findings.7873358bed", repair_owner="source"))
     design_text = str(get_path(reference, "design.study_design", "")).casefold()
     if count_number == 1 and "multicenter" in design_text:
-        findings.append({"category": "source-evidence", "field": "design.study_design", "issue": "Study design says multicenter but the approved site count is one.", "required": "A consistent center description and site count."})
+        findings.append(declare_finding({"category": "source-evidence", "field": "design.study_design", "issue": "Study design says multicenter but the approved site count is one.", "required": "A consistent center description and site count."}, classification="essential_defect", reason="contracts.input_findings.67fdb18001", repair_owner="source"))
     if count_number and count_number > 1 and ("single-center" in design_text or "single center" in design_text):
-        findings.append({"category": "source-evidence", "field": "design.study_design", "issue": "Study design says single-center but the approved site count is greater than one.", "required": "A consistent center description and site count."})
+        findings.append(declare_finding({"category": "source-evidence", "field": "design.study_design", "issue": "Study design says single-center but the approved site count is greater than one.", "required": "A consistent center description and site count."}, classification="essential_defect", reason="contracts.input_findings.0521ba63fb", repair_owner="source"))
     return findings
 
 
@@ -2169,37 +2171,26 @@ def source_contract(
     findings = [*alias_findings, *input_findings(normalized)]
     if require_approval:
         if str(get_path(normalized, "approval.status", "")).casefold() != "approved":
-            findings.append({"category": "approval", "field": "approval.status", "issue": "The current Source-of-Truth Markdown has not been explicitly approved.", "required": "Explicit approval of the current file."})
+            findings.append(declare_finding({"category": "approval", "field": "approval.status", "issue": "The current Source-of-Truth Markdown has not been explicitly approved.", "required": "Explicit approval of the current file."}, classification="technical_failure", reason="contracts.source_contract.b6fe4d34ee", repair_owner="integrity"))
         review_file = get_path(normalized, "approval.review_file")
         if not review_file or (run_dir is not None and not (run_dir / str(review_file)).is_file()):
-            findings.append({"category": "approval", "field": "approval.review_file", "issue": "The approved Source-of-Truth Markdown file is unavailable.", "required": "An existing reviewer-facing Markdown file."})
-    source_gap_issues = {
-        "Required Source Input is missing.",
-        "Required Source Input has conflicting source candidates.",
-        "Required Source Input has conflicting declared aliases.",
-        "Supplied site address cannot be separated into PRS location components.",
-    }
+            findings.append(declare_finding({"category": "approval", "field": "approval.review_file", "issue": "The approved Source-of-Truth Markdown file is unavailable.", "required": "An existing reviewer-facing Markdown file."}, classification="technical_failure", reason="contracts.source_contract.fe90e69d31", repair_owner="integrity"))
     source_gaps = [
         finding for finding in findings
-        if finding.get("category") != "approval"
-        and (
-            finding.get("issue") in source_gap_issues
-            or finding.get("field") == "meta.icf_template"
-            and "unresolved" in str(finding.get("issue", "")).casefold()
-        )
+        if finding["finding_policy"]["repair_owner"] == "source"
     ]
     technical_findings = [
         finding for finding in findings
         if finding.get("category") != "approval" and finding not in source_gaps
     ]
     return {
-        "status": "passed" if not findings else "blocked",
+        "status": "blocked" if any(blocks_construction(item) for item in findings) else "passed",
         "study_type": branch,
         "blocking_findings": findings,
         "source_gaps": source_gaps,
         "technical_findings": technical_findings,
         "normalized_reference": normalized,
-        "computed_fields": computed_study_fields(normalized) if not findings else {},
+        "computed_fields": computed_study_fields(normalized) if not any(blocks_construction(item) for item in findings) else {},
     }
 
 

@@ -1,49 +1,49 @@
 {
-  "schema_version": "blocking-check-audit/v2",
-  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in the production modules, including the shared finding policy; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
+  "schema_version": "blocking-check-audit/v3",
+  "scope": "Scoped ordinary/shared finding producers, stage decisions, and evidence helpers, including class/nested producers. Separate installation/certification gates preserve their own policy. Fingerprints and declared reason contracts are developer review evidence; controlled public delivery is distinct behavior evidence.",
   "baseline_commit": "b35761d",
   "families": {
     "source": {
       "authority": "Approved Source-of-Truth schema, branch requirements and clinical relationships",
       "false_rejection_risk": "Alias or source-shape differences; mixed enrollment/endpoint text needs source review before generation",
       "duplicate_policy": "source_contract owns normalization before approval; clinical evidence remains immutable",
-      "coverage": "test_contracts.py; test_reliability_maintenance.py"
+      "coverage": "test_contracts.py; test_reliability_maintenance.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "evidence": {
       "authority": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
       "false_rejection_risk": "Lexical overlap is a heuristic; structural IDs, bibliography and binary cells must be excluded by the shared projection",
       "duplicate_policy": "Drafting, Protocol rendered fidelity and Sterling consume shared section projections; endpoint inventory stays in its Study Design owner. Independent review still assesses meaning/relations.",
-      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py; test_concept_reference_grounding.py"
+      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py; test_concept_reference_grounding.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "clinical": {
       "authority": "Approved values plus Brad section ownership and governed template clauses",
       "false_rejection_risk": "Overbroad keyword rules or contradictory draft/render scopes; do not promote heuristic success into clinical approval",
       "duplicate_policy": "Shared evidence scope for sourced prose; exact legal text and placement retain separate authority",
-      "coverage": "test_sterling_rendered_scope.py; test_phase2_sterling_fidelity.py; test_brad_editorial_feedback.py; test_sterling_template_comments.py"
+      "coverage": "test_sterling_rendered_scope.py; test_phase2_sterling_fidelity.py; test_brad_editorial_feedback.py; test_sterling_template_comments.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "structured": {
       "authority": "Approved enrollment total, cohorts/interventions, endpoints, visits and PRS schema",
       "false_rejection_risk": "Dropping keys or guessing first numbers can destroy relationships; ambiguous matrix cells must not be guessed",
       "duplicate_policy": "contracts normalizes visit interpretation; table and narrative project that interpretation. PRS generation/validation share mapping helpers; independently asserted expected values in regression tests and full independent content review provide additional protection.",
-      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py; test_mixed_visit_representations.py"
+      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py; test_mixed_visit_representations.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "render": {
       "authority": "Exact template topology, DOCX/PDF/page images and release-owned renderer",
       "false_rejection_risk": "Host environment, font capability, page splitting or sparse page classifications; host smoke does not certify every layout",
       "duplicate_policy": "Render defects route to layout/construction owner; complete fresh exact-artifact review follows repair",
-      "coverage": "test_duration_reference_preservation.py; test_handoff_quality.py; host installation render smoke"
+      "coverage": "test_duration_reference_preservation.py; test_handoff_quality.py; host installation render smoke; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "review": {
       "authority": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
       "false_rejection_risk": "Malformed responses or targets can look like content defects; transport and semantic findings need different routes",
       "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; explicit harmless editorial findings can be retained warnings. Factual, safety, missing/true material flags remain blocking.",
-      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py; test_cause_aware_recovery.py"
+      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py; test_cause_aware_recovery.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "recovery": {
       "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
       "false_rejection_risk": "Counting the same response repeatedly; generic diagnostics produce identical retries; transport retry must not consume drafting streak",
       "duplicate_policy": "workflow owns retry state/deadlines; code-owned sections use native rendered snapshots when no accepted AI draft exists. Progress requires changed target and candidate; a fresh full review still decides correctness.",
-      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py; test_cause_aware_recovery.py"
+      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py; test_cause_aware_recovery.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     },
     "installation": {
       "authority": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
@@ -55,813 +55,2904 @@
       "authority": "Final complete accepted review, atomic publication and exact client bytes",
       "false_rejection_risk": "Transient attachment access must retry the same bytes within the original deadline",
       "duplicate_policy": "One final artifact identity; client output never substitutes an unapproved candidate",
-      "coverage": "test_reliability_maintenance.py; test_handoff_quality.py"
+      "coverage": "test_reliability_maintenance.py; test_handoff_quality.py; test_complete_delivery_policy.py; test_complete_delivery_publication.py sparse/rich controlled five-family Desktop matrix"
     }
   },
   "checks": [
     {
       "file": "scripts/contracts.py",
+      "function": "recovery_finding",
+      "code_sha256": "47ecedc9a7a1ec0ddc1ca2431175cb0b5b9f03888a2d71464fa3e374ad7e965f",
+      "family": "source",
+      "scope": "ordinary",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/contracts.py",
       "function": "_fidelity_evidence",
       "code_sha256": "78a60eb6fe5f35c9c63ee1837c2228b70090f1d716cb5d27c916da21294dbf61",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "_canonicalize_declared_aliases",
-      "code_sha256": "60876656bef28950eab8618ab5233e785acdcc44df8f296e15a87be514c11b1c",
-      "family": "source"
+      "code_sha256": "1da6a6410228dd633b900d06f4e8a3f2ca22b2dcc193becd3a38802562bc040f",
+      "family": "source",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts._canonicalize_declared_aliases.2a71b9c085'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts._canonicalize_declared_aliases.ff50e9e3bb'",
+          "repair_owner": "'source'"
+        }
+      ]
     },
     {
       "file": "scripts/contracts.py",
       "function": "assessment_matrix",
       "code_sha256": "47798c4eff332d378810eda2d64f94afbf35388d86d5e7e586642f74d776d868",
-      "family": "structured"
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/contracts.py",
       "function": "_schedule_activity_identity",
-      "code_sha256": "9d8f37ec0eefa482bbf3caa68a092e91ede3d6e3469d6ad6f59c081a6c1b57f1"
+      "code_sha256": "9d8f37ec0eefa482bbf3caa68a092e91ede3d6e3469d6ad6f59c081a6c1b57f1",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/contracts.py",
       "function": "_matrix_visit_alias",
-      "code_sha256": "3fa7a89607f8fe43d1554bfa2006581a37b1c1151644bdd5e4450c932907c9a0"
+      "code_sha256": "3fa7a89607f8fe43d1554bfa2006581a37b1c1151644bdd5e4450c932907c9a0",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "normalized_visit_records",
       "code_sha256": "d2b82e87211979a0d91ff8c603ccbc34caf1da8e8792276159318f2945cd4a66",
-      "family": "structured"
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "participant_followup_summary",
       "code_sha256": "f42f5a2390c70f252a11d1add202d5047fabb95aab41a7c7b84c7a873f93e19b",
-      "family": "structured"
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "computed_study_fields",
       "code_sha256": "c2d6b80c6ae38bb81a943552e4ba201ed9d98a7372451b7df44652e64eba17b2",
-      "family": "structured"
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "semantic_evidence_contract",
       "code_sha256": "b9fe749ac93aa97c6fdd9c9d75d7ac588d56688b67a2bd2ef1c1fed14eac6bc5",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "sterling_draft_word_budget",
       "code_sha256": "8e21c89c6c6dff99d9527f0d846264616164fcaa98e4245c7eefc91d049ba730",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
       "code_sha256": "0d6ffdd70dd2d760650ca5695a8454ba2039cdfd05ab123182089a0be7dc4ebe",
-      "family": "structured"
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/contracts.py",
       "function": "timeline_findings",
-      "code_sha256": "bcf4a7025f532743b9d90cbbdde05a214f3b5a7567f1f576e16e30179022b644",
-      "family": "source"
+      "code_sha256": "6759fed32bb14b8f9a047c4b73cf5019972cd58ce9faa821b3a091f7b78b7c52",
+      "family": "source",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.timeline_findings.a226bc4c2b'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.timeline_findings.f4f767b459'",
+          "repair_owner": "'source'"
+        }
+      ]
     },
     {
       "file": "scripts/contracts.py",
       "function": "input_findings",
-      "code_sha256": "f9e743c6b096901219fb1908f79720ab4c886c1093ec52cec970f15bb0f56d79",
-      "family": "source"
+      "code_sha256": "e732b0f8c03c0ae8c3d3cfa4e8977f244c6d0acce3a6ba185758cc6a46847208",
+      "family": "source",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.0521ba63fb'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.0edb1de130'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.14bfb8632f'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.14c3948e4e'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.1651f1b30b'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.2661dee226'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.2cbfede812'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.2ec745388c'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.41b43fd2af'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.42b320f0a3'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.44ce95c49e'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.4c8d6bbee6'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.53981bb78f'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.5d355eab6e'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.67fdb18001'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.7526e35a2e'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.7873358bed'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.9c0fabd7c5'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.c0cbb6595d'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.d13d448a7c'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.e777578320'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.ef9ab4d6e3'",
+          "repair_owner": "'source'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'contracts.input_findings.f80f9f283a'",
+          "repair_owner": "'source'"
+        }
+      ]
     },
     {
       "file": "scripts/contracts.py",
       "function": "source_contract",
-      "code_sha256": "866f9cd57fe763dd9a8522441bc1c29df98f4abe371d7f0f0b768b07e8677b0f",
-      "family": "source"
+      "code_sha256": "0ef882d5b43d08438d4760d1f3acb25f29ec1114c59e34bd8157c4b0463b0b4c",
+      "family": "source",
+      "scope": "shared",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'contracts.source_contract.b6fe4d34ee'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'contracts.source_contract.fe90e69d31'",
+          "repair_owner": "'integrity'"
+        }
+      ],
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/contracts.py",
       "function": "repair_report",
       "code_sha256": "64566c43e985cdcd71e3526df41f5f71796b3259e495f86bb0e3eb1c22447ed7",
-      "family": "source"
+      "family": "source",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "ContractedTemplateBundleError.__init__",
+      "code_sha256": "5c0c0a687ea2e98dee8c15daafe7ae62f1fb12cfb1a0c0a689d74645c5b759df",
+      "family": "source",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'contracts.__init__.c4d47ec21d'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "section_evidence_value",
       "code_sha256": "fed1c95e1285dc8313e6ab081c82532964d25b1ff08884a01045d2193d52529a",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "_leaf_texts",
       "code_sha256": "8d8b4d99fb56c423784e98bd3361e4ef1db0b0a894354525274e9c2d2c33d736",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "_grounding_tokens",
       "code_sha256": "a497a34680362f50a927b483bf7c65a863a376398a3f9d9bcffe99f6f4e415dd",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "_evidence_diagnostics",
       "code_sha256": "b1472eaefd4cb7318c6515245685a7cc879861f7407fc79925e9101d15520811",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "evidence_grounded",
       "code_sha256": "b77e679fb41e400e8653948f7d208a4780ccd8dab5a6aa1bff1b58ef18213030",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "hypothesis_claim_issues",
       "code_sha256": "6213c4a50e70e9689c6ca997fda27e75faa27af37c7fb65d4d8c92ccd90ed02b",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "source_evidence_diagnostics",
       "code_sha256": "e1b25c05dd152edb13aeb300ee21b5f9088b144403ab801e174d766fc8c51819",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "source_evidence_grounded",
       "code_sha256": "2bef509e849baed504aa25a7c3779282d3d2133cef1858a99057b61d81bd13dc",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "evidence",
       "file": "scripts/drafting.py",
       "function": "lexical_evidence_uncertainty",
-      "code_sha256": "6769e87b5e86e7b23d172283b6e770d1c518dfbec5b6239214d1be4714576ffc"
+      "code_sha256": "6769e87b5e86e7b23d172283b6e770d1c518dfbec5b6239214d1be4714576ffc",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "_material_source",
       "code_sha256": "5cccf1fa31146d6ea059b8b9706c20514edf18996a79fcc24acb15715446ad0a",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "_timeline_grounded",
       "code_sha256": "642e73aa397043316f0e6b9fdc63322f36484c946020e7a24d1109e52c420735",
-      "family": "evidence"
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/drafting.py",
       "function": "_background_claim_findings",
-      "code_sha256": "abf462fba08050a9d119bb7ba3d82c73ca6e5a29db5b2efa681b3a67f8b6396c",
-      "family": "evidence"
+      "code_sha256": "dd76e0369e45cfe4102f9494dbb7e3bd792994f104c10e3e1da534c32788d086",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._background_claim_findings.5d6b57c028'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._background_claim_findings.a408f68ebb'",
+          "repair_owner": "'drafting'"
+        }
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "2067af408c20f5a3959c2b6f7f3ac8e0ac4eb17d9fde75f0253a3ae6c9ae7630",
-      "family": "evidence"
+      "code_sha256": "451d3b62b0ac41f0986560fb182c37c8b156408b28ec93a9013c384d90602166",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'The draft strengthens a qualified approved source claim.'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.1598aadf97'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.1ac08e4aea'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.273ed11e9b'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.32d04387eb'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.335d7e46d4'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.37b5e423a3'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.4c45f7a0e3'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.4dea61044f'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.5266803315'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.6e7a81e3f1'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.9a731c2c1f'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.9c2801135a'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.bc7ae04c65'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.c203966771'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.c36a5b6bb1'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.d1b8a08ac1'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.e77175dc81'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.f2bfba154e'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._coverage_findings.f3f683eda6'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Only lexical grounding is uncertain.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Only lexical grounding is uncertain.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Only lexical grounding is uncertain.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Placement heuristic requires independent assessment of meaning and ownership.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Placement heuristic requires independent assessment of meaning and ownership.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Placement heuristic requires independent assessment of meaning and ownership.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Placement heuristic requires independent assessment of meaning and ownership.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'lexical-evidence-uncertainty'",
+          "repair_owner": "'independent_review'"
+        }
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "_validate_paragraph",
-      "code_sha256": "aa0d94c630b895fe0fd11ff795fb8339ed4486a4e495539feefcfb76a4b52fd5",
-      "family": "evidence"
+      "code_sha256": "7be9d58f9b154ffa40fb64ae3ce9df8c446b5802db933ce2cb777f953faf55a8",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.264f5f76c9'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.2deed4e27b'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.929fcaabe3'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.b60ae283de'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.c1cc884915'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.ed54c68b6d'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.f8c4818f52'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_paragraph.fc75f414f1'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Word count alone does not establish a substantive omission.'",
+          "repair_owner": "'independent_review'"
+        }
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "_validate_list",
-      "code_sha256": "74ffbfc269153baf39e4bd9096246f1e6b67e318f6596d01005de1f56ab50792",
-      "family": "evidence"
+      "code_sha256": "fb56dcf8343ec30862966e89dc59ee47363e1750ce6eace874b4cfd1c02e48a4",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_list.12841e7025'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_list.2a1a4fc58a'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_list.61dc798fa4'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_list.b40beb0035'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting._validate_list.ee2d9fadc6'",
+          "repair_owner": "'drafting'"
+        }
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "b36d91f71bbd712495e5d7b7cb0d2ec720e07f0add31c342164c79ef8203afbc",
-      "family": "evidence"
+      "code_sha256": "2e8ec945d7702b5c140585acd10650dc63b34a1bba950594a2edb60aa8ec858c",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'icf-concept-repetition'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'icf-enrollment-placement'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'icf-generated-repetition'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.00675c0082'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.0ae484f2ff'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.0e083a3b85'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.17f9fbdfb1'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.249fb699c5'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.2f0f75ee1b'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.301f618b9a'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.32a3e9b3cc'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.45bee21b36'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.4a0cfb54e2'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.4a502846d0'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.5ada4685f3'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.5e2e19cecd'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.68c5cce8c6'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.70b28286e7'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.72292994fe'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.8b651466ec'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.b2ca126543'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.b6be568e3a'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.b9a05275ba'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.b9c7cdce9f'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.ba5edbfe6d'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.ce942b65c2'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.dca3204b3e'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.e35c63207a'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.e427245d32'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.validate_response.e5f7670e9f'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'icf-enrollment-quantity'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'semantic_uncertainty' if lexical_only else 'essential_defect'",
+          "reason": "'icf-summary-grounding-review'",
+          "repair_owner": "'independent_review' if lexical_only else 'drafting'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Text overlap alone does not establish material repetition or loss of section ownership.'",
+          "repair_owner": "'independent_review'"
+        }
+      ],
+      "decision_inputs": [
+        "findings",
+        "section_findings",
+        "blocking_section_findings"
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "d5db4ebaa862354e3fac53a44687c119290906d1049c5a6dda91ccdc122bc041",
-      "family": "evidence"
+      "code_sha256": "3875298803a705cc72094286d36c5ffa040de871c03eaea89f973e33a97e3881",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.ingest_responses.9a5dfec133'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.ingest_responses.dea9be4851'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.ingest_responses.f121eb0209'",
+          "repair_owner": "'drafting'"
+        }
+      ],
+      "decision_inputs": [
+        "blocking_response_findings"
+      ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "accepted_cross_section_duplicate_findings",
-      "code_sha256": "a2edd64169f3e01ec5cdc7598149ce168839406cd2662e901a67cafe34cdf4de",
-      "family": "evidence"
+      "code_sha256": "23c376eeaa3a1a0791993a85efbf7cd066c005b1f570fd122443dd41de43975f",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'icf-generated-repetition'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.accepted_cross_section_duplicate_findings.be64fbadcf'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'drafting.accepted_cross_section_duplicate_findings.c8db372b28'",
+          "repair_owner": "'drafting'"
+        }
+      ]
     },
     {
       "file": "scripts/finding_policy.py",
       "function": "classify_finding",
-      "code_sha256": "5f76bf19b5a2577a49710789639b61d02fa063505781570c4cb67aa7a5072975",
-      "family": "recovery"
+      "code_sha256": "b88fb3d6f7f1f487f055859c1a404df9033333f586bcf51b34ca4fc11064ad40",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "_validate",
+      "code_sha256": "3ea5d67078162c8e4f92f140c24ae6fa01193f501d7d6bde64e9875048dc88dd",
+      "family": "evidence",
+      "scope": "ordinary",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "finding_classification",
+      "code_sha256": "5676caf460e04a1a4aa7d8ecb5164db187ef2f22ea44b17ff9c69737bf09d7e0",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/finding_policy.py",
       "function": "blocks_construction",
-      "code_sha256": "01e238b6b7a311559c51422709ee969ed7357e8995084391c2a4bea36c205195",
-      "family": "recovery"
+      "code_sha256": "b12c168c5196dd8877d8c4e60a3686b62e5bc7b3e43c5929a53e364ca5c5ab68",
+      "family": "evidence",
+      "scope": "ordinary",
+      "policy_declarations": [],
+      "role": "decision",
+      "decision_inputs": []
     },
     {
       "file": "scripts/finding_policy.py",
       "function": "blocks_publication",
-      "code_sha256": "3521992c39213b736d4076a9c7fe61132198f158b6e7b6ba883e1037f292b3f5",
-      "family": "recovery"
+      "code_sha256": "2cc4b64175d24abc76198ade6ece586b9e981f0c78d7ef2938e3d8e27498a11d",
+      "family": "evidence",
+      "scope": "ordinary",
+      "policy_declarations": [],
+      "role": "decision",
+      "decision_inputs": []
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "normalize_finding",
+      "code_sha256": "82a7f6b47e6459b4b7ef62ec0ccf954f83e777c33e1cfdd2188bcfdb40304c0d",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'finding-policy-classification'",
+          "repair_owner": "'construction'"
+        }
+      ]
+    },
+    {
+      "file": "scripts/finding_policy.py",
+      "function": "declare_finding",
+      "code_sha256": "a8ad585d7e6d8fd2f3a94781bebec07916f228bcdd7e92a49b651e356309ffeb",
+      "family": "evidence",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "classification",
+          "reason": "reason",
+          "repair_owner": "repair_owner"
+        }
+      ]
     },
     {
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "normalized_day_quantity",
-      "code_sha256": "52ccf6a9030f45c9437fb76035c74a799a47e6b05842916b703e67de9b733afd"
+      "code_sha256": "52ccf6a9030f45c9437fb76035c74a799a47e6b05842916b703e67de9b733afd",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "screening_interval_in_text",
-      "code_sha256": "dbc7cc203598ec395b19cd425db7663738c0f8bf887da5954e3e815cc309829c"
+      "code_sha256": "dbc7cc203598ec395b19cd425db7663738c0f8bf887da5954e3e815cc309829c",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "_approved_screening_interval",
-      "code_sha256": "681ad43ac7dd8929af0506f05fe6b15cc4dde839ebdb3e15777ff4f9cec097fe"
+      "code_sha256": "681ad43ac7dd8929af0506f05fe6b15cc4dde839ebdb3e15777ff4f9cec097fe",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "screening_interval_requirement",
-      "code_sha256": "89cbe6f9173087206c7330ea5c0a2bc38e7459c9840285d0f6104e49a275068b"
+      "code_sha256": "89cbe6f9173087206c7330ea5c0a2bc38e7459c9840285d0f6104e49a275068b",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "_screening_interval_requirement_from_xml",
-      "code_sha256": "5f79b27c4179dcd6e931451fbda827cf4c10493132f7c56d039c49b4b2f93fba"
+      "code_sha256": "5f79b27c4179dcd6e931451fbda827cf4c10493132f7c56d039c49b4b2f93fba",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "_validation_screening_interval_requirement",
-      "code_sha256": "af13bfc96a012298329812d0f4ce014a68297d6fe3f579d4109265d10296c64e"
+      "code_sha256": "af13bfc96a012298329812d0f4ce014a68297d6fe3f579d4109265d10296c64e",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/prs_xml.py",
       "function": "generate",
-      "code_sha256": "b0040c04222f79c3a11836c16fe9047df8399895fad7520cf603e9f47cc445e6",
-      "family": "structured"
+      "code_sha256": "f2abcc60e0c91e83fa523511ad1994a423df357522a770af6bf92a642ce978a0",
+      "family": "structured",
+      "scope": "shared",
+      "role": "decision",
+      "policy_declarations": [],
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/prs_xml.py",
       "function": "validate_output",
-      "code_sha256": "0a8817df5c58bb005f793d949eb6d2b9d23a56304364b0f36027cd9431539e7a",
-      "family": "structured"
+      "code_sha256": "6f8281156a65b36f94be9e972022475aa6f4658452d4474614441cdd31b97689",
+      "family": "structured",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.require_repeated_value.959a7d0c5f'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.0902b2d915'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.2bf8df2763'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.2de167e180'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.69ea741e98'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.6a6262dc9b'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.7a44d3c6c2'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.86c9701a62'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.8d708b5ab7'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.90d9c3c887'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.90da17d22c'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.a6fabffe7a'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.a82b421fa7'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.ccd9d380a6'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.d2e1eb643e'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.d98b9d5c9b'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.df96a332d9'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.e1878aa1e9'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.eedfee42aa'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.validate_output.f3a5fede27'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'prs_xml.validate_output.6af47165b0'",
+          "repair_owner": "'construction'"
+        }
+      ]
+    },
+    {
+      "file": "scripts/prs_xml.py",
+      "function": "validate_output.require_repeated_value",
+      "code_sha256": "bd3c96e5499b432fea5c5cb38eb2eec63ee9ab536b0b8046f52b666c066ceb09",
+      "family": "structured",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'prs_xml.require_repeated_value.959a7d0c5f'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "verification_request_authentication_findings",
-      "code_sha256": "c7dfa659136fc67e9581294d21200718ceb8d16873629c781e8642a177097fd3",
-      "family": "review"
+      "code_sha256": "65dcfd999387776ddb14d33932074312f6ee41af01471fce1f09d170ce77fd44",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.finding.4a502846d0'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_format_conformance_outputs",
       "code_sha256": "480de3f16bc4ccc199c651d1ba0acb6d692cdfb3bf32b8b5ccb2c32903adf5ca",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_gate_ledger",
       "code_sha256": "2b4c9f189843e13d6b9f8f9270483fb0d48108629d4ca0b150f6b9007ba65713",
-      "family": "review"
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "build_gate_ledger",
+      "code_sha256": "ed495e1460ecbb0dcb4b8a555e86c7494b3fbf18362677783627008f2f59520a",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "retry_gate_ledger",
       "code_sha256": "c15bf9c008348be1216a4a86fcef768b2a4261d4dc67417090271e25ae97d38c",
-      "family": "review"
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "advance_gate_ledger",
       "code_sha256": "9e87ea099ff7fc98cbe1e1ce7d31550bc1cc543be57c5b762ba74822a469cd8a",
-      "family": "review"
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "_pdfium_integrity_failure",
-      "code_sha256": "914f67287edc6b20d7384d13b8f36a29c4c85c00eca79f7c6a58ca8fdc551a9d",
-      "family": "render"
+      "code_sha256": "73bf43ac9ce1e70899c71f4508267b80e445d1f08ff45c8edd482b5c114eb125",
+      "family": "render",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality._pdfium_integrity_failure.4a502846d0'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "run_pdfium_worker",
-      "code_sha256": "fcf2094c1e86461b35c35279616aa438aee0f68eb305c7f6980577be6d1ecced",
-      "family": "render"
+      "code_sha256": "5866f2645a30605cae63da4c68b0d3e86797f7a8bd28950db827d2a7af769d41",
+      "family": "render",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.run_pdfium_worker.4a502846d0'",
+          "repair_owner": "'runtime'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "rasterize_pdf",
       "code_sha256": "2805c9e45e642314b6baae2b36528f6be930c9b3c4714284243bea083ebf76d4",
-      "family": "render"
+      "family": "render",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "renderers",
       "code_sha256": "51ba0f2f41bd6549130c557f0692b57a7dba8ed9bc3dc56b80e7b6d37ba38705",
-      "family": "render"
+      "family": "render",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "preflight",
-      "code_sha256": "b9f6510553a65fbbbbb566879b913efb8cca162a1af30cded17862151c6d8f5f",
-      "family": "render"
+      "code_sha256": "c10ef4db151f1356e77f3c31a5f6c853740d82cbd6f3634e4e5709cfe0169e9d",
+      "family": "render",
+      "scope": "shared",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.preflight.3b1b636438'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.preflight.4a502846d0'",
+          "repair_owner": "'runtime'"
+        }
+      ],
+      "diagnostic_record_sites": {
+        "f0dfc7de8cd40685b34b17e43ac270a15568c9350f9a26fd7ead03a70ff625f8": "Adapter attempt rows; failures are emitted separately with explicit policy.",
+        "1d36f023e181186453e6a626ba60face7b7f7440cb8a7b48394dae06f8447cdc": "Adapter attempt rows; failures are emitted separately with explicit policy.",
+        "cb715e9322012413de3e735405187b82f952c07551f001c707dbd26dc8632849": "Adapter attempt rows; failures are emitted separately with explicit policy.",
+        "f7e2790ff848d51a1e77fc503cce5913f78afa5ba4a37a814fee5b714dd12208": "Adapter attempt rows; failures are emitted separately with explicit policy.",
+        "0b309bbeaa11d74c6178e77888d2e29eb76519bd01484f17b13f5e51a150a7f2": "Adapter attempt rows; failures are emitted separately with explicit policy.",
+        "319e965907aa5a0087f2904d5770694d7e27790a40a62d4fb622a5895d76b7d3": "Adapter attempt rows; failures are emitted separately with explicit policy."
+      },
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "_protocol_section15_opening_findings",
-      "code_sha256": "ae30168c9d1cf3bbce89e34ba0e01ee017623560236459705dd591ba3d0ee572",
-      "family": "render"
+      "code_sha256": "6760767cb6e477f33d9d745e54291991e6c0fadaf6d7604edb961c88fc122669",
+      "family": "render",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality._protocol_section15_opening_findings.3972552d6d'",
+          "repair_owner": "'rendering'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_final_toc_destinations",
-      "code_sha256": "0d51f7b90a46917561e22f758a45f117e00bb55db08296a7237667c135ac13a6",
-      "family": "render"
+      "code_sha256": "f523b4673c4713bb567845bf6e4061cd7d507cc1dafd6d3c7d639503903dd912",
+      "family": "render",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.audit_final_toc_destinations.3498646905'",
+          "repair_owner": "'rendering'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.audit_final_toc_destinations.a9b6404ad3'",
+          "repair_owner": "'rendering'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "_sparse_pdf_pages",
       "code_sha256": "a2a2b558392ca4e2bee432057113c54e5785d10098a4fe410463ae8967ec13c4",
-      "family": "render"
+      "family": "render",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": [],
+      "diagnostic_record_sites": {
+        "b405d4c92a5e7d0804d4a26c4d628916059bc4eba022cd7fa6692cca3f6d6aed": "Optional occupied-body observations, not failure findings."
+      }
     },
     {
       "file": "scripts/quality.py",
       "function": "render_pages",
-      "code_sha256": "4d247311f683afba8a212e3e1c5851376d8fd590c55802debe7a1c9a915a5081",
-      "family": "render"
+      "code_sha256": "5cbe0a7f130d1c5336be5fbbd1a6e3b928e9eeff8dc909570d85eb60bccf88ea",
+      "family": "render",
+      "scope": "shared",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.render_pages.05edee7f5c'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.render_pages.08bf9f975e'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.render_pages.2467cc0b95'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.render_pages.7755efd15a'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.render_pages.d83275eda8'",
+          "repair_owner": "'runtime'"
+        }
+      ],
+      "diagnostic_record_sites": {
+        "618eceb6b2a9717c6afeb17611b940fbb95affe641b3e9cef76e0f5ee52baa3d": "Renderer attempt exception records; final causes are emitted separately.",
+        "7b35bf0a585ae9bd6b8747df7c60c45d6882d8df4839e7bbfff382b786f3351a": "Renderer attempt exception records; final causes are emitted separately."
+      },
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "render_assurance",
-      "code_sha256": "de0d14d93ac03ff226629030d42ae5983b1133332436b928bf1a87e6056941d3",
-      "family": "render"
+      "code_sha256": "89b163c47057f1e9891839c20b155f7c146435b71d5f82b920e135e67c252152",
+      "family": "render",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.render_assurance.2989c4b1e9'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.render_assurance.457f02cef4'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.render_assurance.4f09155abc'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.render_assurance.78e9ea4716'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "_validated_candidate_structure",
-      "code_sha256": "5f1ad37c7716c828ddb8144f2e4825136d9aba8d36e42237cca9b50d6bd61925",
-      "family": "render"
+      "code_sha256": "183680d43c06562d84f8728be0acdb34a389e83fb7ac1f02ef8ebff9b942f01c",
+      "family": "render",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality._validated_candidate_structure.0957402f9a'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "_governed_adapter_attempts",
       "code_sha256": "6c7573f48fb8ed2293d0f665b66a1965d759059ec4eba73b293659c10f81aef3",
-      "family": "render"
+      "family": "render",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": [],
+      "diagnostic_record_sites": {
+        "40eb421c37cc9c588731fcfe5457ee4c74747dca771f66f49974a6a2fd3f102a": "Render adapter attempt diagnostics, not publication findings."
+      }
     },
     {
       "file": "scripts/quality.py",
       "function": "_retrospective_lexical_coverage_finding",
-      "code_sha256": "7f3c4831aca01eaf6adb31cec390cd577a7c9fe618140544059cf7d096801be3",
-      "family": "clinical"
+      "code_sha256": "330a6951bf8058ecd60ebbd0732c6673d6daea7fe3f87200c0b91016eb383a86",
+      "family": "clinical",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality._retrospective_lexical_coverage_finding.4a502846d0'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality._retrospective_lexical_coverage_finding.e4a45e1a0a'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_computed_protocol_fields",
-      "code_sha256": "563a0ffb11820efb34d494a3b2f2d3d9aabfacf3e3403137e252c9767547abea",
-      "family": "structured"
+      "code_sha256": "3b0a01b63d0eb60a48c9caa9b37cd0f10c4c3411d69790c5feb77008a6e24cdb",
+      "family": "structured",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.audit_computed_protocol_fields.8c9986d99d'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "audit_source_surfaces",
-      "code_sha256": "c6e935cb815a7e300ab21b6f3c89373fcafdf18d0145048b9be96f40295580ac",
-      "family": "clinical"
+      "code_sha256": "dde46804dcdf88c0d38455d63858e90f497d9f0b565f5a299d8e2a4691ac8dd7",
+      "family": "clinical",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.audit_source_surfaces.17e8f7b212'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.audit_source_surfaces.aa6879fb7b'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.audit_source_surfaces.f8617fdc81'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "21c88f12a63e6c7f54f802bfef9d53d7a246750106699020491f926b63363ff2",
-      "family": "clinical"
-    },
-    {
-      "file": "scripts/quality.py",
-      "function": "assess_icf_output",
-      "code_sha256": "6008acfd0ee0b7ee0bc6fa47f389cfb5f3feb367ecd5e1ba9ad6e44dc5890012",
-      "family": "clinical"
-    },
-    {
-      "file": "scripts/quality.py",
-      "function": "assess_protocol_concept_repetition",
-      "code_sha256": "17afb523e27c0096f4dc901035efb619887da65e8fe6a830c14cc9e21720ea16",
-      "family": "clinical"
+      "code_sha256": "9933d95217fe18b23560dc700d4f1fdcd379c19b4a3c7060b8f46cb0def1e87c",
+      "family": "clinical",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'icf-word-goal'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'quality.validate_sterling_clause_contract.e4cb0cadd7'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.add.4f14a818e6'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_sterling_clause_contract.08fb106316'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "code",
+          "repair_owner": "'construction' if code == 'sterling-clause-misplaced' else 'drafting'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'icf-lexical-evidence-uncertainty'",
+          "repair_owner": "'independent_review'"
+        }
+      ]
     },
     {
       "family": "structured",
       "file": "scripts/quality.py",
       "function": "prs_candidate_findings",
-      "code_sha256": "3a656537f4329bfc8efae314dd93db3c34439fe16636246a18cdb5fdb95cd356"
+      "code_sha256": "3a656537f4329bfc8efae314dd93db3c34439fe16636246a18cdb5fdb95cd356",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "5822e34f40b7e2eed27156f41d2da4af5948f0ecddead1a59cdc1952cca15c3e",
-      "family": "clinical"
+      "code_sha256": "cbe9fed5e49e21f7d82268c1d259ceb10d6b64d293c153723b34a761ce231927",
+      "family": "clinical",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'Rendered text asserts a stronger comparative trial claim than the approved source.'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.22f090cb6d'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.2b4062e206'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.4ec19b4e10'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.54d7bedc80'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.589f00c4b6'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.6fe16e9326'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.7c5914d8ff'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.927f900b30'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.a765406104'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.aca8fb5943'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.b4594fae6f'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.b4957b1431'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.c0316ba144'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.e2b4d4f3f8'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.e8a6d5fd23'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.eda4d445f3'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.deterministic_content_check.f0aad1a143'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Exact wording overlap does not alone prove unusable repetition.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Exact wording overlap requires assessment of section ownership and materiality.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'semantic_uncertainty'",
+          "reason": "'Only lexical grounding is uncertain.'",
+          "repair_owner": "'independent_review'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.deterministic_content_check.05fb19a059'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "semantic_evidence_inventory",
       "code_sha256": "8c6c138ce6eec15511e6f08af4175f2e9ffe5e7c1445b5f193fa6a1cacd46e85",
-      "family": "review"
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "_source_field_inventory",
       "code_sha256": "a321d8fcb3b0795d9101d0077a35df5599d09c42f100a6cf98261057bba504a6",
-      "family": "review"
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "verification_recovery_request_findings",
-      "code_sha256": "d18adeb5576a7193cab877841b09a78268d73ec94c768fad98fab1f210e47805",
-      "family": "review"
+      "code_sha256": "7755c99ec7fd87805c64b8f38ea4e80f883ff15c9f1c77e0518f77316b39d7e4",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.issue.982d9e3eb9'",
+          "repair_owner": "'review_response'"
+        }
+      ]
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "6968c984117d6bb8639ab5b72a17e5b6279e027023ef5e3c6ea8d2c2ef6aff79"
-    },
-    {
-      "file": "scripts/quality.py",
-      "function": "_is_publication_warning",
-      "code_sha256": "96e9bc33bbfd0cf7f89e1929f7a9d7750ff180d40cee919640a7e003dae8b035",
-      "family": "review"
+      "code_sha256": "6968c984117d6bb8639ab5b72a17e5b6279e027023ef5e3c6ea8d2c2ef6aff79",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "_accepted_drafting_warnings",
-      "code_sha256": "06bd3e3f65715c8c246a7e2314e63014216a2c88ff3292c63c982ef3182d77db",
-      "family": "review"
+      "code_sha256": "df0dad04dee7d3dbaec3ba534c2c7d5624ef29ee76aa85e62dca6b07e75288ec",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "a51a2fc4b867e4b1dbba37df86aba361df2ae3131455a913b13d4af30742cf83"
+      "code_sha256": "a51a2fc4b867e4b1dbba37df86aba361df2ae3131455a913b13d4af30742cf83",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_reviewed_lexical_warnings",
-      "code_sha256": "18d8451248d65f4f3fd05341312992ce7ab4fbe2baf858591c6bc543d2fc2e6c"
+      "code_sha256": "18d8451248d65f4f3fd05341312992ce7ab4fbe2baf858591c6bc543d2fc2e6c",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'independent_content_review_passed'",
+          "repair_owner": "'none'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "_render_warnings",
-      "code_sha256": "40d29981ee53123141a20c1c8efe2bc49c2b6917175f473ba80e1f105351419e",
-      "family": "review"
+      "code_sha256": "bd54d3644f9e2fb40b9f6ee997487a8abe71337e06c1cd714c9b99bb0412de61",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "_governed_editorial_warning",
       "code_sha256": "2d7da1381110f6ee605a8ecf1b51e6838fb9f6723e5b86776fa505f9d8d620fa",
-      "family": "review"
+      "family": "review",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/quality.py",
       "function": "verification_response_is_terminal",
-      "code_sha256": "1bf0a690ba7c85ddbb38505844baaec79eecfd7da96c05c1c4fcecf63f5d87ad",
-      "family": "review"
+      "code_sha256": "4db8b8607c9dc5d44be474df361e3adfd8c996ba7b7ba71ac975fda982d9d41e",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [],
+      "decision_inputs": [
+        "authentication_findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "b8aa4a14e85fede900883050433c1b0cc463cacb6564035353fc80c389936987",
-      "family": "review"
+      "code_sha256": "2f76b376fe88a1b064515dbca4a6a3494c1bf81e2b245e79197ea1b2678d6ca6",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'authenticated-editorial_warning'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'authenticated-editorial_warning'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'authenticated-content-defect'",
+          "repair_owner": "'construction' if recovery_class == 'deterministic_structure_defect' else 'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'authenticated-essential_defect'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'authenticated-material-repetition'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'authenticated-visual-defect'",
+          "repair_owner": "'rendering'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.1281a61039'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.1281a61039'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.659f45c8be'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.7967e20c37'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.7f877edb34'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.8e223a2e8c'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.9098399422'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.aa47cce5aa'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.validate_verifications.fb05d25307'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'Malformed finding identity cannot authorize a clinical repair.'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.059838202e'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.05e21e5c28'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.0d0ce42452'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.29d4caa38d'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.3d9cf9eb3b'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.47e7d0ec7e'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.4b17bed24e'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.4cf55a0dc2'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.51352005fb'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.5a0383d879'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.6c38743352'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.96bf9cd452'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.a0d7b23bcf'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.ab379dfddf'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.b14301961a'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.b92b392dd6'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.b9be81ed3b'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.db61ff0261'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.validate_verifications.f443ae89d9'",
+          "repair_owner": "'review_response'"
+        }
+      ],
+      "diagnostic_record_sites": {
+        "5322a670142d825aec5c2983d680a7f1918bafb63747045b50760cf6b1b958cc": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
+        "fbd82605144ee809c6df2ac35e3b239567a01770c0f2ee4a860c6a46a5447764": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
+        "887a1905e093a4344cc1ce21154104e5c260400b4c99c56f1e5ea8ce47185adc": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
+        "b98f3670671e65eae7e9230eaa5e1696d97eeb3c71178521f480d5417ab88f8c": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
+        "2cd8d49388671f299cb5bc4848b8b75f8593b77a73e520b50a4e7b37e5dbdf19": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
+        "0e828581d39516cfdf4097b7ba393f1018dcc745e5df54bd2dd77fcc0fb0dd3d": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
+        "6c6ddde3261ceef70e90878dd924b0bbf2713608616f105b72c950dfa1b8e199": "Untrusted raw reviewer input decoder; authenticated findings classify at emission."
+      },
+      "decision_inputs": [
+        "authentication_findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "_final_verification_scope_findings",
-      "code_sha256": "298d06c29c757a97e9b9be75429c35d4c8707cab11bd7740a7e6ba22b6875fe3",
-      "family": "review"
+      "code_sha256": "768ee251575c925e73c36148870d56c953e9ce571232506b7610b568b4ef3803",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality._final_verification_scope_findings.4a502846d0'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "ea5454abd8ecd7e296d6ad2d66c41df880fbbc338e9ef6f6d59d8f8c8262a57d",
-      "family": "delivery"
+      "code_sha256": "6a5787fdbac5be7597166334c349d22bd4b54db8eee8f0f414c28f605bb7b7d2",
+      "family": "delivery",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.final_exact_artifact_review_findings.4a502846d0'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.final_exact_artifact_review_findings.9772626d08'",
+          "repair_owner": "'integrity'"
+        }
+      ],
+      "decision_inputs": [
+        "deterministic_findings",
+        "verification_findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "8011ae36e09fe7ac399ae558739a69fb87dc4fc2f8172544d6837e3ae4a09a76",
-      "family": "review"
+      "code_sha256": "57e84db407d269de9a40d94c654ad62d2e6364b05255eee82103c3d8e05ae4f2",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [],
+      "decision_inputs": [
+        "findings",
+        "deterministic_findings",
+        "verification_findings"
+      ]
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "verification_request_authentication_findings.finding",
+      "code_sha256": "ade7dbf25a1c175137c729f4f799f550021ffdf0f335c702f0d024a4105e916f",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.finding.4a502846d0'",
+          "repair_owner": "'integrity'"
+        }
+      ]
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "validate_sterling_clause_contract.add",
+      "code_sha256": "aba1b4fa06e1aebc224b6ad2dc62c0c0ae796b8265750df4155b26f3740f72d7",
+      "family": "clinical",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'quality.add.4f14a818e6'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "code",
+          "repair_owner": "'construction' if code == 'sterling-clause-misplaced' else 'drafting'"
+        }
+      ]
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "verification_recovery_request_findings.issue",
+      "code_sha256": "0ddc3b4681616175fc1020f4861eb1d093407f51cb4811cb47ec42f5cd7056af",
+      "family": "review",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'quality.issue.982d9e3eb9'",
+          "repair_owner": "'review_response'"
+        }
+      ]
     },
     {
       "file": "scripts/rendering.py",
       "function": "protocol_section_snapshot",
       "code_sha256": "2cc98c3fe61dc85f18fee91c51c8666e633a1320f10f18a67ee513aa32e3633b",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/rendering.py",
       "function": "rendered_section_snapshot",
       "code_sha256": "03516291abc0584a65f2aa3664ae887b044370c81168bd6445718932dec73152",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/rendering.py",
       "function": "_rendered_heading_text",
       "code_sha256": "7b9728b26ec1597985524cb3f59b1e7261b1c90b7bc9b1dba3de3ef1474eae46",
-      "family": "render"
+      "family": "render",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/rendering.py",
       "function": "_target_heading",
       "code_sha256": "e0736763683f7abe507634772b701276a0b7d71a025e0bdb186650239dbefb5d",
-      "family": "render"
+      "family": "render",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/rendering.py",
       "function": "audit_docx",
-      "code_sha256": "9d177d987ac2b0a3835a2582062c8485c9fe7579d0e761c906c9c6acc37b310a",
-      "family": "render"
+      "code_sha256": "9d072fb49585272fd83cae15d2b696869ba9afa88736fbf819e9f5ca91317fe8",
+      "family": "render",
+      "scope": "shared",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'editorial_warning'",
+          "reason": "'rendering.audit_docx.55be2085b4'",
+          "repair_owner": "'none'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.4c80e29aa7'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.4f31def4f8'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.8e83807ea0'",
+          "repair_owner": "'rendering'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.8e90b259e6'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.a09ffaef07'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.a81ad1cf1e'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.audit_docx.e549b149e4'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "ac29b68eaa3b110a939b4340ae90a76952ce9e7dbb14330d56d986bde47a2aae",
-      "family": "render"
+      "code_sha256": "fe99fa4b684176c4ab82a030989ce02387388131d8397ead8af203c8b8d8544e",
+      "family": "render",
+      "scope": "shared",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.render_documents.a7eba2d2f7'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'essential_defect'",
+          "reason": "'rendering.render_documents.a932f6355b'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'rendering.render_documents.a9b6404ad3'",
+          "repair_owner": "'construction'"
+        }
+      ],
+      "decision_inputs": [
+        "blocking_findings",
+        "findings"
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_manifest_integrity",
       "code_sha256": "1f0c2c8a9b8f32b36824408a361ed875ec0fc7fb14f0d0b419801c11714053cc",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_certification_attestation",
       "code_sha256": "2aeed1c2c720f842f7d0ed4ac2c594d8cce8c67f5eba98f4622cefdfe1163c7b",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "bind_release_certification",
       "code_sha256": "239337aa485ab448eeef93bd08dece0cd88fe669846d0b1aa0f36c038c8d895f",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_validate_hermes_discovery",
       "code_sha256": "b598814a7dda4f8eec9cda0a4f6a4ea580320de87f93b5231718a923643d7f80",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "verify_installation",
       "code_sha256": "e5b155119ae3db9f4812abe6c1e6f60f7553aa06be0cd68e19d19f50c7002724",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_provision_page_renderer",
       "code_sha256": "ae16acd53ff634b8f5b3b25937f4a7c6b1eef8da051797b4065b99b471cc3f3d",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "provision_render_assurance",
       "code_sha256": "879a98dc21f5a252e52eaa0a31da17ac48550cd8db84fe83dfa5a4acd730f8eb",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_installation_smoke_result",
       "code_sha256": "733e56055a010baf6f8d4ffeaf48e6dacabe8b622406d063c46b80d6b0260952",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_recover_interrupted_activation",
       "code_sha256": "201dfcdaca2107c70f472915385c30920138173cd2339938cdc52ddc8c1b2987",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_manifest_era_candidate_integrity",
       "code_sha256": "af9607844f1823beb1dc73cc229ca43c6e1c79e1ecf96b45864cf42bfa5bacfe",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "install_release",
       "code_sha256": "ee54364ac658443092131d64b9c67df6429304aff4dd837b32e85da5cc9dfa0b",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_disposable_rollback_smoke",
       "code_sha256": "f51021d808af31eed45aff005753b63fc784a685a1a9b3203c587d818f55fb3b",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_recover_interrupted_rollback",
       "code_sha256": "163a13beacad5930f10c4794de23a84e49cd8ed62d0ee177eb5d307ead8a0072",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "rollback_release",
       "code_sha256": "5f48720c5c54de890adf4eb25ec5d1f7c0d1b1ddb50bf2de641322621f5d9155",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "prepare",
       "code_sha256": "3f29cf472c713f3110981e489f5cc3166dcd321a47571d1cd4412529f8531815",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "approve",
-      "code_sha256": "c22101216b4417fd163a45ffc6524fecc29504e5331e00b3b6ab32e6379f99fa",
-      "family": "recovery"
+      "code_sha256": "728903bb8a81cfac03809bf444149fbc30f7f32ef1190ca2ef39ae9aeb9cb204",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.approve.8d73e344a2'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.approve.fbadd8de75'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "validate",
-      "code_sha256": "5eb5488595afd9fa2da1b803863546b1876fb55639091c9ccc39e5ce88fd6334",
-      "family": "recovery"
+      "code_sha256": "7d03626f1a9c151290b30e71118c62a9d3d46132307792aee07ef1590557462f",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.validate.a45a04b24b'",
+          "repair_owner": "'integrity'"
+        }
+      ],
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_repair_block",
       "code_sha256": "fc0d0cf4e977cdbd63b70a486484a8fbc324e7a7b07c60a765048da14fb1771b",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_merge_artifact_reports",
       "code_sha256": "3ade83da0d3436d25653ae1e614e00bf8a2b4a201904ff564a247424d09b6251",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_review_copy",
       "code_sha256": "7efc9468e48b81dad1ada8cb1f16f5e21bde8780fda4d589780d20f882df075f",
-      "family": "delivery"
+      "family": "delivery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "desktop_attachment_reply",
       "code_sha256": "b183e9378d50585f2cdd31727b89152e2aa808c2e6f891a980a81d3923a686b8",
-      "family": "delivery"
+      "family": "delivery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "confirm_desktop_delivery",
-      "code_sha256": "a82a85a960446b85af7bc7cb6c7e026753e5d9b1200923612383acb9d55d285f",
-      "family": "delivery"
+      "code_sha256": "9a3267028ce0a8f6a7b559b7de68d8b2f7427eb88c395380a42200c6c81d6627",
+      "family": "delivery",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.confirm_desktop_delivery.9cf84e4184'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.confirm_desktop_delivery.fd15860e75'",
+          "repair_owner": "'runtime'"
+        }
+      ],
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_desktop_delivery_set_finding",
-      "code_sha256": "e0e29e399cedc6c2aac2f710bb15422b1a16be12bf63524992ccf4dfe199de9b",
-      "family": "delivery"
+      "code_sha256": "48b6a0d510e6a290068ae8436df5ffb17e46dd557168a61c18ad1e2a9e18d57b",
+      "family": "delivery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._desktop_delivery_set_finding.279bb8c81d'",
+          "repair_owner": "'runtime'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "d240be1f455fa179f897ccff305caa05e3e5b0c3cc674f2477c3de68bfb7974c",
-      "family": "recovery"
+      "code_sha256": "ef489b0c7cee7c43eb66a6e2928f08a416432e9e25f65784f15842dce4dc19ff",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'ordinary-gate-failure'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.finish.120283389b'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_bounded_parent_review.4a502846d0'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.26d40443fa'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.2c031304d3'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.39c24ffa34'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.4a7083ab84'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.6a9bf307a7'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.8ccd10cb0e'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.a9b6404ad3'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.a9b6404ad3'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.a9b6404ad3'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.b3d7b1b41d'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.ef90bfdb13'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_desktop_operation.f6e095fa92'",
+          "repair_owner": "'runtime'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_production_worker_readiness",
       "code_sha256": "5d3734ae4c9582c2ca8bc627157da676dd48899ee6c999ba9367e9e5d6a9ff30",
-      "family": "installation"
+      "family": "installation",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": [],
+      "diagnostic_record_sites": {
+        "3381607a04e09d2f7b96b5198e150b055648cac5176a6bdc7f883df73fa1cc74": "Worker identity/login status diagnostic; ordinary failure wrapper classifies at admission."
+      }
     },
     {
       "file": "scripts/workflow.py",
       "function": "_installed_release_identity",
-      "code_sha256": "9b7240ec4a162d74a117a1f7036bb1cabeadffe5896c526bf3e59754bb6520f0",
-      "family": "installation"
+      "code_sha256": "4836aed026d1a33f7a8d16a25f4e31bc585d578e9e6a437a25a43388e4f05c7a",
+      "family": "installation",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'installed-release-integrity'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_production_desktop_operation",
-      "code_sha256": "cb28297475bb8acf3fbb009d383553a8bb81c7f8a82d5a223fa38e11c3475910",
-      "family": "recovery"
+      "code_sha256": "e9331b871deb4cf125b9413f75f0fe1b0dfb813d4dfe92308833615c3b523031",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_production_desktop_operation.120bbdd510'",
+          "repair_owner": "'runtime'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_bind_verification_response_payload",
       "code_sha256": "c1faeafd89b10836fa9d4a352f16a7bd333d24a37d91faafef7ce81e868b78f7",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_publication_evidence_findings",
-      "code_sha256": "1615a8f824547f221df07a947f5b2c730fc45cf7fd274927198b1577be1ce834",
-      "family": "delivery"
+      "code_sha256": "b910ac50015d6651dcda69d3d2878641e1b630155722c877d13405a8993d0568",
+      "family": "delivery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'publication-byte-integrity'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'publication-byte-integrity'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'publication-byte-integrity'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_retained_gate_predecessors",
       "code_sha256": "3ac87fcb88129330244a94d44f4758da82f5cf8b00e53c0a9b26ad1c2d9083cf",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_ledger_findings",
-      "code_sha256": "32d504c1603db886d2c7c9ba24ea07b77b5727bf8b9a75fa8f357b411edadb87",
-      "family": "recovery"
+      "code_sha256": "574da0426b31f7a1db562248db335572a8995381afa8de9a2b32466b9fe4b79d",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'ordinary-gate-failure'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'ordinary-gate-failure'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
       "code_sha256": "7e864688008d8cf71f6bd64ceb5e2bac29477e1826bfdebe7bdd7fa055854ee3",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_archive_failed_attempt",
       "code_sha256": "b45c32957a58cbe30c1d8f72004b75884db78656dad67cb12edadd5a0a159e3d",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_complete_pending_recovery_attempts",
-      "code_sha256": "8fec4e97cbcaf1edd47637f76ab426d6f5940becbb17e96a8f52c601b3f7ba0a",
-      "family": "recovery"
+      "code_sha256": "030752d09c7065e0594d569525f7ec55c1e681bc4a30e018f4b456c4ac576cf2",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._complete_pending_recovery_attempts.191e02989c'",
+          "repair_owner": "'integrity'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_repeated_drafting_findings",
-      "code_sha256": "e4210dea139a2f4c1601b4992068a388f71c81fa411a8915bd4c0de1fa04503b",
-      "family": "recovery"
+      "code_sha256": "f0fdbb6cf10c1c6c41900cb13a13f05199b42848c7c3947bf0d5a5333b5d9b9e",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._repeated_drafting_findings.f3f0f03c27'",
+          "repair_owner": "'construction'"
+        }
+      ],
+      "diagnostic_record_sites": {
+        "105064fd9852d6e9c028c93b41827134745c20db8cd55efab849579c2bc1926c": "Normalized finding identity used only for progress comparison."
+      }
     },
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "ecd5036ccc978ec4bd5a92f15e94bc7d35b4bdd8ba8d0c6e7601f63d0edaf319",
-      "family": "recovery"
+      "code_sha256": "191bfdf98886a1d20ec917ea4596859788e65aa974c00ebe50eb3d925b537b78",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._quality_retry.433e238f54'",
+          "repair_owner": "'review_response'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._quality_retry.9303df0fef'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._quality_retry.ac33e5ad4e'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._quality_retry.fa896837b9'",
+          "repair_owner": "'construction'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._quality_retry.ff80304fa9'",
+          "repair_owner": "'review_response'"
+        }
+      ],
+      "decision_inputs": [
+        "authority_findings"
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_repeated_no_progress_findings",
-      "code_sha256": "0b8b5727410ff89fd7d5209c5904197cdf3df34ee4a7c5a171fc1c3771e79228",
-      "family": "recovery"
+      "code_sha256": "9e92b423da86f9da2800b21907610d33ebe6efaada6bee939c914622ea2de468",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._repeated_no_progress_findings.39fd6a7b04'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "_continue_repairable_no_progress",
-      "code_sha256": "42c3a5302be36daf4d52ef49d81ee4d795b7fb049c219a78b61165488727a463",
-      "family": "recovery"
-    },
-    {
-      "file": "scripts/workflow.py",
-      "function": "_begin_independent_review",
-      "code_sha256": "53bf6f34c07bafbcf4596709e69ccffc1d2aef0632df07c73b768035f421cc78",
-      "family": "review"
+      "code_sha256": "ed14f35825dcee91a6b487585fd223361176a83f1c7238701aa4da402a1a49e0",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._continue_repairable_no_progress.a9b6404ad3'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow._continue_repairable_no_progress.c73f9fab91'",
+          "repair_owner": "'construction'"
+        }
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "70f41cc8879a55d5e47c3f78732cf1c443af7f23f5f0288aa3ce50984e407516",
-      "family": "recovery"
+      "code_sha256": "cb5851a3c63444e4d27f1656c230301427f73b388efdb2a9a035a23b8c77f612",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [
+        {
+          "classification": "'essential_defect'",
+          "reason": "'workflow.generate.296d2d1cc1'",
+          "repair_owner": "'drafting'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.generate.52d27f8217'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.generate.a45a04b24b'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.generate.a9b6404ad3'",
+          "repair_owner": "'integrity'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.generate.a9b6404ad3'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.generate.d6904aa236'",
+          "repair_owner": "'runtime'"
+        },
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.generate.dd6ca394d6'",
+          "repair_owner": "'integrity'"
+        }
+      ],
+      "decision_inputs": [
+        "drafting_findings",
+        "duplicate_findings",
+        "early_findings"
+      ]
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_release_gate",
       "code_sha256": "ccf6ba058bf9c2b92b10b1064f8f2c9082bebac422ab81f8e9f9a9e6d333c111",
-      "family": "installation"
+      "family": "installation",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "_run_format_conformance_in_disposable_candidate",
       "code_sha256": "a2214646186832e6db29c192861f2fcf30d22a9dfa316036412d593850c1f81f",
-      "family": "installation"
+      "family": "installation",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "run_format_conformance",
       "code_sha256": "a4bbbdc37de09db669f8803614ecb5ccc996fc479f0dce7827d9c8ef8f3145a8",
-      "family": "installation"
+      "family": "installation",
+      "scope": "ordinary",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/workflow.py",
       "function": "main",
       "code_sha256": "a0580a1fc7306aa3747a9b66466f94cc4ce1ae137af72fd127d78a883ce5176d",
-      "family": "recovery"
+      "family": "recovery",
+      "scope": "separate",
+      "role": "helper",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "run_desktop_operation.finish",
+      "code_sha256": "cbb553fdf9b5aa63816ff62b42cbc514cfe734e7a32788badf7e2ec275005671",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.finish.120283389b'",
+          "repair_owner": "'runtime'"
+        }
+      ]
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_quality_retry.prearchive_block",
+      "code_sha256": "cca7d28831c1f21a1be3434cb66fde891528105ce97b0293be0f74be68b8d033",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "decision",
+      "policy_declarations": [],
+      "decision_inputs": []
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "run_desktop_operation.run_bounded_parent_review",
+      "code_sha256": "545a0c4598a6f4e3c974c6b9942641f782920d7055ede9459f2bb2830c27f81a",
+      "family": "recovery",
+      "scope": "ordinary",
+      "role": "producer",
+      "policy_declarations": [
+        {
+          "classification": "'technical_failure'",
+          "reason": "'workflow.run_bounded_parent_review.4a502846d0'",
+          "repair_owner": "'review_response'"
+        }
+      ]
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format"
