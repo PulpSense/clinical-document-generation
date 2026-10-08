@@ -276,6 +276,42 @@
       "family": "recovery"
     },
     {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "normalized_day_quantity",
+      "code_sha256": "52ccf6a9030f45c9437fb76035c74a799a47e6b05842916b703e67de9b733afd"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "screening_interval_in_text",
+      "code_sha256": "dbc7cc203598ec395b19cd425db7663738c0f8bf887da5954e3e815cc309829c"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_approved_screening_interval",
+      "code_sha256": "681ad43ac7dd8929af0506f05fe6b15cc4dde839ebdb3e15777ff4f9cec097fe"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "screening_interval_requirement",
+      "code_sha256": "89cbe6f9173087206c7330ea5c0a2bc38e7459c9840285d0f6104e49a275068b"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_screening_interval_requirement_from_xml",
+      "code_sha256": "5f79b27c4179dcd6e931451fbda827cf4c10493132f7c56d039c49b4b2f93fba"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_validation_screening_interval_requirement",
+      "code_sha256": "af13bfc96a012298329812d0f4ce014a68297d6fe3f579d4109265d10296c64e"
+    },
+    {
       "file": "scripts/prs_xml.py",
       "function": "generate",
       "code_sha256": "b0040c04222f79c3a11836c16fe9047df8399895fad7520cf603e9f47cc445e6",
@@ -284,7 +320,7 @@
     {
       "file": "scripts/prs_xml.py",
       "function": "validate_output",
-      "code_sha256": "acaab964bdb3fab0798755c64047aadcd162420d991091b85d3a14690658a8f0",
+      "code_sha256": "0a8817df5c58bb005f793d949eb6d2b9d23a56304364b0f36027cd9431539e7a",
       "family": "structured"
     },
     {
@@ -426,9 +462,15 @@
       "family": "clinical"
     },
     {
+      "family": "structured",
+      "file": "scripts/quality.py",
+      "function": "prs_candidate_findings",
+      "code_sha256": "3a656537f4329bfc8efae314dd93db3c34439fe16636246a18cdb5fdb95cd356"
+    },
+    {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "f2b853a7131dc2c4ed9ac3f62bf6aa834af4509fff5f0397d8734fca0100faa7",
+      "code_sha256": "5822e34f40b7e2eed27156f41d2da4af5948f0ecddead1a59cdc1952cca15c3e",
       "family": "clinical"
     },
     {
@@ -788,13 +830,13 @@
     {
       "file": "scripts/workflow.py",
       "function": "_begin_independent_review",
-      "code_sha256": "38794dbed8337e8ac491d0a252c5d6ee09f464d3767b25242017bcca85e7e91f",
+      "code_sha256": "53bf6f34c07bafbcf4596709e69ccffc1d2aef0632df07c73b768035f421cc78",
       "family": "review"
     },
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "2559e0ec4809994213fe7b66621c40cc80d4164b0b846eba7b010787892d8768",
+      "code_sha256": "70f41cc8879a55d5e47c3f78732cf1c443af7f23f5f0288aa3ce50984e407516",
       "family": "recovery"
     },
     {
