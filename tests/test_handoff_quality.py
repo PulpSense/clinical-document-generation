@@ -93,6 +93,7 @@ def test_failed_content_assessment_is_complete_negative_evidence_not_a_transient
     response["status"] = "failed"
     response["section_assessments"][0]["status"] = "failed"
     response["findings"] = [{
+        "finding_id": "source-grounded-repair",
         "target_ids": [failed_section],
         "issue": "The section contains a source-fidelity defect.",
     }]
@@ -145,6 +146,7 @@ def test_prs_structured_content_finding_routes_to_deterministic_rebuild(tmp_path
     structured["status"] = "failed"
     response["status"] = "blocked"
     response["findings"] = [{
+        "finding_id": "source-grounded-repair",
         "target_ids": ["prs.structured"],
         "issue": "The structured eligibility qualifier differs from the approved source.",
     }]
@@ -2132,6 +2134,7 @@ def test_public_generation_preserves_approval_when_visual_repair_makes_no_progre
             failed_section["status"] = "failed"
             response["status"] = "blocked"
             response["findings"] = [{
+                "finding_id": "source-grounded-repair",
                 "target_ids": [failed_section["section_id"]],
                 "issue": "The section requires a source-grounded content repair.",
             }]

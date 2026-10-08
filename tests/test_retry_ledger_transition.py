@@ -4,6 +4,7 @@ from pathlib import Path
 import zipfile
 
 import pytest
+from docx import Document
 
 import workflow
 
@@ -44,7 +45,9 @@ def test_semantic_no_progress_is_retained_without_terminal_exhaustion(tmp_path):
     revision = run_dir / 'revisions/r-test'
     candidate = revision / 'candidate/protocol.docx'
     candidate.parent.mkdir(parents=True)
-    _write_docx_like(candidate, (2025, 1, 1, 0, 0, 0), b'<document>same</document>')
+    document = Document()
+    document.add_paragraph("same")
+    document.save(candidate)
     finding = {
         'category': 'visual',
         'field': 'protocol',
@@ -67,7 +70,7 @@ def test_semantic_no_progress_is_retained_without_terminal_exhaustion(tmp_path):
         },
     }
     reference_path.write_text(json.dumps(working), encoding='utf-8')
-    _write_docx_like(candidate, (2026, 1, 1, 0, 0, 0), b'<document>same</document>')
+    document.save(candidate)
 
     no_progress = workflow._complete_pending_recovery_attempts(
         revision,

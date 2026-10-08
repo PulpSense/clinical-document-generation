@@ -4667,23 +4667,13 @@ def test_generation_authority_inventory_includes_nested_manifest_named_files(tmp
 
 
 def test_verifier_transient_remains_retryable_after_three_attempts(tmp_path, monkeypatch):
-    run_dir = tmp_path / "run"
-    revision = run_dir / "revisions/r-test"
-    reference_path = run_dir / "reference/study.reference.json"
-    reference_path.parent.mkdir(parents=True)
-    candidate = revision / "candidate"
-    candidate.mkdir(parents=True)
-    Document().save(candidate / "protocol.docx")
-    Document().save(candidate / "icf.docx")
-    (candidate / "study.xml").write_text("<study />", encoding="utf-8")
-    request_path = quality.create_verification_requests(
-        revision,
-        _source(),
-        {"status": "passed", "artifacts": []},
-        review_set=1,
-    )[0]
+    from test_owner_aware_recovery import review_case
+    run_dir, revision, reference_path, source, _protocol, _findings = review_case(tmp_path, table_error=False)
+    request_path = next(path for path in (revision / "hermes/verification-requests").glob("*.json")
+                        if json.loads(path.read_text())["task"] == "clinical_content_verification")
     request = json.loads(request_path.read_text(encoding="utf-8"))
     request_id = request["request_id"]
+    (revision / request["response_path"]).unlink()
     generation = {"review_set": 1, "verification_attempts": {request_id: 3}}
     reference_path.write_text(json.dumps({"generation": generation}), encoding="utf-8")
     finding = {
@@ -4693,7 +4683,8 @@ def test_verifier_transient_remains_retryable_after_three_attempts(tmp_path, mon
         "verification_request_id": request_id,
         "recovery_class": "verifier_transient",
         "action": "retry_verifier",
-        "issue": "malformed reviewer response",
+        "code": "verification_response_missing",
+        "issue": "reviewer response is missing",
     }
     expected = {"status": "awaiting_hermes", "stage": "independent_verification_retry"}
     monkeypatch.setattr(workflow, "_awaiting", lambda *_args, **_kwargs: expected)
@@ -4702,7 +4693,7 @@ def test_verifier_transient_remains_retryable_after_three_attempts(tmp_path, mon
         run_dir,
         reference_path,
         {"generation": generation},
-        _source(),
+        source,
         revision,
         {},
         [finding],
@@ -5371,21 +5362,14 @@ def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):
 
 
 def test_multiple_transient_findings_from_one_reviewer_consume_one_retry(tmp_path):
-    run_dir = tmp_path / "run"
-    revision = run_dir / "revisions/r-test"
-    reference_path = run_dir / "reference/study.reference.json"
-    reference_path.parent.mkdir(parents=True)
+    from test_owner_aware_recovery import review_case
+    run_dir, revision, reference_path, source, _protocol, _findings = review_case(tmp_path, table_error=False)
     working = {"generation": {"review_set": 1}}
     reference_path.write_text(json.dumps(working), encoding="utf-8")
-    request_id = "r-test.review-1.verify.content"
-    request_path = revision / "hermes/verification-requests/content.json"
-    request_path.parent.mkdir(parents=True)
-    request = _verification_request_payload(
-        request_id,
-        "clinical_content_verification",
-    )
-    request_path.write_text(json.dumps(request), encoding="utf-8")
-    _write_verification_ledger(revision, request)
+    request_path = next(path for path in (revision / "hermes/verification-requests").glob("*.json")
+                        if json.loads(path.read_text())["task"] == "clinical_content_verification")
+    request = json.loads(request_path.read_text(encoding="utf-8"))
+    request_id = request["request_id"]
     response_path = revision / request["response_path"]
     response_path.parent.mkdir(parents=True, exist_ok=True)
     response_path.write_text("{}", encoding="utf-8")
@@ -5403,7 +5387,7 @@ def test_multiple_transient_findings_from_one_reviewer_consume_one_retry(tmp_pat
         run_dir,
         reference_path,
         working,
-        _source(),
+        source,
         revision,
         {},
         [finding, {**finding, "field": "section_assessments"}],
