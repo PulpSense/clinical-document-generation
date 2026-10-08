@@ -41,6 +41,17 @@ def _run(tmp_path, branch, family, profile=None):
         if branch != "Retrospective":
             source["procedures"]["minimum_days_before_screening_without_participation"] = "ninety days"
             source["population"]["inclusion_criteria"].append("No participation in other research for ninety days before screening.")
+    if profile == "review-fixes":
+        source["procedures"]["completion"] = "Participant completion requires attendance at the final assessment."
+        source["study"]["completion"] = "Study closeout requires verification of all case records."
+        if branch == "Retrospective":
+            source["population"]["inclusion_criteria"] = ["Records describe adults who underwent cataract extraction."]
+        else:
+            source["study"].update(title="Monitoring recovery", short_title="Monitoring recovery",
+                hypothesis="Monitoring describes recovery.", timeline="3 months")
+            source["objectives"]["primary"] = ["Describe recovery."]
+            source["endpoints"]["primary"] = [{"label": "Recovery", "time_point": "Month 3"}]
+            source["design"]["study_design"] = "Observational monitoring study."
     source["approval"] = {"status": "draft"}
     reference_path.write_text(json.dumps(source))
     assert workflow.prepare(run)["status"] == "awaiting_approval"
@@ -77,7 +88,22 @@ def _run(tmp_path, branch, family, profile=None):
                 workflow._save_verification_response(revision, request_path, review)
                 continue
             response = drafting.recorded_acceptance_response(request)
+            if profile == "review-fixes" and request["artifact"] == "prs":
+                response["narrative"]["brief_summary"]["text"] = "Observational monitoring measures recovery after three months."
             for item in list(response.get("section_results", [])):
+                if profile == "review-fixes":
+                    replacements = {
+                        "endpoint-criteria.completion": "Subjects finish participation once they attend the last evaluation.",
+                        "endpoint-criteria.study-completion": "The project ends after every participant file has been checked. The planned timeline is 3 months.",
+                        "icf.duration": "Participation lasts three months.",
+                    }
+                    if item["section_id"] in replacements:
+                        item["paragraphs"][0]["text"] = replacements[item["section_id"]]
+                    if branch == "Retrospective" and item["section_id"] == "subjects.eligibility":
+                        for paragraph in item.get("paragraphs", []):
+                            paragraph["text"] = paragraph["text"].replace("Records describe adults who underwent cataract extraction.", "Files concern grown patients treated by removing a clouded lens.")
+                        for group in item.get("lists", []):
+                            group["items"] = [value.replace("Records describe adults who underwent cataract extraction.", "Files concern grown patients treated by removing a clouded lens.") for value in group["items"]]
                 if item["section_id"] == "analysis-plan.methodology":
                     item["paragraphs"][0]["text"] = source["statistics"]["analysis_plan"]
                 if item["section_id"] != "analysis-plan.considerations":
@@ -118,7 +144,7 @@ def _run(tmp_path, branch, family, profile=None):
     assert source["study"]["title"] in body
     table_text = "\n".join(cell.text for table in protocol.tables for row in table.rows for cell in row.cells)
     assert "40 participants" in body + table_text
-    assert "Primary outcome" in body + table_text
+    assert ("Recovery" if profile == "review-fixes" and branch != "Retrospective" else "Primary outcome") in body + table_text
     assert "Month" in body + table_text
     if branch != "Retrospective":
         xml = ET.parse(run / "output/study.xml")
@@ -156,3 +182,16 @@ def test_sparse_and_rich_complete_sources_deliver_with_controlled_editorial_revi
     assert manifest["quality"]["final_exact_artifact_review"]["every_page"] is True
     if profile != "rich":
         assert manifest["quality"]["resolved_evidence_cautions"]
+
+
+@pytest.mark.parametrize("branch,family", [("Prospective", "Advarra"), ("Retrospective", "Advarra")])
+def test_review_paraphrases_and_concise_sections_deliver_actual_branch_set(tmp_path, governed_pdfium, branch, family):
+    result, observed, manifest = _run(tmp_path, branch, family, profile="review-fixes")
+    assert manifest["quality"]["final_exact_artifact_review"]["every_page"] is True
+    assert observed["draft_attempts"] == 1
+    targets = {c["section_id"] for c in observed["review_cautions"]}
+    if branch == "Prospective":
+        assert {"icf.duration", "prs.brief-summary", "endpoint-criteria.completion", "endpoint-criteria.study-completion"} <= targets
+    else:
+        assert "subjects.eligibility" in targets
+    assert all(c.get("resolution") == "independent_content_review_passed" for c in manifest["quality"]["resolved_evidence_cautions"])

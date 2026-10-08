@@ -1326,7 +1326,7 @@ def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) ->
     return material
 
 
-def _timeline_grounded(content: str, value: Any) -> bool:
+def _timeline_evidence_diagnostics(content: str, value: Any) -> dict[str, Any]:
     """Compare recognized study phases with their durations, not lexical shorthand."""
     phases = {
         "enrollment": r"\b(?:enroll(?:ment|ing|ed)?|recruit(?:ment|ing|ed)?)\b",
@@ -1357,16 +1357,34 @@ def _timeline_grounded(content: str, value: Any) -> bool:
                     found.setdefault(phase, set()).add((str(float(number)), unit))
         return found
 
+    diagnostic = source_evidence_diagnostics(content, "study.timeline", value, all_items=True)
     expected = facts(str(value or ""))
     if not expected:
-        return evidence_grounded(content, value)
+        return diagnostic
     # Unrecognized source wording retains the existing fallback rather than
     # claiming that a partial phase parse covers the entire supplied timeline.
     source_numbers = duration.findall(str(value or ""))
     if len(source_numbers) != sum(len(values) for values in expected.values()):
-        return evidence_grounded(content, value)
+        return diagnostic
     observed = facts(content)
-    return all(observed.get(phase) == values for phase, values in expected.items())
+    if all(observed.get(phase) == values for phase, values in expected.items()):
+        diagnostic.update(passed=True, unobserved_values=[])
+    else:
+        diagnostic["passed"] = False
+        for phase, values in expected.items():
+            if observed.get(phase) == values:
+                continue
+            # A recognized phase with the wrong duration is factual evidence.
+            # An absent lexical phase label alone needs independent meaning review.
+            mismatch = {"source_excerpt": str(value), "phase": phase, "required_anchor_count": 1}
+            if observed.get(phase) or any(values & other_values for other_phase, other_values in observed.items() if other_phase != phase):
+                mismatch["missing_numbers"] = sorted(number for number, _unit in values)
+            diagnostic["unobserved_values"].append(mismatch)
+    return diagnostic
+
+
+def _timeline_grounded(content: str, value: Any) -> bool:
+    return bool(_timeline_evidence_diagnostics(content, value)["passed"])
 
 
 def _approved_followup_value(timeline: Any) -> str:
@@ -1511,7 +1529,11 @@ def _coverage_findings(
                 "source:study.timeline" not in set(map(str, evidence_refs))
                 or (bool(follow_up_value) and not evidence_grounded(content, follow_up_value))
             ):
+                diagnostics = [source_evidence_diagnostics(content, "study.timeline", follow_up_value)]
+                lexical_only = "source:study.timeline" in set(map(str, evidence_refs)) and lexical_evidence_uncertainty(diagnostics)
                 findings.append(declare_finding({
+                    **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_only else {}),
+                    "evidence_diagnostics": diagnostics,
                     "category": "drafting", "field": section_id,
                     "issue": "Section omits the approved participant follow-up period.",
                     "next_action": "State the approved follow-up period without inventing a completion criterion.",
@@ -1618,7 +1640,11 @@ def _coverage_findings(
             completion = material.get("procedures.completion")
             missing_conditions = [item for item in _completion_condition_items(completion) if not evidence_grounded(content, item)]
             if completion and (not evidence_grounded(content, completion) or missing_conditions):
+                diagnostics = [source_evidence_diagnostics(content, "procedures.completion", item)
+                               for item in missing_conditions or [completion]]
                 findings.append(declare_finding({
+                    **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_evidence_uncertainty(diagnostics) else {}),
+                    "evidence_diagnostics": diagnostics,
                     "category": "drafting", "field": section_id,
                     "issue": "Section omits the approved participant-completion condition.",
                     "next_action": "Preserve the supplied completion condition and its timing without repeating the full visit schedule. Missing conditions: " + "; ".join(missing_conditions),
@@ -1627,7 +1653,10 @@ def _coverage_findings(
             if section_id == "endpoint-criteria.study-completion":
                 missing_conditions = [item for item in _completion_condition_items(material.get("study.completion")) if not evidence_grounded(content, item)]
                 if missing_conditions:
+                    diagnostics = [source_evidence_diagnostics(content, "study.completion", item) for item in missing_conditions]
                     findings.append(declare_finding({
+                        **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_evidence_uncertainty(diagnostics) else {}),
+                        "evidence_diagnostics": diagnostics,
                         "category": "drafting", "field": section_id,
                         "issue": "Study Completion omits a supplied closeout prerequisite: " + "; ".join(missing_conditions),
                         "next_action": "Preserve every supplied prerequisite for study closeout or starting analysis.",
@@ -1715,8 +1744,7 @@ def _coverage_findings(
         diagnostics = [
             source_evidence_diagnostics(content, path, material[path], all_items=all_items)
             if not (section_id == "icf.duration" and path == "study.timeline")
-            else {"source_path": path, "source_excerpt": material[path], "passed": False,
-                  "validation_mode": "phase_bound_timeline", "release_acceptance": False}
+            else _timeline_evidence_diagnostics(content, material[path])
             for path in ungrounded
         ]
         lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
@@ -1811,8 +1839,8 @@ def _validate_paragraph(
     boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
     if len(text.split()) < 5:
         finding = declare_finding({"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."}, classification="essential_defect", reason="drafting._validate_paragraph.2deed4e27b", repair_owner="drafting")
-        if text and request.get("artifact") == "protocol":
-            finding = classify_finding(declare_finding({**finding, "code": "protocol-concise-prose", "issue": "Section prose is shorter than the preferred sentence length.", "next_action": "Assess substantive meaning against the cited source."}, classification="essential_defect", reason="drafting._validate_paragraph.264f5f76c9", repair_owner="drafting"), classification="semantic_uncertainty",
+        if text:
+            finding = classify_finding(declare_finding({**finding, "code": "concise-prose", "issue": "Section prose is shorter than the preferred sentence length.", "next_action": "Assess substantive meaning against the cited source."}, classification="essential_defect", reason="drafting._validate_paragraph.264f5f76c9", repair_owner="drafting"), classification="semantic_uncertainty",
                                        reason="Word count alone does not establish a substantive omission.", repair_owner="independent_review")
         findings.append(finding)
     lowered = text.casefold()
@@ -2023,8 +2051,20 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative item is not an object.", "next_action": "Return text and evidence_refs."}, classification="essential_defect", reason="drafting.validate_response.68c5cce8c6", repair_owner="drafting"))
                 continue
             text = str(item.get("text") or "").strip()
-            if re.search(r"</?[A-Za-z_][^>]*>", text) or len(text.split()) < 8:
-                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty, too short, or contains XML markup.", "next_action": "Return source-grounded prose only."}, classification="essential_defect", reason="drafting.validate_response.ce942b65c2", repair_owner="drafting"))
+            if not text or re.search(r"</?[A-Za-z_][^>]*>", text):
+                findings.append(declare_finding({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty or contains XML markup.", "next_action": "Return source-grounded prose only."}, classification="essential_defect", reason="drafting.validate_response.ce942b65c2", repair_owner="drafting"))
+            elif PLACEHOLDER.search(text) or any(token in text.casefold() for token in FORBIDDEN_DRAFT_LANGUAGE):
+                findings.append(classify_finding({"category": "drafting", "field": section_id,
+                    "target_ids": [section_id], "issue": "PRS narrative contains a placeholder or internal drafting instruction.",
+                    "next_action": "Return source-grounded clinical prose."}, classification="essential_defect",
+                    reason="PRS placeholder is not clinical narrative content.", repair_owner="drafting"))
+            elif len(text.split()) < 8:
+                findings.append(classify_finding({"category": "drafting", "field": section_id,
+                    "target_ids": [section_id], "code": "concise-prose",
+                    "issue": "PRS prose is shorter than the preferred sentence length.",
+                    "next_action": "Assess substantive meaning against the cited source."},
+                    classification="semantic_uncertainty", reason="Word count alone does not establish a substantive omission.",
+                    repair_owner="independent_review"))
             evidence_refs = _canonical_evidence_refs(request, item.get("evidence_refs") or [])
             contract = contracts.get(section_id, {})
             invalid = sorted(set(evidence_refs) - _allowed_evidence(request))
@@ -2039,10 +2079,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             findings.extend(_coverage_findings(request, contract, section_id, text, evidence_refs))
             for finding in findings[section_finding_count:]:
                 finding["target_ids"] = [section_id]
-            if len(findings) == section_finding_count:
+            if not any(blocks_construction(f) for f in findings[section_finding_count:]):
                 clean[key] = {
                     "text": text,
                     "evidence_refs": evidence_refs,
+                    "warnings": findings[section_finding_count:],
                     "producer": dict(producer),
                     "request_id": request.get("request_id"),
                     "request_sha256": request.get("request_sha256"),

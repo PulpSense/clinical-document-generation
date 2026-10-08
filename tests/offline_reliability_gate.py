@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 AUDIT = ROOT / 'docs/reliability/blocking-checks.json'
 # Explicit selection prevents accidental execution of live certification/corpora.
 TEST_FILES = (
-    'test_evidence_diagnostics.py', 'test_evidence_variations.py', 'test_offline_reliability_gate.py',
+    'test_evidence_diagnostics.py', 'test_evidence_variations.py', 'test_review_fidelity_regressions.py', 'test_offline_reliability_gate.py',
     'test_synopsis_recovery.py', 'test_layout_field_corrections.py', 'test_run07_reliability.py',
     'test_assessment_matrix.py', 'test_hypothesis_fidelity.py', 'test_sterling_rendered_scope.py',
     'test_visit_identifier_scope.py', 'test_bilateral_review_block.py', 'test_section_background_scope.py',
@@ -135,7 +135,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_validate', 'finding_classification', 'blocks_construction', 'blocks_publication',
                 '_leaf_texts', '_grounding_tokens', '_evidence_diagnostics',
                 'evidence_grounded', 'source_evidence_diagnostics', 'source_evidence_grounded',
-                'hypothesis_claim_issues', '_timeline_grounded', '_material_source',
+                'hypothesis_claim_issues', '_timeline_grounded', '_timeline_evidence_diagnostics', '_material_source',
                 'section_evidence_value', 'semantic_evidence_contract', 'assessment_matrix',
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
                 '_matrix_visit_alias', '_schedule_activity_identity', 'lexical_evidence_uncertainty',
