@@ -41,6 +41,8 @@ def _run(tmp_path, branch, family, profile=None):
         if branch != "Retrospective":
             source["procedures"]["minimum_days_before_screening_without_participation"] = "ninety days"
             source["population"]["inclusion_criteria"].append("No participation in other research for ninety days before screening.")
+    if profile == "review-phase":
+        source["study"]["timeline"] = "Enrollment: 3 months; Follow-up: 3 months."
     if profile == "review-fixes":
         source["procedures"]["completion"] = "Participant completion requires attendance at the final assessment."
         source["study"]["completion"] = "Study closeout requires verification of all case records."
@@ -91,6 +93,8 @@ def _run(tmp_path, branch, family, profile=None):
             if profile == "review-fixes" and request["artifact"] == "prs":
                 response["narrative"]["brief_summary"]["text"] = "Observational monitoring measures recovery after three months."
             for item in list(response.get("section_results", [])):
+                if profile == "review-phase" and item["section_id"] == "icf.duration":
+                    item["paragraphs"][0]["text"] = "Enrollment lasts three months; patients are monitored for three months."
                 if profile == "review-fixes":
                     replacements = {
                         "endpoint-criteria.completion": "Subjects finish participation once they attend the last evaluation.",
@@ -195,3 +199,14 @@ def test_review_paraphrases_and_concise_sections_deliver_actual_branch_set(tmp_p
     else:
         assert "subjects.eligibility" in targets
     assert all(c.get("resolution") == "independent_content_review_passed" for c in manifest["quality"]["resolved_evidence_cautions"])
+
+
+def test_equal_phase_durations_with_followup_paraphrase_deliver_actual_icf(tmp_path, governed_pdfium):
+    result, observed, manifest = _run(tmp_path, "Prospective", "Advarra", profile="review-phase")
+    assert manifest["quality"]["final_exact_artifact_review"]["every_page"] is True
+    duration = [c for c in observed["review_cautions"] if c["section_id"] == "icf.duration"]
+    assert duration and all(c["artifact"] == "icf" for c in duration)
+    consent = Document(tmp_path / "controlled-replay/output/icf.docx")
+    assert "Enrollment lasts three months; patients are monitored for three months." in "\n".join(p.text for p in consent.paragraphs)
+    assert any(c.get("resolution") == "independent_content_review_passed" and c.get("field") == "icf.duration"
+               for c in result["desktop_reply"]["cautions"])
