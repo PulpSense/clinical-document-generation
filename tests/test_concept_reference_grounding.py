@@ -126,3 +126,16 @@ def test_missing_explicit_quantity_is_not_downgraded_to_wording_warning(tmp_path
         and item.get("publication_disposition") != "warning"
         for item in findings
     )
+
+
+def test_brief_reference_has_explicit_semantic_review_policy(tmp_path):
+    request, _ = considerations_request(tmp_path)
+    accepted, findings = drafting.validate_response(request, considerations_response(
+        request, "Results will be interpreted descriptively to characterize the observed outcomes."
+    ))
+    assert accepted["drafts"]
+    assert findings[0]["finding_policy"] == {
+        "classification": "semantic_uncertainty",
+        "reason": "lexical-evidence-uncertainty",
+        "repair_owner": "independent_review",
+    }

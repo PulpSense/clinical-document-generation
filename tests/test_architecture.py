@@ -4,9 +4,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_production_architecture_is_exactly_six_python_files():
+def test_production_architecture_has_explicit_shared_finding_policy():
     names = sorted(path.name for path in (ROOT / "scripts").glob("*.py"))
-    assert names == ["contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py"]
+    assert names == ["contracts.py", "drafting.py", "finding_policy.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py"]
 
 
 def test_contracts_is_the_only_governed_resource_selector():

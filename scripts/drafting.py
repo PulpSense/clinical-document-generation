@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from finding_policy import blocks_construction, classify_finding
+
 from contracts import (
     BOILERPLATE_VERSION,
     CONTRACT_VERSION,
@@ -47,7 +49,7 @@ RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
 PROMPT_VERSION = "section-drafting-v18-semantic-hypothesis"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
-IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
+IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "finding_policy.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
 
 def _canonical(value: Any) -> bytes:
@@ -1627,6 +1629,9 @@ def _coverage_findings(
                     **({
                         "code": "lexical-evidence-uncertainty",
                         "publication_disposition": "warning",
+                        **classify_finding({}, classification="semantic_uncertainty",
+                                           reason="lexical-evidence-uncertainty",
+                                           repair_owner="independent_review"),
                     } if lexical_uncertainty else {}),
                     "issue": f"Reference evidence is cited but not observable: {', '.join(ungrounded)}.",
                     "next_action": (
@@ -2289,7 +2294,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         section_findings = findings[section_finding_count:]
         blocking_section_findings = [
             finding for finding in section_findings
-            if finding.get("publication_disposition") != "warning"
+            if blocks_construction(finding)
         ]
         if not blocking_section_findings and section_id not in duplicate_target_ids:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
@@ -2372,7 +2377,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             accepted_request.write_text(request_path.read_text(encoding="utf-8"), encoding="utf-8")
         blocking_response_findings = [
             finding for finding in response_findings
-            if finding.get("publication_disposition") != "warning"
+            if blocks_construction(finding)
         ]
         if blocking_response_findings:
             findings.extend(blocking_response_findings)

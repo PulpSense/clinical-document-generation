@@ -25,6 +25,8 @@ import zlib
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 
+from finding_policy import classify_finding, finding_classification, blocks_publication
+
 from docx import Document
 from docx.oxml.ns import qn
 from docx.table import Table
@@ -5788,6 +5790,14 @@ def _reviewed_lexical_warnings(
         if canonical_evidence_sha256(warning) in reviewed:
             resolved.append({"caution": warning, "resolution": "independent_content_review_passed",
                              "verification_request_id": record["request_id"]})
+            if finding_classification(warning) == "semantic_uncertainty":
+                retained.append({
+                    **classify_finding(warning, classification="editorial_warning",
+                                       reason="independent_content_review_passed",
+                                       repair_owner="none"),
+                    "resolution": "independent_content_review_passed",
+                    "verification_request_id": record["request_id"],
+                })
         else:
             retained.append(warning)
     return retained, resolved
@@ -6706,6 +6716,8 @@ def final_exact_artifact_review_findings(
         )
     )
     fresh_warnings, fresh_resolutions = _reviewed_lexical_warnings(fresh_warnings, fresh_evidence, verification_findings)
+    verification_findings.extend(dict(item) for item in fresh_warnings
+                                 if finding_classification(item) is not None and blocks_publication(item))
     if (
         canonical_evidence_sha256(fresh_evidence)
         != final_review.get("verification_evidence_sha256")
@@ -6748,6 +6760,8 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     findings.extend(_blocking_findings(verification_findings))
     findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
     warnings, resolutions = _reviewed_lexical_warnings(warnings, evidence, findings)
+    findings.extend(dict(item) for item in warnings
+                    if finding_classification(item) is not None and blocks_publication(item))
     candidate_hashes = {
         path.relative_to(revision_dir).as_posix(): sha256_file(path)
         for path in sorted((revision_dir / "candidate").glob("*"))
