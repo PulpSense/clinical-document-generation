@@ -1506,6 +1506,41 @@ def sterling_draft_word_budget(reference: Mapping[str, Any], section_id: str) ->
     return max(1, maximum - len(re.findall(r"[a-z0-9]+", reserved.casefold())))
 
 
+# Sentence case is presentation only for these descriptive heads. Do not apply
+# casefold to clinical identifiers (qPCR, genes), units (mL/Mg), or matrix marks.
+SCHEDULE_DESCRIPTIVE_LEADS = frozenset({
+    "adverse", "demographics", "distance", "exit", "informed", "medical",
+    "ophthalmic", "patient", "physical", "study", "vital", "visual",
+})
+
+
+def protocol_table_rows_match(contract: Mapping[str, Any], actual: Iterable[Iterable[str]]) -> bool:
+    """Compare a constructed table without weakening its source relationships.
+
+    Only whitespace and initial sentence case of descriptive activity labels
+    may differ. Headers, order, quantities, units, visit marks and blanks remain
+    exact. Construction still emits the approved spelling, never this projection.
+    """
+    expected = [[re.sub(r"\s+", " ", str(cell)).strip() for cell in row]
+                for row in contract["rows"]]
+    observed = [[re.sub(r"\s+", " ", str(cell)).strip() for cell in row] for row in actual]
+    if len(expected) != len(observed):
+        return False
+    for index, (source_row, actual_row) in enumerate(zip(expected, observed)):
+        if len(source_row) != len(actual_row):
+            return False
+        for column, (source, value) in enumerate(zip(source_row, actual_row)):
+            if source == value:
+                continue
+            descriptive_label = (contract["section_id"] == "evaluation-procedures"
+                                 and index >= contract["header_rows"] and column == 0)
+            lead = re.match(r"[A-Za-z]+", source)
+            if not (descriptive_label and lead and lead.group().lower() in SCHEDULE_DESCRIPTIVE_LEADS
+                    and source[1:] == value[1:] and source[0].lower() == value[0].lower()):
+                return False
+    return True
+
+
 def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     """Return typed, source-derived Protocol table matrices for rendering and QA."""
     visits = normalized_visit_records(reference)
@@ -2671,5 +2706,5 @@ __all__ = [
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "country_name_aliases", "document_set",
     "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
-    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
+    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "protocol_table_rows_match", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
 ]

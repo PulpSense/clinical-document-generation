@@ -20,6 +20,8 @@ jobs:
           tests/test_complete_delivery_publication.py::test_review_paraphrases_and_concise_sections_deliver_actual_branch_set
           tests/test_offline_reliability_gate.py
           tests/test_cause_aware_recovery.py
+          tests/test_schedule_delivery.py
+          tests/test_assessment_matrix.py
           tests/test_contracts.py
           tests/test_prs_xml.py
           tests/test_editorial_publication.py

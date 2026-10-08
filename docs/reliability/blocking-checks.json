@@ -170,6 +170,15 @@
     },
     {
       "file": "scripts/contracts.py",
+      "function": "protocol_table_rows_match",
+      "code_sha256": "e1a03822547de58a8203a2b83d6a04195a9c2b2b07484d0375a0f799e9c6d838",
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
       "code_sha256": "0d6ffdd70dd2d760650ca5695a8454ba2039cdfd05ab123182089a0be7dc4ebe",
       "family": "structured",
@@ -1664,7 +1673,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "8f399166cd0d05b956189a7a98e3c253fa251ba348d1b0b138dc43015e5d4859",
+      "code_sha256": "da24755290f6a810f3f77529f9910be46f8e6f7d2c9f608353686dced25acf9e",
       "family": "clinical",
       "scope": "ordinary",
       "role": "decision",
@@ -1737,7 +1746,7 @@
         {
           "classification": "'essential_defect'",
           "reason": "'quality.deterministic_content_check.e2b4d4f3f8'",
-          "repair_owner": "'drafting'"
+          "repair_owner": "'construction'"
         },
         {
           "classification": "'essential_defect'",

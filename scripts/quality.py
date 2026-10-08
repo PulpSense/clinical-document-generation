@@ -39,6 +39,7 @@ from lxml import etree as ET
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
 from drafting import _background_claim_findings, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_in_text, screening_interval_requirement, validate_output as validate_prs_output
+from contracts import protocol_table_rows_match
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -4671,12 +4672,6 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         if count != 1:
             findings.append(declare_finding({"category": "content", "field": section.section_id, "target_ids": [section.section_id], "issue": f"Protocol section heading must appear exactly once; found {count}: {section.number} {section.title}"}, classification="essential_defect", reason="quality.deterministic_content_check.eda4d445f3", repair_owner="drafting"))
 
-    def normalized_matrix(table: Table) -> list[list[str]]:
-        return [
-            [re.sub(r"\s+", " ", cell.text).strip() for cell in row.cells]
-            for row in table.rows
-        ]
-
     contracted_section_ids = {section.section_id for section in sections}
     for table_id, table_contract in protocol_table_contracts(reference).items():
         if branch == "Retrospective" or table_contract["section_id"] not in contracted_section_ids:
@@ -4692,13 +4687,16 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             if table.rows
             and re.sub(r"\s+", " ", table.rows[0].cells[0].text).strip() == expected_rows[0][0]
         ]
-        if len(matches) != 1 or normalized_matrix(matches[0]) != expected_rows:
-            findings.append(declare_finding({
+        if len(matches) != 1 or not protocol_table_rows_match(
+            table_contract, [[cell.text for cell in row.cells] for row in matches[0].rows],
+        ):
+            findings.append(recovery_finding(declare_finding({
                 "category": "content",
+                "artifact": "protocol", "surface": "table", "table_ids": [table_id],
                 "field": "procedures.visit_schedule" if table_id == "schedule-of-assessments" else "statistics.sample_size_evidence",
                 "target_ids": [str(table_contract["section_id"])],
                 "issue": f"{table_contract['caption']} does not preserve the contracted headers, row order, column order, cell values, and allowed blanks.",
-            }, classification="essential_defect", reason="quality.deterministic_content_check.e2b4d4f3f8", repair_owner="drafting"))
+            }, classification="essential_defect", reason="quality.deterministic_content_check.e2b4d4f3f8", repair_owner="construction"), "deterministic_structure_defect"))
     stale_protocol_claims = {
         "an investigator-initiated clinical trial": "title-page",
         "all subjects will be monitored for adverse events": "quality-safety",

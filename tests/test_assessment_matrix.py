@@ -161,7 +161,15 @@ def test_constructed_schedule_preserves_source_label_case_and_rejects_changed_cl
     assert not [f for f in quality.deterministic_content_check(tmp_path, source)
                 if f.get('field') == 'procedures.visit_schedule']
     row = next(row for row in matrix.rows if row.cells[0].text.strip() == 'qPCR collection at 5 mL')
+    consent = next(row for row in matrix.rows if row.cells[0].text.strip() == 'informed consent')
+    consent.cells[0].text = 'Informed   consent'
+    document.save(path)
+    assert not [f for f in quality.deterministic_content_check(tmp_path, source)
+                if f.get('field') == 'procedures.visit_schedule']
     row.cells[0].text = 'qPCR collection at 99 mL'
     document.save(path)
-    assert any(f.get('field') == 'procedures.visit_schedule'
-               for f in quality.deterministic_content_check(tmp_path, source))
+    defects = [f for f in quality.deterministic_content_check(tmp_path, source)
+               if f.get('field') == 'procedures.visit_schedule']
+    assert defects
+    assert all(f['recovery_class'] == 'deterministic_structure_defect'
+               and f['owner'] == 'construction' and f['surface'] == 'table' for f in defects)
