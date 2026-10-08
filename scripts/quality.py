@@ -4148,7 +4148,7 @@ def validate_sterling_clause_contract(
             if str(clause["section_id"]) in draftable_icf_ids
             else "document_structure_defect"
         )
-        findings.append(recovery_finding(finding, recovery))
+        findings.append(recovery_finding(classify_finding(finding, classification="essential_defect", reason=code, repair_owner="construction" if code == "sterling-clause-misplaced" else "drafting"), recovery))
 
     for clause in contract["clauses"]:
         section = str(clause["section"])
@@ -4243,6 +4243,7 @@ def validate_sterling_clause_contract(
             if not length_ok or not maximum_ok:
                 findings.append({
                     "code": "sterling-clause-word-goal",
+                    **classify_finding({}, classification="editorial_warning", reason="icf-word-goal", repair_owner="none"),
                     "category": "editorial",
                     "check": "sterling_clause_contract",
                     "clause_id": clause["clause_id"],
@@ -4263,6 +4264,7 @@ def validate_sterling_clause_contract(
                 and lexical_evidence_uncertainty(grounding_diagnostics)):
             findings.append({
                 "code": "icf-lexical-evidence-uncertainty", "category": "content",
+                **classify_finding({}, classification="semantic_uncertainty", reason="icf-lexical-evidence-uncertainty", repair_owner="independent_review"),
                 "field": clause["section_id"], "target_ids": [clause["section_id"]],
                 "clause_id": clause["clause_id"], "publication_disposition": "warning",
                 "evidence_diagnostics": grounding_diagnostics,
@@ -4421,6 +4423,7 @@ def assess_icf_output(
                 seen_sections.add(section_id)
                 findings.append(recovery_finding({
                     "code": "icf-exact-generated-duplication",
+                    **classify_finding({}, classification="editorial_warning", reason="icf-generated-repetition", repair_owner="none"),
                     "category": "editorial",
                     "check": "exact_rendered_duplication",
                     "publication_disposition": "warning",
@@ -4465,6 +4468,7 @@ def assess_icf_output(
     if len(purpose_tokens) >= 24 and (overlap >= 0.30 or len(repeated_markers) >= 3):
         findings.append(recovery_finding({
             "code": "icf-concept-repetition",
+            **classify_finding({}, classification="editorial_warning", reason="icf-concept-repetition", repair_owner="none"),
             "category": "editorial",
             "check": "concept_repetition",
             "concept_id": "clinical-background-and-rationale",
@@ -5760,7 +5764,7 @@ def _lexical_review_cautions(
         except (OSError, ValueError, zipfile.BadZipFile):
             # Construction/package checks own malformed candidates; no caution can approve them.
             pass
-    codes = {"lexical-evidence-uncertainty", "icf-lexical-evidence-uncertainty",
+    codes = {"lexical-evidence-uncertainty", "icf-lexical-evidence-uncertainty", "icf-summary-grounding-review",
              "retrospective-lexical-evidence-uncertainty"}
     records = {}
     for warning in warnings:

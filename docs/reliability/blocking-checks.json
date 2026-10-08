@@ -242,7 +242,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "c25230a6711e1c90a539f3f679ed3854a792306b83269e75e2c058b193bff1c2",
+      "code_sha256": "b36d91f71bbd712495e5d7b7cb0d2ec720e07f0add31c342164c79ef8203afbc",
       "family": "evidence"
     },
     {
@@ -254,7 +254,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "accepted_cross_section_duplicate_findings",
-      "code_sha256": "b7213acc5c6d896e5532080c4efb4bed8d302688e7fd6c0aba7681a4763be432",
+      "code_sha256": "a2edd64169f3e01ec5cdc7598149ce168839406cd2662e901a67cafe34cdf4de",
       "family": "evidence"
     },
     {
@@ -410,13 +410,13 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "db74474dbc942c9b901ba4db57e4ab0a7351c0e96fcbf4c76484c949a97d36a3",
+      "code_sha256": "21c88f12a63e6c7f54f802bfef9d53d7a246750106699020491f926b63363ff2",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "assess_icf_output",
-      "code_sha256": "3764e2cbff89d48cb6abd2e46d078737e64c9464084797bebc5a7292c600783d",
+      "code_sha256": "6008acfd0ee0b7ee0bc6fa47f389cfb5f3feb367ecd5e1ba9ad6e44dc5890012",
       "family": "clinical"
     },
     {
@@ -471,7 +471,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "c2ff50c7cdfea29517afdc749e2d4354b45a54147778b9c9f1a5f80878d97ea1"
+      "code_sha256": "a51a2fc4b867e4b1dbba37df86aba361df2ae3131455a913b13d4af30742cf83"
     },
     {
       "family": "review",

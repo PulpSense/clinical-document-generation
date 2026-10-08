@@ -188,7 +188,7 @@ def test_icf_procedures_rejects_source_gap_commentary_before_rendering(tmp_path)
     )
 
 
-def test_icf_purpose_rejects_redundant_enrollment_count(tmp_path):
+def test_icf_purpose_warns_about_redundant_enrollment_count(tmp_path):
     reference = fixture()
     reference["meta"]["icf_template"] = "Sterling"
     batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
@@ -200,13 +200,14 @@ def test_icf_purpose_rejects_redundant_enrollment_count(tmp_path):
     request = json.loads(request_path.read_text(encoding="utf-8"))
     response = recorded_acceptance_response(request)
     purpose = next(item for item in response["section_results"] if item["section_id"] == "icf.study-purpose")
-    purpose["paragraphs"][0]["text"] += " The study is expected to include 40 treatment subjects; 0 control subjects."
+    purpose["paragraphs"][0]["text"] += " The study is expected to include 40 participants."
 
     _accepted, findings = validate_response(request, response)
 
     assert any(
         item.get("field") == "icf.study-purpose"
-        and "Enrollment counts belong" in item["issue"]
+        and item.get("code") == "icf-enrollment-placement"
+        and item.get("finding_policy", {}).get("classification") == "editorial_warning"
         for item in findings
     )
 
@@ -296,7 +297,7 @@ def test_rendered_icf_duplication_uses_governed_summary_drafting_recovery(tmp_pa
     assert finding["action"] == contracts.RECOVERY_POLICIES["drafting_defect"]
 
 
-def test_draft_time_icf_duplication_retries_summary_and_preserves_detail(tmp_path):
+def test_draft_time_icf_duplication_warns_and_preserves_detail(tmp_path):
     reference = fixture()
     reference["meta"]["icf_template"] = "Sterling"
     batch = next(item for item in batch_plan("Prospective", "Sterling") if item.batch_id == "icf-narrative")
@@ -325,7 +326,7 @@ def test_draft_time_icf_duplication_retries_summary_and_preserves_detail(tmp_pat
 
     accepted_ids = {item["section_id"] for item in (accepted or {}).get("drafts", [])}
     assert "icf.risks" in accepted_ids
-    assert "icf.key-information-summary" not in accepted_ids
+    assert "icf.key-information-summary" in accepted_ids
     duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
     assert duplicate["target_ids"] == ["icf.key-information-summary"]
 
@@ -719,7 +720,8 @@ def test_draft_time_icf_duplicate_targets_summary_and_preserves_detail(tmp_path)
     accepted_ids = {item["section_id"] for item in (accepted or {}).get("drafts", [])}
     assert duplicate["target_ids"] == ["icf.key-information-summary"]
     assert "icf.study-purpose" in accepted_ids
-    assert "icf.key-information-summary" not in accepted_ids
+    assert "icf.key-information-summary" in accepted_ids
+    assert duplicate["finding_policy"]["classification"] == "editorial_warning"
 
 
 def test_protocol_operational_design_contract_preserves_eye_specific_assignment():

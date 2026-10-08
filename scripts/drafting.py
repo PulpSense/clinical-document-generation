@@ -2107,9 +2107,10 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             else section_id
         )
         preserved_section = section_id if target_section == prior_section else prior_section
-        if request.get("artifact") != "protocol":
+        if request.get("artifact") != "protocol" and not target_section.startswith("icf."):
             duplicate_target_ids.add(target_section)
         finding = {
+            **(classify_finding({}, classification="editorial_warning", reason="icf-generated-repetition", repair_owner="none") if target_section.startswith("icf.") else {}),
             "category": "drafting",
             "field": target_section,
             "target_ids": [target_section],
@@ -2206,16 +2207,34 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             section_id == "icf.study-purpose"
             and str(icf_template or "").strip().casefold() == "sterling"
         ):
-            if re.search(
+            enrollment_claims = re.findall(
                 r"\b\d+\s+(?:(?:treatment|control|study)\s+)?(?:subjects|participants)\b",
                 combined_content, re.I,
-            ):
+            )
+            approved_enrollment = "\n".join(_leaf_texts(get_path(request.get("approved_source", {}), "population.sample_size")))
+            unsupported_counts = [
+                claim for claim in enrollment_claims
+                if any(value.get("missing_numbers") for value in
+                       source_evidence_diagnostics(approved_enrollment, "population.sample_size", claim)["unobserved_values"])
+            ]
+            if unsupported_counts:
+                findings.append({
+                    "category": "drafting", "field": section_id, "target_ids": [section_id],
+                    "code": "icf-enrollment-quantity",
+                    **classify_finding({}, classification="essential_defect", reason="icf-enrollment-quantity", repair_owner="drafting"),
+                    "issue": "PURPOSE states an enrollment quantity absent from the approved sample size.",
+                    "unsupported_claims": unsupported_counts,
+                    "next_action": "Preserve the approved enrollment quantity wherever it is stated.",
+                })
+            elif enrollment_claims:
                 findings.append({
                     "category": "drafting",
                     "field": section_id,
                     "target_ids": [section_id],
-                    "issue": "Enrollment counts belong in KEY INFORMATION or DURATION, not PURPOSE.",
-                    "next_action": "Remove the participant count from PURPOSE and keep its concise study aim, hypothesis, and primary outcome.",
+                    "code": "icf-enrollment-placement",
+                    **classify_finding({}, classification="editorial_warning", reason="icf-enrollment-placement", repair_owner="none"),
+                    "issue": "Enrollment counts also appear in PURPOSE; placement is an editorial preference.",
+                    "next_action": "Optionally keep enrollment detail in KEY INFORMATION or DURATION for brevity.",
                 })
             approved_source = request.get("approved_source")
             background = get_path(
@@ -2232,10 +2251,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     "field": section_id,
                     "target_ids": [section_id],
                     "code": "icf-concept-repetition",
+                    **classify_finding({}, classification="editorial_warning", reason="icf-concept-repetition", repair_owner="none"),
                     "primary_section": "icf.background",
                     "secondary_section": section_id,
-                    "issue": "PURPOSE materially repeats the clinical background, comparative evidence, or rationale owned by BACKGROUND.",
-                    "next_action": "Rewrite only PURPOSE as a concise purpose, hypothesis, and primary-endpoint statement; preserve BACKGROUND.",
+                    "issue": "PURPOSE overlaps with BACKGROUND; lexical similarity alone does not establish material harm.",
+                    "next_action": "Optionally shorten PURPOSE while preserving its required study facts and BACKGROUND.",
                 })
         if not clean_paragraphs and not lists:
             findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
@@ -2292,12 +2312,26 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     if cited_sources and not any(
                         cited_fact_is_observable(ref) for ref in cited_sources
                     ):
+                        diagnostics = []
+                        for ref in sorted(cited_sources):
+                            path = ref.removeprefix("source:")
+                            value = source_values.get(path)
+                            if concept == "participation-duration" and path == "study.timeline":
+                                value = _approved_followup_value(value)
+                            diagnostics.append(source_evidence_diagnostics(text, path, value))
+                        lexical_only = lexical_evidence_uncertainty(diagnostics)
                         findings.append({
                             "category": "drafting", "field": section_id, "target_ids": [section_id],
                             "code": "icf-summary-grounding-review",
-                            "publication_disposition": "warning",
-                            "issue": f"KEY INFORMATION concept {concept} cites source evidence whose material facts are not observable.",
-                            "next_action": "Have the independent content reviewer assess the cited source facts in context.",
+                            **classify_finding({}, classification="semantic_uncertainty" if lexical_only else "essential_defect",
+                                               reason="icf-summary-grounding-review", repair_owner="independent_review" if lexical_only else "drafting"),
+                            "evidence_diagnostics": diagnostics,
+                            "issue": f"KEY INFORMATION concept {concept} cites source evidence whose deterministic anchors are not observable.",
+                            "next_action": (
+                                "Have the independent content reviewer assess the cited source facts in context."
+                                if lexical_only else
+                                "Restore the approved clinical quantities and required facts in this summary."
+                            ),
                         })
                     if not allowed_sources and allowed_boilerplate and not cited_boilerplate:
                         findings.append({
@@ -2591,6 +2625,7 @@ def accepted_cross_section_duplicate_findings(
             "category": "content",
             "field": summary,
             "target_ids": [summary],
+            **classify_finding({}, classification="editorial_warning", reason="icf-generated-repetition", repair_owner="none"),
             "issue": f"A generated ICF summary sentence is duplicated in {detail} before rendering.",
             "recovery_class": "drafting_defect",
             "action": "retry_drafting_target",
