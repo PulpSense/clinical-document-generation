@@ -5064,6 +5064,7 @@ def verification_recovery_request_findings(
     artifact_path: str | None = None,
     allow_missing_response: bool = False,
     _validate_companions: bool = True,
+    _request_only: bool = False,
     originating_finding: Mapping[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     """Own canonical verification authority for one proposed recovery route."""
@@ -5118,6 +5119,7 @@ def verification_recovery_request_findings(
             render_report=render_report,
             allow_missing_response=True,
             _validate_companions=False,
+            _request_only=True,
         ):
             return issue("verification_request_invalid_inventory", "The active verification request inventory contains a task-incomplete companion request.")
     if not records:
@@ -5298,7 +5300,23 @@ def verification_recovery_request_findings(
         }
         if set(counts) != expected_inventory:
             return issue("verification_request_invalid_inventory", "The active verification request inventory is not the complete expected content-and-visual request set.")
+    # Companion authority is its complete canonical request and exact artifact
+    # inventory. A rejected companion response cannot invalidate usable evidence
+    # from another authenticated response, nor authorize substantive repairs.
+    if _request_only:
+        return []
     response_path = revision_dir / str(request.get("response_path") or "")
+    response_recovery = (
+        originating_finding is not None
+        and originating_finding.get("recovery_class") == "verifier_transient"
+        and originating_finding.get("action") == RECOVERY_POLICIES["verifier_transient"]
+        and originating_finding.get("verification_request_id") == request_id
+        and originating_finding.get("target_ids") == [
+            "verification:visual" if expected_task == "rendered_page_visual_verification"
+            else "verification:content"
+        ]
+        and not target_ids and not bound_artifact and artifact_path is None
+    )
     if not response_path.is_file():
         return [] if allow_missing_response else issue(
             "verification_response_missing",
@@ -5306,6 +5324,11 @@ def verification_recovery_request_findings(
         )
     if not _revision_owned_nonsymlink_path(revision_dir, response_path):
         return issue("verification_response_invalid", "Verification response path is not revision-owned canonical evidence.")
+    # Response retry consumes no clinical target from the rejected envelope.
+    # Request authentication above still proves task, branch, source, review set,
+    # immutable request ledger and current artifact/page bytes before archival.
+    if response_recovery:
+        return []
     try:
         response = _json(response_path)
     except (OSError, ValueError, json.JSONDecodeError):
@@ -6123,6 +6146,11 @@ def validate_verifications(
             continue
         raw_issues = response.get("findings")
         issues: list[Any] = list(raw_issues) if isinstance(raw_issues, list) else []
+        finding_id_counts: dict[str, int] = {}
+        for item in issues:
+            if isinstance(item, Mapping):
+                finding_id = _text(item.get("finding_id"))
+                finding_id_counts[finding_id] = finding_id_counts.get(finding_id, 0) + 1
         if response.get("status") != "passed" or issues:
             for item in issues or [{"issue": "Verifier did not pass the artifact."}]:
                 source = item if isinstance(item, Mapping) else {"issue": item}
@@ -6145,6 +6173,23 @@ def validate_verifications(
                     "surface", "table_ids",
                 ):
                     if key in source: finding[key] = source[key]
+                # A malformed item cannot authorize a clinical/layout action.
+                # Keep usable companion items from the authenticated envelope,
+                # but send this exact evidence back to its response owner.
+                finding_id = _text(source.get("finding_id"))
+                if category != "visual" and (
+                    not isinstance(source.get("finding_id"), str)
+                    or not _valid_finding_id(finding_id)
+                    or finding_id_counts.get(finding_id) != 1
+                ):
+                    findings.append(recovery_finding(classify_finding({
+                        **finding,
+                        "code": "verification_finding_invalid_identity",
+                        "target_ids": [verification_target],
+                        "issue": "Reviewer finding requires one unique valid finding_id. " + finding["issue"],
+                    }, classification="technical_failure", reason="Malformed finding identity cannot authorize a clinical repair.",
+                        repair_owner="review_response"), "verifier_transient"))
+                    continue
                 if category == "visual":
                     expected_artifacts = {
                         str(artifact.get("artifact"))
@@ -6611,10 +6656,17 @@ def _final_verification_scope_findings(
     }
     if actual_names != expected_names:
         issues.append("The final candidate directory is not the exact branch document set.")
+    response_scope_codes = {
+        "Final review requires exactly one package-wide content review.": "review_response_coverage",
+        "Final review requires one document-scoped visual review with the complete rendered page inventory for every final DOCX.": "review_response_coverage",
+        "All final review responses must belong to the same complete review set.": "review_response_set",
+        "Every final response must bind request, reviewer, model, and response identity.": "review_response_identity",
+    }
     return [
         recovery_finding({
             "category": "verification",
             "field": "final_exact_artifact_review",
+            "code": response_scope_codes.get(issue, "final_scope_integrity"),
             "target_ids": ["verification:content"],
             "issue": issue,
         }, "document_structure_defect")
@@ -6766,7 +6818,16 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     verification_findings, evidence = validate_verifications(revision_dir)
     warnings.extend(_warning_findings(verification_findings))
     findings.extend(_blocking_findings(verification_findings))
-    findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
+    scope_findings = _final_verification_scope_findings(revision_dir, reference, render_report, evidence)
+    # A rejected response has not yet supplied final evidence. Its authenticated
+    # request must be retried first; absence of that response is not a second
+    # unbound construction defect. Keep artifact/scope integrity causes active,
+    # and require every final-scope check again after response recovery.
+    response_pending = any(item.get("recovery_class") == "verifier_transient" for item in verification_findings)
+    deferred_scope = [item for item in scope_findings if response_pending and item.get("code") in {
+        "review_response_coverage", "review_response_set", "review_response_identity",
+    }]
+    findings.extend(item for item in scope_findings if item not in deferred_scope)
     warnings, resolutions = _reviewed_lexical_warnings(warnings, evidence, findings)
     findings.extend(dict(item) for item in warnings
                     if finding_classification(item) is not None and blocks_publication(item))
@@ -6790,7 +6851,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
         "every_page": not findings,
         "section_three_and_orphan_heading_checks": not findings,
     }
-    return {"status": final_review["status"], "findings": findings, "warnings": warnings, "resolved_evidence_cautions": resolutions, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
+    return {"status": final_review["status"], "findings": findings, "deferred_review_scope_findings": deferred_scope, "warnings": warnings, "resolved_evidence_cautions": resolutions, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
 __all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "content_review_sections", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_authentication_findings", "verification_request_hash_valid", "verification_request_ledger_record", "verification_recovery_request_findings", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]

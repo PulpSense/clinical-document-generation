@@ -45,6 +45,7 @@ from drafting import accepted_cross_section_duplicate_findings, governing_resour
 from prs_xml import generate as generate_xml
 from quality import audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, prs_candidate_findings, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
+from finding_policy import finding_classification
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -7973,6 +7974,29 @@ def _quality_retry(
     current_review_set = max(1, int(generation_state.get("review_set", 1)))
     for index, raw in enumerate(findings):
         finding = dict(raw)
+        if finding_classification(finding) == "semantic_uncertainty":
+            # An unresolved caution shares the content review's owner. A failed
+            # companion assessment must not turn it into a drafting action or
+            # an unsupported manual-review repair route. Bind only a caution
+            # actually presented to this exact current canonical request.
+            request_id = f"{revision_dir.name}.review-{current_review_set}.verify.content"
+            request_path = revision_dir / "hermes/verification-requests" / f"{request_id}.json"
+            try:
+                request = _read(request_path)
+            except (OSError, ValueError, json.JSONDecodeError):
+                request = {}
+            if any(
+                isinstance(record, Mapping)
+                and record.get("caution") == finding
+                and record.get("caution_sha256") == canonical_evidence_sha256(finding)
+                for record in request.get("lexical_review_cautions", [])
+            ):
+                finding = recovery_finding({
+                    "category": "reviewer-transient", "field": "clinical_content_verification",
+                    "verification_request_id": request_id, "target_ids": ["verification:content"],
+                    "issue": finding["issue"], "review_caution": finding,
+                    "finding_policy": finding["finding_policy"],
+                }, "verifier_transient")
         recovery_class = str(finding.get("recovery_class") or "")
         if (
             recovery_class not in RECOVERY_POLICIES

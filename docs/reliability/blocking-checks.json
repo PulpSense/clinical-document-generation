@@ -37,13 +37,13 @@
       "authority": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
       "false_rejection_risk": "Malformed responses or targets can look like content defects; transport and semantic findings need different routes",
       "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; explicit harmless editorial findings can be retained warnings. Factual, safety, missing/true material flags remain blocking.",
-      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py"
+      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py; test_cause_aware_recovery.py"
     },
     "recovery": {
       "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
       "false_rejection_risk": "Counting the same response repeatedly; generic diagnostics produce identical retries; transport retry must not consume drafting streak",
       "duplicate_policy": "workflow owns retry state/deadlines; code-owned sections use native rendered snapshots when no accepted AI draft exists. Progress requires changed target and candidate; a fresh full review still decides correctness.",
-      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py"
+      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py; test_cause_aware_recovery.py"
     },
     "installation": {
       "authority": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
@@ -488,7 +488,7 @@
     {
       "file": "scripts/quality.py",
       "function": "verification_recovery_request_findings",
-      "code_sha256": "066bb3c29c202bbf87a29e7fc4c416194dbf9afa8d56a7e255c499e2bdecfaea",
+      "code_sha256": "d18adeb5576a7193cab877841b09a78268d73ec94c768fad98fab1f210e47805",
       "family": "review"
     },
     {
@@ -542,13 +542,13 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "209f4e918681907197f1cb883f3ce35c81b850352c5f2c26a4292a42cafcaa96",
+      "code_sha256": "b8aa4a14e85fede900883050433c1b0cc463cacb6564035353fc80c389936987",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_final_verification_scope_findings",
-      "code_sha256": "4c8a1a8da31613a3d4fe6e68ab9eae42d5dd80fcb7e9b03f4b14da2060f2ab95",
+      "code_sha256": "298d06c29c757a97e9b9be75429c35d4c8707cab11bd7740a7e6ba22b6875fe3",
       "family": "review"
     },
     {
@@ -560,7 +560,7 @@
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "8ff65d7401dc6059037b7349f47c9c404a537391f69f91a9d44f7498e45f2607",
+      "code_sha256": "8011ae36e09fe7ac399ae558739a69fb87dc4fc2f8172544d6837e3ae4a09a76",
       "family": "review"
     },
     {
@@ -812,7 +812,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "d0e60629831c7b4645c7a9bd0d8247cd2b815b31c3a0a61ef020a4cc6b359825",
+      "code_sha256": "ecd5036ccc978ec4bd5a92f15e94bc7d35b4bdd8ba8d0c6e7601f63d0edaf319",
       "family": "recovery"
     },
     {
