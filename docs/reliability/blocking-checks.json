@@ -422,7 +422,7 @@
     {
       "file": "scripts/quality.py",
       "function": "assess_protocol_concept_repetition",
-      "code_sha256": "b772164571317bf426c54125d973d890c7ba3ea071d1cc538f1b092cdc9b55af",
+      "code_sha256": "17afb523e27c0096f4dc901035efb619887da65e8fe6a830c14cc9e21720ea16",
       "family": "clinical"
     },
     {

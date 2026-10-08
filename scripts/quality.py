@@ -4595,16 +4595,12 @@ def assess_protocol_concept_repetition(
                     "target_ids": [secondary],
                     "repair_action": "redraft_secondary_section",
                     "disposition": "manual_review",
-                    "severity": "blocking" if material else "warning",
-                    "publication_disposition": "blocking" if material else "warning",
-                    "action": RECOVERY_POLICIES["drafting_defect"] if material else "manual_review",
-                    **({
-                        "recovery_class": "drafting_defect",
-                        "owner": "drafting",
-                    } if material else {}),
+                    "severity": "warning",
+                    "publication_disposition": "warning",
+                    "action": "manual_review",
                 })
                 break
-    return [classify_finding({**item, "severity": "warning", "action": "manual_review"},
+    return [classify_finding(item,
         classification="semantic_uncertainty" if item["material"] else "editorial_warning",
         reason="Overlap and length suggest possible material repetition; independent review must establish harm." if item["material"] else "Nonmaterial concept repetition without contradiction or obscured information.",
         repair_owner="independent_review" if item["material"] else "none") for item in findings]

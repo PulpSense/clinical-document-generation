@@ -1078,3 +1078,5 @@ def test_heuristic_endpoint_overlap_requires_review_before_materiality_is_proven
     assert findings[0]["finding_policy"]["classification"] == "semantic_uncertainty"
     assert findings[0]["finding_policy"]["repair_owner"] == "independent_review"
     assert findings[0]["publication_disposition"] == "warning"
+    assert "recovery_class" not in findings[0]
+    assert "owner" not in findings[0]
