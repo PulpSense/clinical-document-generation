@@ -3790,6 +3790,10 @@ def _review_finding_locations(reference: Mapping[str, Any], finding: Mapping[str
             continue
         if location not in locations:
             locations.append(location)
+    artifact = str(finding.get("artifact") or "")
+    page = finding.get("page")
+    if artifact in {"protocol", "icf"} and isinstance(page, int) and not isinstance(page, bool) and page > 0:
+        locations.append(f"{'Protocol' if artifact == 'protocol' else 'ICF'} p.{page}")
     return locations or ["Document location not specified by the check"]
 
 
@@ -3932,7 +3936,7 @@ def _terminal_diagnostic_archive(run_dir: Path) -> dict[str, Any]:
     }
 
 
-def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | None = None) -> dict[str, Any]:
+def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | None = None, delivery_confirmed: bool = False) -> dict[str, Any]:
     """Build the supported file-link payload for the final Desktop reply.
 
     The manifest is the only source for attachments.  In particular, this
@@ -3976,8 +3980,21 @@ def desktop_attachment_reply(manifest: Mapping[str, Any], *, run_dir: Path | Non
         "attachments": attachments,
         "client_outputs_only": True,
     }
+    reply["delivery_status"] = "confirmed" if delivery_confirmed else "prepared_unconfirmed"
+    message = ["Complete verified Branch Document Set delivered." if delivery_confirmed
+               else "Complete verified Branch Document Set prepared. Delivery confirmation pending."]
     if manifest.get("delivery_warnings"):
         reply["cautions"] = list(manifest["delivery_warnings"])
+        for caution in reply["cautions"]:
+            locations = "; ".join(caution.get("document_locations") or [])
+            prefix = f" — {locations}" if locations else ""
+            if (caution.get("resolution") == "independent_content_review_passed"
+                    and caution.get("verification_request_id")):
+                message.append(f"Reviewer-resolved wording uncertainty{prefix}: final content review confirmed fidelity to the approved source.")
+            else:
+                detail = " ".join(str(caution.get("issue") or "Editorial wording caution.").split())
+                message.append(f"Editorial warning{prefix}: {detail[:240]}")
+    reply["message"] = "\n".join(message)
     return reply
 
 
@@ -4924,6 +4941,8 @@ def run_desktop_operation(
                 },
                 findings=gate_findings,
             )
+        if delivery["confirmed"]:
+            final["desktop_reply"] = desktop_attachment_reply(manifest, run_dir=run_dir, delivery_confirmed=True)
         if not delivery["confirmed"]:
             final["client_outputs"] = []
             final.pop("desktop_reply", None)

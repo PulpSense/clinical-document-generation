@@ -458,13 +458,13 @@
     {
       "file": "scripts/quality.py",
       "function": "_is_publication_warning",
-      "code_sha256": "d7a47892a679361098897905791e4e67e3cceadf10770102de0d1c9b8280c94c",
+      "code_sha256": "96e9bc33bbfd0cf7f89e1929f7a9d7750ff180d40cee919640a7e003dae8b035",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_accepted_drafting_warnings",
-      "code_sha256": "5ca1270d7248cb71f1c7890f67e29947aebcc0c35ee64f6a449d74ebfb0f4963",
+      "code_sha256": "06bd3e3f65715c8c246a7e2314e63014216a2c88ff3292c63c982ef3182d77db",
       "family": "review"
     },
     {
@@ -679,6 +679,12 @@
     },
     {
       "file": "scripts/workflow.py",
+      "function": "desktop_attachment_reply",
+      "code_sha256": "b183e9378d50585f2cdd31727b89152e2aa808c2e6f891a980a81d3923a686b8",
+      "family": "delivery"
+    },
+    {
+      "file": "scripts/workflow.py",
       "function": "confirm_desktop_delivery",
       "code_sha256": "a82a85a960446b85af7bc7cb6c7e026753e5d9b1200923612383acb9d55d285f",
       "family": "delivery"
@@ -692,7 +698,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "776967f38e5a99a6d214e43c2376eca96e2199393c44ece1c9f88661ec821c59",
+      "code_sha256": "d240be1f455fa179f897ccff305caa05e3e5b0c3cc674f2477c3de68bfb7974c",
       "family": "recovery"
     },
     {
