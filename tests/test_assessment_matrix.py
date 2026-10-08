@@ -135,3 +135,33 @@ def test_declared_custom_visit_headers_share_the_same_projection_and_table_polic
     raw = source['procedures']['visit_schedule_table']
     scoped = drafting.section_evidence_value('icf.procedures', 'procedures.visit_schedule_table', raw, source)
     assert drafting.evidence_grounded('Alpha contact: blood draw at 5 mL; Beta contact has no assigned activities.', scoped, all_items=True)
+
+
+def test_constructed_schedule_preserves_source_label_case_and_rejects_changed_clinical_quantity(tmp_path):
+    from docx import Document
+    import quality
+    import rendering
+
+    root = Path(__file__).resolve().parents[1]
+    source = json.loads((root / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['procedures']['visit_schedule_table'] = []
+    source['procedures']['visit_schedule'] = [
+        {'visit': 'Screening', 'timing': 'Before enrollment',
+         'procedures': ['qPCR collection at 5 mL', 'informed consent']},
+        {'visit': 'Month 3', 'timing': 'Month 3', 'procedures': ['qPCR collection at 5 mL']},
+    ]
+    original = copy.deepcopy(source)
+    rendering.render_documents(root, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}},
+                               artifact_names={'protocol', 'icf'})
+    path = tmp_path / 'candidate/protocol.docx'
+    document = Document(path)
+    matrix = next(table for table in document.tables if table.rows[0].cells[0].text.strip() == 'Activity')
+    assert 'qPCR collection at 5 mL' in [row.cells[0].text.strip() for row in matrix.rows]
+    assert source == original
+    assert not [f for f in quality.deterministic_content_check(tmp_path, source)
+                if f.get('field') == 'procedures.visit_schedule']
+    row = next(row for row in matrix.rows if row.cells[0].text.strip() == 'qPCR collection at 5 mL')
+    row.cells[0].text = 'qPCR collection at 99 mL'
+    document.save(path)
+    assert any(f.get('field') == 'procedures.visit_schedule'
+               for f in quality.deterministic_content_check(tmp_path, source))

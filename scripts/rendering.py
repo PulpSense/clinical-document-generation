@@ -3365,10 +3365,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     if matrix_mode:
         row_values = [list(row) for row in row_values]
         row_values[1][0] = ""
-    for row in row_values[header_rows:]:
-        if row and row[0]:
-            row[0] = row[0][0].upper() + row[0][1:]
-
     authority = Document(authority_path)
     design = authority.tables[-1]
     body_run_properties = next((
