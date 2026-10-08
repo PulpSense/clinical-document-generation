@@ -13,7 +13,7 @@
       "authority": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
       "false_rejection_risk": "Lexical overlap is a heuristic; structural IDs, bibliography and binary cells must be excluded by the shared projection",
       "duplicate_policy": "Drafting, Protocol rendered fidelity and Sterling consume shared section projections; endpoint inventory stays in its Study Design owner. Independent review still assesses meaning/relations.",
-      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py"
+      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py; test_concept_reference_grounding.py"
     },
     "clinical": {
       "authority": "Approved values plus Brad section ownership and governed template clauses",
@@ -224,7 +224,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "a5abf58186ac8f2db8b49c0fb6398f97839a1d3cc9b7f8b008b89280790f75b2",
+      "code_sha256": "a14dfde1c8a52de44908e6246b02361ab54cf2ffffc6f5dafc40e3f74280459b",
       "family": "evidence"
     },
     {

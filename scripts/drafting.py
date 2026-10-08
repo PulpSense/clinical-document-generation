@@ -1614,10 +1614,27 @@ def _coverage_findings(
                 and not source_evidence_grounded(content, path, value)
             ]
             if ungrounded:
+                # Brief references do not own the source's full methods or
+                # timeline. Independent review assesses meaning when only
+                # lexical anchors are uncertain; quantities remain blocking.
+                diagnostics = [
+                    source_evidence_diagnostics(content, path, material[path])
+                    for path in ungrounded
+                ]
+                lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
                 findings.append({
                     "category": "drafting", "field": section_id,
+                    **({
+                        "code": "lexical-evidence-uncertainty",
+                        "publication_disposition": "warning",
+                    } if lexical_uncertainty else {}),
                     "issue": f"Reference evidence is cited but not observable: {', '.join(ungrounded)}.",
-                    "next_action": "Preserve the supplied reference value without restating concepts owned elsewhere.",
+                    "next_action": (
+                        "Have the independent content reviewer assess the cited source facts in context."
+                        if lexical_uncertainty else
+                        "Preserve the supplied reference value without restating concepts owned elsewhere."
+                    ),
+                    "evidence_diagnostics": diagnostics,
                 })
         return findings
     source_value = request.get("approved_source")
