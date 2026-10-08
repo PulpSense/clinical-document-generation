@@ -3941,7 +3941,7 @@ def render_documents(
                 "issue": "Required source-bound section icf.procedures is missing or empty.",
             }, classification="essential_defect", reason="rendering.render_documents.a7eba2d2f7", repair_owner="construction"))
         blocking_findings = [finding for finding in findings if blocks_construction(finding)]
-        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if not blocks_construction(finding)]})
+        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "blocked" if any(blocks_construction(item) for item in blocking_findings) else "passed", "findings": blocking_findings, "warnings": [finding for finding in findings if not blocks_construction(finding)]})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
         "contracted_template_bundle": bundle,

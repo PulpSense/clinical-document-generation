@@ -2375,7 +2375,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             finding for finding in section_findings
             if blocks_construction(finding)
         ]
-        if not blocking_section_findings and section_id not in duplicate_target_ids:
+        if not any(blocks_construction(item) for item in blocking_section_findings) and section_id not in duplicate_target_ids:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if not blocks_construction(finding)], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
     return {"kind": "sections", "drafts": accepted}, findings
 
@@ -2458,7 +2458,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             finding for finding in response_findings
             if blocks_construction(finding)
         ]
-        if blocking_response_findings:
+        if any(blocks_construction(item) for item in blocking_response_findings):
             findings.extend(blocking_response_findings)
             rejected = revision_dir / "hermes/rejected" / response_path.name
             _write_json(rejected, {"request": request_path.name, "findings": blocking_response_findings})

@@ -3000,7 +3000,7 @@ def preflight(
     ordered_renderers = ([identity] if identity else []) + [candidate for candidate in renderer_candidates if candidate != identity]
     ordered_page_renderers = ([page_identity] if page_identity else []) + [candidate for candidate in page_candidates if candidate != page_identity]
     return {
-        "status": "passed" if not findings else "blocked",
+        "status": "blocked" if any(blocks_construction(item) for item in findings) else "passed",
         "contracted_template_bundle": dict(bundle),
         "renderer": identity,
         "renderer_candidates": ordered_renderers,
@@ -3487,7 +3487,7 @@ def render_pages(
             })
         renderer_attempts.append({"renderer": identity, "status": "passed"})
         return {
-            "status": "passed" if not findings else "blocked",
+            "status": "blocked" if any(blocks_construction(item) for item in findings) else "passed",
             "renderer": identity,
             "renderer_attempts": renderer_attempts,
             "page_renderer": selected_page_renderer,
@@ -5939,12 +5939,12 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
             continue
         active_request_id = str(active_request.get("request_id") or "")
         request_id_counts[active_request_id] = request_id_counts.get(active_request_id, 0) + 1
-    if verification_request_authentication_findings(
+    if any(blocks_construction(item) for item in verification_request_authentication_findings(
         revision_dir,
         request_path,
         request,
         request_id_counts=request_id_counts,
-    ):
+    )):
         return False
     if any(
         response.get(key) != expected
@@ -6089,7 +6089,7 @@ def validate_verifications(
             request,
             request_id_counts=active_request_id_counts,
         )
-        if authentication_findings:
+        if any(blocks_construction(item) for item in authentication_findings):
             findings.extend(authentication_findings)
             continue
         response_path = revision_dir / request["response_path"]
@@ -6841,7 +6841,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     final_review = {
         "schema_version": FINAL_REVIEW_SCHEMA,
         "scope": FINAL_REVIEW_SCOPE,
-        "status": "passed" if not findings else "blocked",
+        "status": "blocked" if any(blocks_publication(item) for item in findings) else "passed",
         "branch_document_set": sorted(document_set(get_path(reference, "meta.study_type"))),
         "candidate_hashes": candidate_hashes,
         "rendered_hashes": rendered_hashes,

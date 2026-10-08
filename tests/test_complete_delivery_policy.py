@@ -133,3 +133,12 @@ def test_developer_guardrails_are_not_ordinary_runtime_gates():
                 assert all('offline_reliability_gate' not in item.name for item in node.names)
             elif isinstance(node, ast.ImportFrom):
                 assert 'offline_reliability_gate' not in (node.module or '')
+
+
+def test_fingerprinted_compound_presence_veto_still_fails_policy_guard(tmp_path):
+    gate = _developer_fixture(tmp_path, 'def publish(findings, allowed):\n    return {"status": "blocked" if findings and allowed else "passed"}\n', [])
+    records = gate.blocking_check_inventory(tmp_path)
+    records[0].update(scope='ordinary', role='decision', decision_inputs=['findings'])
+    import json
+    (tmp_path / gate.AUDIT.relative_to(gate.ROOT)).write_text(json.dumps({'checks': records}))
+    assert any('Raw finding decision' in issue for issue in gate.policy_findings(tmp_path))

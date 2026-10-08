@@ -104,12 +104,15 @@ def policy_findings(root: Path = ROOT) -> list[str]:
                         result.append(f"Raw finding decision: {location}:{item.lineno}")
                 if record.get("role") == "decision" and isinstance(item, (ast.If, ast.IfExp)):
                     inputs = set(record.get("decision_inputs", []))
-                    test = item.test
-                    if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
-                        test = test.operand
-                    if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "bool" and len(test.args) == 1:
-                        test = test.args[0]
-                    if isinstance(test, ast.Name) and test.id in inputs:
+                    def raw_presence(test):
+                        if isinstance(test, ast.BoolOp):
+                            return any(raw_presence(value) for value in test.values)
+                        if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+                            return raw_presence(test.operand)
+                        if isinstance(test, ast.Call) and isinstance(test.func, ast.Name) and test.func.id == "bool" and len(test.args) == 1:
+                            return raw_presence(test.args[0])
+                        return isinstance(test, ast.Name) and test.id in inputs
+                    if raw_presence(item.test):
                         result.append(f"Raw finding decision: {location}:{item.lineno}")
     return sorted(set(result))
 

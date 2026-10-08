@@ -4637,6 +4637,8 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
 
     assert result["status"] == "awaiting_hermes", json.dumps(result, indent=2)
     assert result["stage"] == "independent_verification_retry"
+    assert result["findings"][0]["finding_policy"]["classification"] == "technical_failure"
+    assert result["findings"][0]["finding_policy"]["repair_owner"] == "review_response"
     assert [item["request_id"] for item in result["handoffs"]] == [finding["verification_request_id"]]
     assert request_path.is_file()
     assert not response_path.exists()

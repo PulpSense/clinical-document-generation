@@ -3460,7 +3460,7 @@ def validate(run_dir: Path, **_: Any) -> dict[str, Any]:
     contract = source_contract(reference); approved, approval_issue = _approval_valid(run_dir, reference)
     findings = list(contract["blocking_findings"])
     if not approved: findings.append(declare_finding({"category": "approval", "field": "approval", "issue": approval_issue}, classification="technical_failure", reason="workflow.validate.a45a04b24b", repair_owner="integrity"))
-    return {"status": "passed" if not findings else "blocked", "stage": "readiness", "study_type": contract.get("study_type"), "findings": findings, "client_outputs": []}
+    return {"status": "blocked" if any(blocks_construction(item) for item in findings) else "passed", "stage": "readiness", "study_type": contract.get("study_type"), "findings": findings, "client_outputs": []}
 
 
 def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
@@ -4069,8 +4069,8 @@ def confirm_desktop_delivery(
             findings.append(recovery_finding(declare_finding({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."}, classification="technical_failure", reason="workflow.confirm_desktop_delivery.fd15860e75", repair_owner="runtime"), "transport_fault"))
             break
     return {
-        "status": "confirmed" if not findings else "blocked",
-        "confirmed": not findings,
+        "status": "blocked" if any(blocks_construction(item) for item in findings) else "confirmed",
+        "confirmed": not any(blocks_construction(item) for item in findings),
         "opened": opened,
         "attempts": total_attempts,
         "findings": findings,
@@ -8159,7 +8159,7 @@ def _quality_retry(
                     ),
                     originating_finding=finding,
                 )
-                if authority_findings:
+                if any(blocks_construction(item) for item in authority_findings):
                     unsupported_targets.append(parsed_targets[0].target_id if parsed_targets else None)
                     routing_failure_code = str(authority_findings[0].get("code") or "verification_request_canonical_mismatch")
                     routing_failure = str(authority_findings[0].get("issue") or "Verification request authority validation failed.")
@@ -8867,7 +8867,7 @@ def generate(
         else recovery_finding(finding, "drafting_defect")
         for finding in ingest_responses(revision_dir, expected_governing)
     ]
-    if drafting_findings:
+    if any(blocks_construction(item) for item in drafting_findings):
         source_gaps = [item for item in drafting_findings if item.get("category") in {"source-evidence", "request-integrity"}]
         retryable = [item for item in drafting_findings if item not in source_gaps]
         if source_gaps:
@@ -8917,7 +8917,7 @@ def generate(
         reference,
         expected_governing,
     )
-    if duplicate_findings:
+    if any(blocks_construction(item) for item in duplicate_findings):
         return _quality_retry(
             run_dir,
             reference_path,
@@ -9226,7 +9226,7 @@ def generate(
     _, early_findings = _begin_independent_review(
         revision_dir, reference, render_report, bundle, review_set,
     )
-    if early_findings:
+    if any(blocks_construction(item) for item in early_findings):
         return _quality_retry(
             run_dir, reference_path, working_reference, reference, revision_dir,
             attempts, early_findings, "drafting", contracted_bundle=bundle,

@@ -731,7 +731,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "fb377ab012dba31cde3e88ddc23773b1e3721b516bd886dddf3a8235cab633f5",
+      "code_sha256": "2e8ec945d7702b5c140585acd10650dc63b34a1bba950594a2edb60aa8ec858c",
       "family": "evidence",
       "scope": "ordinary",
       "role": "decision",
@@ -903,16 +903,18 @@
         }
       ],
       "decision_inputs": [
-        "section_findings"
+        "findings",
+        "section_findings",
+        "blocking_section_findings"
       ]
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "46dbc8ae2b475983554dac00c1ba76e1deb5587c7e3b2c54c5905893c5b1c035",
+      "code_sha256": "3875298803a705cc72094286d36c5ffa040de871c03eaea89f973e33a97e3881",
       "family": "evidence",
       "scope": "ordinary",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'essential_defect'",
@@ -929,6 +931,9 @@
           "reason": "'drafting.ingest_responses.f121eb0209'",
           "repair_owner": "'drafting'"
         }
+      ],
+      "decision_inputs": [
+        "blocking_response_findings"
       ]
     },
     {
@@ -1092,8 +1097,11 @@
       "code_sha256": "f2abcc60e0c91e83fa523511ad1994a423df357522a770af6bf92a642ce978a0",
       "family": "structured",
       "scope": "shared",
-      "role": "helper",
-      "policy_declarations": []
+      "role": "decision",
+      "policy_declarations": [],
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/prs_xml.py",
@@ -1336,10 +1344,10 @@
     {
       "file": "scripts/quality.py",
       "function": "preflight",
-      "code_sha256": "0fa0ecfb576fa28ad88816918c10a2ecd11a86be998ca77d8e717992c59ac908",
+      "code_sha256": "c10ef4db151f1356e77f3c31a5f6c853740d82cbd6f3634e4e5709cfe0169e9d",
       "family": "render",
       "scope": "shared",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'technical_failure'",
@@ -1359,7 +1367,10 @@
         "f7e2790ff848d51a1e77fc503cce5913f78afa5ba4a37a814fee5b714dd12208": "Adapter attempt rows; failures are emitted separately with explicit policy.",
         "0b309bbeaa11d74c6178e77888d2e29eb76519bd01484f17b13f5e51a150a7f2": "Adapter attempt rows; failures are emitted separately with explicit policy.",
         "319e965907aa5a0087f2904d5770694d7e27790a40a62d4fb622a5895d76b7d3": "Adapter attempt rows; failures are emitted separately with explicit policy."
-      }
+      },
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
@@ -1411,10 +1422,10 @@
     {
       "file": "scripts/quality.py",
       "function": "render_pages",
-      "code_sha256": "9d3801566d383169d6ea84cab6f1c7953f5d246fd573ea5ecc8c5f3d251003cd",
+      "code_sha256": "5cbe0a7f130d1c5336be5fbbd1a6e3b928e9eeff8dc909570d85eb60bccf88ea",
       "family": "render",
       "scope": "shared",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'technical_failure'",
@@ -1445,7 +1456,10 @@
       "diagnostic_record_sites": {
         "618eceb6b2a9717c6afeb17611b940fbb95affe641b3e9cef76e0f5ee52baa3d": "Renderer attempt exception records; final causes are emitted separately.",
         "7b35bf0a585ae9bd6b8747df7c60c45d6882d8df4839e7bbfff382b786f3351a": "Renderer attempt exception records; final causes are emitted separately."
-      }
+      },
+      "decision_inputs": [
+        "findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
@@ -1829,19 +1843,22 @@
     {
       "file": "scripts/quality.py",
       "function": "verification_response_is_terminal",
-      "code_sha256": "1bf0a690ba7c85ddbb38505844baaec79eecfd7da96c05c1c4fcecf63f5d87ad",
+      "code_sha256": "4db8b8607c9dc5d44be474df361e3adfd8c996ba7b7ba71ac975fda982d9d41e",
       "family": "review",
       "scope": "ordinary",
-      "role": "helper",
-      "policy_declarations": []
+      "role": "decision",
+      "policy_declarations": [],
+      "decision_inputs": [
+        "authentication_findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "87d9e003677e47068e690b8e67afcc7d72b3eb7e7a85033bb43f367c94009608",
+      "code_sha256": "2f76b376fe88a1b064515dbca4a6a3494c1bf81e2b245e79197ea1b2678d6ca6",
       "family": "review",
       "scope": "ordinary",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'editorial_warning'",
@@ -2027,7 +2044,10 @@
         "2cd8d49388671f299cb5bc4848b8b75f8593b77a73e520b50a4e7b37e5dbdf19": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
         "0e828581d39516cfdf4097b7ba393f1018dcc745e5df54bd2dd77fcc0fb0dd3d": "Untrusted raw reviewer input decoder; authenticated findings classify at emission.",
         "6c6ddde3261ceef70e90878dd924b0bbf2713608616f105b72c950dfa1b8e199": "Untrusted raw reviewer input decoder; authenticated findings classify at emission."
-      }
+      },
+      "decision_inputs": [
+        "authentication_findings"
+      ]
     },
     {
       "file": "scripts/quality.py",
@@ -2071,12 +2091,13 @@
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "2b0a2c4835bcd35dcd1cb47970be5a52a5fcff04a44be2bcb027dda40496c8a6",
+      "code_sha256": "57e84db407d269de9a40d94c654ad62d2e6364b05255eee82103c3d8e05ae4f2",
       "family": "review",
       "scope": "ordinary",
       "role": "decision",
       "policy_declarations": [],
       "decision_inputs": [
+        "findings",
         "deterministic_findings",
         "verification_findings"
       ]
@@ -2220,7 +2241,7 @@
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "b8de91b0bc8970a8d148249739f80ca7ae69b42fa026ad580e7fbd2c581132fc",
+      "code_sha256": "fe99fa4b684176c4ab82a030989ce02387388131d8397ead8af203c8b8d8544e",
       "family": "render",
       "scope": "shared",
       "role": "decision",
@@ -2242,6 +2263,7 @@
         }
       ],
       "decision_inputs": [
+        "blocking_findings",
         "findings"
       ]
     },
@@ -2403,16 +2425,19 @@
     {
       "file": "scripts/workflow.py",
       "function": "validate",
-      "code_sha256": "e46d2fb409950c86846cb92ca6c68b6ac78c9deb2ddfe30acf0683479f63295d",
+      "code_sha256": "7d03626f1a9c151290b30e71118c62a9d3d46132307792aee07ef1590557462f",
       "family": "recovery",
       "scope": "ordinary",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'technical_failure'",
           "reason": "'workflow.validate.a45a04b24b'",
           "repair_owner": "'integrity'"
         }
+      ],
+      "decision_inputs": [
+        "findings"
       ]
     },
     {
@@ -2454,10 +2479,10 @@
     {
       "file": "scripts/workflow.py",
       "function": "confirm_desktop_delivery",
-      "code_sha256": "d39dd7eee745ba5c7731316b6c1bb0cb505db1aba6b7272f6cac28944963eaa6",
+      "code_sha256": "9a3267028ce0a8f6a7b559b7de68d8b2f7427eb88c395380a42200c6c81d6627",
       "family": "delivery",
       "scope": "ordinary",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'technical_failure'",
@@ -2469,6 +2494,9 @@
           "reason": "'workflow.confirm_desktop_delivery.fd15860e75'",
           "repair_owner": "'runtime'"
         }
+      ],
+      "decision_inputs": [
+        "findings"
       ]
     },
     {
@@ -2730,7 +2758,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "fbd273f1f31f9c07847d9ee655706923f978c0d20e8e4ae3e089fa6a5d90831c",
+      "code_sha256": "191bfdf98886a1d20ec917ea4596859788e65aa974c00ebe50eb3d925b537b78",
       "family": "recovery",
       "scope": "ordinary",
       "role": "decision",
@@ -2761,7 +2789,9 @@
           "repair_owner": "'review_response'"
         }
       ],
-      "decision_inputs": []
+      "decision_inputs": [
+        "authority_findings"
+      ]
     },
     {
       "file": "scripts/workflow.py",
@@ -2801,10 +2831,10 @@
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "abff89efd1795b4a6da87e6b2b70f9deff543faa27bca313a9e8d1bd142a9c25",
+      "code_sha256": "cb5851a3c63444e4d27f1656c230301427f73b388efdb2a9a035a23b8c77f612",
       "family": "recovery",
       "scope": "ordinary",
-      "role": "producer",
+      "role": "decision",
       "policy_declarations": [
         {
           "classification": "'essential_defect'",
@@ -2841,6 +2871,11 @@
           "reason": "'workflow.generate.dd6ca394d6'",
           "repair_owner": "'integrity'"
         }
+      ],
+      "decision_inputs": [
+        "drafting_findings",
+        "duplicate_findings",
+        "early_findings"
       ]
     },
     {
