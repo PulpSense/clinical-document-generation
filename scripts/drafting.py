@@ -705,6 +705,11 @@ def _clinical_evidence_text(value: str) -> str:
         def remove_label(match: re.Match[str]) -> str:
             ids = set(re.findall(r"\d+", match.group(2)))
             return match.group(1) if ids <= reference_ids else match.group(0)
+        # Bracketed labels are nonclinical only when every cited identifier
+        # resolves to an identified bibliography entry. Unknown labels remain
+        # evidence; this cannot erase a missing clinical quantity.
+        clinical = re.sub(r"(?P<prefix>[.!?])?\[(?P<ids>\d+(?:\s*,\s*\d+)*)\]",
+            lambda match: (match.group("prefix") or "") if set(re.findall(r"\d+", match.group("ids"))) <= reference_ids else match.group(0), clinical)
         clinical = re.sub(
             r"([A-Za-z][.!?])(\d+(?:\s*,\s*\d+)*)(?=\s|$)", remove_label, clinical,
         )
@@ -1148,15 +1153,27 @@ def _evidence_diagnostics(content: str, value: Any, *, all_items: bool = False) 
             else:
                 values.add(str(int(token)))
         number_words = {
-            "zero": "0", "one": "1", "two": "2", "three": "3",
-            "four": "4", "five": "5", "six": "6", "seven": "7",
-            "eight": "8", "nine": "9", "ten": "10", "eleven": "11", "twelve": "12",
+            "zero": 0, "one": 1, "two": 2, "three": 3, "four": 4,
+            "five": 5, "six": 6, "seven": 7, "eight": 8, "nine": 9,
+            "ten": 10, "eleven": 11, "twelve": 12, "thirteen": 13,
+            "fourteen": 14, "fifteen": 15, "sixteen": 16, "seventeen": 17,
+            "eighteen": 18, "nineteen": 19, "twenty": 20, "thirty": 30,
+            "forty": 40, "fifty": 50, "sixty": 60, "seventy": 70,
+            "eighty": 80, "ninety": 90,
         }
-        values.update(
-            number_words[word]
-            for word in re.findall(r"\b[a-z]+\b", text.casefold())
-            if word in number_words
-        )
+        word_matches = list(re.finditer(r"\b[a-z]+\b", text.casefold()))
+        words = [match.group(0) for match in word_matches]
+        index = 0
+        while index < len(words):
+            number = number_words.get(words[index])
+            if number is not None:
+                if (number >= 20 and index + 1 < len(words)
+                    and re.fullmatch(r"[ -]+", text[word_matches[index].end():word_matches[index + 1].start()])
+                    and 0 < number_words.get(words[index + 1], 100) < 10):
+                    number += number_words[words[index + 1]]
+                    index += 1
+                values.add(str(number))
+            index += 1
         return values
 
     content_numbers = numeric_tokens(content)
@@ -1364,7 +1381,7 @@ def _approved_followup_value(timeline: Any) -> str:
 def _background_claim_findings(
     section_id: str, content: str, approved_source: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    if section_id not in {"icf.background", "prs.detailed-description"}:
+    if section_id not in {"introduction", "icf.background", "prs.detailed-description"}:
         return []
     source_background = str(get_path(approved_source, "study.background") or "")
     source_trial_qualified = bool(re.search(
@@ -1440,7 +1457,10 @@ def _coverage_findings(
                 "next_action": "Summarize the approved clinical context and evidence gap from study.background.",
             })
         elif background and not evidence_grounded(content, background):
+            diagnostics = source_evidence_diagnostics(content, "study.background", background)
             findings.append({
+                **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_evidence_uncertainty([diagnostics]) else {}),
+                "evidence_diagnostics": [diagnostics],
                 "category": "drafting", "field": section_id,
                 "issue": "Introduction cites the background without conveying its concrete clinical context.",
                 "next_action": "Name the source-supported setting and specific evidence gap in concise clinical language.",
@@ -1448,6 +1468,7 @@ def _coverage_findings(
         if re.search(r"\b(?:the\s+)?(?:study\s+)?hypothes(?:is|izes)\b|\bprimary endpoint\b", content, re.I):
             findings.append({
                 "category": "drafting", "field": section_id,
+                **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
                 "issue": "Introduction repeats the hypothesis or endpoint definition instead of closing on the evidence gap.",
                 "next_action": "End with the source-supported evidence gap and rationale; leave hypothesis and endpoint definitions to Study Design.",
             })
@@ -1461,11 +1482,14 @@ def _coverage_findings(
                     "next_action": "Summarize prior evidence and the specific evidence gap; leave the combination's expected benefit as a hypothesis in Study Design.",
                 })
                 break
-        return findings
+        return findings + [classify_finding(item, classification="essential_defect",
+            reason="The draft strengthens a qualified approved source claim.", repair_owner="drafting")
+            for item in _background_claim_findings(section_id, content, source)]
     if section_id == "objectives" and "endpoint-inventory" not in set(contract.get("concept_ownership", {}).get("owns", [])):
         if re.search(r"\b(?:primary|secondary) endpoint(?:s)?\b", content, re.I):
             return [{
                 "category": "drafting", "field": section_id,
+                **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
                 "issue": "Objectives repeats an endpoint definition owned by Study Design.",
                 "next_action": "State the approved purpose and objectives without naming the primary or secondary endpoint inventory.",
             }]
@@ -1537,7 +1561,10 @@ def _coverage_findings(
             and not evidence_grounded(content, value)
         ]
         if ungrounded_methods:
+            diagnostics = [source_evidence_diagnostics(content, path, material[path]) for path in ungrounded_methods]
             findings.append({
+                **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if lexical_evidence_uncertainty(diagnostics) else {}),
+                "evidence_diagnostics": diagnostics,
                 "category": "drafting",
                 "field": section_id,
                 "issue": "Statistical Methodology does not preserve the approved analysis method: "
@@ -1557,7 +1584,8 @@ def _coverage_findings(
             if interpretation and len(interpretation.split()) <= 30 and not software and len(content.split()) > 60:
                 findings.append({
                     "category": "drafting", "field": section_id,
-                    "issue": "General Statistical Considerations expands a short interpretation qualification into a methods recap.",
+                    **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
+                "issue": "General Statistical Considerations expands a short interpretation qualification into a methods recap.",
                     "next_action": "State the approved interpretation qualification in one short paragraph; Section 10.2 owns endpoint methods.",
                 })
         if section_id == "endpoint-criteria.study-completion":
@@ -1572,7 +1600,8 @@ def _coverage_findings(
             if mentioned_visits or re.search(r"\bexit form\b", content, re.I):
                 findings.append({
                     "category": "drafting", "field": section_id,
-                    "issue": "Study Completion repeats a participant visit or assessment instead of the study-level timeline.",
+                    **classify_finding({"code": "protocol-placement-preference"}, classification="semantic_uncertainty", reason="Placement heuristic requires independent assessment of meaning and ownership.", repair_owner="independent_review"),
+                "issue": "Study Completion repeats a participant visit or assessment instead of the study-level timeline.",
                     "next_action": "State the approved closeout timeline only; keep visits and the exit form in Sections 9, 15, and 18.1.",
                 })
         missing = [path for path in material if f"source:{path}" not in cited]
@@ -1694,6 +1723,7 @@ def _coverage_findings(
             **({
                 "code": "icf-lexical-evidence-uncertainty" if section_id.startswith("icf.") else "lexical-evidence-uncertainty",
                 "publication_disposition": "warning",
+                **(classify_finding({}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review") if not section_id.startswith("icf.") else {}),
             } if lexical_uncertainty else {}),
             "issue": f"Evidence references are present but their material facts are not observable in the section: {', '.join(ungrounded)}.",
             "next_action": (
@@ -1777,7 +1807,11 @@ def _validate_paragraph(
     evidence_refs = _canonical_evidence_refs(request, paragraph.get("evidence_refs")) if isinstance(paragraph.get("evidence_refs"), list) else []
     boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
     if len(text.split()) < 5:
-        findings.append({"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."})
+        finding = {"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."}
+        if text and request.get("artifact") == "protocol":
+            finding = classify_finding({**finding, "code": "protocol-concise-prose", "issue": "Section prose is shorter than the preferred sentence length.", "next_action": "Assess substantive meaning against the cited source."}, classification="semantic_uncertainty",
+                                       reason="Word count alone does not establish a substantive omission.", repair_owner="independent_review")
+        findings.append(finding)
     lowered = text.casefold()
     if PLACEHOLDER.search(text) or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE):
         findings.append({"category": "drafting", "field": section_id, "issue": "Section contains a placeholder or internal drafting language.", "next_action": "Replace it with supported client-facing prose."})
@@ -2073,14 +2107,19 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             else section_id
         )
         preserved_section = section_id if target_section == prior_section else prior_section
-        duplicate_target_ids.add(target_section)
-        findings.append({
+        if request.get("artifact") != "protocol":
+            duplicate_target_ids.add(target_section)
+        finding = {
             "category": "drafting",
             "field": target_section,
             "target_ids": [target_section],
             "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
             "next_action": f"Rewrite only {target_section} with independent source-grounded prose; preserve {preserved_section}.",
-        })
+        }
+        if request.get("artifact") == "protocol":
+            finding = classify_finding({**finding, "code": "protocol-exact-repetition"},
+                classification="semantic_uncertainty", reason="Text overlap alone does not establish material repetition or loss of section ownership.", repair_owner="independent_review")
+        findings.append(finding)
     if has_blocking_contract_findings:
         return None, findings
     accepted: list[dict[str, Any]] = []
@@ -2292,6 +2331,9 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                             "next_action": "Include the retained voluntary-participation statement in the summary text.",
                         })
         section_findings = findings[section_finding_count:]
+        if request.get("artifact") == "protocol":
+            section_findings += [finding for finding in findings[:section_finding_count]
+                if finding.get("field") == section_id and not blocks_construction(finding)]
         blocking_section_findings = [
             finding for finding in section_findings
             if blocks_construction(finding)

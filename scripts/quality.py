@@ -35,7 +35,7 @@ from pypdf import PdfReader
 from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
-from drafting import evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
+from drafting import _background_claim_findings, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
@@ -4600,7 +4600,10 @@ def assess_protocol_concept_repetition(
                     } if material else {}),
                 })
                 break
-    return findings
+    return [classify_finding({**item, "severity": "warning", "action": "manual_review"},
+        classification="semantic_uncertainty" if item["material"] else "editorial_warning",
+        reason="Overlap and length suggest possible material repetition; independent review must establish harm." if item["material"] else "Nonmaterial concept repetition without contradiction or obscured information.",
+        repair_owner="independent_review" if item["material"] else "none") for item in findings]
 
 
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -4723,7 +4726,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         if section.role == "container" or not section_applies(reference, section):
             continue
         content = section_content(section)
-        if content is not None and len(re.findall(r"\b\w+\b", content)) < 3:
+        if content is not None and not content.strip():
             findings.append({
                 "category": "content",
                 "field": section.section_id,
@@ -4736,6 +4739,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         section_paragraphs[section.section_id] = [
             paragraph.strip() for paragraph in content.splitlines() if paragraph.strip()
         ]
+        if section.section_id == "introduction":
+            findings.extend(classify_finding(item, classification="essential_defect",
+                reason="Rendered text asserts a stronger comparative trial claim than the approved source.", repair_owner="drafting")
+                for item in _background_claim_findings("introduction", content, reference))
         if section.role == "source":
             approved = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), "")
             if re.sub(r"\s+", " ", _text(approved)).strip().casefold() not in re.sub(r"\s+", " ", content).strip().casefold():
@@ -4766,7 +4773,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 "field": section.section_id,
                 "target_ids": [section.section_id],
                 "evidence_diagnostics": diagnostics,
-                **({"code": "lexical-evidence-uncertainty", "publication_disposition": "warning"}
+                **(classify_finding({"code": "lexical-evidence-uncertainty"}, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review")
                    if lexical_evidence_uncertainty(diagnostics) else {}),
                 "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
             })
@@ -4794,9 +4801,9 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         key = text.casefold()
         if len(text.split()) >= 8 and key in seen:
             if seen[key] == current_section:
-                findings.append({"category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."})
+                findings.append(classify_finding({"code": "protocol-exact-repetition", "action": "manual_review", "category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."}, classification="semantic_uncertainty", reason="Exact wording overlap does not alone prove unusable repetition.", repair_owner="independent_review"))
             else:
-                findings.append(recovery_finding({
+                findings.append(classify_finding({
                     "code": "protocol-exact-repetition",
                     "category": "content",
                     "check": "concept_repetition",
@@ -4809,10 +4816,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     "treatment": "excessive",
                     "necessary": False,
                     "concise": False,
-                    "severity": "blocking",
-                    "publication_disposition": "blocking",
+                    "severity": "warning",
+                    "action": "manual_review",
                     "issue": f"Exact paragraph is repeated from Protocol section {seen[key]} in secondary section {current_section}.",
-                }, "drafting_defect"))
+                }, classification="semantic_uncertainty", reason="Exact wording overlap requires assessment of section ownership and materiality.", repair_owner="independent_review"))
         elif len(text.split()) >= 8:
             seen[key] = current_section
     if branch == "Retrospective":
@@ -5757,7 +5764,7 @@ def _lexical_review_cautions(
              "retrospective-lexical-evidence-uncertainty"}
     records = {}
     for warning in warnings:
-        if warning.get("code") not in codes:
+        if warning.get("code") not in codes and finding_classification(warning) != "semantic_uncertainty":
             continue
         identity = canonical_evidence_sha256(warning)
         section = str(warning.get("field") or (warning.get("target_ids") or [""])[0])

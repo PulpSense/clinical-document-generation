@@ -170,7 +170,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_evidence_diagnostics",
-      "code_sha256": "d8190cf0779c1ee288f1413c9a561554b8a17d244e85a1b6c2924b506e5d45df",
+      "code_sha256": "b1472eaefd4cb7318c6515245685a7cc879861f7407fc79925e9101d15520811",
       "family": "evidence"
     },
     {
@@ -218,19 +218,19 @@
     {
       "file": "scripts/drafting.py",
       "function": "_background_claim_findings",
-      "code_sha256": "0df8a96b584c138c69931bc8c171331c821c3a60e3ae753c358791167ace8a9c",
+      "code_sha256": "abf462fba08050a9d119bb7ba3d82c73ca6e5a29db5b2efa681b3a67f8b6396c",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "59a0abc99d62599791199a41a1e66f5cbe632d25ab3cb6755c9416386c9cb29c",
+      "code_sha256": "2067af408c20f5a3959c2b6f7f3ac8e0ac4eb17d9fde75f0253a3ae6c9ae7630",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_validate_paragraph",
-      "code_sha256": "d5e1fb2b3d2beac8ee5be5966b17c6529beee4c25b4ce6581fd7da1c5a70ca85",
+      "code_sha256": "aa0d94c630b895fe0fd11ff795fb8339ed4486a4e495539feefcfb76a4b52fd5",
       "family": "evidence"
     },
     {
@@ -242,7 +242,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "c6ff98b96d63d04261af1e7cd6bf6608e8dca61dd807b13167f912273b725e64",
+      "code_sha256": "c25230a6711e1c90a539f3f679ed3854a792306b83269e75e2c058b193bff1c2",
       "family": "evidence"
     },
     {
@@ -422,13 +422,13 @@
     {
       "file": "scripts/quality.py",
       "function": "assess_protocol_concept_repetition",
-      "code_sha256": "2d852d2efcc84d4fa384c5c4c44ca845288acc381ac144048c28e8113f9eb554",
+      "code_sha256": "b772164571317bf426c54125d973d890c7ba3ea071d1cc538f1b092cdc9b55af",
       "family": "clinical"
     },
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "7dbbc982992b4c05061a43f401bf6a672de26035bc8b77aa467200796badd205",
+      "code_sha256": "f2b853a7131dc2c4ed9ac3f62bf6aa834af4509fff5f0397d8734fca0100faa7",
       "family": "clinical"
     },
     {
@@ -471,7 +471,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "9dc71a2593494cb771fd766f143178c430f29e34a2aa03b6ea96514ff49a632c"
+      "code_sha256": "c2ff50c7cdfea29517afdc749e2d4354b45a54147778b9c9f1a5f80878d97ea1"
     },
     {
       "family": "review",
