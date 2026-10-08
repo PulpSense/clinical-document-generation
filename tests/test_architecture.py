@@ -91,27 +91,16 @@ def test_skill_requires_source_truth_as_file_not_inline_chat():
 
 def test_unsigned_linux_drop_in_is_provisioned_and_smoke_tested_before_generation():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-    public_interface = instructions.index("## Public interface")
-    provision = instructions.index(
-        '"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate',
-        public_interface,
-    )
-    smoke = instructions.index(
-        '"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation',
-        provision,
-    )
-    manual_generation = instructions.index(
-        '"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review',
-        public_interface,
-    )
-
-    assert provision < smoke < manual_generation
-    normalized = " ".join(instructions.split())
+    assert "](references/linux-setup.md)" in instructions
+    setup = (ROOT / "references/linux-setup.md").read_text(encoding="utf-8")
+    provision = setup.index('"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate')
+    smoke = setup.index('"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation')
+    assert provision < smoke
+    normalized = " ".join(setup.split())
     assert "Do not use `--install-release` for this unsigned drop-in path." in normalized
-    assert (
-        "promoted release fingerprint, or the candidate manifest fingerprint for "
-        "`manual_pre_release`" in normalized
-    )
+    assert "before generation" in normalized
+    assert "manual_pre_release" in instructions
+    assert "does not confer promotion or certification" in instructions
     for authority_path in (
         ROOT / "CONTEXT.md",
         ROOT / "docs/adr/0018-own-render-assurance-capabilities.md",
@@ -137,12 +126,12 @@ def test_skill_keeps_each_study_in_a_named_collision_safe_run_directory():
     )
     assert "first unused suffix" in policy
     assert "every workflow command's `--run-dir`" in policy
-    assert "final deliverables only in `<run-folder>/output/`" in policy
-    assert "`client_outputs` is the workflow result field" in policy
+    assert "verified deliverables in `<run-folder>/output/`" in policy
+    assert "`client_outputs` lists only passed deliverables" in policy
 
 
 def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():
-    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    instructions = (ROOT / "references/desktop-review.md").read_text(encoding="utf-8")
     assert "Use the returned `handoffs` as routing metadata" in instructions
     assert "Keep request contents out of the parent orchestration context" in instructions
     assert "one request path to each subagent" in instructions
@@ -212,3 +201,45 @@ def test_governed_renderer_authorities_require_host_office_and_only_pdfium():
     assert "timeout_seconds" in rasterize_contract
     assert "subprocess.Popen" in rasterize_contract
     assert "--internal-pdfium-worker" in workflow
+
+
+def test_ordinary_skill_route_discloses_explicit_setup_release_and_maintenance():
+    import re
+
+    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    commands = "\n".join(re.findall(r"```bash\n(.*?)```", instructions, re.S))
+    assert "--desktop-operation --manual-review" in commands
+    for option in ("--provision-candidate", "--verify-installation", "--package-release",
+                   "--bind-certification", "--install-release", "--rollback-release",
+                   "--release-gate", "--format-conformance", "--stage generate"):
+        assert option not in commands
+    for name in ("linux-setup", "release-workflow", "maintenance-workflow",
+                 "desktop-review", "document-authorities"):
+        path = f"references/{name}.md"
+        assert f"]({path})" in instructions
+        assert (ROOT / path).is_file()
+    assert "explicitly requests" in instructions
+    assert "read-only" in instructions
+    assert len(instructions.splitlines()) < 210
+
+
+def test_disclosed_release_safeguards_and_ordinary_delivery_remain_explicit():
+    main = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    release = (ROOT / "references/release-workflow.md").read_text(encoding="utf-8")
+    for condition in ("2700 seconds", "review_delivery", "<!-- field:",
+                      "separate explicit approval action", "producer.model_id",
+                      "producer.reviewer_id", "exact DOCX, PDF, and page-image hashes",
+                      "stage: desktop_delivery", "delivery.confirmed: true"):
+        assert condition in main
+    for safeguard in ("external RSA", "private key must never", "detached signature",
+                      "1,024 members", "atomic", "activation journal",
+                      "previous verified release", "rollback journal", "explicit authorization"):
+        assert safeguard in " ".join(release.split())
+    for guide in ("approval-loop", "intake-workflow", "local-handoff",
+                  "reference-schema", "template-contract", "prs-xml",
+                  "n8n-prospective-protocol-icf-xml", "n8n-ambispective-protocol-icf-xml",
+                  "n8n-retrospective-protocol"):
+        instructions = (ROOT / f"references/{guide}.md").read_text(encoding="utf-8")
+        assert "SKILL.md" in instructions
+        assert "--stage generate" not in instructions
+        assert "pytest" not in instructions

@@ -32,12 +32,12 @@ It cannot return XML markup or alter structural fields.
 
 ## Validation and delivery
 
-Run only the public lifecycle:
-
-```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage validate
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
-```
+Follow [ordinary generation](../SKILL.md#post-approval-desktop-operation) through
+the production Desktop adapter, which owns construction, review, recovery and
+exact complete atomic delivery. Client-ready means `status: passed`,
+`stage: desktop_delivery`, `delivery.confirmed: true` after actual opener
+confirmation of each reviewed artifact's byte length and SHA-256. A standalone
+inner generation pass is insufficient.
 
 The structural-reference and generation-template hashes bind drafting
 governance, candidate caching, and the delivery manifest. Any authority change
