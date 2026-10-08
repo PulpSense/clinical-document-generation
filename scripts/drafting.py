@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from finding_policy import blocks_construction, classify_finding
+from prs_xml import screening_interval_in_text, screening_interval_requirement
 
 from contracts import (
     BOILERPLATE_VERSION,
@@ -2911,17 +2912,26 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
         all_items = contract.get("source_coverage") == "all_material_items"
         for path in allowed_paths:
             ref = f"source:{path}"
-            if ref in used_refs and evidence_grounded(existing, source[path], all_items=all_items):
+            if path != "procedures.minimum_days_before_screening_without_participation" and ref in used_refs and evidence_grounded(existing, source[path], all_items=all_items):
                 continue
             label = path.rsplit(".", 1)[-1].replace("_", " ")
             section_label = str(contract.get("title") or result.get("section_id") or "section").strip().casefold()
             if path == "procedures.minimum_days_before_screening_without_participation":
-                duration = value_text(source[path]).rstrip(".")
-                if not re.search(r"\bdays?\s*$", duration, re.I):
-                    duration = f"{duration} days"
+                interval = screening_interval_requirement(request.get("reference", {}))
+                # Requests expose the canonical source projection as flat paths.
+                if interval is None:
+                    interval = screening_interval_requirement({
+                        "procedures": {"minimum_days_before_screening_without_participation": source[path]},
+                        "population": {
+                            "inclusion_criteria": source.get("population.inclusion_criteria", []),
+                            "exclusion_criteria": source.get("population.exclusion_criteria", []),
+                        },
+                    })
+                if interval and screening_interval_in_text(existing, interval):
+                    continue
                 text = (
-                    f"At least {duration} without participation "
-                    "in another study are required before screening."
+                    f"At least {interval.days} days without participation in {interval.participation_scope} before screening."
+                    if interval else value_text(source[path])
                 )
             elif section_id == "quality-safety" and path == "safety.roles":
                 text = _structured_safety_role_prose(source[path])

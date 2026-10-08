@@ -238,109 +238,95 @@ def _normalize_participation_scope(value: str) -> str:
     return re.sub(r"\bstudies\b$", "study", normalized)
 
 
-def _equivalent_screening_criterion(value: str, requirement: ScreeningIntervalRequirement) -> bool:
-    """Recognize an already supplied interval before adding its PRS wording."""
+_NUMBER_WORDS = {
+    **dict(zip("zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen".split(), range(20))),
+    **dict(zip("twenty thirty forty fifty sixty seventy eighty ninety".split(), range(20, 100, 10))),
+}
+_QUANTITY_PATTERN = r"(?:\d+(?:\.\d+)?|(?:" + "|".join(_NUMBER_WORDS) + r"|hundred)(?:[ -](?:" + "|".join(_NUMBER_WORDS) + r"|hundred|and))*)"
+
+
+def normalized_day_quantity(value: str) -> str | None:
+    """Supported day quantities; refuse unrelated units or ambiguous words."""
+    text = value.strip().casefold()
+    if re.fullmatch(r"\d+(?:\.\d+)?", text):
+        whole, _, fraction = text.partition(".")
+        fraction = fraction.rstrip("0")
+        return str(int(whole)) + (f".{fraction}" if fraction else "")
+    words = text.replace("-", " ").split()
+    if words and all(word in _NUMBER_WORDS for word in words):
+        if len(words) == 1:
+            return str(_NUMBER_WORDS[words[0]])
+        if len(words) == 2 and _NUMBER_WORDS[words[0]] >= 20 and 0 < _NUMBER_WORDS[words[1]] < 10:
+            return str(sum(_NUMBER_WORDS[word] for word in words))
+    if len(words) >= 2 and words[0] in _NUMBER_WORDS and 0 < _NUMBER_WORDS[words[0]] < 10 and words[1] == "hundred":
+        tail = words[2:]
+        if tail and tail[0] == "and":
+            tail = tail[1:]
+        remainder = normalized_day_quantity(" ".join(tail)) if tail else "0"
+        if remainder is not None and int(remainder) < 100:
+            return str(100 * _NUMBER_WORDS[words[0]] + int(remainder))
+    return None
+
+
+def screening_interval_in_text(value: str, requirement: ScreeningIntervalRequirement) -> bool:
+    """Compare the quantity bound to abstention, scope and before-screening relation."""
     text = re.sub(r"\s+", " ", value).strip().casefold()
-    days = re.escape(requirement.days)
-    scope = re.escape(requirement.participation_scope.casefold())
-    return bool(
-        re.search(rf"\b(?:no|without) participation in {scope} (?:during|within|in) (?:the )?{days} days? before screening\b", text)
-        or re.search(rf"\bat least {days} days? without participation in {scope} before screening\b", text)
+    scope = re.escape(requirement.participation_scope)
+    quantity = rf"(?P<days>{_QUANTITY_PATTERN})\s*[- ]?\s*days?"
+    patterns = (
+        rf"\b(?:no|without) participation in {scope} (?:during|within|in) (?:the )?{quantity} before screening\b",
+        rf"\bat least {quantity} without participation in {scope}(?: are required)? before screening\b",
+        rf"\bwithout participation in {scope} for at least {quantity} before screening\b",
     )
+    observed = [normalized_day_quantity(match.group("days"))
+                for pattern in patterns for match in re.finditer(pattern, text)]
+    return bool(observed) and all(days == requirement.days for days in observed)
 
 
-def screening_interval_requirement(
-    reference: Mapping[str, Any],
-) -> ScreeningIntervalRequirement | None:
+def _equivalent_screening_criterion(value: str, requirement: ScreeningIntervalRequirement) -> bool:
+    return screening_interval_in_text(value, requirement)
+
+
+def _approved_screening_interval(reference: Mapping[str, Any]) -> ScreeningIntervalRequirement | None:
     raw = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
-    if not raw:
-        return None
     match = re.fullmatch(
-        r"(?:at\s+least\s+)?(?P<days>\d+(?:\.\d+)?)\s*(?:days?)?"
-        r"(?:\s+before\s+screening)?\s*\.?",
-        raw,
-        re.I,
+        rf"(?:at\s+least\s+)?(?P<days>{_QUANTITY_PATTERN})\s*(?:days?)?"
+        r"(?:\s+before\s+screening)?\s*\.?", raw, re.I,
     )
-    if not match:
+    days = normalized_day_quantity(match.group("days")) if match else None
+    if days is None:
         return None
     participation_scope = "another study"
     inclusion = get_path(reference, "population.inclusion_criteria", []) or []
     exclusion = get_path(reference, "population.exclusion_criteria", []) or []
     for criterion in (*inclusion, *exclusion):
-        scope_match = re.search(
-            r"\banother(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b",
-            _text(criterion),
-            re.I,
-        )
+        scope_match = re.search(r"\banother(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b", _text(criterion), re.I)
         if scope_match:
-            candidate = _normalize_participation_scope(scope_match.group(0))
-            participation_scope = candidate
-            if candidate != "another study":
+            participation_scope = _normalize_participation_scope(scope_match.group(0))
+            if participation_scope != "another study":
                 break
-    return ScreeningIntervalRequirement(
-        days=match.group("days"),
-        participation_scope=participation_scope,
-    )
+    return ScreeningIntervalRequirement(days=days, participation_scope=participation_scope)
 
 
-def _screening_interval_requirement_from_xml(
-    study: ET.Element,
-) -> ScreeningIntervalRequirement | None:
+def screening_interval_requirement(reference: Mapping[str, Any]) -> ScreeningIntervalRequirement | None:
+    return _approved_screening_interval(reference)
+
+
+def _screening_interval_requirement_from_xml(study: ET.Element) -> ScreeningIntervalRequirement | None:
     criteria = study.find("eligibility/criteria")
     text = " ".join(criteria.itertext()) if criteria is not None else ""
     match = re.search(
-        r"\bat\s+least\s+(?P<days>\d+(?:\.\d+)?)\s+days?\s+without\s+participation\s+in\s+"
-        r"(?P<scope>another(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies))\s+before\s+screening\b",
-        text,
-        re.I,
+        rf"\bat\s+least\s+(?P<days>{_QUANTITY_PATTERN})\s+days?\s+without\s+participation\s+in\s+"
+        r"(?P<scope>another(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies))\s+before\s+screening\b", text, re.I,
     )
     if not match:
         return None
-    normalized_scope = re.sub(r"\s+", " ", match.group("scope")).strip().casefold()
-    normalized_scope = re.sub(r"\bstudies\b$", "study", normalized_scope)
-    return ScreeningIntervalRequirement(
-        days=match.group("days"),
-        participation_scope=normalized_scope,
-    )
+    days = normalized_day_quantity(match.group("days"))
+    return ScreeningIntervalRequirement(days=days, participation_scope=_normalize_participation_scope(match.group("scope"))) if days else None
 
 
-def _validation_screening_interval_requirement(
-    reference: Mapping[str, Any],
-) -> ScreeningIntervalRequirement | None:
-    source_value = get_path(
-        reference,
-        "procedures.minimum_days_before_screening_without_participation",
-    )
-    source_text = str(source_value).strip() if source_value is not None else ""
-    source_match = re.fullmatch(
-        r"(?:at\s+least\s+)?(?P<quantity>\d+(?:\.\d+)?)\s*(?:day|days)?"
-        r"(?:\s+before\s+screening)?\s*\.?",
-        source_text,
-        re.I,
-    )
-    if not source_match:
-        return None
-    scope = "another study"
-    criteria_values = [
-        *(get_path(reference, "population.inclusion_criteria", []) or []),
-        *(get_path(reference, "population.exclusion_criteria", []) or []),
-    ]
-    for criterion in criteria_values:
-        criterion_match = re.search(
-            r"\banother(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b",
-            str(criterion),
-            re.I,
-        )
-        if criterion_match:
-            candidate = re.sub(r"\s+", " ", criterion_match.group(0)).strip().casefold()
-            candidate = re.sub(r"\bstudies\b$", "study", candidate)
-            scope = candidate
-            if candidate != "another study":
-                break
-    return ScreeningIntervalRequirement(
-        days=source_match.group("quantity"),
-        participation_scope=scope,
-    )
+def _validation_screening_interval_requirement(reference: Mapping[str, Any]) -> ScreeningIntervalRequirement | None:
+    return _approved_screening_interval(reference)
 
 
 def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[str, str]:
@@ -831,8 +817,8 @@ def validate_output(
 ) -> list[dict[str, str]]:
     findings = []
     try:
-        raw = path.read_text(encoding="utf-8"); ET.parse(path)
-    except (OSError, ET.ParseError) as exc: return [{"category": "xml", "field": path.name, "issue": f"Invalid XML: {exc}"}]
+        raw = path.read_text(encoding="utf-8"); _study(ET.parse(path).getroot())
+    except (OSError, ET.ParseError, ValueError) as exc: return [{"category": "xml", "field": path.name, "issue": f"Invalid XML: {exc}"}]
     if TOKEN.search(raw): findings.append({"category": "xml", "field": path.name, "issue": "Unresolved template token remains."})
     actual, expected = repeated_counts(path), expected_counts(reference)
     for tag, count in expected.items():
@@ -943,7 +929,18 @@ def validate_output(
             continue
         expected_value = _text(expected_fields.get(token_name))
         actual_value = _text("".join(target.itertext())) if target is not None else ""
-        if actual_value != expected_value:
+        if token_name == "eligibilityCriteria":
+            def criterion_items(text: str) -> list[str]:
+                lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines() if line.strip()]
+                return [re.sub(
+                    rf"(?P<quantity>{_QUANTITY_PATTERN})(?=\s+days?\b)",
+                    lambda match: normalized_day_quantity(match.group("quantity")) or match.group("quantity"),
+                    line, flags=re.I,
+                ) for line in lines]
+            values_match = criterion_items(actual_value) == criterion_items(expected_value)
+        else:
+            values_match = actual_value == expected_value
+        if not values_match:
             findings.append({
                 "category": "xml",
                 "field": target_path,

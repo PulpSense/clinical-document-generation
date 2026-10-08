@@ -36,7 +36,7 @@ from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
 from drafting import evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
-from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
+from prs_xml import screening_interval_in_text, screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, template_paths
 
 
@@ -4607,6 +4607,29 @@ def assess_protocol_concept_repetition(
     return findings
 
 
+def prs_candidate_findings(
+    revision_dir: Path, reference: Mapping[str, Any], *,
+    contracted_bundle: Mapping[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Validate current PRS bytes against the canonical source and governed structure."""
+    findings = []
+    xml_path = revision_dir / "candidate/study.xml"
+    if xml_path.is_file():
+        repo_root = Path(__file__).resolve().parents[1]
+        xml_bundle = contracted_bundle or contracted_template_bundle(repo_root, reference)
+        for item in validate_prs_output(
+            xml_path, reference,
+            repo_root / str(xml_bundle["prs_authority"]["structural_reference"]["path"]),
+            generation_template=repo_root / str(xml_bundle["prs_authority"]["generation_template"]["path"]),
+        ):
+            maintenance = item.get("code") == "screening_interval_validator_inconsistency"
+            findings.append(recovery_finding({
+                **item,
+                "target_ids": ["quality-gate:prs-screening-interval"] if maintenance else ["prs.structured"],
+            }, "capability_gap" if maintenance else "deterministic_structure_defect"))
+    return findings
+
+
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     findings: list[dict[str, Any]] = []
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
@@ -4918,47 +4941,16 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
         if minimum_days:
             screening_interval = screening_interval_requirement(reference)
-            day_count = screening_interval.days if screening_interval else minimum_days
-            day_pattern = re.compile(rf"\b{re.escape(day_count)}\s*[- ]?\s*days?\b", re.I)
-            if not day_pattern.search(visible):
-                findings.append({"category": "content", "field": "subjects.inclusion", "target_ids": ["subjects.inclusion"], "issue": "Protocol omits the approved minimum interval without participation in another study before screening."})
-            if not day_pattern.search(icf_visible):
-                findings.append({"category": "content", "field": "icf.procedures", "target_ids": ["icf.procedures"], "issue": "ICF omits the approved minimum interval without participation in another study before screening."})
-            xml_path = revision_dir / "candidate/study.xml"
-            if xml_path.is_file():
-                repo_root = Path(__file__).resolve().parents[1]
-                prs_findings = validate_prs_output(
-                    xml_path,
-                    reference,
-                    repo_root / str(bundle["prs_authority"]["structural_reference"]["path"]),
-                    generation_template=repo_root / str(bundle["prs_authority"]["generation_template"]["path"]),
-                )
-                if any(
-                    item.get("code") == "screening_interval_semantic_mismatch"
-                    for item in prs_findings
-                ):
-                    findings.append(recovery_finding({
-                        "category": "content",
-                        "field": "prs.eligibility",
-                        "target_ids": ["layout:xml"],
-                        "issue": (
-                            "PRS XML omits or materially alters the approved minimum interval "
-                            "without participation in another study before screening."
-                        ),
-                    }, "document_structure_defect"))
-                if any(
-                    item.get("code") == "screening_interval_validator_inconsistency"
-                    for item in prs_findings
-                ):
-                    findings.append(recovery_finding({
-                        "category": "quality-gate",
-                        "field": "prs.eligibility-validator",
-                        "target_ids": ["quality-gate:prs-screening-interval"],
-                        "issue": (
-                            "PRS screening-interval validators disagree or cannot represent the "
-                            "approved value; maintenance is required before document repair."
-                        ),
-                    }, "capability_gap"))
+            if screening_interval is None:
+                findings.append(recovery_finding({
+                    "category": "quality-gate", "field": "screening-interval-validator",
+                    "target_ids": ["quality-gate:prs-screening-interval"],
+                    "issue": "The approved screening interval cannot be represented by the canonical projection; maintenance is required.",
+                }, "capability_gap"))
+            else:
+                for text, target, artifact in ((visible, "subjects.inclusion", "Protocol"), (icf_visible, "icf.procedures", "ICF")):
+                    if not screening_interval_in_text(text, screening_interval):
+                        findings.append({"category": "content", "field": target, "target_ids": [target], "issue": f"{artifact} omits or changes the approved interval, participation scope or before-screening relation."})
 
         consent_to_sign = any(phrase in icf_visible for phrase in (
             "should not sign",
@@ -4967,6 +4959,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         ))
         if not consent_to_sign:
             findings.append(recovery_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, "document_structure_defect"))
+    findings.extend(prs_candidate_findings(revision_dir, reference))
     governed = []
     for item in findings:
         if (

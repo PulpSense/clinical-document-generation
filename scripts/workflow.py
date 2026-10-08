@@ -43,7 +43,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, prs_candidate_findings, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 
 
@@ -8717,6 +8717,11 @@ def _begin_independent_review(
     render_report: Mapping[str, Any], bundle: Mapping[str, Any], review_set: int,
 ) -> tuple[list[Path], list[dict[str, Any]]]:
     """Apply existing Sterling checks before spending independent review calls."""
+    # Catch code-owned XML defects before refreshing immutable review requests.
+    # The ordinary repair route archives prior bindings and advances review_set.
+    xml_findings = prs_candidate_findings(revision_dir, reference, contracted_bundle=bundle)
+    if xml_findings:
+        return [], xml_findings
     protocol_path = revision_dir / "candidate/protocol.docx"
     if protocol_path.is_file():
         computed_findings = audit_computed_protocol_fields(protocol_path, reference)
@@ -8922,6 +8927,18 @@ def generate(
         prior_build = _read(revision_dir / "candidate-build.json")
     except (OSError, ValueError, json.JSONDecodeError):
         prior_build = None
+    # A resumed operation can observe candidate edits after review requests exist.
+    # Diagnose the actual XML before a cache miss silently reconstructs it; recovery
+    # must archive those bytes and allocate a fresh review identity for the repair.
+    if prior_build and (revision_dir / "hermes/verification-requests").is_dir():
+        current_xml_findings = prs_candidate_findings(revision_dir, reference, contracted_bundle=bundle)
+        if current_xml_findings:
+            return _quality_retry(
+                run_dir, reference_path, working_reference, reference, revision_dir,
+                attempts, current_xml_findings, "quality", contracted_bundle=bundle,
+                operation_deadline=operation_deadline, clock=clock,
+                stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime,
+            )
     repair_artifacts = {
         str(artifact)
         for artifact in state.get("pending_layout_artifacts", [])

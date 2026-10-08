@@ -60,6 +60,9 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',
                 '_accepted_drafting_warnings', '_render_warnings',
                 'renderers',
+                'normalized_day_quantity', '_approved_screening_interval',
+                'screening_interval_requirement', 'screening_interval_in_text', 'prs_candidate_findings',
+                '_validation_screening_interval_requirement', '_screening_interval_requirement_from_xml',
                 'semantic_evidence_inventory', '_source_field_inventory', 'create_verification_requests',
             }
             if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:
