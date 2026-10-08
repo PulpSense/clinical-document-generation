@@ -151,14 +151,18 @@ def test_key_information_participant_duration_uses_followup_not_whole_study_time
     _accepted, findings = validate_response(request, response)
 
     assert not any(
-        "participation-duration cites source evidence whose material facts are not observable" in item["issue"]
+        item.get("code") == "icf-summary-grounding-review" and "participation-duration" in item["issue"]
         for item in findings
     )
 
     summary["paragraphs"][1]["text"] = "You will attend screening and follow-up over two months."
     _accepted, wrong_duration_findings = validate_response(request, response)
     assert any(
-        "participation-duration cites source evidence whose material facts are not observable" in item["issue"]
+        item.get("code") == "icf-summary-grounding-review"
+        and "participation-duration" in item["issue"]
+        and item["finding_policy"]["classification"] == "essential_defect"
+        and any("3" in value.get("missing_numbers", [])
+                for diagnostics in item["evidence_diagnostics"] for value in diagnostics["unobserved_values"])
         for item in wrong_duration_findings
     )
 
