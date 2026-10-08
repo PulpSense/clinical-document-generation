@@ -225,3 +225,32 @@ def test_placeholder_prs_text_is_not_a_concise_narrative(tmp_path):
     accepted, findings = drafting.validate_response(request, response)
     assert not accepted
     assert any(blocks_construction(f) and "placeholder" in f["issue"] for f in findings)
+
+
+@pytest.mark.parametrize("source,text", [
+    ("Enrollment: 3 months; Follow-up: 3 months.",
+     "Enrollment lasts three months; patients are monitored for three months."),
+    ("Enrollment: 6 months; Follow-up: 3 months.",
+     "Enrollment lasts six months; patients are monitored for three months."),
+])
+def test_correct_other_phase_value_cannot_prove_followup_reassignment(tmp_path, source, text):
+    request, response = section_response(tmp_path, "icf.duration", text,
+        source_path="study.timeline", source_value=source)
+    accepted, findings = drafting.validate_response(request, response)
+    assert [s["section_id"] for s in accepted["drafts"]] == ["icf.duration"], findings
+    assert findings and all(not blocks_construction(f) for f in findings)
+    assert all(f["finding_policy"]["repair_owner"] == "independent_review" for f in findings)
+
+
+@pytest.mark.parametrize("source,text", [
+    ("Enrollment: 3 months; Follow-up: 3 months.", "Enrollment lasts nine months; patients are monitored for three months."),
+    ("Enrollment: 6 months; Follow-up: 3 months.", "Enrollment lasts three months; follow-up lasts six months."),
+    ("Enrollment: 3 months; Follow-up: 3 weeks.", "Enrollment lasts three months; follow-up lasts three months."),
+    ("Enrollment: 6 months; Follow-up: 3 months.", "Enrollment lasts six months; patients are monitored."),
+])
+def test_real_phase_disagreement_unit_change_or_quantity_omission_is_essential(tmp_path, source, text):
+    request, response = section_response(tmp_path, "icf.duration", text,
+        source_path="study.timeline", source_value=source)
+    accepted, findings = drafting.validate_response(request, response)
+    assert not accepted["drafts"]
+    assert any(blocks_construction(f) and f.get("evidence_diagnostics") for f in findings)

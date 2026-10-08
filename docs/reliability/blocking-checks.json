@@ -462,7 +462,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_timeline_evidence_diagnostics",
-      "code_sha256": "12f35ab8e82a756d286de3fe3c6fcd2b194272f894d2e3328d4c554baf31d1eb",
+      "code_sha256": "3b4b69b9c79f4c3d19d586db5c10c26696033c4cb8b74d94057f7e7281664008",
       "family": "evidence",
       "scope": "ordinary",
       "role": "helper",
@@ -2989,6 +2989,7 @@
     "scope": "Spec 71 decision 4 and final Standards/Spec findings; no material safeguard downgrades.",
     "heuristics": "Pure word count, specialized completion/closeout wording, absent lexical phase labels, Retrospective eligibility/visit/timeline wording require independent review.",
     "essential_evidence": "Empty or malformed/placeholder text, invalid/missing citations, missing quantities, recognized conflicting phase-duration bindings, source polarity, protected safeguards and proven textless rendered pages retain essential repair.",
-    "ownership": "Retrospective missing narrative facts belong to drafting; proven textless pages belong to rendering, never runtime."
+    "ownership": "Retrospective missing narrative facts belong to drafting; proven textless pages belong to rendering, never runtime.",
+    "equal_phase_durations": "A correctly approved value on another recognized phase cannot establish reassignment when a phase label is unrecognized. Recognized phase/value disagreement or an explicitly unsupported phase assignment remains factual; actual missing quantities and units remain essential. Paired canonical ingestion negatives and an equal-duration actual ICF Desktop delivery cover the distinction."
   }
 }

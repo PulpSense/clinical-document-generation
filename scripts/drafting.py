@@ -1377,8 +1377,16 @@ def _timeline_evidence_diagnostics(content: str, value: Any) -> dict[str, Any]:
             # A recognized phase with the wrong duration is factual evidence.
             # An absent lexical phase label alone needs independent meaning review.
             mismatch = {"source_excerpt": str(value), "phase": phase, "required_anchor_count": 1}
-            if observed.get(phase) or any(values & other_values for other_phase, other_values in observed.items() if other_phase != phase):
+            unsupported_assignment = any(
+                values & other_values and other_phase not in expected
+                for other_phase, other_values in observed.items() if other_phase != phase
+            )
+            # Another phase's approved duration is never proof of reassignment,
+            # even when both source phases have the same value. Only an observed
+            # disagreement or an explicitly unsupported phase assignment is factual.
+            if observed.get(phase) or unsupported_assignment:
                 mismatch["missing_numbers"] = sorted(number for number, _unit in values)
+                mismatch["observed_phase_values"] = {key: sorted(items) for key, items in observed.items()}
             diagnostic["unobserved_values"].append(mismatch)
     return diagnostic
 
