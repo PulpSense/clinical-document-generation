@@ -1506,21 +1506,36 @@ def sterling_draft_word_budget(reference: Mapping[str, Any], section_id: str) ->
     return max(1, maximum - len(re.findall(r"[a-z0-9]+", reserved.casefold())))
 
 
-# Sentence case is presentation only for these descriptive heads. Do not apply
-# casefold to clinical identifiers (qPCR, genes), units (mL/Mg), or matrix marks.
-SCHEDULE_DESCRIPTIVE_LEADS = frozenset({
-    "adverse", "demographics", "distance", "exit", "informed", "medical",
-    "ophthalmic", "patient", "physical", "study", "vital", "visual",
-})
-
-
 def protocol_table_rows_match(contract: Mapping[str, Any], actual: Iterable[Iterable[str]]) -> bool:
     """Compare a constructed table without weakening its source relationships.
 
-    Only whitespace and initial sentence case of descriptive activity labels
+    Only whitespace and sentence/title case of descriptive activity words
     may differ. Headers, order, quantities, units, visit marks and blanks remain
     exact. Construction still emits the approved spelling, never this projection.
     """
+    def descriptive_casing(source: str, value: str) -> bool:
+        source_tokens = list(re.finditer(r"[A-Za-z]+|[^A-Za-z]+", source))
+        value_tokens = re.findall(r"[A-Za-z]+|[^A-Za-z]+", value)
+        if len(source_tokens) != len(value_tokens):
+            return False
+        for token, actual_token in zip(source_tokens, value_tokens):
+            approved_token = token.group()
+            if approved_token == actual_token:
+                continue
+            # Never fold mixed-case/uppercase identifiers, unit-like tokens,
+            # alphanumeric identifiers, numbers, operators or punctuation.
+            word = re.fullmatch(r"[A-Za-z]{2,}", approved_token)
+            unit = re.fullmatch(r"(?:[afpnumcdhkMGT]?(?:mol|g|l|m|s|a|v|w|hz|pa)|min|mmhg|ppm|ppb)",
+                                approved_token, flags=re.IGNORECASE)
+            touches_number = ((token.start() > 0 and source[token.start() - 1].isdigit())
+                              or (token.end() < len(source) and source[token.end()].isdigit()))
+            if not (word and not unit and not touches_number
+                    and (approved_token.islower() or approved_token.istitle())
+                    and (actual_token.islower() or actual_token.istitle())
+                    and approved_token.lower() == actual_token.lower()):
+                return False
+        return True
+
     expected = [[re.sub(r"\s+", " ", str(cell)).strip() for cell in row]
                 for row in contract["rows"]]
     observed = [[re.sub(r"\s+", " ", str(cell)).strip() for cell in row] for row in actual]
@@ -1534,9 +1549,7 @@ def protocol_table_rows_match(contract: Mapping[str, Any], actual: Iterable[Iter
                 continue
             descriptive_label = (contract["section_id"] == "evaluation-procedures"
                                  and index >= contract["header_rows"] and column == 0)
-            lead = re.match(r"[A-Za-z]+", source)
-            if not (descriptive_label and lead and lead.group().lower() in SCHEDULE_DESCRIPTIVE_LEADS
-                    and source[1:] == value[1:] and source[0].lower() == value[0].lower()):
+            if not (descriptive_label and descriptive_casing(source, value)):
                 return False
     return True
 
