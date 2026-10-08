@@ -1141,7 +1141,31 @@ def test_runtime_root_symlink_escape_fails_closed_with_exact_path(
 
 def test_release_package_contains_hashed_runtime_and_excludes_development_data(tmp_path):
     archive_path = tmp_path / "clinical-document-generation-release.zip"
-    result = package_release(ROOT, archive_path)
+    # A normal Git clone retains tracked developer files. Package a clean clone
+    # with concrete agent-config sentinels, so exclusion is observed, not assumed.
+    package_root = tmp_path / "checkout"
+    subprocess.run(["git", "clone", "--local", str(ROOT), str(package_root)],
+                   check=True, capture_output=True, text=True)
+    development_files = {
+        "AGENTS.md": "Development instructions only.\n",
+        "CLAUDE.md": "Development instructions only.\n",
+        "GLOSSARY.md": "Development domain documentation.\n",
+        ".agents/config.json": "{}\n",
+        ".codex/config.toml": "# Development configuration\n",
+        "docs/agents/issue-tracker.md": "Development tracker only.\n",
+    }
+    for relative, content in development_files.items():
+        path = package_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "add", "--force", *development_files], cwd=package_root,
+                   check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-c", "user.name=Package test", "-c",
+                    "user.email=package-test@example.invalid", "commit", "-m",
+                    "Add development exclusion sentinels"], cwd=package_root,
+                   check=True, capture_output=True, text=True)
+    assert all((package_root / relative).is_file() for relative in development_files)
+    result = package_release(package_root, archive_path)
 
     assert result["status"] == "passed"
     with zipfile.ZipFile(archive_path) as archive:
@@ -1184,7 +1208,7 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         assert manifest["package_fingerprint"] == result["package_fingerprint"]
         assert manifest["git_commit"] == subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=ROOT,
+            cwd=package_root,
             check=True,
             capture_output=True,
             text=True,
