@@ -1,3 +1,4 @@
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -274,7 +275,7 @@ def test_rendered_icf_assessment_detects_renderer_only_generated_duplication(tmp
     assert assessment["status"] == "passed"
     finding = assessment["findings"][0]
     assert finding["code"] == "icf-exact-generated-duplication"
-    assert finding["publication_disposition"] == "warning"
+    assert not blocks_construction(finding)
     assert finding["target_ids"] == ["icf.key-information-summary"]
     assert finding["detail_section"] == "icf.procedures"
     assert finding["repair_action"] == "redraft_summary"
@@ -811,7 +812,7 @@ def test_protocol_repetition_verifier_finding_remains_structured_manual_review(t
     assert finding["concept_id"] == "statistical-methods"
     assert finding["primary_section"] == "analysis-plan.methodology"
     assert finding["secondary_section"] == "analysis-plan.considerations"
-    assert finding["publication_disposition"] == "warning"
+    assert not blocks_construction(finding)
     assert finding["action"] == "manual_review"
 
 
@@ -926,7 +927,7 @@ def test_protocol_repetition_verifier_cannot_downgrade_ungoverned_or_mistargeted
 
     findings, _evidence = validate_verifications(tmp_path, request_paths=[request_path])
 
-    assert not any(item.get("publication_disposition") == "warning" for item in findings)
+    assert not any(not blocks_construction(item) for item in findings)
     assert any(item.get("recovery_class") == "verifier_transient" for item in findings)
 
 
@@ -984,7 +985,7 @@ def test_unresolved_material_repetition_cannot_be_downgraded_to_warning(tmp_path
     findings, _evidence = validate_verifications(tmp_path, request_paths=[request_path])
 
     finding = next(item for item in findings if item.get("code") == "protocol-concept-repetition")
-    assert finding.get("publication_disposition") != "warning"
+    assert blocks_construction(finding)
     assert finding["recovery_class"] == "drafting_defect"
     assert finding["target_ids"] == ["analysis-plan.considerations"]
 
@@ -1019,7 +1020,7 @@ def test_final_exact_review_recomputes_deterministic_protocol_warnings(tmp_path,
         "target_ids": ["objectives"],
         "primary_section": "introduction",
         "secondary_section": "objectives",
-        "publication_disposition": "warning",
+        "finding_policy": {"classification": "editorial_warning", "reason": "synthetic-confirmed-repetition", "repair_owner": "none"},
         "action": "manual_review",
         "issue": "The secondary section repeats the complete rationale.",
     }
@@ -1077,6 +1078,6 @@ def test_heuristic_endpoint_overlap_requires_review_before_materiality_is_proven
     assert findings[0]["material"] is True  # retained heuristic concern
     assert findings[0]["finding_policy"]["classification"] == "semantic_uncertainty"
     assert findings[0]["finding_policy"]["repair_owner"] == "independent_review"
-    assert findings[0]["publication_disposition"] == "warning"
+    assert not blocks_construction(findings[0])
     assert "recovery_class" not in findings[0]
     assert "owner" not in findings[0]

@@ -1,4 +1,5 @@
 """Recovery preserves independently usable evidence without acting on malformed items."""
+from finding_policy import blocks_construction
 import copy
 import json
 from pathlib import Path
@@ -37,7 +38,7 @@ def test_malformed_finding_identity_does_not_redraft_valid_companions(tmp_path, 
     findings, _ = quality.validate_verifications(tmp_path)
     malformed = [item for item in findings if item.get("verification_source_finding", {}).get("issue") == "Unlocalized malformed reviewer evidence."]
     assert malformed and all(item["recovery_class"] == "verifier_transient" for item in malformed)
-    assert all(item.get("publication_disposition") != "warning" for item in malformed)
+    assert all(blocks_construction(item) for item in malformed)
     assert all(item["finding_policy"]["classification"] == "technical_failure" for item in malformed)
     companions = [item for item in findings if item.get("verification_source_finding", {}).get("issue") == "Approved study purpose is materially omitted."]
     assert companions

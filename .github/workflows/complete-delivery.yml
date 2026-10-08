@@ -1,0 +1,25 @@
+name: Complete delivery developer guards
+on: [push, pull_request]
+jobs:
+  finding-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r requirements.txt
+      - name: Declared Linux office prerequisite for focused render checks
+        run: sudo apt-get update && sudo apt-get install -y libreoffice
+      - name: Explicit focused policy and recovery checks
+        run: >-
+          python -m pytest -q
+          tests/test_complete_delivery_policy.py
+          tests/test_offline_reliability_gate.py
+          tests/test_cause_aware_recovery.py
+          tests/test_contracts.py
+          tests/test_prs_xml.py
+          tests/test_editorial_publication.py
+          tests/test_complete_delivery_publication.py::test_sparse_and_rich_complete_sources_deliver_with_controlled_editorial_review
+          tests/test_complete_delivery_replay.py::test_essential_mutation_requires_real_repair_before_delivery
+          tests/test_complete_delivery_icf.py::test_altered_voluntary_summary_requires_repair_before_delivery

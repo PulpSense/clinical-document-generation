@@ -1,4 +1,5 @@
 """Lexical uncertainty is deferred to real review, never treated as clinical proof."""
+from finding_policy import blocks_construction, classify_finding
 import json
 
 import pytest
@@ -17,7 +18,7 @@ def test_faithful_non_numeric_paraphrase_reaches_review_on_every_branch(section)
         request, contract, section,
         "Staff call people ahead of visits so they remember to attend.", ["source:" + path])
     assert len(findings) == 1
-    assert findings[0]["publication_disposition"] == "warning"
+    assert not blocks_construction(findings[0])
     assert findings[0]["evidence_diagnostics"][0]["release_acceptance"] is False
 
 
@@ -37,13 +38,13 @@ def test_missing_source_citation_remains_a_drafting_failure():
         {"approved_input": [{"path": path, "value": "Reminder calls"}], "approved_source": {}},
         {"minimum_evidence": [path], "source_coverage": "all_material_items"},
         "study-design.bias", "Staff make reminder calls.", [])
-    assert findings and not any(f.get("publication_disposition") == "warning" for f in findings)
+    assert findings and not any(not blocks_construction(f) for f in findings)
 
 
 def reviewed_caution(tmp_path, branch="Prospective", template="Advarra"):
     from test_handoff_quality import acceptance_verification
-    warning = {"code": "lexical-evidence-uncertainty", "field": "study-design.bias",
-               "publication_disposition": "warning", "issue": "Reminder-call wording needs meaning review."}
+    warning = classify_finding({"code": "lexical-evidence-uncertainty", "field": "study-design.bias",
+               "issue": "Reminder-call wording needs meaning review."}, classification="semantic_uncertainty", reason="synthetic-source-meaning", repair_owner="independent_review")
     accepted = tmp_path / "hermes/accepted"
     accepted.mkdir(parents=True)
     (accepted / "study-design.bias.json").write_text(json.dumps({"warnings": [warning]}))
@@ -65,9 +66,11 @@ def reviewed_caution(tmp_path, branch="Prospective", template="Advarra"):
 ])
 def test_authenticated_review_resolves_only_presented_lexical_caution(tmp_path, branch, template):
     warning, request, path, evidence = reviewed_caution(tmp_path, branch, template)
-    editorial = {"publication_disposition": "warning", "code": "editorial-repetition"}
+    editorial = classify_finding({"code": "editorial-repetition"}, classification="editorial_warning", reason="synthetic-editorial", repair_owner="none")
     remaining, resolved = quality._reviewed_lexical_warnings([warning, editorial], evidence, [])
-    assert remaining == [editorial]
+    assert remaining[-1] == editorial
+    assert remaining[0]["finding_policy"]["classification"] == "editorial_warning"
+    assert remaining[0]["resolution"] == "independent_content_review_passed"
     assert resolved[0]["verification_request_id"] == request["request_id"]
     other = {**warning, "issue": "A new, unreviewed source mismatch."}
     assert quality._reviewed_lexical_warnings([other], evidence, [])[0] == [other]

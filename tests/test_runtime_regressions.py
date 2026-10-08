@@ -1,3 +1,4 @@
+from finding_policy import blocks_construction
 import copy
 import hashlib
 import json
@@ -1232,7 +1233,7 @@ def test_document_report_failure_preserves_a_governed_drafting_route_through_qua
 
     assert block is None
     assert findings == report["artifacts"][0]["findings"]
-    assert result["status"] == "awaiting_hermes", result
+    assert result["status"] == "awaiting_hermes", json.dumps(result, indent=2)
     assert result["stage"] == "drafting_retry"
 
 
@@ -2101,7 +2102,7 @@ def test_governed_content_omission_is_reported_as_a_nonblocking_manual_review_wa
         "obscures_required_information": False,
         "materially_unusable": False,
         "severity": "warning",
-        "publication_disposition": "warning",
+        "finding_policy": {"classification": "editorial_warning", "reason": "authenticated-editorial_warning", "repair_owner": "none"},
         "action": "manual_review",
     }]
     assert quality.verification_response_is_complete(revision, request_path) is True
@@ -2541,7 +2542,7 @@ def test_verification_integrity_failure_remains_blocking(tmp_path, failure):
     findings, _evidence = validate_verifications(revision)
 
     assert findings
-    assert all(item.get("publication_disposition") != "warning" for item in findings)
+    assert all(blocks_construction(item) for item in findings)
     assert quality.verification_response_is_complete(revision, request_path) is False
 
 
@@ -2583,7 +2584,8 @@ def test_non_verifier_finding_cannot_self_label_as_publication_warning(tmp_path,
     )
 
     assert report["status"] == "blocked"
-    assert report["findings"] == [forged]
+    assert report["findings"][0]["code"] == "finding-policy-classification"
+    assert report["findings"][0]["original_finding"] == forged
     assert report["warnings"] == []
 
 
@@ -4563,6 +4565,7 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
         "recovery_class": "visual_defect",
         "action": "targeted_layout_repair",
         "issue": "orphan heading",
+        "finding_policy": {"classification": "essential_defect", "reason": "synthetic-visual-defect", "repair_owner": "rendering"},
     }
     generation = {
         "review_set": 7,
@@ -4580,17 +4583,33 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
     response_dir.mkdir(parents=True)
     request_path = request_dir / f"{finding['verification_request_id']}.json"
     response_path = response_dir / f"{finding['verification_request_id']}.json"
-    request = {
-        "request_id": finding["verification_request_id"],
-        "task": "rendered_page_visual_verification",
-        "revision_id": revision.name,
-        "review_set": 7,
-        "response_path": response_path.relative_to(revision).as_posix(),
-        "artifacts": [{"artifact": "protocol", "pages": []}],
-    }
-    request["request_sha256"] = verification_request_sha256(request)
-    request_path.write_text(json.dumps(request), encoding="utf-8")
-    response_path.write_text("{}", encoding="utf-8")
+    candidate = revision / "candidate/protocol.docx"
+    candidate.parent.mkdir(parents=True)
+    Document().save(candidate)
+    pdf = revision / "rendered/protocol.pdf"
+    page = revision / "rendered/protocol/page-1.png"
+    page.parent.mkdir(parents=True)
+    pdf.write_bytes(b"bound-pdf")
+    page.write_bytes(b"bound-page")
+    report = {"artifacts": [{"artifact": "protocol", "docx": "candidate/protocol.docx",
+        "docx_sha256": quality.sha256_file(candidate), "pdf": "rendered/protocol.pdf",
+        "pdf_sha256": quality.sha256_file(pdf), "pages": [{"page": 1, "path": "rendered/protocol/page-1.png", "sha256": quality.sha256_file(page)}]}]}
+    Document().save(revision / "candidate/icf.docx")
+    (revision / "candidate/study.xml").write_text("<clinical_study/>")
+    (revision / "candidate-build.json").write_text(json.dumps({"render_report": report}))
+    paths = quality.create_verification_requests(revision, _source(), report, review_set=7)
+    request_path = next(path for path in paths if path.name.endswith("visual.protocol.json"))
+    request = json.loads(request_path.read_text())
+    response_path = revision / request["response_path"]
+    from test_handoff_quality import acceptance_verification
+    for path in paths:
+        companion = json.loads(path.read_text())
+        (revision / companion["response_path"]).write_text(json.dumps(acceptance_verification(companion)))
+    response = acceptance_verification(request)
+    response["status"] = "blocked"
+    response["findings"] = [{**finding, "page": 1, "finding_id": "orphan-heading"}]
+    response["page_assessments"][0]["status"] = "blocked"
+    response_path.write_text(json.dumps(response), encoding="utf-8")
 
     def archive_then_remove_current(*_args, **_kwargs):
         archive = revision / "attempts/quality-a01"
@@ -4616,7 +4635,7 @@ def test_exhausted_safe_layout_ladder_reprompts_visual_reviewer_until_deadline(
         "quality",
     )
 
-    assert result["status"] == "awaiting_hermes"
+    assert result["status"] == "awaiting_hermes", json.dumps(result, indent=2)
     assert result["stage"] == "independent_verification_retry"
     assert [item["request_id"] for item in result["handoffs"]] == [finding["verification_request_id"]]
     assert request_path.is_file()
@@ -5312,7 +5331,7 @@ def test_retrospective_lexical_checks_warn_on_paraphrase_but_block_missing_numbe
         issue="Retrospective eligibility omits approved source content.",
     )
     assert warning is not None
-    assert warning["publication_disposition"] == "warning"
+    assert not blocks_construction(warning)
     assert warning["action"] == "manual_review"
     assert quality._retrospective_lexical_coverage_finding(
         criterion, criterion, field="subjects.eligibility",
@@ -5324,14 +5343,14 @@ def test_retrospective_lexical_checks_warn_on_paraphrase_but_block_missing_numbe
         issue="Retrospective eligibility omits approved source content.",
     )
     assert missing_week is not None
-    assert missing_week.get("publication_disposition") != "warning"
+    assert blocks_construction(missing_week)
     assert "12" in missing_week["missing_numbers"]
 
     visit = quality._retrospective_lexical_coverage_finding(
         "Historical chart abstraction", "Existing charts will be reviewed and abstracted.",
         field="study-procedure.enrollment", issue="Retrospective study procedure omits approved visit.",
     )
-    assert visit is not None and visit["publication_disposition"] == "warning"
+    assert visit is not None and not blocks_construction(visit)
 
 
 def test_transient_verifier_failure_is_retried_with_a_bounded_counter(tmp_path):

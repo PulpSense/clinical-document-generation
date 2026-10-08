@@ -181,7 +181,7 @@ def test_warning_only_drafting_response_is_accepted_and_reported(tmp_path, monke
     warning = {
         "category": "drafting", "field": "icf.background",
         "code": "icf-lexical-evidence-uncertainty",
-        "publication_disposition": "warning",
+        "finding_policy": {"classification": "semantic_uncertainty", "reason": "synthetic-contextual-review", "repair_owner": "independent_review"},
         "issue": "The cited fact needs contextual review.",
     }
     accepted = {"kind": "sections", "drafts": [{
@@ -197,17 +197,17 @@ def test_warning_only_drafting_response_is_accepted_and_reported(tmp_path, monke
     assert quality._accepted_drafting_warnings(tmp_path) == [warning]
 
 
-def test_final_quality_keeps_drafting_and_render_warnings_without_blocking(tmp_path, monkeypatch):
+def test_final_quality_retains_editorial_warning_and_unresolved_meaning_concern(tmp_path, monkeypatch):
     accepted = tmp_path / "hermes/accepted/icf.background.json"
     accepted.parent.mkdir(parents=True)
     drafting_warning = {
         "code": "icf-lexical-evidence-uncertainty",
-        "publication_disposition": "warning",
+        "finding_policy": {"classification": "semantic_uncertainty", "reason": "synthetic-contextual-review", "repair_owner": "independent_review"},
         "issue": "Check the source paraphrase in context.",
     }
     render_warning = {
         "code": "visible-duplicate-word",
-        "publication_disposition": "warning",
+        "finding_policy": {"classification": "editorial_warning", "reason": "synthetic-duplicate-word", "repair_owner": "none"},
         "issue": "Visible text repeats a word.",
     }
     accepted.write_text(json.dumps({"warnings": [drafting_warning]}), encoding="utf-8")
@@ -219,6 +219,7 @@ def test_final_quality_keeps_drafting_and_render_warnings_without_blocking(tmp_p
 
     report = quality.quality_report(tmp_path, reference, render, None)
 
-    assert report["status"] == "passed"
+    assert report["status"] == "blocked"
     assert report["warnings"] == [drafting_warning, render_warning]
-    assert quality.final_exact_artifact_review_findings(tmp_path, reference, render, report) == []
+    assert drafting_warning in report["findings"]
+    assert quality.final_exact_artifact_review_findings(tmp_path, reference, render, report)
