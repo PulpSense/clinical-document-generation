@@ -3464,7 +3464,7 @@ def render_pages(
                     "page": page_number,
                     "target_ids": [f"layout:{docx.stem}"],
                     "issue": f"Rendered {docx.stem} contains a textless page at page {page_number}.",
-                }, classification="technical_failure", reason="quality.render_pages.08bf9f975e", repair_owner="runtime"))
+                }, classification="essential_defect", reason="quality.render_pages.08bf9f975e", repair_owner="rendering"))
             if docx.stem == "protocol":
                 findings.extend(_protocol_section15_opening_findings(docx, pdf))
             toc_destinations = audit_final_toc_destinations(docx, pdf)
@@ -3889,12 +3889,14 @@ def _retrospective_lexical_coverage_finding(
     finding: dict[str, Any] = declare_finding({
         "category": "content", "field": field, "target_ids": [field],
         "issue": issue,
-    }, classification="essential_defect", reason="quality._retrospective_lexical_coverage_finding.4a502846d0", repair_owner="construction")
-    if missing_numbers:
+    }, classification="essential_defect", reason="quality._retrospective_lexical_coverage_finding.4a502846d0", repair_owner="drafting")
+    if missing_numbers or any(value.get("required_polarity") for value in diagnostic.get("unobserved_values", [])):
         finding["missing_numbers"] = missing_numbers
+        finding["evidence_diagnostics"] = [diagnostic]
         return finding
-    return declare_finding({
+    return classify_finding({
         **finding,
+        "evidence_diagnostics": [diagnostic],
         "code": "retrospective-lexical-evidence-uncertainty",
 
         "action": "manual_review",
@@ -3903,7 +3905,7 @@ def _retrospective_lexical_coverage_finding(
             "independent content review must assess whether the fact is present."
         ),
         "source_excerpt": _text(approved),
-    }, classification="essential_defect", reason="quality._retrospective_lexical_coverage_finding.e4a45e1a0a", repair_owner="construction")
+    }, classification="semantic_uncertainty", reason="Only lexical grounding is uncertain.", repair_owner="independent_review")
 
 
 def audit_computed_protocol_fields(document: Path | Document, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -4867,7 +4869,10 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     findings.append(finding)
         timeline = get_path(reference, "study.timeline")
         if timeline and not _timeline_covered(timeline, normalized_visible):
-            findings.append(declare_finding({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": "Retrospective study procedure omits the approved study timeline."}, classification="essential_defect", reason="quality.deterministic_content_check.927f900b30", repair_owner="drafting"))
+            finding = _retrospective_lexical_coverage_finding(timeline, normalized_visible,
+                field="study-procedure.enrollment", issue="Retrospective study procedure omits the approved study timeline.")
+            if finding:
+                findings.append(finding)
         schedule = get_path(reference, "procedures.visit_schedule_table", []) or []
         visit_names = [item.get("visitName") or item.get("visit") for item in schedule if isinstance(item, Mapping)]
         for visit_name in visit_names:
@@ -5764,7 +5769,11 @@ def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
             continue
         if not isinstance(record, Mapping):
             continue
-        values = record.get("warnings")
+        values = list(record.get("warnings") or []) if isinstance(record.get("warnings"), list) else []
+        if record.get("kind") == "prs" and isinstance(record.get("narrative"), Mapping):
+            for narrative in record["narrative"].values():
+                if isinstance(narrative, Mapping) and isinstance(narrative.get("warnings"), list):
+                    values.extend(narrative["warnings"])
         if isinstance(values, list):
             # Do not discard a migrated essential/technical record just because
             # it was stored in a legacy warnings array. The final policy check
@@ -5795,7 +5804,7 @@ def _lexical_review_cautions(
         section = str(warning.get("field") or (warning.get("target_ids") or [""])[0])
         records[identity] = {
             "caution_sha256": identity, "section_id": section,
-            "artifact": "icf" if section.startswith("icf.") else "protocol",
+            "artifact": "icf" if section.startswith("icf.") else "study.xml" if section.startswith("prs.") else "protocol",
             "caution": warning,
         }
     return list(records.values())

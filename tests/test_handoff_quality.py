@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from finding_policy import blocks_construction, classify_finding
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from pypdf import PdfWriter
@@ -473,7 +474,7 @@ def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_mis
     )
 
 
-def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp_path):
+def test_governed_duplicate_prose_keeps_contracts_pending_meaning_review(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
     path = create_drafting_request(
@@ -501,13 +502,14 @@ def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp
     assert accepted is not None
     assert {
         item["section_id"] for item in accepted["drafts"]
-    } == set(batch.section_ids) - {"evaluation-procedures"}
+    } == set(batch.section_ids)
     duplicate_findings = [item for item in findings if "duplicated across separately contracted" in item["issue"]]
     assert duplicate_findings
     assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures"]
+    assert all(not blocks_construction(f) for f in duplicate_findings)
 
 
-def test_duplicate_ingestion_preserves_primary_and_retries_secondary_only(tmp_path):
+def test_duplicate_ingestion_retains_primary_secondary_and_review_caution(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
     request_path = create_drafting_request(
@@ -532,29 +534,16 @@ def test_duplicate_ingestion_preserves_primary_and_retries_secondary_only(tmp_pa
     governing = governing_resources(ROOT, reference)
     findings = ingest_responses(tmp_path, governing)
 
-    assert findings[0]["target_ids"] == ["evaluation-procedures"]
+    assert findings == []
     accepted_ids = {
         section_id for section_id in batch.section_ids
         if accepted_draft(tmp_path, section_id, governing) is not None
     }
-    assert accepted_ids == set(batch.section_ids) - {"evaluation-procedures"}
-    attempts, exhausted = retry_attempts(findings, {})
-    assert exhausted == []
-    created = schedule_requests(
-        repo_root=ROOT,
-        revision_dir=tmp_path,
-        revision_id="r-duplicate-local-retry",
-        reference=reference,
-        attempts=attempts,
-        wave="retry",
-        findings=findings,
-    )
-    retry = next(
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in created
-        if json.loads(path.read_text(encoding="utf-8"))["batch_id"] == batch.batch_id
-    )
-    assert [item["section_id"] for item in retry["section_contracts"]] == ["evaluation-procedures"]
+    assert accepted_ids == set(batch.section_ids)
+    draft = accepted_draft(tmp_path, "evaluation-procedures", governing)
+    assert draft["warnings"] and all(not blocks_construction(f) for f in draft["warnings"])
+    review = json.loads(create_verification_requests(tmp_path, reference, {"artifacts": []})[0].read_text())
+    assert any(c["section_id"] == "evaluation-procedures" for c in review["lexical_review_cautions"])
 
 
 def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp_path):
@@ -705,7 +694,7 @@ def test_fixed_boilerplate_outcome_rejects_case_mutated_contract_text(tmp_path):
     )
 
 
-def test_authorized_boilerplate_does_not_hide_an_unauthorized_cross_section_copy(tmp_path):
+def test_authorized_boilerplate_retains_an_unauthorized_copy_for_meaning_review(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations")
     path = create_drafting_request(
@@ -732,9 +721,10 @@ def test_authorized_boilerplate_does_not_hide_an_unauthorized_cross_section_copy
     assert accepted is not None
     accepted_ids = {item["section_id"] for item in accepted["drafts"]}
     assert "introduction" in accepted_ids
-    assert "study-design.bias" not in accepted_ids
+    assert "study-design.bias" in accepted_ids
     duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
     assert duplicate["target_ids"] == ["study-design.bias"]
+    assert not blocks_construction(duplicate)
 
 
 def test_mutated_drafting_request_with_stale_hash_is_blocked_before_response_ingestion(tmp_path):
@@ -1265,7 +1255,7 @@ def test_protocol_leaf_heading_without_body_content_is_blocked(tmp_path):
     )
 
 
-def test_unlocalized_protocol_duplicate_stops_as_a_structural_defect(tmp_path):
+def test_unlocalized_protocol_repetition_requires_meaning_review(tmp_path):
     reference = json.loads((ROOT / "tests/fixtures/retrospective-acceptance-source.json").read_text(encoding="utf-8"))
     run_dir = tmp_path / "run"
     revision = run_dir / "revisions/r-test"
@@ -1285,22 +1275,9 @@ def test_unlocalized_protocol_duplicate_stops_as_a_structural_defect(tmp_path):
 
     findings = deterministic_content_check(revision, reference)
     duplicate = next(item for item in findings if "duplicated in protocol section protocol" in item["issue"])
-    reference_path = run_dir / "reference/study.reference.json"
-    reference_path.parent.mkdir(parents=True)
-    reference_path.write_text(json.dumps({"generation": {}}), encoding="utf-8")
-    result = workflow._quality_retry(
-        run_dir,
-        reference_path,
-        {"generation": {}},
-        reference,
-        revision,
-        {},
-        [duplicate],
-        "quality",
-    )
-
-    assert (duplicate["recovery_class"], duplicate["action"]) == ("document_structure_defect", "preserve_and_stop")
-    assert result["stage"] == "document_structure"
+    assert duplicate["finding_policy"]["classification"] == "semantic_uncertainty"
+    assert duplicate["finding_policy"]["repair_owner"] == "independent_review"
+    assert not blocks_construction(duplicate)
 
 
 def test_stale_icf_cost_language_uses_the_supported_branch_drafting_target(tmp_path):
@@ -1328,7 +1305,7 @@ def test_complete_bundle_is_part_of_governing_resources():
     assert "assets/client-templates/reference/advarra-icf-reference.docx" in bundle["resource_hashes"]
     assert set(resources["implementation_sha256"]) == {
         f"scripts/{name}"
-        for name in ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
+        for name in ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "finding_policy.py")
     }
 
 
@@ -1512,7 +1489,7 @@ def test_invalid_section_preserves_other_sections_and_increments_once(tmp_path):
     path = create_drafting_request(repo_root=ROOT, revision_dir=tmp_path, revision_id="r-test", reference=reference, batch=batch, attempts={item: 1 for item in batch.section_ids}, wave="initial")
     request = json.loads(path.read_text(encoding="utf-8")); response = recorded_acceptance_response(request)
     failed = response["section_results"][0]["section_id"]
-    response["section_results"][0]["paragraphs"][0]["text"] = "Too short"
+    response["section_results"][0]["paragraphs"][0]["text"] = "TBD"
     accepted, findings = validate_response(request, response)
     assert accepted is not None
     assert failed not in {draft["section_id"] for draft in accepted["drafts"]}
@@ -1537,7 +1514,7 @@ def test_partial_batch_ingestion_retries_only_the_failed_section(tmp_path):
     request = json.loads(path.read_text(encoding="utf-8"))
     response = recorded_acceptance_response(request)
     failed = response["section_results"][0]["section_id"]
-    response["section_results"][0]["paragraphs"][0]["text"] = "Too short"
+    response["section_results"][0]["paragraphs"][0]["text"] = "TBD"
     response_path = tmp_path / request["response_path"]
     response_path.parent.mkdir(parents=True, exist_ok=True)
     response_path.write_text(json.dumps(response), encoding="utf-8")
@@ -2261,6 +2238,9 @@ def test_public_generation_replays_a_committed_recovery_plan_after_interruption(
     revision_dir = run_dir / "revisions" / approval["revision_id"]
     approved = json.loads((revision_dir / "approved-reference.json").read_text(encoding="utf-8"))
     working = json.loads(reference_path.read_text(encoding="utf-8"))
+    from rendering import render_documents
+    render_documents(ROOT, revision_dir, approved, {"protocol": [], "icf": {}, "prs": {}})
+    protocol_path = revision_dir / "candidate/protocol.docx"
     real_apply = workflow._apply_pending_recovery_plan
     monkeypatch.setattr(
         workflow,
@@ -2275,16 +2255,13 @@ def test_public_generation_replays_a_committed_recovery_plan_after_interruption(
             approved,
             revision_dir,
             {},
-            [{
-                "category": "visual",
-                "artifact": "protocol",
-                "check": "orphan_heading",
-                "element": "5. INTRODUCTION",
-                "target_ids": ["layout:protocol"],
-                "recovery_class": "visual_defect",
-                "action": "targeted_layout_repair",
+            [classify_finding({
+                "category": "visual", "artifact": "protocol", "check": "orphan_heading",
+                "element": "5. INTRODUCTION", "target_ids": ["layout:protocol"],
+                "artifact_path": "candidate/protocol.docx", "artifact_sha256": quality.sha256_file(protocol_path),
+                "recovery_class": "visual_defect", "action": "targeted_layout_repair",
                 "issue": "orphan heading",
-            }],
+            }, classification="essential_defect", reason="Controlled bound heading-layout defect.", repair_owner="rendering")],
             "quality",
         )
     monkeypatch.setattr(workflow, "_apply_pending_recovery_plan", real_apply)
