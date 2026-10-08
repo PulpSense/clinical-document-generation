@@ -14,3 +14,9 @@ the applicable Protocol section batches with targeted retries. Retrospective
 runs do not create an ICF or PRS XML. A passing run atomically publishes exactly
 `output/protocol.docx` after deterministic and independent rendered-page/content
 verification.
+
+Follow [ordinary generation](../SKILL.md) through the production Desktop
+adapter after approval. Client-ready requires `status: passed`,
+`stage: desktop_delivery`, `delivery.confirmed: true` and actual opener byte/hash
+confirmation of the exact reviewed Protocol. A passing inner generate result
+is insufficient.

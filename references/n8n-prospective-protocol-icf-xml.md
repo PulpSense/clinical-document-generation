@@ -4,9 +4,9 @@ Treat n8n field names as intake aliases only. Translate them into the canonical
 reference described in `reference-schema.md`, then use the public workflow:
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
-python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by <name>
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 ```
 
 The editable Source-of-Truth Markdown is the only reviewer-facing generation
@@ -15,7 +15,11 @@ internal mapper directly. After approval, Hermes handles the requested drafting
 batches and independent verification requests. Python owns deterministic Word
 rendering, the manual client PRS XML structure, retries, and atomic publication.
 
-A passing prospective run publishes exactly:
+Follow [ordinary generation](../SKILL.md). Reviewer metadata is optional when
+already supplied. Client-ready requires `status: passed`,
+`stage: desktop_delivery`, `delivery.confirmed: true` and actual opener byte/hash
+confirmation of all reviewed attachments. A passing inner generation result is
+insufficient. A complete prospective delivery contains exactly:
 
 - `output/protocol.docx`
 - `output/icf.docx`

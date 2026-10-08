@@ -2,7 +2,7 @@
 
 Hermes skill for generating reviewed clinical Protocol DOCX, ICF DOCX, and ClinicalTrials.gov PRS XML packages.
 
-The repository root is the skill root. Install the whole repository—not only `SKILL.md`—because the skill requires its templates, contracts, boilerplate, and Python modules.
+The repository root is the skill root. Use the complete release archive for installation, because the skill requires its templates, contracts, boilerplate, and Python modules. A normal Git clone includes tracked development documentation; the installable archive excludes AGENTS.md, CLAUDE.md, GLOSSARY.md, docs/, tests/ and development agent configuration.
 
 ## Architecture
 
@@ -52,18 +52,17 @@ Protocol and ICF rendering begins from the bundled client Word families. The ren
 For the normative Hermes setup—including the dedicated Python environment,
 one-time unsigned-candidate provisioning, installation smoke, and the boundary
 between `--manual-review` and formally certified activation—follow
-[SKILL.md's Public interface](SKILL.md#public-interface). `CLINICAL_PYTHON` must
+[explicit Linux setup](references/linux-setup.md). `CLINICAL_PYTHON` must
 be the resolved absolute Python 3.10+ path; do not rely on the host's
 unqualified `python3`. The Desktop operation records that identity and every
 later runtime used to resume it.
 
-## Public commands
+## Ordinary generation commands
 
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 ```
 
 `generate` may return `awaiting_hermes`. It is the deterministic inner lifecycle
@@ -82,7 +81,7 @@ write the bound verification responses. Worker redispatch is never relabelled
 as parent review:
 
 ```bash
-"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --run-dir <run-dir> \
+"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --manual-review --run-dir <run-dir> \
   --desktop-opener-command /absolute/path/to/desktop-opener \
   --parent-visual-review-command /absolute/path/to/desktop-parent-reviewer
 ```
@@ -214,11 +213,12 @@ the run workspace and isolated runtime caches. It never patches code or
 templates, installs packages, runs the development suite, or starts a recovery
 operation to obtain a new deadline.
 
-## Verification
+## Explicit release verification
+
+Use [release workflow](references/release-workflow.md) only when the owner explicitly requests a release action. Development checks belong to [maintenance workflow](references/maintenance-workflow.md); run explicit focused targets, and obtain owner approval for a full suite or live certification corpus.
 
 ```bash
 "$CLINICAL_PYTHON" -m py_compile scripts/*.py
-"$CLINICAL_PYTHON" -m pytest -q
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 # Build a clean release archive outside the checkout
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
@@ -312,4 +312,4 @@ material only for active and immediately previous releases; displaced older
 releases become lightweight identity and certification records under
 `release-history/`.
 
-The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.
+The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return the complete workflow client outputs only at `status: passed`, `stage: desktop_delivery`, `delivery.confirmed: true` with actual opener confirmation of every byte length and SHA-256.

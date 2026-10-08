@@ -1,0 +1,30 @@
+# Clinical document authorities
+
+Read before drafting or repairing clinical content together with the exact assigned request and [template contract](template-contract.md), [fixed clinical boilerplate](fixed-clinical-boilerplate.json), [Sterling clause contract](sterling-clause-contract.json), [quality corrections](quality-corrections.md) and [PRS XML contract](prs-xml.md). Those contracts remain authoritative; examples carry structure and language, not facts for another study.
+
+- Approved Fixed Clinical Boilerplate from `references/fixed-clinical-boilerplate.json` is allowed only where a request lists it and remains applicable to the approved source. Source-specific facts constrain boilerplate: it must not broaden decision-making authority, conflate successful completion with discontinuation, or add unsupported obligations. Approval of the library is not an exemption from clinical-fidelity review.
+- Preserve the Advarra template's separate acknowledgement of receiving all pages and promise of a signed copy after signing. Report uncertainty about whether standard ICF privacy authorization applies to the particular study as a review caution; a source contradiction or an affirmative unsupported study-specific privacy practice still requires correction.
+
+## Word template authorities
+
+- Every Protocol branch uses the bundled Protocol client authority for page geometry, typography, headers/footers, heading hierarchy, document-control surfaces, and table design.
+- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Preserve the template's page breaks except the narrowly authorized Section 15 correction in `references/quality-corrections.md`; ensure the Table of Contents and its first following body section each begin at a page boundary without adding breaks before later body sections. Keep every heading with its first substantive paragraph, list, or table.
+- Advarra ICF output uses the bundled Advarra authority; Sterling output uses the bundled Sterling authority.
+- For Sterling ICF, preserve the IRB-owned front-matter merge tags for title, protocol number, investigator, site, phone, and sponsor. Retain the template's fixed consent introduction and INFORMATION wording without model drafting. Insert the exact template ClinicalTrials.gov statement only when its approved source trigger applies; do not copy the template's mutually exclusive or study-specific example options into the output.
+- Sterling output must satisfy `references/sterling-clause-contract.json`. Validate substantive body language and section placement, not headings or signatures alone. Insert conditional or source-dependent clauses only when their declared approved-input trigger is present; never retain an untriggered template option or invent legal, regulatory, payment, injury, privacy, authorization, or contact terms. Exact governed clauses may be moved intact to repair placement, but a materially altered or missing safeguard requires targeted redrafting or blocks delivery.
+- Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
+- ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
+- ICF section ownership is template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Introduction summarizes approved background and the evidence gap without repeating a speculative comparison for the untested combination; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Section 15 prose briefly introduces its source-derived table and only genuinely unallocated notes. Study Completion states the supplied closeout timeline and defines a completion trigger only when supplied, without repeating visits or the exit form. Summary of benefits owns potential clinical benefit; Section 17 owns payment and reimbursement. General Statistical Considerations states a source-supported interpretation point without repeating endpoint methods. Short role-specific references are allowed. Repetition without a factual or consent-language defect is retained as an editorial warning.
+- `meta.date` defaults once, during `prepare`, to `dd MMM yyyy`. `meta.version` remains blank unless the approved source supplies it.
+
+## PRS XML authority
+
+- Keep `assets/client-templates/reference/prs-manual-reference.xml` as the client-derived structural architecture authority. Use `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml` only as the generation/format template whose populated output must validate against that structural reference.
+- Python alone owns XML tags, ordering, optional nodes, namespaces, escaping, and repeated blocks.
+- Derive intervention, arm, primary/secondary/other outcome, and location counts from the approved source—not from generated fields.
+- Validate every source-backed value inside every intervention, arm, outcome,
+  and location block in addition to validating repeated-block counts and the
+  client template's tag order and structure.
+- The PRS subagent may return only `brief_summary` and `detailed_description` prose.
+- Any XML failure blocks the complete Prospective/Ambispective package.
+

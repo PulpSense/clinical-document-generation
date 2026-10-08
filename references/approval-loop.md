@@ -5,7 +5,7 @@ Use only the public lifecycle in `scripts/workflow.py`.
 ## 1. Prepare
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
 If the result is `blocked`, present the returned missing-input checklist and
@@ -24,10 +24,9 @@ When the reviewer edits the Markdown, preserve the uploaded file and pass it to
 the approval stage:
 
 ```bash
-python3 scripts/workflow.py \
+"$CLINICAL_PYTHON" scripts/workflow.py \
   --run-dir <run-dir> \
   --stage approve \
-  --approved-by "<reviewer>" \
   --source-md <edited-source.md>
 ```
 
@@ -41,8 +40,7 @@ one repair report.
 For an unchanged Source-of-Truth file:
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage approve --approved-by "<reviewer>"
-python3 scripts/workflow.py --run-dir <run-dir> --stage validate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
 ```
 
 Approval binds the exact Markdown hash and creates a write-once revision with
@@ -54,22 +52,25 @@ document-content questions after this point. Sparse-but-complete approved input
 uses only its approved evidence and the section's listed Fixed Clinical
 Boilerplate.
 
-## 4. Generate
+Reviewer identity is optional audit metadata: use `--approved-by` only when
+already supplied; otherwise the workflow uses `client` without a new question.
+
+## 4. Complete the Desktop operation
+
+Follow [the ordinary production route](../SKILL.md#post-approval-desktop-operation):
 
 ```bash
-python3 scripts/workflow.py --run-dir <run-dir> --stage generate
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
 ```
 
-When the result is `awaiting_hermes`, complete every returned JSON request at
-its declared response path and rerun `generate`. Continue until `passed` or a
-truthful blocker is returned. The enclosing Desktop operation may convert a
-blocked result with a complete, verified candidate into `review_required`.
-
-This loop is internal. The next reviewer-facing response after approval must be
-the complete `client_outputs` package, the complete `review_outputs` package
-with its findings report, or one consolidated technical repair blocker.
-
-Return only `client_outputs` after `status: passed`. Never deliver partial
-documents, PDFs, page PNGs, drafts, or logs.
-For `status: review_required`, return every labeled review-only document and
-the findings report together. State that the review copy is not client-ready.
+The adapter owns drafting, supported cause-specific repair, independent content
+and every-page visual review, and atomic complete branch delivery under the
+original 2700-second deadline. Ordinary generation keeps the installed release
+read-only and launches no maintenance, developer suite or certification.
+Return client-ready attachments only at `status: passed`,
+`stage: desktop_delivery`, `delivery.confirmed: true`, after the actual opener
+confirms every final byte length and hash. A passing inner generate result is
+insufficient. Retained cautions belong only in the Hermes Delivery Message.
+If an exceptional result provides complete review-only copies, expose them and
+its findings honestly as not client-ready; this is not successful completion.
+Never deliver partial documents or internal PDFs, page PNGs, drafts or logs.
