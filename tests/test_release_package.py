@@ -1158,6 +1158,17 @@ def test_release_package_contains_hashed_runtime_and_excludes_development_data(t
         assert prefix + "assets/client-templates/reference/advarra-icf-reference.docx" in names
         assert prefix + f"assets/runtime-wheels/{PDFIUM_WHEEL}" in names
         assert not any(name.startswith(prefix + "docs/") for name in names)
+        for development_file in ("AGENTS.md", "CLAUDE.md", "GLOSSARY.md"):
+            assert prefix + development_file not in names
+        for development_directory in (".agents/", ".codex/", "docs/agents/", "tests/"):
+            assert not any(name.startswith(prefix + development_directory) for name in names)
+        for reference in ("linux-setup", "release-workflow", "maintenance-workflow",
+                          "desktop-review", "document-authorities"):
+            path = f"references/{reference}.md"
+            assert prefix + path in names
+            entry = next(item for item in manifest["files"] if item["path"] == path)
+            assert entry["sha256"] == hashlib.sha256(archive.read(prefix + path)).hexdigest()
+
         assert not any(name == prefix + ".gitignore" for name in names)
         assert not any(
             "/runtime-wheels/" in name and not name.endswith(PDFIUM_WHEEL)
