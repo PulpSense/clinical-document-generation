@@ -227,8 +227,16 @@
     {
       "file": "scripts/contracts.py",
       "function": "normalized_visit_records",
-      "code_sha256": "d2b82e87211979a0d91ff8c603ccbc34caf1da8e8792276159318f2945cd4a66",
-      "family": "structured"
+      "code_sha256": "7ee83f0e8e722a2d8fa08adec53ab140e4fa2a3357d226f2f6d5ce2d4650bd35",
+      "family": "structured",
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_string_visit_inventory_drives_both_tables_without_splitting_prose"
+        ],
+        "invalid": [
+          "test_mixed_visit_representations.py::test_matrix_alias_does_not_merge_distinct_contacts_or_timings"
+        ]
+      }
     },
     {
       "file": "scripts/contracts.py",
@@ -610,10 +618,20 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "bbaec32ec7e172089c80a5b994eec3afeaa6772b4ec1a0af48f22410b4344ee2",
+      "code_sha256": "dff037f22f931517e46f235424240eeb1aa232a507da4dc4a3922156aa5fd640",
       "authority_contract": {
-        "authority": "uncertainty",
-        "resolution_authority": "independent_source_grounded_review"
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review",
+        "requirement": "Clinical uncertainty needs independent source-grounded review; missing current section evidence must be repaired by construction before dispatch.",
+        "repair_owner": "construction_for_missing_evidence; reviewer_for_clinical_meaning"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_generated_summary_is_available_to_section_review"
+        ],
+        "invalid": [
+          "test_review_contract_root_causes.py::test_empty_section_evidence_is_rejected_before_dispatch"
+        ]
       }
     },
     {
@@ -653,8 +671,16 @@
     {
       "file": "scripts/quality.py",
       "function": "verification_response_is_terminal",
-      "code_sha256": "1bf0a690ba7c85ddbb38505844baaec79eecfd7da96c05c1c4fcecf63f5d87ad",
-      "family": "review"
+      "code_sha256": "ad87b633f548dff369f66c3007376b79091b4f5e61e7c03b6374327738afbd67",
+      "family": "review",
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_substantive_blocked_review_survives_invalid_resolution_metadata"
+        ],
+        "invalid": [
+          "test_review_resolutions.py::test_resolution_cannot_quote_invented_passage_or_source"
+        ]
+      }
     },
     {
       "file": "scripts/quality.py",
@@ -689,8 +715,16 @@
     {
       "file": "scripts/rendering.py",
       "function": "rendered_section_snapshot",
-      "code_sha256": "0596f82dd7c627dfab972bcc0cb58de419f7abc53b5a9a33d94360422c9ae0f6",
-      "family": "recovery"
+      "code_sha256": "e1c0ea171124c9931039b03576df910d71bd84d30e37e6604459f0ca7b7b4548",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_generated_summary_is_available_to_section_review"
+        ],
+        "invalid": [
+          "test_review_contract_root_causes.py::test_empty_section_evidence_is_rejected_before_dispatch"
+        ]
+      }
     },
     {
       "file": "scripts/rendering.py",
@@ -851,8 +885,16 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "776967f38e5a99a6d214e43c2376eca96e2199393c44ece1c9f88661ec821c59",
-      "family": "recovery"
+      "code_sha256": "a9f4faf4cdb595d53779acec1930d00f5bb802f56cbdfe0aa16a459254e82a7c",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_new_candidate_review_has_its_own_transport_retry_budget"
+        ],
+        "invalid": [
+          "test_review_contract_root_causes.py::test_identical_unconsumable_review_does_not_spend_entire_operation"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -941,8 +983,16 @@
     {
       "file": "scripts/workflow.py",
       "function": "_begin_independent_review",
-      "code_sha256": "38794dbed8337e8ac491d0a252c5d6ee09f464d3767b25242017bcca85e7e91f",
-      "family": "review"
+      "code_sha256": "53b534fdb3a2aa4e7e35d9c77d516a2520ffc0ea783db05c46a17621cac36836",
+      "family": "review",
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_generated_summary_is_available_to_section_review"
+        ],
+        "invalid": [
+          "test_review_contract_root_causes.py::test_evidence_construction_failure_is_returned_to_its_owner"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",

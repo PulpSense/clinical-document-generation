@@ -1342,7 +1342,10 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
         decoded = assessment_matrix(raw, get_path(reference, "procedures.visits", []) or [])
         if path.endswith("visit_schedule_table"):
             matrix_table = decoded is not None
-        source_rows = decoded["visits"] if decoded is not None else [row for row in raw if isinstance(row, Mapping)] if isinstance(raw, list) else []
+        source_rows = decoded["visits"] if decoded is not None else [
+            row if isinstance(row, Mapping) else {"visit": row}
+            for row in raw if isinstance(row, Mapping) or isinstance(row, str) and row.strip()
+        ] if isinstance(raw, list) else []
         source_keys = [
             (str(row.get("visit") or row.get("visitName") or "").strip(),
              str(row.get("timing") or row.get("visitWindow") or "").strip())

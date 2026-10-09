@@ -77,25 +77,10 @@ def _list(value: Any) -> list[str]:
 def _plain_language_assessments(value: Any) -> list[str]:
     if isinstance(value, list):
         return _list(value)
-    text = _text(value).rstrip(".")
-    if not text:
-        return []
-    text = re.sub(r",\s*including\s+", ", ", text, flags=re.I)
-    return [part.strip() for part in re.split(r",\s*(?:and\s+)?", text) if part.strip()]
-
-
-def _assessment_timing(label: str) -> str:
-    timepoint = re.search(r"\b(?:Month|Week|Day)\s+[+-]?\d+\b", label, re.I)
-    if timepoint:
-        return timepoint.group(0)
-    lowered = label.casefold()
-    if "baseline" in lowered:
-        return "Baseline"
-    if "historical" in lowered:
-        return "Historical record review"
-    if "screening" in lowered:
-        return "Screening"
-    return "Per approved schedule"
+    # Commas inside clinical prose do not delimit activities or visit phases.
+    # Preserve unstructured evidence atomically rather than infer relationships.
+    text = _text(value)
+    return [text] if text else []
 
 
 def _assessment_visit_labels(value: Any) -> list[str]:
@@ -292,8 +277,11 @@ def rendered_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
         return snapshot
     if not section_id.startswith("icf."):
         return protocol_section_snapshot(path, section_id)
+    # The drafted summary occupies the retained KEY INFORMATION section.
+    # Resolve its contract identity without adding another rendering insertion.
+    heading_id = "icf.key-information" if section_id == "icf.key-information-summary" else section_id
     titles = {title for sections in ICF_RETAINED_SHELL_SECTIONS.values()
-              for target, title in sections if target == section_id}
+              for target, title in sections if target == heading_id}
     for mapping in (_STERLING_ICF_HEADINGS, _ADVARRA_ICF_HEADINGS):
         if section_id in mapping:
             titles.add(mapping[section_id])
@@ -3364,12 +3352,12 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     header_rows = int(table_contract["header_rows"])
     if not row_values:
         # Restore the readable, unnumbered source inventory when no explicit
-        # visit/procedure matrix exists. Keep the full verbatim notes below it
-        # as well: splitting a schedule for display must not lose qualifications.
+        # visit/procedure matrix exists. Scalar prose remains one atomic entry;
+        # retain the full verbatim notes so no timing qualification is lost.
         labels = _plain_language_assessments(get_path(reference, "procedures.assessments", []))
         if labels:
             row_values = [["Approved visit or assessment", "Approved timing"],
-                          *[[label, _assessment_timing(label)] for label in labels]]
+                          *[[label, "Per approved schedule"] for label in labels]]
         else:
             # Supplemental evidence is still source-owned when there are no
             # rows at all; the old early return silently discarded these notes.

@@ -43,7 +43,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 
 
@@ -3525,9 +3525,10 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings
             "task": str(request["task"]),
             "batch_id": request.get("batch_id"),
         }
-        if request.get("task") == "rendered_page_visual_verification":
+        if request.get("task") in {"clinical_content_verification", "rendered_page_visual_verification"}:
             handoff["request_id"] = str(request["request_id"])
             handoff["request_sha256"] = str(request["request_sha256"])
+        if request.get("task") == "rendered_page_visual_verification":
             handoff["fallback_owner"] = "parent"
             handoff["completion_requirement"] = "inspect_every_bound_page_image"
         handoffs.append(handoff)
@@ -4688,6 +4689,34 @@ def run_desktop_operation(
                 prior_by_response.get(str(item.get("response_path") or ""), item)
                 for item in current_handoffs
             ]
+            for handoff in handoffs:
+                feedback = [str(item.get("issue") or "") for item in result.get("findings", [])
+                            if isinstance(item, Mapping)
+                            and item.get("verification_request_id") == handoff.get("request_id")
+                            and item.get("recovery_class") == "verifier_transient"]
+                if feedback:
+                    handoff["response_repair_feedback"] = feedback
+            # Repeating the identical unconsumable response is transport work,
+            # not a new clinical repair. Preserve its identity and stop after
+            # one retry; a repaired candidate receives a new review request.
+            stalled = [item for item in handoffs
+                       if item.get("fallback_owner") != "parent"
+                       and int(attempt_counters["handoff_dispatches"].get(str(
+                           item.get("request_sha256") or item.get("request_id")
+                           or item.get("request_path") or "")) or 0) >= 2
+                       and not _handoff_response_is_bound(
+                           run_dir, str(result.get("revision_id") or ""), item)]
+            if stalled:
+                return finish({
+                    "status": "blocked", "stage": "hermes_handoff",
+                    "findings": [{
+                        "category": "hermes", "code": "handoff_no_progress",
+                        "field": str(item.get("request_path") or "handoff"),
+                        "verification_request_id": item.get("request_id"),
+                        "issue": "The identical worker request produced no consumable response after one retry; inspect preserved worker evidence and repair the response contract before continuing.",
+                    } for item in stalled],
+                    "client_outputs": [],
+                })
             pending_handoffs = [dict(item) for item in handoffs]
             save("running")
             remaining = remaining_seconds()
@@ -5127,6 +5156,13 @@ def _production_agent_prompt(
         if task in {"clinical_content_verification", "rendered_page_visual_verification"}
         else " The next generate invocation is the authoritative response validator."
     )
+    feedback = handoff.get("response_repair_feedback") or []
+    repair_rule = (
+        " Response contract corrections from the previous validation: "
+        + json.dumps(feedback, ensure_ascii=False)
+        + " Correct these response fields against the unchanged bound evidence. Do not assume approval or change the source."
+        if feedback else ""
+    )
     return (
         "Complete one isolated clinical-document Hermes handoff.\n"
         f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
@@ -5136,7 +5172,7 @@ def _production_agent_prompt(
         "request_sha256, task, revision_id, target, and evidence "
         "reference exactly. producer.model_id must record the actual model used for this response, and "
         "producer.reviewer_id must record the independent reviewer role for this response."
-        f"{response_write_rule}{verification_rule} The validator interpreter is dependency-complete; do not search "
+        f"{response_write_rule}{verification_rule}{repair_rule} The validator interpreter is dependency-complete; do not search "
         "the filesystem for Python or dependency paths. Do not modify production code or "
         "approved source material."
     )
@@ -8769,10 +8805,13 @@ def _begin_independent_review(
         blocking = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
         if blocking:
             return [], blocking
-    paths = create_verification_requests(
-        revision_dir, reference, render_report,
-        contracted_bundle=bundle, review_set=review_set,
-    )
+    try:
+        paths = create_verification_requests(
+            revision_dir, reference, render_report,
+            contracted_bundle=bundle, review_set=review_set,
+        )
+    except ReviewEvidenceError as exc:
+        return [], [exc.finding]
     return paths, []
 
 

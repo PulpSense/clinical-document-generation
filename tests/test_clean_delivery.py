@@ -253,7 +253,8 @@ def test_authenticated_source_conflict_stops_without_drafting_retry(tmp_path, mo
     assert not list((revision / 'hermes/requests').glob('*retry*'))
 
 
-def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tmp_path, monkeypatch):
+@pytest.mark.parametrize('incomplete_resolution', [False, True])
+def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tmp_path, monkeypatch, incomplete_resolution):
     import rendering
     render_count = []
     review_count = []
@@ -290,6 +291,8 @@ def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tm
                 if decision['caution_sha256'] == caution['caution_sha256']:
                     decision.update(disposition='confirmed_defect', affected_passage=passage,
                                     rationale='The running header accidentally repeats a word.')
+        if incomplete_resolution and len(review_count) == 1:
+            response['uncertainty_resolutions'] = []
         return response
     source = json.loads((ROOT / CASES[0]['source_path']).read_text())
     result, _ = deliver(tmp_path, monkeypatch, source, review=review, render=render)

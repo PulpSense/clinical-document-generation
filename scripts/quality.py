@@ -38,6 +38,18 @@ from prs_xml import screening_interval_requirement, validate_output as validate_
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 
 
+class ReviewEvidenceError(ValueError):
+    """Code could not bind a caution to the actual candidate section."""
+
+    def __init__(self, artifact: str, section_id: str):
+        self.finding = recovery_finding({
+            "category": "document_structure", "code": "review_evidence_unavailable",
+            "artifact": artifact, "field": section_id, "target_ids": [section_id],
+            "issue": "Review evidence has no current passage for the affected section; repair section localization before dispatch.",
+        }, "deterministic_structure_defect")
+        super().__init__(self.finding["issue"])
+
+
 VERIFY_SCHEMA = "hermes-verification/v1"
 RESPONSE_SCHEMA = "hermes-verification-response/v1"
 FINAL_REVIEW_SCHEMA = "final-exact-artifact-review/v1"
@@ -5787,6 +5799,9 @@ def _lexical_review_cautions(
                                    key=lambda row: len(row[1]), default=None)
             section = matching_section[0] if matching_section else f"{artifact}.shell"
         passage = rendered_section_snapshot(path, section) if path.is_file() else []
+        if not any(key in row and _review_evidence_text(row[key]).strip()
+                   for row in passage for key in ("paragraph", "table")):
+            raise ReviewEvidenceError(artifact, section)
         section_specs = list(protocol_contract(str(get_path(reference, "meta.study_type") or "")))
         if artifact == "icf":
             section_specs = list(icf_contract(str(get_path(reference, "meta.study_type") or ""),
@@ -6047,7 +6062,16 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
         return False
     status = str(response.get("status") or "").casefold()
     if status == "passed":
-        return verification_response_is_complete(revision_dir, request_path)
+        if verification_response_is_complete(revision_dir, request_path):
+            return True
+        validation_findings, evidence = validate_verifications(revision_dir, request_paths=[request_path])
+        # Transport completion is not clinical approval. Retain an authenticated
+        # review with only resolution metadata errors so recovery can explain
+        # those errors to the reviewer; the completeness gate still rejects it.
+        return bool(evidence and validation_findings) and all(
+            item.get("code") == "uncertainty_resolution_invalid"
+            and item.get("recovery_class") == "verifier_transient"
+            for item in validation_findings)
     findings = response.get("findings") if isinstance(response.get("findings"), list) else []
     if status in {"blocked", "failed"}:
         if not findings or not all(
@@ -6063,7 +6087,7 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
         return not any(
             item.get("recovery_class") in {
                 "verifier_transient", "document_structure_defect",
-            }
+            } and item.get("code") != "uncertainty_resolution_invalid"
             for item in validation_findings
         )
     return False
