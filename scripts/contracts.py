@@ -1507,57 +1507,33 @@ def sterling_draft_word_budget(reference: Mapping[str, Any], section_id: str) ->
 
 
 def protocol_table_rows_match(contract: Mapping[str, Any], actual: Iterable[Iterable[str]]) -> bool:
-    """Compare a constructed table without weakening its source relationships.
-
-    Only whitespace and sentence/title case of descriptive activity words
-    may differ. Headers, order, quantities, units, visit marks and blanks remain
-    exact. Construction still emits the approved spelling, never this projection.
-    """
-    def descriptive_casing(source: str, value: str) -> bool:
-        source_tokens = list(re.finditer(r"[A-Za-z]+|[^A-Za-z]+", source))
-        value_tokens = re.findall(r"[A-Za-z]+|[^A-Za-z]+", value)
-        if len(source_tokens) != len(value_tokens):
-            return False
-        # Protect complete measurement expressions, including compound units,
-        # by source quantity context rather than a finite unit spelling list.
-        quantities = (r"(?:\d+(?:[.,]\d+)?|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|"
-                      r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
-                      r"thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand))")
-        unit_spans = list(re.finditer(quantities + r"\s*([A-Za-zµμ][A-Za-zµμ0-9/.*^·−+-]*(?:\s*[/·*]\s*[A-Za-zµμ0-9/.*^·−+-]+)*)", source,
-                                     flags=re.IGNORECASE))
-        for token, actual_token in zip(source_tokens, value_tokens):
-            approved_token = token.group()
-            if approved_token == actual_token:
-                continue
-            # Never fold mixed-case/uppercase or short title-shaped identifiers,
-            # alphanumeric identifiers, numbers, operators or punctuation.
-            word = re.fullmatch(r"[A-Za-z]{2,}", approved_token)
-            unit = any(span.start(1) <= token.start() and token.end() <= span.end(1) for span in unit_spans)
-            touches_number = ((token.start() > 0 and source[token.start() - 1].isdigit())
-                              or (token.end() < len(source) and source[token.end()].isdigit()))
-            if not (word and not unit and not touches_number
-                    and (approved_token.islower() or (approved_token.istitle() and len(approved_token) > 3))
-                    and (actual_token.islower() or actual_token.istitle())
-                    and approved_token.lower() == actual_token.lower()):
-                return False
-        return True
-
+    """Validate exact source values after construction, ignoring whitespace only."""
     expected = [[re.sub(r"\s+", " ", str(cell)).strip() for cell in row]
                 for row in contract["rows"]]
     observed = [[re.sub(r"\s+", " ", str(cell)).strip() for cell in row] for row in actual]
-    if len(expected) != len(observed):
-        return False
-    for index, (source_row, actual_row) in enumerate(zip(expected, observed)):
-        if len(source_row) != len(actual_row):
-            return False
-        for column, (source, value) in enumerate(zip(source_row, actual_row)):
-            if source == value:
-                continue
-            descriptive_label = (contract["section_id"] == "evaluation-procedures"
-                                 and index >= contract["header_rows"] and column == 0)
-            if not (descriptive_label and descriptive_casing(source, value)):
-                return False
-    return True
+    return expected == observed
+
+
+def protocol_table_label_restorations(contract: Mapping[str, Any], actual: Iterable[Iterable[str]]) -> list[dict[str, Any]]:
+    """Plan source-authorized case restoration, never assert semantic equivalence.
+
+    Restore labels to their exact approved spelling, including units/identifiers.
+    Do not change quantities, punctuation, headers, visit marks, order or blanks.
+    Ambiguous word/identifier guesses are deliberately unnecessary.
+    """
+    rows = [[str(cell) for cell in row] for row in actual]
+    expected = contract["rows"]
+    if len(rows) != len(expected) or any(len(row) != len(source) for row, source in zip(rows, expected)):
+        return []
+    if contract["section_id"] != "evaluation-procedures":
+        return []
+    changes = []
+    for index in range(contract["header_rows"], len(rows)):
+        source = re.sub(r"\s+", " ", str(expected[index][0])).strip()
+        value = re.sub(r"\s+", " ", rows[index][0]).strip()
+        if source != value and source.lower() == value.lower():
+            changes.append({"row": index, "source": str(expected[index][0])})
+    return changes
 
 
 def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
@@ -2725,5 +2701,5 @@ __all__ = [
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "country_name_aliases", "document_set",
     "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
-    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "protocol_table_rows_match", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
+    "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "protocol_table_rows_match", "protocol_table_label_restorations", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
 ]

@@ -171,7 +171,16 @@
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_rows_match",
-      "code_sha256": "d957fdedc79cc11ec097cdca7f12c7988a68b3f2e7a10e1d2dd19cc85e8e21cb",
+      "code_sha256": "a46e2c1ba489d73f5c3f16f6c173843963ac76bc45b2865cbef544cef4884bdf",
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "protocol_table_label_restorations",
+      "code_sha256": "807d772a2ae88533e2b85cc3054b3143d53e767de0efc20101a1f665f5bbda9a",
       "family": "structured",
       "scope": "shared",
       "role": "helper",
@@ -1465,7 +1474,7 @@
     {
       "file": "scripts/quality.py",
       "function": "render_pages",
-      "code_sha256": "ae3634c360f5f8e2172f5eb92a27d394afc5082f92e001eb144e4d5e277e3128",
+      "code_sha256": "153b48a55a4895719e84382afb451104355629baf94d8532779c2fa5ca31582e",
       "family": "render",
       "scope": "shared",
       "role": "decision",
@@ -1507,7 +1516,7 @@
     {
       "file": "scripts/quality.py",
       "function": "render_assurance",
-      "code_sha256": "89b163c47057f1e9891839c20b155f7c146435b71d5f82b920e135e67c252152",
+      "code_sha256": "caa5a9d1b210cac2b314677eb4f9ee8842c5f5fb5d7b94ab5e128c5e67eb2c46",
       "family": "render",
       "scope": "shared",
       "role": "producer",
@@ -2189,6 +2198,15 @@
           "repair_owner": "'review_response'"
         }
       ]
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "restore_protocol_table_label_case",
+      "code_sha256": "670b82a00fc76102bf5e1ba18cfdf67d6e5a225516f45eeaca97f1dd8058161d",
+      "family": "structured",
+      "scope": "shared",
+      "role": "helper",
+      "policy_declarations": []
     },
     {
       "file": "scripts/rendering.py",

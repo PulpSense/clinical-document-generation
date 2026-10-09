@@ -29,6 +29,7 @@ from pypdf import PdfReader
 
 from contracts import ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
+from contracts import protocol_table_label_restorations
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -3648,6 +3649,35 @@ def _set_update_fields(document: Document) -> None:
         element = OxmlElement("w:updateFields")
         settings.append(element)
     element.set(qn("w:val"), "true")
+
+
+def restore_protocol_table_label_case(path: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Restore generated label casing from the source while retaining cell design."""
+    if path.stem != "protocol" or canonical_study_type(get_path(reference, "meta.study_type")) == "Retrospective":
+        return []
+    contract = protocol_table_contracts(reference)["schedule-of-assessments"]
+    document = Document(path)
+    tables = [table for table in document.tables if table.rows
+              and table.rows[0].cells[0].text.strip() == str(contract["rows"][0][0]).strip()]
+    if len(tables) != 1:
+        return []
+    table = tables[0]
+    changes = []
+    for plan in protocol_table_label_restorations(contract, [[c.text for c in row.cells] for row in table.rows]):
+        cell = table.rows[plan["row"]].cells[0]
+        nodes = list(cell._tc.iter(qn("w:t")))
+        source = "".join(plan["source"].split())
+        actual = "".join(char for node in nodes for char in (node.text or "") if not char.isspace())
+        if len(source) != len(actual) or source.lower() != actual.lower():
+            continue
+        before = cell.text
+        spelling = iter(source)
+        for node in nodes:
+            node.text = "".join(char if char.isspace() else next(spelling) for char in (node.text or ""))
+        changes.append({"row": plan["row"], "before": before, "after": cell.text})
+    if changes:
+        document.save(path)
+    return changes
 
 
 def _cell(cell, value: Any, *, bold: bool = False) -> None:

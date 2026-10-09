@@ -40,7 +40,7 @@ from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUN
 from drafting import _background_claim_findings, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_in_text, screening_interval_requirement, validate_output as validate_prs_output
 from contracts import protocol_table_rows_match
-from rendering import audit_docx, refresh_toc_from_pdf, template_paths
+from rendering import audit_docx, refresh_toc_from_pdf, restore_protocol_table_label_case, template_paths
 
 
 VERIFY_SCHEMA = "hermes-verification/v1"
@@ -3298,6 +3298,7 @@ def render_pages(
     office_exporter: Any = None,
     page_exporter: Any = None,
     blank_page_detector: Any = None,
+    source_case_restorer: Any = None,
     require_promoted_runtime: bool = True,
     allow_pending_activation: bool = False,
 ) -> dict[str, Any]:
@@ -3375,13 +3376,17 @@ def render_pages(
                     raise subprocess.TimeoutExpired("DOCX rendering", 0)
                 pdf = export_docx(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
                 for _ in range(3):
-                    if not refresh_toc_from_pdf(docx, pdf):
+                    restored_case = bool(source_case_restorer and source_case_restorer(docx))
+                    refreshed_toc = refresh_toc_from_pdf(docx, pdf)
+                    if not restored_case and not refreshed_toc:
                         break
                     pdf.unlink(missing_ok=True)
                     remaining = 180.0 if deadline_monotonic is None else deadline_monotonic - clock()
                     if remaining <= 0:
                         raise subprocess.TimeoutExpired("DOCX rendering", 0)
                     pdf = export_docx(docx, attempt_root, identity, environment=runtime_environment, timeout_seconds=min(180.0, remaining))
+                if source_case_restorer and source_case_restorer(docx):
+                    raise RuntimeError("Office conversion repeatedly changed source-owned table spelling.")
                 pdfs[docx] = pdf
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
             renderer_attempts.append({"renderer": identity, "status": "failed", "issue": str(exc)})
@@ -3686,6 +3691,13 @@ def render_assurance(
         require_promoted_runtime=require_promoted_runtime,
         allow_pending_activation=allow_pending_activation,
     )
+    source_case_restorations = []
+
+    def restore_source_case(path: Path) -> bool:
+        changes = restore_protocol_table_label_case(path, reference)
+        source_case_restorations.extend({"artifact": path.stem, **change} for change in changes)
+        return bool(changes)
+
     render_report = render_pages(
         revision_dir,
         artifact_names=artifact_names,
@@ -3703,6 +3715,7 @@ def render_assurance(
         office_exporter=office_exporter,
         page_exporter=page_exporter,
         blank_page_detector=blank_page_detector,
+        source_case_restorer=restore_source_case,
         require_promoted_runtime=require_promoted_runtime,
         allow_pending_activation=allow_pending_activation,
     )
@@ -3734,6 +3747,7 @@ def render_assurance(
         "status": render_report.get("status", "blocked"),
         "fonts": fonts,
         "font_substitutions": substitutions,
+        "source_case_restorations": source_case_restorations,
         "candidate": {
             "files": _artifact_hashes(revision_dir, all_candidate_paths),
             "font_evidence": fonts,

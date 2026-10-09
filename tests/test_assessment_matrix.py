@@ -164,6 +164,7 @@ def test_constructed_schedule_preserves_source_label_case_and_rejects_changed_cl
     consent = next(row for row in matrix.rows if row.cells[0].text.strip() == 'informed consent')
     consent.cells[0].text = 'Informed   consent'
     document.save(path)
+    rendering.restore_protocol_table_label_case(path, source)
     assert not [f for f in quality.deterministic_content_check(tmp_path, source)
                 if f.get('field') == 'procedures.visit_schedule']
     row.cells[0].text = 'qPCR collection at 99 mL'
@@ -173,3 +174,36 @@ def test_constructed_schedule_preserves_source_label_case_and_rejects_changed_cl
     assert defects
     assert all(f['recovery_class'] == 'deterministic_structure_defect'
                and f['owner'] == 'construction' and f['surface'] == 'table' for f in defects)
+
+
+def test_case_restoration_preserves_source_facts_and_cell_design(tmp_path):
+    from docx import Document
+    from docx.oxml.ns import qn
+    import rendering
+
+    root = Path(__file__).resolve().parents[1]
+    source = json.loads((root / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    labels = ['blood pressure in two positions', 'Eye examination', 'As needed assessment',
+              'dose at 5 mg kg^-1 min^-1', 'qPCR collection at 5 mL']
+    source['procedures']['visit_schedule_table'] = []
+    source['procedures']['visit_schedule'] = [{'visit': 'Screening', 'timing': 'Before enrollment', 'procedures': labels}]
+    original = copy.deepcopy(source)
+    rendering.render_documents(root, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'protocol'})
+    path = tmp_path / 'candidate/protocol.docx'
+    document = Document(path)
+    table = next(t for t in document.tables if t.rows[0].cells[0].text.strip() == 'Activity')
+    replacements = ['Blood Pressure in Two Positions', 'eye examination', 'as needed assessment',
+                    'dose at 5 mg Kg^-1 min^-1', 'qPCR collection at 99 mL']
+    for row, replacement in zip(table.rows[2:], replacements):
+        row.cells[0]._tc.find('.//' + qn('w:t')).text = replacement
+        row.cells[0].paragraphs[0].runs[0].bold = True
+    design = [row.cells[0]._tc.find(qn('w:tcPr')).xml for row in table.rows[2:]]
+    runs = [row.cells[0].paragraphs[0].runs[0]._r.rPr.xml for row in table.rows[2:]]
+    document.save(path)
+    restorations = rendering.restore_protocol_table_label_case(path, source)
+    assert len(restorations) == 4
+    table = next(t for t in Document(path).tables if t.rows[0].cells[0].text.strip() == 'Activity')
+    assert [r.cells[0].text for r in table.rows[2:]] == labels[:4] + [replacements[-1]]
+    assert [r.cells[0]._tc.find(qn('w:tcPr')).xml for r in table.rows[2:]] == design
+    assert [r.cells[0].paragraphs[0].runs[0]._r.rPr.xml for r in table.rows[2:]] == runs
+    assert source == original

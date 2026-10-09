@@ -20,6 +20,13 @@ from test_handoff_quality import acceptance_verification
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _restored_rows(contract, rows):
+    restored = copy.deepcopy(rows)
+    for plan in contracts.protocol_table_label_restorations(contract, rows):
+        restored[plan['row']][0] = plan['source']
+    return restored
+
+
 @pytest.mark.parametrize("change", ["presentation", "facts"])
 def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tmp_path, governed_pdfium, monkeypatch, change):
     run = tmp_path / "run"
@@ -28,8 +35,8 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
     source = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text())
     source["procedures"]["visit_schedule_table"] = []
     source["procedures"]["visit_schedule"][0]["procedures"].extend([
-        "demographics", "informed consent", "blood pressure", "as needed assessment",
-        "qPCR collection at 5 mL", "dose at 5 mcg", "heart rate at 60 bpm", "Hb assessment",
+        "demographics", "informed consent", "blood pressure in two positions", "As needed assessment", "Eye examination",
+        "qPCR collection at 5 mL", "dose at 5 mcg", "heart rate at 60 bpm", "Hb assessment", "dose at 5 mg kg^-1 min^-1",
     ])
     reference_path.write_text(json.dumps(source))
     assert workflow.prepare(run)["status"] == "awaiting_approval"
@@ -54,10 +61,11 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
             table = next(t for t in document.tables if t.rows[0].cells[0].text.strip() == "Activity")
             replacements = {
                 "presentation": [("demographics", "Demographics"), ("informed consent", "Informed Consent"),
-                                 ("blood pressure", "Blood pressure"), ("as needed assessment", "As needed assessment")],
+                                 ("blood pressure in two positions", "Blood Pressure in Two Positions"),
+                                 ("As needed assessment", "as needed assessment"), ("Eye examination", "eye examination")],
                 "facts": [("qPCR collection at 5 mL", "qPCR collection at 99 mL"),
                           ("dose at 5 mcg", "dose at 5 Mcg"), ("heart rate at 60 bpm", "heart rate at 60 Bpm"),
-                          ("Hb assessment", "hb assessment")],
+                          ("Hb assessment", "hb assessment"), ("dose at 5 mg kg^-1 min^-1", "dose at 5 mg Kg^-1 min^-1")],
             }[change]
             for label, replacement in replacements:
                 row = next(row for row in table.rows if row.cells[0].text.strip() == label)
@@ -65,11 +73,10 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
             document.save(protocol_path)
             defects = [f for f in quality.deterministic_content_check(revision, source)
                        if f.get("field") == "procedures.visit_schedule"]
-            if change == "presentation":
-                assert defects == []
-            else:
-                assert defects and all(f["owner"] == "construction"
-                                      and f["action"] == "rebuild_deterministic_structure" for f in defects)
+            # Raw altered units/identifiers are never declared equivalent. The
+            # render boundary must restore exact source spelling before review.
+            assert defects and all(f["owner"] == "construction"
+                                  and f["action"] == "rebuild_deterministic_structure" for f in defects)
             assert not (run / "output").exists()
             observed["drafts"] = accepted_bytes()
             observed["mutated"] = True
@@ -104,11 +111,13 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
     state = json.loads((run / "logs/desktop-operation-schedule-replay.json").read_text())
     assert state["deadline_at_epoch"] - state["started_at_epoch"] == 2700
     reconstructions = json.loads(reference_path.read_text()).get("generation", {}).get("deterministic_reconstructions", [])
+    assurance = json.loads(reference_path.read_text())["generation"]["render_assurance"]
     if change == "facts":
         assert any(item["target"] == "evaluation-procedures" and item["outcome"] == "rebuilt"
                    and item["candidate_bytes_changed"] for item in reconstructions)
     else:
         assert reconstructions == []
+        assert len(assurance["source_case_restorations"]) >= 5
     protocol = Document(run / "output/protocol.docx")
     table = next(t for t in protocol.tables if t.rows[0].cells[0].text.strip() == "Activity")
     assert contracts.protocol_table_rows_match(contracts.protocol_table_contracts(source)["schedule-of-assessments"],
@@ -126,20 +135,20 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
 def test_sentence_case_descriptor_is_not_a_clinical_change(label):
     contract = {"section_id": "evaluation-procedures", "header_rows": 1,
                 "rows": [["Activity", "Visit 1"], [label, "X"]]}
-    assert contracts.protocol_table_rows_match(contract, [["Activity", "Visit 1"], [label[0].upper() + label[1:], "X"]])
+    assert contracts.protocol_table_rows_match(contract, _restored_rows(contract, [["Activity", "Visit 1"], [label[0].upper() + label[1:], "X"]]))
 
 
 def test_title_case_descriptive_words_preserve_technical_tokens():
     contract = {"section_id": "evaluation-procedures", "header_rows": 1,
                 "rows": [["Activity", "Visit 1"], ["informed consent and qPCR collection at 5 mL", "X"]]}
-    assert contracts.protocol_table_rows_match(contract,
-        [["Activity", "Visit 1"], ["Informed Consent and qPCR Collection at 5 mL", "X"]])
+    assert contracts.protocol_table_rows_match(contract, _restored_rows(contract,
+        [["Activity", "Visit 1"], ["Informed Consent and qPCR Collection at 5 mL", "X"]]))
 
 
 def test_function_words_are_not_mistaken_for_measurement_units():
     contract = {"section_id": "evaluation-procedures", "header_rows": 1,
                 "rows": [["Activity", "Visit 1"], ["as needed assessment", "X"]]}
-    assert contracts.protocol_table_rows_match(contract, [["Activity", "Visit 1"], ["As needed assessment", "X"]])
+    assert contracts.protocol_table_rows_match(contract, _restored_rows(contract, [["Activity", "Visit 1"], ["As needed assessment", "X"]]))
 
 
 @pytest.mark.parametrize("label,replacement", [("PCR collection", "Pcr collection"),
@@ -177,3 +186,39 @@ def test_clinical_cells_and_source_relationships_remain_exact(rows):
     contract = {"section_id": "evaluation-procedures", "header_rows": 1,
         "rows": [["Activity", "Visit 1", "Visit 2"], ["qPCR collection at 5 mL", "X", ""], ["medical history", "", "X"]]}
     assert not contracts.protocol_table_rows_match(contract, rows)
+
+
+def test_repeated_office_case_mutation_cannot_certify_stale_pages(tmp_path, governed_pdfium):
+    import rendering
+    from test_render_assurance import _bundle, _structural_validation, _write_text_pdf
+
+    source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['procedures']['visit_schedule_table'] = []
+    source['procedures']['visit_schedule'] = [{'visit': 'Screening', 'timing': 'Before enrollment',
+                                             'procedures': ['medical history']}]
+    rendering.render_documents(ROOT, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'protocol'})
+    exports = []
+
+    def export(docx, output_dir, _identity, **_kwargs):
+        document = Document(docx)
+        table = next(t for t in document.tables if t.rows[0].cells[0].text.strip() == 'Activity')
+        from docx.oxml.ns import qn
+        next(table.rows[2].cells[0]._tc.iter(qn('w:t'))).text = 'Medical history'
+        document.save(docx)
+        exports.append(docx.name)
+        pdf = output_dir / 'protocol.pdf'
+        _write_text_pdf(pdf)
+        return pdf
+
+    def pages(*_args, **_kwargs):
+        pytest.fail('Persistently mutated DOCX/PDF pairs must not reach page verification.')
+
+    report = quality.render_assurance(ROOT, tmp_path, source, contracted_bundle=_bundle(),
+        structural_validation=_structural_validation(tmp_path, 'protocol.docx'),
+        renderer_identities=[{'kind': 'LibreOffice', 'path': '/controlled/soffice'}],
+        page_renderer_identities=[governed_pdfium], font_probe=lambda *_args, **_kwargs: (True, 'available'),
+        office_exporter=export, page_exporter=pages, blank_page_detector=lambda _pdf: [])
+    assert report['status'] == 'blocked'
+    assert len(exports) == 4
+    assert report['render'].get('artifacts', []) == []
+    assert all(f['recovery_class'] == 'adapter_fault' for f in report['findings'])
