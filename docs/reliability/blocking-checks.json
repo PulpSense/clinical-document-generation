@@ -2202,7 +2202,7 @@
     {
       "file": "scripts/rendering.py",
       "function": "restore_protocol_table_label_case",
-      "code_sha256": "670b82a00fc76102bf5e1ba18cfdf67d6e5a225516f45eeaca97f1dd8058161d",
+      "code_sha256": "ce1251341e66e5390757b3f889e137d5b49126e70e99c74c5f088a2904d4f876",
       "family": "structured",
       "scope": "shared",
       "role": "helper",

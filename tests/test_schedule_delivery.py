@@ -130,6 +130,51 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
         assert quality.sha256_file(delivered) == item["sha256"]
 
 
+def test_narrative_only_assessments_reach_complete_public_delivery(tmp_path, governed_pdfium):
+    run = tmp_path / 'run'
+    reference_path = run / 'reference/study.reference.json'
+    reference_path.parent.mkdir(parents=True)
+    source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['procedures'].pop('visit_schedule', None)
+    source['procedures'].pop('visit_schedule_table', None)
+    reference_path.write_text(json.dumps(source))
+    assert workflow.prepare(run)['status'] == 'awaiting_approval'
+    assert workflow.approve(run, approved_by='Synthetic narrative assessments')['status'] == 'passed'
+    approval = copy.deepcopy(json.loads(reference_path.read_text())['approval'])
+    revision = run / 'revisions' / approval['revision_id']
+    observed = {'accepted': None}
+
+    def runner(handoffs, _remaining):
+        for handoff in handoffs:
+            request_path = revision / handoff['request_path']
+            request = json.loads(request_path.read_text())
+            if 'verification-requests' in handoff['request_path']:
+                if observed['accepted'] is None:
+                    observed['accepted'] = {p.name: p.read_bytes() for p in (revision / 'hermes/accepted').glob('*.json')}
+                workflow._save_verification_response(revision, request_path, acceptance_verification)
+            else:
+                if observed['accepted'] is not None:
+                    pytest.fail('Narrative assessment fallback must not redispatch accepted prose.')
+                response_path = revision / request['response_path']
+                response_path.parent.mkdir(parents=True, exist_ok=True)
+                response_path.write_text(json.dumps(drafting.recorded_acceptance_response(request)))
+
+    result = workflow.run_desktop_operation(run, handoff_runner=runner,
+        opener=lambda path: Path(path).read_bytes(), operation_id='narrative-assessment-replay',
+        release_identity={'package_fingerprint': 'synthetic-narrative-assessment-test'})
+    assert result['status'] == 'passed', result
+    assert result['delivery']['confirmed']
+    assert sorted(result['client_outputs']) == ['output/icf.docx', 'output/protocol.docx', 'output/study.xml']
+    assert result['desktop_reply']['message'].startswith('Complete verified Branch Document Set delivered.')
+    assert json.loads(reference_path.read_text())['approval'] == approval
+    assert observed['accepted'] == {p.name: p.read_bytes() for p in (revision / 'hermes/accepted').glob('*.json')}
+    assert not json.loads(reference_path.read_text()).get('generation', {}).get('deterministic_reconstructions', [])
+    document = Document(run / 'output/protocol.docx')
+    assert any(t.rows[0].cells[0].text.strip() == 'Approved visit or assessment' for t in document.tables)
+    for name in ('icf.docx', 'protocol.docx', 'study.xml'):
+        assert (run / 'output' / name).read_bytes() == (revision / 'candidate' / name).read_bytes()
+
+
 @pytest.mark.parametrize("label", ["demographics", "medical history", "distance-corrected defocus curve",
                                   "adverse event and device deficiency monitoring", "exit form", "blood pressure"])
 def test_sentence_case_descriptor_is_not_a_clinical_change(label):

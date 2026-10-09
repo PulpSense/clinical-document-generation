@@ -42,6 +42,21 @@ def test_matrix_and_typed_visits_construct_the_same_schedule():
     assert contracts.protocol_table_contracts(matrix)['schedule-of-assessments']['rows'] == contracts.protocol_table_contracts(typed)['schedule-of-assessments']['rows']
 
 
+def test_narrative_assessment_inventory_needs_no_case_restoration(tmp_path):
+    import rendering
+    root = Path(__file__).resolve().parents[1]
+    source = json.loads((root / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['procedures'].pop('visit_schedule', None)
+    source['procedures'].pop('visit_schedule_table', None)
+    assert not contracts.input_findings(source)
+    assert contracts.protocol_table_contracts(source)['schedule-of-assessments']['rows'] == []
+    rendering.render_documents(root, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'protocol'})
+    path = tmp_path / 'candidate/protocol.docx'
+    before = path.read_bytes()
+    assert rendering.restore_protocol_table_label_case(path, source) == []
+    assert path.read_bytes() == before
+
+
 def test_unallocated_matrix_activity_is_retained_without_inventing_a_visit():
     source = copy.deepcopy(CASES[-1]['request']['approved_source'])
     row = {key: '' for key in source['procedures']['assessments'][0]}

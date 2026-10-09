@@ -3656,6 +3656,8 @@ def restore_protocol_table_label_case(path: Path, reference: Mapping[str, Any]) 
     if path.stem != "protocol" or canonical_study_type(get_path(reference, "meta.study_type")) == "Retrospective":
         return []
     contract = protocol_table_contracts(reference)["schedule-of-assessments"]
+    if not contract["rows"]:
+        return []
     document = Document(path)
     tables = [table for table in document.tables if table.rows
               and table.rows[0].cells[0].text.strip() == str(contract["rows"][0][0]).strip()]
