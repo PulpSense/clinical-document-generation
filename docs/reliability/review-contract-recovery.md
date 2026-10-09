@@ -59,3 +59,35 @@ evidence, not a fresh clinical review or publication approval. Synthetic DOCX
 outputs render for all five combinations; changed table, bibliography and count
 surfaces receive local visual checks. Packaging tests require a clean committed
 snapshot and are separate from these assembly fixtures.
+
+## Bibliographic identity at the evidence boundary
+
+The next blocked run exposed a numeric evidence defect: `study.background`
+contained attached citation labels, while the approved bibliography lived in
+`study.references`. The evidence projection previously recognized bibliography
+embedded in the background but lost this separately stored citation authority.
+The quantity check consequently required reference number `3` in participant
+prose. Three distinct attempts could not resolve the conflicting requirements.
+Installation smokes and earlier focused tests did not exercise this combination.
+
+Background comparisons now use approved bibliography identities to distinguish
+explicit citation markers from clinical quantities. Drafting and final-document
+checks normalize both the source evidence and the observed prose: a citation
+cannot impose a clinical quantity requirement or satisfy one. ICF assembly uses
+the same marker recognition, preserves split-run formatting, and retains the
+Protocol bibliography. Bibliography identities derive from the same projection
+that renders the Protocol, including mapped entries, legacy lists, and wrapped
+DOI metadata. Bare numeric brackets remain clinical evidence; a confidence
+interval such as `[1–3]` must never disappear as a guessed citation.
+Unresolved labels remain visible; real quantities and
+clinical qualifications retain their existing checks. Approved source bytes
+and Linux dependencies remain unchanged.
+
+The captured final ICF no longer triggers the citation-only Background defect,
+and all six captured ICF responses pass drafting validation, including the first
+response. Synthetic regression tests cover the five supported branch/template
+combinations, canonical and explicit legacy reference identities, multiple
+marker forms, unresolved labels and ranges, actual missing quantities, and
+citations falsely standing in for a quantity. These replays establish this
+shared defect's correction, not fresh independent clinical/visual approval or
+a completed Hermes delivery.

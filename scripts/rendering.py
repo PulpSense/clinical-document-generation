@@ -27,6 +27,7 @@ from pypdf import PdfReader
 
 from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
+from contracts import bibliographic_citation_spans, protocol_bibliography
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -1731,40 +1732,8 @@ def _normalize_protocol_running_header(document: Document) -> None:
 
 
 def _supplied_protocol_references(reference: Mapping[str, Any]) -> str:
-    """Preserve explicit references and recognizable bibliography in background."""
-    canonical = get_path(reference, "study.references")
-    if isinstance(canonical, list):
-        citations = [_text(item) for item in canonical if _text(item)]
-        if citations:
-            # One list item is one citation, even when its DOI wraps to a new
-            # line. The canonical inventory already owns order and identity.
-            return "\n".join(
-                citation if re.match(r"^\d+[.)]\s", citation) else f"{index}. {citation}"
-                for index, citation in enumerate(citations, 1)
-            )
-    explicit = _text(canonical) or _text(reference.get("references"))
-    background = _text(get_path(reference, "study.background"))
-    heading = re.search(r"(?im)^[ \t]*references?(?:[ \t]*:[ \t]*|[ \t]*$)", background)
-    if heading:
-        embedded = background[heading.end():].strip()
-    else:
-        blocks = re.findall(
-            r"(?m)^[ \t]*\d{1,3}[.)][ \t]+[^\n]+(?:\n(?!(?:[ \t]*\d{1,3}[.)][ \t]+|[ \t]*$))(?:(?:[ \t]+|(?i:doi\s*:|PMID\s*:|https?://))[^\n]+))*",
-            background,
-        )
-        entries = [block for block in blocks if (
-            re.search(r"\b(?:19|20)\d{2}\b", block)
-            and (
-                re.search(r"\bdoi\s*:|https?://(?:dx\.)?doi\.org/|\bPMID\s*:", block, re.I)
-                or (
-                    re.match(r"\s*\d{1,3}[.)]\s+[A-Z][A-Za-z'’\-]+\s+[A-Z]{1,4}\b", block)
-                    and re.search(r"\b(?:19|20)\d{2}\s*;\s*\d+[^\n]*:\s*\d+", block)
-                )
-            )
-        )]
-        embedded = "\n".join(entry.strip() for entry in entries)
-    supplied = list(dict.fromkeys(line.strip() for line in (explicit + "\n" + embedded).splitlines() if line.strip()))
-    return "\n".join(supplied)
+    """Render the shared approved bibliography projection."""
+    return protocol_bibliography(reference)
 
 
 def _ensure_protocol_references(document: Document, authority: Document, reference: Mapping[str, Any]) -> None:
@@ -1808,17 +1777,16 @@ def _normalize_icf_source_displays(document: Document, reference: Mapping[str, A
     replacements = []
     bibliography = _supplied_protocol_references(reference)
     available_citations = set(re.findall(r"(?m)^\s*(\d+)[.)]\s", bibliography))
-    if available_citations:
-        replacements.append((re.compile(r"\s*\(references?\s+\d+(?:\s*(?:,|and|–|-)\s*\d+)*\)", re.I), ""))
     raw_count = _text(get_path(reference, "population.sample_size")).rstrip(". ")
     display_count = sample_size_display(raw_count)
     if raw_count and display_count != raw_count:
         replacements.append((re.compile(re.escape(raw_count)), display_count))
     for paragraph in document.paragraphs:
         matches = sorted(
-            ((match, replacement) for pattern, replacement in replacements for match in pattern.finditer(paragraph.text)
-             if replacement or set(re.findall(r"\d+", match.group())) <= available_citations),
-            key=lambda item: item[0].start(), reverse=True,
+            [(match.start(), match.end(), replacement)
+             for pattern, replacement in replacements for match in pattern.finditer(paragraph.text)]
+            + [(start, end, "") for start, end in bibliographic_citation_spans(paragraph.text, available_citations)],
+            reverse=True,
         )
         if not matches:
             continue
@@ -1827,11 +1795,11 @@ def _normalize_icf_source_displays(document: Document, reference: Mapping[str, A
         for run in paragraph.runs:
             spans.append((offset, offset + len(run.text), run))
             offset += len(run.text)
-        for match, replacement in matches:
+        for match_start, match_end, replacement in matches:
             for start, end, run in reversed(spans):
-                if start < match.end() and end > match.start():
-                    left, right = max(0, match.start() - start), min(end - start, match.end() - start)
-                    inserted = replacement if start <= match.start() < end else ""
+                if start < match_end and end > match_start:
+                    left, right = max(0, match_start - start), min(end - start, match_end - start)
+                    inserted = replacement if start <= match_start < end else ""
                     run.text = run.text[:left] + inserted + run.text[right:]
 
 

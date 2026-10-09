@@ -317,7 +317,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "section_evidence_value",
-      "code_sha256": "fed1c95e1285dc8313e6ab081c82532964d25b1ff08884a01045d2193d52529a",
+      "code_sha256": "b28f639864cc998e8c87dde6bdaf7d1bf3bbe3ca16b363f93061c3cf2d8b95e6",
       "family": "evidence"
     },
     {
@@ -363,13 +363,13 @@
     {
       "file": "scripts/drafting.py",
       "function": "source_evidence_diagnostics",
-      "code_sha256": "ceb87ff99f4af32612c847b4bf99de0824ccd76a6bff025effb7d90d498cb61c",
+      "code_sha256": "d7097b7a60c25e076c870ffdbcee8fdf69a4d737593a4c0d0069be7c67179a3e",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "source_evidence_grounded",
-      "code_sha256": "2bef509e849baed504aa25a7c3779282d3d2133cef1858a99057b61d81bd13dc",
+      "code_sha256": "c6231d3ae0add7be781f2d3a36fe60dc6979032fbc9c72bb8b75791730989482",
       "family": "evidence"
     },
     {
@@ -403,7 +403,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "a14dfde1c8a52de44908e6246b02361ab54cf2ffffc6f5dafc40e3f74280459b",
+      "code_sha256": "82e02f9ab91dcc39319e3c6a3895385a9d0982870472f128694253edaa0f0cae",
       "family": "evidence"
     },
     {
@@ -421,7 +421,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "e0532b96c96977e2e24e9abb65f4928a33393d460381e0c92904d53561f90299",
+      "code_sha256": "f67ab5b0d6a3b43b369b51096a24b9f2145a2db53823d04e22e031b9c149cbb6",
       "family": "evidence"
     },
     {
@@ -661,7 +661,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "077faeecb31ed2bc87e3ceb259d221efe24d9bb2cb64723329f71c5e6f127c7e",
+      "code_sha256": "6d97caf48d1025182b2cadbc9a5d2a31a95800483642f12c70144698b6c3cfc9",
       "family": "clinical"
     },
     {
@@ -683,7 +683,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "773c4725a0045e3345fa537e29a2dbd5f5b65e14a0d02f05de02be33cd22cdf1",
+      "code_sha256": "3f5ddd874a2d47f73c151208102aa488dbfa0b0056b6f22b1b6336ff6acba31b",
       "family": "clinical"
     },
     {
@@ -866,7 +866,7 @@
       "family": "structured",
       "file": "scripts/rendering.py",
       "function": "_supplied_protocol_references",
-      "code_sha256": "cc04cc7847f78b83223f18a6b5954e7def7c04374d43bc38e925d1309179bb8c",
+      "code_sha256": "191633247a880ee65071dfb78365c976ac4ee6168ce9b5ea94b5772725c5c1b2",
       "behavioral_evidence": {
         "valid": [
           "test_shared_output_projection.py::test_multiline_bibliography_entries_keep_their_citation_numbers"
@@ -880,7 +880,7 @@
       "family": "structured",
       "file": "scripts/rendering.py",
       "function": "_normalize_icf_source_displays",
-      "code_sha256": "3905f3e2e5f650d4b670db57a4cdb2a1e5a8bde8e488796278e458a44c9cf1ea",
+      "code_sha256": "10d96eeff33252640820df4b6ecc5f80d1aef4a8d1161df973375afe51841ec2",
       "behavioral_evidence": {
         "valid": [
           "test_shared_output_projection.py::test_citation_cleanup_preserves_split_run_formatting_and_clinical_qualification"
@@ -1242,6 +1242,76 @@
         ],
         "invalid": [
           "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "bibliography_reference_ids",
+      "code_sha256": "aa4a108c921d9039c94782372fcab758d4bb5b4717ff64bc6b1d4f1a81172472",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_missing_real_quantity_still_blocks_final_background"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "bibliographic_citation_spans",
+      "code_sha256": "154faa2d723f08ea3bb7a896e1f4c53d127bd205ba600fce9c4e2781a301d7fc",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_missing_real_quantity_still_blocks_final_background"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_clinical_evidence_text",
+      "code_sha256": "4c5d246a4cbce70cf7075e3222395d2c8dc53e81ccdbf0d24afaddbf3efe6023",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_missing_real_quantity_still_blocks_final_background"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "_bibliography_text",
+      "code_sha256": "5313a5111d83d4bf76d08939b576801b295cfa730e0083ff68b9ecf72d0ffb11",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_explicit_bibliography_identity_is_shared_with_icf_assembly"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_square_bracket_clinical_interval_is_preserved_and_its_loss_blocks"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "protocol_bibliography",
+      "code_sha256": "70b6ecdeb71243acdf11a5dca419da6eaed7e29e85deff2f0c5d81c776e3f6bd",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_explicit_bibliography_identity_is_shared_with_icf_assembly"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_square_bracket_clinical_interval_is_preserved_and_its_loss_blocks"
         ]
       }
     }

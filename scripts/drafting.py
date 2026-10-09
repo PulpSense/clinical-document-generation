@@ -26,6 +26,9 @@ from contracts import (
     BatchSpec,
     SectionSpec,
     batch_plan,
+    bibliographic_citation_spans,
+    bibliography_reference_ids,
+    protocol_bibliography,
     canonical_study_type,
     contracted_template_bundle,
     contextual_clinical_boilerplate,
@@ -685,28 +688,20 @@ def _canonical_evidence_refs(request: Mapping[str, Any], refs: Iterable[Any]) ->
     ]
 
 
-def _clinical_evidence_text(value: str) -> str:
+def _clinical_evidence_text(value: str, reference: Mapping[str, Any] | None = None) -> str:
     """Exclude identified bibliography entries and their inline reference labels."""
-    heading = re.search(r"\bReferences?\s*:\s*", value, re.I)
-    entries = list(re.finditer(
-        r"(?m)^\s*(\d{1,3})[.)]\s+"
-        r"(?=[^\n]*(?i:\bdoi\s*:|https?://(?:dx\.)?doi\.org/|\bPMID\s*:))"
-        r"(?=[^\n]*\b(?:19|20)\d{2}\b)"
-        r"[A-Z][A-Za-z'’\-]+\s+(?:[A-Z]{1,4}\b|et al\.)[^\n]*",
-        value,
-    ))
-    starts = ([heading.start()] if heading else []) + [m.start() for m in entries]
-    if not starts:
-        return value
-    clinical = value[:min(starts)].strip()
-    reference_ids = {m.group(1) for m in entries}
-    if reference_ids:
-        def remove_label(match: re.Match[str]) -> str:
-            ids = set(re.findall(r"\d+", match.group(2)))
-            return match.group(1) if ids <= reference_ids else match.group(0)
-        clinical = re.sub(
-            r"([A-Za-z][.!?])(\d+(?:\s*,\s*\d+)*)(?=\s|$)", remove_label, clinical,
-        )
+    embedded_source = {"study": {"background": value}}
+    embedded = protocol_bibliography(embedded_source)
+    clinical = value
+    if embedded:
+        heading = re.search(r"\bReferences?\s*:\s*|(?im:^[ \t]*references?[ \t]*$)", value)
+        first_entry = re.search(r"(?m)^[ \t]*" + re.escape(embedded.splitlines()[0]), value)
+        start = heading.start() if heading else first_entry.start() if first_entry else None
+        if start is not None:
+            clinical = value[:start].strip()
+    reference_ids = bibliography_reference_ids(embedded_source) | bibliography_reference_ids(reference or {})
+    for start, end in reversed(bibliographic_citation_spans(clinical, reference_ids)):
+        clinical = clinical[:start] + clinical[end:]
     return clinical
 
 
@@ -738,7 +733,7 @@ def section_evidence_value(section_id: str, path: str, value: Any, reference: Ma
             for record in value
         ]
     if path == "study.background" and isinstance(value, str) and section_id in {"introduction", "icf.background"}:
-        clinical = _clinical_evidence_text(value)
+        clinical = _clinical_evidence_text(value, reference)
         # Proposal backgrounds often include objectives and the planned study
         # design. Those clauses remain available to their owning sections,
         # but must not impose endpoint numbers on clinical context/rationale.
@@ -1267,8 +1262,13 @@ def _quantity_claim_issues(content: str, value: Any) -> list[dict[str, str]]:
     return issues
 
 
-def source_evidence_diagnostics(content: str, path: str, value: Any, *, all_items: bool = False) -> dict[str, Any]:
+def source_evidence_diagnostics(content: str, path: str, value: Any, *, all_items: bool = False,
+                                reference: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Shared draft/render decision and actionable feedback, never release approval."""
+    if path == "study.background" and isinstance(value, str):
+        reference = reference if reference is not None else {"study": {"background": value}}
+        value = _clinical_evidence_text(value, reference)
+        content = _clinical_evidence_text(content, reference)
     if semantic_evidence_contract(path, value):
         issues = hypothesis_claim_issues(content, value)
         report = {
@@ -1286,9 +1286,10 @@ def source_evidence_diagnostics(content: str, path: str, value: Any, *, all_item
     return {**report, "source_path": path, "release_acceptance": False}
 
 
-def source_evidence_grounded(content: str, path: str, value: Any, *, all_items: bool = False) -> bool:
+def source_evidence_grounded(content: str, path: str, value: Any, *, all_items: bool = False,
+                             reference: Mapping[str, Any] | None = None) -> bool:
     """Check deterministic anchors, deferring declared narrative meaning to review."""
-    return bool(source_evidence_diagnostics(content, path, value, all_items=all_items)["passed"])
+    return bool(source_evidence_diagnostics(content, path, value, all_items=all_items, reference=reference)["passed"])
 
 
 def lexical_evidence_uncertainty(diagnostics: Iterable[Mapping[str, Any]]) -> bool:
@@ -1455,14 +1456,14 @@ def _coverage_findings(
         findings: list[dict[str, Any]] = []
         source_value = request.get("approved_source")
         source: Mapping[str, Any] = source_value if isinstance(source_value, Mapping) else {}
-        background = section_evidence_value(section_id, "study.background", get_path(source, "study.background"))
+        background = section_evidence_value(section_id, "study.background", get_path(source, "study.background"), source)
         if "source:study.background" not in set(map(str, evidence_refs)):
             findings.append({
                 "category": "drafting", "field": section_id,
                 "issue": "Introduction does not cite the approved background.",
                 "next_action": "Summarize the approved clinical context and evidence gap from study.background.",
             })
-        elif background and not evidence_grounded(content, background):
+        elif background and not source_evidence_grounded(content, "study.background", background, reference=source):
             findings.append({
                 "category": "drafting", "field": section_id,
                 "issue": "Introduction cites the background without conveying its concrete clinical context.",
@@ -1636,14 +1637,14 @@ def _coverage_findings(
                     )
                     and re.search(r"\bdescriptiv(?:e|ely)\b", content, re.I)
                 )
-                and not source_evidence_grounded(content, path, value)
+                and not source_evidence_grounded(content, path, value, reference=source)
             ]
             if ungrounded:
                 # Brief references do not own the source's full methods or
                 # timeline. Independent review assesses meaning when only
                 # lexical anchors are uncertain; quantities remain blocking.
                 diagnostics = [
-                    source_evidence_diagnostics(content, path, material[path])
+                    source_evidence_diagnostics(content, path, material[path], reference=source)
                     for path in ungrounded
                 ]
                 lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
@@ -1696,12 +1697,12 @@ def _coverage_findings(
         and not (
             _timeline_grounded(content, value)
             if section_id == "icf.duration" and path == "study.timeline"
-            else source_evidence_grounded(content, path, value, all_items=all_items)
+            else source_evidence_grounded(content, path, value, all_items=all_items, reference=approved_source)
         )
     ]
     if ungrounded:
         diagnostics = [
-            source_evidence_diagnostics(content, path, material[path], all_items=all_items)
+            source_evidence_diagnostics(content, path, material[path], all_items=all_items, reference=approved_source)
             if not (section_id == "icf.duration" and path == "study.timeline")
             else {"source_path": path, "source_excerpt": material[path], "passed": False,
                   "validation_mode": "phase_bound_timeline", "release_acceptance": False}
@@ -2237,6 +2238,8 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     "next_action": "Return one concise block for each ordered summary_concepts value.",
                 })
             else:
+                source_value = request.get("approved_source")
+                summary_source = source_value if isinstance(source_value, Mapping) else {}
                 source_values = {
                     str(source.get("path")): source.get("value")
                     for source in request.get("approved_input", [])
@@ -2268,8 +2271,8 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                             # This participant summary owns follow-up duration, not
                             # recruitment and analysis phases from the same field.
                             value = _approved_followup_value(value)
-                            return bool(value) and source_evidence_grounded(text, path, value)
-                        return source_evidence_grounded(text, path, value)
+                            return bool(value) and source_evidence_grounded(text, path, value, reference=summary_source)
+                        return source_evidence_grounded(text, path, value, reference=summary_source)
 
                     if cited_sources and not any(
                         cited_fact_is_observable(ref) for ref in cited_sources

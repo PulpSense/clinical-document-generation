@@ -4241,7 +4241,7 @@ def validate_sterling_clause_contract(
             (
                 re.search(r"\b(?:no|not|without|will not|none)\b", text) is not None
                 if isinstance(value, str) and value.strip().casefold() == "none"
-                else source_evidence_grounded(raw_sections.get(section, ""), path, value)
+                else source_evidence_grounded(raw_sections.get(section, ""), path, value, reference=normalized_source)
             )
             for path, value in authority_records
         ]
@@ -4291,7 +4291,7 @@ def validate_sterling_clause_contract(
                 })
             continue
 
-        grounding_diagnostics = [source_evidence_diagnostics(raw_sections.get(section, ""), path, value)
+        grounding_diagnostics = [source_evidence_diagnostics(raw_sections.get(section, ""), path, value, reference=normalized_source)
                                  for (path, value), passed in zip(authority_records, grounding_results)
                                  if not passed]
         if (has_body and exact_ok and sources_ok and block_ok
@@ -4326,7 +4326,7 @@ def validate_sterling_clause_contract(
                 "sterling-clause-weakened",
                 source_fidelity_details=semantic_issues,
                 evidence_diagnostics=[
-                    source_evidence_diagnostics(raw_sections.get(section, ""), path, value)
+                    source_evidence_diagnostics(raw_sections.get(section, ""), path, value, reference=normalized_source)
                     for (path, value), passed in zip(authority_records, grounding_results)
                     if not passed
                 ],
@@ -4334,7 +4334,7 @@ def validate_sterling_clause_contract(
                 missing_source_values=[value for value in source_values if value not in text],
                 ungrounded_source_paths=[
                     path for path, value in authority_records
-                    if not source_evidence_grounded(raw_sections.get(section, ""), path, value)
+                    if not source_evidence_grounded(raw_sections.get(section, ""), path, value, reference=normalized_source)
                     and not (isinstance(value, str) and value.strip().casefold() == "none" and re.search(r"\b(?:no|not|without|will not|none)\b", text))
                 ],
                 contradiction=contradiction,
@@ -4787,14 +4787,14 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             and not source_evidence_grounded(
                 content, path,
                 section_evidence_value(section.section_id, path, get_path(reference, path), reference),
-                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other",
+                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other", reference=reference,
             )
         ]
         if ungrounded_paths:
             diagnostics = [source_evidence_diagnostics(
                 content, path,
                 section_evidence_value(section.section_id, path, get_path(reference, path), reference),
-                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other",
+                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other", reference=reference,
             ) for path in ungrounded_paths]
             findings.append({
                 "category": "content",

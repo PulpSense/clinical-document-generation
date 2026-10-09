@@ -887,6 +887,94 @@ def contextual_clinical_boilerplate(
     return result
 
 
+def _bibliography_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        text = value.strip()
+        link = re.fullmatch(r"\[([^\]]+)\]\((?:mailto:)?[^)]+\)", text, re.I)
+        return link.group(1).strip() if link else text
+    if isinstance(value, (int, float)):
+        return str(value)
+    if isinstance(value, Mapping):
+        for key in ("text", "label", "measure", "name", "title", "description"):
+            if meaningful(value.get(key)):
+                return _bibliography_text(value[key])
+        return ""
+    if isinstance(value, Iterable):
+        return "\n".join(part for item in value if (part := _bibliography_text(item)))
+    return str(value).strip()
+
+
+def protocol_bibliography(reference: Mapping[str, Any]) -> str:
+    """Preserve explicit references and recognizable bibliography in background."""
+    canonical = get_path(reference, "study.references")
+    if isinstance(canonical, list):
+        citations = [_bibliography_text(item) for item in canonical if _bibliography_text(item)]
+        if citations:
+            # One list item is one citation, even when its DOI wraps to a new
+            # line. The canonical inventory already owns order and identity.
+            return "\n".join(
+                citation if re.match(r"^\d+[.)]\s", citation) else f"{index}. {citation}"
+                for index, citation in enumerate(citations, 1)
+            )
+    explicit = _bibliography_text(canonical) or _bibliography_text(reference.get("references"))
+    background = _bibliography_text(get_path(reference, "study.background"))
+    heading = re.search(r"\bReferences?\s*:\s*|(?im:^[ \t]*references?[ \t]*$)", background)
+    if heading:
+        embedded = background[heading.end():].strip()
+    else:
+        blocks = re.findall(
+            r"(?m)^[ \t]*\d{1,3}[.)][ \t]+[^\n]+(?:\n(?!(?:[ \t]*\d{1,3}[.)][ \t]+|[ \t]*$))(?:(?:[ \t]+|(?i:doi\s*:|PMID\s*:|https?://))[^\n]+))*",
+            background,
+        )
+        entries = [block for block in blocks if (
+            re.search(r"\b(?:19|20)\d{2}\b", block)
+            and (
+                re.search(r"\bdoi\s*:|https?://(?:dx\.)?doi\.org/|\bPMID\s*:", block, re.I)
+                or (
+                    re.match(r"\s*\d{1,3}[.)]\s+[A-Z][A-Za-z'’\-]+\s+[A-Z]{1,4}\b", block)
+                    and re.search(r"\b(?:19|20)\d{2}\s*;\s*\d+[^\n]*:\s*\d+", block)
+                )
+            )
+        )]
+        embedded = "\n".join(entry.strip() for entry in entries)
+    supplied = list(dict.fromkeys(line.strip() for line in (explicit + "\n" + embedded).splitlines() if line.strip()))
+    return "\n".join(supplied)
+
+
+def bibliography_reference_ids(reference: Mapping[str, Any]) -> set[str]:
+    """Use the same bibliography identity that Protocol assembly publishes."""
+    return set(re.findall(r"(?m)^\s*(\d+)[.)]\s", protocol_bibliography(reference)))
+
+
+def bibliographic_citation_spans(text: str, reference_ids: set[str]) -> list[tuple[int, int]]:
+    """Locate explicit citation markers whose every label has bibliography authority.
+
+    Bare numbers and ordinary parentheses can be clinical quantities. Only
+    attached sentence citations and named reference markers
+    are projected away; unresolved labels remain observable for review.
+    """
+    identifiers = r"\d+(?:\s*(?:,|and|–|-)\s*\d+)*"
+    pattern = re.compile(
+        rf"(?<=[A-Za-z][.!?])(?P<attached>{identifiers})(?=\s|$)"
+        rf"|\s*\(references?\s+(?P<named>{identifiers})\)"
+        rf"|\s*\[references?\s+(?P<bracket>{identifiers})\]", re.I,
+    )
+    spans = []
+    for match in pattern.finditer(text):
+        labels = next(value for value in match.groups() if value is not None)
+        ids = set(re.findall(r"\d+", labels))
+        ranges = re.findall(r"(\d+)\s*[–-]\s*(\d+)", labels)
+        if any(int(last) < int(first) or int(last) - int(first) > 1000 for first, last in ranges):
+            continue
+        for first, last in ranges:
+            ids.update(str(number) for number in range(int(first), int(last) + 1))
+        if ids <= reference_ids:
+            spans.append(match.span())
+    return spans
+
+
 def sterling_clause_contract(repo_root: Path | None = None) -> dict[str, Any]:
     """Load and minimally validate the governed Sterling language contract."""
     root = (repo_root or Path(__file__).resolve().parents[1]).resolve()
@@ -2755,7 +2843,7 @@ __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES", "STERLING_CLAUSE_CONTRACT_VERSION", "STERLING_CLAUSE_CONTRACT_RESOURCE",
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
-    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "contextual_clinical_boilerplate", "country_name_aliases", "document_set",
+    "batch_plan", "protocol_bibliography", "bibliographic_citation_spans", "bibliography_reference_ids", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "contextual_clinical_boilerplate", "country_name_aliases", "document_set",
     "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
 ]

@@ -30,6 +30,7 @@ TEST_FILES = (
     'test_owner_aware_recovery.py', 'test_review_resolutions.py', 'test_shared_output_projection.py',
     'test_editorial_publication.py', 'test_phase1_repetition.py',
     'test_contextual_output_fixes.py',
+    'test_bibliographic_evidence.py',
 )
 
 
@@ -52,7 +53,9 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_leaf_texts', '_grounding_tokens', '_evidence_diagnostics',
                 'evidence_grounded', 'source_evidence_diagnostics', 'source_evidence_grounded',
                 'hypothesis_claim_issues', '_timeline_grounded', '_material_source',
-                'section_evidence_value', 'semantic_evidence_contract', 'assessment_matrix',
+                'section_evidence_value', '_clinical_evidence_text', 'bibliography_reference_ids',
+                '_bibliography_text', 'protocol_bibliography',
+                'bibliographic_citation_spans', 'semantic_evidence_contract', 'assessment_matrix',
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
                 '_matrix_visit_alias', '_schedule_activity_identity', 'lexical_evidence_uncertainty',
                 '_lexical_review_cautions', '_reviewed_lexical_warnings', '_review_evidence_text', '_quantity_claim_issues', '_uncertainty_rule_sha256',
