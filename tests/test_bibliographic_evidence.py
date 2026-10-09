@@ -12,6 +12,15 @@ import rendering
 from test_shared_output_projection import ROOT, COMBINATIONS, source_for
 
 
+def assert_background_requires_quantity_review(findings):
+    rows = [row for row in findings if row.get('clause_id') == 'sterling.background.context']
+    assert rows and all(row.get('publication_disposition') == 'warning' for row in rows)
+    assert any(value.get('missing_numbers') for row in rows
+               for diagnostic in row.get('evidence_diagnostics', [])
+               for value in diagnostic.get('unobserved_values', []))
+
+
+
 def reference(branch='Prospective', family='Sterling'):
     source = source_for(branch, family)
     source['study']['background'] = 'Earlier research described improved visual outcomes.3'
@@ -49,15 +58,16 @@ def test_known_citation_styles_are_metadata_in_final_background(marker):
 
 
 @pytest.mark.parametrize('quantity', ['3 months', '0.3 mL', '66 cm', '120 participants'])
-def test_missing_real_quantity_still_blocks_final_background(quantity):
+def test_unobserved_clinical_quantity_requires_final_background_review(quantity):
     source = reference()
     source['study']['background'] = f'Earlier research described improved visual outcomes at {quantity}.3'
     document = Document()
     document.add_heading('BACKGROUND', level=1)
     document.add_paragraph('Earlier research described improved visual outcomes.')
     findings = quality.validate_sterling_clause_contract(document, source)['findings']
-    assert any(f.get('clause_id') == 'sterling.background.context'
-               and f.get('publication_disposition') != 'warning' for f in findings)
+    # Missing token evidence must reach review; it cannot establish clinical
+    # equivalence or be silently erased by bibliography normalization.
+    assert_background_requires_quantity_review(findings)
 
 
 @pytest.mark.parametrize('marker', ['.3', ' [reference 3]', ' (reference 3)'])
@@ -68,8 +78,9 @@ def test_citation_cannot_satisfy_a_missing_clinical_quantity(marker):
     document.add_heading('BACKGROUND', level=1)
     document.add_paragraph('Earlier research described improved visual outcomes' + marker)
     findings = quality.validate_sterling_clause_contract(document, source)['findings']
-    assert any(f.get('clause_id') == 'sterling.background.context'
-               and f.get('publication_disposition') != 'warning' for f in findings)
+    # Missing token evidence must reach review; it cannot establish clinical
+    # equivalence or be silently erased by bibliography normalization.
+    assert_background_requires_quantity_review(findings)
 
 
 def test_unresolved_citation_number_is_not_silently_discarded():
@@ -79,8 +90,9 @@ def test_unresolved_citation_number_is_not_silently_discarded():
     document.add_heading('BACKGROUND', level=1)
     document.add_paragraph('Earlier research described improved visual outcomes.')
     findings = quality.validate_sterling_clause_contract(document, source)['findings']
-    assert any(f.get('clause_id') == 'sterling.background.context'
-               and f.get('publication_disposition') != 'warning' for f in findings)
+    # Missing token evidence must reach review; it cannot establish clinical
+    # equivalence or be silently erased by bibliography normalization.
+    assert_background_requires_quantity_review(findings)
 
 
 @pytest.mark.parametrize('bibliography', [
@@ -123,8 +135,9 @@ def test_embedded_bibliography_citation_cannot_replace_a_clinical_quantity():
     document.add_heading('BACKGROUND', level=1)
     document.add_paragraph('Earlier research described improved visual outcomes.3')
     findings = quality.validate_sterling_clause_contract(document, source)['findings']
-    assert any(f.get('clause_id') == 'sterling.background.context'
-               and f.get('publication_disposition') != 'warning' for f in findings)
+    # Missing token evidence must reach review; it cannot establish clinical
+    # equivalence or be silently erased by bibliography normalization.
+    assert_background_requires_quantity_review(findings)
 
 
 def test_citation_range_requires_every_bibliographic_identity():
@@ -135,8 +148,9 @@ def test_citation_range_requires_every_bibliographic_identity():
     document.add_heading('BACKGROUND', level=1)
     document.add_paragraph('Earlier research described improved visual outcomes.')
     findings = quality.validate_sterling_clause_contract(document, source)['findings']
-    assert any(f.get('clause_id') == 'sterling.background.context'
-               and f.get('publication_disposition') != 'warning' for f in findings)
+    # Missing token evidence must reach review; it cannot establish clinical
+    # equivalence or be silently erased by bibliography normalization.
+    assert_background_requires_quantity_review(findings)
 
 
 @pytest.mark.parametrize('branch,family', COMBINATIONS[1:])
@@ -156,7 +170,7 @@ def test_icf_assembly_omits_known_citations_and_keeps_real_quantities(tmp_path, 
     assert source == original
 
 
-def test_square_bracket_clinical_interval_is_preserved_and_its_loss_blocks(tmp_path):
+def test_square_bracket_clinical_interval_is_preserved_and_its_loss_requires_review(tmp_path):
     source = reference()
     source['study']['background'] = 'Prior research reported a mean difference of 2 points with confidence interval [1–3].'
     target = {'paragraphs': [{'text': source['study']['background']}], 'lists': []}
@@ -168,8 +182,9 @@ def test_square_bracket_clinical_interval_is_preserved_and_its_loss_blocks(tmp_p
         if '[1–3]' in paragraph.text:
             paragraph.text = paragraph.text.replace('[1–3]', '')
     findings = quality.validate_sterling_clause_contract(document, source)['findings']
-    assert any(f.get('clause_id') == 'sterling.background.context'
-               and f.get('publication_disposition') != 'warning' for f in findings)
+    # Missing token evidence must reach review; it cannot establish clinical
+    # equivalence or be silently erased by bibliography normalization.
+    assert_background_requires_quantity_review(findings)
 
 
 @pytest.mark.parametrize('branch,family', COMBINATIONS)

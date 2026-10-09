@@ -179,11 +179,12 @@ def test_sterling_meaning_preserving_term_proxy_requests_review(tmp_path):
     purpose = [row for row in findings if row['clause_id'] == 'sterling.purpose.study-purpose']
     assert purpose
     assert all(row.get('publication_disposition') == 'warning' for row in purpose)
-    # Quantities still have deterministic authority even when term proxies differ.
+    # Different clinical wording does not prove quantity-role identity; it must
+    # be assessed against the approved facts, not cleared by token matching.
     for paragraph in doc.paragraphs:
         paragraph.text = paragraph.text.replace('66 cm', '65 cm')
     findings = quality.validate_sterling_clause_contract(doc, SOURCE)['findings']
-    assert any(row.get('publication_disposition') != 'warning' for row in findings)
+    assert any(row.get('publication_disposition') == 'warning' and row.get('evidence_diagnostics') for row in findings)
 
 
 def test_explicit_quantity_sign_change_is_not_a_paraphrase():

@@ -196,9 +196,107 @@
   "checks": [
     {
       "file": "scripts/contracts.py",
+      "function": "narrative_review_finding",
+      "code_sha256": "bb69ed5976cdfa5abfe97924d9966b42cef21865b0658e81b284cbf7780495fe",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "finding_requires_repair",
+      "code_sha256": "b341bff686a8b720bbf981f61e77b6eb86b62ee10a11c33fbb5d38dc6202cef1",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
       "function": "_fidelity_evidence",
       "code_sha256": "78a60eb6fe5f35c9c63ee1837c2228b70090f1d716cb5d27c916da21294dbf61",
       "family": "evidence"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "contextual_clinical_boilerplate",
+      "code_sha256": "d560c7c02db78a219b3db8386b6e6c250fda95ef99c4847412de45ac2cabc766",
+      "family": "clinical",
+      "behavioral_evidence": {
+        "valid": [
+          "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
+        ],
+        "invalid": [
+          "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "_bibliography_text",
+      "code_sha256": "5313a5111d83d4bf76d08939b576801b295cfa730e0083ff68b9ecf72d0ffb11",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_explicit_bibliography_identity_is_shared_with_icf_assembly"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_square_bracket_clinical_interval_is_preserved_and_its_loss_requires_review"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "protocol_bibliography",
+      "code_sha256": "70b6ecdeb71243acdf11a5dca419da6eaed7e29e85deff2f0c5d81c776e3f6bd",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_explicit_bibliography_identity_is_shared_with_icf_assembly"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_square_bracket_clinical_interval_is_preserved_and_its_loss_requires_review"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "bibliography_reference_ids",
+      "code_sha256": "aa4a108c921d9039c94782372fcab758d4bb5b4717ff64bc6b1d4f1a81172472",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_unobserved_clinical_quantity_requires_final_background_review"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "bibliographic_citation_spans",
+      "code_sha256": "154faa2d723f08ea3bb7a896e1f4c53d127bd205ba600fce9c4e2781a301d7fc",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_unobserved_clinical_quantity_requires_final_background_review"
+        ]
+      }
     },
     {
       "file": "scripts/contracts.py",
@@ -316,6 +414,20 @@
     },
     {
       "file": "scripts/drafting.py",
+      "function": "_clinical_evidence_text",
+      "code_sha256": "4c5d246a4cbce70cf7075e3222395d2c8dc53e81ccdbf0d24afaddbf3efe6023",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
+        ],
+        "invalid": [
+          "test_bibliographic_evidence.py::test_unobserved_clinical_quantity_requires_final_background_review"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
       "function": "section_evidence_value",
       "code_sha256": "b28f639864cc998e8c87dde6bdaf7d1bf3bbe3ca16b363f93061c3cf2d8b95e6",
       "family": "evidence"
@@ -353,11 +465,19 @@
     {
       "file": "scripts/drafting.py",
       "function": "_quantity_claim_issues",
-      "code_sha256": "c9c892ea50b09783851f5b358df980408d451c00cbfc88a4e7b5187120403aad",
+      "code_sha256": "793c747c0ee8ab03120977b8ea91deb977363a6e327298758acf0188af8c088d",
       "family": "evidence",
       "authority_contract": {
         "authority": "objective",
         "requirement": "Preserve signs and case-sensitive units in explicitly supplied unambiguous clinical quantities."
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_narrative_quantity_representation_reaches_independent_review"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_unambiguous_quantity_changes_still_require_correction"
+        ]
       }
     },
     {
@@ -376,10 +496,32 @@
       "family": "evidence",
       "file": "scripts/drafting.py",
       "function": "lexical_evidence_uncertainty",
-      "code_sha256": "b89a253b293e362dbb103b2b5aac14ee82b8280970aa2a3d35ab1854cff58fe6",
+      "code_sha256": "b85b055ee047cd716f529193a0f4040db28c8d02a888c5cc59e3096f6e85e73d",
       "authority_contract": {
         "authority": "uncertainty",
         "resolution_authority": "independent_source_grounded_review"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "evidence_coverage_finding",
+      "code_sha256": "93e0f6113dc346a48fb0472e3c00ce8b98a9eb709c47ae8c465321ebe8e4bb74",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
       }
     },
     {
@@ -403,8 +545,30 @@
     {
       "file": "scripts/drafting.py",
       "function": "_coverage_findings",
-      "code_sha256": "82e02f9ab91dcc39319e3c6a3895385a9d0982870472f128694253edaa0f0cae",
-      "family": "evidence"
+      "code_sha256": "3b0a35ffbe6f975da7370eb22833ffa693cc45014b0a7cf066d7f3393511c1be",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_source_coverage_findings",
+      "code_sha256": "b8bb74a4b275b03e20830235284f58de1aa32fb10f689d6979f185a4a6621c10",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
     },
     {
       "file": "scripts/drafting.py",
@@ -421,14 +585,30 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "f67ab5b0d6a3b43b369b51096a24b9f2145a2db53823d04e22e031b9c149cbb6",
-      "family": "evidence"
+      "code_sha256": "05458f26c1b0f45e31388d3daa87e96849f4500db0be619c0a888306bb2da49a",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_prs_uncertainty_is_bound_to_xml_and_resolved_before_clean_delivery"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_ineffective_or_cycling_quantity_repairs_never_publish"
+        ]
+      }
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "83d03965a26b50b060e0f3a161119bd7258870a5649455692bc3586dcd7e8577",
-      "family": "evidence"
+      "code_sha256": "f27dcb55bbc8869ae69a98e2c3a3cbce1340a15b896f341656ea62ed623a25f2",
+      "family": "evidence",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
     },
     {
       "file": "scripts/drafting.py",
@@ -465,6 +645,20 @@
         ],
         "invalid": [
           "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
+        ]
+      }
+    },
+    {
+      "file": "scripts/prs_xml.py",
+      "function": "_person_degrees",
+      "code_sha256": "af68f3ad2d32a89b47c3bb8fddcc6f3e4d2f7ad6aa6b57bac56026b0670a69c2",
+      "family": "structured",
+      "behavioral_evidence": {
+        "valid": [
+          "test_contextual_output_fixes.py::test_xml_credentials_are_separate_from_job_titles"
+        ],
+        "invalid": [
+          "test_contextual_output_fixes.py::test_xml_degree_corruption_remains_detectable"
         ]
       }
     },
@@ -527,6 +721,20 @@
         "invalid": [
           "test_review_contract_root_causes.py::test_evidence_construction_failure_is_returned_to_its_owner",
           "test_offline_reliability_gate.py::test_review_evidence_blocker_routing_changes_are_audited"
+        ]
+      }
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "branch_acceptance_source",
+      "code_sha256": "a3e54a323592c7c27f4ea0f42d49e2ff53dbb9dcd547a5603fb7c5188c5e5510",
+      "family": "installation",
+      "behavioral_evidence": {
+        "valid": [
+          "test_clean_delivery.py::test_delivery_matrix_has_five_actual_families_and_distinct_profiles"
+        ],
+        "invalid": [
+          "test_clean_delivery.py::test_delivery_matrix_rejects_mislabeled_or_unconfined_source"
         ]
       }
     },
@@ -634,12 +842,6 @@
     },
     {
       "file": "scripts/quality.py",
-      "function": "_retrospective_lexical_coverage_finding",
-      "code_sha256": "7f3c4831aca01eaf6adb31cec390cd577a7c9fe618140544059cf7d096801be3",
-      "family": "clinical"
-    },
-    {
-      "file": "scripts/quality.py",
       "function": "audit_computed_protocol_fields",
       "code_sha256": "563a0ffb11820efb34d494a3b2f2d3d9aabfacf3e3403137e252c9767547abea",
       "family": "structured"
@@ -683,8 +885,16 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "3f5ddd874a2d47f73c151208102aa488dbfa0b0056b6f22b1b6336ff6acba31b",
-      "family": "clinical"
+      "code_sha256": "62c4ea39da6a370830e86fb8f3786e6ca6afd3e96f8e6745574bc74a6d83a6b5",
+      "family": "clinical",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
     },
     {
       "file": "scripts/quality.py",
@@ -712,21 +922,23 @@
     },
     {
       "file": "scripts/quality.py",
-      "function": "_is_publication_warning",
-      "code_sha256": "d7a47892a679361098897905791e4e67e3cceadf10770102de0d1c9b8280c94c",
-      "family": "review"
-    },
-    {
-      "file": "scripts/quality.py",
       "function": "_accepted_drafting_warnings",
-      "code_sha256": "aa14627074ba796c5adc5aa59e9259adc55edf39cf3b43b810aa3c1df7b48f6c",
-      "family": "review"
+      "code_sha256": "0738a5bd69958fd7bf009128188a3561919a9b6a6b5684468f60feb4a2ad8da5",
+      "family": "review",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+        ]
+      }
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "dff037f22f931517e46f235424240eeb1aa232a507da4dc4a3922156aa5fd640",
+      "code_sha256": "92482c94ba20f29dbce0743c9432404737478bd92f161902708d268de2dfcab2",
       "authority_contract": {
         "authority": "mixed",
         "resolution_authority": "independent_source_grounded_review",
@@ -735,10 +947,10 @@
       },
       "behavioral_evidence": {
         "valid": [
-          "test_review_contract_root_causes.py::test_generated_summary_is_available_to_section_review"
+          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
         ],
         "invalid": [
-          "test_review_contract_root_causes.py::test_empty_section_evidence_is_rejected_before_dispatch"
+          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
         ]
       }
     },
@@ -1152,8 +1364,16 @@
     {
       "file": "scripts/workflow.py",
       "function": "_repeated_drafting_findings",
-      "code_sha256": "e4210dea139a2f4c1601b4992068a388f71c81fa411a8915bd4c0de1fa04503b",
-      "family": "recovery"
+      "code_sha256": "1566faefc86aad132de47fc5935bb4462fa5da0b0400cb04be276cd1ca7c4d39",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_materially_improving_repairs_finish_despite_unchanged_finding_text"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_ineffective_or_cycling_quantity_repairs_never_publish"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1196,8 +1416,16 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_release_gate",
-      "code_sha256": "ccf6ba058bf9c2b92b10b1064f8f2c9082bebac422ab81f8e9f9a9e6d333c111",
-      "family": "installation"
+      "code_sha256": "cda9aa863fe94c365912c6d0057d414d51bb75c43c17792e1711c95f00d69ce7",
+      "family": "installation",
+      "behavioral_evidence": {
+        "valid": [
+          "test_clean_delivery.py::test_delivery_matrix_has_five_actual_families_and_distinct_profiles"
+        ],
+        "invalid": [
+          "test_clean_delivery.py::test_delivery_matrix_rejects_mislabeled_or_unconfined_source"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1216,104 +1444,6 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
-    },
-    {
-      "file": "scripts/prs_xml.py",
-      "function": "_person_degrees",
-      "code_sha256": "af68f3ad2d32a89b47c3bb8fddcc6f3e4d2f7ad6aa6b57bac56026b0670a69c2",
-      "family": "structured",
-      "behavioral_evidence": {
-        "valid": [
-          "test_contextual_output_fixes.py::test_xml_credentials_are_separate_from_job_titles"
-        ],
-        "invalid": [
-          "test_contextual_output_fixes.py::test_xml_degree_corruption_remains_detectable"
-        ]
-      }
-    },
-    {
-      "file": "scripts/contracts.py",
-      "function": "contextual_clinical_boilerplate",
-      "code_sha256": "d560c7c02db78a219b3db8386b6e6c250fda95ef99c4847412de45ac2cabc766",
-      "family": "clinical",
-      "behavioral_evidence": {
-        "valid": [
-          "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
-        ],
-        "invalid": [
-          "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
-        ]
-      }
-    },
-    {
-      "file": "scripts/contracts.py",
-      "function": "bibliography_reference_ids",
-      "code_sha256": "aa4a108c921d9039c94782372fcab758d4bb5b4717ff64bc6b1d4f1a81172472",
-      "family": "evidence",
-      "behavioral_evidence": {
-        "valid": [
-          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
-        ],
-        "invalid": [
-          "test_bibliographic_evidence.py::test_missing_real_quantity_still_blocks_final_background"
-        ]
-      }
-    },
-    {
-      "file": "scripts/contracts.py",
-      "function": "bibliographic_citation_spans",
-      "code_sha256": "154faa2d723f08ea3bb7a896e1f4c53d127bd205ba600fce9c4e2781a301d7fc",
-      "family": "evidence",
-      "behavioral_evidence": {
-        "valid": [
-          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
-        ],
-        "invalid": [
-          "test_bibliographic_evidence.py::test_missing_real_quantity_still_blocks_final_background"
-        ]
-      }
-    },
-    {
-      "file": "scripts/drafting.py",
-      "function": "_clinical_evidence_text",
-      "code_sha256": "4c5d246a4cbce70cf7075e3222395d2c8dc53e81ccdbf0d24afaddbf3efe6023",
-      "family": "evidence",
-      "behavioral_evidence": {
-        "valid": [
-          "test_bibliographic_evidence.py::test_sterling_background_does_not_require_an_approved_citation_numeral"
-        ],
-        "invalid": [
-          "test_bibliographic_evidence.py::test_missing_real_quantity_still_blocks_final_background"
-        ]
-      }
-    },
-    {
-      "file": "scripts/contracts.py",
-      "function": "_bibliography_text",
-      "code_sha256": "5313a5111d83d4bf76d08939b576801b295cfa730e0083ff68b9ecf72d0ffb11",
-      "family": "evidence",
-      "behavioral_evidence": {
-        "valid": [
-          "test_bibliographic_evidence.py::test_explicit_bibliography_identity_is_shared_with_icf_assembly"
-        ],
-        "invalid": [
-          "test_bibliographic_evidence.py::test_square_bracket_clinical_interval_is_preserved_and_its_loss_blocks"
-        ]
-      }
-    },
-    {
-      "file": "scripts/contracts.py",
-      "function": "protocol_bibliography",
-      "code_sha256": "70b6ecdeb71243acdf11a5dca419da6eaed7e29e85deff2f0c5d81c776e3f6bd",
-      "family": "evidence",
-      "behavioral_evidence": {
-        "valid": [
-          "test_bibliographic_evidence.py::test_explicit_bibliography_identity_is_shared_with_icf_assembly"
-        ],
-        "invalid": [
-          "test_bibliographic_evidence.py::test_square_bracket_clinical_interval_is_preserved_and_its_loss_blocks"
-        ]
-      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

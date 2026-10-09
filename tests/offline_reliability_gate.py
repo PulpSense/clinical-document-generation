@@ -30,7 +30,7 @@ TEST_FILES = (
     'test_owner_aware_recovery.py', 'test_review_resolutions.py', 'test_shared_output_projection.py',
     'test_editorial_publication.py', 'test_phase1_repetition.py',
     'test_contextual_output_fixes.py',
-    'test_bibliographic_evidence.py',
+    'test_bibliographic_evidence.py', 'test_clean_delivery.py', 'test_general_delivery_reliability.py',
 )
 
 
@@ -51,6 +51,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
             strings = {item.value for item in ast.walk(node) if isinstance(item, ast.Constant) and isinstance(item.value, str)}
             shared_helpers = {
                 '_leaf_texts', '_grounding_tokens', '_evidence_diagnostics',
+                'branch_acceptance_source', 'finding_requires_repair', 'evidence_coverage_finding',
                 'evidence_grounded', 'source_evidence_diagnostics', 'source_evidence_grounded',
                 'hypothesis_claim_issues', '_timeline_grounded', '_material_source',
                 'section_evidence_value', '_clinical_evidence_text', 'bibliography_reference_ids',
@@ -100,7 +101,7 @@ def audit_findings(root: Path = ROOT) -> list[str]:
                       if isinstance(key, ast.Constant) and isinstance(value, ast.Constant)}
             code = str(values.get('code') or '')
             if (any(token in code for token in ('lexical', 'repetition', 'word-goal'))
-                    and values.get('publication_disposition') == 'blocking'):
+                    and values.get('publication_disposition', 'blocking') != 'warning'):
                 findings.append(f'Unjustified lexical publication veto: {path.relative_to(root)}:{node.lineno}')
     for item in audit['checks']:
         family = audit.get('families', {}).get(item.get('family'), {})

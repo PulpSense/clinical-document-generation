@@ -31,7 +31,7 @@ def test_all_items_reports_the_missing_item_only():
     assert detail['unobserved_values'][0]['missing_numbers'] == ['66']
 
 
-def test_public_drafting_rejection_carries_concrete_retry_diagnostics():
+def test_public_drafting_uncertainty_carries_concrete_source_diagnostics():
     import copy
     import json
     from pathlib import Path
@@ -40,7 +40,8 @@ def test_public_drafting_rejection_carries_concrete_retry_diagnostics():
     for paragraph in case['response']['section_results'][0]['paragraphs']:
         paragraph['text'] = paragraph['text'].replace('66 cm', 'far away')
     accepted, findings = drafting.validate_response(case['request'], case['response'])
-    assert not accepted['drafts']
+    assert accepted['drafts']
+    assert all(row.get('publication_disposition') == 'warning' for row in findings)
     details = [detail for item in findings for detail in item.get('evidence_diagnostics', [])]
     assert any('66' in value.get('missing_numbers', []) for detail in details for value in detail['unobserved_values'])
 

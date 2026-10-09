@@ -43,7 +43,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 
 
@@ -7936,13 +7936,35 @@ def _repeated_drafting_findings(
             attempt = int((attempts or {}).get(target, 1))
             previous = last.get(target, {})
             prior_keys = set(previous.get("keys") or [])
+            # Progress concerns unresolved evidence, not repeated issue prose or
+            # cosmetic changes to a candidate. A strict subset demonstrates that
+            # a material defect disappeared without introducing another one.
+            defects = set()
+            for finding, identity, key in rows:
+                if key not in keys:
+                    continue
+                for diagnostic in finding.get("evidence_diagnostics") or []:
+                    path = str(diagnostic.get("source_path") or "")
+                    for issue in diagnostic.get("quantity_issues") or []:
+                        defects.add(canonical_evidence_sha256({"path": path, "quantity": issue}))
+                    for value in diagnostic.get("unobserved_values") or []:
+                        for number in value.get("missing_numbers") or []:
+                            defects.add(canonical_evidence_sha256({"path": path, "source": value.get("source_excerpt"), "missing_number": number}))
+                        if value.get("required_polarity"):
+                            defects.add(canonical_evidence_sha256({"path": path, "source": value.get("source_excerpt"), "polarity": value["required_polarity"]}))
+            previous_defects = set(previous.get("best_evidence_defects") or previous.get("evidence_defects") or [])
+            best_defects = defects if keys != prior_keys or not previous_defects else previous_defects
+            if previous_defects and defects and defects < previous_defects:
+                best_defects = defects
+                for key in keys:
+                    history.pop(key, None)
             if attempt not in {previous.get("attempt"), int(previous.get("attempt") or 0) + 1}:
                 for key in prior_keys:
                     history.pop(key, None)
             else:
                 for key in prior_keys - keys:
                     history.pop(key, None)
-            last[target] = {"attempt": attempt, "keys": sorted(keys)}
+            last[target] = {"attempt": attempt, "keys": sorted(keys), "evidence_defects": sorted(defects), "best_evidence_defects": sorted(best_defects)}
     for finding, identity, key in rows:
         sets = history.setdefault(key, [])
         epoch = (
@@ -9339,29 +9361,8 @@ def run_release_gate(
             study_type = str(case["study_type"]); richness = str(case["profile"]).split("-", 1)[0]
             run_dir = root / str(case["fixture_id"])
             if not (run_dir / REFERENCE).is_file():
-                reference = _read(repo_root / str(corpus_item["source_path"]))
-                reference["meta"]["protocol_number"] = f"{study_type[:3].upper()}-{richness}-26"; reference["study"]["title"] = str(case.get("study_title") or f"{study_type} {richness} acceptance study"); reference["study"]["short_title"] = str(case.get("study_short_title") or f"{study_type} {richness} acceptance")
-                if study_type != "Retrospective":
-                    reference["meta"]["icf_template"] = str(case.get("icf_template") or reference["meta"].get("icf_template") or ("Sterling" if richness == "rich" else "Advarra"))
-                if richness == "rich":
-                    reference["study"]["background"] = f"{reference['study']['background'].rstrip('.')} with extended follow-up."
-                    reference["study"]["timeline"] = "6 months"
-                    reference["procedures"]["assessments"] = list(reference["procedures"].get("assessments", [])) + ["Extended follow-up assessment"]
-                    reference["procedures"]["visit_schedule_table"] = list(reference["procedures"].get("visit_schedule_table", [])) + [{"visitNumber": "4", "visitName": "Month 6", "visitWindow": "±14 days", "CRFnumber": "CRF-04"}]
-                    reference["population"]["sample_size"] = "80 participants"
-                    for item in reference["population"].get("sample_size_evidence", []):
-                        if isinstance(item, dict): item["value"] = "80 participants"
-                    for item in reference.get("statistics", {}).get("sample_size_evidence", []):
-                        if isinstance(item, dict): item["value"] = "80 participants"
-                    if study_type != "Retrospective":
-                        reference["endpoints"].setdefault("other", []).extend([{"label": "Extended follow-up outcome", "time_point": "Month 6"}, {"label": "Participant experience outcome", "time_point": "Month 6"}])
-                        reference["design"]["interventions"] = [{"name": "Sentinel Patch", "type": "Device", "description": "Primary monitoring configuration.", "arm_group_label": "Primary cohort"}, {"name": "Sentinel Patch Extended", "type": "Device", "description": "Extended monitoring configuration.", "arm_group_label": "Extended cohort"}]
-                        reference["design"]["arms"] = [{"name": "Primary cohort", "description": "Primary observational cohort."}, {"name": "Extended cohort", "description": "Extended observational cohort."}]
-                    if reference.get("sites"):
-                        second_site = copy.deepcopy(reference["sites"][0]); second_site["facility"]["name"] = "Site Two"; second_site["contact"]["name"] = "Taylor Coordinator"; second_site["contact"]["email"] = "taylor@example.org"; second_site["investigators"][0]["name"] = "Morgan Investigator"
-                        reference["sites"].append(second_site); reference["design"]["number_of_sites"] = 2
-                        reference["design"]["study_design"] = str(reference["design"]["study_design"]).replace("single-center", "multicenter")
-                reference["approval"] = {"status": "draft"}; _write(run_dir / REFERENCE, reference)
+                reference = branch_acceptance_source(repo_root, corpus_item)
+                _write(run_dir / REFERENCE, reference)
                 first = prepare(run_dir)
                 if first.get("status") != "awaiting_approval": results.append({"case": run_dir.name, "status": "failed", "result": first}); continue
                 approval = approve(run_dir, approved_by="Recorded Acceptance")

@@ -1,0 +1,267 @@
+{
+  "synthetic": true,
+  "study_type": "Ambispective",
+  "icf_template": "Advarra",
+  "source": {
+    "meta": {
+      "study_type": "Ambispective",
+      "document_set": [
+        "protocol_docx",
+        "icf_docx",
+        "xml"
+      ],
+      "protocol_number": "SYN-ROBUST-3",
+      "version": "1.0",
+      "date": "21 Aug 2026",
+      "icf_template": "Advarra"
+    },
+    "approval": {
+      "status": "draft"
+    },
+    "source": {
+      "source_of_truth_file": "reference/source.md",
+      "field_candidates": {}
+    },
+    "study": {
+      "title": "Respiratory Recovery Following Asthma Exacerbation",
+      "timeline": "3 months",
+      "short_title": "Asthma Recovery Cohort",
+      "background": "Clinical records describe symptoms during acute asthma exacerbations. Less is known about patient reported recovery after discharge.",
+      "hypothesis": "Observed outcomes may change during routine care; this observational study does not establish treatment superiority."
+    },
+    "population": {
+      "study_population": "Adults discharged after an asthma exacerbation.",
+      "sample_size": "40 participants",
+      "sample_justification": "Descriptive estimates with expected attrition.",
+      "minimum_age": "18 Years",
+      "maximum_age": "80 Years",
+      "inclusion_criteria": [
+        "Adults discharged after an asthma exacerbation."
+      ],
+      "exclusion_criteria": [
+        "Records or planned follow-up information unavailable."
+      ],
+      "sample_size_evidence": [
+        {
+          "evidence": "Planned sample",
+          "value": "40 participants",
+          "source": "Approved source"
+        }
+      ]
+    },
+    "parties": {
+      "sponsor": {
+        "name": "PulpSense Research",
+        "address": "1 Research Way"
+      },
+      "principal_investigator": {
+        "name": "Alex Investigator",
+        "title": "MD"
+      },
+      "sub_investigators": "None",
+      "irb": {
+        "name": "Example IRB",
+        "affiliation": "Independent",
+        "phone": "555-0100",
+        "email": "irb@example.org",
+        "address": "1 Review Way"
+      },
+      "study_coordinator": {
+        "name": "Jordan Coordinator",
+        "title": "CRC",
+        "business_phone": "555-0101",
+        "office_phone": "555-0102",
+        "email": "jordan@example.org"
+      }
+    },
+    "sites": [
+      {
+        "facility": {
+          "name": "Site One"
+        },
+        "contact": {
+          "name": "Jordan Coordinator",
+          "email": "jordan@example.org"
+        },
+        "investigators": [
+          {
+            "name": "Alex Investigator",
+            "degrees": "MD"
+          }
+        ]
+      }
+    ],
+    "design": {
+      "study_design": "Ambispective, single-center observational cohort study of routine care.",
+      "number_of_sites": 1,
+      "masking": "None",
+      "arms": [
+        {
+          "name": "Routine care cohort",
+          "description": "Adults discharged after an asthma exacerbation."
+        }
+      ],
+      "intervention_name": "Respiratory symptom questionnaire and clinical record review",
+      "intervention_type": "Other"
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "label": "Respiratory symptom score",
+          "time_point": "Month 3"
+        }
+      ],
+      "secondary": [
+        {
+          "label": "Unscheduled respiratory care visits",
+          "time_point": "Month 3"
+        }
+      ]
+    },
+    "procedures": {
+      "assessments": [
+        "Respiratory symptom questionnaire and clinical record review"
+      ],
+      "retention": "Reminder calls support follow-up.",
+      "discontinuation": "Participants may withdraw at any time.",
+      "replacement": "No replacement participants are planned.",
+      "visit_schedule_table": [
+        {
+          "visitNumber": "1",
+          "visitName": "Baseline",
+          "visitWindow": "Day 0",
+          "CRFnumber": "BL"
+        },
+        {
+          "visitNumber": "2",
+          "visitName": "Month 1",
+          "visitWindow": "Day 30 +/- 7",
+          "CRFnumber": "M1"
+        },
+        {
+          "visitNumber": "3",
+          "visitName": "Month 3",
+          "visitWindow": "Day 90 +/- 7",
+          "CRFnumber": "M3"
+        }
+      ],
+      "visit_schedule": [
+        {
+          "visit": "Baseline",
+          "timing": "Day 0",
+          "procedures": [
+            "Respiratory symptom questionnaire and clinical record review"
+          ]
+        },
+        {
+          "visit": "Month 1",
+          "timing": "Day 30 +/- 7",
+          "procedures": [
+            "Respiratory symptom questionnaire and clinical record review"
+          ]
+        },
+        {
+          "visit": "Month 3",
+          "timing": "Day 90 +/- 7",
+          "procedures": [
+            "Respiratory symptom questionnaire and clinical record review"
+          ]
+        }
+      ],
+      "minimum_days_before_screening_without_participation": 30
+    },
+    "safety": {
+      "roles": "The investigator assesses and reports safety events."
+    },
+    "risks_benefits": {
+      "risks": "Record review creates privacy risks and questionnaires may cause inconvenience.",
+      "benefits": "No direct benefit is guaranteed.",
+      "injury_handling": "Research-related concerns will be reported to the investigator.",
+      "privacy": "Records will be stored confidentially.",
+      "compensation_or_reimbursement": "No compensation is planned."
+    },
+    "template_fields": {
+      "data_driven_tables": {
+        "sample_size_evidence": {
+          "columns": [
+            {
+              "key": "evidence",
+              "label": "Evidence"
+            },
+            {
+              "key": "value",
+              "label": "Value"
+            },
+            {
+              "key": "source",
+              "label": "Source"
+            }
+          ],
+          "rows": [
+            {
+              "evidence": "Planned sample",
+              "value": "40",
+              "source": "Approved source"
+            }
+          ]
+        }
+      }
+    },
+    "statistics": {
+      "analysis_plan": "Continuous scores will be summarized using medians and interquartile ranges. Categorical outcomes will be summarized using counts and percentages. No hypothesis tests are planned.",
+      "sample_size_evidence": [
+        {
+          "evidence": "Planned sample",
+          "value": "40 participants",
+          "source": "Approved source"
+        }
+      ]
+    },
+    "objectives": {
+      "primary": "Characterize respiratory recovery in adults after an asthma exacerbation.",
+      "secondary": []
+    },
+    "regulatory": {
+      "prs": {
+        "study_type": "Observational",
+        "observational_study_design": "Cohort",
+        "study_uid": "S000H9K100000098"
+      }
+    }
+  },
+  "drafts": {
+    "introduction": {
+      "text": "Hospital charts document breathing problems during asthma attacks. Patients experiences of recuperation after leaving hospital remain poorly understood.",
+      "evidence_refs": [
+        "source:study.background"
+      ]
+    },
+    "objectives": {
+      "text": "Describe how breathing improves in grown patients following an acute asthma attack.",
+      "evidence_refs": [
+        "source:objectives.primary"
+      ]
+    },
+    "analysis-plan.methodology": {
+      "text": "Summarize numeric outcomes with the median and interquartile range, and categorical outcomes with frequencies and proportions. The analysis remains descriptive without hypothesis testing.",
+      "evidence_refs": [
+        "source:statistics.analysis_plan",
+        "source:endpoints.primary",
+        "source:endpoints.secondary"
+      ]
+    },
+    "icf.procedures": {
+      "text": "Study assessments involve respiratory symptom questionnaire and clinical record review at Baseline on Day 0, Month 1 on Day 30 with a seven day window, and Month 3 on Day 90 with a seven day window. Eligible adults are 18 to 80 years old. Adults discharged after an asthma exacerbation. Records or planned follow-up information must be available. You must not have taken part in another study during the ninety days before screening.",
+      "evidence_refs": [
+        "source:procedures.assessments",
+        "source:procedures.visit_schedule",
+        "source:population.inclusion_criteria",
+        "source:population.exclusion_criteria",
+        "source:population.minimum_age",
+        "source:population.maximum_age",
+        "source:procedures.minimum_days_before_screening_without_participation"
+      ]
+    }
+  },
+  "prs_objective": "Describe how breathing improves in grown patients following an acute asthma attack."
+}

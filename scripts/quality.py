@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import copy
 import hashlib
 import hmac
 import importlib
@@ -32,8 +33,8 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
-from drafting import accepted_cross_section_duplicate_findings, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, country_name_aliases, document_set, finding_requires_repair, get_path, icf_contract, icf_retained_sections, meaningful, narrative_review_finding, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
+from drafting import accepted_cross_section_duplicate_findings, evidence_coverage_finding, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 
@@ -69,6 +70,7 @@ VISUAL_CHECKS = (
     "excessive_whitespace", "artificial_pagination",
 )
 UNCERTAINTY_CODES = {
+    "narrative-review-uncertainty",
     "lexical-evidence-uncertainty", "icf-lexical-evidence-uncertainty",
     "retrospective-lexical-evidence-uncertainty", "icf-summary-grounding-review",
     "protocol-concept-repetition", "protocol-exact-repetition", "icf-concept-repetition",
@@ -180,6 +182,43 @@ def branch_acceptance_inventory(repo_root: Path) -> tuple[dict[str, Any], ...]:
     if case_ids != DETERMINISTIC_BRANCH_ACCEPTANCE_CASES:
         raise ValueError("Branch Acceptance Corpus does not match the canonical ten-case inventory.")
     return tuple(inventory)
+
+
+def branch_acceptance_source(repo_root: Path, corpus_item: Mapping[str, Any]) -> dict[str, Any]:
+    """Materialize the effective source shared by every corpus lifecycle runner."""
+    case = corpus_item["descriptor"]
+    study_type = str(case["study_type"])
+    richness = str(case["profile"]).split("-", 1)[0]
+    source_path = (repo_root / str(corpus_item["source_path"])).resolve()
+    if not source_path.is_relative_to(repo_root.resolve()):
+        raise ValueError("Branch Acceptance Corpus source escapes the repository.")
+    reference = json.loads(source_path.read_text(encoding="utf-8"))
+    if get_path(reference, "meta.study_type") != study_type:
+        raise ValueError("Branch Acceptance Corpus descriptor and source study types disagree.")
+    reference["meta"]["protocol_number"] = f"{study_type[:3].upper()}-{richness}-26"; reference["study"]["title"] = str(case.get("study_title") or f"{study_type} {richness} acceptance study"); reference["study"]["short_title"] = str(case.get("study_short_title") or f"{study_type} {richness} acceptance")
+    if study_type != "Retrospective":
+        reference["meta"]["icf_template"] = str(case.get("icf_template") or reference["meta"].get("icf_template") or ("Sterling" if richness == "rich" else "Advarra"))
+    if richness == "rich":
+        reference["study"]["background"] = f"{reference['study']['background'].rstrip('.')} with extended follow-up."
+        reference["study"]["timeline"] = "6 months"
+        reference["procedures"]["assessments"] = list(reference["procedures"].get("assessments", [])) + ["Extended follow-up assessment"]
+        reference["procedures"]["visit_schedule_table"] = list(reference["procedures"].get("visit_schedule_table", [])) + [{"visitNumber": "4", "visitName": "Month 6", "visitWindow": "±14 days", "CRFnumber": "CRF-04"}]
+        reference["population"]["sample_size"] = "80 participants"
+        for item in reference["population"].get("sample_size_evidence", []):
+            if isinstance(item, dict): item["value"] = "80 participants"
+        for item in reference.get("statistics", {}).get("sample_size_evidence", []):
+            if isinstance(item, dict): item["value"] = "80 participants"
+        if study_type != "Retrospective":
+            reference["endpoints"].setdefault("other", []).extend([{"label": "Extended follow-up outcome", "time_point": "Month 6"}, {"label": "Participant experience outcome", "time_point": "Month 6"}])
+            reference["design"]["interventions"] = [{"name": "Sentinel Patch", "type": "Device", "description": "Primary monitoring configuration.", "arm_group_label": "Primary cohort"}, {"name": "Sentinel Patch Extended", "type": "Device", "description": "Extended monitoring configuration.", "arm_group_label": "Extended cohort"}]
+            reference["design"]["arms"] = [{"name": "Primary cohort", "description": "Primary observational cohort."}, {"name": "Extended cohort", "description": "Extended observational cohort."}]
+        if reference.get("sites"):
+            second_site = copy.deepcopy(reference["sites"][0]); second_site["facility"]["name"] = "Site Two"; second_site["contact"]["name"] = "Taylor Coordinator"; second_site["contact"]["email"] = "taylor@example.org"; second_site["investigators"][0]["name"] = "Morgan Investigator"
+            reference["sites"].append(second_site); reference["design"]["number_of_sites"] = 2
+            reference["design"]["study_design"] = str(reference["design"]["study_design"]).replace("single-center", "multicenter")
+    reference["approval"] = {"status": "draft"}
+    return reference
+
 GOVERNED_GATE_SEQUENCE = (
     "clinical_fidelity",
     "content_completeness_consistency",
@@ -3896,35 +3935,18 @@ def _timeline_covered(approved_timeline: Any, visible_text: Any) -> bool:
 def _retrospective_lexical_coverage_finding(
     approved: Any, visible_text: str, *, field: str, issue: str,
 ) -> dict[str, Any] | None:
-    """Keep a paraphrase from becoming a retry loop; retain missing numbers as blockers."""
+    """Use the shared evidence policy for retrospective narrative coverage."""
     expected = re.sub(r"\s+", " ", _text(approved)).strip().casefold().rstrip(".")
     visible = re.sub(r"\s+", " ", visible_text).strip().casefold()
     if not expected or expected in visible:
         return None
     diagnostic = source_evidence_diagnostics(visible, field, approved, all_items=True)
-    missing_numbers = sorted({
-        str(number)
-        for value in diagnostic.get("unobserved_values", [])
-        for number in value.get("missing_numbers", [])
-    })
-    finding: dict[str, Any] = {
-        "category": "content", "field": field, "target_ids": [field],
-        "issue": issue,
-    }
-    if missing_numbers:
-        finding["missing_numbers"] = missing_numbers
-        return finding
-    return {
-        **finding,
-        "code": "retrospective-lexical-evidence-uncertainty",
-        "publication_disposition": "warning",
-        "action": "manual_review",
-        "issue": (
-            "Automated text matching could not confirm the approved wording; "
-            "independent content review must assess whether the fact is present."
-        ),
-        "source_excerpt": _text(approved),
-    }
+    if diagnostic["passed"]:
+        # Different spelling with observable coverage is not itself a defect.
+        return None
+    return {**evidence_coverage_finding(field, [diagnostic], issue,
+        "Preserve the demonstrated approved value.", category="content"),
+        "source_excerpt": _text(approved)}
 
 
 def audit_computed_protocol_fields(document: Path | Document, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -4807,12 +4829,12 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             })
     benefits_text = "\n".join(section_paragraphs.get("risks-benefits.benefits", []))
     if re.search(r"\b(?:compensat\w*|reimburs\w*|payment\w*)\b|\$\s*\d", benefits_text, re.I):
-        findings.append({
+        findings.append(narrative_review_finding({
             "category": "content",
             "field": "risks-benefits.benefits",
             "target_ids": ["risks-benefits.benefits"],
             "issue": "Protocol benefits section includes payment or reimbursement terms owned by Section 17.",
-        })
+        }))
     concept_findings = assess_protocol_concept_repetition(
         section_paragraphs,
         protocol_concept_ownership(branch),
@@ -4952,10 +4974,13 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             screening_interval = screening_interval_requirement(reference)
             day_count = screening_interval.days if screening_interval else minimum_days
             day_pattern = re.compile(rf"\b{re.escape(day_count)}\s*[- ]?\s*days?\b", re.I)
-            if not day_pattern.search(visible):
-                findings.append({"category": "content", "field": "subjects.inclusion", "target_ids": ["subjects.inclusion"], "issue": "Protocol omits the approved minimum interval without participation in another study before screening."})
-            if not day_pattern.search(icf_visible):
-                findings.append({"category": "content", "field": "icf.procedures", "target_ids": ["icf.procedures"], "issue": "ICF omits the approved minimum interval without participation in another study before screening."})
+            for target, passage in (("subjects.inclusion", visible), ("icf.procedures", icf_visible)):
+                if not day_pattern.search(passage):
+                    findings.append(evidence_coverage_finding(target, [source_evidence_diagnostics(
+                        passage, "procedures.minimum_days_before_screening_without_participation", minimum_days,
+                        reference=reference,
+                    )], "Screening interval wording needs source-grounded assessment.",
+                        "Preserve the approved interval without study participation before screening.", category="content"))
             xml_path = revision_dir / "candidate/study.xml"
             if xml_path.is_file():
                 repo_root = Path(__file__).resolve().parents[1]
@@ -5760,7 +5785,7 @@ def pending_verifications(revision_dir: Path) -> list[Path]:
 
 
 def _is_publication_warning(finding: Mapping[str, Any]) -> bool:
-    return finding.get("publication_disposition") == "warning"
+    return not finding_requires_repair(finding)
 
 
 def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -5787,6 +5812,11 @@ def _accepted_drafting_warnings(revision_dir: Path, reference: Mapping[str, Any]
         values = record.get("warnings")
         if isinstance(values, list):
             warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
+        narrative = record.get("narrative")
+        if isinstance(narrative, Mapping):
+            for item in narrative.values():
+                if isinstance(item, Mapping) and isinstance(item.get("warnings"), list):
+                    warnings.extend(_warning_findings(value for value in item["warnings"] if isinstance(value, Mapping)))
     if reference is not None and any((revision_dir / "hermes/accepted").glob("*.json")):
         root = Path(__file__).resolve().parents[1]
         warnings.extend(accepted_cross_section_duplicate_findings(
@@ -5812,8 +5842,8 @@ def _lexical_review_cautions(
             continue
         identity = canonical_evidence_sha256(warning)
         section = str((warning.get("target_ids") or [warning.get("field") or ""])[0])
-        artifact = "icf" if section.startswith("icf.") or section == "icf.docx" else "protocol"
-        path = revision_dir / f"candidate/{artifact}.docx"
+        artifact = "study.xml" if section.startswith("prs.") else "icf" if section.startswith("icf.") or section == "icf.docx" else "protocol"
+        path = revision_dir / ("candidate/study.xml" if artifact == "study.xml" else f"candidate/{artifact}.docx")
         if section.endswith(".docx") and path.is_file():
             matches = [(row["section_id"], _review_evidence_text(
                 rendered_section_snapshot(path, row["section_id"])))
@@ -5823,7 +5853,11 @@ def _lexical_review_cautions(
                                     and warning["affected_passage"] in row[1]),
                                    key=lambda row: len(row[1]), default=None)
             section = matching_section[0] if matching_section else f"{artifact}.shell"
-        passage = rendered_section_snapshot(path, section) if path.is_file() else []
+        if artifact == "study.xml" and path.is_file():
+            tag = section.split(".", 1)[1].replace("-", "_")
+            passage = [{"paragraph": ET.parse(str(path)).findtext(f".//{tag}/textblock") or ""}]
+        else:
+            passage = rendered_section_snapshot(path, section) if path.is_file() else []
         if not any(key in row and _review_evidence_text(row[key]).strip()
                    for row in passage for key in ("paragraph", "table")):
             raise ReviewEvidenceError(artifact, section)
@@ -5832,7 +5866,12 @@ def _lexical_review_cautions(
             section_specs = list(icf_contract(str(get_path(reference, "meta.study_type") or ""),
                                              str(get_path(reference, "meta.icf_template") or "Advarra")))
         spec = next((item for item in section_specs if item.section_id == section), None)
-        source_evidence = warning.get("evidence_diagnostics") or warning.get("source_excerpt")
+        diagnostics = warning.get("evidence_diagnostics")
+        source_evidence = ({
+            "approved_facts": {str(row["source_path"]): get_path(reference, str(row["source_path"]))
+                               for row in diagnostics if isinstance(row, Mapping) and row.get("source_path")},
+            "diagnostics": diagnostics,
+        } if diagnostics else warning.get("source_excerpt"))
         if not source_evidence:
             source_evidence = {key: get_path(reference, key) for key in spec.evidence} if spec else reference
         template_excerpt = ""

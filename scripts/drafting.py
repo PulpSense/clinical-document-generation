@@ -15,6 +15,7 @@ import math
 import re
 import unicodedata
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -33,6 +34,8 @@ from contracts import (
     contracted_template_bundle,
     contextual_clinical_boilerplate,
     get_path,
+    finding_requires_repair,
+    narrative_review_finding,
     icf_contract,
     icf_summary_obligations,
     meaningful,
@@ -1244,9 +1247,20 @@ def hypothesis_claim_issues(content: str, value: Any) -> list[str]:
 
 
 def _quantity_claim_issues(content: str, value: Any) -> list[dict[str, str]]:
-    """Detect explicit sign or unit-case changes in an unambiguous supplied quantity."""
-    pattern = re.compile(r"(?<![\w.])([+-]?\d+(?:\.\d+)?)\s*(mL|mg|ug|µg|mcg|kg|mm|cm|kPa|mmHg|IU|mIU|L)\b", re.I)
-    source = [match.groups() for leaf in _leaf_texts(value) for match in pattern.finditer(leaf)]
+    """Detect physical quantity substitutions in a directly matched source relation."""
+    pattern = re.compile(r"(?<![\w.])([+-]?\d+(?:\.\d+)?)\s*(mL|mg|ug|µg|mcg|kg|mm|cm|kPa|mmHg|IU|mIU|L|g|m)\b", re.I)
+    leaves = _leaf_texts(value)
+    def relation(text: str) -> str:
+        return re.sub(r"\s+", " ", pattern.sub("<quantity>", text)).strip().casefold().rstrip(" .!?;")
+    observed_relation = relation(content)
+    bound = [leaf for leaf in leaves if pattern.search(leaf)
+             and re.search(r"[a-z]", relation(leaf).replace("<quantity>", ""))
+             and relation(leaf) in observed_relation]
+    # Quantity substitution has objective authority only in an observable same
+    # relation. A matching numeral or dimension elsewhere may have another role.
+    if not bound:
+        return []
+    source = [match.groups() for leaf in bound for match in pattern.finditer(leaf)]
     issues = []
     for number, unit in pattern.findall(content):
         expected = {(float(source_number), source_unit) for source_number, source_unit in source
@@ -1259,6 +1273,32 @@ def _quantity_claim_issues(content: str, value: Any) -> list[dict[str, str]]:
         if float(number) != source_number or unit != source_unit:
             issues.append({"source_quantity": str(source_number), "observed_quantity": number,
                            "source_unit": source_unit, "observed_unit": unit})
+    # Compare physical quantities only when both passages supply one distinct
+    # quantity in that dimension. Multiple doses or roles require interpretation;
+    # a bag of numerals cannot establish which quantity belongs to which role.
+    scales = {
+        "mg": ("mass", "1"), "g": ("mass", "1000"), "kg": ("mass", "1000000"),
+        "ug": ("mass", ".001"), "µg": ("mass", ".001"), "mcg": ("mass", ".001"),
+        "mm": ("length", "1"), "cm": ("length", "10"), "m": ("length", "1000"),
+        "mL": ("volume", "1"), "L": ("volume", "1000"),
+    }
+    def quantities(rows: Iterable[tuple[str, str]]) -> dict[str, set[Decimal]]:
+        grouped: dict[str, set[Decimal]] = {}
+        for number, unit in rows:
+            if unit in scales:
+                dimension, scale = scales[unit]
+                grouped.setdefault(dimension, set()).add(Decimal(number) * Decimal(scale))
+        return grouped
+    supplied = quantities(source)
+    observed = quantities(pattern.findall(content))
+    source_anchors = _grounding_tokens(" ".join(_leaf_texts(value))) - set(scales)
+    if source_anchors & _grounding_tokens(content):
+        for dimension in supplied.keys() & observed.keys():
+            if len(supplied[dimension]) == len(observed[dimension]) == 1 and supplied[dimension] != observed[dimension]:
+                issues.append({"dimension": dimension,
+                    "source_quantity": str(next(iter(supplied[dimension]))),
+                    "observed_quantity": str(next(iter(observed[dimension]))),
+                    "reason": "unambiguous_quantity_change"})
     return issues
 
 
@@ -1293,21 +1333,43 @@ def source_evidence_grounded(content: str, path: str, value: Any, *, all_items: 
 
 
 def lexical_evidence_uncertainty(diagnostics: Iterable[Mapping[str, Any]]) -> bool:
-    """Word-overlap failure needs meaning review; missing quantities/polarity do not."""
+    """Token absence is uncertainty; demonstrated quantity contradictions are not.
+
+    Missing digit tokens do not prove a missing quantity: prose may spell a
+    number, convert a duration, or express the relationship differently.
+    Structured values and demonstrated quantity changes retain their own checks.
+    """
     records = list(diagnostics)
     return bool(records) and all(
         record.get("validation_mode") == "deterministic_anchors"
         and not record.get("quantity_issues")
         and record.get("unobserved_values")
         and all(
-            "required_anchor_count" in value
-            and not value.get("missing_numbers")
-            and not value.get("required_polarity")
+            "required_anchor_count" in value or value.get("required_polarity")
             for value in record["unobserved_values"]
         )
         for record in records
     )
 
+
+
+def evidence_coverage_finding(section_id: str, diagnostics: Iterable[Mapping[str, Any]],
+                              issue: str, next_action: str, *, category: str = "drafting") -> dict[str, Any]:
+    """Give uncertain narrative coverage one policy for draft and rendered consumers."""
+    records = list(diagnostics)
+    uncertain = lexical_evidence_uncertainty(records) or bool(records) and all(
+        row.get("passed") and not row.get("quantity_issues") and not row.get("claim_issues") for row in records)
+    return {
+        "category": category, "field": section_id, "target_ids": [section_id],
+        "code": "lexical-evidence-uncertainty" if uncertain else "source-evidence-defect",
+        "publication_disposition": "warning" if uncertain else "blocking",
+        "authority": "uncertainty" if uncertain else "objective",
+        "resolution_authority": "independent_source_grounded_review" if uncertain else "deterministic_recheck",
+        "issue": issue, "next_action": (
+            "Have the independent content reviewer compare the passage with the approved facts, including quantities, units, timing and relationships."
+            if uncertain else next_action),
+        "evidence_diagnostics": records,
+    }
 
 def _material_source(request: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
     source = {
@@ -1444,7 +1506,28 @@ def _completion_condition_items(value: Any) -> list[str]:
     return conditions
 
 
+
 def _coverage_findings(
+    request: Mapping[str, Any], contract: Mapping[str, Any], section_id: str,
+    content: str, evidence_refs: Iterable[str], role_content: str | None = None,
+) -> list[dict[str, Any]]:
+    findings = _source_coverage_findings(request, contract, section_id, content, evidence_refs, role_content)
+    for finding in findings:
+        if finding.get("evidence_diagnostics"):
+            finding.update(evidence_coverage_finding(section_id, finding["evidence_diagnostics"],
+                str(finding["issue"]), str(finding.get("next_action") or "Repair the demonstrated source discrepancy.")))
+    if (section_id == "objectives"
+            and "endpoint-inventory" not in set(contract.get("concept_ownership", {}).get("owns", []))
+            and re.search(r"\b(?:primary|secondary) endpoint(?:s)?\b", content, re.I)):
+        findings.append(narrative_review_finding({
+            "category": "drafting", "field": section_id, "target_ids": [section_id],
+            "issue": "Objectives mentions endpoint terminology owned by Study Design.",
+            "next_action": "Assess whether this source-supported mention is useful context or harmful duplication.",
+        }))
+    return findings
+
+
+def _source_coverage_findings(
     request: Mapping[str, Any],
     contract: Mapping[str, Any],
     section_id: str,
@@ -1464,35 +1547,27 @@ def _coverage_findings(
                 "next_action": "Summarize the approved clinical context and evidence gap from study.background.",
             })
         elif background and not source_evidence_grounded(content, "study.background", background, reference=source):
-            findings.append({
-                "category": "drafting", "field": section_id,
-                "issue": "Introduction cites the background without conveying its concrete clinical context.",
-                "next_action": "Name the source-supported setting and specific evidence gap in concise clinical language.",
-            })
+            findings.append(evidence_coverage_finding(section_id, [
+                source_evidence_diagnostics(content, "study.background", background, reference=source)
+            ], "Introduction background coverage needs source-grounded assessment.",
+                "Preserve the supplied clinical setting and evidence gap."))
         if re.search(r"\b(?:the\s+)?(?:study\s+)?hypothes(?:is|izes)\b|\bprimary endpoint\b", content, re.I):
-            findings.append({
+            findings.append(narrative_review_finding({
                 "category": "drafting", "field": section_id,
                 "issue": "Introduction repeats the hypothesis or endpoint definition instead of closing on the evidence gap.",
                 "next_action": "End with the source-supported evidence gap and rationale; leave hypothesis and endpoint definitions to Study Design.",
-            })
+            }))
         for sentence in re.split(r"(?<=[.!?])\s+|\n+", content):
             comparison = re.search(r"\b(?:may|might|could|expected to|will)\b.{0,180}\b(?:better|broader|wider|fewer|less|more)\b.{0,180}\b(?:than|compared with|relative to)\b", sentence, re.I)
             study_combination = re.search(r"\b(?:mix.and.match|combination|combined|study intervention)\b|\bdominant eye\b.{0,100}\bnon.dominant eye\b", sentence, re.I)
             if comparison and study_combination:
-                findings.append({
+                findings.append(narrative_review_finding({
                     "category": "drafting", "field": section_id,
                     "issue": "Introduction presents speculative superiority of the untested study combination as background evidence.",
                     "next_action": "Summarize prior evidence and the specific evidence gap; leave the combination's expected benefit as a hypothesis in Study Design.",
-                })
+                }))
                 break
         return findings
-    if section_id == "objectives" and "endpoint-inventory" not in set(contract.get("concept_ownership", {}).get("owns", [])):
-        if re.search(r"\b(?:primary|secondary) endpoint(?:s)?\b", content, re.I):
-            return [{
-                "category": "drafting", "field": section_id,
-                "issue": "Objectives repeats an endpoint definition owned by Study Design.",
-                "next_action": "State the approved purpose and objectives without naming the primary or secondary endpoint inventory.",
-            }]
     if section_id == "icf.key-information-summary":
         # Ordered concept-to-block grounding is validated after each paragraph
         # has been normalized; aggregate citation coverage is insufficient.
@@ -1504,15 +1579,17 @@ def _coverage_findings(
             findings: list[dict[str, Any]] = []
             timeline = get_path(source, "study.timeline")
             follow_up_value = _approved_followup_value(timeline)
-            if timeline and (
-                "source:study.timeline" not in set(map(str, evidence_refs))
-                or (bool(follow_up_value) and not evidence_grounded(content, follow_up_value))
-            ):
+            if timeline and "source:study.timeline" not in set(map(str, evidence_refs)):
                 findings.append({
                     "category": "drafting", "field": section_id,
-                    "issue": "Section omits the approved participant follow-up period.",
-                    "next_action": "State the approved follow-up period without inventing a completion criterion.",
+                    "issue": "Section does not cite the approved participant follow-up period.",
+                    "next_action": "Cite the approved timeline without inventing a completion criterion.",
                 })
+            elif follow_up_value and not evidence_grounded(content, follow_up_value):
+                findings.append(evidence_coverage_finding(section_id, [
+                    source_evidence_diagnostics(content, "study.timeline", follow_up_value, reference=source)
+                ], "Participant follow-up coverage needs source-grounded assessment.",
+                    "Preserve the approved follow-up period."))
             visit_labels = tuple(
                 label.casefold()
                 for visit in normalized_visit_records(source)
@@ -1528,11 +1605,11 @@ def _coverage_findings(
                         or any(label in normalized for label in visit_labels)
                     )
                 ):
-                    findings.append({
+                    findings.append(narrative_review_finding({
                         "category": "drafting", "field": section_id,
                         "issue": "Section states a participant-completion criterion that the approved source does not provide.",
                         "next_action": "Describe the approved follow-up period and distinguish completion from discontinuation; do not treat scheduled visits as a completion rule.",
-                    })
+                    }))
                     break
             return findings
     if contract.get("source_coverage") == "table_with_notes":
@@ -1561,13 +1638,12 @@ def _coverage_findings(
             and not evidence_grounded(content, value)
         ]
         if ungrounded_methods:
-            findings.append({
-                "category": "drafting",
-                "field": section_id,
-                "issue": "Statistical Methodology does not preserve the approved analysis method: "
+            findings.append(evidence_coverage_finding(section_id, [
+                source_evidence_diagnostics(content, path, material[path], reference=request.get("approved_source"))
+                for path in ungrounded_methods
+            ], "Statistical Methodology coverage needs source-grounded assessment: "
                 + ", ".join(ungrounded_methods) + ".",
-                "next_action": "State the approved methods for each outcome group without repeating endpoint names and time points.",
-            })
+                "Preserve the approved analysis method and its qualifications."))
         return findings
     if contract.get("source_coverage") == "concept_reference":
         source_value = request.get("approved_source")
@@ -1579,11 +1655,11 @@ def _coverage_findings(
             interpretation = str(material.get("statistics.analysis_plan") or "")
             software = material.get("statistics.software")
             if interpretation and len(interpretation.split()) <= 30 and not software and len(content.split()) > 60:
-                findings.append({
+                findings.append(narrative_review_finding({
                     "category": "drafting", "field": section_id,
                     "issue": "General Statistical Considerations expands a short interpretation qualification into a methods recap.",
                     "next_action": "State the approved interpretation qualification in one short paragraph; Section 10.2 owns endpoint methods.",
-                })
+                }))
         if section_id == "endpoint-criteria.study-completion":
             timeline = _normalized_prose(get_path(source, "study.timeline"))
             mentioned_visits = [
@@ -1594,11 +1670,11 @@ def _coverage_findings(
                 and _normalized_prose(visit.get("visit")) not in timeline
             ]
             if mentioned_visits or re.search(r"\bexit form\b", content, re.I):
-                findings.append({
+                findings.append(narrative_review_finding({
                     "category": "drafting", "field": section_id,
                     "issue": "Study Completion repeats a participant visit or assessment instead of the study-level timeline.",
                     "next_action": "State the approved closeout timeline only; keep visits and the exit form in Sections 9, 15, and 18.1.",
-                })
+                }))
         missing = [path for path in material if f"source:{path}" not in cited]
         if missing:
             findings.append({
@@ -1610,20 +1686,18 @@ def _coverage_findings(
             completion = material.get("procedures.completion")
             missing_conditions = [item for item in _completion_condition_items(completion) if not evidence_grounded(content, item)]
             if completion and (not evidence_grounded(content, completion) or missing_conditions):
-                findings.append({
-                    "category": "drafting", "field": section_id,
-                    "issue": "Section omits the approved participant-completion condition.",
-                    "next_action": "Preserve the supplied completion condition and its timing without repeating the full visit schedule. Missing conditions: " + "; ".join(missing_conditions),
-                })
+                findings.append(evidence_coverage_finding(section_id, [
+                    source_evidence_diagnostics(content, "procedures.completion", completion, reference=source)
+                ], "Participant-completion coverage needs source-grounded assessment.",
+                    "Preserve the supplied completion condition and its timing."))
         else:
             if section_id == "endpoint-criteria.study-completion":
                 missing_conditions = [item for item in _completion_condition_items(material.get("study.completion")) if not evidence_grounded(content, item)]
                 if missing_conditions:
-                    findings.append({
-                        "category": "drafting", "field": section_id,
-                        "issue": "Study Completion omits a supplied closeout prerequisite: " + "; ".join(missing_conditions),
-                        "next_action": "Preserve every supplied prerequisite for study closeout or starting analysis.",
-                    })
+                    findings.append(evidence_coverage_finding(section_id, [
+                        source_evidence_diagnostics(content, "study.completion", material["study.completion"], reference=source)
+                    ], "Study closeout prerequisite coverage needs source-grounded assessment.",
+                        "Preserve every supplied prerequisite for closeout or starting analysis."))
             ungrounded = [
                 path for path, value in material.items()
                 if f"source:{path}" in cited
@@ -1705,7 +1779,9 @@ def _coverage_findings(
             source_evidence_diagnostics(content, path, material[path], all_items=all_items, reference=approved_source)
             if not (section_id == "icf.duration" and path == "study.timeline")
             else {"source_path": path, "source_excerpt": material[path], "passed": False,
-                  "validation_mode": "phase_bound_timeline", "release_acceptance": False}
+                  "validation_mode": "deterministic_anchors", "release_acceptance": False,
+                  "unobserved_values": [{"source_excerpt": material[path], "required_anchor_count": 1,
+                                         "reason": "phase_bound_timeline_interpretation"}]}
             for path in ungrounded
         ]
         lexical_uncertainty = lexical_evidence_uncertainty(diagnostics)
@@ -2023,10 +2099,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             findings.extend(_coverage_findings(request, contract, section_id, text, evidence_refs))
             for finding in findings[section_finding_count:]:
                 finding["target_ids"] = [section_id]
-            if len(findings) == section_finding_count:
+            if not any(finding_requires_repair(row) for row in findings[section_finding_count:]):
                 clean[key] = {
                     "text": text,
                     "evidence_refs": evidence_refs,
+                    "warnings": [dict(row) for row in findings[section_finding_count:]],
                     "producer": dict(producer),
                     "request_id": request.get("request_id"),
                     "request_sha256": request.get("request_sha256"),
@@ -2192,13 +2269,13 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 r"\b\d+\s+(?:(?:treatment|control|study)\s+)?(?:subjects|participants)\b",
                 combined_content, re.I,
             ):
-                findings.append({
+                findings.append(narrative_review_finding({
                     "category": "drafting",
                     "field": section_id,
                     "target_ids": [section_id],
                     "issue": "Enrollment counts belong in KEY INFORMATION or DURATION, not PURPOSE.",
                     "next_action": "Remove the participant count from PURPOSE and keep its concise study aim, hypothesis, and primary outcome.",
-                })
+                }))
             approved_source = request.get("approved_source")
             background = get_path(
                 approved_source if isinstance(approved_source, Mapping) else {},
@@ -2319,7 +2396,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                             if row.get("code") == "draft-repetition-uncertainty" and row.get("field") == section_id] + findings[section_finding_count:]
         blocking_section_findings = [
             finding for finding in section_findings
-            if finding.get("publication_disposition") != "warning"
+            if finding_requires_repair(finding)
         ]
         if not blocking_section_findings:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
@@ -2402,7 +2479,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             accepted_request.write_text(request_path.read_text(encoding="utf-8"), encoding="utf-8")
         blocking_response_findings = [
             finding for finding in response_findings
-            if finding.get("publication_disposition") != "warning"
+            if finding_requires_repair(finding)
         ]
         if blocking_response_findings:
             findings.extend(blocking_response_findings)

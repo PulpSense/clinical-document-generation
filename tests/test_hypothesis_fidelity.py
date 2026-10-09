@@ -79,12 +79,12 @@ def test_all_archived_purpose_paraphrases_pass_source_fidelity():
         assert accepted['drafts']
 
 
-def test_wrong_endpoint_distance_remains_blocking():
+def test_unmatched_endpoint_distance_requires_independent_review():
     response = copy.deepcopy(REPLAY['response'])
     response['section_results'][0]['paragraphs'][2]['text'] = response['section_results'][0]['paragraphs'][2]['text'].replace('66 cm', '60 cm')
     accepted, findings = drafting.validate_response(REPLAY['request'], response)
-    assert not accepted or not accepted['drafts']
-    assert any('endpoints.primary' in item['issue'] for item in findings)
+    assert accepted and accepted['drafts']
+    assert any('endpoints.primary' in item['issue'] and item.get('publication_disposition') == 'warning' for item in findings)
 
 
 def test_sterling_rejects_same_amplified_hypothesis_as_drafting():

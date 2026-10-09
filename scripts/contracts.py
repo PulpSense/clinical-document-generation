@@ -55,6 +55,24 @@ RECOVERY_OWNERS = {
 }
 
 
+
+
+def narrative_review_finding(finding: Mapping[str, Any]) -> dict[str, Any]:
+    """Label a narrative interpretation for authenticated source-grounded review."""
+    return {**dict(finding), "code": "narrative-review-uncertainty",
+            "publication_disposition": "warning", "authority": "uncertainty",
+            "resolution_authority": "independent_source_grounded_review"}
+
+
+def finding_requires_repair(finding: Mapping[str, Any]) -> bool:
+    """Apply the same trusted finding disposition at ingestion and publication.
+
+    Unknown findings fail closed. Narrative producers must explicitly identify
+    uncertainty; only authenticated independent review can resolve it.
+    """
+    return finding.get("publication_disposition") != "warning"
+
+
 def recovery_finding(
     finding: Mapping[str, Any],
     recovery_class: str,

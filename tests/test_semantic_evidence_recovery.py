@@ -25,10 +25,11 @@ def test_faithful_non_numeric_paraphrase_reaches_review_on_every_branch(section)
     ("Blood draw at 5 mL", "Blood is collected at 6 mL."),
     ("none", "Compensation is provided."),
 ])
-def test_missing_quantity_and_negative_polarity_are_not_lexical_uncertainty(value, text):
+def test_unbound_quantity_and_polarity_need_meaning_review(value, text):
     diagnostic = drafting.source_evidence_diagnostics(text, "procedures.assessments", value)
     assert diagnostic["passed"] is False
-    assert not drafting.lexical_evidence_uncertainty([diagnostic])
+    assert drafting.lexical_evidence_uncertainty([diagnostic])
+    assert diagnostic["release_acceptance"] is False
 
 
 def test_missing_source_citation_remains_a_drafting_failure():

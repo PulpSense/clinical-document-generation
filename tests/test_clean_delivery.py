@@ -70,7 +70,12 @@ def deliver(tmp_path, monkeypatch, source, review=None, draft=None, render=None)
 
 @pytest.mark.parametrize('case', CASES, ids=lambda item: item['descriptor']['fixture_id'])
 def test_varied_complete_sources_deliver_complete_exact_set_with_clean_message(tmp_path, monkeypatch, case):
-    source = json.loads((ROOT / case['source_path']).read_text())
+    source = quality.branch_acceptance_source(ROOT, case)
+    descriptor = case['descriptor']
+    assert source['meta']['study_type'] == descriptor['study_type']
+    if descriptor['study_type'] != 'Retrospective':
+        assert source['meta']['icf_template'] == descriptor['icf_template']
+    assert source['population']['sample_size'] == ('80 participants' if descriptor['profile'].startswith('rich') else '40 participants')
     result, revision = deliver(tmp_path, monkeypatch, source)
     assert result['status'] == 'passed', result
     assert result['warnings'] == []
@@ -300,3 +305,24 @@ def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tm
     assert len(review_count) == 2
     assert result['warnings'] == []
     assert passage not in Document(tmp_path / 'output/protocol.docx').sections[0].header.paragraphs[0].text
+
+
+def test_delivery_matrix_has_five_actual_families_and_distinct_profiles():
+    sources = [quality.branch_acceptance_source(ROOT, case) for case in CASES]
+    assert {(source['meta']['study_type'], source['meta'].get('icf_template')
+             if source['meta']['study_type'] != 'Retrospective' else None) for source in sources} == {
+        ('Prospective', 'Advarra'), ('Prospective', 'Sterling'),
+        ('Ambispective', 'Advarra'), ('Ambispective', 'Sterling'), ('Retrospective', None)}
+    assert len({quality.canonical_evidence_sha256(source) for source in sources}) == 10
+
+
+@pytest.mark.parametrize('mutation', ['study_type', 'path'])
+def test_delivery_matrix_rejects_mislabeled_or_unconfined_source(mutation):
+    import copy
+    case = copy.deepcopy(CASES[0])
+    if mutation == 'study_type':
+        case['descriptor']['study_type'] = 'Retrospective'
+    else:
+        case['source_path'] = '../unconfined-source.json'
+    with pytest.raises(ValueError, match='disagree|escapes'):
+        quality.branch_acceptance_source(ROOT, case)

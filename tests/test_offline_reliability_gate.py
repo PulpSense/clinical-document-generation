@@ -20,6 +20,8 @@ def test_release_check_is_explicit_and_excludes_live_suites():
     assert command[:3] == ['python', '-m', 'pytest']
     assert len(gate.TEST_FILES) < len(list((gate.ROOT / 'tests').glob('test_*.py')))
     assert all((gate.ROOT / 'tests' / filename).is_file() for filename in gate.TEST_FILES)
+    assert 'test_clean_delivery.py' in gate.TEST_FILES
+    assert 'test_general_delivery_reliability.py' in gate.TEST_FILES
     assert 'test_assessment_matrix.py' in gate.TEST_FILES
     assert 'test_hypothesis_fidelity.py' in gate.TEST_FILES
     assert 'test_sterling_rendered_scope.py' in gate.TEST_FILES
@@ -113,11 +115,14 @@ def test_current_fingerprint_without_authority_and_owner_is_not_an_audit(tmp_pat
     assert any('authority contract' in finding for finding in gate.audit_findings(tmp_path))
 
 
-def test_direct_lexical_veto_requires_independent_resolution_even_with_a_fingerprint(tmp_path):
+@pytest.mark.parametrize("disposition", [None, "blocking"])
+def test_direct_lexical_veto_requires_independent_resolution_even_with_a_fingerprint(tmp_path, disposition):
     scripts = tmp_path / 'scripts'
     scripts.mkdir()
-    (scripts / 'example.py').write_text(
-        'def check():\n    return {"code": "new-lexical-check", "publication_disposition": "blocking"}\n')
+    finding = {"code": "new-lexical-check"}
+    if disposition is not None:
+        finding["publication_disposition"] = disposition
+    (scripts / 'example.py').write_text('def check():\n    return ' + repr(finding) + '\n')
     audit = tmp_path / gate.AUDIT.relative_to(gate.ROOT)
     audit.parent.mkdir(parents=True)
     audit.write_text(json.dumps({'checks': gate.blocking_check_inventory(tmp_path), 'families': {}}))
