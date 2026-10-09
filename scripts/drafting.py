@@ -28,6 +28,7 @@ from contracts import (
     batch_plan,
     canonical_study_type,
     contracted_template_bundle,
+    contextual_clinical_boilerplate,
     get_path,
     icf_contract,
     icf_summary_obligations,
@@ -282,7 +283,7 @@ def load_boilerplate(
     sections = payload.get("sections")
     if not isinstance(sections, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in sections.items()):
         raise ValueError("Fixed Clinical Boilerplate must contain a string map named sections.")
-    return dict(sections)
+    return contextual_clinical_boilerplate(sections, reference)
 
 
 def governing_resources(

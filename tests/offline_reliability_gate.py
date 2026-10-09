@@ -29,6 +29,7 @@ TEST_FILES = (
     'test_concept_reference_grounding.py', 'test_review_contract_root_causes.py',
     'test_owner_aware_recovery.py', 'test_review_resolutions.py', 'test_shared_output_projection.py',
     'test_editorial_publication.py', 'test_phase1_repetition.py',
+    'test_contextual_output_fixes.py',
 )
 
 
@@ -57,6 +58,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_lexical_review_cautions', '_reviewed_lexical_warnings', '_review_evidence_text', '_quantity_claim_issues', '_uncertainty_rule_sha256',
                 'study_short_title', 'sample_size_display', 'study_design_display',
                 '_name', '_contact_fields', '_site_investigator', '_observational_cohorts',
+                '_person_degrees', 'contextual_clinical_boilerplate',
                 '_supplied_protocol_references', '_normalize_icf_source_displays',
                 '_omit_empty_visit_window', '_assessment_matrix',
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',

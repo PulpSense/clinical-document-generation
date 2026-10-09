@@ -116,30 +116,20 @@ def test_sterling_questions_deduplicate_equal_phone_aliases(tmp_path):
     assert questions_text.count(phone) == 1
 
 
-def test_assessment_supplemental_notes_are_full_width_body_paragraphs(monkeypatch, tmp_path):
-    real_contracts = rendering.protocol_table_contracts
-    note = 'Synthetic source note: review the measure at the approved final contact.'
-    def contracts_with_notes(reference):
-        contracts = real_contracts(reference)
-        contracts['schedule-of-assessments']['supplemental_notes'] = [note]
-        return contracts
-    monkeypatch.setattr(rendering, 'protocol_table_contracts', contracts_with_notes)
-    doc = Document()
-    doc.add_paragraph('{visitsTable}')
-    reference = {'procedures': {'visit_schedule': [{'visit': 'Final', 'procedures': ['Measure']}]}}
-    rendering._assessment_matrix(doc, reference, ROOT / 'assets/client-templates/reference/protocol-reference.docx')
-    following = doc.tables[0]._tbl.getnext()
-    assert following.tag == qn('w:p')
-    from docx.text.paragraph import Paragraph
-    paragraph = Paragraph(following, doc)
-    assert paragraph.text == note and paragraph.style.name == 'Normal'
-    assert paragraph.paragraph_format.left_indent is None
-    assert all(note not in cell.text for row in doc.tables[0].rows for cell in row.cells)
+def test_assessment_supplemental_notes_are_full_width_table_rows(tmp_path):
     import json
+    note = 'Synthetic source note: review the measure at the approved final contact.'
     reference = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
-    rendering.render_documents(ROOT, tmp_path, reference, {'protocol': [{'section_id': 'evaluation-procedures', 'paragraphs': [{'text': 'Synthetic approved assessment narrative.'}], 'lists': []}], 'icf': {}, 'prs': {}}, artifact_names={'protocol'})
+    reference['procedures']['assessments'] = note
+    rendering.render_documents(ROOT, tmp_path, reference, {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'protocol'})
     generated = Document(tmp_path / 'candidate/protocol.docx')
-    assert sum(p.text == note for p in generated.paragraphs) == 1
+    table = next(t for t in generated.tables if t.cell(0, 0).text.strip() == 'Activity')
+    row = next(r for r in table.rows if r.cells[0].text == note)
+    assert len(row._tr.tc_lst) == 1
+    width = int(row.cells[0]._tc.tcPr.find(qn('w:tcW')).get(qn('w:w')))
+    assert width == sum(int(c.get(qn('w:w'))) for c in table._tbl.tblGrid.gridCol_lst)
+    assert row._tr.trPr.find(qn('w:cantSplit')).get(qn('w:val')) not in {'0', 'false'}
+    assert not any(p.text == note for p in generated.paragraphs)
 
 
 

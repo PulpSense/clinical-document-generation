@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 
 
@@ -3410,24 +3410,12 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     if placeholder is None:
         return
     table_contract = protocol_table_contracts(reference)["schedule-of-assessments"]
-    row_values = table_contract["rows"]
+    row_values = [list(row) for row in table_contract["rows"]]
     header_rows = int(table_contract["header_rows"])
-    if not row_values:
-        # Restore the readable, unnumbered source inventory when no explicit
-        # visit/procedure matrix exists. Scalar prose remains one atomic entry;
-        # retain the full verbatim notes so no timing qualification is lost.
-        labels = _plain_language_assessments(get_path(reference, "procedures.assessments", []))
-        if labels:
-            row_values = [["Approved visit or assessment", "Approved timing"],
-                          *[[label, "Per approved schedule"] for label in labels]]
-        else:
-            # Supplemental evidence is still source-owned when there are no
-            # rows at all; the old early return silently discarded these notes.
-            for note in table_contract.get("supplemental_notes", []):
-                paragraph = document.add_paragraph(str(note), style="Normal")
-                placeholder._p.addprevious(paragraph._p)
-            placeholder._element.getparent().remove(placeholder._element)
-            return
+    detail_rows = table_contract.get("detail_rows", [])
+    if not row_values and not detail_rows:
+        placeholder._element.getparent().remove(placeholder._element)
+        return
     matrix_mode = header_rows == 2
     if matrix_mode:
         row_values = [list(row) for row in row_values]
@@ -3435,6 +3423,8 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     for row in row_values[header_rows:]:
         if row and row[0]:
             row[0] = row[0][0].upper() + row[0][1:]
+    detail_start = len(row_values) if row_values else 1
+    row_values.extend(detail_rows)
 
     authority = Document(authority_path)
     design = authority.tables[-1]
@@ -3508,6 +3498,15 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
             cell_width.set(qn("w:type"), "dxa")
     for index, grid_column in enumerate(table._tbl.tblGrid.gridCol_lst):
         grid_column.set(qn("w:w"), str(widths[index]))
+    for row in table.rows[detail_start:]:
+        if len(row.cells) > 1:
+            # Clear copies before merging so Word does not concatenate them.
+            for cell in row.cells[1:]:
+                cell.text = ""
+            merged = row.cells[0].merge(row.cells[-1])
+            for paragraph in merged.paragraphs[1:]:
+                if not paragraph.text:
+                    paragraph._p.getparent().remove(paragraph._p)
     for cell in table._tbl.tr_lst[-1].tc_lst:
         properties = cell.get_or_add_tcPr()
         borders = properties.find(qn("w:tcBorders"))
@@ -3521,11 +3520,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
         for key, value in (("w:val", "double"), ("w:sz", "6"), ("w:space", "0"), ("w:color", "auto")):
             bottom.set(qn(key), value)
     placeholder._p.addprevious(table._tbl)
-    # Source-owned narrative requirements belong on the table's full-width
-    # surface, not compressed into Activity cells or assigned invented marks.
-    for note in table_contract.get("supplemental_notes", []):
-        paragraph = document.add_paragraph(str(note), style="Normal")
-        placeholder._p.addprevious(paragraph._p)
     placeholder._element.getparent().remove(placeholder._element)
 
 
@@ -3732,12 +3726,13 @@ def _cell(cell, value: Any, *, bold: bool = False) -> None:
     cell.vertical_alignment = WD_CELL_VERTICAL_ALIGNMENT.CENTER
 
 
-def _boilerplate(repo_root: Path, bundle: Mapping[str, Any]) -> dict[str, str]:
+def _boilerplate(repo_root: Path, bundle: Mapping[str, Any], reference: Mapping[str, Any]) -> dict[str, str]:
     relative = str(bundle["fixed_clinical_boilerplate"]["path"])
     payload = json.loads((repo_root / relative).read_text(encoding="utf-8"))
     if payload.get("version") != BOILERPLATE_VERSION or not isinstance(payload.get("sections"), dict):
         raise ValueError("Fixed Clinical Boilerplate does not match the rendering contract.")
-    return {str(key): str(value) for key, value in payload["sections"].items()}
+    return contextual_clinical_boilerplate(
+        {str(key): str(value) for key, value in payload["sections"].items()}, reference)
 
 
 def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
@@ -3947,7 +3942,7 @@ def render_documents(
     fields = render_fields(reference, model)
     bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))
     protocol_template, icf_template = template_paths(repo_root, reference, contracted_bundle=bundle)
-    boilerplate = _boilerplate(repo_root, bundle)
+    boilerplate = _boilerplate(repo_root, bundle, reference)
     substitutions = dict(font_substitutions or {})
     selected = set(artifact_names or bundle["contracted_templates"])
     unknown_artifacts = selected - set(bundle["contracted_templates"])

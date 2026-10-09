@@ -860,6 +860,33 @@ def meaningful(value: Any) -> bool:
     return True
 
 
+def contextual_clinical_boilerplate(
+    sections: Mapping[str, str], reference: Mapping[str, Any],
+) -> dict[str, str]:
+    """Connect controlled benefit defaults to an approved subject, not a claim.
+
+    This projection leaves source-supplied benefits and the no-direct-benefit
+    qualification untouched. It does not infer efficacy or assign treatment.
+    """
+    result = dict(sections)
+    name = get_path(reference, "design.intervention_name")
+    subject = "the outcomes studied in this research"
+    if isinstance(name, str) and name.strip().casefold() not in {"", "none", "n/a", "not applicable"}:
+        subject = f"outcomes associated with {name.strip().rstrip('.')}"
+    else:
+        condition = get_path(reference, "study.condition")
+        conditions = condition if isinstance(condition, list) else [condition]
+        labels = [item.strip().rstrip('.') for item in conditions if isinstance(item, str)
+                  and item.strip().casefold() not in {"", "none", "n/a", "not applicable"}]
+        if labels:
+            subject = "outcomes related to " + " and ".join(labels)
+    for key in ("protocol-sparse-benefits", "icf-sparse-benefits"):
+        if key in result:
+            result[key] = result[key].replace(
+                "the condition, intervention, or procedures being evaluated", subject)
+    return result
+
+
 def sterling_clause_contract(repo_root: Path | None = None) -> dict[str, Any]:
     """Load and minimally validate the governed Sterling language contract."""
     root = (repo_root or Path(__file__).resolve().parents[1]).resolve()
@@ -1759,12 +1786,22 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         if evidence_rows and selected_columns
         else []
     )
+    # Keep unallocated source detail inside the owned table, without inventing
+    # activity-to-visit relationships. Repeated values represent a merged row
+    # in Word's logical cell grid and can be checked like the matrix itself.
+    detail_columns = len(assessment_rows[0]) if assessment_rows else 1
+    detail_rows = (
+        [["Approved assessment and safety details"] * detail_columns,
+         *[[note] * detail_columns for note in supplemental_notes]]
+        if supplemental_notes else []
+    )
     return {
         "schedule-of-assessments": {
             "section_id": "evaluation-procedures",
             "caption": "Table 15.1. Proposed Visits and Study Assessments",
             "header_rows": 2 if assessment_rows and assessment_rows[0][0] == "Activity" else 1,
             "rows": assessment_rows,
+            "detail_rows": detail_rows,
             "supplemental_notes": supplemental_notes,
             "assessment_inventory": inventory,
             "unallocated_assessments": unallocated,
@@ -2718,7 +2755,7 @@ __all__ = [
     "APPROVED_FONT_PLAN_VERSION", "APPROVED_PACKAGED_FONT_FALLBACKS", "BOILERPLATE_VERSION", "BUNDLED_FONT_FILES", "STERLING_CLAUSE_CONTRACT_VERSION", "STERLING_CLAUSE_CONTRACT_RESOURCE",
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
-    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "country_name_aliases", "document_set",
+    "batch_plan", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "contextual_clinical_boilerplate", "country_name_aliases", "document_set",
     "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
 ]

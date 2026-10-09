@@ -279,8 +279,16 @@
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
-      "code_sha256": "e366889ff568accee7ed68feb78e46e10c54eb23c3d8643d708d204e649def3f",
-      "family": "structured"
+      "code_sha256": "81e97047891f27f99d0db1df5314abd90eae2e9387c3ea68a28ad1e6e7289fd4",
+      "family": "structured",
+      "behavioral_evidence": {
+        "valid": [
+          "test_contextual_output_fixes.py::test_schedule_details_stay_inside_the_table_without_inferred_assignments"
+        ],
+        "invalid": [
+          "test_contextual_output_fixes.py::test_schedule_details_stay_inside_the_table_without_inferred_assignments"
+        ]
+      }
     },
     {
       "file": "scripts/contracts.py",
@@ -464,7 +472,7 @@
       "family": "structured",
       "file": "scripts/prs_xml.py",
       "function": "_contact_fields",
-      "code_sha256": "cab53ae1dc0a600fe8b1b6cce51a97d08f468e60e137e088e092d26a05cc7e88",
+      "code_sha256": "efb8c559b51148e3a2663bfdcd95dde6a8e29d79a0f5a0cc1042e5cdfbd3bc4b",
       "behavioral_evidence": {
         "valid": [
           "test_shared_output_projection.py::test_explicit_person_components_override_full_display_name"
@@ -497,7 +505,7 @@
     {
       "file": "scripts/prs_xml.py",
       "function": "validate_output",
-      "code_sha256": "4f75d604b3880475eb29f8b5e603bd379184052d5fa51272ec7b5df732b8a12d",
+      "code_sha256": "21a36bf2476f4cdb1358fb747268d947ad0dfec77d388fdeec4dfc5f19e95705",
       "family": "structured"
     },
     {
@@ -675,7 +683,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "74e581c0462b7767922f3870eacdfec0752d11d2c1f4850ec2b61cc548a3f27b",
+      "code_sha256": "773c4725a0045e3345fa537e29a2dbd5f5b65e14a0d02f05de02be33cd22cdf1",
       "family": "clinical"
     },
     {
@@ -700,7 +708,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "60fb120b2e86d64454cde4f83c3057ab62365dc5b741ffd1f3b62704405e349c"
+      "code_sha256": "eaf4e9bbadf16c751bc4aeb4a25b301858d31f96bdab8fda19423a06f8e229ae"
     },
     {
       "file": "scripts/quality.py",
@@ -912,14 +920,13 @@
       "family": "structured",
       "file": "scripts/rendering.py",
       "function": "_assessment_matrix",
-      "code_sha256": "dd487552547a38b0a04da36896622876747c39fc25697b5692c5bba6b96c9124",
+      "code_sha256": "db9a2bf0c5a13036b1696f294ca960fe01f2e345ed210eab5988a3b0488064aa",
       "behavioral_evidence": {
         "valid": [
-          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields",
-          "test_shared_output_projection.py::test_structured_schedule_keeps_real_timing_and_assignments"
+          "test_contextual_output_fixes.py::test_schedule_details_stay_inside_the_table_without_inferred_assignments"
         ],
         "invalid": [
-          "test_shared_output_projection.py::test_table_assignment_corruption_is_construction_owned"
+          "test_contextual_output_fixes.py::test_schedule_details_stay_inside_the_table_without_inferred_assignments"
         ]
       }
     },
@@ -932,7 +939,7 @@
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "ac29b68eaa3b110a939b4340ae90a76952ce9e7dbb14330d56d986bde47a2aae",
+      "code_sha256": "c69cf6ad70a685f8450e2675745d38f2a2c04c86730f6f247d799d2810343b4e",
       "family": "render"
     },
     {
@@ -1209,6 +1216,34 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/prs_xml.py",
+      "function": "_person_degrees",
+      "code_sha256": "af68f3ad2d32a89b47c3bb8fddcc6f3e4d2f7ad6aa6b57bac56026b0670a69c2",
+      "family": "structured",
+      "behavioral_evidence": {
+        "valid": [
+          "test_contextual_output_fixes.py::test_xml_credentials_are_separate_from_job_titles"
+        ],
+        "invalid": [
+          "test_contextual_output_fixes.py::test_xml_degree_corruption_remains_detectable"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "contextual_clinical_boilerplate",
+      "code_sha256": "d560c7c02db78a219b3db8386b6e6c250fda95ef99c4847412de45ac2cabc766",
+      "family": "clinical",
+      "behavioral_evidence": {
+        "valid": [
+          "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
+        ],
+        "invalid": [
+          "test_contextual_output_fixes.py::test_benefit_defaults_use_approved_context_and_remain_authorized"
+        ]
+      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

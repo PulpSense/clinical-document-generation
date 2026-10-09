@@ -32,7 +32,7 @@ from docx.text.paragraph import Paragraph
 from pypdf import PdfReader
 from lxml import etree as ET
 
-from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
+from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
 from drafting import accepted_cross_section_duplicate_findings, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
@@ -4687,7 +4687,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             continue
         expected_rows = [
             [re.sub(r"\s+", " ", str(cell)).strip() for cell in row]
-            for row in table_contract["rows"]
+            for row in [*table_contract["rows"], *table_contract.get("detail_rows", [])]
         ]
         if not expected_rows:
             continue
@@ -5444,6 +5444,8 @@ def create_verification_requests(
     authorized_boilerplate = _json(boilerplate_path)
     if authorized_boilerplate.get("version") != BOILERPLATE_VERSION:
         raise ValueError("Verification boilerplate does not match the content contract.")
+    authorized_boilerplate["sections"] = contextual_clinical_boilerplate(
+        authorized_boilerplate["sections"], reference)
     cross_document_checks = [] if branch == "Retrospective" else list(CROSS_DOCUMENT_CHECKS)
     content_request_id = f"{revision_dir.name}.review-{review_set}.verify.content"
     content_instructions = f"This is complete review set {review_set}. Assess every listed section against every content check."

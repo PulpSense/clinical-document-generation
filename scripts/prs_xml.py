@@ -167,13 +167,32 @@ def _mapping_value(value: Mapping[str, Any], *keys: str) -> str:
     return ""
 
 
+def _person_degrees(value: Mapping[str, Any]) -> str:
+    """Prefer explicit credentials, including an explicitly empty field.
+
+    Legacy title fields mix credentials and employment roles. Only recognized
+    credential tokens may be projected from that ambiguous field; unfamiliar
+    credentials remain supported through the explicit degree fields.
+    """
+    for key in ("degrees", "degree"):
+        if key in value:
+            return _text(value[key])
+    credentials = {"md", "do", "phd", "dphil", "mbbs", "mbchb", "mb", "bch", "bao",
+                   "od", "dds", "dmd", "pharmd", "dnp", "dpt", "otd", "drph", "scd",
+                   "edd", "med", "mmed", "bmed", "jd", "rn", "bsn", "msn", "np", "pa",
+                   "mph", "ms", "msc", "bs", "bsc", "ma", "mba"}
+    parts = re.split(r"[,;/\s]+", _mapping_value(value, "title"))
+    return ", ".join(part.strip() for part in parts
+                     if re.sub(r"[.\s]", "", part).casefold() in credentials)
+
+
 def _contact_fields(value: Mapping[str, Any]) -> dict[str, str]:
     first, middle, last = _name(_mapping_value(value, "name", "full_name"))
     return {
         "first_name": _mapping_value(value, "first_name", "given_name") or first,
         "middle_name": _text(value["middle_name"]) if "middle_name" in value else middle,
         "last_name": _mapping_value(value, "last_name", "family_name", "surname") or last,
-        "degrees": _mapping_value(value, "degrees", "degree", "title"),
+        "degrees": _person_degrees(value),
         "phone": _mapping_value(value, "phone", "business_phone", "office_phone"),
         "phone_ext": _mapping_value(value, "phone_ext", "extension", "ext"),
         "email": _mapping_value(value, "email"),
@@ -429,7 +448,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "responsiblePartyInvestigatorTitle": _mapping_value(responsible, "investigator_title", "title") or _text(pi.get("title") if responsible_is_investigator else ""),
         "responsiblePartyInvestigatorAffiliation": _mapping_value(responsible, "investigator_affiliation") or _text(investigator_affiliation if responsible_is_investigator else ""),
         "overallContactFirstName": contact_first, "overallContactMiddleName": contact_middle, "overallContactLastName": contact_last,
-        "overallContactDegrees": _text(coordinator.get("degrees") or coordinator.get("degree")), "overallContactPhone": _text(coordinator.get("business_phone")), "overallContactEmail": _text(coordinator.get("email")),
+        "overallContactDegrees": _person_degrees(coordinator), "overallContactPhone": _text(coordinator.get("business_phone")), "overallContactEmail": _text(coordinator.get("email")),
         "overallContactBackupFirstName": overall_backup_fields["first_name"],
         "overallContactBackupMiddleName": overall_backup_fields["middle_name"],
         "overallContactBackupLastName": overall_backup_fields["last_name"],
@@ -1037,7 +1056,7 @@ def validate_output(
             continue
         location = generated_locations[index - 1]
         for field, expected_value in _contact_fields(_site_backup_contact(site)).items():
-            if expected_value and _text(location.findtext(f"contact_backup/{field}")) != expected_value:
+            if (expected_value or field == "degrees") and _text(location.findtext(f"contact_backup/{field}")) != expected_value:
                 findings.append({
                     "category": "xml",
                     "field": f"location[{index}].contact_backup.{field}",
@@ -1045,7 +1064,7 @@ def validate_output(
                 })
 
     def require_repeated_value(node: ET.Element, target_path: str, expected_value: Any, field: str) -> None:
-        if meaningful(expected_value) and _text(node.findtext(target_path)) != _text(expected_value):
+        if (meaningful(expected_value) or target_path.endswith("/degrees")) and _text(node.findtext(target_path)) != _text(expected_value):
             findings.append({
                 "category": "xml",
                 "field": field,
