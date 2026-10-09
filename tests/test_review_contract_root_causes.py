@@ -235,3 +235,103 @@ def test_resolution_metadata_retry_reaches_clean_delivery(tmp_path, monkeypatch)
     assert result['status'] == 'passed', result
     assert result['warnings'] == []
     assert len(reviews) == 2 and reviews[0] == reviews[1]
+
+
+def test_changing_metadata_errors_recover_through_public_desktop_delivery(tmp_path, monkeypatch):
+    from pathlib import Path
+    from test_clean_delivery import controlled_render, reminder_source, reminder_draft
+    from test_handoff_quality import acceptance_verification
+    monkeypatch.setattr(workflow, 'render_assurance', controlled_render)
+    reference = tmp_path / 'reference/study.reference.json'
+    reference.parent.mkdir(parents=True)
+    reference.write_text(json.dumps(reminder_source()))
+    assert workflow.prepare(tmp_path)['status'] == 'awaiting_approval'
+    approved = workflow.approve(tmp_path, approved_by='controlled-fixture-owner')
+    revision = tmp_path / 'revisions' / approved['revision_id']
+    reviews, feedback = [], []
+    text = 'The team phones people before appointments so they remember to attend.'
+
+    def runner(items, _remaining):
+        for item in items:
+            request = json.loads((revision / item['request_path']).read_text())
+            if request['task'] in {'section_drafting', 'prs_narrative_drafting'}:
+                response = reminder_draft(request, text)
+                path = revision / request['response_path']
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(response))
+                continue
+            response = acceptance_verification(request)
+            if request['task'] == 'clinical_content_verification':
+                reviews.append(request['request_id'])
+                feedback.append(item.get('response_repair_feedback', []))
+                if len(reviews) == 1:
+                    response['uncertainty_resolutions'] = []
+                elif len(reviews) == 2:
+                    for decision in response['uncertainty_resolutions']:
+                        decision['affected_passage'] = 'Not a quotation in this document.'
+            log = tmp_path / f"{request['request_id']}.{len(reviews)}.worker.json"
+            log.write_text(json.dumps(response))
+            assert workflow._production_publish_quiet_response(revision, item, log)
+
+    result = workflow.run_desktop_operation(tmp_path, handoff_runner=runner,
+        opener=lambda path: Path(path).read_bytes(), budget_seconds=2700, require_promoted_runtime=False)
+    assert result['status'] == 'passed', result
+    assert result['warnings'] == []
+    assert len(reviews) == 3 and len(set(reviews)) == 1
+    assert feedback[1] and feedback[2] and feedback[1] != feedback[2]
+    assert sorted(path.name for path in (tmp_path / 'output').iterdir()) == ['icf.docx', 'protocol.docx', 'study.xml']
+    assert result['deadline_at_epoch'] - result['started_at_epoch'] == 2700
+
+
+@pytest.mark.parametrize('errors,expected_calls', [
+    ([['A'], ['B'], ['A'], ['B'], ['A']], 4),
+    ([['A', 'B'], ['B', 'A'], ['A', 'B']], 2),
+    ([['A', 'A'], ['A'], ['A'], ['A']], 3),
+])
+def test_feedback_progress_preserves_cycles_order_and_error_count(tmp_path, monkeypatch, errors, expected_calls):
+    handoff = {'request_id': 'r1.verify', 'request_sha256': 'a' * 64,
+               'request_path': 'request.json', 'response_path': 'response.json',
+               'task': 'clinical_content_verification'}
+    steps, calls = iter(errors), []
+    def generate(*_args, **_kwargs):
+        return {'status': 'awaiting_hermes', 'stage': 'independent_verification_retry',
+                'revision_id': 'r1', 'handoffs': [handoff], 'findings': [
+                    {'verification_request_id': handoff['request_id'], 'issue': issue,
+                     'recovery_class': 'verifier_transient'} for issue in next(steps)]}
+    monkeypatch.setattr(workflow, 'generate', generate)
+    monkeypatch.setattr(workflow.time, 'sleep', lambda *_: None)
+    result = workflow.run_desktop_operation(tmp_path,
+        handoff_runner=lambda items, _: calls.append(items[0]['response_repair_feedback']),
+        opener=lambda _: b'', budget_seconds=30)
+    assert result['findings'][0]['code'] == 'handoff_no_progress'
+    assert len(calls) == expected_calls
+
+
+@pytest.mark.parametrize('resumed_error,expected_calls', [('A', 2), ('B', 3)])
+def test_feedback_progress_and_deadline_survive_process_resume(tmp_path, monkeypatch, resumed_error, expected_calls):
+    handoff = {'request_id': 'r1.verify', 'request_sha256': 'a' * 64,
+               'request_path': 'request.json', 'response_path': 'response.json',
+               'task': 'clinical_content_verification'}
+    error, now, calls = ['A'], [0.0], []
+    monkeypatch.setattr(workflow, 'generate', lambda *_args, **_kwargs: {
+        'status': 'awaiting_hermes', 'stage': 'independent_verification_retry',
+        'revision_id': 'r1', 'handoffs': [handoff], 'findings': [{
+            'verification_request_id': handoff['request_id'], 'issue': error[0],
+            'recovery_class': 'verifier_transient'}]})
+    monkeypatch.setattr(workflow.time, 'sleep', lambda *_: None)
+    def interrupted(*_args):
+        calls.append(error[0])
+        now[0] += 1
+        raise KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt):
+        workflow.run_desktop_operation(tmp_path, handoff_runner=interrupted,
+            opener=lambda _: b'', budget_seconds=30, clock=lambda: now[0], wall_clock=lambda: 1000)
+    now[0], error[0] = 500, resumed_error
+    def runner(*_args):
+        calls.append(error[0])
+        now[0] += 1
+    result = workflow.run_desktop_operation(tmp_path, handoff_runner=runner,
+        opener=lambda _: b'', budget_seconds=2700, clock=lambda: now[0], wall_clock=lambda: 1010)
+    assert result['findings'][0]['code'] == 'handoff_no_progress'
+    assert len(calls) == expected_calls
+    assert result['started_at_epoch'] == 1000 and result['deadline_at_epoch'] == 1030

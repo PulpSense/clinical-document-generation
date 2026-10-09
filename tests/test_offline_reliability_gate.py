@@ -122,3 +122,16 @@ def test_direct_lexical_veto_requires_independent_resolution_even_with_a_fingerp
     audit.parent.mkdir(parents=True)
     audit.write_text(json.dumps({'checks': gate.blocking_check_inventory(tmp_path), 'families': {}}))
     assert any('Unjustified lexical publication veto' in finding for finding in gate.audit_findings(tmp_path))
+
+
+def test_review_evidence_blocker_routing_changes_are_audited(tmp_path):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    path = scripts / 'quality.py'
+    original = (gate.ROOT / 'scripts/quality.py').read_text()
+    path.write_text(original)
+    before = gate.blocking_check_inventory(tmp_path)
+    changed = original.replace('"deterministic_structure_defect"', '"drafting_defect"', 1)
+    assert changed != original
+    path.write_text(changed)
+    assert gate.blocking_check_inventory(tmp_path) != before

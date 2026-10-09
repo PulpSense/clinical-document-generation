@@ -4431,6 +4431,11 @@ def run_desktop_operation(
         "parent_visual_callbacks": dict(raw_attempt_counters.get("parent_visual_callbacks") or {}),
         "delivery": int(raw_attempt_counters.get("delivery") or 0),
     }
+    raw_feedback_attempts = persisted.get("handoff_feedback_attempts")
+    handoff_feedback_attempts = {
+        str(key): dict(value) for key, value in raw_feedback_attempts.items()
+        if isinstance(value, Mapping)
+    } if isinstance(raw_feedback_attempts, Mapping) else {}
     raw_stage_timings = persisted.get("stage_timings")
     if not isinstance(raw_stage_timings, Mapping):
         raw_stage_timings = {}
@@ -4475,6 +4480,15 @@ def run_desktop_operation(
     def remaining_seconds() -> float:
         return deadline_at_epoch - epoch_now()
 
+    def handoff_feedback_identity(item: Mapping[str, Any]) -> tuple[str, str]:
+        request_key = str(item.get("request_sha256") or item.get("request_id")
+                          or item.get("request_path") or "")
+        # Reviewer wording, producer IDs and package churn are not progress.
+        # Changed validator feedback (including fewer errors) permits a fresh
+        # correction strategy; ordering alone does not.
+        feedback = sorted(str(value) for value in item.get("response_repair_feedback", []))
+        return request_key, sha256_value(feedback)
+
     def save(status: str, result: Mapping[str, Any] | None = None) -> dict[str, Any]:
         payload = {
             "operation_id": operation_id,
@@ -4495,6 +4509,7 @@ def run_desktop_operation(
             "stage_timings": stage_timings,
             "attempt_counters": attempt_counters,
             "pending_handoffs": pending_handoffs,
+            "handoff_feedback_attempts": handoff_feedback_attempts,
             "soft_budgets": soft_budgets,
             "soft_budget_events": soft_budget_events,
             "release_transitions": release_transitions,
@@ -4696,16 +4711,18 @@ def run_desktop_operation(
                             and item.get("recovery_class") == "verifier_transient"]
                 if feedback:
                     handoff["response_repair_feedback"] = feedback
-            # Repeating the identical unconsumable response is transport work,
-            # not a new clinical repair. Preserve its identity and stop after
-            # one retry; a repaired candidate receives a new review request.
-            stalled = [item for item in handoffs
-                       if item.get("fallback_owner") != "parent"
-                       and int(attempt_counters["handoff_dispatches"].get(str(
-                           item.get("request_sha256") or item.get("request_id")
-                           or item.get("request_path") or "")) or 0) >= 2
-                       and not _handoff_response_is_bound(
-                           run_dir, str(result.get("revision_id") or ""), item)]
+            # A request stays immutable while its response metadata is repaired.
+            # Changed validator feedback must get another correction attempt;
+            # repeated or cycling failures retain their prior attempt history.
+            stalled = []
+            for item in handoffs:
+                if item.get("fallback_owner") == "parent":
+                    continue
+                request_key, feedback_sha = handoff_feedback_identity(item)
+                repeats = int(handoff_feedback_attempts.get(request_key, {}).get(feedback_sha) or 0)
+                if repeats >= 2 and not _handoff_response_is_bound(
+                        run_dir, str(result.get("revision_id") or ""), item):
+                    stalled.append(item)
             if stalled:
                 return finish({
                     "status": "blocked", "stage": "hermes_handoff",
@@ -4713,7 +4730,7 @@ def run_desktop_operation(
                         "category": "hermes", "code": "handoff_no_progress",
                         "field": str(item.get("request_path") or "handoff"),
                         "verification_request_id": item.get("request_id"),
-                        "issue": "The identical worker request produced no consumable response after one retry; inspect preserved worker evidence and repair the response contract before continuing.",
+                        "issue": "The worker request remains unconsumable with the same validation feedback after one retry; inspect preserved worker evidence and reassess the response contract before continuing.",
                     } for item in stalled],
                     "client_outputs": [],
                 })
@@ -4736,11 +4753,14 @@ def run_desktop_operation(
                             int(attempt_counters[counter_name].get(str(target)) or 0),
                             int(attempt),
                         )
-                    dispatch_key = str(handoff.get("request_sha256") or handoff.get("request_id") or handoff.get("request_path") or "")
+                    dispatch_key, feedback_sha = handoff_feedback_identity(handoff)
                     if dispatch_key:
                         attempt_counters["handoff_dispatches"][dispatch_key] = int(
                             attempt_counters["handoff_dispatches"].get(dispatch_key) or 0
                         ) + 1
+                        if handoff.get("fallback_owner") != "parent":
+                            attempts = handoff_feedback_attempts.setdefault(dispatch_key, {})
+                            attempts[feedback_sha] = int(attempts.get(feedback_sha) or 0) + 1
                 stage_elapsed = float(stage_timings.get(stage, {}).get("elapsed_seconds") or 0.0)
                 supports_parent_fallback = (
                     stage == "independent_verification"
@@ -4759,10 +4779,7 @@ def run_desktop_operation(
                 fresh_fallback_owned: list[Mapping[str, Any]] = []
                 replayed_fallback_owned: list[Mapping[str, Any]] = []
                 for item in fallback_owned:
-                    dispatch_key = str(
-                        item.get("request_sha256") or item.get("request_id")
-                        or item.get("request_path") or ""
-                    )
+                    dispatch_key, _ = handoff_feedback_identity(item)
                     target = (
                         fresh_fallback_owned
                         if int(attempt_counters["handoff_dispatches"].get(dispatch_key) or 0) == 1

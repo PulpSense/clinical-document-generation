@@ -885,14 +885,15 @@
     {
       "file": "scripts/workflow.py",
       "function": "run_desktop_operation",
-      "code_sha256": "a9f4faf4cdb595d53779acec1930d00f5bb802f56cbdfe0aa16a459254e82a7c",
+      "code_sha256": "6ea27dff0aee0e9138288458f4e5efbf459fd950742487bf69344ab76f27a027",
       "family": "recovery",
       "behavioral_evidence": {
         "valid": [
-          "test_review_contract_root_causes.py::test_new_candidate_review_has_its_own_transport_retry_budget"
+          "test_review_contract_root_causes.py::test_changing_metadata_errors_recover_through_public_desktop_delivery"
         ],
         "invalid": [
-          "test_review_contract_root_causes.py::test_identical_unconsumable_review_does_not_spend_entire_operation"
+          "test_review_contract_root_causes.py::test_identical_unconsumable_review_does_not_spend_entire_operation",
+          "test_review_contract_root_causes.py::test_feedback_progress_preserves_cycles_order_and_error_count"
         ]
       }
     },
@@ -1023,6 +1024,28 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_review_evidence_finding",
+      "code_sha256": "717c22911e81fcb235e490b9c5089338fb452b254f1517f1cbfe47a4df2d0305",
+      "family": "review",
+      "authority_contract": {
+        "requirement": "A review caution must bind to an actual nonempty candidate passage before dispatch.",
+        "evidence": "Current rendered section snapshot",
+        "authority": "objective",
+        "resolution_authority": "deterministic_recheck_for_objective_defects",
+        "repair_owner": "construction"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_every_applicable_generated_icf_section_can_be_localized"
+        ],
+        "invalid": [
+          "test_review_contract_root_causes.py::test_evidence_construction_failure_is_returned_to_its_owner",
+          "test_offline_reliability_gate.py::test_review_evidence_blocker_routing_changes_are_audited"
+        ]
+      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

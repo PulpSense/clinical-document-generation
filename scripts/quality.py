@@ -38,15 +38,21 @@ from prs_xml import screening_interval_requirement, validate_output as validate_
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 
 
+def _review_evidence_finding(artifact: str, section_id: str) -> dict[str, Any]:
+    """Declare the construction-owned missing-evidence blocker in the audit seam."""
+    return recovery_finding({
+        "category": "document_structure", "code": "review_evidence_unavailable",
+        "artifact": artifact, "field": section_id, "target_ids": [section_id],
+        "publication_disposition": "blocking",
+        "issue": "Review evidence has no current passage for the affected section; repair section localization before dispatch.",
+    }, "deterministic_structure_defect")
+
+
 class ReviewEvidenceError(ValueError):
     """Code could not bind a caution to the actual candidate section."""
 
     def __init__(self, artifact: str, section_id: str):
-        self.finding = recovery_finding({
-            "category": "document_structure", "code": "review_evidence_unavailable",
-            "artifact": artifact, "field": section_id, "target_ids": [section_id],
-            "issue": "Review evidence has no current passage for the affected section; repair section localization before dispatch.",
-        }, "deterministic_structure_defect")
+        self.finding = _review_evidence_finding(artifact, section_id)
         super().__init__(self.finding["issue"])
 
 
