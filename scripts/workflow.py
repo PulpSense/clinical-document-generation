@@ -7903,6 +7903,65 @@ def _apply_pending_recovery_plan(
     return created
 
 
+def _unresolved_evidence_defects(finding: Mapping[str, Any]) -> set[str] | None:
+    """Return unresolved facts, or None when incomplete feedback cannot prove progress."""
+    origin = finding.get("verification_source_finding")
+    diagnostics = finding.get("evidence_diagnostics", (
+        origin.get("evidence_diagnostics", []) if isinstance(origin, Mapping) else []
+    ))
+    if not isinstance(diagnostics, list):
+        return None
+    def numeric(value: Any) -> bool:
+        return not isinstance(value, bool) and isinstance(value, (str, int, float)) and bool(re.fullmatch(
+            r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[Ee][+-]?\d+)?", str(value).strip()))
+    defects: set[str] = set()
+    for diagnostic in diagnostics:
+        if not isinstance(diagnostic, Mapping):
+            return None
+        path = diagnostic.get("source_path")
+        if not isinstance(path, str) or not path.strip():
+            return None
+        quantity_issues = diagnostic.get("quantity_issues", [])
+        if not isinstance(quantity_issues, list):
+            return None
+        for issue in quantity_issues:
+            if not isinstance(issue, Mapping) or not all(numeric(issue.get(key)) for key in (
+                "source_quantity", "observed_quantity",
+            )):
+                return None
+            units = [issue.get("source_unit"), issue.get("observed_unit")]
+            dimension = issue.get("dimension")
+            if not ((isinstance(dimension, str) and dimension.strip())
+                    or all(isinstance(unit, str) and unit.strip() for unit in units)):
+                return None
+            defects.add(canonical_evidence_sha256({"path": path, "quantity": issue}))
+        unobserved = diagnostic.get("unobserved_values", [])
+        if not isinstance(unobserved, list):
+            return None
+        for value in unobserved:
+            if not isinstance(value, Mapping):
+                return None
+            source = value.get("source_excerpt")
+            if not isinstance(source, str) or not source.strip():
+                return None
+            missing = value.get("missing_numbers", [])
+            if not isinstance(missing, list):
+                return None
+            for number in missing:
+                if not numeric(number):
+                    return None
+                defects.add(canonical_evidence_sha256({"path": path, "source": source, "missing_number": number}))
+            polarity = value.get("required_polarity")
+            if "required_polarity" in value and polarity not in ("positive", "negative"):
+                return None
+            if polarity in ("positive", "negative"):
+                defects.add(canonical_evidence_sha256({"path": path, "source": source, "polarity": polarity}))
+            if not missing and not polarity:
+                defects.add(canonical_evidence_sha256({"path": path, "source": source}))
+    return defects
+
+
+
 def _repeated_drafting_findings(
     generation: dict[str, Any], findings: Sequence[Mapping[str, Any]],
     *, stage: str = "quality", attempts: Mapping[str, int] | None = None,
@@ -7926,45 +7985,45 @@ def _repeated_drafting_findings(
         }
         key = canonical_evidence_sha256(identity)
         rows.append((finding, identity, key))
-    if stage == "drafting":
-        current: dict[str, set[str]] = {}
+    current: dict[str, set[str]] = {}
+    for finding, identity, key in rows:
+        for target in identity["target_ids"] or [str(finding.get("field") or "")]:
+            current.setdefault(target, set()).add(key)
+    last = generation.setdefault(
+        "drafting_validation_last_failures" if stage == "drafting" else "drafting_review_last_failures", {},
+    )
+    for target, keys in current.items():
+        attempt = int((attempts or {}).get(target, 1)) if stage == "drafting" else review_set
+        previous = last.get(target, {})
+        prior_keys = set(previous.get("keys") or [])
+        # Progress concerns unresolved evidence, not repeated issue prose or
+        # cosmetic changes to a candidate. A strict subset demonstrates that
+        # a material defect disappeared without introducing another one.
+        defects: set[str] = set()
+        evidence_complete = True
         for finding, identity, key in rows:
-            for target in identity["target_ids"] or [str(finding.get("field") or "")]:
-                current.setdefault(target, set()).add(key)
-        last = generation.setdefault("drafting_validation_last_failures", {})
-        for target, keys in current.items():
-            attempt = int((attempts or {}).get(target, 1))
-            previous = last.get(target, {})
-            prior_keys = set(previous.get("keys") or [])
-            # Progress concerns unresolved evidence, not repeated issue prose or
-            # cosmetic changes to a candidate. A strict subset demonstrates that
-            # a material defect disappeared without introducing another one.
-            defects = set()
-            for finding, identity, key in rows:
-                if key not in keys:
-                    continue
-                for diagnostic in finding.get("evidence_diagnostics") or []:
-                    path = str(diagnostic.get("source_path") or "")
-                    for issue in diagnostic.get("quantity_issues") or []:
-                        defects.add(canonical_evidence_sha256({"path": path, "quantity": issue}))
-                    for value in diagnostic.get("unobserved_values") or []:
-                        for number in value.get("missing_numbers") or []:
-                            defects.add(canonical_evidence_sha256({"path": path, "source": value.get("source_excerpt"), "missing_number": number}))
-                        if value.get("required_polarity"):
-                            defects.add(canonical_evidence_sha256({"path": path, "source": value.get("source_excerpt"), "polarity": value["required_polarity"]}))
-            previous_defects = set(previous.get("best_evidence_defects") or previous.get("evidence_defects") or [])
-            best_defects = defects if keys != prior_keys or not previous_defects else previous_defects
-            if previous_defects and defects and defects < previous_defects:
-                best_defects = defects
-                for key in keys:
-                    history.pop(key, None)
-            if attempt not in {previous.get("attempt"), int(previous.get("attempt") or 0) + 1}:
-                for key in prior_keys:
-                    history.pop(key, None)
+            if key not in keys:
+                continue
+            unresolved = _unresolved_evidence_defects(finding)
+            if unresolved is None:
+                evidence_complete = False
             else:
-                for key in prior_keys - keys:
-                    history.pop(key, None)
-            last[target] = {"attempt": attempt, "keys": sorted(keys), "evidence_defects": sorted(defects), "best_evidence_defects": sorted(best_defects)}
+                defects.update(unresolved)
+        if not evidence_complete:
+            defects.clear()
+        previous_defects = set(previous.get("best_evidence_defects") or previous.get("evidence_defects") or [])
+        best_defects = defects if keys != prior_keys or not previous_defects else previous_defects
+        if previous_defects and defects and defects < previous_defects:
+            best_defects = defects
+            for key in keys:
+                history.pop(key, None)
+        if stage == "drafting" and attempt not in {previous.get("attempt"), int(previous.get("attempt") or 0) + 1}:
+            for key in prior_keys:
+                history.pop(key, None)
+        else:
+            for key in prior_keys - keys:
+                history.pop(key, None)
+        last[target] = {"attempt": attempt, "keys": sorted(keys), "evidence_defects": sorted(defects), "best_evidence_defects": sorted(best_defects)}
     for finding, identity, key in rows:
         sets = history.setdefault(key, [])
         epoch = (

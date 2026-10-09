@@ -310,6 +310,128 @@ def test_quantity_from_another_role_does_not_create_an_objective_false_alarm():
     assert detail['release_acceptance'] is False
 
 
+def test_matched_and_paraphrased_quantity_roles_are_checked_separately(tmp_path):
+    source = source_for('Prospective', 'Sterling')
+    source['procedures']['assessments'] = ['The alignment offset is -5 mm.', 'The carrier length is 5 mm.']
+    target = 'study-procedure.visits'
+    batch = next(batch for batch in contracts.batch_plan('Prospective', 'Sterling') if target in batch.section_ids)
+    path = drafting.create_drafting_request(repo_root=ROOT, revision_dir=tmp_path,
+        revision_id='separate-quantity-roles', reference=source, batch=batch,
+        target_ids=[target], attempts={target: 1}, wave='initial')
+    request = json.loads(path.read_text())
+    response = drafting.recorded_acceptance_response(request)
+    for row in response['section_results'][0]['paragraphs']:
+        row['text'] = row['text'].replace('The carrier length is 5 mm.', 'Carrier length measures 5 mm.')
+    accepted, findings = drafting.validate_response(request, response)
+    assert [row['section_id'] for row in accepted['drafts']] == [target]
+    assert all(row.get('publication_disposition') == 'warning' for row in findings)
+
+
+@pytest.mark.parametrize('repair_mode', [
+    'progress', 'progress-facts', 'ineffective', 'cycling', 'malformed-diagnostics', 'malformed-facts',
+    'malformed-partial'])
+def test_independent_review_recovery_tracks_evidence_progress(tmp_path, monkeypatch, repair_mode):
+    from test_clean_delivery import reminder_source
+    from test_handoff_quality import acceptance_verification
+    from rendering import rendered_section_snapshot
+    source = reminder_source()
+    source['statistics']['bias_minimization'] = (
+        'Personnel telephone enrolled participants 13, 17, and 19 days before scheduled follow-up appointments.')
+    passages = [
+        'Personnel telephone enrolled participants before scheduled follow-up appointments.',
+        'Personnel telephone enrolled participants 13 days before scheduled follow-up appointments.',
+        'Personnel telephone enrolled participants 13 and 17 days before scheduled follow-up appointments.',
+        source['statistics']['bias_minimization'],
+    ]
+    facts = ['13', '17', '19']
+    source_facts = {}
+    if repair_mode == 'progress-facts':
+        source['statistics']['bias_minimization'] = (
+            'Personnel telephone enrollees, send email reminders, and post appointment letters.')
+        facts = ['telephone', 'email', 'post']
+        source_facts = {'telephone': 'telephone enrollees', 'email': 'send email reminders',
+                        'post': 'post appointment letters'}
+        passages = [
+            'Personnel assist enrolled participants with follow-up appointments.',
+            'Personnel telephone enrollees about their appointments.',
+            'Personnel telephone enrollees and send email reminders about their appointments.',
+            source['statistics']['bias_minimization'],
+        ]
+    elif repair_mode in {'ineffective', 'malformed-diagnostics', 'malformed-facts', 'malformed-partial'}:
+        # Distinct candidate bytes do not establish evidence progress. Avoid the
+        # earlier unchanged-candidate guard so this exercises final-review stalls.
+        passages = [
+            'Personnel telephone enrolled participants before scheduled follow-up appointments.',
+            'Personnel will telephone enrolled participants before scheduled follow-up appointments.',
+            'Study personnel telephone enrolled participants before scheduled follow-up appointments.',
+            'Study staff telephone enrolled participants before scheduled follow-up appointments.',
+        ]
+    attempts, reviewed_missing = [], []
+    def draft(request):
+        response = drafting.recorded_acceptance_response(request)
+        for row in response.get('section_results', []):
+            if row['section_id'] == 'study-design.bias':
+                index = len(attempts) % 2 if repair_mode == 'cycling' else min(len(attempts), 3)
+                text = passages[index]
+                attempts.append(text)
+                row['paragraphs'] = [{'text': text,
+                    'evidence_refs': ['source:statistics.bias_minimization'], 'boilerplate_refs': []}]
+                row['lists'] = []
+        return response
+    def review(request):
+        response = acceptance_verification(request)
+        if request['task'] != 'clinical_content_verification':
+            return response
+        passage = quality._review_evidence_text(rendered_section_snapshot(
+            tmp_path / 'revisions' / request['revision_id'] / 'candidate/protocol.docx', 'study-design.bias'))
+        missing = [fact for fact in facts if fact not in passage]
+        reviewed_missing.append(missing)
+        if not missing:
+            return response
+        response['status'] = 'blocked'
+        response['findings'] = [{'finding_id': 'reminder-times-omitted', 'artifact': 'protocol',
+            'check': 'source_supported', 'target_ids': ['study-design.bias'],
+            'issue': 'The approved reminder timings are not preserved.',
+            'affected_passage': passage, 'source_excerpt': source['statistics']['bias_minimization'],
+            'recommended_action': 'Restore the approved reminder timings.',
+            'evidence_diagnostics': [{'source_path': 'statistics.bias_minimization',
+                'unobserved_values': [{'source_excerpt': source['statistics']['bias_minimization'],
+                                       'missing_numbers': missing}]}]}]
+        if repair_mode == 'malformed-diagnostics':
+            response['findings'][0]['evidence_diagnostics'] = [None, 'unstructured evidence']
+        elif repair_mode == 'malformed-facts':
+            response['findings'][0]['evidence_diagnostics'] = [
+                {'quantity_issues': [{}], 'unobserved_values': [
+                    {'missing_numbers': [None, {}] if len(attempts) == 1 else [None]}]}]
+        elif repair_mode == 'malformed-partial' and len(attempts) > 1:
+            response['findings'][0]['evidence_diagnostics'][0]['unobserved_values'][0]['missing_numbers'] = [
+                '13', '17', None]
+        elif repair_mode == 'progress-facts':
+            response['findings'][0]['evidence_diagnostics'][0]['unobserved_values'] = [
+                {'source_excerpt': source_facts[fact]} for fact in missing]
+        for row in response['section_assessments']:
+            if row['section_id'] == 'study-design.bias':
+                row['status'] = 'blocked'
+        for decision in response.get('uncertainty_resolutions', []):
+            caution = next(row for row in request['lexical_review_cautions']
+                          if row['caution_sha256'] == decision['caution_sha256'])
+            if caution['section_id'] == 'study-design.bias':
+                decision.update(disposition='confirmed_defect', affected_passage=passage,
+                    source_excerpt=source['statistics']['bias_minimization'],
+                    rationale='Some approved reminder timings are omitted.')
+        return response
+    result, _ = deliver(tmp_path, monkeypatch, source, draft=draft, review=review)
+    if repair_mode.startswith('progress'):
+        assert result['status'] == 'passed', result
+        assert attempts == passages
+        assert reviewed_missing == [facts, facts[1:], facts[2:], []]
+        assert result['warnings'] == []
+    else:
+        assert result['status'] != 'passed' and result.get('stage') == 'internal_recovery_stalled'
+        assert len(attempts) == (4 if repair_mode == 'cycling' else 3)
+        assert not (tmp_path / 'output').exists()
+
+
 def test_negative_wording_proxy_requests_review_instead_of_an_objective_veto():
     detail = drafting.source_evidence_diagnostics(
         'Participant remuneration is absent.', 'risks_benefits.compensation_or_reimbursement', 'None')

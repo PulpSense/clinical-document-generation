@@ -1252,27 +1252,35 @@ def _quantity_claim_issues(content: str, value: Any) -> list[dict[str, str]]:
     leaves = _leaf_texts(value)
     def relation(text: str) -> str:
         return re.sub(r"\s+", " ", pattern.sub("<quantity>", text)).strip().casefold().rstrip(" .!?;")
-    observed_relation = relation(content)
-    bound = [leaf for leaf in leaves if pattern.search(leaf)
-             and re.search(r"[a-z]", relation(leaf).replace("<quantity>", ""))
-             and relation(leaf) in observed_relation]
-    # Quantity substitution has objective authority only in an observable same
-    # relation. A matching numeral or dimension elsewhere may have another role.
-    if not bound:
-        return []
-    source = [match.groups() for leaf in bound for match in pattern.finditer(leaf)]
-    issues = []
-    for number, unit in pattern.findall(content):
-        expected = {(float(source_number), source_unit) for source_number, source_unit in source
-                    if abs(float(number)) == abs(float(source_number)) and unit.casefold() == source_unit.casefold()}
-        # Multiple supplied signs/unit cases require relationship review; do not
-        # guess which source quantity this passage describes.
-        if len(expected) != 1:
+    # Retain the actual matched passage. Once one source relation matches, other
+    # quantities elsewhere in the section still have their own clinical roles.
+    relations: dict[str, set[tuple[tuple[str, str], ...]]] = {}
+    for leaf in leaves:
+        template = relation(leaf)
+        if pattern.search(leaf) and re.search(r"[a-z]", template.replace("<quantity>", "")):
+            relations.setdefault(template, set()).add(tuple(pattern.findall(leaf)))
+    matched = []
+    for template, variants in relations.items():
+        # Identically worded source relations with different values are ambiguous.
+        if len(variants) != 1:
             continue
-        source_number, source_unit = next(iter(expected))
-        if float(number) != source_number or unit != source_unit:
-            issues.append({"source_quantity": str(source_number), "observed_quantity": number,
-                           "source_unit": source_unit, "observed_unit": unit})
+        expression = re.escape(template).replace(r"\ ", r"\s+").replace("<quantity>", pattern.pattern)
+        for match in re.finditer(expression, content, re.I):
+            groups = match.groups()
+            matched.append((next(iter(variants)), list(zip(groups[::2], groups[1::2]))))
+    issues = []
+    for source, observed in matched:
+        for number, unit in observed:
+            expected = {(float(source_number), source_unit) for source_number, source_unit in source
+                        if abs(float(number)) == abs(float(source_number)) and unit.casefold() == source_unit.casefold()}
+            # Multiple supplied signs/unit cases require relationship review; do
+            # not guess which source quantity this passage describes.
+            if len(expected) != 1:
+                continue
+            source_number, source_unit = next(iter(expected))
+            if float(number) != source_number or unit != source_unit:
+                issues.append({"source_quantity": str(source_number), "observed_quantity": number,
+                               "source_unit": source_unit, "observed_unit": unit})
     # Compare physical quantities only when both passages supply one distinct
     # quantity in that dimension. Multiple doses or roles require interpretation;
     # a bag of numerals cannot establish which quantity belongs to which role.
@@ -1289,10 +1297,9 @@ def _quantity_claim_issues(content: str, value: Any) -> list[dict[str, str]]:
                 dimension, scale = scales[unit]
                 grouped.setdefault(dimension, set()).add(Decimal(number) * Decimal(scale))
         return grouped
-    supplied = quantities(source)
-    observed = quantities(pattern.findall(content))
-    source_anchors = _grounding_tokens(" ".join(_leaf_texts(value))) - set(scales)
-    if source_anchors & _grounding_tokens(content):
+    for source, observed_rows in matched:
+        supplied = quantities(source)
+        observed = quantities(observed_rows)
         for dimension in supplied.keys() & observed.keys():
             if len(supplied[dimension]) == len(observed[dimension]) == 1 and supplied[dimension] != observed[dimension]:
                 issues.append({"dimension": dimension,

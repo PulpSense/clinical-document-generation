@@ -465,7 +465,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_quantity_claim_issues",
-      "code_sha256": "793c747c0ee8ab03120977b8ea91deb977363a6e327298758acf0188af8c088d",
+      "code_sha256": "a4b2419580b24c3613d3f7e630a7d2684b688d5a950f9ef2b90be3779908a26f",
       "family": "evidence",
       "authority_contract": {
         "authority": "objective",
@@ -473,7 +473,8 @@
       },
       "behavioral_evidence": {
         "valid": [
-          "test_general_delivery_reliability.py::test_narrative_quantity_representation_reaches_independent_review"
+          "test_general_delivery_reliability.py::test_narrative_quantity_representation_reaches_independent_review",
+          "test_general_delivery_reliability.py::test_matched_and_paraphrased_quantity_roles_are_checked_separately"
         ],
         "invalid": [
           "test_general_delivery_reliability.py::test_unambiguous_quantity_changes_still_require_correction"
@@ -918,7 +919,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "eaf4e9bbadf16c751bc4aeb4a25b301858d31f96bdab8fda19423a06f8e229ae"
+      "code_sha256": "37b6f167d4b0eda6b39d60ba2349766dc4d457852a2b79348a69944ffa21c0ee"
     },
     {
       "file": "scripts/quality.py",
@@ -1364,14 +1365,15 @@
     {
       "file": "scripts/workflow.py",
       "function": "_repeated_drafting_findings",
-      "code_sha256": "1566faefc86aad132de47fc5935bb4462fa5da0b0400cb04be276cd1ca7c4d39",
+      "code_sha256": "5fe7201904ed431792ed6582a35add4eb95fc9eed7f98c6e1e58ca77e9e0816c",
       "family": "recovery",
       "behavioral_evidence": {
         "valid": [
-          "test_general_delivery_reliability.py::test_materially_improving_repairs_finish_despite_unchanged_finding_text"
+          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
         ],
         "invalid": [
-          "test_general_delivery_reliability.py::test_ineffective_or_cycling_quantity_repairs_never_publish"
+          "test_general_delivery_reliability.py::test_ineffective_or_cycling_quantity_repairs_never_publish",
+          "test_reliability_maintenance.py::test_repeated_identical_drafting_finding_stops_after_three_review_sets"
         ]
       }
     },
@@ -1444,6 +1446,20 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_unresolved_evidence_defects",
+      "code_sha256": "4b664728d0d8534058d721e6d15cc9fb613f3c3ccf59b825f5fed4772a4f3452",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
+        ]
+      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

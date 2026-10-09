@@ -23,7 +23,9 @@ repaired and reviewed again; no one-shot waiver is introduced.
 
 Recovery compares unresolved evidence rather than repeated issue wording. A
 strict reduction relative to the best prior evidence state permits continued
-repair within the original deadline. Cosmetic edits, ineffective repairs and
+repair during drafting and final independent review within the original deadline.
+The reviewer reports source paths and unresolved facts; malformed feedback earns
+no progress reset. Cosmetic edits, ineffective repairs and
 cycling between previously seen defect sets do not earn fresh progress.
 
 ## Evidence and its limits
