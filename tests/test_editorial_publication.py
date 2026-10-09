@@ -1,4 +1,4 @@
-"""Minor review findings must not turn a complete package into review copies."""
+"""Confirmed editorial defects are repaired before clean client-ready delivery."""
 import json
 from pathlib import Path
 
@@ -47,7 +47,7 @@ def repetition_review(root, branch, template, render_report=None):
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES)
-def test_warning_only_review_publishes_normal_exact_bytes_with_location(tmp_path, monkeypatch, branch, template):
+def test_confirmed_repetition_cannot_publish_before_repair(tmp_path, monkeypatch, branch, template):
     from test_atomic_delivery import _publish_fixture
     # Byte sentinels isolate publication from clinical/visual content assessment.
     # Real requests, artifact bindings, final review and atomic publication run.
@@ -65,25 +65,22 @@ def test_warning_only_review_publishes_normal_exact_bytes_with_location(tmp_path
     (revision / "approved-reference.json").write_text(json.dumps(source))
     repetition_review(revision, branch, template, build["render_report"])
     report = quality.quality_report(revision, source, build["render_report"], None)
-    assert report["status"] == "passed"
-    result = workflow._publish(run, revision, source, report)
-    expected = ["protocol.docx"] if branch == "Retrospective" else ["icf.docx", "protocol.docx", "study.xml"]
-    assert sorted(path.name for path in (run / "output").iterdir()) == expected
-    assert result["status"] == "passed"
-    number = "9.3" if branch == "Retrospective" else "10.3"
-    assert result["warnings"][0]["document_locations"] == [f"Protocol §{number} — General Statistical Considerations"]
-    assert (run / "output/protocol.docx").read_bytes() == b"new protocol"
-    assert result["desktop_reply"]["cautions"] == result["warnings"]
+    assert report["status"] == "blocked"
+    assert report["warnings"] == []
+    assert any(item.get("recovery_class") == "drafting_defect" for item in report["findings"])
+    with pytest.raises(RuntimeError, match="final verification is incomplete"):
+        workflow._publish(run, revision, source, report)
+    assert (run / "output/protocol.docx").read_bytes() == b"old protocol"
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES)
-def test_structured_minor_repetition_needs_no_optional_magic_labels(tmp_path, branch, template):
+def test_structured_minor_repetition_routes_to_repair_without_optional_labels(tmp_path, branch, template):
     path, _, _ = repetition_review(tmp_path, branch, template)
     findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
     assert len(findings) == 1
-    assert findings[0]["publication_disposition"] == "warning"
+    assert findings[0]["recovery_class"] == "drafting_defect"
     assert findings[0]["target_ids"] == ["analysis-plan.considerations"]
-    assert quality.verification_response_is_complete(tmp_path, path)
+    assert not quality.verification_response_is_complete(tmp_path, path)
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES[1:])
@@ -101,7 +98,7 @@ def test_icf_editorial_repetition_is_distinct_from_material_cost_disclosure(tmp_
         "obscures_required_information": False, "materially_unusable": False,
     }]
     response_path.write_text(json.dumps(response))
-    assert quality.verification_response_is_complete(tmp_path, path) is (not material)
+    assert not quality.verification_response_is_complete(tmp_path, path)
 
 
 @pytest.mark.parametrize("mutation", ["material", "safety", "unknown", "wrong-owner", "missing-flag", "stale"])
@@ -120,7 +117,7 @@ def test_repetition_warning_preserves_material_and_response_guards(tmp_path, mut
 
 @pytest.mark.parametrize("branch,template", FAMILIES)
 @pytest.mark.parametrize("safety", ["absent", True])
-def test_previously_valid_structured_warning_remains_compatible_without_hiding_safety(tmp_path, branch, template, safety):
+def test_legacy_structured_repetition_requires_repair_with_or_without_safety_flag(tmp_path, branch, template, safety):
     path, response_path, response = repetition_review(tmp_path, branch, template)
     finding = response["findings"][0]
     finding.update(code="protocol-concept-repetition", disposition="manual_review")
@@ -129,7 +126,7 @@ def test_previously_valid_structured_warning_remains_compatible_without_hiding_s
     else:
         finding["safety_critical"] = safety
     response_path.write_text(json.dumps(response))
-    assert quality.verification_response_is_complete(tmp_path, path) is (safety == "absent")
+    assert not quality.verification_response_is_complete(tmp_path, path)
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES[1:])

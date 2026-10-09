@@ -269,7 +269,7 @@ def test_rendered_icf_assessment_detects_renderer_only_generated_duplication(tmp
     assert assessment["status"] == "passed"
     finding = assessment["findings"][0]
     assert finding["code"] == "icf-exact-generated-duplication"
-    assert finding["publication_disposition"] == "warning"
+    assert finding["recovery_class"] == "drafting_defect"
     assert finding["target_ids"] == ["icf.key-information-summary"]
     assert finding["detail_section"] == "icf.procedures"
     assert finding["repair_action"] == "redraft_summary"
@@ -325,7 +325,7 @@ def test_draft_time_icf_duplication_retries_summary_and_preserves_detail(tmp_pat
 
     accepted_ids = {item["section_id"] for item in (accepted or {}).get("drafts", [])}
     assert "icf.risks" in accepted_ids
-    assert "icf.key-information-summary" not in accepted_ids
+    assert "icf.key-information-summary" in accepted_ids
     duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
     assert duplicate["target_ids"] == ["icf.key-information-summary"]
 
@@ -601,7 +601,7 @@ def test_content_review_request_requires_structured_protocol_concept_findings(tm
     ):
         assert field in instructions
     assert "generic similarity percentage" in instructions
-    assert "manual review" in instructions
+    assert "independently verified" in instructions
 
 
 def test_protocol_secondary_sections_do_not_own_complete_schedule_or_methods():
@@ -718,7 +718,7 @@ def test_draft_time_icf_duplicate_targets_summary_and_preserves_detail(tmp_path)
     accepted_ids = {item["section_id"] for item in (accepted or {}).get("drafts", [])}
     assert duplicate["target_ids"] == ["icf.key-information-summary"]
     assert "icf.study-purpose" in accepted_ids
-    assert "icf.key-information-summary" not in accepted_ids
+    assert "icf.key-information-summary" in accepted_ids
 
 
 def test_protocol_operational_design_contract_preserves_eye_specific_assignment():
@@ -804,8 +804,8 @@ def test_protocol_repetition_verifier_finding_remains_structured_manual_review(t
     assert finding["concept_id"] == "statistical-methods"
     assert finding["primary_section"] == "analysis-plan.methodology"
     assert finding["secondary_section"] == "analysis-plan.considerations"
-    assert finding["publication_disposition"] == "warning"
-    assert finding["action"] == "manual_review"
+    assert finding["recovery_class"] == "drafting_defect"
+    assert finding["action"] == "retry_drafting_target"
 
 
 def test_repetition_finding_cannot_contradict_passing_section_assessment(tmp_path):
@@ -1024,14 +1024,14 @@ def test_final_exact_review_recomputes_deterministic_protocol_warnings(tmp_path,
 
     report = quality.quality_report(tmp_path, reference, render_report, None)
 
-    assert report["status"] == "passed"
+    assert report["status"] == "blocked"
     assert report["warnings"] == [warning]
     assert quality.final_exact_artifact_review_findings(
         tmp_path,
         reference,
         render_report,
         report,
-    ) == []
+    ) != []
 
 
 def test_production_icf_assessment_receives_explicit_fixed_boilerplate_exemptions(tmp_path, monkeypatch):

@@ -38,7 +38,7 @@ def test_missing_completion_rule_does_not_force_invented_visit_criterion(tmp_pat
     assert completion_contract["minimum_evidence"] == ["study.timeline"]
     assert completion_contract["fixed_boilerplate"] == []
     assert completion_contract["allowed_modes"] == ["agent_draft"]
-    assert "do not derive one" in completion_contract["content_expectations"][0]
+    assert "procedures.completion" not in completion_contract["minimum_evidence"]
     result = next(item for item in response["section_results"] if item["section_id"] == "endpoint-criteria.completion")
     result["paragraphs"] = [{
         "text": "The planned participant follow-up is 3 months. Participant completion and discontinuation are distinct dispositions; the visit schedule is described in Section 15.",

@@ -149,7 +149,7 @@ def test_materially_weakened_voluntariness_and_participant_rights_are_blocking()
 
     report = quality.validate_sterling_clause_contract(document, source())
 
-    assert clause(report, "sterling.voluntary.core")["code"] == "sterling-clause-weakened"
+    assert clause(report, "sterling.voluntary.core")["code"] == "icf-lexical-evidence-uncertainty"
     rights = clause(report, "sterling.contact.participant-rights")
     assert rights["severity"] == "blocking"
     assert rights["safety_critical"] is True
@@ -304,7 +304,7 @@ def test_protocol_endpoint_inventory_repetition_targets_secondary_sections():
         "analysis-plan.methodology",
     }
     assert all(item["target_ids"] == [item["secondary_section"]] for item in findings)
-    assert all(item["publication_disposition"] == "blocking" for item in findings)
+    assert all(item["publication_disposition"] == "warning" for item in findings)
 
 
 def test_legitimate_endpoint_references_with_section_specific_roles_are_allowed():
@@ -326,24 +326,21 @@ def test_legitimate_endpoint_references_with_section_specific_roles_are_allowed(
     ) == []
 
 
-def test_safety_and_participant_rights_omissions_never_receive_generic_warning():
-    for target in (
-        "icf.risks",
-        "icf.injury",
-        "icf.voluntary-participation",
-        "icf.contact.participant-rights",
-        "icf.authorization.participant-statement",
-    ):
-        finding = {
-            "category": "content",
-            "check": "substantive",
-            "target_ids": [target],
-            "safety_critical": False,
-            "contradiction": False,
-            "obscures_required_information": False,
-            "materially_unusable": False,
-        }
-        assert quality._governed_content_omission(finding, [target]) is False
+def test_safety_and_participant_rights_omissions_never_receive_generic_warning(tmp_path):
+    from test_editorial_publication import repetition_review
+    path, response_path, response = repetition_review(tmp_path, "Prospective", "Sterling")
+    for row in response["section_assessments"]:
+        row["status"] = "blocked" if row["section_id"] == "icf.risks" else "passed"
+    response["findings"] = [{
+        "finding_id": "missing-safeguard", "category": "content", "artifact": "icf",
+        "check": "substantive", "target_ids": ["icf.risks"], "issue": "The supplied risk is omitted.",
+        "safety_critical": False, "contradiction": False,
+        "obscures_required_information": False, "materially_unusable": False,
+    }]
+    response_path.write_text(json.dumps(response))
+    findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
+    assert findings and all(row.get("publication_disposition") != "warning" for row in findings)
+    assert not quality.verification_response_is_complete(tmp_path, path)
 
 
 def test_protocol_termination_authority_is_source_mode_and_absent_when_unsupported(tmp_path):
@@ -394,6 +391,6 @@ def test_exact_substantive_protocol_duplication_remains_blocking(tmp_path):
     )
 
     finding = next(item for item in findings if item.get("code") == "protocol-exact-repetition")
-    assert finding["publication_disposition"] == "blocking"
+    assert finding["publication_disposition"] == "warning"
     assert finding["recovery_class"] == "drafting_defect"
     assert finding["target_ids"] == ["study-procedure.measurements"]

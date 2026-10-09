@@ -137,8 +137,8 @@ def test_skill_keeps_each_study_in_a_named_collision_safe_run_directory():
     )
     assert "first unused suffix" in policy
     assert "every workflow command's `--run-dir`" in policy
-    assert "final deliverables only in `<run-folder>/output/`" in policy
-    assert "`client_outputs` is the workflow result field" in policy
+    assert "verified deliverables in `<run-folder>/output/`" in policy
+    assert "`client_outputs` lists only passed deliverables" in policy
 
 
 def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():

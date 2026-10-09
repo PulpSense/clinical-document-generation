@@ -526,7 +526,7 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 - Sterling output must satisfy `references/sterling-clause-contract.json`. Validate substantive body language and section placement, not headings or signatures alone. Insert conditional or source-dependent clauses only when their declared approved-input trigger is present; never retain an untriggered template option or invent legal, regulatory, payment, injury, privacy, authorization, or contact terms. Exact governed clauses may be moved intact to repair placement, but a materially altered or missing safeguard requires targeted redrafting or blocks delivery.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
-- ICF section ownership is template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Introduction summarizes approved background and the evidence gap without repeating a speculative comparison for the untested combination; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Section 15 prose briefly introduces its source-derived table and only genuinely unallocated notes. Study Completion states the supplied closeout timeline and defines a completion trigger only when supplied, without repeating visits or the exit form. Summary of benefits owns potential clinical benefit; Section 17 owns payment and reimbursement. General Statistical Considerations states a source-supported interpretation point without repeating endpoint methods. Short role-specific references are allowed. Repetition without a factual or consent-language defect is retained as an editorial warning.
+- ICF section ownership is template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Introduction summarizes approved background and the evidence gap without repeating a speculative comparison for the untested combination; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Section 15 prose briefly introduces its source-derived table and only genuinely unallocated notes. Study Completion states the supplied closeout timeline and defines a completion trigger only when supplied, without repeating visits or the exit form. Summary of benefits owns potential clinical benefit; Section 17 owns payment and reimbursement. General Statistical Considerations states a source-supported interpretation point without repeating endpoint methods. Short role-specific references are allowed. Repetition heuristics request independent meaning and readability review. Accept valid stylistic alternatives; correct confirmed editorial defects through their owning section before final review.
 - `meta.date` defaults once, during `prepare`, to `dd MMM yyyy`. `meta.version` remains blank unless the approved source supplies it.
 
 ## PRS XML authority
@@ -555,12 +555,32 @@ openable Desktop files, not inline-code paths, and must not include QA artifacts
 time and its runtime classification. A 10–20 minute result meets the normal
 target; a successful result above 20 minutes is diagnostic evidence but remains
 within the operation until the 45-minute correctness ceiling.
-If a passed result contains `warnings`, deliver the complete package and briefly
-name each caution with its `document_locations` and plain-language concern.
-Minor editorial findings publish normal filenames with this delivery note;
-they do not require another drafting attempt or a review-only label. If a check
-did not identify a location, say so instead of guessing a section. Keep the
-caution in the delivery message, outside the documents.
+Normal client-ready delivery has a clean message. Keep fixed defects, dismissed
+false alarms, reference length goals, and repair history in the internal evidence.
+For each `lexical_review_cautions` item, the content reviewer must return an
+`uncertainty_resolutions` decision with its `caution_sha256`, `disposition`
+(`faithful`, `confirmed_defect`, or `source_clarification`), a source-grounded
+`rationale`, an exact `source_excerpt` from its approved or template evidence,
+and an `affected_passage` from the current artifact passage. A bare pass or
+request to ignore a checker is insufficient. Code binds the decision to the
+source, section, artifact, rule, request, and reviewer; changed evidence requires
+fresh review. Review every section and every rendered page even when code passes.
+
+Correct confirmed prose and editorial defects through drafting, deterministic
+cell/mapping defects through construction, and layout defects through rendering.
+Verify changed output and obtain final independent exact-artifact review; an
+attempted correction alone never establishes success. Reviewers cannot waive an
+objective factual, exact-text, structure, integrity, or delivery failure.
+
+If a passed result contains `warnings`, disclose each meaningful remaining
+limitation with its `document_locations` and plain-language concern, outside the
+documents. Only an explicit nonmaterial external limitation may use the review
+check `client_limitation`: include `remaining_limitation: true`, a
+`limitation_kind` of `external_dependency` or `client_environment`,
+`why_not_repairable`, `recommended_action`, and explicit false values for
+`material`, `safety_critical`, `contradiction`, `obscures_required_information`,
+and `materially_unusable`. This does not waive a clinical defect or incomplete
+verification. Do not add a caution for an issue already fixed or dismissed.
 
 If `status: review_required`, make every file in `review_outputs` individually accessible to the recipient; list each exact path or attach each file. Include the `review_findings` path. For each flagged concern, quote its `document_locations` from that report beside a plain-language explanation (for example, “Protocol §13.3 — Procedures for Recording and Reporting AEs and SAEs”). If the check supplied no document location, say so instead of guessing a section. The diagnostic ZIP is additional evidence, not a substitute for the individual review files. State that automated checks can sometimes flag a valid document, and ask the recipient to compare each concern with the approved source and relevant passage. Label the files as review copies until the concern is resolved; they are not client-ready deliverables. If `status: blocked` without review outputs, report the diagnostic ZIP, one consolidated technical blocker, and the repair report; state that no complete review files were produced. Never present partial or unbound candidates as usable documents.
 

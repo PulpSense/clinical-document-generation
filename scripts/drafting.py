@@ -1247,6 +1247,25 @@ def hypothesis_claim_issues(content: str, value: Any) -> list[str]:
     return issues
 
 
+def _quantity_claim_issues(content: str, value: Any) -> list[dict[str, str]]:
+    """Detect explicit sign or unit-case changes in an unambiguous supplied quantity."""
+    pattern = re.compile(r"(?<![\w.])([+-]?\d+(?:\.\d+)?)\s*(mL|mg|ug|µg|mcg|kg|mm|cm|kPa|mmHg|IU|mIU|L)\b", re.I)
+    source = [match.groups() for leaf in _leaf_texts(value) for match in pattern.finditer(leaf)]
+    issues = []
+    for number, unit in pattern.findall(content):
+        expected = {(float(source_number), source_unit) for source_number, source_unit in source
+                    if abs(float(number)) == abs(float(source_number)) and unit.casefold() == source_unit.casefold()}
+        # Multiple supplied signs/unit cases require relationship review; do not
+        # guess which source quantity this passage describes.
+        if len(expected) != 1:
+            continue
+        source_number, source_unit = next(iter(expected))
+        if float(number) != source_number or unit != source_unit:
+            issues.append({"source_quantity": str(source_number), "observed_quantity": number,
+                           "source_unit": source_unit, "observed_unit": unit})
+    return issues
+
+
 def source_evidence_diagnostics(content: str, path: str, value: Any, *, all_items: bool = False) -> dict[str, Any]:
     """Shared draft/render decision and actionable feedback, never release approval."""
     if semantic_evidence_contract(path, value):
@@ -1259,6 +1278,10 @@ def source_evidence_diagnostics(content: str, path: str, value: Any, *, all_item
         }
     else:
         report = _evidence_diagnostics(content, value, all_items=all_items)
+    quantity_issues = _quantity_claim_issues(content, value)
+    if quantity_issues:
+        report["passed"] = False
+        report["quantity_issues"] = quantity_issues
     return {**report, "source_path": path, "release_acceptance": False}
 
 
@@ -1272,6 +1295,7 @@ def lexical_evidence_uncertainty(diagnostics: Iterable[Mapping[str, Any]]) -> bo
     records = list(diagnostics)
     return bool(records) and all(
         record.get("validation_mode") == "deterministic_anchors"
+        and not record.get("quantity_issues")
         and record.get("unobserved_values")
         and all(
             "required_anchor_count" in value
@@ -2050,7 +2074,6 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         for section_id, contract in expected_contracts.items()
         if section_id in results_by_id
     ]
-    duplicate_target_ids: set[str] = set()
     repeatable_icf_text = [
         str(block.get("text") or "")
         for contract in expected_contracts.values()
@@ -2068,11 +2091,12 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             else section_id
         )
         preserved_section = section_id if target_section == prior_section else prior_section
-        duplicate_target_ids.add(target_section)
         findings.append({
             "category": "drafting",
             "field": target_section,
             "target_ids": [target_section],
+            "code": "draft-repetition-uncertainty",
+            "publication_disposition": "warning",
             "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
             "next_action": f"Rewrite only {target_section} with independent source-grounded prose; preserve {preserved_section}.",
         })
@@ -2188,6 +2212,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                     "field": section_id,
                     "target_ids": [section_id],
                     "code": "icf-concept-repetition",
+                    "publication_disposition": "warning",
                     "primary_section": "icf.background",
                     "secondary_section": section_id,
                     "issue": "PURPOSE materially repeats the clinical background, comparative evidence, or rationale owned by BACKGROUND.",
@@ -2286,12 +2311,13 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                             "issue": f"KEY INFORMATION concept {concept} cites but omits retained voluntary-participation text.",
                             "next_action": "Include the retained voluntary-participation statement in the summary text.",
                         })
-        section_findings = findings[section_finding_count:]
+        section_findings = [row for row in findings[:section_finding_count]
+                            if row.get("code") == "draft-repetition-uncertainty" and row.get("field") == section_id] + findings[section_finding_count:]
         blocking_section_findings = [
             finding for finding in section_findings
             if finding.get("publication_disposition") != "warning"
         ]
-        if not blocking_section_findings and section_id not in duplicate_target_ids:
+        if not blocking_section_findings:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
     return {"kind": "sections", "drafts": accepted}, findings
 
@@ -2522,8 +2548,9 @@ def accepted_cross_section_duplicate_findings(
             "field": current,
             "target_ids": [current],
             "issue": f"Exact prose is duplicated across authenticated Protocol sections {prior} and {current} before rendering.",
-            "recovery_class": "drafting_defect",
-            "action": "retry_drafting_target",
+            "code": "draft-repetition-uncertainty",
+            "publication_disposition": "warning",
+            "action": "manual_review",
         }
         for prior, current in _cross_section_duplicate_pairs(records)
     ]
@@ -2545,8 +2572,9 @@ def accepted_cross_section_duplicate_findings(
             "field": summary,
             "target_ids": [summary],
             "issue": f"A generated ICF summary sentence is duplicated in {detail} before rendering.",
-            "recovery_class": "drafting_defect",
-            "action": "retry_drafting_target",
+            "code": "draft-repetition-uncertainty",
+            "publication_disposition": "warning",
+            "action": "manual_review",
         })
     return findings
 

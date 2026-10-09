@@ -197,7 +197,7 @@ def test_warning_only_drafting_response_is_accepted_and_reported(tmp_path, monke
     assert quality._accepted_drafting_warnings(tmp_path) == [warning]
 
 
-def test_final_quality_keeps_drafting_and_render_warnings_without_blocking(tmp_path, monkeypatch):
+def test_final_quality_keeps_unreviewed_history_and_requires_a_resolution(tmp_path, monkeypatch):
     accepted = tmp_path / "hermes/accepted/icf.background.json"
     accepted.parent.mkdir(parents=True)
     drafting_warning = {
@@ -219,6 +219,6 @@ def test_final_quality_keeps_drafting_and_render_warnings_without_blocking(tmp_p
 
     report = quality.quality_report(tmp_path, reference, render, None)
 
-    assert report["status"] == "passed"
+    assert report["status"] == "blocked"
     assert report["warnings"] == [drafting_warning, render_warning]
-    assert quality.final_exact_artifact_review_findings(tmp_path, reference, render, report) == []
+    assert all(item['code'] == 'uncertainty_resolution_required' for item in report['findings'])

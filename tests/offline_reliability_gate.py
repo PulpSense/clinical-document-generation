@@ -27,7 +27,7 @@ TEST_FILES = (
     'test_prs_quality_corrections.py', 'test_prs_xml.py', 'test_worker_readiness.py',
     'test_mixed_visit_representations.py', 'test_semantic_evidence_recovery.py',
     'test_concept_reference_grounding.py',
-    'test_owner_aware_recovery.py',
+    'test_owner_aware_recovery.py', 'test_review_resolutions.py',
     'test_editorial_publication.py', 'test_phase1_repetition.py',
 )
 
@@ -54,7 +54,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'section_evidence_value', 'semantic_evidence_contract', 'assessment_matrix',
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
                 '_matrix_visit_alias', '_schedule_activity_identity', 'lexical_evidence_uncertainty',
-                '_lexical_review_cautions', '_reviewed_lexical_warnings',
+                '_lexical_review_cautions', '_reviewed_lexical_warnings', '_review_evidence_text', '_quantity_claim_issues',
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',
                 '_rendered_heading_text', '_target_heading',
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',
@@ -83,6 +83,40 @@ def audit_findings(root: Path = ROOT) -> list[str]:
     for key in sorted(expected.keys() | actual.keys()):
         if expected.get(key) != actual.get(key):
             findings.append(f'Blocking-check audit requires review: {key[0]}:{key[1]}')
+    for path in sorted((root / 'scripts').glob('*.py')):
+        for node in ast.walk(ast.parse(path.read_text())):
+            if not isinstance(node, ast.Dict):
+                continue
+            values = {key.value: value.value for key, value in zip(node.keys, node.values)
+                      if isinstance(key, ast.Constant) and isinstance(value, ast.Constant)}
+            code = str(values.get('code') or '')
+            if (any(token in code for token in ('lexical', 'repetition', 'word-goal'))
+                    and values.get('publication_disposition') == 'blocking'):
+                findings.append(f'Unjustified lexical publication veto: {path.relative_to(root)}:{node.lineno}')
+    for item in audit['checks']:
+        family = audit.get('families', {}).get(item.get('family'), {})
+        contract = {**family.get('authority_contract', {}), **item.get('authority_contract', {})}
+        required = ('requirement', 'evidence', 'authority', 'resolution_authority', 'repair_owner')
+        if (any(not contract.get(field) for field in required)
+                or contract.get('authority') not in {'objective', 'uncertainty', 'mixed'}):
+            findings.append(f"Blocking-check authority contract requires review: {item['file']}:{item['function']}")
+        behavior = item.get('behavioral_evidence') or family.get('behavioral_evidence')
+        if behavior is None:
+            findings.append(f"Blocking-check paired behavioral evidence is missing: {item['function']}")
+        else:
+            for role in ('valid', 'invalid'):
+                nodes = behavior.get(role, [])
+                if not nodes:
+                    findings.append(f"Blocking-check paired {role} evidence is missing: {item['function']}")
+                for node in nodes:
+                    filename, _, name = node.partition('::')
+                    path = root / 'tests' / filename
+                    if (not path.is_file() or not name or not any(
+                            isinstance(test, ast.FunctionDef) and test.name == name
+                            for test in ast.parse(path.read_text()).body)):
+                        findings.append(f"Blocking-check behavioral evidence is invalid: {node}")
+        if contract.get('authority') == 'uncertainty' and contract.get('resolution_authority') != 'independent_source_grounded_review':
+            findings.append(f"Lexical publication veto is unjustified: {item['function']}")
     return findings
 
 

@@ -41,7 +41,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
-from drafting import accepted_cross_section_duplicate_findings, governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
+from drafting import governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
 from quality import audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
@@ -244,6 +244,61 @@ def performance_classification(elapsed_seconds: float) -> str:
     if elapsed_seconds <= NORMAL_RUNTIME_TARGET_MAX_SECONDS:
         return "target_window"
     return "above_target_within_deadline"
+
+
+def delivery_reliability_metrics(
+    operations: Sequence[Mapping[str, Any]], *, evidence_kind: str,
+) -> dict[str, Any]:
+    """Aggregate retained operation evidence without treating byte changes as review."""
+    if evidence_kind not in {"controlled_fixture", "simulated", "historical", "fresh_linux"}:
+        raise ValueError("Delivery metrics require an explicit evidence provenance.")
+    complete = clean = dismissed = reviewed = limitations = classified = unnecessary = 0
+    latencies: list[float] = []
+    owners: dict[str, dict[str, int]] = {}
+    for operation in operations:
+        result = operation.get("result") or {}
+        quality = operation.get("quality") or {}
+        expected = set(document_set(operation.get("study_type")))
+        outputs = [Path(path).name for path in result.get("client_outputs", [])]
+        delivered = (result.get("status") == "passed" and quality.get("status") == "passed"
+                     and result.get("delivery", {}).get("confirmed") is True
+                     and bool(expected) and set(outputs) == expected and len(outputs) == len(expected))
+        complete += int(delivered)
+        remaining = list(quality.get("warnings") or [])
+        clean += int(delivered and not remaining)
+        limitations += len(remaining)
+        dismissed += len({row["caution_sha256"] for row in quality.get("resolved_evidence_cautions", [])
+                          if row.get("disposition") == "faithful"})
+        reviewed += len({row["caution_sha256"]
+                         for record in (quality.get("verification_evidence") or {}).values()
+                         for row in record.get("lexical_review_cautions", [])})
+        if isinstance(operation.get("unnecessary_stop"), bool):
+            classified += 1
+            unnecessary += int(operation["unnecessary_stop"])
+        elapsed = result.get("elapsed_seconds")
+        if isinstance(elapsed, (int, float)) and not isinstance(elapsed, bool) and math.isfinite(elapsed) and elapsed >= 0:
+            latencies.append(float(elapsed))
+        for action in operation.get("recovery_actions", []):
+            owner = str(action.get("triggering_finding", {}).get("owner") or "unclassified")
+            counts = owners.setdefault(owner, {"numerator": 0, "denominator": 0})
+            counts["denominator"] += 1
+            # The complete final independent review certifies the corrected bytes.
+            counts["numerator"] += int(delivered and action.get("candidate_bytes_changed") is True
+                                       and action.get("target_bytes_changed") is True)
+    return {
+        "schema_version": "delivery-reliability-metrics/v1", "status": "passed",
+        "evidence_kind": evidence_kind,
+        "complete_delivery": {"numerator": complete, "denominator": len(operations)},
+        "clean_delivery": {"numerator": clean, "denominator": complete},
+        "dismissed_false_alarms": {"numerator": dismissed, "denominator": reviewed},
+        "unnecessary_stops": {"numerator": unnecessary, "denominator": classified,
+                              "unclassified": len(operations) - classified},
+        "repair_success_by_owner": owners,
+        "unresolved_client_limitations": {"count": limitations, "operations": len(operations)},
+        "latency_seconds": {"measured_operations": len(latencies), "total": sum(latencies),
+                            "mean": sum(latencies) / len(latencies) if latencies else None,
+                            "maximum": max(latencies) if latencies else None},
+    }
 
 
 def _active_release_identity(skill_root: Path) -> dict[str, Any]:
@@ -8857,28 +8912,6 @@ def generate(
             revision_dir, reference_path, working_reference,
         )
         return {"status": "blocked", "stage": "drafting", "findings": [{"category": "drafting", "field": item, "issue": "Required section has no accepted draft after all requests were processed."} for item in missing], "client_outputs": []}
-    duplicate_findings = accepted_cross_section_duplicate_findings(
-        revision_dir,
-        reference,
-        expected_governing,
-    )
-    if duplicate_findings:
-        return _quality_retry(
-            run_dir,
-            reference_path,
-            working_reference,
-            reference,
-            revision_dir,
-            attempts,
-            duplicate_findings,
-            "pre_render_content",
-            contracted_bundle=bundle,
-            operation_deadline=operation_deadline,
-            clock=clock,
-            stage_observer=stage_observer,
-            require_promoted_runtime=require_promoted_runtime,
-        )
-
     observe_stage("drafting")
     model = merged_drafts(revision_dir, reference, expected_governing)
     font_substitutions = {
@@ -9530,6 +9563,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--package-release", metavar="ARCHIVE", help="create an immutable candidate archive")
     parser.add_argument("--provision-candidate", action="store_true", help="install the packaged PDFium runtime into an extracted certification candidate")
     parser.add_argument("--bind-certification", metavar="REPORT", help="embed a passing full-corpus report in --release-archive")
+    parser.add_argument("--delivery-metrics", metavar="RECORDS_JSON", help="summarize retained operation records and explicit evidence_kind; does not run generation")
     parser.add_argument("--release-archive", help="candidate archive used with --bind-certification")
     parser.add_argument("--verify-installation", action="store_true", help="smoke-test this installed release")
     parser.add_argument("--install-release", metavar="ARCHIVE", help="atomically install and activate a certified release archive")
@@ -9550,6 +9584,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.internal_pending_activation_smoke and not args.verify_installation:
         parser.error("internal pending activation smoke requires --verify-installation")
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
+    elif args.delivery_metrics:
+        records = _read(Path(args.delivery_metrics))
+        result = delivery_reliability_metrics(records["operations"], evidence_kind=records["evidence_kind"])
     elif args.package_release: result = package_release(SCRIPT_DIR.parent, Path(args.package_release))
     elif args.provision_candidate:
         result = provision_render_assurance(SCRIPT_DIR.parent)
@@ -9610,7 +9647,7 @@ def main(argv: list[str] | None = None) -> int:
     print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
 
 
-__all__ = ["approve", "bind_release_certification", "command_desktop_opener", "command_parent_visual_reviewer", "confirm_desktop_delivery", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
+__all__ = ["approve", "bind_release_certification", "command_desktop_opener", "command_parent_visual_reviewer", "confirm_desktop_delivery", "delivery_reliability_metrics", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]
 
 
 if __name__ == "__main__": raise SystemExit(main())

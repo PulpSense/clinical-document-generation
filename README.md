@@ -35,6 +35,14 @@ study inputs
 
 See [SKILL.md](SKILL.md) for the exact Hermes orchestration and retry loop.
 
+Spec [#81](https://github.com/PulpSense/clinical-document-generation/issues/81)
+supersedes the routine editorial-warning delivery policy in ADR 0019. Lexical
+and repetition proxies request independent source-grounded decisions. Confirmed
+prose/editorial defects are repaired, table defects go to construction, and
+objective integrity, clinical quantity, template, XML and final-byte safeguards
+remain blocking. Resolutions and reference length diagnostics stay internal;
+only meaningful remaining external limitations accompany delivery.
+
 ## Runtime
 
 - Python 3.10+
@@ -313,3 +321,36 @@ releases become lightweight identity and certification records under
 `release-history/`.
 
 The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.
+
+## Delivery reliability evidence
+
+The focused developer replay in `tests/test_clean_delivery.py` exercises the
+existing ten sparse/detailed branch-template fixtures through preparation,
+approval, construction, independent-review envelopes, atomic publication and
+Desktop byte confirmation. It uses controlled renderer and reviewer doubles;
+it establishes workflow behavior, not real clinical or every-page visual review.
+The full suite and paid Linux Hermes certification remain separately authorized.
+
+To summarize retained operations without running generation or tests:
+
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --delivery-metrics /absolute/path/records.json
+```
+
+The JSON contains `evidence_kind` (`controlled_fixture`, `simulated`, `historical`,
+or `fresh_linux`) and `operations`. Each operation supplies `study_type`, its
+measured Desktop `result`, `quality` from the delivery manifest, and archived
+`recovery_actions` from attempt manifests. Include `unnecessary_stop` only when
+an independent audit classified that operation; unclassified cases remain
+explicitly unmeasured. Keep source documents and client identifiers out of this
+summary. Provenance is supplied by the evidence collector and does not itself
+certify a release.
+
+Complete-delivery uses all recorded operations as its denominator and requires
+the exact branch inventory plus confirmed Desktop retrieval. Clean-delivery
+uses completed deliveries. Dismissed false alarms use presented cautions. Repair
+success by owner requires changed implicated bytes and completed independently
+reviewed delivery, rather than a requested fix or byte change alone. Latency
+reports the measured count, total, mean and maximum; remaining client limitations
+are counted separately. Fresh Linux reliability claims still require authorized
+real content and every-page visual review, including measured repair outcomes.

@@ -42,14 +42,23 @@ def test_missing_source_citation_remains_a_drafting_failure():
 
 def reviewed_caution(tmp_path, branch="Prospective", template="Advarra"):
     from test_handoff_quality import acceptance_verification
-    warning = {"code": "lexical-evidence-uncertainty", "field": "study-design.bias",
+    warning = {"code": "lexical-evidence-uncertainty", "field": "analysis-plan.considerations",
                "publication_disposition": "warning", "issue": "Reminder-call wording needs meaning review."}
     accepted = tmp_path / "hermes/accepted"
     accepted.mkdir(parents=True)
-    (accepted / "study-design.bias.json").write_text(json.dumps({"warnings": [warning]}))
-    paths = quality.create_verification_requests(tmp_path, {"meta": {"study_type": branch, "icf_template": template}}, {"artifacts": []})
+    (accepted / "analysis-plan.considerations.json").write_text(json.dumps({"warnings": [warning]}))
+    from pathlib import Path
+    from rendering import render_documents
+    root = Path(__file__).resolve().parents[1]
+    source = json.loads((root / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['meta'].update(study_type=branch, icf_template=template)
+    render_documents(root, tmp_path, source, {'protocol': [{
+        'section_id': 'analysis-plan.considerations', 'paragraphs': [{'text': 'Staff call people ahead of visits.'}],
+        'lists': [],
+    }], 'icf': {}, 'prs': {}}, artifact_names={'protocol'})
+    paths = quality.create_verification_requests(tmp_path, source, {"artifacts": []})
     request = json.loads(paths[0].read_text())
-    assert request["lexical_review_cautions"][0]["caution"] == warning
+    assert any(item["caution"] == warning for item in request["lexical_review_cautions"])
     for path in paths:
         payload = json.loads(path.read_text())
         response = acceptance_verification(payload)
@@ -90,11 +99,11 @@ def test_actual_omission_remains_blocking_and_is_routed_to_drafting(tmp_path):
     response = json.loads(response_path.read_text())
     response["status"] = "blocked"
     response["findings"] = [{"finding_id": "missing-reminder-call", "category": "content",
-        "check": "source_supported", "artifact": "protocol", "target_ids": ["study-design.bias"],
+        "check": "source_supported", "artifact": "protocol", "target_ids": ["analysis-plan.considerations"],
         "issue": "The supplied reminder calls are absent.", "affected_passage": "Unrelated prose",
         "source_excerpt": "Personnel make reminder calls", "contradiction": False}]
     for row in response["section_assessments"]:
-        if row["section_id"] == "study-design.bias": row["status"] = "blocked"
+        if row["section_id"] == "analysis-plan.considerations": row["status"] = "blocked"
     response_path.write_text(json.dumps(response))
     findings, evidence = quality.validate_verifications(tmp_path)
     defect = next(f for f in findings if f.get("check") == "source_supported")

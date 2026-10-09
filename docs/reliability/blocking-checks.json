@@ -1,5 +1,5 @@
 {
-  "schema_version": "blocking-check-audit/v2",
+  "schema_version": "blocking-check-audit/v3",
   "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in six production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
   "baseline_commit": "b35761d",
   "families": {
@@ -7,55 +7,190 @@
       "authority": "Approved Source-of-Truth schema, branch requirements and clinical relationships",
       "false_rejection_risk": "Alias or source-shape differences; mixed enrollment/endpoint text needs source review before generation",
       "duplicate_policy": "source_contract owns normalization before approval; clinical evidence remains immutable",
-      "coverage": "test_contracts.py; test_reliability_maintenance.py"
+      "coverage": "test_contracts.py; test_reliability_maintenance.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Approved Source-of-Truth schema, branch requirements and clinical relationships",
+        "evidence": "Approved Source-of-Truth schema, branch requirements and clinical relationships",
+        "authority": "objective",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "source_readiness"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_obligatory_intake.py::test_missing_optional_input_does_not_block_preparation"
+        ],
+        "invalid": [
+          "test_obligatory_intake.py::test_missing_required_sample_justification_still_blocks"
+        ]
+      }
     },
     "evidence": {
       "authority": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
       "false_rejection_risk": "Lexical overlap is a heuristic; structural IDs, bibliography and binary cells must be excluded by the shared projection",
       "duplicate_policy": "Drafting, Protocol rendered fidelity and Sterling consume shared section projections; endpoint inventory stays in its Study Design owner. Independent review still assesses meaning/relations.",
-      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py; test_concept_reference_grounding.py"
+      "coverage": "test_evidence_variations.py; test_evidence_diagnostics.py; test_assessment_matrix.py; test_hypothesis_fidelity.py; test_visit_identifier_scope.py; test_section_background_scope.py; test_semantic_evidence_recovery.py; test_concept_reference_grounding.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Approved facts and citations must be retained; lexical overlap and narrative repetition are uncertainty, not proof of absence.",
+        "evidence": "SectionSpec evidence/ownership and shared section_evidence_value; semantic hypothesis contract",
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "drafting"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_resolutions.py::test_source_complete_repetition_is_accepted_for_independent_review"
+        ],
+        "invalid": [
+          "test_review_resolutions.py::test_case_sensitive_quantity_change_is_an_objective_defect"
+        ]
+      }
     },
     "clinical": {
       "authority": "Approved values plus Brad section ownership and governed template clauses",
       "false_rejection_risk": "Overbroad keyword rules or contradictory draft/render scopes; do not promote heuristic success into clinical approval",
       "duplicate_policy": "Shared evidence scope for sourced prose; exact legal text and placement retain separate authority",
-      "coverage": "test_sterling_rendered_scope.py; test_phase2_sterling_fidelity.py; test_brad_editorial_feedback.py; test_sterling_template_comments.py"
+      "coverage": "test_sterling_rendered_scope.py; test_phase2_sterling_fidelity.py; test_brad_editorial_feedback.py; test_sterling_template_comments.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Approved values plus Brad section ownership and governed template clauses",
+        "evidence": "Approved values plus Brad section ownership and governed template clauses",
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "drafting_or_construction_by_surface"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_resolutions.py::test_sterling_meaning_preserving_term_proxy_requests_review"
+        ],
+        "invalid": [
+          "test_review_resolutions.py::test_case_sensitive_quantity_change_is_an_objective_defect"
+        ]
+      }
     },
     "structured": {
       "authority": "Approved enrollment total, cohorts/interventions, endpoints, visits and PRS schema",
       "false_rejection_risk": "Dropping keys or guessing first numbers can destroy relationships; ambiguous matrix cells must not be guessed",
       "duplicate_policy": "contracts normalizes visit interpretation; table and narrative project that interpretation. PRS generation/validation share mapping helpers; independently asserted expected values in regression tests and full independent content review provide additional protection.",
-      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py; test_mixed_visit_representations.py"
+      "coverage": "test_assessment_matrix.py; test_prs_quality_corrections.py; test_prs_xml.py; test_bilateral_review_block.py; test_mixed_visit_representations.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Approved enrollment total, cohorts/interventions, endpoints, visits and PRS schema",
+        "evidence": "Approved enrollment total, cohorts/interventions, endpoints, visits and PRS schema",
+        "authority": "objective",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "construction"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_evidence_variations.py::test_binary_encodings_and_key_order_preserve_the_same_clinical_facts"
+        ],
+        "invalid": [
+          "test_review_resolutions.py::test_deterministic_assessment_cell_defect_routes_to_construction"
+        ]
+      }
     },
     "render": {
       "authority": "Exact template topology, DOCX/PDF/page images and release-owned renderer",
       "false_rejection_risk": "Host environment, font capability, page splitting or sparse page classifications; host smoke does not certify every layout",
       "duplicate_policy": "Render defects route to layout/construction owner; complete fresh exact-artifact review follows repair",
-      "coverage": "test_duration_reference_preservation.py; test_handoff_quality.py; host installation render smoke"
+      "coverage": "test_duration_reference_preservation.py; test_handoff_quality.py; host installation render smoke; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Exact template topology, DOCX/PDF/page images and release-owned renderer",
+        "evidence": "Exact template topology, DOCX/PDF/page images and release-owned renderer",
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "layout_or_construction_by_surface"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_render_assurance.py::test_pdfium_worker_accepts_exact_page_pixel_dimension_and_output_boundaries"
+        ],
+        "invalid": [
+          "test_render_assurance.py::test_pdfium_worker_rejects_one_over_each_numeric_boundary"
+        ]
+      }
     },
     "review": {
       "authority": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
       "false_rejection_risk": "Malformed responses or targets can look like content defects; transport and semantic findings need different routes",
-      "duplicate_policy": "Canonical request/evidence inventory shared across creation, recovery and final checks; explicit harmless editorial findings can be retained warnings. Factual, safety, missing/true material flags remain blocking.",
-      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py"
+      "duplicate_policy": "Exact authenticated requests and source-grounded uncertainty resolutions share the canonical ledger. Confirmed prose/editorial defects require correction; only meaningful remaining external limitations accompany delivery. Objective failures cannot be waived.",
+      "coverage": "test_handoff_quality.py; test_visit_inventory_review.py; test_hypothesis_fidelity.py; test_editorial_publication.py; test_phase1_repetition.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
+        "evidence": "Authenticated independent reviewer identity, complete source and artifact scope, exact hashes",
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "reviewer"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_resolutions.py::test_faithful_resolution_binds_source_section_rule_and_reviewer"
+        ],
+        "invalid": [
+          "test_review_resolutions.py::test_bare_passing_review_cannot_dismiss_uncertainty"
+        ]
+      }
     },
     "recovery": {
       "authority": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
       "false_rejection_risk": "Counting the same response repeatedly; generic diagnostics produce identical retries; transport retry must not consume drafting streak",
       "duplicate_policy": "workflow owns retry state/deadlines; code-owned sections use native rendered snapshots when no accepted AI draft exists. Progress requires changed target and candidate; a fresh full review still decides correctness.",
-      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py"
+      "coverage": "test_reliability_maintenance.py; test_worker_readiness.py; test_owner_aware_recovery.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
+        "evidence": "Persisted deadline, distinct completed attempts, recovery ownership and gate ledger",
+        "authority": "objective",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "finding.owner_from_RECOVERY_OWNERS"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_owner_aware_recovery.py::test_table_finding_routes_to_real_reconstruction_before_visual_stop"
+        ],
+        "invalid": [
+          "test_owner_aware_recovery.py::test_visual_only_failure_is_not_silently_cleared"
+        ]
+      }
     },
     "installation": {
       "authority": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
       "false_rejection_risk": "API-key profile mistaken for subscription; unsigned ordinary generation accidentally subjected to signed certification",
       "duplicate_policy": "Installation owns provisioning/smoke; ordinary manual review does not require certification; developer offline check is not activation preflight",
-      "coverage": "test_worker_readiness.py; exact host installation integrity/render smoke; optional certification deliberately excluded"
+      "coverage": "test_worker_readiness.py; exact host installation integrity/render smoke; optional certification deliberately excluded; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
+        "evidence": "Package manifest, installation/runtime integrity, exact worker profile and optional certification mode",
+        "authority": "objective",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "installation"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_worker_readiness.py::test_study_operation_finds_renderer_that_passed_installation_smoke"
+        ],
+        "invalid": [
+          "test_worker_readiness.py::test_logged_out_worker_stops_before_creating_the_deadline"
+        ]
+      }
     },
     "delivery": {
       "authority": "Final complete accepted review, atomic publication and exact client bytes",
       "false_rejection_risk": "Transient attachment access must retry the same bytes within the original deadline",
       "duplicate_policy": "One final artifact identity; client output never substitutes an unapproved candidate",
-      "coverage": "test_reliability_maintenance.py; test_handoff_quality.py"
+      "coverage": "test_reliability_maintenance.py; test_handoff_quality.py; test_review_resolutions.py; test_clean_delivery.py",
+      "authority_contract": {
+        "requirement": "Final complete accepted review, atomic publication and exact client bytes",
+        "evidence": "Final complete accepted review, atomic publication and exact client bytes",
+        "authority": "objective",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "transport"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_clean_delivery.py::test_varied_complete_sources_deliver_complete_exact_set_with_clean_message"
+        ],
+        "invalid": [
+          "test_atomic_delivery.py::test_publish_rejects_changed_bytes_after_evidence_and_preserves_prior_output"
+        ]
+      }
     }
   },
   "checks": [
@@ -187,8 +322,18 @@
     },
     {
       "file": "scripts/drafting.py",
+      "function": "_quantity_claim_issues",
+      "code_sha256": "c9c892ea50b09783851f5b358df980408d451c00cbfc88a4e7b5187120403aad",
+      "family": "evidence",
+      "authority_contract": {
+        "authority": "objective",
+        "requirement": "Preserve signs and case-sensitive units in explicitly supplied unambiguous clinical quantities."
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
       "function": "source_evidence_diagnostics",
-      "code_sha256": "e1b25c05dd152edb13aeb300ee21b5f9088b144403ab801e174d766fc8c51819",
+      "code_sha256": "ceb87ff99f4af32612c847b4bf99de0824ccd76a6bff025effb7d90d498cb61c",
       "family": "evidence"
     },
     {
@@ -201,7 +346,11 @@
       "family": "evidence",
       "file": "scripts/drafting.py",
       "function": "lexical_evidence_uncertainty",
-      "code_sha256": "6769e87b5e86e7b23d172283b6e770d1c518dfbec5b6239214d1be4714576ffc"
+      "code_sha256": "b89a253b293e362dbb103b2b5aac14ee82b8280970aa2a3d35ab1854cff58fe6",
+      "authority_contract": {
+        "authority": "uncertainty",
+        "resolution_authority": "independent_source_grounded_review"
+      }
     },
     {
       "file": "scripts/drafting.py",
@@ -242,7 +391,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "78acc7282802314012fd673adb258df067311e9dc84167a7f8a8d613b879d026",
+      "code_sha256": "e0532b96c96977e2e24e9abb65f4928a33393d460381e0c92904d53561f90299",
       "family": "evidence"
     },
     {
@@ -254,8 +403,12 @@
     {
       "file": "scripts/drafting.py",
       "function": "accepted_cross_section_duplicate_findings",
-      "code_sha256": "b7213acc5c6d896e5532080c4efb4bed8d302688e7fd6c0aba7681a4763be432",
-      "family": "evidence"
+      "code_sha256": "9c2573d23c5b12883ec7e0d18b540a390b41c2977455c196a808825d952d9fed",
+      "family": "evidence",
+      "authority_contract": {
+        "authority": "uncertainty",
+        "resolution_authority": "independent_source_grounded_review"
+      }
     },
     {
       "file": "scripts/prs_xml.py",
@@ -392,7 +545,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "db74474dbc942c9b901ba4db57e4ab0a7351c0e96fcbf4c76484c949a97d36a3",
+      "code_sha256": "077faeecb31ed2bc87e3ceb259d221efe24d9bb2cb64723329f71c5e6f127c7e",
       "family": "clinical"
     },
     {
@@ -404,13 +557,17 @@
     {
       "file": "scripts/quality.py",
       "function": "assess_protocol_concept_repetition",
-      "code_sha256": "2d852d2efcc84d4fa384c5c4c44ca845288acc381ac144048c28e8113f9eb554",
-      "family": "clinical"
+      "code_sha256": "18cf27bca73f786021e77e32e79d753be3809e2532f6c9ee17570157a0ec4e53",
+      "family": "clinical",
+      "authority_contract": {
+        "authority": "uncertainty",
+        "resolution_authority": "independent_source_grounded_review"
+      }
     },
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "7dbbc982992b4c05061a43f401bf6a672de26035bc8b77aa467200796badd205",
+      "code_sha256": "74e581c0462b7767922f3870eacdfec0752d11d2c1f4850ec2b61cc548a3f27b",
       "family": "clinical"
     },
     {
@@ -435,7 +592,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "6968c984117d6bb8639ab5b72a17e5b6279e027023ef5e3c6ea8d2c2ef6aff79"
+      "code_sha256": "3c6a774a38751a9855cd9d20137e78a88322c254818ba79dab0896c32ae87d37"
     },
     {
       "file": "scripts/quality.py",
@@ -446,31 +603,45 @@
     {
       "file": "scripts/quality.py",
       "function": "_accepted_drafting_warnings",
-      "code_sha256": "5ca1270d7248cb71f1c7890f67e29947aebcc0c35ee64f6a449d74ebfb0f4963",
+      "code_sha256": "1e466d50abcdff42381ba316961b51c889d5fcc10e45366327af4112573aecd0",
       "family": "review"
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "9dc71a2593494cb771fd766f143178c430f29e34a2aa03b6ea96514ff49a632c"
+      "code_sha256": "79bb0cc49a5d2728d56d989ddd6b33a8f4f4856d03432b61d019e8c0d0d7180a",
+      "authority_contract": {
+        "authority": "uncertainty",
+        "resolution_authority": "independent_source_grounded_review"
+      }
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_review_evidence_text",
+      "code_sha256": "c71766c3abd65b660dd53ce4aee85cde339924a863d39463ea0177a5613389df",
+      "family": "review"
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_reviewed_lexical_warnings",
-      "code_sha256": "3c7d66995b6071d589c390c2d8d5b57d628f94ea13eae99c8504a6bc046063b7"
+      "code_sha256": "c635457300feb1050d70f61ec8aa7f41bbb317964f35dc9779e9972a37be07cf",
+      "authority_contract": {
+        "authority": "uncertainty",
+        "resolution_authority": "independent_source_grounded_review"
+      }
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_unresolved_uncertainty_findings",
+      "code_sha256": "50fd65ee44dcd0233016833a87913c7f205814d850bf93da59d5e40f1e728721",
+      "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_render_warnings",
       "code_sha256": "40d29981ee53123141a20c1c8efe2bc49c2b6917175f473ba80e1f105351419e",
-      "family": "review"
-    },
-    {
-      "file": "scripts/quality.py",
-      "function": "_governed_editorial_warning",
-      "code_sha256": "2d7da1381110f6ee605a8ecf1b51e6838fb9f6723e5b86776fa505f9d8d620fa",
       "family": "review"
     },
     {
@@ -482,25 +653,25 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "209f4e918681907197f1cb883f3ce35c81b850352c5f2c26a4292a42cafcaa96",
+      "code_sha256": "a06ea490eae604f91da77c7899216d01e65096bd052f92f41382a78024621cd7",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "_final_verification_scope_findings",
-      "code_sha256": "4c8a1a8da31613a3d4fe6e68ab9eae42d5dd80fcb7e9b03f4b14da2060f2ab95",
+      "code_sha256": "8bf8ddf8d45eee579132fdf9e8d17bfd69613d7a40e9a3d3bd6aaa8bc31ba971",
       "family": "review"
     },
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "5546e4f3cade3508f70a8d493aadbc95affc312407a4332269e93f4ac2e4a082",
+      "code_sha256": "5f5705a7981a610df9cd0d40692f7e27b6fb4b0017d073480fdc8054b805b9a5",
       "family": "delivery"
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "0926d02934bf4afd6b735e637bcf34c24dd856f0b40e857f87751aca4f60f0e4",
+      "code_sha256": "38be1f0f903b72361667e2e605de6537a768b744e01178fbaf2ff333ee2ad331",
       "family": "review"
     },
     {
@@ -530,7 +701,7 @@
     {
       "file": "scripts/rendering.py",
       "function": "audit_docx",
-      "code_sha256": "9d177d987ac2b0a3835a2582062c8485c9fe7579d0e761c906c9c6acc37b310a",
+      "code_sha256": "96dda5388657651ee830c067919747de4ad6dc52224ebe788a51ed15e4fba839",
       "family": "render"
     },
     {
@@ -770,7 +941,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "2559e0ec4809994213fe7b66621c40cc80d4164b0b846eba7b010787892d8768",
+      "code_sha256": "46995b0ebd285917de7f010ac012c27e2bd6fede28efead7a8f29f3063f10a3a",
       "family": "recovery"
     },
     {
@@ -794,9 +965,10 @@
     {
       "file": "scripts/workflow.py",
       "function": "main",
-      "code_sha256": "a0580a1fc7306aa3747a9b66466f94cc4ce1ae137af72fd127d78a883ce5176d",
+      "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
     }
   ],
-  "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format"
+  "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",
+  "authority_contract_inheritance": "Each producer resolves its family authority contract plus explicit per-producer overrides. Paired tests are behavioral evidence at that family seam, not exhaustive clinical certification."
 }

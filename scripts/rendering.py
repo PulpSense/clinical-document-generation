@@ -3779,11 +3779,13 @@ def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict
         findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, "document_structure_defect"))
     if AUTHORING_LANGUAGE.search(text):
         findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "document_structure_defect"))
-    duplicate = next((match for paragraph_text in paragraph_texts if (match := DUPLICATE_WORD.search(paragraph_text))), None)
+    duplicate_passage = next((value for value in paragraph_texts if DUPLICATE_WORD.search(value)), "")
+    duplicate = DUPLICATE_WORD.search(duplicate_passage)
     if duplicate:
         findings.append({
             "category": "editorial", "field": path.name,
             "code": "visible-duplicate-word",
+            "affected_passage": duplicate_passage,
             "publication_disposition": "warning",
             "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively.",
         })

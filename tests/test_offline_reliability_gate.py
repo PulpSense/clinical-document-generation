@@ -100,3 +100,25 @@ def test_gate_subprocess_discovers_profile_office_with_restricted_worker_path(tm
         env=environment, capture_output=True, text=True, check=True,
     )
     assert result.stdout.strip() == str(office)
+
+
+def test_current_fingerprint_without_authority_and_owner_is_not_an_audit(tmp_path):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    (scripts / 'example.py').write_text('def check():\n    return {"status": "blocked"}\n')
+    audit = tmp_path / gate.AUDIT.relative_to(gate.ROOT)
+    audit.parent.mkdir(parents=True)
+    checks = gate.blocking_check_inventory(tmp_path)
+    audit.write_text(json.dumps({'checks': checks, 'families': {}}))
+    assert any('authority contract' in finding for finding in gate.audit_findings(tmp_path))
+
+
+def test_direct_lexical_veto_requires_independent_resolution_even_with_a_fingerprint(tmp_path):
+    scripts = tmp_path / 'scripts'
+    scripts.mkdir()
+    (scripts / 'example.py').write_text(
+        'def check():\n    return {"code": "new-lexical-check", "publication_disposition": "blocking"}\n')
+    audit = tmp_path / gate.AUDIT.relative_to(gate.ROOT)
+    audit.parent.mkdir(parents=True)
+    audit.write_text(json.dumps({'checks': gate.blocking_check_inventory(tmp_path), 'families': {}}))
+    assert any('Unjustified lexical publication veto' in finding for finding in gate.audit_findings(tmp_path))

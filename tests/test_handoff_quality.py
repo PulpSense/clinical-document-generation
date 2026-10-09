@@ -189,6 +189,22 @@ def acceptance_verification(request):
             for page in artifact.get("pages", [])
         ]
     else:
+        # Controlled reviewer double: these decisions are synthetic evidence,
+        # never a claim of real independent clinical review.
+        def first_text(value, within=None):
+            if isinstance(value, str):
+                return value if within is None or value in within else ""
+            if isinstance(value, dict):
+                return next((text for child in value.values() if (text := first_text(child, within))), "")
+            if isinstance(value, list):
+                return next((text for child in value if (text := first_text(child, within))), "")
+            return ""
+        response["uncertainty_resolutions"] = [{
+            "caution_sha256": item["caution_sha256"], "disposition": "faithful",
+            "source_excerpt": first_text(item["source_evidence"], quality._review_evidence_text(request.get("approved_source", {}))),
+            "affected_passage": first_text(item["artifact_passage"]),
+            "rationale": "Controlled fixture reviewer accepts this source-grounded variation.",
+        } for item in request.get("lexical_review_cautions", [])]
         response["section_assessments"] = [
             {
                 "artifact": item["artifact"],
@@ -471,7 +487,7 @@ def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_mis
     )
 
 
-def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp_path):
+def test_governed_drafting_response_retains_repetition_for_meaning_review(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
     path = create_drafting_request(
@@ -499,13 +515,13 @@ def test_governed_drafting_response_rejects_duplicate_prose_across_contracts(tmp
     assert accepted is not None
     assert {
         item["section_id"] for item in accepted["drafts"]
-    } == set(batch.section_ids) - {"evaluation-procedures"}
+    } == set(batch.section_ids)
     duplicate_findings = [item for item in findings if "duplicated across separately contracted" in item["issue"]]
     assert duplicate_findings
     assert duplicate_findings[0]["target_ids"] == ["evaluation-procedures"]
 
 
-def test_duplicate_ingestion_preserves_primary_and_retries_secondary_only(tmp_path):
+def test_duplicate_ingestion_preserves_both_sections_and_internal_uncertainty(tmp_path):
     reference = fixture()
     batch = next(item for item in batch_plan("Prospective") if item.batch_id == "protocol-operations")
     request_path = create_drafting_request(
@@ -530,29 +546,12 @@ def test_duplicate_ingestion_preserves_primary_and_retries_secondary_only(tmp_pa
     governing = governing_resources(ROOT, reference)
     findings = ingest_responses(tmp_path, governing)
 
-    assert findings[0]["target_ids"] == ["evaluation-procedures"]
-    accepted_ids = {
-        section_id for section_id in batch.section_ids
-        if accepted_draft(tmp_path, section_id, governing) is not None
-    }
-    assert accepted_ids == set(batch.section_ids) - {"evaluation-procedures"}
-    attempts, exhausted = retry_attempts(findings, {})
-    assert exhausted == []
-    created = schedule_requests(
-        repo_root=ROOT,
-        revision_dir=tmp_path,
-        revision_id="r-duplicate-local-retry",
-        reference=reference,
-        attempts=attempts,
-        wave="retry",
-        findings=findings,
-    )
-    retry = next(
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in created
-        if json.loads(path.read_text(encoding="utf-8"))["batch_id"] == batch.batch_id
-    )
-    assert [item["section_id"] for item in retry["section_contracts"]] == ["evaluation-procedures"]
+    assert findings == []
+    accepted_ids = {section_id for section_id in batch.section_ids
+                    if accepted_draft(tmp_path, section_id, governing) is not None}
+    assert accepted_ids == set(batch.section_ids)
+    secondary = accepted_draft(tmp_path, "evaluation-procedures", governing)
+    assert any(row["code"] == "draft-repetition-uncertainty" for row in secondary["warnings"])
 
 
 def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp_path):
@@ -592,11 +591,11 @@ def test_authenticated_cross_batch_duplicate_prose_is_found_before_rendering(tmp
 
     assert len(findings) == 1
     assert findings[0]["target_ids"] == ["study-procedure.measurements"]
-    assert findings[0]["recovery_class"] == "drafting_defect"
-    assert findings[0]["action"] == "retry_drafting_target"
+    assert findings[0]["publication_disposition"] == "warning"
+    assert findings[0]["action"] == "manual_review"
 
 
-def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tmp_path, monkeypatch):
+def test_cross_batch_repetition_reaches_independent_review_with_actual_candidate(tmp_path, monkeypatch):
     run_dir = tmp_path / "run"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
@@ -630,17 +629,14 @@ def test_cross_batch_duplicate_routes_localized_retry_before_candidate_render(tm
         response_path.parent.mkdir(parents=True, exist_ok=True)
         response_path.write_text(json.dumps(recorded_acceptance_response(request)), encoding="utf-8")
 
-    monkeypatch.setattr(
-        workflow,
-        "render_documents",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("rendered too early")),
-    )
-    result = generate(run_dir)
-
+    from test_clean_delivery import controlled_render
+    monkeypatch.setattr(workflow, "render_assurance", controlled_render)
+    result = generate(run_dir, require_promoted_runtime=False)
     assert result["status"] == "awaiting_hermes"
-    assert result["stage"] == "drafting_retry"
-    assert {item["field"] for item in result["findings"]} == {"study-procedure.measurements"}
-    assert not (revision_dir / "candidate").exists()
+    assert result["stage"] == "independent_verification"
+    content = next(json.loads((revision_dir / path).read_text()) for path in result["requests"]
+                   if json.loads((revision_dir / path).read_text())["task"] == "clinical_content_verification")
+    assert any(row["caution"]["code"] == "draft-repetition-uncertainty" for row in content["lexical_review_cautions"])
 
 
 def test_fixed_boilerplate_outcome_cannot_bypass_duplicate_prose_gate(tmp_path):
@@ -730,7 +726,7 @@ def test_authorized_boilerplate_does_not_hide_an_unauthorized_cross_section_copy
     assert accepted is not None
     accepted_ids = {item["section_id"] for item in accepted["drafts"]}
     assert "introduction" in accepted_ids
-    assert "study-design.bias" not in accepted_ids
+    assert "study-design.bias" in accepted_ids
     duplicate = next(item for item in findings if "duplicated across separately contracted" in item["issue"])
     assert duplicate["target_ids"] == ["study-design.bias"]
 

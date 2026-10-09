@@ -33,9 +33,9 @@ from pypdf import PdfReader
 from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, country_name_aliases, document_set, get_path, icf_contract, icf_retained_sections, meaningful, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
-from drafting import evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
+from drafting import accepted_cross_section_duplicate_findings, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
-from rendering import audit_docx, refresh_toc_from_pdf, template_paths
+from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 
 
 VERIFY_SCHEMA = "hermes-verification/v1"
@@ -50,6 +50,13 @@ VISUAL_CHECKS = (
     "inconsistent_style", "missing_header_footer", "toc_mismatch",
     "excessive_whitespace", "artificial_pagination",
 )
+UNCERTAINTY_CODES = {
+    "lexical-evidence-uncertainty", "icf-lexical-evidence-uncertainty",
+    "retrospective-lexical-evidence-uncertainty", "icf-summary-grounding-review",
+    "protocol-concept-repetition", "protocol-exact-repetition", "icf-concept-repetition",
+    "visible-duplicate-word", "icf-exact-generated-duplication", "draft-repetition-uncertainty",
+}
+INTERNAL_DIAGNOSTIC_CODES = {"sterling-clause-word-goal"}
 TRANSIENT_REVIEW_STATUSES = {"retryable_error", "transient_error", "unavailable", "temporarily_unavailable"}
 _MAC_FONT_NAMES: set[str] | None = None
 _WINDOWS_FONT_NAMES: set[str] | None = None
@@ -4256,15 +4263,17 @@ def validate_sterling_clause_contract(
         grounding_diagnostics = [source_evidence_diagnostics(raw_sections.get(section, ""), path, value)
                                  for (path, value), passed in zip(authority_records, grounding_results)
                                  if not passed]
-        if (has_body and exact_ok and terms_ok and sources_ok and block_ok
+        if (has_body and exact_ok and sources_ok and block_ok
                 and not semantic_issues and not contradiction
-                and lexical_evidence_uncertainty(grounding_diagnostics)):
+                and (grounding_ok or lexical_evidence_uncertainty(grounding_diagnostics))
+                and (not terms_ok or lexical_evidence_uncertainty(grounding_diagnostics))):
             findings.append({
                 "code": "icf-lexical-evidence-uncertainty", "category": "content",
                 "field": clause["section_id"], "target_ids": [clause["section_id"]],
                 "clause_id": clause["clause_id"], "publication_disposition": "warning",
                 "evidence_diagnostics": grounding_diagnostics,
-                "issue": "Sterling source wording needs independent meaning review; its exact safeguards remain intact.",
+                "missing_term_groups": [group for group in term_groups if not any(term in text for term in group)],
+                "issue": "Sterling meaning and safeguards require independent review; exact-text and quantitative checks remain enforced.",
             })
             continue
 
@@ -4589,13 +4598,9 @@ def assess_protocol_concept_repetition(
                     "target_ids": [secondary],
                     "repair_action": "redraft_secondary_section",
                     "disposition": "manual_review",
-                    "severity": "blocking" if material else "warning",
-                    "publication_disposition": "blocking" if material else "warning",
-                    "action": RECOVERY_POLICIES["drafting_defect"] if material else "manual_review",
-                    **({
-                        "recovery_class": "drafting_defect",
-                        "owner": "drafting",
-                    } if material else {}),
+                    "severity": "warning",
+                    "publication_disposition": "warning",
+                    "action": "manual_review",
                 })
                 break
     return findings
@@ -4661,12 +4666,13 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
             and re.sub(r"\s+", " ", table.rows[0].cells[0].text).strip() == expected_rows[0][0]
         ]
         if len(matches) != 1 or normalized_matrix(matches[0]) != expected_rows:
-            findings.append({
-                "category": "content",
+            findings.append(recovery_finding({
+                "category": "content", "artifact": "protocol", "surface": "table",
+                "table_ids": [table_id],
                 "field": "procedures.visit_schedule" if table_id == "schedule-of-assessments" else "statistics.sample_size_evidence",
                 "target_ids": [str(table_contract["section_id"])],
                 "issue": f"{table_contract['caption']} does not preserve the contracted headers, row order, column order, cell values, and allowed blanks.",
-            })
+            }, "deterministic_structure_defect"))
     stale_protocol_claims = {
         "an investigator-initiated clinical trial": "title-page",
         "all subjects will be monitored for adverse events": "quality-safety",
@@ -4792,7 +4798,7 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         key = text.casefold()
         if len(text.split()) >= 8 and key in seen:
             if seen[key] == current_section:
-                findings.append({"category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."})
+                findings.append({"code": "protocol-exact-repetition", "category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "publication_disposition": "warning", "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."})
             else:
                 findings.append(recovery_finding({
                     "code": "protocol-exact-repetition",
@@ -4807,8 +4813,9 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                     "treatment": "excessive",
                     "necessary": False,
                     "concise": False,
-                    "severity": "blocking",
-                    "publication_disposition": "blocking",
+                    "severity": "warning",
+                    "publication_disposition": "warning",
+                    "action": "manual_review",
                     "issue": f"Exact paragraph is repeated from Protocol section {seen[key]} in secondary section {current_section}.",
                 }, "drafting_defect"))
         elif len(text.split()) >= 8:
@@ -5409,23 +5416,23 @@ def create_verification_requests(
         content_instructions += " Assess every cross-document check."
     content_instructions += (
         " Findings must include target_ids for affected section IDs. Every finding must include a unique finding_id "
-        "made from ASCII letters or digits separated only by single hyphens or underscores. An ordinary substantive "
-        "content omission is a finding with category `content`, check `substantive`, and no safety-critical target. "
-        "To qualify for warning treatment it must also set safety_critical, contradiction, "
-        "obscures_required_information, and materially_unusable to explicit false booleans; omitted or true values "
-        "remain blocking. "
-        "It remains a finding with top-level status `blocked`, but the workflow may publish it as a manual-review "
-        "warning. When a failed `procedures` cross-document assessment is caused solely by the same ordinary "
-        "substantive content omission, its notes must cite that finding_id as an exact token. Safety, invention, "
-        "contradiction, source-integrity, rendering, security, package, ledger, and delivery findings are never "
-        "eligible for this warning treatment. Approved source takes precedence over "
+        "made from ASCII letters or digits separated only by single hyphens or underscores. Confirmed prose "
+        "omissions, excessive repetition and editorial defects require correction through drafting. Do not "
+        "report valid stylistic alternatives as defects. Keep findings at top-level status blocked until repaired "
+        "and independently verified; resolved internal findings do not belong in the delivery message. "
+        "Safety, invention, contradiction, source-integrity, rendering, security, package, ledger and delivery "
+        "failures remain blocking. Approved source takes precedence over "
         "applicable Fixed Clinical Boilerplate and retained template language; authorization is not a blanket "
         "exemption from source fidelity. Fail expanded decision authority, added termination grounds, and "
         "conflation of completion with withdrawal or discontinuation, even in verbatim boilerplate. "
         "Assess semantic_evidence requirements against their exact source excerpts under source_supported and no_invention. "
         "Assess every lexical_review_caution in its named section against the approved facts and exact artifact. "
         "These are unresolved word-matching cautions, not established omissions. A faithful paraphrase may pass "
-        "its section assessment; explain its source-supported meaning in the assessment notes. A real omission, "
+        "its section assessment. Return uncertainty_resolutions with one decision per caution: caution_sha256, "
+        "disposition (faithful, confirmed_defect, or source_clarification), rationale, source_excerpt quoted from "
+        "approved_source, and affected_passage quoted from artifact_passage. Bare pass or ignore declarations "
+        "do not resolve uncertainty. Confirmed defects and source clarification require a substantive finding "
+        "on the same artifact and section. Objective integrity, schema and factual failures cannot be waived. A real omission, "
         "changed quantity-to-procedure relationship, reversed negation or strengthened claim must be a "
         "source_supported or no_invention finding, with exact passage and source evidence. "
         "Meaning is mandatory; source word overlap or an incidental group-count word is not proof of fidelity. "
@@ -5464,9 +5471,8 @@ def create_verification_requests(
         "must identify concept_id, primary_section, secondary_section, relevant primary_paragraphs and "
         "secondary_paragraphs, classify the secondary treatment as necessary, concise, or excessive, and set "
         "necessary and concise to explicit booleans. Route a confirmed excessive repetition only to the secondary "
-        "section unless the primary section is incomplete. For manual review, explicitly set material, safety_critical, contradiction, "
-        "obscures_required_information, and materially_unusable to false. Treat ordinary noncontradictory concept "
-        "repetition as manual review; omitted or true material-harm flags remain blocking."
+        "section unless the primary section is incomplete. Explain the actual readability harm rather than "
+        "reporting repetition solely because a phrase appears twice."
         " Check each section purpose and editorial relevance: flag prose that answers another section's "
         "question instead of its own, redundant narration of a source-derived table or notes, and "
         "self-referential filler that conveys no approved clinical fact. Identify the exact passage and the "
@@ -5489,10 +5495,13 @@ def create_verification_requests(
         "endpoint methods. A clinically unusable section is material; minor wording preferences are "
         "not findings. For a nonmaterial editorial_relevance finding, explicitly set material, safety_critical, "
         "contradiction, obscures_required_information and materially_unusable to false, and give affected_passage "
-        "and recommended_action. Such findings are retained manual-review warnings; missing or true flags, "
-        "source_supported/no_invention defects and safety/rights/template safeguards remain blocking. "
-        "An editorial finding in a safety-related section is still a warning when all five flags are explicitly "
-        "false; identify an actual missing safeguard or unsupported claim using the corresponding content check."
+        "and recommended_action. Confirmed defects are repaired automatically and reviewed again. "
+        "Identify missing safeguards or unsupported claims using the corresponding content check. "
+        "Only a meaningful remaining external limitation may use check client_limitation with "
+        "remaining_limitation true, limitation_kind external_dependency or client_environment, "
+        "why_not_repairable, recommended_action, and all five material-harm flags explicitly false. "
+        "This cannot waive an omission, source conflict, unsupported claim, missing safeguard, failed review, "
+        "unusable layout, integrity failure or incomplete document set."
     )
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
         content_instructions += (
@@ -5723,7 +5732,7 @@ def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, A
     ]
 
 
-def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
+def _accepted_drafting_warnings(revision_dir: Path, reference: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     """Carry accepted drafting cautions into the final report for human review."""
     warnings: list[dict[str, Any]] = []
     for path in sorted((revision_dir / "hermes/accepted").glob("*.json")):
@@ -5736,6 +5745,10 @@ def _accepted_drafting_warnings(revision_dir: Path) -> list[dict[str, Any]]:
         values = record.get("warnings")
         if isinstance(values, list):
             warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
+    if reference is not None:
+        root = Path(__file__).resolve().parents[1]
+        warnings.extend(accepted_cross_section_duplicate_findings(
+            revision_dir, reference, governing_resources(root, reference)))
     return warnings
 
 
@@ -5743,7 +5756,7 @@ def _lexical_review_cautions(
     revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     """Expose heuristic uncertainty to the existing independent review, without a new gate."""
-    warnings = _accepted_drafting_warnings(revision_dir) + _render_warnings(render_report)
+    warnings = _accepted_drafting_warnings(revision_dir, reference) + _render_warnings(render_report)
     protocol = revision_dir / "candidate/protocol.docx"
     if protocol.is_file():
         try:
@@ -5751,46 +5764,178 @@ def _lexical_review_cautions(
         except (OSError, ValueError, zipfile.BadZipFile):
             # Construction/package checks own malformed candidates; no caution can approve them.
             pass
-    codes = {"lexical-evidence-uncertainty", "icf-lexical-evidence-uncertainty",
-             "retrospective-lexical-evidence-uncertainty"}
     records = {}
     for warning in warnings:
-        if warning.get("code") not in codes:
+        if warning.get("code") not in UNCERTAINTY_CODES:
             continue
         identity = canonical_evidence_sha256(warning)
-        section = str(warning.get("field") or (warning.get("target_ids") or [""])[0])
+        section = str((warning.get("target_ids") or [warning.get("field") or ""])[0])
+        artifact = "icf" if section.startswith("icf.") or section == "icf.docx" else "protocol"
+        path = revision_dir / f"candidate/{artifact}.docx"
+        if section.endswith(".docx") and path.is_file():
+            matching_section = next((row["section_id"] for row in content_review_sections(reference)
+                if row["artifact"] == artifact and warning.get("affected_passage")
+                and warning["affected_passage"] in json.dumps(
+                    rendered_section_snapshot(path, row["section_id"]), ensure_ascii=False)), None)
+            section = matching_section or section
+        passage = rendered_section_snapshot(path, section) if path.is_file() else []
+        section_specs = list(protocol_contract(str(get_path(reference, "meta.study_type") or "")))
+        if artifact == "icf":
+            section_specs = list(icf_contract(str(get_path(reference, "meta.study_type") or ""),
+                                             str(get_path(reference, "meta.icf_template") or "Advarra")))
+        spec = next((item for item in section_specs if item.section_id == section), None)
+        source_evidence = warning.get("evidence_diagnostics") or warning.get("source_excerpt")
+        if not source_evidence:
+            source_evidence = {key: get_path(reference, key) for key in spec.evidence} if spec else reference
+        template_excerpt = ""
+        if warning.get("clause_id"):
+            clause_contract = sterling_clause_contract(Path(__file__).resolve().parents[1])
+            clause = next(row for row in clause_contract["clauses"] if row["clause_id"] == warning["clause_id"])
+            validation = clause.get("validation") or {}
+            if any(validation.get(key) for key in ("exact_template", "exact_boilerplate_id", "placement_boilerplate_id")) or clause.get("approved_source", {}).get("boilerplate_id"):
+                template_excerpt = sterling_clause_text(str(warning["clause_id"]))
+            else:
+                template_excerpt = _review_evidence_text(clause.get("validation", {}).get("required_term_groups", []))
+        if template_excerpt:
+            source_evidence = {"approved_facts": source_evidence, "template": template_excerpt}
         records[identity] = {
             "caution_sha256": identity, "section_id": section,
-            "artifact": "icf" if section.startswith("icf.") else "protocol",
-            "caution": warning,
+            "artifact": artifact, "caution": warning,
+            "approved_source_sha256": canonical_evidence_sha256(reference),
+            "artifact_sha256": sha256_file(path) if path.is_file() else None,
+            "section_sha256": canonical_evidence_sha256(passage),
+            "artifact_passage": passage,
+            "source_evidence": source_evidence,
+            "template_excerpt": template_excerpt,
+            "rule_sha256": canonical_evidence_sha256({
+                "quality": sha256_file(Path(__file__)),
+                "drafting": sha256_file(Path(__file__).with_name("drafting.py")),
+            }),
         }
     return list(records.values())
+
+
+def _review_evidence_text(value: Any) -> str:
+    """Quote actual text values rather than JSON-escaped serialization."""
+    if isinstance(value, Mapping):
+        return "\n".join(_review_evidence_text(child) for child in value.values())
+    if isinstance(value, list):
+        return "\n".join(_review_evidence_text(child) for child in value)
+    return "" if value is None else str(value)
+
+
+def _uncertainty_resolution_records(
+    request: Mapping[str, Any], response: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Validate decisions against evidence in the authenticated review request."""
+    cautions = {row["caution_sha256"]: row for row in request.get("lexical_review_cautions", [])}
+    supplied = response.get("uncertainty_resolutions", [])
+    if not isinstance(supplied, list):
+        return [], ["Uncertainty resolutions must be a list."]
+    records, errors, seen = [], [], set()
+    for decision in supplied:
+        identity = decision.get("caution_sha256") if isinstance(decision, Mapping) else None
+        if not isinstance(identity, str) or identity not in cautions or identity in seen:
+            errors.append("Uncertainty resolution has an unknown or duplicate caution identity.")
+            continue
+        seen.add(identity)
+        caution = cautions[identity]
+        disposition = decision.get("disposition")
+        source_excerpt = _text(decision.get("source_excerpt"))
+        passage = _text(decision.get("affected_passage"))
+        rationale = _text(decision.get("rationale"))
+        source_text = _review_evidence_text(request.get("approved_source"))
+        artifact_text = _review_evidence_text(caution["artifact_passage"])
+        if (disposition not in {"faithful", "confirmed_defect", "source_clarification"}
+                or not rationale or not source_excerpt
+                or (source_excerpt not in source_text and source_excerpt not in caution.get("template_excerpt", ""))
+                or source_excerpt not in _review_evidence_text(caution["source_evidence"])
+                or not passage or passage not in artifact_text):
+            errors.append("Uncertainty resolution requires a rationale and exact source/current passage evidence.")
+            continue
+        if (caution["approved_source_sha256"] != canonical_evidence_sha256(request.get("approved_source"))
+                or caution["rule_sha256"] != canonical_evidence_sha256({
+                    "quality": sha256_file(Path(__file__)),
+                    "drafting": sha256_file(Path(__file__).with_name("drafting.py")),
+                })):
+            errors.append("The resolution source or rule identity is stale.")
+            continue
+        target = (caution["artifact"], caution["section_id"])
+        section_passed = any(
+            (row.get("artifact"), row.get("section_id")) == target
+            and row.get("status") == "passed" and set(row.get("checks", [])) == set(CONTENT_CHECKS)
+            for row in response.get("section_assessments", []) if isinstance(row, Mapping)
+        )
+        companion = any(
+            row.get("artifact") == target[0] and target[1] in row.get("target_ids", [])
+            and row.get("check") in {"source_supported", "no_invention", "substantive"}
+            for row in response.get("findings", []) if isinstance(row, Mapping)
+        )
+        if (disposition == "faithful" and not section_passed) or (disposition != "faithful" and not companion):
+            errors.append("Uncertainty disposition contradicts its section assessment or lacks a substantive finding.")
+            continue
+        records.append({
+            "schema_version": "source-grounded-resolution/v1", **dict(decision),
+            **{key: caution[key] for key in (
+                "artifact", "section_id", "approved_source_sha256", "artifact_sha256",
+                "section_sha256", "rule_sha256",
+            )},
+            "verification_request_id": request["request_id"],
+            "request_sha256": request["request_sha256"],
+            "producer": dict(response["producer"]),
+        })
+    if seen != set(cautions):
+        errors.append("Every presented uncertainty needs an explicit source-grounded decision.")
+    return records, errors
 
 
 def _reviewed_lexical_warnings(
     warnings: list[dict[str, Any]], evidence: Mapping[str, Any], findings: Iterable[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Clear only cautions explicitly presented to an authenticated exact-artifact review."""
-    if _blocking_findings(findings):
-        return warnings, []
+    """Retain decisions internally; unrelated defects do not erase faithful resolutions."""
     content = [record for record in evidence.values()
                if record.get("task") == "clinical_content_verification"]
     if len(content) != 1:
         return warnings, []
     record = content[0]
-    passing_sections = {(row.get("artifact"), row.get("section_id"))
-                        for row in record.get("section_assessments", [])
-                        if row.get("status") == "passed" and set(row.get("checks", [])) == set(CONTENT_CHECKS)}
-    reviewed = {item["caution_sha256"] for item in record.get("lexical_review_cautions", [])
-                if (item.get("artifact"), item.get("section_id")) in passing_sections}
+    # Invalid reviewer or stale artifact evidence cannot grant resolution authority.
+    if any(item.get("recovery_class") in {"verifier_transient", "document_structure_defect"}
+           and item.get("verification_request_id") == record["request_id"] for item in findings):
+        return warnings, []
+    reviewed = {row["caution_sha256"]: row for row in record.get("uncertainty_resolutions", [])}
     retained, resolved = [], []
     for warning in warnings:
-        if canonical_evidence_sha256(warning) in reviewed:
-            resolved.append({"caution": warning, "resolution": "independent_content_review_passed",
-                             "verification_request_id": record["request_id"]})
+        decision = reviewed.get(canonical_evidence_sha256(warning))
+        if decision:
+            resolved.append({"caution": warning, "resolution": (
+                "independent_content_review_passed" if decision["disposition"] == "faithful"
+                else "independent_content_review_confirmed_defect"), **decision})
         else:
             retained.append(warning)
     return retained, resolved
+
+
+def _unresolved_uncertainty_findings(
+    warnings: Iterable[Mapping[str, Any]], evidence: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """New uncertainty requires review rather than silently becoming a client caution."""
+    request_id = next((row.get("request_id") for row in evidence.values()
+                       if row.get("task") == "clinical_content_verification"), None)
+    return [recovery_finding({
+        "category": "verification", "code": "uncertainty_resolution_required",
+        "verification_request_id": request_id,
+        "field": warning.get("field"), "target_ids": ["verification:content"],
+        "issue": "Present this uncertainty and obtain a source-grounded reviewer decision.",
+        "caution": dict(warning),
+    }, "verifier_transient") for warning in warnings if warning.get("code") in UNCERTAINTY_CODES]
+
+
+def _delivery_warning_partition(warnings: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Reference length goals are internal diagnostics, not client limitations."""
+    remaining, history = [], []
+    for warning in warnings:
+        (history if warning.get("code") in INTERNAL_DIAGNOSTIC_CODES else remaining).append(dict(warning))
+    return remaining, history
 
 
 def _render_warnings(render_report: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -5803,48 +5948,17 @@ def _render_warnings(render_report: Mapping[str, Any]) -> list[dict[str, Any]]:
     return warnings
 
 
-def _safety_critical_content_target(target: str) -> bool:
-    return any(
-        token in re.split(r"[^a-z0-9]+", target.casefold())
-        for token in (
-            "adverse", "contraindication", "emergency", "harm", "injury",
-            "pregnancy", "risk", "risks", "safety", "sideeffect", "sideeffects",
-            "authorization", "compensation", "contact", "cost", "costs", "privacy",
-            "rights", "voluntary", "withdrawal",
-        )
-    )
-
-
-def _governed_content_omission(
-    finding: Mapping[str, Any],
-    targets: Iterable[str],
-) -> bool:
-    normalized_targets = [str(target) for target in targets]
+def _remaining_client_limitation(finding: Mapping[str, Any]) -> bool:
+    """Allow only explicit, nonmaterial external limitations to accompany delivery."""
     return (
-        _text(finding.get("category")).casefold() == "content"
-        and _text(finding.get("check")).casefold() == "substantive"
-        and bool(normalized_targets)
-        and not any(_safety_critical_content_target(target) for target in normalized_targets)
-        and finding.get("safety_critical") is False
-        and finding.get("contradiction") is False
-        and finding.get("obscures_required_information") is False
-        and finding.get("materially_unusable") is False
-    )
-
-
-def _governed_editorial_warning(finding: Mapping[str, Any], targets: Iterable[str]) -> bool:
-    """Only explicit harmless editorial findings can pass as retained warnings."""
-    targets = list(targets)
-    return (
-        _text(finding.get("category")).casefold() == "content"
-        and _text(finding.get("check")).casefold() == "editorial_relevance"
-        and bool(targets)
-        and all(finding.get(flag) is False for flag in (
-            "material", "safety_critical", "contradiction",
-            "obscures_required_information", "materially_unusable",
-        ))
-        and bool(_text(finding.get("affected_passage")))
+        finding.get("check") == "client_limitation"
+        and finding.get("remaining_limitation") is True
+        and finding.get("limitation_kind") in {"external_dependency", "client_environment"}
+        and bool(_text(finding.get("why_not_repairable")))
         and bool(_text(finding.get("recommended_action")))
+        and all(finding.get(flag) is False for flag in (
+            "material", "safety_critical", "contradiction", "obscures_required_information", "materially_unusable",
+        ))
     )
 
 
@@ -6196,7 +6310,16 @@ def validate_verifications(
                             and _text(source.get("disposition")).casefold() == "manual_review"
                         )
                         protocol_repetition = source_check == "concept_repetition" or legacy_repetition
-                        if protocol_repetition:
+                        if _remaining_client_limitation(source):
+                            findings.append({
+                                **finding, "category": "content", "check": "client_limitation",
+                                "remaining_limitation": True,
+                                "limitation_kind": source["limitation_kind"],
+                                "why_not_repairable": source["why_not_repairable"],
+                                "recommended_action": source["recommended_action"],
+                                "publication_disposition": "warning", "severity": "warning",
+                            })
+                        elif protocol_repetition:
                             required = (
                                 "concept_id", "primary_section", "secondary_section",
                                 "primary_paragraphs", "secondary_paragraphs", "treatment",
@@ -6222,20 +6345,6 @@ def validate_verifications(
                                 and source.get("necessary") is False
                                 and source.get("concise") is False
                             )
-                            material_flags = (
-                                "material", "contradiction",
-                                "obscures_required_information", "materially_unusable",
-                            )
-                            # The previous structured contract required four harm
-                            # flags. Retain valid legacy warnings without turning
-                            # a newly requested field into a publication blocker.
-                            safety_nonmaterial = source.get("safety_critical") is False or (
-                                legacy_repetition and "safety_critical" not in source
-                            )
-                            explicitly_nonmaterial = (
-                                all(source.get(key) is False for key in material_flags)
-                                and safety_nonmaterial
-                            )
                             if (
                                 any(not source.get(key) for key in required)
                                 or not governed_pair
@@ -6246,37 +6355,12 @@ def validate_verifications(
                                     "target_ids": [verification_target],
                                     "issue": f"Protocol repetition finding has invalid structured evidence or warning routing. {finding['issue']}".strip(),
                                 }, "verifier_transient"))
-                            elif not explicitly_nonmaterial:
+                            else:
                                 findings.append(recovery_finding({
-                                    **finding,
-                                    "category": source_category,
+                                    **finding, "category": source_category,
                                     "check": source_check,
                                     "verification_request_id": request["request_id"],
                                 }, "drafting_defect"))
-                            else:
-                                findings.append({
-                                    **finding,
-                                    "category": source_category or "content",
-                                    "check": source_check or "concept_repetition",
-                                    "verification_request_id": request["request_id"],
-                                    "severity": "warning",
-                                    "publication_disposition": "warning",
-                                    "action": "manual_review",
-                                })
-                        elif _governed_content_omission(source, supplied_targets) or _governed_editorial_warning(source, supplied_targets):
-                            findings.append({
-                                **finding,
-                                "category": source_category,
-                                "check": source_check,
-                                "verification_request_id": request["request_id"],
-                                **(
-                                    {"recommended_action": source.get("recommended_action")}
-                                    if _text(source.get("recommended_action")) else {}
-                                ),
-                                "severity": "warning",
-                                "publication_disposition": "warning",
-                                "action": "manual_review",
-                            })
                         else:
                             approved_source = request.get("approved_source") or {}
                             branch = str(get_path(approved_source, "meta.study_type") or "")
@@ -6456,7 +6540,16 @@ def validate_verifications(
                 page.get("status") != "passed" for page in valid_page_rows
             ):
                 findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing visual response contains a non-passing page assessment."}, "verifier_transient"))
+        resolution_records, resolution_errors = ([], [])
+        if request["task"] == "clinical_content_verification":
+            resolution_records, resolution_errors = _uncertainty_resolution_records(request, response)
+            findings.extend(recovery_finding({
+                "category": "verification", "field": "uncertainty_resolutions",
+                "code": "uncertainty_resolution_invalid", "target_ids": [verification_target],
+                "verification_request_id": request["request_id"], "issue": message,
+            }, "verifier_transient") for message in resolution_errors)
         evidence[evidence_key] = {
+            "uncertainty_resolutions": resolution_records if not resolution_errors else [],
             "task": request.get("task"),
             "request_id": request.get("request_id"),
             "review_set": request.get("review_set"),
@@ -6472,6 +6565,7 @@ def validate_verifications(
             "page_renderer": request.get("page_renderer"),
             "artifacts": request.get("artifacts", []),
             "sections": request.get("sections", []),
+            "approved_source_sha256": canonical_evidence_sha256(request["approved_source"]) if "approved_source" in request else None,
             "semantic_evidence": request.get("semantic_evidence", []),
             "lexical_review_cautions": request.get("lexical_review_cautions", []),
             "section_assessments": response.get("section_assessments", []) if request.get("task") == "clinical_content_verification" else [],
@@ -6499,6 +6593,9 @@ def _final_verification_scope_findings(
     if len(content) != 1:
         issues.append("Final review requires exactly one package-wide content review.")
     else:
+        if (content[0].get("approved_source_sha256") is not None
+                and content[0]["approved_source_sha256"] != canonical_evidence_sha256(reference)):
+            issues.append("The final content review belongs to a different approved source.")
         content_paths = {
             str(artifact.get("path"))
             for artifact in content[0].get("artifacts", [])
@@ -6693,7 +6790,7 @@ def final_exact_artifact_review_findings(
     deterministic_warnings = _warning_findings(deterministic_findings)
     verification_findings, fresh_evidence = validate_verifications(revision_dir)
     fresh_warnings = (
-        deterministic_warnings + _accepted_drafting_warnings(revision_dir)
+        deterministic_warnings + _accepted_drafting_warnings(revision_dir, reference)
         + _render_warnings(render_report) + _warning_findings(render_report.get("findings", []))
         + _warning_findings(verification_findings)
     )
@@ -6706,6 +6803,10 @@ def final_exact_artifact_review_findings(
         )
     )
     fresh_warnings, fresh_resolutions = _reviewed_lexical_warnings(fresh_warnings, fresh_evidence, verification_findings)
+    verification_findings.extend(_unresolved_uncertainty_findings(fresh_warnings, fresh_evidence))
+    fresh_warnings, fresh_history = _delivery_warning_partition(fresh_warnings)
+    if fresh_history != list(quality.get("internal_diagnostics") or []):
+        issues.append("Final internal diagnostic evidence changed after review.")
     if (
         canonical_evidence_sha256(fresh_evidence)
         != final_review.get("verification_evidence_sha256")
@@ -6730,7 +6831,7 @@ def final_exact_artifact_review_findings(
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
     deterministic_findings = deterministic_content_check(revision_dir, reference)
     warnings = (
-        _warning_findings(deterministic_findings) + _accepted_drafting_warnings(revision_dir)
+        _warning_findings(deterministic_findings) + _accepted_drafting_warnings(revision_dir, reference)
         + _render_warnings(render_report) + _warning_findings(render_report.get("findings", []))
     )
     findings = _blocking_findings(deterministic_findings)
@@ -6748,6 +6849,8 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     findings.extend(_blocking_findings(verification_findings))
     findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
     warnings, resolutions = _reviewed_lexical_warnings(warnings, evidence, findings)
+    findings.extend(_unresolved_uncertainty_findings(warnings, evidence))
+    warnings, internal_history = _delivery_warning_partition(warnings)
     candidate_hashes = {
         path.relative_to(revision_dir).as_posix(): sha256_file(path)
         for path in sorted((revision_dir / "candidate").glob("*"))
@@ -6768,7 +6871,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
         "every_page": not findings,
         "section_three_and_orphan_heading_checks": not findings,
     }
-    return {"status": final_review["status"], "findings": findings, "warnings": warnings, "resolved_evidence_cautions": resolutions, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
+    return {"status": final_review["status"], "findings": findings, "warnings": warnings, "resolved_evidence_cautions": resolutions, "internal_diagnostics": internal_history, "renderer": render_report.get("renderer"), "verification_evidence": evidence, "final_exact_artifact_review": final_review}
 
 
 __all__ = ["CONTENT_CHECKS", "CROSS_DOCUMENT_CHECKS", "FORMAT_CONFORMANCE_MATRIX", "GOVERNED_GATE_SEQUENCE", "ICF_RETAINED_SHELL_SECTIONS", "PAGE_RENDERER_BACKENDS", "RECOVERY_POLICIES", "RESPONSE_SCHEMA", "VISUAL_CHECKS", "advance_gate_ledger", "audit_format_conformance_outputs", "build_gate_ledger", "canonical_evidence_sha256", "content_review_sections", "create_verification_requests", "deterministic_content_check", "load_format_conformance_matrix", "normalized_docx_format_signature", "page_renderer", "page_renderers", "pending_verifications", "preflight", "quality_report", "rasterize_pdf", "recovery_finding", "render_assurance", "render_pages", "renderer", "renderers", "retry_gate_ledger", "sha256_file", "validate_gate_ledger", "verification_request_authentication_findings", "verification_request_hash_valid", "verification_request_ledger_record", "verification_recovery_request_findings", "verification_request_sha256", "verification_response_is_complete", "verification_response_is_terminal"]
