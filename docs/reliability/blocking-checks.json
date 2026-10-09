@@ -171,7 +171,7 @@
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_rows_match",
-      "code_sha256": "570d1c714e448bf8615d1dc432506ebebbbb5d9e73f82aecf62058f2e1597099",
+      "code_sha256": "d957fdedc79cc11ec097cdca7f12c7988a68b3f2e7a10e1d2dd19cc85e8e21cb",
       "family": "structured",
       "scope": "shared",
       "role": "helper",

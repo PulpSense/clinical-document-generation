@@ -1518,19 +1518,25 @@ def protocol_table_rows_match(contract: Mapping[str, Any], actual: Iterable[Iter
         value_tokens = re.findall(r"[A-Za-z]+|[^A-Za-z]+", value)
         if len(source_tokens) != len(value_tokens):
             return False
+        # Protect complete measurement expressions, including compound units,
+        # by source quantity context rather than a finite unit spelling list.
+        quantities = (r"(?:\d+(?:[.,]\d+)?|\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|"
+                      r"eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
+                      r"thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand))")
+        unit_spans = list(re.finditer(quantities + r"\s*([A-Za-zµμ][A-Za-zµμ0-9/.*^·−+-]*(?:\s*[/·*]\s*[A-Za-zµμ0-9/.*^·−+-]+)*)", source,
+                                     flags=re.IGNORECASE))
         for token, actual_token in zip(source_tokens, value_tokens):
             approved_token = token.group()
             if approved_token == actual_token:
                 continue
-            # Never fold mixed-case/uppercase identifiers, unit-like tokens,
+            # Never fold mixed-case/uppercase or short title-shaped identifiers,
             # alphanumeric identifiers, numbers, operators or punctuation.
             word = re.fullmatch(r"[A-Za-z]{2,}", approved_token)
-            unit = re.fullmatch(r"(?:[afpnumcdhkMGT]?(?:mol|g|l|m|s|a|v|w|hz|pa)|min|mmhg|ppm|ppb)",
-                                approved_token, flags=re.IGNORECASE)
+            unit = any(span.start(1) <= token.start() and token.end() <= span.end(1) for span in unit_spans)
             touches_number = ((token.start() > 0 and source[token.start() - 1].isdigit())
                               or (token.end() < len(source) and source[token.end()].isdigit()))
             if not (word and not unit and not touches_number
-                    and (approved_token.islower() or approved_token.istitle())
+                    and (approved_token.islower() or (approved_token.istitle() and len(approved_token) > 3))
                     and (actual_token.islower() or actual_token.istitle())
                     and approved_token.lower() == actual_token.lower()):
                 return False

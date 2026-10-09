@@ -20,7 +20,7 @@ from test_handoff_quality import acceptance_verification
 ROOT = Path(__file__).resolve().parents[1]
 
 
-@pytest.mark.parametrize("change", ["sentence-case", "title-case", "unlisted", "quantity"])
+@pytest.mark.parametrize("change", ["presentation", "facts"])
 def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tmp_path, governed_pdfium, monkeypatch, change):
     run = tmp_path / "run"
     reference_path = run / "reference/study.reference.json"
@@ -28,7 +28,8 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
     source = json.loads((ROOT / "tests/fixtures/prospective-acceptance-source.json").read_text())
     source["procedures"]["visit_schedule_table"] = []
     source["procedures"]["visit_schedule"][0]["procedures"].extend([
-        "demographics", "informed consent", "blood pressure", "qPCR collection at 5 mL",
+        "demographics", "informed consent", "blood pressure", "as needed assessment",
+        "qPCR collection at 5 mL", "dose at 5 mcg", "heart rate at 60 bpm", "Hb assessment",
     ])
     reference_path.write_text(json.dumps(source))
     assert workflow.prepare(run)["status"] == "awaiting_approval"
@@ -51,18 +52,20 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
             protocol_path = revision / "candidate/protocol.docx"
             document = Document(protocol_path)
             table = next(t for t in document.tables if t.rows[0].cells[0].text.strip() == "Activity")
-            label, replacement = {
-                "sentence-case": ("demographics", "Demographics"),
-                "title-case": ("informed consent", "Informed Consent"),
-                "unlisted": ("blood pressure", "Blood pressure"),
-                "quantity": ("qPCR collection at 5 mL", "qPCR collection at 99 mL"),
+            replacements = {
+                "presentation": [("demographics", "Demographics"), ("informed consent", "Informed Consent"),
+                                 ("blood pressure", "Blood pressure"), ("as needed assessment", "As needed assessment")],
+                "facts": [("qPCR collection at 5 mL", "qPCR collection at 99 mL"),
+                          ("dose at 5 mcg", "dose at 5 Mcg"), ("heart rate at 60 bpm", "heart rate at 60 Bpm"),
+                          ("Hb assessment", "hb assessment")],
             }[change]
-            row = next(row for row in table.rows if row.cells[0].text.strip() == label)
-            row.cells[0].text = replacement
+            for label, replacement in replacements:
+                row = next(row for row in table.rows if row.cells[0].text.strip() == label)
+                row.cells[0].text = replacement
             document.save(protocol_path)
             defects = [f for f in quality.deterministic_content_check(revision, source)
                        if f.get("field") == "procedures.visit_schedule"]
-            if change != "quantity":
+            if change == "presentation":
                 assert defects == []
             else:
                 assert defects and all(f["owner"] == "construction"
@@ -101,7 +104,7 @@ def test_schedule_variation_or_real_defect_reaches_verified_complete_delivery(tm
     state = json.loads((run / "logs/desktop-operation-schedule-replay.json").read_text())
     assert state["deadline_at_epoch"] - state["started_at_epoch"] == 2700
     reconstructions = json.loads(reference_path.read_text()).get("generation", {}).get("deterministic_reconstructions", [])
-    if change == "quantity":
+    if change == "facts":
         assert any(item["target"] == "evaluation-procedures" and item["outcome"] == "rebuilt"
                    and item["candidate_bytes_changed"] for item in reconstructions)
     else:
@@ -133,10 +136,26 @@ def test_title_case_descriptive_words_preserve_technical_tokens():
         [["Activity", "Visit 1"], ["Informed Consent and qPCR Collection at 5 mL", "X"]])
 
 
+def test_function_words_are_not_mistaken_for_measurement_units():
+    contract = {"section_id": "evaluation-procedures", "header_rows": 1,
+                "rows": [["Activity", "Visit 1"], ["as needed assessment", "X"]]}
+    assert contracts.protocol_table_rows_match(contract, [["Activity", "Visit 1"], ["As needed assessment", "X"]])
+
+
 @pytest.mark.parametrize("label,replacement", [("PCR collection", "Pcr collection"),
     ("sample at 5 mol", "Sample at 5 Mol"), ("sample at 5 mg", "Sample at 5 Mg"),
     ("brca1 assessment", "Brca1 Assessment"), ("eGFR assessment", "Egfr Assessment")])
 def test_title_case_does_not_fold_identifiers_or_units(label, replacement):
+    contract = {"section_id": "evaluation-procedures", "header_rows": 1,
+                "rows": [["Activity", "Visit 1"], [label, "X"]]}
+    assert not contracts.protocol_table_rows_match(contract, [["Activity", "Visit 1"], [replacement, "X"]])
+
+
+@pytest.mark.parametrize("label,replacement", [("dose at 5 mcg", "Dose at 5 Mcg"),
+    ("heart rate at 60 bpm", "Heart rate at 60 Bpm"), ("Hb assessment", "hb assessment"),
+    ("dose at 5 mcg/kg/min", "Dose at 5 mcg/Kg/min"),
+    ("dose at 5 mcg / kg / min", "Dose at 5 mcg / Kg / min")])
+def test_quantity_units_and_short_technical_identifiers_are_exact(label, replacement):
     contract = {"section_id": "evaluation-procedures", "header_rows": 1,
                 "rows": [["Activity", "Visit 1"], [label, "X"]]}
     assert not contracts.protocol_table_rows_match(contract, [["Activity", "Visit 1"], [replacement, "X"]])
