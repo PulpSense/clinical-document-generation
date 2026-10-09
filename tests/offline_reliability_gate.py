@@ -27,7 +27,7 @@ TEST_FILES = (
     'test_prs_quality_corrections.py', 'test_prs_xml.py', 'test_worker_readiness.py',
     'test_mixed_visit_representations.py', 'test_semantic_evidence_recovery.py',
     'test_concept_reference_grounding.py', 'test_review_contract_root_causes.py',
-    'test_owner_aware_recovery.py', 'test_review_resolutions.py',
+    'test_owner_aware_recovery.py', 'test_review_resolutions.py', 'test_shared_output_projection.py',
     'test_editorial_publication.py', 'test_phase1_repetition.py',
 )
 
@@ -55,6 +55,10 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
                 '_matrix_visit_alias', '_schedule_activity_identity', 'lexical_evidence_uncertainty',
                 '_lexical_review_cautions', '_reviewed_lexical_warnings', '_review_evidence_text', '_quantity_claim_issues', '_uncertainty_rule_sha256',
+                'study_short_title', 'sample_size_display', 'study_design_display',
+                '_name', '_contact_fields', '_site_investigator', '_observational_cohorts',
+                '_supplied_protocol_references', '_normalize_icf_source_displays',
+                '_omit_empty_visit_window', '_assessment_matrix',
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',
                 '_rendered_heading_text', '_target_heading',
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',

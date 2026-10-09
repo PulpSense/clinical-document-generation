@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.42-retrospective-design"
+CONTRACT_VERSION = "clinical-documents-v2.43-shared-output-projection"
 BOILERPLATE_VERSION = "clinical-boilerplate-v13"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -1422,6 +1422,33 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     return visits
 
 
+def study_short_title(reference: Mapping[str, Any]) -> str:
+    """Use one concise title policy for DOCX headers and PRS brief titles."""
+    supplied = str(get_path(reference, "study.short_title") or "").strip()
+    if supplied:
+        return supplied
+    title = str(get_path(reference, "study.title") or "").strip()
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    if branch:
+        title = re.sub(rf"^\s*{re.escape(branch)}\s+", "", title, flags=re.I)
+    title = re.sub(r"^\s*Evaluation\s+of\s+the\s+", "", title, flags=re.I)
+    title = re.sub(r"^\s*(?:A|An)\s+.{0,100}?\bstudy\s+evaluating\s+", "", title, flags=re.I)
+    title = re.sub(r"\s+", " ", title).strip()
+    if len(title) <= 72:
+        return title[:1].upper() + title[1:]
+    boundary = title.rfind(" ", 0, 73)
+    concise = title[:boundary] if boundary > 35 else title[:72]
+    concise = re.sub(r"\s+(?:a|after|an|and|before|for|in|of|the|to|with|without)$", "", concise, flags=re.I)
+    # A length cap can otherwise leave a dangling phrase such as "after Bilateral".
+    trailing_modifier = re.search(
+        r"\s+(?:after|before|for|in|with|without|among|receiving|undergoing|following)\s+([^\s]+)$",
+        concise, flags=re.I,
+    )
+    if trailing_modifier and trailing_modifier.start() >= 35:
+        concise = concise[:trailing_modifier.start()]
+    return concise[:1].upper() + concise[1:]
+
+
 def participant_followup_summary(reference: Mapping[str, Any]) -> str:
     """Project participant follow-up from approved phases or canonical visits.
 
@@ -1434,7 +1461,13 @@ def participant_followup_summary(reference: Mapping[str, Any]) -> str:
         r"\bfollow[ -]?up\s*[:=]\s*(.+?)(?=[;,\n.]\s*(?:enrollment|recruitment|(?:data\s+)?analysis)\s*[:=]|$)", timeline, re.I | re.S,
     )
     if followup:
-        return followup.group(1).strip().rstrip(".")
+        supplied = followup.group(1).strip().rstrip(".")
+        abbreviation = re.fullmatch(r"(\d+(?:\.\d+)?)\s*([MDWY])", supplied, re.I)
+        if abbreviation:
+            count, unit = abbreviation.groups()
+            label = {"m": "month", "d": "day", "w": "week", "y": "year"}[unit.casefold()]
+            return f"{count} {label}{'' if float(count) == 1 else 's'}"
+        return supplied
     visits = normalized_visit_records(reference)
     if visits:
         final = visits[-1]
@@ -1538,7 +1571,11 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         # Both matrix and inventory forms use the same normalized visit set.
         entries = [[visit["visit"], visit["timing"]] for visit in visits]
         if entries:
-            assessment_rows = [["Approved visit or assessment", "Approved timing"], *entries]
+            assessment_rows = (
+                [["Approved visit or assessment", "Approved timing"], *entries]
+                if any(row[1] for row in entries) else
+                [["Approved visit or assessment"], *[[row[0]] for row in entries]]
+            )
     # A structured matrix must not suppress supplied narrative assessments.
     # Preserve source clauses verbatim; no NLP guess assigns them to visits.
     inventory: list[dict[str, Any]] = []

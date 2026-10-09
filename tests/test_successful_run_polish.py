@@ -84,16 +84,23 @@ def test_method_request_scopes_out_interpretation_owned_by_considerations():
     assert 'standard deviation' in scoped
 
 
-def test_sterling_defect_is_repaired_before_independent_review_requests(tmp_path):
+def test_missing_sterling_purpose_is_repaired_before_independent_review_requests(tmp_path):
     from docx import Document
     import workflow
     revision = tmp_path / 'revision'
     candidate = revision / 'candidate'
     candidate.mkdir(parents=True)
     document = Document(FIXTURE.parent / 'successful-run-documents/icf.docx')
+    in_purpose = False
     for p in document.paragraphs:
-        if p.text.startswith("The purpose is to evaluate vision"):
-            p.text = 'The purpose is to evaluate vision and patients experiences.'
+        if p.text.strip() == 'PURPOSE':
+            in_purpose = True
+        elif p.text.strip() == 'DURATION':
+            in_purpose = False
+        elif in_purpose:
+            # Missing content is an objective defect; a wording variation now
+            # belongs to the independent source-grounded semantic review.
+            p.text = ''
     document.save(candidate / 'icf.docx')
     source = DATA['reference']
     pending, findings = workflow._begin_independent_review(revision, source, {}, {}, 1)

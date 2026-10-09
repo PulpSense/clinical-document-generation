@@ -4033,6 +4033,19 @@ def audit_source_surfaces(path: Path, reference: Mapping[str, Any]) -> list[dict
                                      "target_ids": ["layout:icf"],
                                      "issue": f"ICF omits supplied site-address component {field}: {item['value']}"})
     if path.stem == "protocol":
+        references = get_path(reference, "study.references") or reference.get("references")
+        references_path = "study.references" if get_path(reference, "study.references") else "references"
+        entries = references if isinstance(references, list) else [references] if isinstance(references, str) else []
+        visible = re.sub(r"\s+", " ", "\n".join(p.text for p in document.paragraphs))
+        for entry in entries:
+            if isinstance(entry, str) and entry.strip() and re.sub(r"\s+", " ", entry.strip()) not in visible:
+                findings.append(recovery_finding({
+                    "category": "content", "artifact": "protocol", "field": "protocol.shell",
+                    "target_ids": ["protocol.shell"], "source_path": references_path,
+                    "check": "computed_source_fidelity",
+                    "issue": "The code-owned bibliography omits a supplied reference.",
+                    "source_excerpt": entry,
+                }, "deterministic_structure_defect"))
         sponsor_name = str(get_path(reference, "parties.sponsor.name", "") or "").strip()
         if sponsor_name:
             for table in document.tables:
@@ -5463,6 +5476,10 @@ def create_verification_requests(
         "Separate prose defects from code-owned table defects. For a Protocol table finding, set surface to "
         "table and table_ids to the affected canonical IDs from code_owned_tables; use their owner section IDs "
         "in target_ids. These table values are reconstructed from approved facts, not repaired by rewriting prose. "
+        "Inspect code-owned values as well as drafted prose: supplied references must remain resolvable, "
+        "names must distinguish honorifics from given names, and unknown counts must not become zero. "
+        "Check the readable presentation of raw null slots, group counts and empty optional columns; "
+        "route confirmed assembly defects to the owning shell or table. Preserve meaningful negatives. "
         "Verify that PURPOSE actually explains the aim, hypothesis and main outcome. Reject missing material hypothesis "
         "facts and strengthened qualifications or reversed negations with category content, check source_supported, "
         "target_ids, contradiction true for changed meaning, and exact source/passage evidence. A recognized "

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
-from contracts import canonical_study_type, facility_projection, get_path, meaningful
+from contracts import study_short_title, canonical_study_type, facility_projection, get_path, meaningful
 
 
 TOKEN = re.compile(r"\{[#/^]?([A-Za-z_][A-Za-z0-9_.\-\[\]()&]*)\}")
@@ -111,7 +111,8 @@ def _text(value: Any) -> str:
 
 
 def _name(value: Any) -> tuple[str, str, str]:
-    parts = _text(value).split(",", 1)[0].split()
+    name = re.sub(r"^(?:(?:Dr|Doctor|Prof|Professor|Mr|Mrs|Ms|Mx)\.?\s+)+", "", _text(value), flags=re.I)
+    parts = name.split(",", 1)[0].split()
     if not parts: return "", "", ""
     if len(parts) == 1: return parts[0], "", ""
     return parts[0], " ".join(parts[1:-1]), parts[-1]
@@ -170,7 +171,7 @@ def _contact_fields(value: Mapping[str, Any]) -> dict[str, str]:
     first, middle, last = _name(_mapping_value(value, "name", "full_name"))
     return {
         "first_name": _mapping_value(value, "first_name", "given_name") or first,
-        "middle_name": _mapping_value(value, "middle_name") or middle,
+        "middle_name": _text(value["middle_name"]) if "middle_name" in value else middle,
         "last_name": _mapping_value(value, "last_name", "family_name", "surname") or last,
         "degrees": _mapping_value(value, "degrees", "degree", "title"),
         "phone": _mapping_value(value, "phone", "business_phone", "office_phone"),
@@ -194,6 +195,14 @@ def _site_backup_contact(site: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(candidate, Mapping):
             merged.update(candidate)
     return merged
+
+
+def _site_investigator(site: Mapping[str, Any]) -> Mapping[str, Any]:
+    investigators = site.get("investigators")
+    if isinstance(investigators, list) and investigators and isinstance(investigators[0], Mapping):
+        return investigators[0]
+    investigator = site.get("investigator")
+    return investigator if isinstance(investigator, Mapping) else {}
 
 
 def _stable_study_uid(reference: Mapping[str, Any]) -> str:
@@ -357,8 +366,10 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "parties.backup_contact",
     )
     overall_backup_fields = _contact_fields(overall_contact_backup)
-    pi_first, pi_middle, pi_last = _name(pi.get("name"))
-    contact_first, contact_middle, contact_last = _name(coordinator.get("name"))
+    pi_fields = _contact_fields(pi)
+    coordinator_fields = _contact_fields(coordinator)
+    pi_first, pi_middle, pi_last = (pi_fields[key] for key in ("first_name", "middle_name", "last_name"))
+    contact_first, contact_middle, contact_last = (coordinator_fields[key] for key in ("first_name", "middle_name", "last_name"))
     responsible = _merged_mapping(
         reference,
         "regulatory.prs.responsible_party",
@@ -378,7 +389,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         for site in get_path(reference, "sites", []) or []:
             if not isinstance(site, Mapping):
                 continue
-            investigators = site.get("investigators") if isinstance(site.get("investigators"), list) else []
+            investigators = site.get("investigators") if isinstance(site.get("investigators"), list) else [_site_investigator(site)]
             if not any(isinstance(item, Mapping) and _text(item.get("name")).casefold() == pi_name for item in investigators):
                 continue
             facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
@@ -427,8 +438,8 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "overallContactBackupPhoneExt": overall_backup_fields["phone_ext"],
         "overallContactBackupEmail": overall_backup_fields["email"],
         "overallOfficialFirstName": pi_first, "overallOfficialMiddleName": pi_middle, "overallOfficialLastName": pi_last,
-        "overallOfficialDegrees": _text(pi.get("title")), "overallOfficialRole": "Principal Investigator", "overallOfficialAffiliation": investigator_affiliation,
-        "briefTitle": _text(get_path(reference, "study.short_title")) or title, "officialTitle": title,
+        "overallOfficialDegrees": pi_fields["degrees"], "overallOfficialRole": "Principal Investigator", "overallOfficialAffiliation": investigator_affiliation,
+        "briefTitle": study_short_title(reference), "officialTitle": title,
         "briefSummary": _text(brief), "detailedDescription": _text(detailed), "eligibilityCriteria": criteria,
         "eligibilityGender": _text(get_path(reference, "population.sex")), "healthyVolunteers": _text(get_path(reference, "population.healthy_volunteers")),
         "samplingMethod": _text(get_path(reference, "regulatory.prs.sampling_method")), "studyPopulation": _text(get_path(reference, "population.study_population")),
@@ -449,7 +460,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "allocation": _text(get_path(reference, "regulatory.prs.allocation")),
         "interventionModel": _text(get_path(reference, "regulatory.prs.intervention_model")), "primaryPurpose": _text(get_path(reference, "regulatory.prs.primary_purpose")),
         "masking": _text(get_path(reference, "design.masking")), "numberOfArms": str(len(_items(reference, "design.arms"))),
-        "numberOfGroups": str(len(_observational_cohorts(reference))), "condition": _text(get_path(reference, "study.condition")),
+        "numberOfGroups": str(len(_observational_cohorts(reference))) if _observational_cohorts(reference) else "", "condition": _text(get_path(reference, "study.condition")),
         "sharingIPD": _text(get_path(reference, "regulatory.prs.ipd_sharing")), "sharingIpd": _text(get_path(reference, "regulatory.prs.ipd_sharing")),
         "studyUid": _stable_study_uid(reference), "nctId": _text(get_path(reference, "regulatory.prs.nct_id")),
     }
@@ -469,7 +480,7 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
         "isINDStudy": _source_value(reference, "regulatory.prs.is_ind_study"),
         "isIndStudy": _source_value(reference, "regulatory.prs.is_ind_study"),
         "overallContactPhoneExt": _source_value(reference, "parties.study_coordinator.phone_ext"),
-        "briefTitle": _source_value(reference, "study.short_title", "study.title"),
+        "briefTitle": study_short_title(reference),
         "eligibilityGender": _source_value(reference, "population.gender", "population.sex"),
         "healthyVolunteers": _source_value(reference, "population.healthy_volunteers", "regulatory.prs.healthy_volunteers"),
         "samplingMethod": _source_value(reference, "regulatory.prs.sampling_method", "design.sampling_method"),
@@ -628,7 +639,7 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
         facility_value = site.get("facility")
         facility: Mapping[str, Any] = facility_value if isinstance(facility_value, Mapping) else {}
         facility_fields = facility_projection(facility)
-        contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}; investigator = (site.get("investigators") or [{}])[0]
+        contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}; investigator = _site_investigator(site)
         contact_fields = _contact_fields(contact)
         backup_fields = _contact_fields(_site_backup_contact(site))
         investigator_fields = _contact_fields(investigator)
@@ -953,7 +964,7 @@ def validate_output(
         "uid": _stable_study_uid(reference),
         "id_info/provider_study_id": _source_value(reference, "regulatory.prs.provider_study_id", "meta.protocol_number"),
         "id_info/org_name": _source_value(reference, "regulatory.prs.org_name", "regulatory.prs.organization_name", "parties.sponsor.name"),
-        "brief_title": _source_value(reference, "study.short_title", "study.title"),
+        "brief_title": study_short_title(reference),
         "official_title": get_path(reference, "study.title"),
         "condition": get_path(reference, "study.condition"),
         "study_design/study_type": get_path(reference, "regulatory.prs.study_type"),
@@ -1075,7 +1086,7 @@ def validate_output(
         ):
             require_repeated_value(node, f"facility/address/{field}", expected_value, f"location[{index}].facility.address.{field}")
         contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}
-        investigator = (site.get("investigators") or [{}])[0]
+        investigator = _site_investigator(site)
         for field, expected_value in _contact_fields(contact).items():
             require_repeated_value(node, f"contact/{field}", expected_value, f"location[{index}].contact.{field}")
         investigator_fields = _contact_fields(investigator)

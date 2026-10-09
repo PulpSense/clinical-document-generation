@@ -25,7 +25,7 @@ from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
 
-from contracts import ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 
 
@@ -143,7 +143,7 @@ def _icf_duration_text(reference: Mapping[str, Any], model: Mapping[str, Any]) -
     duration = _icf_text(model, "icf.duration")
     if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() != "advarra":
         return duration
-    enrollment = _text(get_path(reference, "population.sample_size")).strip().rstrip(".")
+    enrollment = sample_size_display(get_path(reference, "population.sample_size"))
     if not enrollment:
         return duration
     expected_numbers = set(re.findall(r"\b\d+\b", enrollment))
@@ -313,33 +313,32 @@ def _document_control_date(reference: Mapping[str, Any]) -> str:
 
 
 def _protocol_short_title(reference: Mapping[str, Any]) -> str:
-    supplied = _text(get_path(reference, "study.short_title"))
-    if supplied:
-        return supplied
-    title = _text(get_path(reference, "study.title"))
-    branch = canonical_study_type(get_path(reference, "meta.study_type"))
-    if branch:
-        title = re.sub(rf"^\s*{re.escape(branch)}\s+", "", title, flags=re.I)
-    title = re.sub(r"^\s*Evaluation\s+of\s+the\s+", "", title, flags=re.I)
-    title = re.sub(r"^\s*(?:A|An)\s+.{0,100}?\bstudy\s+evaluating\s+", "", title, flags=re.I)
-    title = re.sub(r"\s+", " ", title).strip()
-    if len(title) <= 72:
-        return title[:1].upper() + title[1:]
-    boundary = title.rfind(" ", 0, 73)
-    concise = title[:boundary] if boundary > 35 else title[:72]
-    concise = re.sub(r"\s+(?:a|after|an|and|before|for|in|of|the|to|with|without)$", "", concise, flags=re.I)
-    # A length cap can otherwise leave a dangling phrase such as "after Bilateral".
-    trailing_modifier = re.search(
-        r"\s+(?:after|before|for|in|with|without|among|receiving|undergoing|following)\s+([^\s]+)$",
-        concise, flags=re.I,
-    )
-    if trailing_modifier and trailing_modifier.start() >= 35:
-        concise = concise[:trailing_modifier.start()]
-    return concise[:1].upper() + concise[1:]
+    return study_short_title(reference)
 
 
 def _protocol_number(reference: Mapping[str, Any]) -> str:
     return _text(get_path(reference, "meta.protocol_number") or get_path(reference, "regulatory.prs.provider_study_id"))
+
+
+def sample_size_display(value: Any) -> str:
+    """Translate the legacy count record only when its whole shape is known."""
+    text = _text(value).rstrip(". ")
+    match = re.fullmatch(r"(\d[\d,]*)\s+(?:subjects?|participants?|patients?)\s*\(treatment\)\s*;\s*control\s*:\s*(\d[\d,]*)", text, re.I)
+    if match:
+        count, control = match.groups()
+        return f"{count} participants. There is no control group" if int(control.replace(",", "")) == 0 else f"{count} participants in the treatment group and {control} in the control group"
+    return text
+
+
+def study_design_display(reference: Mapping[str, Any]) -> str:
+    """Drop standalone legacy null slots while retaining meaningful negatives."""
+    text = _text(get_path(reference, "design.study_design_summary") or get_path(reference, "design.study_design"))
+    clauses = []
+    for clause in text.split(";"):
+        parts = [part.strip() for part in clause.split(",") if part.strip().casefold() not in {"", "none", "null", "n/a"}]
+        if parts:
+            clauses.append(", ".join(parts))
+    return "; ".join(clauses)
 
 
 def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dict[str, str]:
@@ -393,8 +392,8 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         ]))),
         "sterlingSecondaryPhone": _text(coordinator.get("office_phone")),
         "objective": "; ".join(_list(get_path(reference, "objectives.primary", []))),
-        "studyDesignShort": _text(get_path(reference, "design.study_design_summary") or get_path(reference, "design.study_design")), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
-        "sampleSize": _text(get_path(reference, "population.sample_size")).rstrip(". "),
+        "studyDesignShort": study_design_display(reference), "sitesNumber": _text(get_path(reference, "design.number_of_sites")),
+        "sampleSize": sample_size_display(get_path(reference, "population.sample_size")),
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
         "daysBeforeScreening": screening_interval.days if screening_interval else "",
@@ -1733,7 +1732,17 @@ def _normalize_protocol_running_header(document: Document) -> None:
 
 def _supplied_protocol_references(reference: Mapping[str, Any]) -> str:
     """Preserve explicit references and recognizable bibliography in background."""
-    explicit = _text(reference.get("references"))
+    canonical = get_path(reference, "study.references")
+    if isinstance(canonical, list):
+        citations = [_text(item) for item in canonical if _text(item)]
+        if citations:
+            # One list item is one citation, even when its DOI wraps to a new
+            # line. The canonical inventory already owns order and identity.
+            return "\n".join(
+                citation if re.match(r"^\d+[.)]\s", citation) else f"{index}. {citation}"
+                for index, citation in enumerate(citations, 1)
+            )
+    explicit = _text(canonical) or _text(reference.get("references"))
     background = _text(get_path(reference, "study.background"))
     heading = re.search(r"(?im)^[ \t]*references?(?:[ \t]*:[ \t]*|[ \t]*$)", background)
     if heading:
@@ -1792,6 +1801,38 @@ def _ensure_protocol_references(document: Document, authority: Document, referen
     source_run = _first_visible_run(exemplar)
     for run in body.runs:
         _copy_run_design(run, source_run)
+
+
+def _normalize_icf_source_displays(document: Document, reference: Mapping[str, Any]) -> None:
+    """Normalize exact source encodings even when repeated inside AI drafts."""
+    replacements = []
+    bibliography = _supplied_protocol_references(reference)
+    available_citations = set(re.findall(r"(?m)^\s*(\d+)[.)]\s", bibliography))
+    if available_citations:
+        replacements.append((re.compile(r"\s*\(references?\s+\d+(?:\s*(?:,|and|–|-)\s*\d+)*\)", re.I), ""))
+    raw_count = _text(get_path(reference, "population.sample_size")).rstrip(". ")
+    display_count = sample_size_display(raw_count)
+    if raw_count and display_count != raw_count:
+        replacements.append((re.compile(re.escape(raw_count)), display_count))
+    for paragraph in document.paragraphs:
+        matches = sorted(
+            ((match, replacement) for pattern, replacement in replacements for match in pattern.finditer(paragraph.text)
+             if replacement or set(re.findall(r"\d+", match.group())) <= available_citations),
+            key=lambda item: item[0].start(), reverse=True,
+        )
+        if not matches:
+            continue
+        spans = []
+        offset = 0
+        for run in paragraph.runs:
+            spans.append((offset, offset + len(run.text), run))
+            offset += len(run.text)
+        for match, replacement in matches:
+            for start, end, run in reversed(spans):
+                if start < match.end() and end > match.start():
+                    left, right = max(0, match.start() - start), min(end - start, match.end() - start)
+                    inserted = replacement if start <= match.start() < end else ""
+                    run.text = run.text[:left] + inserted + run.text[right:]
 
 
 def _plain_blank(paragraph: Paragraph) -> bool:
@@ -2758,6 +2799,27 @@ def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
                 table._tbl.tblGrid.remove(grid_columns[3])
 
 
+def _omit_empty_visit_window(document: Document) -> None:
+    """Hide an entirely unsupplied optional column without inventing windows."""
+    for table in document.tables:
+        if len(table.columns) != 3 or not table.rows:
+            continue
+        if table.cell(0, 1).text.strip() != "Visit Name" or table.cell(0, 2).text.strip() != "Visit Window":
+            continue
+        if any(row.cells[2].text.strip() for row in table.rows[1:]):
+            continue
+        width = sum(column.w or 0 for column in table._tbl.tblGrid.gridCol_lst)
+        for row in table._tbl.tr_lst:
+            row.remove(row.tc_lst[2])
+        table._tbl.tblGrid.remove(table._tbl.tblGrid.gridCol_lst[2])
+        widths = [round(width * .2), round(width * .8)]
+        for column, size in zip(table._tbl.tblGrid.gridCol_lst, widths):
+            column.w = size
+        for row in table.rows:
+            for cell, size in zip(row.cells, widths):
+                cell.width = size
+
+
 def _apply_protocol_visit_table_layout(document: Document, authority: Document) -> None:
     """Apply the client's compact three-column Visit Schedule table pattern."""
     output = next((
@@ -3376,9 +3438,15 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
 
     authority = Document(authority_path)
     design = authority.tables[-1]
+    # The authority's Activity header spans three rows. Select its first actual
+    # body row rather than copying a continuation of that merged header.
+    body_row_index = next((
+        index for index, row in enumerate(design.rows)
+        if index >= 2 and row.cells[0]._tc.get_or_add_tcPr().find(qn("w:vMerge")) is None
+    ), len(design.rows) - 1)
     body_run_properties = next((
         run._r.rPr
-        for row in design.rows[2:]
+        for row in design.rows[body_row_index:]
         for cell in row.cells
         for paragraph in cell.paragraphs
         for run in paragraph.runs
@@ -3390,7 +3458,7 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
     for row_index, values in enumerate(row_values):
-        source_row_index = min(row_index, len(design.rows) - 1)
+        source_row_index = min(row_index if row_index < header_rows else body_row_index, len(design.rows) - 1)
         for column_index, value in enumerate(values):
             source_column_index = 0 if column_index == 0 else min(column_index, len(design.columns) - 1)
             _copy_cell_design(
@@ -3558,6 +3626,7 @@ def _template_document(
         if sterling:
             _repair_sterling_footer_page_fields(document)
         _populate_icf_sections(document, model, reference, sterling=sterling)
+        _normalize_icf_source_displays(document, reference)
         if not sterling:
             _remove_advarra_example_study_prose(document)
         if sterling:
@@ -3592,6 +3661,7 @@ def _template_document(
         _populate_protocol_signature_values(document, reference)
         _normalize_protocol_running_header(document)
         _apply_protocol_visit_table_layout(document, authority)
+        _omit_empty_visit_window(document)
         _ensure_contract_headings(document, branch)
         _insert_source_bound_sections(document, reference, branch)
         _normalize_protocol_container_introductions(document, branch, boilerplate)

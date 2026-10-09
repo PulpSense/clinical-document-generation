@@ -239,9 +239,23 @@
       }
     },
     {
+      "family": "structured",
+      "file": "scripts/contracts.py",
+      "function": "study_short_title",
+      "code_sha256": "2cdb84ac68ced6251aeffa03f2837d318716f4439afc90a74ea3a4a1ea189bb9",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_xml_projection_preserves_identity_without_fabricating_groups"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
+        ]
+      }
+    },
+    {
       "file": "scripts/contracts.py",
       "function": "participant_followup_summary",
-      "code_sha256": "f42f5a2390c70f252a11d1add202d5047fabb95aab41a7c7b84c7a873f93e19b",
+      "code_sha256": "c6d7008edd3901f02ac9297c49ffe0151699b8bafbdc678798b978447fa6c14f",
       "family": "structured"
     },
     {
@@ -265,7 +279,7 @@
     {
       "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
-      "code_sha256": "0d6ffdd70dd2d760650ca5695a8454ba2039cdfd05ab123182089a0be7dc4ebe",
+      "code_sha256": "e366889ff568accee7ed68feb78e46e10c54eb23c3d8643d708d204e649def3f",
       "family": "structured"
     },
     {
@@ -419,6 +433,62 @@
       }
     },
     {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_name",
+      "code_sha256": "e448a3d22e2342f026b5fd9074693d6b690aefe77a1c2e18d854bafdc84722fc",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_person_name_projection_removes_only_honorifics"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_observational_cohorts",
+      "code_sha256": "80d55895cba3181c61ce2287c8fef3bffe2383219cbaa7eadc2684556f924a90",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_unknown_and_explicit_group_counts_are_distinct"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_contact_fields",
+      "code_sha256": "cab53ae1dc0a600fe8b1b6cce51a97d08f468e60e137e088e092d26a05cc7e88",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_explicit_person_components_override_full_display_name"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/prs_xml.py",
+      "function": "_site_investigator",
+      "code_sha256": "beb3d4f1cb661cb5963f234ffe9e2a8083e657ce9bc62ef334fa71add3b8b190",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_xml_projection_preserves_identity_without_fabricating_groups"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
+        ]
+      }
+    },
+    {
       "file": "scripts/prs_xml.py",
       "function": "generate",
       "code_sha256": "b0040c04222f79c3a11836c16fe9047df8399895fad7520cf603e9f47cc445e6",
@@ -427,8 +497,30 @@
     {
       "file": "scripts/prs_xml.py",
       "function": "validate_output",
-      "code_sha256": "acaab964bdb3fab0798755c64047aadcd162420d991091b85d3a14690658a8f0",
+      "code_sha256": "4f75d604b3880475eb29f8b5e603bd379184052d5fa51272ec7b5df732b8a12d",
       "family": "structured"
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_review_evidence_finding",
+      "code_sha256": "717c22911e81fcb235e490b9c5089338fb452b254f1517f1cbfe47a4df2d0305",
+      "family": "review",
+      "authority_contract": {
+        "requirement": "A review caution must bind to an actual nonempty candidate passage before dispatch.",
+        "evidence": "Current rendered section snapshot",
+        "authority": "objective",
+        "resolution_authority": "deterministic_recheck_for_objective_defects",
+        "repair_owner": "construction"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_contract_root_causes.py::test_every_applicable_generated_icf_section_can_be_localized"
+        ],
+        "invalid": [
+          "test_review_contract_root_causes.py::test_evidence_construction_failure_is_returned_to_its_owner",
+          "test_offline_reliability_gate.py::test_review_evidence_blocker_routing_changes_are_audited"
+        ]
+      }
     },
     {
       "file": "scripts/quality.py",
@@ -547,8 +639,16 @@
     {
       "file": "scripts/quality.py",
       "function": "audit_source_surfaces",
-      "code_sha256": "c6e935cb815a7e300ab21b6f3c89373fcafdf18d0145048b9be96f40295580ac",
-      "family": "clinical"
+      "code_sha256": "8dbf193970968fac6e0c56326c3ac356cfd0364544ac122a0aa543974a3fc3b7",
+      "family": "clinical",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_supplied_bibliography_loss_is_construction_owned"
+        ]
+      }
     },
     {
       "file": "scripts/quality.py",
@@ -600,7 +700,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "c8ba532440a0ff6d2fa51b134107ae2da491eaf5dcec924ffb1e6deaa02ddc8e"
+      "code_sha256": "60fb120b2e86d64454cde4f83c3057ab62365dc5b741ffd1f3b62704405e349c"
     },
     {
       "file": "scripts/quality.py",
@@ -727,6 +827,76 @@
       }
     },
     {
+      "family": "structured",
+      "file": "scripts/rendering.py",
+      "function": "sample_size_display",
+      "code_sha256": "076f78e60440a2e8582a9f3929fa4eef5f806a96edb62541abab9ff367526718",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_presentation_cleanup_keeps_meaningful_negative_and_unrecognized_counts"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/rendering.py",
+      "function": "study_design_display",
+      "code_sha256": "c8ead16b5d7c37e2249aeb0043832fcf824b20e43186447d8cc172eecb23436d",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_presentation_cleanup_keeps_meaningful_negative_and_unrecognized_counts"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/rendering.py",
+      "function": "_supplied_protocol_references",
+      "code_sha256": "cc04cc7847f78b83223f18a6b5954e7def7c04374d43bc38e925d1309179bb8c",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_multiline_bibliography_entries_keep_their_citation_numbers"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_supplied_bibliography_loss_is_construction_owned"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/rendering.py",
+      "function": "_normalize_icf_source_displays",
+      "code_sha256": "3905f3e2e5f650d4b670db57a4cdb2a1e5a8bde8e488796278e458a44c9cf1ea",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_citation_cleanup_preserves_split_run_formatting_and_clinical_qualification"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_citation_cleanup_does_not_hide_missing_bibliographic_sources"
+        ]
+      }
+    },
+    {
+      "family": "structured",
+      "file": "scripts/rendering.py",
+      "function": "_omit_empty_visit_window",
+      "code_sha256": "2635cfb30c995b4974d3bbb000aa2d5e421981efe61ef9c34356b84ff6245839",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_structured_schedule_keeps_real_timing_and_assignments"
+        ]
+      }
+    },
+    {
       "file": "scripts/rendering.py",
       "function": "_rendered_heading_text",
       "code_sha256": "7b9728b26ec1597985524cb3f59b1e7261b1c90b7bc9b1dba3de3ef1474eae46",
@@ -737,6 +907,21 @@
       "function": "_target_heading",
       "code_sha256": "e0736763683f7abe507634772b701276a0b7d71a025e0bdb186650239dbefb5d",
       "family": "render"
+    },
+    {
+      "family": "structured",
+      "file": "scripts/rendering.py",
+      "function": "_assessment_matrix",
+      "code_sha256": "dd487552547a38b0a04da36896622876747c39fc25697b5692c5bba6b96c9124",
+      "behavioral_evidence": {
+        "valid": [
+          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields",
+          "test_shared_output_projection.py::test_structured_schedule_keeps_real_timing_and_assignments"
+        ],
+        "invalid": [
+          "test_shared_output_projection.py::test_table_assignment_corruption_is_construction_owned"
+        ]
+      }
     },
     {
       "file": "scripts/rendering.py",
@@ -1024,28 +1209,6 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
-    },
-    {
-      "file": "scripts/quality.py",
-      "function": "_review_evidence_finding",
-      "code_sha256": "717c22911e81fcb235e490b9c5089338fb452b254f1517f1cbfe47a4df2d0305",
-      "family": "review",
-      "authority_contract": {
-        "requirement": "A review caution must bind to an actual nonempty candidate passage before dispatch.",
-        "evidence": "Current rendered section snapshot",
-        "authority": "objective",
-        "resolution_authority": "deterministic_recheck_for_objective_defects",
-        "repair_owner": "construction"
-      },
-      "behavioral_evidence": {
-        "valid": [
-          "test_review_contract_root_causes.py::test_every_applicable_generated_icf_section_can_be_localized"
-        ],
-        "invalid": [
-          "test_review_contract_root_causes.py::test_evidence_construction_failure_is_returned_to_its_owner",
-          "test_offline_reliability_gate.py::test_review_evidence_blocker_routing_changes_are_audited"
-        ]
-      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

@@ -270,6 +270,11 @@ already exist and the chosen path is the first available collision-safe name.
 
 Create `<run-dir>/reference/study.reference.json` from the user’s supplied facts. Preserve raw material under `<run-dir>/input/` when available. Use the field names documented in `references/reference-schema.md`; do not add generated prose under the source fields.
 
+Before `prepare`, follow the representation rules in `references/intake-workflow.md`
+for narrative or structured schedules, person names, references, study groups,
+and short titles. Resolve source relationships during extraction so every
+document receives the same reviewer-visible facts.
+
 Set `meta.study_type` to exactly `Prospective`, `Ambispective`, or `Retrospective`. For prospective/ambispective studies, set `meta.icf_template` to `Advarra` or `Sterling` based on the user’s choice or clear evidence. Do not guess between templates.
 
 Preserve any supplied site address exactly in the source. An unambiguous full US mailing address can be projected into PRS city, state, postal code, and country without changing the approved text. If a supplied comma-delimited address cannot be separated safely, resolve that existing site field before approval; never invent location components during XML generation.
