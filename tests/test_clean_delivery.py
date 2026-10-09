@@ -42,8 +42,8 @@ def controlled_render(_root, revision, *_args, **_kwargs):
             'font_substitutions': {}, 'candidate': {'files': []}, 'render': render, 'findings': []}
 
 
-def deliver(tmp_path, monkeypatch, source, review=None, draft=None):
-    monkeypatch.setattr(workflow, 'render_assurance', controlled_render)
+def deliver(tmp_path, monkeypatch, source, review=None, draft=None, render=None):
+    monkeypatch.setattr(workflow, 'render_assurance', render or controlled_render)
     reference = tmp_path / 'reference/study.reference.json'
     reference.parent.mkdir(parents=True)
     reference.write_text(json.dumps(source))
@@ -174,7 +174,7 @@ def test_confirmed_omission_is_repaired_then_verified_despite_different_words(tm
         return response
 
     result, revision = deliver(tmp_path, monkeypatch, reminder_source(), draft=draft, review=review)
-    assert len(repair_requested) >= 2
+    assert len(repair_requested) >= 2, result
     if repair_mode != 'faithful':
         assert result['status'] != 'passed', result
         assert not (tmp_path / 'output').exists()
@@ -213,3 +213,87 @@ def test_resolved_paraphrase_cannot_certify_changed_evidence(tmp_path, monkeypat
     with pytest.raises(RuntimeError, match='stale publication evidence'):
         workflow._publish(tmp_path, revision, source, manifest['quality'])
     assert (tmp_path / 'output/protocol.docx').read_bytes() == original
+
+
+def test_authenticated_source_conflict_stops_without_drafting_retry(tmp_path, monkeypatch):
+    source = reminder_source()
+    source['procedures']['retention'] = 'Participants must not be contacted before appointments.'
+    text = 'The team phones people before appointments so they remember to attend.'
+    calls = []
+    reviewed_sources = []
+    def draft(request):
+        calls.append(request['request_id'])
+        return reminder_draft(request, text)
+    def review(request):
+        response = acceptance_verification(request)
+        if request['task'] != 'clinical_content_verification':
+            return response
+        reviewed_sources.append(request['approved_source'])
+        for decision in response['uncertainty_resolutions']:
+            caution = next(row for row in request['lexical_review_cautions'] if row['caution_sha256'] == decision['caution_sha256'])
+            if caution['section_id'] != 'study-design.bias':
+                continue
+            decision.update(disposition='source_clarification', affected_passage=text,
+                source_excerpt=source['statistics']['bias_minimization'],
+                rationale='The approved reminder calls conflict with the approved prohibition on contact before appointments.')
+            response['status'] = 'blocked'
+            response['findings'] = [{'category': 'content', 'artifact': 'protocol',
+                'check': 'source_supported', 'target_ids': ['study-design.bias'],
+                'issue': decision['rationale']}]
+            for row in response['section_assessments']:
+                if row['section_id'] == 'study-design.bias':
+                    row['status'] = 'blocked'
+        return response
+    result, revision = deliver(tmp_path, monkeypatch, source, review=review, draft=draft)
+    assert result['status'] == 'blocked' and result['stage'] == 'source_review', result
+    assert not (tmp_path / 'output').exists()
+    assert json.loads((revision / 'approved-reference.json').read_text()) == reviewed_sources[0]
+    assert len(reviewed_sources) == 1
+    assert len(calls) == len(set(calls))
+    assert not list((revision / 'hermes/requests').glob('*retry*'))
+
+
+def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tmp_path, monkeypatch):
+    import rendering
+    render_count = []
+    review_count = []
+    passage = 'Repeated repeated header'
+    def render(root, revision, *args, **kwargs):
+        render_count.append(revision)
+        if len(render_count) == 1:
+            path = revision / 'candidate/protocol.docx'
+            doc = Document(path)
+            doc.sections[0].header.paragraphs[0].text = passage
+            doc.save(path)
+        report = controlled_render(root, revision)
+        for artifact in report['render']['artifacts']:
+            artifact['warnings'] = [row for row in rendering.audit_docx(revision / artifact['docx'])
+                                    if row.get('publication_disposition') == 'warning']
+        return report
+    def review(request):
+        response = acceptance_verification(request)
+        if request['task'] != 'clinical_content_verification':
+            return response
+        review_count.append(request['request_id'])
+        for caution in request['lexical_review_cautions']:
+            if caution['caution'].get('code') != 'visible-duplicate-word':
+                continue
+            assert caution['section_id'] == 'protocol.shell'
+            response['status'] = 'blocked'
+            response['findings'] = [{'finding_id': 'repeated-header', 'category': 'content',
+                'artifact': 'protocol', 'check': 'substantive', 'target_ids': ['protocol.shell'],
+                'issue': 'Remove the accidental repeated word in the running header.'}]
+            for row in response['section_assessments']:
+                if row['section_id'] == 'protocol.shell':
+                    row['status'] = 'blocked'
+            for decision in response['uncertainty_resolutions']:
+                if decision['caution_sha256'] == caution['caution_sha256']:
+                    decision.update(disposition='confirmed_defect', affected_passage=passage,
+                                    rationale='The running header accidentally repeats a word.')
+        return response
+    source = json.loads((ROOT / CASES[0]['source_path']).read_text())
+    result, _ = deliver(tmp_path, monkeypatch, source, review=review, render=render)
+    assert result['status'] == 'passed', result
+    assert len(review_count) == 2
+    assert result['warnings'] == []
+    assert passage not in Document(tmp_path / 'output/protocol.docx').sections[0].header.paragraphs[0].text

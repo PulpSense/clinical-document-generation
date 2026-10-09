@@ -564,10 +564,15 @@ For each `lexical_review_cautions` item, the content reviewer must return an
 and an `affected_passage` from the current artifact passage. A bare pass or
 request to ignore a checker is insufficient. Code binds the decision to the
 source, section, artifact, rule, request, and reviewer; changed evidence requires
-fresh review. Review every section and every rendered page even when code passes.
+fresh review. An authenticated `source_clarification` with a substantive companion
+finding stops at `source_review`; preserve the approved source and obtain the
+missing source decision before proceeding. Review every section and every
+rendered page even when code passes.
 
 Correct confirmed prose and editorial defects through drafting, deterministic
-cell/mapping defects through construction, and layout defects through rendering.
+cell/mapping and document shell defects through construction, and layout defects
+through rendering. Use `protocol.shell` or `icf.shell` for running headers and
+footers; identify the exact visible passage and location.
 Verify changed output and obtain final independent exact-artifact review; an
 attempted correction alone never establishes success. Reviewers cannot waive an
 objective factual, exact-text, structure, integrity, or delivery failure.

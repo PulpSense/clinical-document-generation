@@ -54,7 +54,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'section_evidence_value', 'semantic_evidence_contract', 'assessment_matrix',
                 'normalized_visit_records', 'protocol_table_contracts', 'sterling_draft_word_budget',
                 '_matrix_visit_alias', '_schedule_activity_identity', 'lexical_evidence_uncertainty',
-                '_lexical_review_cautions', '_reviewed_lexical_warnings', '_review_evidence_text', '_quantity_claim_issues',
+                '_lexical_review_cautions', '_reviewed_lexical_warnings', '_review_evidence_text', '_quantity_claim_issues', '_uncertainty_rule_sha256',
                 'participant_followup_summary', 'computed_study_fields', 'protocol_section_snapshot', 'rendered_section_snapshot',
                 '_rendered_heading_text', '_target_heading',
                 '_recovery_action_observation', '_governed_editorial_warning', '_fidelity_evidence',

@@ -273,6 +273,23 @@ def protocol_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
 
 def rendered_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any]]:
     """Observe code-owned sections through the same native headings as rendering."""
+    if section_id in {"protocol.shell", "icf.shell"}:
+        document = Document(path)
+        snapshot = [{"location": "body", "paragraph": paragraph.text}
+                    for paragraph in document.paragraphs]
+        snapshot.extend({"location": f"body table {index + 1}", "paragraph": paragraph.text}
+                        for index, table in enumerate(document.tables) for row in table.rows
+                        for cell in row.cells for paragraph in cell.paragraphs)
+        for index, section in enumerate(document.sections):
+            for name in ("header", "footer", "first_page_header", "first_page_footer",
+                         "even_page_header", "even_page_footer"):
+                container = getattr(section, name)
+                paragraphs = list(container.paragraphs)
+                paragraphs.extend(paragraph for table in container.tables for row in table.rows
+                                  for cell in row.cells for paragraph in cell.paragraphs)
+                snapshot.extend({"location": f"section {index + 1} {name}", "paragraph": paragraph.text}
+                                for paragraph in paragraphs if paragraph.text)
+        return snapshot
     if not section_id.startswith("icf."):
         return protocol_section_snapshot(path, section_id)
     titles = {title for sections in ICF_RETAINED_SHELL_SECTIONS.values()

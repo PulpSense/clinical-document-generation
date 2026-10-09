@@ -592,7 +592,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "3c6a774a38751a9855cd9d20137e78a88322c254818ba79dab0896c32ae87d37"
+      "code_sha256": "c8ba532440a0ff6d2fa51b134107ae2da491eaf5dcec924ffb1e6deaa02ddc8e"
     },
     {
       "file": "scripts/quality.py",
@@ -603,18 +603,24 @@
     {
       "file": "scripts/quality.py",
       "function": "_accepted_drafting_warnings",
-      "code_sha256": "1e466d50abcdff42381ba316961b51c889d5fcc10e45366327af4112573aecd0",
+      "code_sha256": "aa14627074ba796c5adc5aa59e9259adc55edf39cf3b43b810aa3c1df7b48f6c",
       "family": "review"
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "79bb0cc49a5d2728d56d989ddd6b33a8f4f4856d03432b61d019e8c0d0d7180a",
+      "code_sha256": "bbaec32ec7e172089c80a5b994eec3afeaa6772b4ec1a0af48f22410b4344ee2",
       "authority_contract": {
         "authority": "uncertainty",
         "resolution_authority": "independent_source_grounded_review"
       }
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_uncertainty_rule_sha256",
+      "code_sha256": "64293ffee36d4755472c29026df576c5e6b0ac46768cbd02e174a4e7788b79ea",
+      "family": "review"
     },
     {
       "file": "scripts/quality.py",
@@ -626,7 +632,7 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "_reviewed_lexical_warnings",
-      "code_sha256": "c635457300feb1050d70f61ec8aa7f41bbb317964f35dc9779e9972a37be07cf",
+      "code_sha256": "e5db622469a4a2ed3d305daa539cd6a41e95325a97da744acd6bd7bba069feb9",
       "authority_contract": {
         "authority": "uncertainty",
         "resolution_authority": "independent_source_grounded_review"
@@ -653,7 +659,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "a06ea490eae604f91da77c7899216d01e65096bd052f92f41382a78024621cd7",
+      "code_sha256": "2f92e6cfc794c601d352d56da5529cc1532046971821e0e6dc4a1764d86c6806",
       "family": "review"
     },
     {
@@ -683,7 +689,7 @@
     {
       "file": "scripts/rendering.py",
       "function": "rendered_section_snapshot",
-      "code_sha256": "03516291abc0584a65f2aa3664ae887b044370c81168bd6445718932dec73152",
+      "code_sha256": "0596f82dd7c627dfab972bcc0cb58de419f7abc53b5a9a33d94360422c9ae0f6",
       "family": "recovery"
     },
     {
@@ -917,7 +923,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "d0e60629831c7b4645c7a9bd0d8247cd2b815b31c3a0a61ef020a4cc6b359825",
+      "code_sha256": "98f70f4547d751024242b18c1c60e8bfe28b6c32234dd6538d56333b3a4f2a81",
       "family": "recovery"
     },
     {
@@ -941,7 +947,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "46995b0ebd285917de7f010ac012c27e2bd6fede28efead7a8f29f3063f10a3a",
+      "code_sha256": "9d5757d5e19a24d5e323dd1a7d5c2d8e4c915cb73b9fc05a44f69df3fd2242c8",
       "family": "recovery"
     },
     {

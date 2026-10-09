@@ -5013,6 +5013,10 @@ def content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]
             {"artifact": "study.xml", "section_id": "prs.detailed-description", "number": "", "title": "Detailed Description"},
             {"artifact": "study.xml", "section_id": "prs.structured", "number": "", "title": "Structured PRS Fields"},
         ))
+    sections.extend({"artifact": artifact, "section_id": f"{artifact}.shell", "number": "",
+                     "title": "Document shell, running headers and footers"}
+                    for artifact in ("protocol", "icf")
+                    if artifact == "protocol" or branch != "Retrospective")
     return sections
 
 
@@ -5418,7 +5422,8 @@ def create_verification_requests(
         " Findings must include target_ids for affected section IDs. Every finding must include a unique finding_id "
         "made from ASCII letters or digits separated only by single hyphens or underscores. Confirmed prose "
         "omissions, excessive repetition and editorial defects require correction through drafting. Do not "
-        "report valid stylistic alternatives as defects. Keep findings at top-level status blocked until repaired "
+        "report valid stylistic alternatives as defects. Document shell, header and footer findings belong to "
+        "the code-owned protocol.shell or icf.shell section and require construction repair. Keep findings at top-level status blocked until repaired "
         "and independently verified; resolved internal findings do not belong in the delivery message. "
         "Safety, invention, contradiction, source-integrity, rendering, security, package, ledger and delivery "
         "failures remain blocking. Approved source takes precedence over "
@@ -5745,7 +5750,7 @@ def _accepted_drafting_warnings(revision_dir: Path, reference: Mapping[str, Any]
         values = record.get("warnings")
         if isinstance(values, list):
             warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
-    if reference is not None:
+    if reference is not None and any((revision_dir / "hermes/accepted").glob("*.json")):
         root = Path(__file__).resolve().parents[1]
         warnings.extend(accepted_cross_section_duplicate_findings(
             revision_dir, reference, governing_resources(root, reference)))
@@ -5773,11 +5778,14 @@ def _lexical_review_cautions(
         artifact = "icf" if section.startswith("icf.") or section == "icf.docx" else "protocol"
         path = revision_dir / f"candidate/{artifact}.docx"
         if section.endswith(".docx") and path.is_file():
-            matching_section = next((row["section_id"] for row in content_review_sections(reference)
-                if row["artifact"] == artifact and warning.get("affected_passage")
-                and warning["affected_passage"] in json.dumps(
-                    rendered_section_snapshot(path, row["section_id"]), ensure_ascii=False)), None)
-            section = matching_section or section
+            matches = [(row["section_id"], _review_evidence_text(
+                rendered_section_snapshot(path, row["section_id"])))
+                for row in content_review_sections(reference)
+                if row["artifact"] == artifact and row["section_id"] != f"{artifact}.shell"]
+            matching_section = min((row for row in matches if warning.get("affected_passage")
+                                    and warning["affected_passage"] in row[1]),
+                                   key=lambda row: len(row[1]), default=None)
+            section = matching_section[0] if matching_section else f"{artifact}.shell"
         passage = rendered_section_snapshot(path, section) if path.is_file() else []
         section_specs = list(protocol_contract(str(get_path(reference, "meta.study_type") or "")))
         if artifact == "icf":
@@ -5807,12 +5815,17 @@ def _lexical_review_cautions(
             "artifact_passage": passage,
             "source_evidence": source_evidence,
             "template_excerpt": template_excerpt,
-            "rule_sha256": canonical_evidence_sha256({
-                "quality": sha256_file(Path(__file__)),
-                "drafting": sha256_file(Path(__file__).with_name("drafting.py")),
-            }),
+            "rule_sha256": _uncertainty_rule_sha256(),
         }
     return list(records.values())
+
+
+def _uncertainty_rule_sha256() -> str:
+    """Use one rule identity for request issuance and decision validation."""
+    return canonical_evidence_sha256({
+        "quality": sha256_file(Path(__file__)),
+        "drafting": sha256_file(Path(__file__).with_name("drafting.py")),
+    })
 
 
 def _review_evidence_text(value: Any) -> str:
@@ -5854,10 +5867,7 @@ def _uncertainty_resolution_records(
             errors.append("Uncertainty resolution requires a rationale and exact source/current passage evidence.")
             continue
         if (caution["approved_source_sha256"] != canonical_evidence_sha256(request.get("approved_source"))
-                or caution["rule_sha256"] != canonical_evidence_sha256({
-                    "quality": sha256_file(Path(__file__)),
-                    "drafting": sha256_file(Path(__file__).with_name("drafting.py")),
-                })):
+                or caution["rule_sha256"] != _uncertainty_rule_sha256()):
             errors.append("The resolution source or rule identity is stale.")
             continue
         target = (caution["artifact"], caution["section_id"])
@@ -5909,6 +5919,8 @@ def _reviewed_lexical_warnings(
         if decision:
             resolved.append({"caution": warning, "resolution": (
                 "independent_content_review_passed" if decision["disposition"] == "faithful"
+                else "independent_content_review_requires_source_clarification"
+                if decision["disposition"] == "source_clarification"
                 else "independent_content_review_confirmed_defect"), **decision})
         else:
             retained.append(warning)
@@ -6548,6 +6560,17 @@ def validate_verifications(
                 "code": "uncertainty_resolution_invalid", "target_ids": [verification_target],
                 "verification_request_id": request["request_id"], "issue": message,
             }, "verifier_transient") for message in resolution_errors)
+        if not resolution_errors:
+            for decision in resolution_records:
+                if decision["disposition"] != "source_clarification":
+                    continue
+                for finding in findings:
+                    if (finding.get("verification_request_id") == request["request_id"]
+                            and finding.get("artifact") == decision["artifact"]
+                            and decision["section_id"] in finding.get("target_ids", [])
+                            and finding.get("check") in {"source_supported", "no_invention", "substantive"}):
+                        finding["source_clarification_required"] = True
+                        finding["source_resolution"] = decision
         evidence[evidence_key] = {
             "uncertainty_resolutions": resolution_records if not resolution_errors else [],
             "task": request.get("task"),

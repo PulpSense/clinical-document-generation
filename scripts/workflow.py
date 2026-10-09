@@ -7970,6 +7970,7 @@ def _quality_retry(
         "verifier_transient": "verification",
     }
     known_sections = {section.section_id for section in protocol_contract(str(get_path(approved_reference, "meta.study_type", "")))}
+    known_sections.add("protocol.shell")
     if canonical_study_type(get_path(approved_reference, "meta.study_type")) != "Retrospective":
         icf_family = str(get_path(approved_reference, "meta.icf_template", "Advarra"))
         known_sections.update(section.section_id for section in icf_contract(
@@ -7979,7 +7980,7 @@ def _quality_retry(
         known_sections.update(section_id for section_id, _title in icf_retained_sections(
             str(get_path(approved_reference, "meta.study_type", "")), icf_family,
         ))
-        known_sections.update(("prs.brief-summary", "prs.detailed-description", "prs.structured"))
+        known_sections.update(("prs.brief-summary", "prs.detailed-description", "prs.structured", "icf.shell"))
     draftable_sections = {
         section_id
         for batch in batch_plan(
@@ -9205,6 +9206,11 @@ def generate(
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
     final_quality["render_assurance"] = assurance_report
     if final_quality["status"] != "passed":
+        source_conflicts = [finding for finding in final_quality["findings"]
+                            if finding.get("source_clarification_required")]
+        if source_conflicts:
+            return _repair_block(run_dir, "source_review", final_quality["findings"],
+                                 candidate_outputs=_candidate_outputs(revision_dir))
         return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
     observe_stage("independent_verification")
     try:

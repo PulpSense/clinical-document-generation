@@ -193,3 +193,60 @@ def test_explicit_quantity_sign_change_is_not_a_paraphrase():
     invalid = drafting.source_evidence_diagnostics('The offset is 5 mm.', 'procedures.assessments', source)
     assert invalid['passed'] is False
     assert not drafting.lexical_evidence_uncertainty([invalid])
+
+
+def test_quoted_duplicate_passage_is_located_for_review(tmp_path):
+    from docx import Document
+    path, request, _ = review_candidate(tmp_path)
+    docx = tmp_path / 'candidate/protocol.docx'
+    doc = Document(docx)
+    passage = 'The "study study" descriptor is used here.'
+    next(p for p in doc.paragraphs if p.text == 'Staff call people ahead of visits so they remember to attend.').text = passage
+    doc.save(docx)
+    cautions = quality._lexical_review_cautions(tmp_path, request['approved_source'], {'artifacts': [{
+        'warnings': [{'code': 'visible-duplicate-word', 'field': 'protocol.docx',
+                      'publication_disposition': 'warning', 'affected_passage': passage}]}]})
+    caution = next(row for row in cautions if row['caution']['code'] == 'visible-duplicate-word')
+    assert caution['section_id'] == 'study-design.bias'
+    assert passage in quality._review_evidence_text(caution['artifact_passage'])
+
+
+def test_header_duplicate_passage_has_explicit_construction_review_location(tmp_path):
+    from docx import Document
+    _, request, _ = review_candidate(tmp_path)
+    docx = tmp_path / 'candidate/protocol.docx'
+    doc = Document(docx)
+    passage = 'Study study header'
+    doc.sections[0].header.paragraphs[0].text = passage
+    doc.save(docx)
+    cautions = quality._lexical_review_cautions(tmp_path, request['approved_source'], {'artifacts': [{
+        'warnings': [{'code': 'visible-duplicate-word', 'field': 'protocol.docx',
+                      'publication_disposition': 'warning', 'affected_passage': passage}]}]})
+    caution = next(row for row in cautions if row['caution']['code'] == 'visible-duplicate-word')
+    assert caution['section_id'] == 'protocol.shell'
+    assert passage in quality._review_evidence_text(caution['artifact_passage'])
+    assert 'header' in quality._review_evidence_text(caution['artifact_passage'])
+    assert any(row['section_id'] == 'protocol.shell' for row in quality.content_review_sections(request['approved_source']))
+
+    from test_clean_delivery import controlled_render
+    render = controlled_render(ROOT, tmp_path)['render']
+    render['artifacts'][0]['warnings'] = [caution['caution']]
+    path = quality.create_verification_requests(tmp_path, request['approved_source'], render, review_set=2)[0]
+    request = json.loads(path.read_text())
+    response = acceptance_verification(request)
+    response['status'] = 'blocked'
+    response['findings'] = [{'finding_id': 'duplicate-header', 'artifact': 'protocol',
+        'category': 'content', 'check': 'substantive', 'target_ids': ['protocol.shell'],
+        'issue': 'Remove the repeated word in the running header.'}]
+    for row in response['section_assessments']:
+        if row['section_id'] == 'protocol.shell':
+            row['status'] = 'blocked'
+    for decision in response['uncertainty_resolutions']:
+        if decision['caution_sha256'] == caution['caution_sha256']:
+            decision.update(disposition='confirmed_defect', affected_passage=passage,
+                            rationale='The repeated header word is an editorial error.')
+    (tmp_path / request['response_path']).write_text(json.dumps(response))
+    findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
+    assert len(findings) == 1, findings
+    assert findings[0]['owner'] == 'construction'
+    assert findings[0]['target_ids'] == ['protocol.shell']
