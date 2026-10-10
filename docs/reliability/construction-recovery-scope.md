@@ -52,3 +52,42 @@ smokes, source approval, the 45-minute deadline and final review requirements
 are preserved. Full-suite, live paid generation, installation and certification
 are outside this implementation request. The next evidence is the varied Linux
 pilot; local passes alone cannot establish reliability for every possible input.
+
+## Verification record
+
+Python 3.11 focused selections completed with 105 passes and one Linux-only
+skip. They comprise:
+
+- `test_construction_reliability.py`: all 29 cases covered by the completed
+  `bare_approved`, `generated_display`, and
+  `native_template or localized_repair or unrelated` selections. Coverage
+  includes integer/text counts, explicit units and groups, all five document
+  families, persistent corrections, multiple findings on one passage, rejected
+  proposals, changed meaning, authenticated records and damaged archives.
+- `test_shared_output_projection.py`, `test_owner_aware_recovery.py`,
+  `test_reviewer_transport.py`, and `test_general_delivery_reliability.py`:
+  66 passes with the latter's `independent_clinical_inputs`, `real_omission`,
+  `independent_review_recovery_tracks`, and `ineffective_or_cycling` selections
+  excluded. Those longer selections were not run for this change.
+- `test_offline_reliability_gate.py`: 10 passes, one Linux-only skip. The
+  changed and newly inventoried authority helpers have paired behavioral
+  evidence. The gate's broader release-check command was not run.
+
+One earlier consolidated construction-file invocation was interrupted when
+review findings required changes; it is not counted as a passing invocation.
+The completed selections above cover the final cases. Python compilation and
+`git diff --check` passed. No full suite, installation smoke, acceptance corpus,
+paid certification or live Hermes generation was run.
+
+## Code review
+
+The Standards review found an archive-indexing exception; the Spec review found
+competing edits when several findings named one paragraph. Both were reproduced
+through failing regressions and corrected. Follow-up reviews found no remaining
+actionable defects. The Spec reviewer independently replayed its original
+two-finding generation reproduction successfully after the correction.
+
+Standards retains one advisory judgment: the provenance dictionaries could
+become a validated record type if more display destinations are added. Current
+dictionaries follow repository conventions, so no refactor is required here.
+Spec has no outstanding findings within the approved implementation scope.
