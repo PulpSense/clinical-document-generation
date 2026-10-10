@@ -50,13 +50,14 @@ from contracts import (
     schedule_interpretation_contract,
     interpreted_schedule_reference,
     source_text_values,
+    set_path,
 )
 
 
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v19-source-routing"
+PROMPT_VERSION = "section-drafting-v20-construction-prose"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -201,6 +202,13 @@ def _request_matches_approved_reference(
     try:
         repo_root = Path(__file__).resolve().parents[1]
         reference = _read_json(snapshot_path)
+        if request.get('construction_repair'):
+            governing = expected_governing or governing_resources(repo_root, reference)
+            spec = request['construction_repair']
+            return dict(request) == _construction_request_payload(
+                revision_dir, reference, governing, str(spec['attempt_path']),
+                int(spec['finding_index']), int(request['attempts'][spec['section_id']]),
+            )
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
         icf_template = get_path(reference, "meta.icf_template")
         plan = batch_plan(branch, str(icf_template or "Advarra"))
@@ -580,6 +588,154 @@ def accepted_context(revision_dir: Path, batch: BatchSpec, expected_governing: M
         return []
     foundations = next((item for item in batch_plan("Prospective") if item.batch_id == "protocol-foundations"), None)
     return [draft for section_id in (foundations.section_ids if foundations else ()) if (draft := accepted_draft(revision_dir, section_id, expected_governing))]
+
+
+def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_index: int) -> dict[str, Any] | None:
+    """Bind an editorial correction to inventoried, generated display prose.
+
+    Retained clauses and arbitrary reviewer quotations are not repair authority.
+    The source, candidate and renderer provenance must all agree first.
+    """
+    relative = Path(attempt_path)
+    if relative.is_absolute() or '..' in relative.parts or relative.parts[:1] != ('attempts',):
+        return None
+    attempt = revision_dir / relative
+    manifest = _read_json(attempt / 'attempt-manifest.json')
+    finding = manifest['findings'][finding_index]
+    source = finding.get('verification_source_finding') or finding
+    if (finding.get('recovery_class') != 'deterministic_structure_defect'
+            or source.get('surface') != 'document_shell'
+            or not all(source.get(flag) is False for flag in (
+                'material', 'safety_critical', 'contradiction',
+                'obscures_required_information', 'materially_unusable'))):
+        return None
+    artifact = str(finding.get('artifact') or '')
+    section_id = f'{artifact}.shell'
+    passage = str(source.get('affected_passage') or '').strip()
+    if artifact not in {'protocol', 'icf'} or finding.get('target_ids') != [section_id] or not passage:
+        return None
+    for name in ('candidate-build.json', f'candidate/{artifact}.docx'):
+        path = attempt / name
+        if path.is_symlink() or not path.is_file() or sha256_file(path) != manifest['files'].get(name):
+            return None
+    report = _read_json(attempt / 'candidate-build.json')['document_report']
+    matches = [item for row in report['artifacts'] if row['artifact'] == artifact
+               for item in row.get('construction_passages', [])
+               if item['text'] == passage and item['section_id'] == section_id]
+    # The exact passage must exist once in the retained native body, rather
+    # than being a substring of a clause or a header/footer/table field.
+    from docx import Document
+    if len(matches) != 1 or sum(p.text == passage for p in Document(attempt / f'candidate/{artifact}.docx').paragraphs) != 1:
+        return None
+    return {
+        **matches[0], 'attempt_path': attempt_path, 'finding_index': finding_index,
+        'before': passage, 'finding': dict(finding),
+    }
+
+
+def construction_rejection_finding(request: Mapping[str, Any], issue: str) -> dict[str, Any]:
+    """Keep archived reviewer authority without claiming a current review result."""
+    original = dict(request['construction_repair']['finding'])
+    original.setdefault('verification_source_finding', dict(original))
+    original.pop('verification_request_id', None)
+    return {**original, 'category': 'recovery', 'field': 'construction_editor',
+            'issue': issue, 'construction_request_id': request['request_id']}
+
+
+def construction_retry_spec(revision_dir: Path, finding: Mapping[str, Any]) -> dict[str, Any] | None:
+    request_id = finding.get('construction_request_id')
+    if not isinstance(request_id, str) or Path(request_id).name != request_id:
+        return None
+    try:
+        request = _read_json(revision_dir / 'hermes/requests' / f'{request_id}.json')
+        if (not request.get('construction_repair') or not _trusted_request_valid(revision_dir, request, None)
+                or dict(finding) != construction_rejection_finding(request, str(finding.get('issue') or ''))):
+            return None
+        return request['construction_repair']
+    except (OSError, ValueError, KeyError, TypeError, IndexError):
+        return None
+
+
+def _construction_request_payload(
+    revision_dir: Path, reference: Mapping[str, Any], governing: Mapping[str, Any],
+    attempt_path: str, finding_index: int, attempt: int,
+) -> dict[str, Any]:
+    spec = construction_repair_spec(revision_dir, attempt_path, finding_index)
+    if spec is None:
+        raise ValueError('No eligible, source-bound construction prose at the reported location.')
+    scoped: dict[str, Any] = {}
+    for path in spec['source_paths']:
+        set_path(scoped, path, copy.deepcopy(get_path(reference, path)))
+    target = spec['section_id']
+    batch_id = f"construction-{spec['artifact']}-{spec['passage_id']}"
+    request_id = _request_id(revision_dir.name, batch_id, {target: attempt}, 'construction-repair', sha256_value(governing))
+    payload = {
+        'schema_version': REQUEST_SCHEMA, 'request_id': request_id, 'revision_id': revision_dir.name,
+        'task': 'section_drafting', 'batch_id': batch_id, 'wave': 'construction-repair',
+        'artifact': spec['artifact'], 'branch': {'study_type': get_path(reference, 'meta.study_type'),
+                                               'icf_template': get_path(reference, 'meta.icf_template')},
+        'topology_version': TOPOLOGY_VERSION, 'prompt_version': PROMPT_VERSION,
+        'governing_resources': dict(governing), 'attempts': {target: attempt},
+        'construction_repair': spec, 'approved_source': scoped, 'approved_input': _source_items(scoped),
+        'section_contracts': [{'section_id': target, 'minimum_evidence': spec['source_paths'],
+                               'allowed_modes': ['agent_draft'], 'fixed_boilerplate': []}],
+        'findings': [spec['finding']],
+        'constraints': [
+            'Correct only the exact before paragraph in construction_repair. Return exactly one paragraph for its section ID.',
+            'Improve grammar or presentation without changing any approved fact, number, unit, qualification, negation or relationship.',
+            'Use only approved_source and the existing paragraph. Do not add clinical claims, procedures, legal terms, promises or obligations.',
+            'Do not edit headings, tables, signatures, protected template clauses or other paragraphs. Return plain text without markup.',
+            'Use the supplied response envelope and cite the listed source paths. Final independent review remains mandatory.',
+        ],
+        'response_path': f'hermes/responses/{request_id}.json',
+    }
+    payload['request_sha256'] = request_sha256(payload)
+    return payload
+
+
+def create_construction_repair_request(
+    revision_dir: Path, reference: Mapping[str, Any], *, attempt_path: str,
+    finding_index: int, attempt: int, governing: Mapping[str, Any],
+) -> Path:
+    payload = _construction_request_payload(revision_dir, reference, governing, attempt_path, finding_index, attempt)
+    path = revision_dir / 'hermes/requests' / f"{payload['request_id']}.json"
+    ledger = _request_ledger_path(revision_dir, payload['request_id'])
+    if ledger.is_file() and _read_json(ledger).get('request_sha256') != payload['request_sha256']:
+        raise ValueError('Construction repair request identity collision.')
+    _write_json(path, payload)
+    _write_json(ledger, {'request_id': payload['request_id'], 'request_sha256': payload['request_sha256']})
+    return path
+
+
+def _validate_construction_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
+    spec = request['construction_repair']
+    rows = response.get('section_results')
+    row = rows[0] if isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], Mapping) else {}
+    paragraphs = row.get('paragraphs')
+    paragraph = paragraphs[0] if isinstance(paragraphs, list) and len(paragraphs) == 1 and isinstance(paragraphs[0], Mapping) else {}
+    text = str(paragraph.get('text') or '').strip()
+    expected_refs = {f'source:{path}' for path in spec['source_paths'] if meaningful(get_path(request['approved_source'], path))}
+    numbers = lambda value: re.findall(r'(?<!\w)\d[\d,]*(?:\.\d+)?(?!\w)', value)
+    if (row.get('section_id') != spec['section_id'] or row.get('outcome') != 'drafted'
+            or row.get('lists') or paragraph.get('boilerplate_refs')
+            or not isinstance(paragraph.get('evidence_refs'), list)
+            or any(not isinstance(ref, str) for ref in paragraph.get('evidence_refs', []))
+            or set(paragraph.get('evidence_refs') or []) != expected_refs
+            or not text or text.split() == spec['before'].split() or len(text.split()) > 150
+            or re.search(r'[\n\r{}<>«»]', text) or INTERNAL_REPAIR_LANGUAGE.search(text)
+            or numbers(text) != numbers(spec['before'])):
+        finding = {**spec['finding'], 'issue': 'Construction editor must return one changed plain paragraph preserving exact quantities and scoped evidence.'}
+        return None, [finding]
+    return {
+        'kind': 'construction', 'section_id': spec['section_id'], 'artifact': spec['artifact'],
+        'passage_id': spec['passage_id'], 'before': spec['before'], 'after': text,
+        'attempt': int(request['attempts'][spec['section_id']]),
+        'producer': dict(response['producer']), 'governing_resources': dict(request['governing_resources']),
+        'request_id': request['request_id'], 'request_sha256': request['request_sha256'],
+    }, []
+
+
+INTERNAL_REPAIR_LANGUAGE = re.compile(r'\b(?:section_id|evidence_refs|boilerplate_refs|source.of.truth|repair request)\b', re.I)
 
 
 def create_drafting_request(
@@ -2125,6 +2281,8 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         findings.append({"category": "drafting", "field": "producer.model_id", "issue": "Response does not identify the producing model.", "next_action": "Record the actual model identity."})
     if findings:
         return None, findings
+    if request.get('construction_repair'):
+        return _validate_construction_response(request, response)
     if request.get("task") == "prs_narrative_drafting":
         narrative = response.get("narrative")
         section_ids = {"brief_summary": "prs.brief-summary", "detailed_description": "prs.detailed-description"}
@@ -2491,6 +2649,16 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
                     "issue": "Accepted drafting request no longer matches the immutable request record.",
                     "required": "Restore the accepted request or create a new approved revision.",
                 })
+            if request.get('construction_repair'):
+                record_path = revision_dir / 'hermes/accepted' / f"construction-{request['request_id']}.json"
+                try:
+                    valid, errors = validate_response(request, _read_json(_response_path(revision_dir, request)))
+                    intact = not errors and valid == _read_json(record_path)
+                except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                    intact = False
+                if not intact:
+                    findings.append({'category': 'request-integrity', 'field': request['batch_id'],
+                                     'target_ids': target_ids, 'issue': 'Accepted construction correction no longer matches its bound response.'})
             continue
         response_path = _response_path(revision_dir, request)
         if not response_path.is_file():
@@ -2514,8 +2682,17 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
                 if str(target) in target_ids
             ] if isinstance(finding.get("target_ids"), list) else []
             finding["target_ids"] = explicit_targets or ([field] if field in target_ids else target_ids)
+            if request.get('construction_repair'):
+                # Preserve the original precise reviewer finding for a bounded
+                # editor retry; a shell paragraph is not an ordinary draftable
+                # section and must not fall into the section retry classifier.
+                issue = finding['issue']
+                finding.clear()
+                finding.update(construction_rejection_finding(request, issue))
         if accepted:
-            if accepted["kind"] == "prs":
+            if accepted['kind'] == 'construction':
+                _write_json(revision_dir / 'hermes/accepted' / f"construction-{request['request_id']}.json", accepted)
+            elif accepted["kind"] == "prs":
                 accepted_path = revision_dir / "hermes/accepted/prs-narrative.json"
                 if accepted_path.is_file():
                     existing = _read_json(accepted_path)
@@ -2532,6 +2709,7 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             and (
                 (accepted.get("kind") == "sections" and accepted.get("drafts"))
                 or (accepted.get("kind") == "prs" and accepted.get("narrative"))
+                or (accepted.get('kind') == 'construction' and accepted.get('after'))
             )
         )
         if has_accepted_content:
@@ -2659,7 +2837,19 @@ def merged_drafts(
         draft = accepted_draft(revision_dir, section.section_id, expected_governing)
         icf[section.section_id] = draft or {}
     prs = accepted_prs_record(revision_dir, expected_governing).get("narrative", {})
-    return {"protocol": protocol, "icf": icf, "prs": prs}
+    repairs = []
+    for path in sorted((revision_dir / 'hermes/accepted').glob('construction-*.json')):
+        record = _read_json(path)
+        if record.get('governing_resources') != dict(expected_governing):
+            continue
+        request_path = revision_dir / 'hermes/accepted-requests' / f"{record.get('request_id')}.json"
+        request = _read_json(request_path)
+        accepted, errors = validate_response(request, _read_json(_response_path(revision_dir, request)))
+        if not _trusted_request_valid(revision_dir, request, expected_governing) or errors or accepted != record:
+            raise ValueError('Construction correction is not authenticated.')
+        repairs.append(record)
+    repairs.sort(key=lambda item: (item['attempt'], item['request_id']))
+    return {"protocol": protocol, "icf": icf, "prs": prs, 'construction_repairs': repairs}
 
 
 def accepted_cross_section_duplicate_findings(

@@ -733,28 +733,32 @@
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "6070edc0039a3d3b8d3473439b7217edbe02d3431e2c34c7698eeea25d636916",
+      "code_sha256": "cb64c8794e755b839cd06ee77999851470bfb985fa62b8af44604e3f827d2c7d",
       "family": "evidence",
       "behavioral_evidence": {
         "valid": [
-          "test_general_delivery_reliability.py::test_prs_uncertainty_is_bound_to_xml_and_resolved_before_clean_delivery"
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
         ],
         "invalid": [
-          "test_general_delivery_reliability.py::test_ineffective_or_cycling_quantity_repairs_never_publish"
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       }
     },
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "f27dcb55bbc8869ae69a98e2c3a3cbce1340a15b896f341656ea62ed623a25f2",
+      "code_sha256": "fbc9692faba399a8571997384c3252d9dab4802b7b8bd5598811f5b84659daf5",
       "family": "evidence",
       "behavioral_evidence": {
         "valid": [
-          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
         ],
         "invalid": [
-          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       }
     },
@@ -1117,7 +1121,17 @@
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "b147ebd2489ab3db46f15b9b4b69b837d24cbcba064d7070e6a3b8307f1efa4d"
+      "code_sha256": "fea166c05d6baab49b2849662c60ae913ebf368d0971fd7381cec35c5398a7e3",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
     },
     {
       "file": "scripts/quality.py",
@@ -1249,13 +1263,15 @@
       "family": "structured",
       "file": "scripts/rendering.py",
       "function": "sample_size_display",
-      "code_sha256": "076f78e60440a2e8582a9f3929fa4eef5f806a96edb62541abab9ff367526718",
+      "code_sha256": "763436a30da80543a6949bbe4ab37bc79246a90c4aab2a1c78587a53f9d151ec",
       "behavioral_evidence": {
         "valid": [
-          "test_shared_output_projection.py::test_public_assembly_preserves_references_and_uses_readable_fields"
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
         ],
         "invalid": [
-          "test_shared_output_projection.py::test_presentation_cleanup_keeps_meaningful_negative_and_unrecognized_counts"
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       }
     },
@@ -1291,13 +1307,15 @@
       "family": "structured",
       "file": "scripts/rendering.py",
       "function": "_normalize_icf_source_displays",
-      "code_sha256": "10d96eeff33252640820df4b6ecc5f80d1aef4a8d1161df973375afe51841ec2",
+      "code_sha256": "80b7390429f3700e7a05d2ed1811f0a1a2b1ceb0f9517a9d3fcbcd53410057b7",
       "behavioral_evidence": {
         "valid": [
-          "test_shared_output_projection.py::test_citation_cleanup_preserves_split_run_formatting_and_clinical_qualification"
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
         ],
         "invalid": [
-          "test_shared_output_projection.py::test_citation_cleanup_does_not_hide_missing_bibliographic_sources"
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       }
     },
@@ -1350,8 +1368,18 @@
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "c69cf6ad70a685f8450e2675745d38f2a2c04c86730f6f247d799d2810343b4e",
-      "family": "render"
+      "code_sha256": "0115728e3995ff4faecc1ba7c9e0aa45d1df1680e8260bcbf95602296f0f5b20",
+      "family": "render",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1553,8 +1581,18 @@
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
-      "code_sha256": "97c23c51d77ba9e0ba5758fc4eb72fc3a1ccce27c10d004fc875daba938496fe",
-      "family": "recovery"
+      "code_sha256": "bc6ed1102afee21fef32c2cafd34d5b3f013872d3da7285ee0c0f437242edf05",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1600,8 +1638,18 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "98f70f4547d751024242b18c1c60e8bfe28b6c32234dd6538d56333b3a4f2a81",
-      "family": "recovery"
+      "code_sha256": "5763aacd5d15313b610888606f99301b48611933ade8f3abbe04638a2f8021e8",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1632,8 +1680,18 @@
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "9d5757d5e19a24d5e323dd1a7d5c2d8e4c915cb73b9fc05a44f69df3fd2242c8",
-      "family": "recovery"
+      "code_sha256": "6a0f46c6c1d3c8bc7b793d6d975a1ab6a39ce7af7cbbc718a9473b28a56beb51",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1666,6 +1724,150 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_construction_request_payload",
+      "code_sha256": "365cf2b1942dec120787aa28aa9e029e7e8d2c5b798becd84f9724e039b36b75",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_request_matches_approved_reference",
+      "code_sha256": "e383902353ccabc105855b1f783b524f03b44f5144d0bdecd578d1e5a1e5ccfc",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_validate_construction_response",
+      "code_sha256": "bf1050bb6cabc507c9bf78d0a38fd1517da75d003dec68d8a44eac51971da27d",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "construction_rejection_finding",
+      "code_sha256": "3d7f5e191cd50356b7ef2a088365d004f02f1dce67937636bf12a0653aba34ba",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "construction_repair_spec",
+      "code_sha256": "bbfdb912749e16105057da6dfd66e14ec5f9e5f523e500cb9dcf7f60d4b0e652",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "construction_retry_spec",
+      "code_sha256": "0ca294031c08aa69f40cdde664b140e25197bbd8fcb631d0fbea39ad5c8212e1",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "create_construction_repair_request",
+      "code_sha256": "c7d4494dafbe0e9121c2513aa98d6d00e806462cfbe20b879cb4c30724f25e3a",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "_template_document",
+      "code_sha256": "4b566d06cb60e4dc51d39bd2823ec8239ee7ea64fbe95dc21973a096d00f48d7",
+      "family": "structured",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_apply_pending_recovery_plan",
+      "code_sha256": "dd476464febb7cd8d71bbc6f645d5355ca3d6c560d70e184364cab31c2196455",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
+          "test_construction_reliability.py::test_bare_approved_count_generates_complete_enrollment_sentence"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
+          "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

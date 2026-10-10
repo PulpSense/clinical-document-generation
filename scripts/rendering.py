@@ -323,8 +323,16 @@ def _protocol_number(reference: Mapping[str, Any]) -> str:
 
 
 def sample_size_display(value: Any) -> str:
-    """Translate the legacy count record only when its whole shape is known."""
+    """Present a count as a complete noun phrase without altering qualified totals.
+
+    Bare counts mean participants under the Branch Input Contract. Explicit
+    record/examination units and cohort breakdowns remain source-owned text.
+    """
     text = _text(value).rstrip(". ")
+    if re.fullmatch(r"\d[\d,]*(?:\.0+)?", text):
+        count = text.split(".")[0]
+        noun = "participant" if int(count.replace(",", "")) == 1 else "participants"
+        return f"{count} {noun}"
     match = re.fullmatch(r"(\d[\d,]*)\s+(?:subjects?|participants?|patients?)\s*\(treatment\)\s*;\s*control\s*:\s*(\d[\d,]*)", text, re.I)
     if match:
         count, control = match.groups()
@@ -1780,7 +1788,10 @@ def _normalize_icf_source_displays(document: Document, reference: Mapping[str, A
     available_citations = set(re.findall(r"(?m)^\s*(\d+)[.)]\s", bibliography))
     raw_count = _text(get_path(reference, "population.sample_size")).rstrip(". ")
     display_count = sample_size_display(raw_count)
-    if raw_count and display_count != raw_count:
+    # A naked number can also be a pressure, duration or endpoint value. Only
+    # replace the complete legacy encoding here; scalar displays are populated
+    # at their own template destination, never by global numeric substitution.
+    if raw_count and display_count != raw_count and not re.fullmatch(r"\d[\d,]*(?:\.0+)?", raw_count):
         replacements.append((re.compile(re.escape(raw_count)), display_count))
     for paragraph in document.paragraphs:
         matches = sorted(
@@ -3553,6 +3564,7 @@ def _template_document(
     icf: bool,
     boilerplate: Mapping[str, str],
     layout_repair_rules: Iterable[Mapping[str, str]] = (),
+    construction_passages: list[dict[str, Any]] | None = None,
 ) -> Document:
     """Populate the selected Contracted Template without replacing its Layout Contract."""
     document = Document(template_path)
@@ -3576,6 +3588,21 @@ def _template_document(
             "sponsorName": "«Sponsor»",
         })
     generated_plain_paragraphs = _normalize_generated_placeholder_layout(document)
+    # Track only source-derived display prose. Headings, tables, signatures,
+    # legal clauses and accepted narrative drafts never become editable shell
+    # prose merely because a reviewer names the broad document shell.
+    display_sources = {"sampleSize": "population.sample_size", "sitesNumber": "design.number_of_sites"}
+    tracked = []
+    for index, paragraph in enumerate(document.paragraphs):
+        tokens = {token.strip('{}') for token in TOKEN.findall(paragraph.text)}
+        source_paths = [display_sources[token] for token in sorted(tokens) if token in display_sources]
+        descriptor = not icf and paragraph.text.strip().casefold() == 'an investigator-initiated clinical trial'
+        if descriptor:
+            source_paths = ['meta.study_type', 'regulatory.prs.study_type', 'design.intervention_type']
+        if (source_paths and (descriptor or tokens <= display_sources.keys())
+                and _heading_level(paragraph) is None):
+            identity = hashlib.sha256(f'{template_path.name}:{index}:{paragraph.text}'.encode()).hexdigest()[:20]
+            tracked.append((f'display-{identity}', paragraph, source_paths))
     table_reference = document_table_reference(reference, model)
     if not icf:
         _assessment_matrix(document, table_reference, authority_path)
@@ -3675,6 +3702,22 @@ def _template_document(
     # table rules so their page breaks cannot split the unit again.
     for target in dict.fromkeys(section15_repairs):
         _repair_section15_table_opening(document, target)
+    artifact = 'icf' if icf else 'protocol'
+    for passage_id, paragraph, source_paths in tracked:
+        if paragraph._p.getparent() is not document.element.body or not paragraph.text.strip():
+            continue
+        base_text = paragraph.text
+        for repair in model.get('construction_repairs', []):
+            if repair.get('artifact') != artifact or repair.get('passage_id') != passage_id:
+                continue
+            if paragraph.text != repair.get('before'):
+                raise LayoutRepairTargetError('Construction prose repair is stale for its exact passage.')
+            _set_paragraph_text(paragraph, str(repair['after']))
+        if construction_passages is not None:
+            construction_passages.append({
+                'passage_id': passage_id, 'artifact': artifact, 'section_id': f'{artifact}.shell',
+                'text': paragraph.text, 'base_text': base_text, 'source_paths': source_paths,
+            })
     _set_update_fields(document)
     return document
 
@@ -3943,6 +3986,7 @@ def render_documents(
             results.append({"artifact": kind, "path": "", "status": "blocked", "findings": [{"category": "rendering", "field": kind, "issue": f"Contracted client template is missing: {template}"}]})
             continue
         try:
+            construction_passages: list[dict[str, Any]] = []
             document = _template_document(
                 reference,
                 model,
@@ -3951,6 +3995,7 @@ def render_documents(
                 icf=kind == "icf",
                 boilerplate=boilerplate,
                 layout_repair_rules=normalized_repairs.get(kind, ()),
+                construction_passages=construction_passages,
             )
         except LayoutRepairTargetError as exc:
             results.append({
@@ -3982,7 +4027,7 @@ def render_documents(
                 "issue": "Required source-bound section icf.procedures is missing or empty.",
             })
         blocking_findings = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
-        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"]})
+        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"], "construction_passages": construction_passages})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
         "contracted_template_bundle": bundle,

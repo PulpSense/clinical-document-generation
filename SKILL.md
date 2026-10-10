@@ -433,12 +433,25 @@ timing, and values before release.
 - Repairable post-approval drafting, deterministic construction, layout, and
   reviewer-response failures retry within the one persisted 45-minute Desktop
   operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap,
-  except the Desktop-parent visual callback: after its initial callback, exactly one
+  except localized construction prose editing (at most three proposals per stable
+  renderer passage) and the Desktop-parent visual callback: after its initial callback, exactly one
   unchanged-request parent retry is permitted, with callback consumption persisted per exact request across process resume, before missing or invalid response evidence
   becomes `missing_parent_visual_review_response`.
 - Invalid draft: retry only failed section IDs in their existing batch.
 - Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
 - Content contradiction: retry only implicated sections unless the approved source conflicts.
+- Generated display prose: when an independent reviewer identifies a nonmaterial
+  shell wording defect, the workflow may issue a `section_drafting` request with
+  `construction_repair`. Follow its exact paragraph, scoped approved evidence and
+  response contract. Return one corrected plain paragraph; preserve quantities,
+  units, negations and meaning. The renderer registers eligible prose positively;
+  retained clauses, headings, tables, signatures and XML are outside this editor.
+  Accepted corrections persist across candidate rebuilding. Unchanged or invalid
+  proposals consume the three-proposal allowance, without reopening intake.
+  Changes elsewhere in a document do not establish progress on that passage.
+  Rerender accepted corrections and obtain fresh complete content and every-page
+  visual reviews before delivery. A failed proposal or exhausted allowance does
+  not approve the candidate or authorize a blind fresh run.
 - Visual defect: localize the exact document, page, element, check, and layout
   target; apply the narrowest untried safe Word-native strategy; rebuild the
   affected artifact; and rerun rendered-page verification.

@@ -42,6 +42,7 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
+from drafting import construction_repair_spec, construction_retry_spec, create_construction_repair_request
 from prs_xml import generate as generate_xml
 from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
@@ -7361,6 +7362,13 @@ def _recovery_action_observation(
                             })
             if (not accepted_path.is_file() or finding.get("surface") == "table") and candidate_path.is_file() and not candidate_path.is_symlink():
                 contexts = rendered_section_snapshot(candidate_path, target)
+            if target in {'protocol.shell', 'icf.shell'}:
+                source = finding.get('verification_source_finding') or finding
+                passage = str(source.get('affected_passage') or '').strip()
+                # A change elsewhere in the document cannot establish progress
+                # on a shell sentence. Missing localization is no evidence of
+                # progress; the independent reviewer must identify the passage.
+                contexts = [row for row in contexts if passage and row.get('paragraph') == passage]
             target_identities[f"candidate/{artifact}.docx#{target}"] = sha256_value(contexts)
 
     structural_paths = []
@@ -7905,11 +7913,17 @@ def _apply_pending_recovery_plan(
             if action not in existing:
                 existing.append(action)
     created: list[Path] = []
+    for action in plan.get('construction_actions', []):
+        created.append(create_construction_repair_request(
+            revision_dir, approved_reference, attempt_path=str(action.get('attempt_path', plan['attempt_path'])),
+            finding_index=action['finding_index'], attempt=action['attempt'],
+            governing=governing_resources(SCRIPT_DIR.parent, approved_reference, contracted_bundle=contracted_bundle),
+        ))
     if section_targets:
         invalidate_accepted_targets(revision_dir, section_targets)
         (revision_dir / "candidate-build.json").unlink(missing_ok=True)
         _clear_verification_responses(revision_dir)
-        created = schedule_requests(
+        created.extend(schedule_requests(
             repo_root=SCRIPT_DIR.parent,
             revision_dir=revision_dir,
             revision_id=revision_dir.name,
@@ -7918,7 +7932,7 @@ def _apply_pending_recovery_plan(
             wave=str(plan.get("wave") or "quality-retry"),
             findings=findings,
             contracted_bundle=contracted_bundle,
-        )
+        ))
     if layout_plan:
         persisted_repairs = generation.setdefault("layout_repairs", {})
         for artifact, repairs in layout_plan.items():
@@ -8173,6 +8187,12 @@ def _quality_retry(
     current_review_set = max(1, int(generation_state.get("review_set", 1)))
     for index, raw in enumerate(findings):
         finding = dict(raw)
+        if 'construction_request_id' in finding and construction_retry_spec(revision_dir, finding) is None:
+            route_error_indexes.add(index)
+            route_errors.append({'category': 'request-integrity', 'field': 'construction_editor',
+                                 'issue': 'Construction retry does not match its immutable source-bound request.'})
+            normalized.append(finding)
+            continue
         recovery_class = str(finding.get("recovery_class") or "")
         if (
             recovery_class not in RECOVERY_POLICIES
@@ -8590,11 +8610,29 @@ def _quality_retry(
     has_layout_target = any(target.category == "layout" for target in targets)
     deterministic_reconstruction = bool(deterministic_targets)
     deterministic_actions: list[dict[str, Any]] = []
+    construction_actions: list[dict[str, Any]] = []
     if deterministic_reconstruction:
         # Structured artifacts are rebuilt from the immutable approved source
         # and accepted drafts. They must not consume another free-form model
         # attempt or be misreported as a missing-source terminal blocker.
         for finding in normalized:
+            retained_findings = _read(recovery_attempt_dir / 'attempt-manifest.json')['findings']
+            finding_index = next((index for index, retained in enumerate(retained_findings) if retained == finding), None)
+            spec = (construction_retry_spec(revision_dir, finding) if finding.get('construction_request_id')
+                    else construction_repair_spec(revision_dir, recovery_attempt_dir.relative_to(revision_dir).as_posix(), finding_index)
+                    if finding_index is not None else None)
+            if spec:
+                editor_attempts = generation_state.setdefault('construction_editor_attempts', {})
+                key = f"{spec['artifact']}:{spec['passage_id']}"
+                attempt = int(editor_attempts.get(key, 0)) + 1
+                if attempt > 3:
+                    return finish(_repair_block(run_dir, 'internal_recovery_stalled', [{
+                        **finding, 'issue': 'Three localized construction prose corrections did not resolve the independently reviewed defect.',
+                    }], candidate_outputs=_candidate_outputs(revision_dir)))
+                editor_attempts[key] = attempt
+                construction_actions.append({'attempt_path': spec['attempt_path'],
+                                             'finding_index': spec['finding_index'], 'attempt': attempt})
+                continue
             for raw_target in finding.get("target_ids", []):
                 target = RetryTarget.parse(str(raw_target)).target_id
                 if target not in deterministic_targets:
@@ -8694,6 +8732,7 @@ def _quality_retry(
         "section_targets": sorted(section_targets),
         "layout_plan": layout_plan,
         "deterministic_actions": deterministic_actions,
+        'construction_actions': construction_actions,
         "reset_verification_set": bool(
             stage == "quality" and (section_targets or has_layout_target or deterministic_reconstruction)
         ),
@@ -9030,7 +9069,7 @@ def generate(
         state.setdefault("legacy_state_migrations", []).append("recovery_exhaustion_ignored")
         _write(reference_path, working_reference)
     drafting_findings = [
-        finding if finding.get("category") in {"source-evidence", "request-integrity"}
+        finding if finding.get("category") in {"source-evidence", "request-integrity"} or finding.get('recovery_class') == 'deterministic_structure_defect'
         else recovery_finding(finding, "drafting_defect")
         for finding in ingest_responses(revision_dir, expected_governing)
     ]
