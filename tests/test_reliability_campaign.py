@@ -97,6 +97,42 @@ def test_report_counts_failed_first_attempt_and_successful_restart_separately(tm
     assert len(data['unrun_cases']) == 9
 
 
+@pytest.mark.parametrize('defect', ['timeout', 'nested-counter', 'counter-container', 'delivery-shape', 'quality-shape'])
+def test_report_retains_deadline_and_malformed_attempts_alongside_valid_delivery(tmp_path, defect):
+    pack = tmp_path / 'pack'
+    assert cli('build', '--output', pack).returncode == 0
+    case = json.loads((pack / 'campaign.json').read_text())['cases'][0]
+    runs = tmp_path / 'runs'
+    run = operation_fixture(runs, pack, case, 'attempt-1', 'passed', 700)
+    path = run / 'logs/desktop-operation.json'
+    state = json.loads(path.read_text())
+    state['started_at_epoch'] = 100
+    if defect == 'timeout':
+        state['status'] = state['result']['status'] = 'timeout'
+    elif defect == 'nested-counter':
+        state['attempt_counters'] = {'drafting': 2}
+    elif defect == 'counter-container':
+        state['attempt_counters'] = 'broken'
+    elif defect == 'delivery-shape':
+        state['result']['delivery'] = []
+    else:
+        manifest_path = run / state['result']['manifest']
+        manifest = json.loads(manifest_path.read_text())
+        manifest['quality'] = []
+        manifest_path.write_text(json.dumps(manifest))
+    path.write_text(json.dumps(state))
+    operation_fixture(runs, pack, case, 'attempt-2', 'passed', 800)
+    result = cli('report', '--pack', pack, '--runs-root', runs, '--evidence-kind', 'controlled_fixture')
+    assert result.returncode == 0, result.stderr
+    report = json.loads(result.stdout)
+    assert len(report['operations']) == 2
+    assert report['total_elapsed_seconds'] == 1500
+    assert report['terminal_failures'] == {'numerator': 1, 'denominator': 2}
+    assert report['eventual_delivery'] == {'numerator': 1, 'denominator': 1}
+    if defect != 'timeout':
+        assert report['evidence_errors']
+
+
 @pytest.mark.parametrize('defect', ['bytes', 'extra-output', 'missing-duration', 'unknown-input', 'malformed-state', 'nonobject-state'])
 def test_report_keeps_incomplete_or_corrupt_attempt_evidence_visible(tmp_path, defect):
     pack = tmp_path / 'pack'

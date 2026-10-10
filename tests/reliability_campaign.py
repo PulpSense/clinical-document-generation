@@ -166,12 +166,18 @@ def confined_file(root: Path, relative: str) -> Path:
 
 def verified_delivery(run: Path, result: dict, expected: list[str]) -> dict[str, str]:
     """Verify reported delivery bytes; this does not assess clinical correctness."""
-    if result.get('status') != 'passed' or result.get('delivery', {}).get('confirmed') is not True:
+    delivery = result.get('delivery', {})
+    if not isinstance(delivery, dict):
+        raise ValueError('Delivery metadata must be an object')
+    if result.get('status') != 'passed' or delivery.get('confirmed') is not True:
         return {}
     manifest = json.loads(confined_file(run, result['manifest']).read_text())
     if not isinstance(manifest, dict):
         raise ValueError('Publication manifest must be an object')
-    if manifest.get('status') != 'passed' or manifest.get('quality', {}).get('status') != 'passed':
+    quality = manifest.get('quality', {})
+    if not isinstance(quality, dict):
+        raise ValueError('Publication quality must be an object')
+    if manifest.get('status') != 'passed' or quality.get('status') != 'passed':
         raise ValueError('Reported delivery has no passing publication manifest')
     outputs = manifest['client_outputs']
     if (sorted(row['path'] for row in outputs) != sorted('output/' + name for name in expected)
@@ -222,8 +228,7 @@ def report_campaign(pack: Path, runs_root: Path, evidence_kind: str) -> dict[str
             operation.update(operation_id=state.get('operation_id'), status=state.get('status'),
                              started_at_epoch=state.get('started_at_epoch'),
                              release_identity=state.get('release_identity'),
-                             approval_identity=state.get('approval_identity'),
-                             attempt_counters=state.get('attempt_counters') or {})
+                             approval_identity=state.get('approval_identity'))
             duration = result.get('elapsed_seconds')
             if isinstance(duration, (int, float)) and not isinstance(duration, bool) and math.isfinite(duration) and duration >= 0:
                 operation['elapsed_seconds'] = duration
@@ -234,6 +239,16 @@ def report_campaign(pack: Path, runs_root: Path, evidence_kind: str) -> dict[str
                 raise ValueError('Operation must retain exactly one matching campaign raw input')
             case_id = matching.pop()
             operation['case_id'] = case_id
+            counters = state.get('attempt_counters', {})
+            if not isinstance(counters, dict):
+                raise ValueError('Operation attempt counters must be an object')
+            for key in ('parent_visual_callbacks', 'handoff_dispatches', 'generation', 'verification', 'drafting'):
+                counts = counters.get(key, {})
+                if not isinstance(counts, dict) or any(
+                    not isinstance(count, int) or isinstance(count, bool) or count < 0 for count in counts.values()
+                ):
+                    raise ValueError(f'Invalid per-target attempt counters: {key}')
+            operation['attempt_counters'] = counters
             case = next(c for c in cases if c['id'] == case_id)
             expected = json.loads((pack / case['oracle']).read_text())['document_set']
             hashes = verified_delivery(run, result, expected)
@@ -252,7 +267,7 @@ def report_campaign(pack: Path, runs_root: Path, evidence_kind: str) -> dict[str
         else:
             errors.append({'case_id': rows[0]['case_id'], 'error': 'First operation order is unverified'})
     ratio = lambda numerator, denominator: {'numerator': numerator, 'denominator': denominator}
-    terminal = {'passed', 'blocked', 'review_required', 'timed_out', 'failed', 'cancelled'}
+    terminal = {'passed', 'blocked', 'review_required', 'timeout', 'failed', 'cancelled'}
     recovered = sum(op['delivered'] and operation_recovered(op) for op in operations)
     return {
         'schema_version': 'hermes-reliability-campaign-report/v1',
