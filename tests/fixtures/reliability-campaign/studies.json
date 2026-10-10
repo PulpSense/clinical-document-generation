@@ -1,0 +1,107 @@
+[
+  {
+    "id": "01-home-diary", "study_type": "Prospective", "icf_template": "Sterling", "pilot": true,
+    "title": "Completeness of Home Blood Pressure Diaries During Routine Hypertension Follow-up",
+    "short_title": "Home Blood Pressure Diaries", "sample": 48, "sites": 2,
+    "background": "Routine care includes home blood pressure diaries. The completeness of these diaries during follow-up is uncertain. Reviewing diary completeness may help improve future instructions, but no direct benefit is guaranteed and the study does not test a treatment effect.",
+    "objective": "Describe completeness of home blood pressure diaries over six weeks of routine hypertension follow-up.",
+    "hypothesis": "Diary completeness may differ over the six-week observation period; this is an exploratory expectation rather than an established result.",
+    "population": "Adults receiving routine outpatient follow-up for hypertension.",
+    "exclusion": "Unable to consent or to provide a paper or electronic diary.",
+    "primary": ["Percentage of scheduled diary entries completed", "Day 42"],
+    "secondary": [["Number of diary clarification requests", "Day 42"]],
+    "timeline": "Enrollment: 2 months; participant follow-up: 42 days; analysis: 1 month.",
+    "washout": 21, "compensation": "Travel reimbursement of up to USD 15 for the final visit; no participation payment.",
+    "visits": [
+      {"visit": "Baseline", "timing": "Day 0", "procedures": ["Informed consent", "Medical history", "Diary instructions"]},
+      {"visit": "Telephone check", "timing": "Day 14, plus or minus 2 days", "procedures": ["Record diary clarification requests"]},
+      {"visit": "Final review", "timing": "Day 42, plus or minus 5 days", "procedures": ["Count completed and scheduled diary entries", "Record diary clarification requests", "Record adverse events"]}
+    ],
+    "analysis": "Summarize diary completion percentages using N, mean, standard deviation, median, minimum and maximum. Summarize clarification requests using counts and percentages. Use participants as the analysis unit. Report missing observations without imputation; no hypothesis tests are planned.",
+    "privacy": "Use study IDs in the analysis file. Only the site investigator can access the identity link. Store files on the sponsor's access-restricted server for 5 years after closeout; publish aggregate results only.",
+    "forbidden": ["A new antihypertensive treatment is assigned", "Participants receive a guaranteed therapeutic benefit", "Telephone check includes blood sampling"]
+  },
+  {
+    "id": "02-hand-function", "study_type": "Ambispective", "icf_template": "Advarra", "pilot": true,
+    "title": "Recorded Hand Function and Prospective Activity Reports After Routine Hand Therapy",
+    "short_title": "Hand Therapy Activity Reports", "sample": 72, "sites": 1,
+    "background": "Routine hand-therapy records contain grip-strength measurements. Their relationship with later patient-reported activity limitations is uncertain. Combining existing records with future questionnaires may improve understanding without establishing a treatment benefit.",
+    "objective": "Describe recorded grip strength and subsequent activity limitations after routine hand therapy.",
+    "hypothesis": "Recorded grip strength may be associated with later reported activity limitations; the association is not established.",
+    "population": "Adults who completed routine hand therapy within the preceding 8 weeks.",
+    "exclusion": "Unavailable therapy records or inability to complete the activity questionnaire.",
+    "primary": ["Activity limitation questionnaire score", "Week 12 after enrollment"],
+    "secondary": [["Recorded grip strength", "Most recent therapy record within 8 weeks before enrollment"]],
+    "timeline": "Review records from the 8 weeks before enrollment; enroll over 3 months; prospective follow-up lasts 12 weeks; analysis takes 1 month.",
+    "washout": 30, "compensation": "None; no participation payment or reimbursement.",
+    "visits": [
+      {"visit": "Enrollment", "timing": "Week 0", "procedures": ["Informed consent", "Abstract recorded grip strength from the preceding 8 weeks", "Activity limitation questionnaire"]},
+      {"visit": "Telephone follow-up", "timing": "Week 12, plus or minus 7 days", "procedures": ["Activity limitation questionnaire", "Record adverse events"]}
+    ],
+    "analysis": "Summarize activity scores using medians and interquartile ranges and recorded grip strength using means and standard deviations. Describe the association using a scatter plot without inferential testing. Report available pairs and missing observations; no imputation is planned.",
+    "privacy": null,
+    "forbidden": ["Historical grip strength is measured again for research", "The study changes the therapy regimen", "The eight-week historical period is added to prospective participant follow-up"]
+  },
+  {
+    "id": "03-radiology-records", "study_type": "Retrospective", "icf_template": null, "pilot": true,
+    "title": "Turnaround Times of Final Radiology Reports in Existing Outpatient Records",
+    "short_title": "Radiology Report Turnaround", "sample": 120, "sites": 3,
+    "background": "Existing outpatient radiology records contain examination and final-report timestamps. Variation in turnaround across sites has not been described for the selected period. This review uses existing records only and provides no direct participant benefit.",
+    "objective": "Describe the interval between examination completion and final report availability in existing outpatient radiology records.",
+    "hypothesis": "Report turnaround may vary across sites; this descriptive expectation is unproven.",
+    "unmet_need": "The participating sites lack a combined description of report turnaround for the selected record period.",
+    "population": "Existing records of adult outpatient radiology examinations completed from 1 January through 31 March 2026.",
+    "exclusion": "Duplicate examination records or records lacking either required timestamp.",
+    "primary": ["Hours from examination completion to final report", "Existing records dated 1 January through 31 March 2026"],
+    "secondary": [["Percentage of reports available within 24 hours", "Existing records dated 1 January through 31 March 2026"]],
+    "timeline": "Existing record period: 1 January through 31 March 2026; abstraction: 6 weeks; analysis: 2 weeks. No new participant contacts.",
+    "compensation": "None; record review only.", "visits": [],
+    "assessments": "Abstract examination completion time, final report availability time and site from existing records dated 1 January through 31 March 2026. No new measurements, visits, questionnaires or participant contact are planned.",
+    "analysis": "Summarize turnaround hours using medians and interquartile ranges overall and by site. Report the proportion available within 24 hours with explicit denominators. Count exclusions for missing timestamps separately. No imputation or inferential testing is planned.",
+    "privacy": "Site personnel remove names before transfer. Use a coded study ID and retain the identity link only at the originating site. Restrict the combined file to named analysts and retain it for 3 years after closeout. Publish aggregate summaries only.",
+    "forbidden": ["Prospective follow-up is required", "Participants must sign an ICF before abstraction", "Retrospective exemption or consent waiver has already been granted", "An ICF or PRS XML belongs to the required document set"]
+  },
+  {
+    "id": "04-skin-diary", "study_type": "Prospective", "icf_template": "Advarra", "pilot": false,
+    "title": "Comfort Reports During Routine Use of a Skin Moisturizer",
+    "short_title": "Moisturizer Comfort Reports", "sample": 36, "sites": 1,
+    "background": "Adults already using a moisturizer in routine care may report different comfort levels over time. A short diary may help characterize comfort, but the study cannot establish effectiveness or promise improvement.",
+    "objective": "Describe daily comfort reports during four weeks of routine moisturizer use.",
+    "hypothesis": "Daily comfort scores may vary during observation; improvement is not assumed.",
+    "population": "Adults already using a moisturizer recommended by their usual clinician.",
+    "exclusion": "Known allergy to the existing moisturizer or inability to complete the diary.",
+    "primary": ["Mean daily comfort score", "Days 1 through 28"],
+    "secondary": [["Number of diary entries completed", "Day 28"]],
+    "timeline": "Enrollment: 1 month; follow-up: 28 days; analysis: 2 weeks.",
+    "washout": 14, "compensation": "USD 20 after the final questionnaire; no travel reimbursement.",
+    "visits": [
+      {"visit": "Enrollment call", "timing": "Day 0", "procedures": ["Informed consent", "Existing moisturizer history", "Diary instructions"]},
+      {"visit": "Final call", "timing": "Day 28, plus or minus 3 days", "procedures": ["Review daily comfort diary for Days 1 through 28", "Count diary entries", "Record adverse events"]}
+    ],
+    "analysis": "Summarize participant mean daily comfort scores using N, median, minimum and maximum. Summarize completed diary entries using counts. State the number of available diary days for every participant. No imputation, treatment comparison or hypothesis testing is planned.",
+    "privacy": null,
+    "forbidden": ["A moisturizer is assigned by the study", "The product is proven effective", "Blood collection is required"]
+  },
+  {
+    "id": "05-hearing-followup", "study_type": "Ambispective", "icf_template": "Sterling", "pilot": false,
+    "title": "Historical Hearing Aid Use and Subsequent Communication Reports in Routine Follow-up",
+    "short_title": "Hearing Aid Communication Reports", "sample": 64, "sites": 2,
+    "background": "Routine records describe hearing aid use before enrollment, while later communication experiences are incompletely characterized. Combining those records with future questionnaires may inform counseling, but does not establish that counseling or a device causes improvement.",
+    "objective": "Describe historical hearing aid use and subsequent self-reported communication difficulty.",
+    "hypothesis": "Historical hearing aid use may be associated with later communication reports; a causal effect is not established.",
+    "population": "Adults with routine hearing aid records covering the 3 months before enrollment.",
+    "exclusion": "Unavailable prior records or inability to complete the communication questionnaire.",
+    "primary": ["Communication difficulty questionnaire score", "Month 3 after enrollment"],
+    "secondary": [["Recorded hours of hearing aid use per day", "3 months before enrollment"], ["Communication difficulty questionnaire score", "Month 1 after enrollment"]],
+    "timeline": "Historical records cover 3 months before enrollment. Enrollment lasts 2 months, prospective follow-up lasts 3 months, and analysis lasts 1 month.",
+    "washout": 45, "compensation": "Travel reimbursement up to USD 25 per in-person follow-up; no participation payment.",
+    "visits": [
+      {"visit": "Baseline", "timing": "Month 0", "procedures": ["Informed consent", "Abstract prior 3 months of hearing aid use", "Communication questionnaire"]},
+      {"visit": "Interim contact", "timing": "Month 1, plus or minus 7 days", "procedures": ["Communication questionnaire", "Record adverse events"]},
+      {"visit": "Final contact", "timing": "Month 3, plus or minus 14 days", "procedures": ["Communication questionnaire", "Record adverse events", "Exit form"]}
+    ],
+    "analysis": "Summarize communication scores and historical use using means, standard deviations, medians and ranges. Report available paired observations descriptively and identify missing questionnaires without imputation. No causal comparison or inferential testing is planned.",
+    "privacy": "Use coded study IDs. Store the identity link separately at each site with investigator-only access. Retain study files for 7 years after closeout on an access-controlled server. Disclose identifiable records only to authorized study monitors and oversight bodies as permitted; publications use aggregate results.",
+    "forbidden": ["Three historical months extend prospective follow-up to six months", "Hearing aid settings are changed by research staff", "Questionnaire responses prove a causal benefit"]
+  }
+]

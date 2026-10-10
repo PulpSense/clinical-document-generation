@@ -123,6 +123,19 @@ def test_source_dependent_payment_cannot_be_invented():
     assert finding["severity"] == "blocking"
 
 
+def test_retention_phrase_is_review_uncertainty_instead_of_authorization_expiry():
+    reference = source()
+    reference.setdefault('confidentiality', {})['data_handling'] = 'Retain coded records for five years after closeout.'
+    document = document_with_sections([
+        ('CONFIDENTIALITY AUTHORIZATION TO COLLECT, USE DISCLOSE YOUR MEDICAL INFORMATION',
+         ['Retain coded records for five years after closeout.']),
+    ])
+    finding = clause(quality.validate_sterling_clause_contract(document, reference),
+                     'sterling.privacy.authorization-duration')
+    assert finding['code'] == 'icf-lexical-evidence-uncertainty'
+    assert finding['publication_disposition'] == 'warning'
+
+
 def test_required_sterling_clause_in_wrong_section_is_repairable_and_exactly_localized():
     voluntary = contracts.sterling_clause_text("sterling.voluntary.core")
     document = document_with_sections([

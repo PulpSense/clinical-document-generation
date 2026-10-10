@@ -1011,8 +1011,17 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_sterling_clause_contract",
-      "code_sha256": "6d97caf48d1025182b2cadbc9a5d2a31a95800483642f12c70144698b6c3cfc9",
-      "family": "clinical"
+      "code_sha256": "2c243cccec802e8d9755ce8906e3fa9cf3bfe1b74411e196c80988ccb972ca7e",
+      "family": "clinical",
+      "behavioral_evidence": {
+        "valid": [
+          "test_phase2_sterling_fidelity.py::test_retention_phrase_is_review_uncertainty_instead_of_authorization_expiry"
+        ],
+        "invalid": [
+          "test_phase2_sterling_fidelity.py::test_source_dependent_payment_cannot_be_invented",
+          "test_reliability_campaign.py::test_phrase_uncertainty_cannot_publish_without_independent_resolution"
+        ]
+      }
     },
     {
       "file": "scripts/quality.py",
@@ -1512,8 +1521,16 @@
     {
       "file": "scripts/workflow.py",
       "function": "_bind_verification_response_payload",
-      "code_sha256": "c1faeafd89b10836fa9d4a352f16a7bd333d24a37d91faafef7ce81e868b78f7",
-      "family": "recovery"
+      "code_sha256": "b0ba2533be4ec993245336469aa5323c46781b06d84b7a2828d435ffffc50e4c",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_reviewer_transport.py::test_request_schema_label_is_normalized_without_changing_visual_judgment"
+        ],
+        "invalid": [
+          "test_reviewer_transport.py::test_normalization_does_not_accept_foreign_or_incomplete_review"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",

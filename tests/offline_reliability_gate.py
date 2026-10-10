@@ -32,6 +32,7 @@ TEST_FILES = (
     'test_contextual_output_fixes.py',
     'test_bibliographic_evidence.py', 'test_clean_delivery.py', 'test_general_delivery_reliability.py',
     'test_source_routing.py',
+    'test_reliability_campaign.py', 'test_reviewer_transport.py',
 )
 
 

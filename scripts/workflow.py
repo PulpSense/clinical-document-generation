@@ -45,6 +45,7 @@ from drafting import governing_resources, ingest_responses, invalidate_accepted_
 from prs_xml import generate as generate_xml
 from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
+from quality import VERIFY_SCHEMA
 from contracts import document_table_reference, protocol_table_contracts
 
 
@@ -5095,7 +5096,10 @@ def _production_publish_quiet_response(
     }
     request = _read(revision_dir / str(handoff.get("request_path") or "")) if verification_task else None
     for candidate in reversed(candidates):
-        if request is not None and "revision_id" not in candidate:
+        if request is not None and (
+            "revision_id" not in candidate
+            or candidate.get("schema_version") == VERIFY_SCHEMA
+        ):
             # Hermes can finish a complete visual judgment while omitting the
             # workflow-owned revision field. Bind only a response that already
             # names the exact schema, request ID, hash, and task.
@@ -5170,7 +5174,10 @@ def _production_agent_prompt(
         "Desktop parent writes that final JSON atomically to the bound response path."
     )
     verification_rule = (
-        " The Desktop parent validates it automatically."
+        f" Set response schema_version to `{RESPONSE_SCHEMA}`. "
+        f"The request uses `{VERIFY_SCHEMA}`; this identifies the request only. "
+        "Copy request_id, request_sha256, task and revision_id from the request. "
+        "The Desktop parent validates it automatically."
         if task in {"clinical_content_verification", "rendered_page_visual_verification"}
         else " The next generate invocation is the authoritative response validator."
     )
@@ -6128,18 +6135,31 @@ def _bind_verification_response_payload(
         "task": request.get("task"),
         "revision_id": request.get("revision_id"),
     }
+    # The known request label is a transport typo, not a different clinical
+    # judgment format. Normalize it only when every actual request identity
+    # already matches. Unknown versions and foreign identities stay rejected.
+    normalized = []
+    source_sha256 = canonical_evidence_sha256(response)
+    if (
+        request.get("schema_version") == VERIFY_SCHEMA
+        and response.get("schema_version") == VERIFY_SCHEMA
+        and all(key in response and key in request and response[key] == request[key]
+                for key in _VERIFICATION_IDENTITY_FIELDS if key != "schema_version")
+    ):
+        response["schema_version"] = RESPONSE_SCHEMA
+        normalized.append("schema_version")
     for key, expected in expected_identity.items():
         if key in response and response.get(key) != expected:
             return None
     missing = [key for key in _VERIFICATION_IDENTITY_FIELDS if key not in response]
-    if not missing:
+    if not missing and not normalized:
         return response
-    source_sha256 = canonical_evidence_sha256(response)
     bound = {**response, **expected_identity}
     bound["workflow_binding"] = {
         "schema_version": "workflow-verification-binding/v1",
         "source_semantic_sha256": source_sha256,
         "added_fields": missing,
+        **({"normalized_fields": normalized} if normalized else {}),
     }
     return bound
 
@@ -6234,6 +6254,7 @@ def command_parent_visual_reviewer(
         request_path = revision_dir / "hermes/desktop-parent-visual-review-request.json"
         _write(request_path, {
             "schema_version": "desktop-parent-visual-review-request/v1",
+            "response_schema_version": RESPONSE_SCHEMA,
             "revision_id": revision_dir.name,
             "handoffs": [dict(item) for item in handoffs],
             "producer_model_policy": "record_actual_nonempty_model_id",

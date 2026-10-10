@@ -4249,12 +4249,19 @@ def validate_sterling_clause_contract(
 
         if not triggered:
             unsupported = any(marker and marker in text for marker in unsupported_markers)
-            if validation.get("prohibit_when_untriggered") and section in {
+            prohibited_section = validation.get("prohibit_when_untriggered") and section in {
                 "COMPENSATION TO YOU", "GENETIC INFORMATION NONDISCRIMINATION ACT"
-            }:
-                unsupported = unsupported or bool(text)
-            if unsupported:
+            } and bool(text)
+            if prohibited_section:
                 add(clause, "sterling-clause-unsupported", actual_section=section)
+            elif unsupported:
+                findings.append({
+                    "code": "icf-lexical-evidence-uncertainty", "category": "content",
+                    "field": clause["section_id"], "target_ids": [clause["section_id"]],
+                    "clause_id": clause["clause_id"], "publication_disposition": "warning",
+                    "matched_markers": [marker for marker in unsupported_markers if marker and marker in text],
+                    "issue": "A phrase may imply an unapproved conditional clause. Independently review its meaning and approved applicability; a phrase match alone does not establish that claim.",
+                })
             continue
 
         has_body = bool(text)
