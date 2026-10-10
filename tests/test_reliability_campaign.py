@@ -226,6 +226,3 @@ def test_phrase_uncertainty_cannot_publish_without_independent_resolution(tmp_pa
     assert observed
     assert result['status'] != 'passed'
     assert not (tmp_path / 'output').exists()
-
-
-

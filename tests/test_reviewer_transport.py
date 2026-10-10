@@ -75,4 +75,3 @@ def test_schema_normalization_retains_a_real_visual_blocker(tmp_path):
     assert accepted['findings'] == response['findings']
     assert quality.verification_response_is_terminal(revision, revision / handoff['request_path'])
     assert not quality.verification_response_is_complete(revision, revision / handoff['request_path'])
-

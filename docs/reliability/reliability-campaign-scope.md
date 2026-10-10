@@ -64,3 +64,19 @@ delivery bytes, not all publication-ledger claims or clinical review judgments.
 The external-audit count intentionally remains pending until a separate audit is
 performed. Live evidence across varied inputs remains the next step before any
 production reliability claim.
+
+## Implementation validation
+
+Focused checks ran on Python 3.11. The campaign, reviewer transport, Sterling
+fidelity and developer-audit selection passed 74 tests; one Linux-only office
+smoke was skipped on this host. A subsequent collector selection passed 17
+tests, including five new timeout/malformed-evidence cases identified in review.
+The Desktop parent-review and deadline selection passed 21 tests. These selections
+overlap; they are not full-suite results. Python compilation and diff whitespace
+checks passed. Standards and Spec reviews found reporting defects, which were
+corrected, retested and confirmed resolved by both reviewers.
+
+The captured response was replayed against the baseline and correction in
+separate temporary copies. The source archive and original diagnostic extraction
+were preserved. No full suite, live model runs, installation, activation or
+release certification was performed.
