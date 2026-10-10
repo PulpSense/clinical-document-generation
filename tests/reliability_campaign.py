@@ -42,6 +42,7 @@ def campaign_cases() -> list[dict[str, Any]]:
                 'icf_template': study['icf_template'],
                 'pilot': study['pilot'] and representation == 'narrative',
                 'representation': representation, 'reference': reference,
+                'visits': copy.deepcopy(study['visits']),
                 'oracle': study_expectations(study),
             })
     return cases
@@ -70,13 +71,14 @@ def study_reference(study: dict[str, Any], representation: str) -> dict[str, Any
                  'protocol_number': 'SYN-' + study['id'].upper(), 'date': '10 Oct 2026'},
         'study': {'title': study['title'], 'short_title': study['short_title'],
                   'background': study['background'], 'hypothesis': study['hypothesis'],
+                  'references': study['references'],
                   'timeline': study['timeline'], **({'unmet_need': study['unmet_need']} if not prospective else {})},
         'objectives': {'primary': study['objective']},
         'design': {'study_design': study['study_type'] + ', observational study of routine care.',
                    'number_of_sites': study['sites'], 'intervention_name': study['short_title'],
                    'intervention_type': 'Other', 'control_arm': 'None'},
         'population': {'description': study['population'], 'sample_size': f"{study['sample']} participants" if prospective else f"{study['sample']} records",
-                       'sample_justification': 'A descriptive convenience sample from the participating sites; no power calculation or inferential comparison is planned.',
+                       'sample_justification': study['sample_justification'],
                        'inclusion_criteria': [study['population']], 'exclusion_criteria': [study['exclusion']]},
         'endpoints': {'primary': [{'label': study['primary'][0], 'time_frame': study['primary'][1]}],
                       'secondary': [{'label': e[0], 'time_frame': e[1]} for e in study['secondary']]},
@@ -106,7 +108,9 @@ def study_expectations(study: dict[str, Any]) -> dict[str, Any]:
         {'id': 'endpoint-timing', 'meaning': {'primary': study['primary'], 'secondary': study['secondary']}, 'artifacts': ['protocol.docx'] + (['study.xml'] if prospective else [])},
         {'id': 'analysis', 'meaning': study['analysis'], 'artifacts': ['protocol.docx']},
         {'id': 'timeline', 'meaning': study['timeline'], 'artifacts': ['protocol.docx'] + (['icf.docx'] if prospective else [])},
-        {'id': 'qualified-benefit', 'meaning': study['background'], 'artifacts': ['protocol.docx'] + (['icf.docx'] if prospective else [])},
+        {'id': 'qualified-benefit', 'meaning': study['potential_benefit'], 'artifacts': ['protocol.docx'] + (['icf.docx'] if prospective else [])},
+        {'id': 'sample-justification', 'meaning': study['sample_justification'], 'artifacts': ['protocol.docx']},
+        {'id': 'bibliography', 'meaning': study['references'], 'artifacts': ['protocol.docx']},
     ]
     if prospective:
         facts.extend([
@@ -123,33 +127,80 @@ def study_expectations(study: dict[str, Any]) -> dict[str, Any]:
 
 
 def raw_packet(case: dict[str, Any]) -> str:
+    """Export a Fillout-style synopsis, rather than a flattened internal reference."""
     source = case['reference']
-    lines = ['# SYNTHETIC STUDY INPUT — testing only', '',
-             'All people, facilities and oversight details below are fictional. No real IRB approval is asserted.', '']
-    sections = list(source.items())
-    if case['representation'] == 'structured':
-        sections.reverse()
-    for name, value in sections:
-        lines.extend(['## ' + name.replace('_', ' ').title(), ''])
-        if name == 'procedures' and case['representation'] == 'structured' and value.get('visit_schedule'):
-            lines.extend(['| Visit | Timing | Activities |', '| --- | --- | --- |'])
-            for v in value['visit_schedule']:
-                lines.append(f"| {v['visit']} | {v['timing']} | {'; '.join(v['procedures'])} |")
-            value = {k: v for k, v in value.items() if k not in {'assessments', 'visit_schedule'}}
-        lines.extend(human_fields(value))
-        lines.append('')
+    prospective = case['study_type'] != 'Retrospective'
+    study, population = source['study'], source['population']
+    lines = ['SYNOPSIS', '', 'SYNTHETIC STUDY INPUT — testing only.',
+             'All people, facilities, studies and references are fictional. No real IRB approval is asserted.', '']
+
+    def answer(label: str, value: str) -> None:
+        lines.extend([label, value, ''])
+
+    answer('Title', study['title'])
+    answer('Short Title', study['short_title'])
+    answer('What type of request are you submitting?', 'Formal Study Proposal (detailed study design)')
+    answer('Are you the Principal Investigator?', 'No')
+    answer('Region(s) where your study will be located', 'Americas')
+    answer('Study Type', case['study_type'])
+    answer('Study Synopsis', source['design']['study_design'] + ' No treatment is assigned by the study.')
+    answer('Describe Hypothesis', study['hypothesis'])
+    total = population['sample_size'].split()[0]
+    answer('Total Sample Size', f'Treatment: {total} subjects\nControl: 0' if prospective else f'{total} eligible examination records')
+    answer('Sample Size Justification', population['sample_justification'])
+    answer('Number of Investigational Sites', str(source['design']['number_of_sites']))
+    answer('Study Status', 'Fully developed protocol: No\nIRB: Not submitted; no approval, exemption or consent waiver has been granted.')
+    answer('Study Duration', study['timeline'])
+    answer('Describe Study Objectives and Significance', study['background'] + '\n\n' + source['objectives']['primary'])
+    if study.get('unmet_need'):
+        answer('Unmet Medical Need', study['unmet_need'])
+    answer('Primary Endpoint', '\n'.join('- ' + row['label'] + '; assessed ' + row['time_frame'] for row in source['endpoints']['primary']))
+    answer('Secondary Endpoints', '\n'.join('- ' + row['label'] + '; assessed ' + row['time_frame'] for row in source['endpoints']['secondary']))
+    answer('Inclusion Criteria', '\n'.join('- ' + item for item in population['inclusion_criteria']))
+    answer('Exclusion Criteria', '\n'.join('- ' + item for item in population['exclusion_criteria']))
+    answer('Control Arm', 'None')
+    procedures = source['procedures']
+    if prospective:
+        visits = case['visits']
+        answer('Please list all the patient visits as required for the study',
+               '\n'.join('- ' + visit['visit'] + ' (' + visit['timing'] + ')' for visit in visits))
+        if case['representation'] == 'structured':
+            activities = list(dict.fromkeys(activity for visit in visits for activity in visit['procedures']))
+            matrix = ['\t'.join(['Activity'] + [visit['visit'] for visit in visits]),
+                      '\t'.join(['Timing / visit window'] + [visit['timing'] for visit in visits])]
+            matrix.extend('\t'.join([activity] + ['X' if activity in visit['procedures'] else '' for visit in visits])
+                          for activity in activities)
+            answer('Type of Test', '\n'.join(matrix))
+        else:
+            answer('Assessments and schedule', procedures['assessments'])
+        answer('Minimum days before screening without participation in another study',
+               str(procedures['minimum_days_before_screening_without_participation']) + ' days')
+    else:
+        answer('Assessments conducted and their schedules', procedures['assessments'])
+        if case['representation'] == 'structured':
+            answer('Record abstraction fields', 'Variable\tData source\nExamination completion time\tExisting outpatient record\nFinal report availability time\tExisting outpatient record\nSite\tExisting outpatient record')
+        else:
+            answer('Record abstraction fields', 'The existing outpatient record supplies examination completion time, final report availability time and site.')
+    answer('Statistical Analysis Plan', source['statistics']['analysis_plan'])
+    answer('References (fictional test bibliography)', '\n'.join(f'{index}. {entry}' for index, entry in enumerate(study['references'], 1)))
+    answer('Financial Request', 'Total: $XXX (sponsor funding request; participant compensation is specified separately below).')
+    answer('Participant compensation or reimbursement', source['risks_benefits']['compensation_or_reimbursement'])
+    if source['confidentiality']['data_handling']:
+        answer('Confidentiality and record handling', source['confidentiality']['data_handling'])
+    answer('Supplemental administrative information supplied with the synopsis', 'Protocol number: ' + source['meta']['protocol_number'] + '\nDocument date: ' + source['meta']['date'])
+    parties = source['parties']
+    for title, key in (('Sponsor', 'sponsor'), ('Principal Investigator', 'principal_investigator'),
+                       ('Study Coordinator', 'study_coordinator'), ('IRB', 'irb')):
+        answer(title, '\n'.join(field.replace('_', ' ').capitalize() + ': ' + str(value)
+                                 for field, value in parties[key].items()))
+    for index, site in enumerate(source['sites'], 1):
+        answer(f'Investigational site {index}',
+               f"Facility: {site['facility']['name']}\nAddress: {site['facility']['address']}\n"
+               f"Site contact: {site['contact']['name']}; {site['contact']['phone']}; {site['contact']['email']}\n"
+               f"Site investigator: {site['investigator']['name']}, {site['investigator']['title']}")
+    if prospective:
+        answer('ICF Template Choice', case['icf_template'])
     return '\n'.join(lines)
-
-
-def human_fields(value: Any, prefix: str = '') -> list[str]:
-    """Render source facts for an ordinary intake, without internal JSON syntax."""
-    if isinstance(value, dict):
-        return [line for key, item in value.items()
-                for line in human_fields(item, prefix + key.replace('_', ' ').title() + ' / ')]
-    if isinstance(value, list):
-        return [line for index, item in enumerate(value, 1)
-                for line in human_fields(item, prefix + str(index) + ' / ')]
-    return [f"{prefix.removesuffix(' / ')}: {value if value is not None else 'Not applicable'}"]
 
 
 def confined_file(root: Path, relative: str) -> Path:
@@ -298,13 +349,18 @@ def operation_recovered(operation: dict) -> bool:
 def build_pack(output: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     records = []
-    for case in campaign_cases():
-        raw = output / 'inputs' / (case['id'] + '.md')
+    cases = campaign_cases()
+    ordered = sorted(cases, key=lambda case: (not case['pilot'], case['representation'] != 'narrative', case['pair']))
+    numbers = {case['id']: index for index, case in enumerate(ordered, 1)}
+    for case in cases:
+        number = numbers[case['id']]
+        raw = output / 'inputs' / f"{number:02d}-{case['id'].split('-', 1)[1]}.md"
         oracle = output / 'reviewer-only' / (case['id'] + '.json')
         raw.parent.mkdir(exist_ok=True)
         raw.write_text(raw_packet(case), encoding='utf-8')
         write_json(oracle, case['oracle'])
-        record = {k: v for k, v in case.items() if k not in {'reference', 'oracle'}}
+        record = {k: v for k, v in case.items() if k not in {'reference', 'oracle', 'visits'}}
+        record['number'] = number
         record.update(input=raw.relative_to(output).as_posix(), input_sha256=digest(raw),
                       oracle=oracle.relative_to(output).as_posix(), oracle_sha256=digest(oracle))
         records.append(record)
@@ -313,6 +369,9 @@ def build_pack(output: Path) -> dict[str, Any]:
     write_json(output / 'campaign.json', manifest)
     guide = ROOT / 'docs/reliability/hermes-campaign-instructions.md'
     (output / 'README.md').write_text(guide.read_text(encoding='utf-8'), encoding='utf-8')
+    (output / 'INPUT-ORDER.txt').write_text('\n'.join(
+        f"{record['number']:02d}. {Path(record['input']).name} — {record['study_type']} / {record['icf_template'] or 'Protocol only'}"
+        for record in sorted(records, key=lambda record: record['number'])) + '\n', encoding='utf-8')
     return manifest
 
 

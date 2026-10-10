@@ -5,6 +5,24 @@ The three `pilot: true` cases in `campaign.json` cover the three study types.
 Expansion covers the remaining two consent families and equivalent input forms.
 Every case is fictional. Retrospective output is Protocol only.
 
+The ten files are five different fictional studies, each supplied twice with the
+same facts. Inputs 01–05 describe assessment assignments in prose; 06–10 use
+matrices or record-field tables. Both use a Brad-style question-and-answer
+synopsis, longer clinical rationale, citation markers, fictional bibliography,
+measurement units, multiple outcomes and enrollment-versus-evaluable sample
+reasoning. Supplemental administrative answers keep obligatory inputs complete.
+The fictional references are formatting test data, not medical evidence.
+
+| Input pair | Study | Study type | ICF template |
+| --- | --- | --- | --- |
+| 01 / 06 | Home BP diaries | Prospective | Sterling |
+| 02 / 07 | Hand therapy | Ambispective | Advarra |
+| 03 / 08 | Radiology records | Retrospective | None; Protocol only |
+| 04 / 09 | Skin comfort diaries | Prospective | Advarra |
+| 05 / 10 | Hearing follow-up | Ambispective | Sterling |
+
+Numbers 01–03 are the initial pilot. See `INPUT-ORDER.txt` for exact filenames.
+
 Build the pack from the repository with:
 
 ```sh

@@ -27,6 +27,8 @@ def test_build_exports_raw_inputs_and_separate_expectations_for_all_families(tmp
     manifest = json.loads((pack / 'campaign.json').read_text())
     assert len(manifest['cases']) == 10
     assert len([c for c in manifest['cases'] if c['pilot']]) == 3
+    assert sorted(c['number'] for c in manifest['cases']) == list(range(1, 11))
+    assert sorted(c['number'] for c in manifest['cases'] if c['pilot']) == [1, 2, 3]
     assert {(c['study_type'], c['icf_template']) for c in manifest['cases']} == {
         ('Retrospective', None), ('Prospective', 'Advarra'), ('Prospective', 'Sterling'),
         ('Ambispective', 'Advarra'), ('Ambispective', 'Sterling')}
@@ -35,8 +37,36 @@ def test_build_exports_raw_inputs_and_separate_expectations_for_all_families(tmp
         assert 'SYNTHETIC' in raw
         assert 'approved_by' not in raw
         assert 'required_facts' not in raw
+        assert raw.startswith('SYNOPSIS\n')
+        assert 'Describe Study Objectives and Significance' in raw
+        assert 'Sample Size Justification' in raw
+        assert 'References (fictional test bibliography)' in raw
+        assert 'Financial Request\nTotal: $XXX' in raw
+        assert Path(case['input']).name.startswith(f"{case['number']:02d}-")
         assert (pack / case['oracle']).is_file()
     assert cli('build', '--output', pack).returncode != 0
+
+
+def test_brad_style_home_diary_forms_preserve_realistic_source_complexity(tmp_path):
+    pack = tmp_path / 'pack'
+    assert cli('build', '--output', pack).returncode == 0
+    narrative = (pack / 'inputs/01-home-diary-narrative.md').read_text()
+    matrix = (pack / 'inputs/06-home-diary-structured.md').read_text()
+    for raw in (narrative, matrix):
+        assert 'Treatment: 48 subjects\nControl: 0' in raw
+        assert 'planned enrollment is 48 subjects' in raw
+        assert 'Forty participants with evaluable diary data' in raw
+        assert 'SBP, mmHg' in raw
+        assert 'missing or unclear.1,2' in raw
+        assert 'purposes and their activities should not be combined.3' in raw
+        assert 'Fictional test reference; not a real publication.' in raw
+        assert 'Participant compensation or reimbursement\nTravel reimbursement of up to USD 15' in raw
+        assert 'ICF Template Choice\nSterling' in raw
+        assert 'Business phone: +1 202-555-0101\nOffice phone: +1 202-555-0101' in raw
+    assert 'Assessments and schedule\nAt Baseline (Day 0)' in narrative
+    assert 'Activity\tBaseline\tTelephone check\tFinal review' in matrix
+    assert 'Informed consent\tX\t\t' in matrix
+    assert 'Record adverse events\t\t\tX' in matrix
 
 
 @pytest.mark.parametrize('case', campaign_cases(), ids=lambda c: c['id'])

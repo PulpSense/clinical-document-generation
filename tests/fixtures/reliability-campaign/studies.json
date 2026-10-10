@@ -1,107 +1,318 @@
 [
   {
-    "id": "01-home-diary", "study_type": "Prospective", "icf_template": "Sterling", "pilot": true,
+    "id": "01-home-diary",
+    "study_type": "Prospective",
+    "icf_template": "Sterling",
+    "pilot": true,
     "title": "Completeness of Home Blood Pressure Diaries During Routine Hypertension Follow-up",
-    "short_title": "Home Blood Pressure Diaries", "sample": 48, "sites": 2,
-    "background": "Routine care includes home blood pressure diaries. The completeness of these diaries during follow-up is uncertain. Reviewing diary completeness may help improve future instructions, but no direct benefit is guaranteed and the study does not test a treatment effect.",
+    "short_title": "Home Blood Pressure Diaries",
+    "sample": 48,
+    "sites": 2,
+    "background": "Home blood pressure (BP) diaries are used during routine hypertension follow-up, but the presence of a completed diary does not establish that all scheduled entries were recorded. In this fictional proposal, earlier feasibility reports describe variability in diary completion and the need for clarification when entries are missing or unclear.1,2 Neither diary completeness nor recorded systolic blood pressure (SBP, mmHg) is evidence that a new treatment has been assigned.\n\nThere are limited descriptive data for the two participating sites over a six-week observation period. The planned study will collect one scheduled home diary entry per day on Days 1–42. The Day 14 telephone contact is for recording clarification requests; the final Day 42 review counts entries and summarizes the diary. The two contacts have different purposes and their activities should not be combined.3\n\nReviewing diary completeness may help improve future instructions, but no direct benefit is guaranteed and the study does not test a treatment effect.",
     "objective": "Describe completeness of home blood pressure diaries over six weeks of routine hypertension follow-up.",
     "hypothesis": "Diary completeness may differ over the six-week observation period; this is an exploratory expectation rather than an established result.",
     "population": "Adults receiving routine outpatient follow-up for hypertension.",
     "exclusion": "Unable to consent or to provide a paper or electronic diary.",
-    "primary": ["Percentage of scheduled diary entries completed", "Day 42"],
-    "secondary": [["Number of diary clarification requests", "Day 42"]],
-    "timeline": "Enrollment: 2 months; participant follow-up: 42 days; analysis: 1 month.",
-    "washout": 21, "compensation": "Travel reimbursement of up to USD 15 for the final visit; no participation payment.",
-    "visits": [
-      {"visit": "Baseline", "timing": "Day 0", "procedures": ["Informed consent", "Medical history", "Diary instructions"]},
-      {"visit": "Telephone check", "timing": "Day 14, plus or minus 2 days", "procedures": ["Record diary clarification requests"]},
-      {"visit": "Final review", "timing": "Day 42, plus or minus 5 days", "procedures": ["Count completed and scheduled diary entries", "Record diary clarification requests", "Record adverse events"]}
+    "primary": [
+      "Percentage of scheduled diary entries completed",
+      "Day 42"
     ],
-    "analysis": "Summarize diary completion percentages using N, mean, standard deviation, median, minimum and maximum. Summarize clarification requests using counts and percentages. Use participants as the analysis unit. Report missing observations without imputation; no hypothesis tests are planned.",
+    "secondary": [
+      [
+        "Number of diary clarification requests",
+        "Day 42"
+      ],
+      [
+        "Mean recorded systolic blood pressure (SBP, mmHg)",
+        "Diary Days 1 through 42, summarized at Day 42"
+      ]
+    ],
+    "timeline": "Enrollment: 2 months; participant follow-up: 42 days; analysis: 1 month.",
+    "washout": 21,
+    "compensation": "Travel reimbursement of up to USD 15 for the final visit; no participation payment.",
+    "visits": [
+      {
+        "visit": "Baseline",
+        "timing": "Day 0",
+        "procedures": [
+          "Informed consent",
+          "Medical history",
+          "Diary instructions"
+        ]
+      },
+      {
+        "visit": "Telephone check",
+        "timing": "Day 14, plus or minus 2 days",
+        "procedures": [
+          "Record diary clarification requests"
+        ]
+      },
+      {
+        "visit": "Final review",
+        "timing": "Day 42, plus or minus 5 days",
+        "procedures": [
+          "Count completed and scheduled diary entries",
+          "Record diary clarification requests",
+          "Record adverse events",
+          "Summarize recorded systolic blood pressure in mmHg from the diary"
+        ]
+      }
+    ],
+    "analysis": "Summarize diary completion percentages using N, mean, standard deviation, median, minimum and maximum. Summarize clarification requests using counts and percentages. Use participants as the analysis unit. Report missing observations without imputation; no hypothesis tests are planned. For the secondary BP summary, calculate each participant's mean recorded SBP (mmHg) over available diary entries on Days 1–42, then report N, mean, standard deviation, minimum and maximum across participants. Report the number of contributing diary entries; this descriptive summary is not a treatment-effect test.",
     "privacy": "Use study IDs in the analysis file. Only the site investigator can access the identity link. Store files on the sponsor's access-restricted server for 5 years after closeout; publish aggregate results only.",
-    "forbidden": ["A new antihypertensive treatment is assigned", "Participants receive a guaranteed therapeutic benefit", "Telephone check includes blood sampling"]
+    "forbidden": [
+      "A new antihypertensive treatment is assigned",
+      "Participants receive a guaranteed therapeutic benefit",
+      "Telephone check includes blood sampling"
+    ],
+    "sample_justification": "Forty participants with evaluable diary data are considered sufficient for a descriptive feasibility summary. Allowing for eight participants with unavailable final data, the planned enrollment is 48 subjects across two sites, not 40 subjects. This is a convenience sample; no power calculation or inferential treatment comparison is planned.",
+    "potential_benefit": "Reviewing diary completeness may help improve future instructions, but no direct benefit is guaranteed and the study does not test a treatment effect.",
+    "references": [
+      "Example A, Sample B. Completeness of home blood pressure diaries in a fictional feasibility cohort. Synthetic Research Methods. 2023;1:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Clarification requests during routine diary follow-up. Synthetic Research Methods. 2024;2:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Descriptive reporting of scheduled and completed diary entries. Synthetic Research Methods. 2025;3:10-19. Fictional test reference; not a real publication."
+    ]
   },
   {
-    "id": "02-hand-function", "study_type": "Ambispective", "icf_template": "Advarra", "pilot": true,
+    "id": "02-hand-function",
+    "study_type": "Ambispective",
+    "icf_template": "Advarra",
+    "pilot": true,
     "title": "Recorded Hand Function and Prospective Activity Reports After Routine Hand Therapy",
-    "short_title": "Hand Therapy Activity Reports", "sample": 72, "sites": 1,
-    "background": "Routine hand-therapy records contain grip-strength measurements. Their relationship with later patient-reported activity limitations is uncertain. Combining existing records with future questionnaires may improve understanding without establishing a treatment benefit.",
+    "short_title": "Hand Therapy Activity Reports",
+    "sample": 72,
+    "sites": 1,
+    "background": "Routine hand-therapy records contain grip-strength measurements in kilograms (kg), while later limitations in everyday activities are usually described by patients. Historical strength and future activity reports refer to different observation periods and cannot be treated as measurements made at the same visit. Fictional methodological examples describe this distinction and the effect of missing historical records on paired summaries.1,2\n\nThis ambispective study combines the most recent grip-strength record in the eight weeks before enrollment with prospective questionnaires at Week 0 and Week 12. The study-specific activity limitation score ranges from 0 to 100; higher scores indicate greater reported limitation. It is not represented as a validated instrument. No research grip-strength measurement or change to routine therapy is planned.3\n\nCombining existing records with future questionnaires may improve understanding of activity limitations, but does not establish a treatment benefit or guarantee improvement for participants.",
     "objective": "Describe recorded grip strength and subsequent activity limitations after routine hand therapy.",
     "hypothesis": "Recorded grip strength may be associated with later reported activity limitations; the association is not established.",
     "population": "Adults who completed routine hand therapy within the preceding 8 weeks.",
     "exclusion": "Unavailable therapy records or inability to complete the activity questionnaire.",
-    "primary": ["Activity limitation questionnaire score", "Week 12 after enrollment"],
-    "secondary": [["Recorded grip strength", "Most recent therapy record within 8 weeks before enrollment"]],
+    "primary": [
+      "Study-specific activity limitation questionnaire score (0–100; higher is greater limitation)",
+      "Week 12 after enrollment"
+    ],
+    "secondary": [
+      [
+        "Recorded grip strength (kg)",
+        "Most recent therapy record within 8 weeks before enrollment"
+      ]
+    ],
     "timeline": "Review records from the 8 weeks before enrollment; enroll over 3 months; prospective follow-up lasts 12 weeks; analysis takes 1 month.",
-    "washout": 30, "compensation": "None; no participation payment or reimbursement.",
+    "washout": 30,
+    "compensation": "None; no participation payment or reimbursement.",
     "visits": [
-      {"visit": "Enrollment", "timing": "Week 0", "procedures": ["Informed consent", "Abstract recorded grip strength from the preceding 8 weeks", "Activity limitation questionnaire"]},
-      {"visit": "Telephone follow-up", "timing": "Week 12, plus or minus 7 days", "procedures": ["Activity limitation questionnaire", "Record adverse events"]}
+      {
+        "visit": "Enrollment",
+        "timing": "Week 0",
+        "procedures": [
+          "Informed consent",
+          "Abstract recorded grip strength from the preceding 8 weeks",
+          "Activity limitation questionnaire"
+        ]
+      },
+      {
+        "visit": "Telephone follow-up",
+        "timing": "Week 12, plus or minus 7 days",
+        "procedures": [
+          "Activity limitation questionnaire",
+          "Record adverse events"
+        ]
+      }
     ],
     "analysis": "Summarize activity scores using medians and interquartile ranges and recorded grip strength using means and standard deviations. Describe the association using a scatter plot without inferential testing. Report available pairs and missing observations; no imputation is planned.",
     "privacy": null,
-    "forbidden": ["Historical grip strength is measured again for research", "The study changes the therapy regimen", "The eight-week historical period is added to prospective participant follow-up"]
+    "forbidden": [
+      "Historical grip strength is measured again for research",
+      "The study changes the therapy regimen",
+      "The eight-week historical period is added to prospective participant follow-up"
+    ],
+    "sample_justification": "A descriptive target of 60 available historical-strength/follow-up-score pairs is planned. Enrollment will be 72 participants to allow for 12 incomplete pairs. The enrollment total is 72; the expected evaluable subset of 60 is not a second enrollment target. No inferential power calculation is proposed.",
+    "potential_benefit": "Combining existing records with future questionnaires may improve understanding of activity limitations, but does not establish a treatment benefit or guarantee improvement for participants.",
+    "references": [
+      "Example A, Sample B. Historical hand-therapy records and subsequent activity reports. Synthetic Research Methods. 2023;1:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Available-pair summaries with incomplete rehabilitation records. Synthetic Research Methods. 2024;2:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Separating historical measurements from prospective questionnaire contacts. Synthetic Research Methods. 2025;3:10-19. Fictional test reference; not a real publication."
+    ]
   },
   {
-    "id": "03-radiology-records", "study_type": "Retrospective", "icf_template": null, "pilot": true,
+    "id": "03-radiology-records",
+    "study_type": "Retrospective",
+    "icf_template": null,
+    "pilot": true,
     "title": "Turnaround Times of Final Radiology Reports in Existing Outpatient Records",
-    "short_title": "Radiology Report Turnaround", "sample": 120, "sites": 3,
-    "background": "Existing outpatient radiology records contain examination and final-report timestamps. Variation in turnaround across sites has not been described for the selected period. This review uses existing records only and provides no direct participant benefit.",
+    "short_title": "Radiology Report Turnaround",
+    "sample": 120,
+    "sites": 3,
+    "background": "Final radiology report availability and examination completion are separate timestamps in the existing outpatient record. Their difference can be summarized in hours (h), but a missing final timestamp is not a turnaround of zero hours. Fictional audit-method examples describe the distinction between excluded records and reports taking more than 24 h.1,2\n\nThe three sites lack a combined description for examinations completed from 1 January through 31 March 2026. This study will abstract existing completion time, final-report availability time and site. The denominator for the percentage finalized within 24 hours will be eligible records with both timestamps, with exclusions reported separately. Each eligible examination is the analysis unit. No new imaging, research visit or participant questionnaire is planned.3\n\nThe findings may help the sites understand existing reporting processes. This record review provides no direct participant benefit and does not demonstrate that any process change improves care.",
     "objective": "Describe the interval between examination completion and final report availability in existing outpatient radiology records.",
     "hypothesis": "Report turnaround may vary across sites; this descriptive expectation is unproven.",
     "unmet_need": "The participating sites lack a combined description of report turnaround for the selected record period.",
     "population": "Existing records of adult outpatient radiology examinations completed from 1 January through 31 March 2026.",
     "exclusion": "Duplicate examination records or records lacking either required timestamp.",
-    "primary": ["Hours from examination completion to final report", "Existing records dated 1 January through 31 March 2026"],
-    "secondary": [["Percentage of reports available within 24 hours", "Existing records dated 1 January through 31 March 2026"]],
+    "primary": [
+      "Hours from examination completion to final report",
+      "Existing records dated 1 January through 31 March 2026"
+    ],
+    "secondary": [
+      [
+        "Percentage of reports available within 24 hours",
+        "Existing records dated 1 January through 31 March 2026"
+      ]
+    ],
     "timeline": "Existing record period: 1 January through 31 March 2026; abstraction: 6 weeks; analysis: 2 weeks. No new participant contacts.",
-    "compensation": "None; record review only.", "visits": [],
+    "compensation": "None; record review only.",
+    "visits": [],
     "assessments": "Abstract examination completion time, final report availability time and site from existing records dated 1 January through 31 March 2026. No new measurements, visits, questionnaires or participant contact are planned.",
     "analysis": "Summarize turnaround hours using medians and interquartile ranges overall and by site. Report the proportion available within 24 hours with explicit denominators. Count exclusions for missing timestamps separately. No imputation or inferential testing is planned.",
     "privacy": "Site personnel remove names before transfer. Use a coded study ID and retain the identity link only at the originating site. Restrict the combined file to named analysts and retain it for 3 years after closeout. Publish aggregate summaries only.",
-    "forbidden": ["Prospective follow-up is required", "Participants must sign an ICF before abstraction", "Retrospective exemption or consent waiver has already been granted", "An ICF or PRS XML belongs to the required document set"]
+    "forbidden": [
+      "Prospective follow-up is required",
+      "Participants must sign an ICF before abstraction",
+      "Retrospective exemption or consent waiver has already been granted",
+      "An ICF or PRS XML belongs to the required document set"
+    ],
+    "sample_justification": "The descriptive analysis targets 120 eligible examination records across three sites. Up to 150 existing records may be screened to allow for approximately 30 duplicate or incomplete records. The analysis target remains 120 eligible records; 150 is the screening pool and is not participant enrollment. No inferential power calculation is planned.",
+    "potential_benefit": "The findings may help the sites understand existing reporting processes. This record review provides no direct participant benefit and does not demonstrate that any process change improves care.",
+    "references": [
+      "Example A, Sample B. Examination and report timestamps in a fictional outpatient audit. Synthetic Research Methods. 2023;1:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Denominators and missing timestamps in turnaround summaries. Synthetic Research Methods. 2024;2:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Retrospective multisite reporting-process descriptions. Synthetic Research Methods. 2025;3:10-19. Fictional test reference; not a real publication."
+    ]
   },
   {
-    "id": "04-skin-diary", "study_type": "Prospective", "icf_template": "Advarra", "pilot": false,
+    "id": "04-skin-diary",
+    "study_type": "Prospective",
+    "icf_template": "Advarra",
+    "pilot": false,
     "title": "Comfort Reports During Routine Use of a Skin Moisturizer",
-    "short_title": "Moisturizer Comfort Reports", "sample": 36, "sites": 1,
-    "background": "Adults already using a moisturizer in routine care may report different comfort levels over time. A short diary may help characterize comfort, but the study cannot establish effectiveness or promise improvement.",
+    "short_title": "Moisturizer Comfort Reports",
+    "sample": 36,
+    "sites": 1,
+    "background": "Adults who already use a moisturizer recommended during routine care may describe comfort differently over time. A diary can capture those reports without assigning a product or establishing product effectiveness. Fictional feasibility reports discuss diary adherence and the distinction between an observed comfort score and a treatment effect.1,2\n\nThe study-specific comfort scale is 0–10, with 0 meaning no comfort and 10 meaning the greatest comfort on this scale; it is not described as a validated instrument. One score is planned each day on Days 1–28. At the final telephone contact, staff review the diary, count available entries and record adverse events. No blood collection, research skin procedure or product switch is planned.3\n\nThe diary may help characterize comfort during routine use, but the study cannot establish effectiveness or promise improvement or direct benefit.",
     "objective": "Describe daily comfort reports during four weeks of routine moisturizer use.",
     "hypothesis": "Daily comfort scores may vary during observation; improvement is not assumed.",
     "population": "Adults already using a moisturizer recommended by their usual clinician.",
     "exclusion": "Known allergy to the existing moisturizer or inability to complete the diary.",
-    "primary": ["Mean daily comfort score", "Days 1 through 28"],
-    "secondary": [["Number of diary entries completed", "Day 28"]],
+    "primary": [
+      "Mean daily study-specific comfort score (0–10; higher is greater comfort)",
+      "Days 1 through 28"
+    ],
+    "secondary": [
+      [
+        "Number of diary entries completed",
+        "Day 28"
+      ]
+    ],
     "timeline": "Enrollment: 1 month; follow-up: 28 days; analysis: 2 weeks.",
-    "washout": 14, "compensation": "USD 20 after the final questionnaire; no travel reimbursement.",
+    "washout": 14,
+    "compensation": "USD 20 after the final questionnaire; no travel reimbursement.",
     "visits": [
-      {"visit": "Enrollment call", "timing": "Day 0", "procedures": ["Informed consent", "Existing moisturizer history", "Diary instructions"]},
-      {"visit": "Final call", "timing": "Day 28, plus or minus 3 days", "procedures": ["Review daily comfort diary for Days 1 through 28", "Count diary entries", "Record adverse events"]}
+      {
+        "visit": "Enrollment call",
+        "timing": "Day 0",
+        "procedures": [
+          "Informed consent",
+          "Existing moisturizer history",
+          "Diary instructions"
+        ]
+      },
+      {
+        "visit": "Final call",
+        "timing": "Day 28, plus or minus 3 days",
+        "procedures": [
+          "Review daily comfort diary for Days 1 through 28",
+          "Count diary entries",
+          "Record adverse events"
+        ]
+      }
     ],
     "analysis": "Summarize participant mean daily comfort scores using N, median, minimum and maximum. Summarize completed diary entries using counts. State the number of available diary days for every participant. No imputation, treatment comparison or hypothesis testing is planned.",
     "privacy": null,
-    "forbidden": ["A moisturizer is assigned by the study", "The product is proven effective", "Blood collection is required"]
+    "forbidden": [
+      "A moisturizer is assigned by the study",
+      "The product is proven effective",
+      "Blood collection is required"
+    ],
+    "sample_justification": "Thirty participants with available diaries are considered adequate for a descriptive feasibility summary. Enrollment is increased to 36 to allow for six unavailable diaries. The planned sample size is 36 participants, not 30. No formal power calculation or treatment comparison is planned.",
+    "potential_benefit": "The diary may help characterize comfort during routine use, but the study cannot establish effectiveness or promise improvement or direct benefit.",
+    "references": [
+      "Example A, Sample B. Comfort diaries during existing moisturizer use. Synthetic Research Methods. 2023;1:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Diary adherence in a fictional routine-care feasibility series. Synthetic Research Methods. 2024;2:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Interpreting descriptive comfort scores without causal claims. Synthetic Research Methods. 2025;3:10-19. Fictional test reference; not a real publication."
+    ]
   },
   {
-    "id": "05-hearing-followup", "study_type": "Ambispective", "icf_template": "Sterling", "pilot": false,
+    "id": "05-hearing-followup",
+    "study_type": "Ambispective",
+    "icf_template": "Sterling",
+    "pilot": false,
     "title": "Historical Hearing Aid Use and Subsequent Communication Reports in Routine Follow-up",
-    "short_title": "Hearing Aid Communication Reports", "sample": 64, "sites": 2,
-    "background": "Routine records describe hearing aid use before enrollment, while later communication experiences are incompletely characterized. Combining those records with future questionnaires may inform counseling, but does not establish that counseling or a device causes improvement.",
+    "short_title": "Hearing Aid Communication Reports",
+    "sample": 64,
+    "sites": 2,
+    "background": "Routine hearing-aid records may contain device-use summaries expressed as hours per day (h/day). Later communication difficulty reports describe a different outcome, and greater historical use alone does not establish a causal improvement in communication. Fictional methodological examples emphasize keeping historical use and later patient reports separate.1,2\n\nThis ambispective study abstracts the three months before enrollment and collects questionnaires at Month 0, Month 1 and Month 3 after enrollment. The study-specific communication difficulty score ranges from 0 to 10, with higher scores indicating more difficulty; no validated-instrument claim is made. The primary endpoint is the Month 3 score. Month 1 is secondary. Historical records do not extend prospective follow-up from three to six months. No device-setting change is performed by research staff.3\n\nCombining prior records with future questionnaires may inform counseling, but does not establish that counseling or a device causes improvement. Participants may receive no direct benefit.",
     "objective": "Describe historical hearing aid use and subsequent self-reported communication difficulty.",
     "hypothesis": "Historical hearing aid use may be associated with later communication reports; a causal effect is not established.",
     "population": "Adults with routine hearing aid records covering the 3 months before enrollment.",
     "exclusion": "Unavailable prior records or inability to complete the communication questionnaire.",
-    "primary": ["Communication difficulty questionnaire score", "Month 3 after enrollment"],
-    "secondary": [["Recorded hours of hearing aid use per day", "3 months before enrollment"], ["Communication difficulty questionnaire score", "Month 1 after enrollment"]],
+    "primary": [
+      "Study-specific communication difficulty questionnaire score (0–10; higher is greater difficulty)",
+      "Month 3 after enrollment"
+    ],
+    "secondary": [
+      [
+        "Recorded hours of hearing aid use per day (h/day)",
+        "3 months before enrollment"
+      ],
+      [
+        "Study-specific communication difficulty questionnaire score (0–10; higher is greater difficulty)",
+        "Month 1 after enrollment"
+      ]
+    ],
     "timeline": "Historical records cover 3 months before enrollment. Enrollment lasts 2 months, prospective follow-up lasts 3 months, and analysis lasts 1 month.",
-    "washout": 45, "compensation": "Travel reimbursement up to USD 25 per in-person follow-up; no participation payment.",
+    "washout": 45,
+    "compensation": "Travel reimbursement up to USD 25 per in-person follow-up; no participation payment.",
     "visits": [
-      {"visit": "Baseline", "timing": "Month 0", "procedures": ["Informed consent", "Abstract prior 3 months of hearing aid use", "Communication questionnaire"]},
-      {"visit": "Interim contact", "timing": "Month 1, plus or minus 7 days", "procedures": ["Communication questionnaire", "Record adverse events"]},
-      {"visit": "Final contact", "timing": "Month 3, plus or minus 14 days", "procedures": ["Communication questionnaire", "Record adverse events", "Exit form"]}
+      {
+        "visit": "Baseline",
+        "timing": "Month 0",
+        "procedures": [
+          "Informed consent",
+          "Abstract prior 3 months of hearing aid use",
+          "Communication questionnaire"
+        ]
+      },
+      {
+        "visit": "Interim contact",
+        "timing": "Month 1, plus or minus 7 days",
+        "procedures": [
+          "Communication questionnaire",
+          "Record adverse events"
+        ]
+      },
+      {
+        "visit": "Final contact",
+        "timing": "Month 3, plus or minus 14 days",
+        "procedures": [
+          "Communication questionnaire",
+          "Record adverse events",
+          "Exit form"
+        ]
+      }
     ],
     "analysis": "Summarize communication scores and historical use using means, standard deviations, medians and ranges. Report available paired observations descriptively and identify missing questionnaires without imputation. No causal comparison or inferential testing is planned.",
     "privacy": "Use coded study IDs. Store the identity link separately at each site with investigator-only access. Retain study files for 7 years after closeout on an access-controlled server. Disclose identifiable records only to authorized study monitors and oversight bodies as permitted; publications use aggregate results.",
-    "forbidden": ["Three historical months extend prospective follow-up to six months", "Hearing aid settings are changed by research staff", "Questionnaire responses prove a causal benefit"]
+    "forbidden": [
+      "Three historical months extend prospective follow-up to six months",
+      "Hearing aid settings are changed by research staff",
+      "Questionnaire responses prove a causal benefit"
+    ],
+    "sample_justification": "The descriptive target is 56 participants with paired historical-use and Month 3 questionnaire data. Enrollment is 64 to allow for eight incomplete pairs. The enrollment total is 64, while 56 is the anticipated evaluable subset. No formal inferential power calculation is planned.",
+    "potential_benefit": "Combining prior records with future questionnaires may inform counseling, but does not establish that counseling or a device causes improvement. Participants may receive no direct benefit.",
+    "references": [
+      "Example A, Sample B. Historical hearing-aid use and later communication reports. Synthetic Research Methods. 2023;1:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Available-pair descriptive summaries of device-use records. Synthetic Research Methods. 2024;2:10-19. Fictional test reference; not a real publication.",
+      "Example A, Sample B. Distinguishing historical windows from prospective follow-up. Synthetic Research Methods. 2025;3:10-19. Fictional test reference; not a real publication."
+    ]
   }
 ]
