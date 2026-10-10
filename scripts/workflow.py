@@ -8611,6 +8611,7 @@ def _quality_retry(
     deterministic_reconstruction = bool(deterministic_targets)
     deterministic_actions: list[dict[str, Any]] = []
     construction_actions: list[dict[str, Any]] = []
+    scheduled_passages: set[str] = set()
     if deterministic_reconstruction:
         # Structured artifacts are rebuilt from the immutable approved source
         # and accepted drafts. They must not consume another free-form model
@@ -8624,6 +8625,9 @@ def _quality_retry(
             if spec:
                 editor_attempts = generation_state.setdefault('construction_editor_attempts', {})
                 key = f"{spec['artifact']}:{spec['passage_id']}"
+                if key in scheduled_passages:
+                    continue
+                scheduled_passages.add(key)
                 attempt = int(editor_attempts.get(key, 0)) + 1
                 if attempt > 3:
                     return finish(_repair_block(run_dir, 'internal_recovery_stalled', [{

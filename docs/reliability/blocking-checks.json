@@ -1638,7 +1638,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "5763aacd5d15313b610888606f99301b48611933ade8f3abbe04638a2f8021e8",
+      "code_sha256": "2a3e8bd78110b3233e3aa7713c8610961b055d1fcad02a7451fe0fe38585f95e",
       "family": "recovery",
       "behavioral_evidence": {
         "valid": [
@@ -1728,7 +1728,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_construction_request_payload",
-      "code_sha256": "365cf2b1942dec120787aa28aa9e029e7e8d2c5b798becd84f9724e039b36b75",
+      "code_sha256": "a7d0554888778be5b88b5cefd127b74de82e2e9289afea4ae56f3bacfe37ddec",
       "family": "recovery",
       "behavioral_evidence": {
         "valid": [
@@ -1792,7 +1792,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "construction_repair_spec",
-      "code_sha256": "bbfdb912749e16105057da6dfd66e14ec5f9e5f523e500cb9dcf7f60d4b0e652",
+      "code_sha256": "bc2de84fbafb04480516f9d89537b3d111e9fdf9d63a9dbfaa5aee30a0b14c29",
       "family": "recovery",
       "behavioral_evidence": {
         "valid": [
@@ -1866,6 +1866,20 @@
         "invalid": [
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
+        ]
+      }
+    },
+    {
+      "file": "scripts/drafting.py",
+      "function": "_construction_finding_source",
+      "code_sha256": "dde7e35dad90b50338fa9998ca2e8b6cb889a480909d16ef63a5dfadf6a5f666",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_construction_reliability.py::test_localized_repair_covers_each_document_family"
+        ],
+        "invalid": [
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed"
         ]
       }
     }

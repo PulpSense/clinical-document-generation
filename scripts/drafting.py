@@ -590,6 +590,19 @@ def accepted_context(revision_dir: Path, batch: BatchSpec, expected_governing: M
     return [draft for section_id in (foundations.section_ids if foundations else ()) if (draft := accepted_draft(revision_dir, section_id, expected_governing))]
 
 
+def _construction_finding_source(finding: Any) -> Mapping[str, Any] | None:
+    if not isinstance(finding, Mapping):
+        return None
+    source = finding.get('verification_source_finding') or finding
+    if (not isinstance(source, Mapping) or finding.get('recovery_class') != 'deterministic_structure_defect'
+            or source.get('surface') != 'document_shell'
+            or not all(source.get(flag) is False for flag in (
+                'material', 'safety_critical', 'contradiction',
+                'obscures_required_information', 'materially_unusable'))):
+        return None
+    return source
+
+
 def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_index: int) -> dict[str, Any] | None:
     """Bind an editorial correction to inventoried, generated display prose.
 
@@ -600,14 +613,20 @@ def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_inde
     if relative.is_absolute() or '..' in relative.parts or relative.parts[:1] != ('attempts',):
         return None
     attempt = revision_dir / relative
-    manifest = _read_json(attempt / 'attempt-manifest.json')
-    finding = manifest['findings'][finding_index]
-    source = finding.get('verification_source_finding') or finding
-    if (finding.get('recovery_class') != 'deterministic_structure_defect'
-            or source.get('surface') != 'document_shell'
-            or not all(source.get(flag) is False for flag in (
-                'material', 'safety_critical', 'contradiction',
-                'obscures_required_information', 'materially_unusable'))):
+    if attempt.is_symlink() or not attempt.resolve().is_relative_to(revision_dir.resolve()):
+        return None
+    try:
+        manifest = _read_json(attempt / 'attempt-manifest.json')
+    except (OSError, ValueError):
+        return None
+    findings = manifest.get('findings') if isinstance(manifest, Mapping) else None
+    if (not isinstance(findings, list) or not isinstance(finding_index, int)
+            or isinstance(finding_index, bool) or not 0 <= finding_index < len(findings)
+            or not isinstance(manifest.get('files'), Mapping)):
+        return None
+    finding = findings[finding_index]
+    source = _construction_finding_source(finding)
+    if source is None:
         return None
     artifact = str(finding.get('artifact') or '')
     section_id = f'{artifact}.shell'
@@ -618,18 +637,28 @@ def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_inde
         path = attempt / name
         if path.is_symlink() or not path.is_file() or sha256_file(path) != manifest['files'].get(name):
             return None
-    report = _read_json(attempt / 'candidate-build.json')['document_report']
-    matches = [item for row in report['artifacts'] if row['artifact'] == artifact
-               for item in row.get('construction_passages', [])
-               if item['text'] == passage and item['section_id'] == section_id]
+    try:
+        build = _read_json(attempt / 'candidate-build.json')
+    except (OSError, ValueError):
+        return None
+    report = build.get('document_report') if isinstance(build, Mapping) else None
+    rows = report.get('artifacts') if isinstance(report, Mapping) else None
+    if not isinstance(rows, list):
+        return None
+    matches = [item for row in rows if isinstance(row, Mapping) and row.get('artifact') == artifact
+               for item in (row.get('construction_passages') or []) if isinstance(item, Mapping)
+               and item.get('text') == passage and item.get('section_id') == section_id]
     # The exact passage must exist once in the retained native body, rather
     # than being a substring of a clause or a header/footer/table field.
     from docx import Document
     if len(matches) != 1 or sum(p.text == passage for p in Document(attempt / f'candidate/{artifact}.docx').paragraphs) != 1:
         return None
+    related = [dict(item) for item in findings if (other := _construction_finding_source(item)) is not None
+               and item.get('artifact') == artifact and item.get('target_ids') == [section_id]
+               and str(other.get('affected_passage') or '').strip() == passage]
     return {
         **matches[0], 'attempt_path': attempt_path, 'finding_index': finding_index,
-        'before': passage, 'finding': dict(finding),
+        'before': passage, 'finding': dict(finding), 'related_findings': related,
     }
 
 
@@ -679,7 +708,7 @@ def _construction_request_payload(
         'construction_repair': spec, 'approved_source': scoped, 'approved_input': _source_items(scoped),
         'section_contracts': [{'section_id': target, 'minimum_evidence': spec['source_paths'],
                                'allowed_modes': ['agent_draft'], 'fixed_boilerplate': []}],
-        'findings': [spec['finding']],
+        'findings': spec['related_findings'],
         'constraints': [
             'Correct only the exact before paragraph in construction_repair. Return exactly one paragraph for its section ID.',
             'Improve grammar or presentation without changing any approved fact, number, unit, qualification, negation or relationship.',

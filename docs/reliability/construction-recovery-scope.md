@@ -27,6 +27,9 @@ Input 01 pilot, under the varied-input reliability work in #89 and #90.
   display editor to three proposals per stable passage under the original
   Desktop deadline. A syntactically valid proposal that changes clinical meaning
   must fail fresh independent review. Preserve unsuccessful attempts.
+  Multiple findings on the same passage share one proposal containing all
+  eligible findings; count proposals rather than findings. Corrupt archived
+  provenance returns an integrity failure instead of interrupting ingestion.
 - After correction, rerender and complete fresh package-wide content and
   every-document, every-page reviews. Preserve atomic exact-byte delivery.
 - Cover all three branches and both ICF families using public generation,

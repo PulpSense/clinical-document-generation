@@ -45,7 +45,7 @@ def test_bare_approved_count_generates_complete_enrollment_sentence(tmp_path, mo
     assert sorted(p.name for p in (tmp_path / 'output').iterdir()) == sorted(workflow.document_set(branch))
 
 
-@pytest.mark.parametrize('repair_mode', ['faithful', 'eventual', 'unchanged', 'changed_quantity', 'changed_meaning', 'malformed'])
+@pytest.mark.parametrize('repair_mode', ['faithful', 'multiple_findings', 'eventual', 'unchanged', 'changed_quantity', 'changed_meaning', 'malformed'])
 def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_path, monkeypatch, repair_mode):
     source = source_for('Prospective', 'Sterling')
     source['population']['sample_size'] = '40 (planned)'
@@ -70,6 +70,9 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
                     'material': 'animals' in passage, 'safety_critical': False, 'contradiction': 'animals' in passage,
                     'obscures_required_information': False, 'materially_unusable': False,
                 }]
+                if repair_mode == 'multiple_findings':
+                    response['findings'] = [{**response['findings'][0], 'finding_id': f'enrollment-{i}',
+                                             'issue': f'Editorial concern {i} on this enrollment sentence.'} for i in range(4)]
                 for row in response['section_assessments']:
                     if row['section_id'] == 'icf.shell':
                         row['status'] = 'blocked'
@@ -80,6 +83,7 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
             repairs.append(request)
             response = drafting.response_template(request, model_id='Controlled construction editor')
             mode = ('unchanged' if len(repairs) == 1 else 'faithful') if repair_mode == 'eventual' else repair_mode
+            if mode == 'multiple_findings': mode = 'faithful'
             response['section_results'][0]['paragraphs'] = [{
                 'text': {
                     'faithful': 'The study is expected to include 40 participants (planned).',
@@ -96,7 +100,7 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
         return drafting.recorded_acceptance_response(request)
 
     result, revision = deliver(tmp_path, monkeypatch, source, review=review, draft=draft)
-    if repair_mode not in {'faithful', 'eventual'}:
+    if repair_mode not in {'faithful', 'multiple_findings', 'eventual'}:
         assert result['status'] != 'passed', result
         assert not result.get('client_outputs') and not (tmp_path / 'output/icf.docx').exists()
         assert len(repairs) <= 3
@@ -107,6 +111,7 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
         return
     assert result['status'] == 'passed', result
     assert len(repairs) == (2 if repair_mode == 'eventual' else 1)
+    if repair_mode == 'multiple_findings': assert len(repairs[0]['findings']) == 4
     assert len(reviews) == 2
     assert 'The study is expected to include 40 participants (planned).' in '\n'.join(
         p.text for p in Document(tmp_path / 'output/icf.docx').paragraphs)
@@ -118,10 +123,17 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
     # An on-disk correction is never trusted independently of its bound response.
     record_path = next((revision / 'hermes/accepted').glob('construction-*.json'))
     record = json.loads(record_path.read_text())
-    record['after'] = record['after'].replace('participants', 'animals')
-    record_path.write_text(json.dumps(record))
+    record_path.write_text(json.dumps({**record, 'after': record['after'].replace('participants', 'animals')}))
     errors = drafting.ingest_responses(revision, record['governing_resources'])
     assert any(row['category'] == 'request-integrity' for row in errors)
+    record_path.write_text(json.dumps(record))
+    archived_manifest = revision / repairs[0]['construction_repair']['attempt_path'] / 'attempt-manifest.json'
+    retained = json.loads(archived_manifest.read_text())
+    for broken in ([], [None], [{'verification_source_finding': 'invalid'}]):
+        archived_manifest.write_text(json.dumps({**retained, 'findings': broken}))
+        errors = drafting.ingest_responses(revision, record['governing_resources'])
+        assert any(row['category'] == 'request-integrity' for row in errors)
+    archived_manifest.write_text(json.dumps(retained))
 
 
 def test_unrelated_document_change_does_not_count_as_localized_shell_progress(tmp_path, monkeypatch):

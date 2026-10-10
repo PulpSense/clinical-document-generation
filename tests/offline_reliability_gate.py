@@ -79,7 +79,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 'interpreted_schedule_reference', 'document_table_reference',
                 'source_routing_obligations', '_bound_source_routing_obligations', 'source_routing_assessment_errors',
                 '_format_value', '_parse_value',
-                'construction_repair_spec', 'construction_retry_spec',
+                '_construction_finding_source', 'construction_repair_spec', 'construction_retry_spec',
                 '_construction_request_payload', 'create_construction_repair_request',
                 '_request_matches_approved_reference', '_template_document',
                 '_apply_pending_recovery_plan',
