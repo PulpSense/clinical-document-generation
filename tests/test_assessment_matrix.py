@@ -101,12 +101,14 @@ def test_unknown_matrix_cell_is_not_interpreted_as_a_visit_assignment(value):
     assert drafting.section_evidence_value('icf.procedures', 'procedures.assessments', raw) == raw
 
 
-def test_missing_clinical_distance_in_real_visit_draft_still_blocks():
+def test_missing_clinical_distance_remains_a_required_independent_review_caution():
     case = copy.deepcopy(CASES[-1])
     for paragraph in case['response']['section_results'][0]['paragraphs']:
         paragraph['text'] = paragraph['text'].replace('66 cm', 'far away')
     accepted, findings = drafting.validate_response(case['request'], case['response'])
-    assert findings and not accepted['drafts']
+    assert accepted['drafts']
+    assert any(row.get('code') == 'lexical-evidence-uncertainty' for row in findings)
+    assert accepted['drafts'][0]['warnings'] == findings
 
 
 def test_explicit_visit_inventory_order_survives_sorted_matrix_keys():

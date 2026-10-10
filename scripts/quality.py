@@ -37,6 +37,8 @@ from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUN
 from drafting import accepted_cross_section_duplicate_findings, evidence_coverage_finding, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
+from contracts import benefit_context_contract, document_table_reference, source_text_values
+from drafting import merged_drafts
 
 
 def _review_evidence_finding(artifact: str, section_id: str) -> dict[str, Any]:
@@ -4704,7 +4706,9 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
         ]
 
     contracted_section_ids = {section.section_id for section in sections}
-    for table_id, table_contract in protocol_table_contracts(reference).items():
+    table_reference = document_table_reference(reference, merged_drafts(
+        revision_dir, reference, governing_resources(Path(__file__).resolve().parents[1], reference)))
+    for table_id, table_contract in protocol_table_contracts(table_reference).items():
         if branch == "Retrospective" or table_contract["section_id"] not in contracted_section_ids:
             continue
         expected_rows = [
@@ -5098,6 +5102,92 @@ def semantic_evidence_inventory(reference: Mapping[str, Any]) -> list[dict[str, 
     return list(records.values())
 
 
+def source_routing_obligations(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Audit raw evidence against destinations, independent of accepted projections."""
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    obligations = []
+    procedures = {path: get_path(reference, path) for path in (
+        "procedures.assessments", "procedures.evaluation", "procedures.visit_schedule",
+        "procedures.visit_schedule_table") if meaningful(get_path(reference, path))}
+    targets = ([('protocol', 'study-procedure.enrollment')] if branch == 'Retrospective'
+               else [('protocol', 'study-procedure.visits'), ('protocol', 'evaluation-procedures'),
+                     ('icf', 'icf.procedures')])
+    if procedures:
+        obligations.extend({"obligation_id": f"visit-relationships:{artifact}:{section}",
+                            "kind": "visit_relationships", "artifact": artifact,
+                            "section_id": section, "source_values": procedures}
+                           for artifact, section in targets)
+    benefit_targets = ([('protocol', 'ethics')] if branch == 'Retrospective'
+                       else [('protocol', 'risks-benefits.benefits'), ('icf', 'icf.benefits')])
+    for artifact, section in benefit_targets:
+        if benefit_context_contract(reference, section):
+            obligations.append({"obligation_id": f"benefit-context:{artifact}:{section}",
+                                "kind": "benefit_context", "artifact": artifact,
+                                "section_id": section, "source_values": {
+                                    "study.background": get_path(reference, "study.background"),
+                                    "risks_benefits.benefits": get_path(reference, "risks_benefits.benefits")}})
+    return obligations
+
+
+def _bound_source_routing_obligations(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
+    obligations = []
+    for item in source_routing_obligations(reference):
+        path = revision_dir / f"candidate/{item['artifact']}.docx"
+        if path.is_file():
+            passage = rendered_section_snapshot(path, item["section_id"])
+            if not _review_evidence_text(passage).strip():
+                raise ReviewEvidenceError(item["artifact"], item["section_id"])
+            obligations.append({**item, "artifact_passage": passage})
+    return obligations
+
+
+def source_routing_assessment_errors(request: Mapping[str, Any], response: Mapping[str, Any]) -> list[str]:
+    """Require explicit, source- and destination-grounded independent decisions."""
+    expected = {row["obligation_id"]: row for row in request.get("source_routing_obligations", [])}
+    rows = response.get("source_routing_assessments", [])
+    if (not isinstance(rows, list) or any(not isinstance(row, Mapping) for row in rows)
+            or any(not isinstance(row.get("obligation_id"), str) for row in rows)
+            or len(rows) != len(expected) or {row.get("obligation_id") for row in rows} != set(expected)):
+        return ["Every source-routing obligation needs exactly one independent assessment."]
+    errors = []
+    for row in rows:
+        obligation = expected[row["obligation_id"]]
+        passage = _review_evidence_text(obligation["artifact_passage"])
+        facts = row.get("facts")
+        if (row.get("status") not in {"passed", "failed"}
+                or not isinstance(row.get("rationale"), str) or not row["rationale"].strip()
+                or not isinstance(facts, list) or not facts):
+            errors.append(f"{row['obligation_id']} requires status, rationale and a fact-by-fact routing audit.")
+            continue
+        for fact in facts:
+            if not isinstance(fact, Mapping):
+                errors.append("Source-routing facts must be objects.")
+                continue
+            excerpt, observed = fact.get("source_excerpt"), fact.get("affected_passage")
+            source_path = fact.get("source_path")
+            if (not isinstance(source_path, str) or source_path not in obligation["source_values"]
+                    or not isinstance(excerpt, str) or not excerpt.strip()
+                    or not any(excerpt in text for text in source_text_values(obligation["source_values"].get(source_path)))
+                    or not isinstance(observed, str) or not observed.strip() or observed not in passage
+                    or fact.get("disposition") not in {"preserved", "not_applicable", "defect"}):
+                errors.append(f"{row['obligation_id']} must quote exact raw source and this destination's actual passage.")
+        reported = response.get("findings")
+        sections = response.get("section_assessments")
+        companion = any(isinstance(item.get("target_ids"), list)
+                        and item.get("artifact") == obligation["artifact"]
+                        and obligation["section_id"] in item.get("target_ids", [])
+                        for item in reported if isinstance(item, Mapping)) if isinstance(reported, list) else False
+        section_passed = any(item.get("artifact") == obligation["artifact"]
+                             and item.get("section_id") == obligation["section_id"]
+                             and item.get("status") == "passed"
+                             for item in sections if isinstance(item, Mapping)) if isinstance(sections, list) else False
+        defects = any(isinstance(fact, Mapping) and fact.get("disposition") == "defect" for fact in facts)
+        if (row["status"] == "passed" and (not section_passed or defects or companion)
+                or row["status"] == "failed" and (not companion or not defects)):
+            errors.append(f"{row['obligation_id']} contradicts the section decision or lacks its repair finding.")
+    return errors
+
+
 def _source_field_inventory(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Inventory supplied leaves directly, independent of drafting/table mappings."""
     inventory: list[dict[str, Any]] = []
@@ -5226,6 +5316,7 @@ def verification_recovery_request_findings(
             or list(request.get("checks") or []) != list(CONTENT_CHECKS)
             or list(request.get("cross_document_checks") or []) != expected_cross_document_checks
             or request.get("semantic_evidence") != semantic_evidence_inventory(reference)
+            or request.get("source_routing_obligations") != _bound_source_routing_obligations(revision_dir, reference)
             or request.get("approved_source") != reference
         ):
             return issue("verification_request_incomplete_scope", "The declared content verification request is not the unique complete package-wide request for the current branch and review set.")
@@ -5515,7 +5606,25 @@ def create_verification_requests(
         "target_ids, contradiction true for changed meaning, and exact source/passage evidence. A recognized "
         "semantic defect is blocking; do not recategorize it as an ordinary substantive warning. "
         "Audit each supplied source field in source_field_inventory against its applicable document surfaces, "
-        "not only accepted drafts or protocol_table_contracts. In activity-by-visit source matrices, X or other "
+        "not only accepted drafts or protocol_table_contracts. Return source_routing_assessments with exactly "
+        "one row per source_routing_obligations entry: obligation_id, status (passed/failed), rationale, "
+        "and nonempty facts. Independently enumerate ALL material relationships or benefit clauses from the "
+        "raw source_values, including conditions, exclusions, historical context, qualified possibilities "
+        "and statements of no guaranteed benefit. Each fact needs source_path, source_excerpt (exact quotation), "
+        "affected_passage (exact quotation from this obligation's artifact_passage), and disposition "
+        "preserved, not_applicable, or defect. Explain nonapplicable clinical context in rationale; do not "
+        "use an empty benefits field as evidence that the background states no benefit. General knowledge-gain "
+        "boilerplate does not preserve a supplied study-specific qualified possibility. Historical findings "
+        "are not guaranteed participant benefits, especially in retrospective record review. "
+        "For visit_relationships, verify every explicit activity-to-visit assignment in prose, lists, or "
+        "matrices against this destination, including blanks, conditions and time windows. A one-cell prose "
+        "inventory is insufficient for the evaluation-procedures table when the source explicitly allocates "
+        "activities to visits. Truly unallocated facts may remain notes. Do not trust a generated table merely "
+        "because it matches its own projection. A mapping or routing defect requires a failed assessment "
+        "and content/source_supported finding on the destination target, surface source_interpretation, "
+        "with exact source and observed passage evidence; route it to drafting, not unchanged table construction. "
+        "Only assembly differences from an otherwise correct interpretation use surface table. "
+        "In activity-by-visit source matrices, X or other "
         "declared binary marks encode activity-to-visit relationships; verify those relationships in the schedule "
         "tables and clinical prose rather than requiring marker glyphs in prose. Blank cells do not assign an "
         "activity to that visit; retain unallocated activity requirements as notes without inventing assignments. "
@@ -5600,6 +5709,7 @@ def create_verification_requests(
         "artifacts": content_files,
         "approved_source": reference,
         "source_field_inventory": _source_field_inventory(reference),
+        "source_routing_obligations": _bound_source_routing_obligations(revision_dir, reference),
         "semantic_evidence": semantic_evidence_inventory(reference),
         "protocol_concept_ownership": protocol_concept_ownership(branch),
         "authorized_boilerplate": authorized_boilerplate,
@@ -6651,6 +6761,14 @@ def validate_verifications(
                 "code": "uncertainty_resolution_invalid", "target_ids": [verification_target],
                 "verification_request_id": request["request_id"], "issue": message,
             }, "verifier_transient") for message in resolution_errors)
+            routing_errors = source_routing_assessment_errors(request, response)
+            findings.extend(recovery_finding({
+                "category": "verification", "field": "source_routing_assessments",
+                "code": "source_routing_assessment_invalid", "target_ids": [verification_target],
+                "publication_disposition": "blocking",
+                "verification_request_id": request["request_id"], "issue": message,
+            }, "verifier_transient") for message in routing_errors)
+            resolution_errors.extend(routing_errors)
         if not resolution_errors:
             for decision in resolution_records:
                 if decision["disposition"] != "source_clarification":
@@ -6664,6 +6782,8 @@ def validate_verifications(
                         finding["source_resolution"] = decision
         evidence[evidence_key] = {
             "uncertainty_resolutions": resolution_records if not resolution_errors else [],
+            "source_routing_assessments": (response.get("source_routing_assessments", [])
+                                           if not resolution_errors else []),
             "task": request.get("task"),
             "request_id": request.get("request_id"),
             "review_set": request.get("review_set"),

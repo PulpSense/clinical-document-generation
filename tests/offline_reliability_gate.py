@@ -31,6 +31,7 @@ TEST_FILES = (
     'test_editorial_publication.py', 'test_phase1_repetition.py',
     'test_contextual_output_fixes.py',
     'test_bibliographic_evidence.py', 'test_clean_delivery.py', 'test_general_delivery_reliability.py',
+    'test_source_routing.py',
 )
 
 
@@ -72,6 +73,10 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_accepted_drafting_warnings', '_render_warnings',
                 'renderers',
                 'semantic_evidence_inventory', '_source_field_inventory', 'create_verification_requests',
+                'source_text_values', 'schedule_interpretation_contract', 'benefit_context_contract',
+                'interpreted_schedule_reference', 'document_table_reference',
+                'source_routing_obligations', '_bound_source_routing_obligations', 'source_routing_assessment_errors',
+                '_format_value', '_parse_value',
             }
             if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:
                 continue

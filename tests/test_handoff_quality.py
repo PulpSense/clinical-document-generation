@@ -205,6 +205,16 @@ def acceptance_verification(request):
             "affected_passage": first_text(item["artifact_passage"]),
             "rationale": "Controlled fixture reviewer accepts this source-grounded variation.",
         } for item in request.get("lexical_review_cautions", [])]
+        response["source_routing_assessments"] = [{
+            "obligation_id": item["obligation_id"], "status": "passed",
+            "rationale": "Controlled reviewer double; this is not independent clinical evidence.",
+            "facts": [{"source_path": path,
+                       "source_excerpt": first_text(value),
+                       "affected_passage": first_text(item["artifact_passage"]),
+                       "disposition": "preserved"}]
+        } for item in request.get("source_routing_obligations", [])
+          for path, value in [next((path, value) for path, value in item["source_values"].items()
+                                  if first_text(value))]]
         response["section_assessments"] = [
             {
                 "artifact": item["artifact"],
@@ -248,7 +258,7 @@ def bound_visual_case(revision_dir: Path, page_numbers=(1,)):
         "pages": pages,
     }
     paths = create_verification_requests(
-        revision_dir, fixture(),
+        revision_dir, {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}},
         {"renderer": {"kind": "test"}, "page_renderer": {"kind": "test"}, "artifacts": [artifact]},
     )
     path = next(path for path in paths if "verify.visual.protocol" in path.name)
@@ -309,6 +319,7 @@ def test_retry_guidance_identifies_the_uncited_paragraph_and_allowed_references(
     request = json.loads(request_path.read_text(encoding="utf-8"))
     response = response_template(request, model_id="Hermes reproduction")
     result = response["section_results"][0]
+    result["schedule_interpretation"] = recorded_acceptance_response(request)["section_results"][0]["schedule_interpretation"]
     result["paragraphs"] = [{
         "text": "The Schedule of Assessments includes the following approved visits, monitoring periods, contacts, and procedures.",
         "evidence_refs": [],
@@ -444,7 +455,7 @@ def test_safety_analysis_does_not_offer_an_efficacy_only_plan_as_evidence(tmp_pa
     assert "statistics.analysis_plan" not in contract["minimum_evidence"]
 
 
-def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_missing_facts(tmp_path):
+def test_long_approved_sections_require_independent_review_of_missing_context(tmp_path):
     reference = fixture()
     reference["study"]["background"] = " ".join(
         f"approved-background-detail-{index}" for index in range(120)
@@ -477,14 +488,15 @@ def test_long_approved_sections_receive_a_soft_depth_signal_but_fail_only_on_mis
     }]
     introduction["lists"] = []
 
-    _accepted, findings = validate_response(request, response)
+    accepted, findings = validate_response(request, response)
 
     assert not any("source-proportional detail" in item.get("issue", "") for item in findings)
     assert any(
         item.get("field") == "introduction"
-        and "concrete clinical context" in item.get("issue", "")
+        and item.get("code") == "lexical-evidence-uncertainty"
         for item in findings
     )
+    assert accepted["drafts"]
 
 
 def test_governed_drafting_response_retains_repetition_for_meaning_review(tmp_path):
@@ -1327,11 +1339,7 @@ def test_complete_bundle_is_part_of_governing_resources():
 
 
 def test_content_verifier_receives_authorized_boilerplate_and_blank_field_policy(tmp_path):
-    candidate = tmp_path / "candidate"
-    candidate.mkdir()
-    for name in ("protocol.docx", "icf.docx", "study.xml"):
-        (candidate / name).write_bytes(b"candidate")
-
+    # Request-policy scope can be tested before candidates are constructed.
     paths = create_verification_requests(tmp_path, fixture(), {"renderer": {}, "artifacts": []})
     content_path = next(path for path in paths if json.loads(path.read_text())["task"] == "clinical_content_verification")
     request = json.loads(content_path.read_text(encoding="utf-8"))
@@ -1363,11 +1371,6 @@ def test_content_verifier_scope_matches_optional_source_sections(
         reference["design"].pop("assignment_method", None)
     else:
         reference["design"]["assignment_method"] = assignment_method
-    candidate = tmp_path / "candidate"
-    candidate.mkdir()
-    for name in ("protocol.docx", "icf.docx", "study.xml"):
-        (candidate / name).write_bytes(b"candidate")
-
     paths = create_verification_requests(
         tmp_path,
         reference,
@@ -1425,7 +1428,8 @@ def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path
         "artifacts": artifacts,
     }
 
-    paths = create_verification_requests(tmp_path, fixture(), render_report)
+    # This fixture exercises visual artifact binding, not clinical source routing.
+    paths = create_verification_requests(tmp_path, {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}, render_report)
     requests = [json.loads(path.read_text(encoding="utf-8")) for path in paths]
     visual = [item for item in requests if item["task"] == "rendered_page_visual_verification"]
 
@@ -1459,7 +1463,7 @@ def test_visual_verification_is_split_by_document_for_concurrent_review(tmp_path
     protocol_artifact["pages"][0]["sha256"] = hashlib.sha256(protocol_page.read_bytes()).hexdigest()
 
     with pytest.raises(ValueError, match="identity collision"):
-        create_verification_requests(tmp_path, fixture(), render_report)
+        create_verification_requests(tmp_path, {"meta": {"study_type": "Prospective", "icf_template": "Advarra"}}, render_report)
     assert all((tmp_path / item["response_path"]).is_file() for item in requests)
 
 

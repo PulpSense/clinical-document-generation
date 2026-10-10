@@ -797,7 +797,7 @@ def batch_plan(study_type: str, icf_template: str = "Advarra") -> tuple[BatchSpe
     for batch_id, families in (
         ("protocol-foundations", ("study", "objectives", "population", "design", "endpoints", "procedures", "statistics")),
         ("protocol-operations", ("study", "procedures", "population", "design", "endpoints", "risks_benefits", "safety")),
-        ("protocol-analysis-and-oversight", ("statistics", "safety", "ethics", "confidentiality", "risks_benefits", "endpoints", "procedures", "population", "parties")),
+        ("protocol-analysis-and-oversight", ("study", "statistics", "safety", "ethics", "confidentiality", "risks_benefits", "endpoints", "procedures", "population", "parties")),
     ):
         plans.append(BatchSpec(batch_id, "protocol", tuple(s.section_id for s in sections if s.batch_id == batch_id), families))
     if branch != "Retrospective":
@@ -1673,6 +1673,178 @@ def sterling_draft_word_budget(reference: Mapping[str, Any], section_id: str) ->
     return max(1, maximum - len(re.findall(r"[a-z0-9]+", reserved.casefold())))
 
 
+def source_text_values(value: Any) -> list[str]:
+    """Flatten source text for exact quotation checks, without interpreting meaning."""
+    if isinstance(value, Mapping):
+        return [text for child in value.values() for text in source_text_values(child)]
+    if isinstance(value, list):
+        return [text for child in value for text in source_text_values(child)]
+    return [value.strip()] if isinstance(value, str) and value.strip() else []
+
+
+def schedule_interpretation_contract(reference: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Offer model interpretation of narrative assessments; never parse clinical meaning."""
+    if canonical_study_type(get_path(reference, "meta.study_type")) == "Retrospective":
+        return None
+    visits = normalized_visit_records(reference)
+    sources = {}
+    for path in ("procedures.assessments", "procedures.evaluation",
+                 "procedures.visit_schedule", "procedures.visit_schedule_table"):
+        value = get_path(reference, path)
+        narrative = ([item for item in value if isinstance(item, str) and item.strip()]
+                     if isinstance(value, list)
+                     else value if isinstance(value, str) else None)
+        if source_text_values(narrative):
+            sources[path] = narrative
+    if not sources:
+        return None
+    schedule_items = [{"source_path": path, "source_index": index, "source_excerpt": value}
+                      for path in sources if path in {"procedures.visit_schedule", "procedures.visit_schedule_table"}
+                      for raw in [get_path(reference, path)] if isinstance(raw, list)
+                      for index, value in enumerate(raw) if isinstance(value, str) and value.strip()]
+    return {"sources": sources, "schedule_items": schedule_items, "visits": [row["visit"] for row in visits],
+            "visit_records": [{key: row.get(key) for key in ("visit", "visitNumber", "timing")} for row in visits],
+            "instructions": (
+                "Return schedule_interpretation with assignments, unallocated, and rationale. "
+                "Each assignment has visit (exact approved label), activity (an exact source phrase), "
+                "source_path, and source_excerpt (an exact contiguous quotation supporting that relationship). "
+                "When labels repeat, supply visit_number from visit_records to identify the exact contact. "
+                "Schedule list strings may be contact labels or prose. For each prose item, return "
+                "narrative_items with exact source_path, source_index and whole source_excerpt from "
+                "schedule_items. Only selected strings are removed from the display contact inventory; "
+                "typed rows and unselected contact labels remain. Selection alone does not preserve "
+                "its facts: map or retain each selected item's facts as unallocated. "
+                "If a contact is explicitly stated in narrative but absent from the separate inventory, "
+                "declare it in visits with visit, optional timing, source_path and source_excerpt; both "
+                "label and any timing must be exact source phrases. Never turn an activity into a visit. "
+                "Map every explicitly assigned activity, preserving quantities, conditions and exceptions. "
+                "Do not infer timing, assign every activity to every visit, or invent a contact. "
+                "Each unallocated item has source_path and source_excerpt; retain every remaining material "
+                "fact or genuinely ambiguous relationship there. An empty assignments list is valid only "
+                "when no explicit relationship is supplied; retain all source text as unallocated then. "
+                "Existing structured relationships remain authoritative. This is a derived display "
+                "interpretation, not an edit or new fact in the approved source.")}
+
+
+def benefit_context_contract(reference: Mapping[str, Any], section_id: str) -> dict[str, Any] | None:
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    targets = {"ethics"} if branch == "Retrospective" else {"risks-benefits.benefits", "icf.benefits"}
+    background = get_path(reference, "study.background")
+    if section_id not in targets or not source_text_values(background):
+        return None
+    return {"source_path": "study.background", "value": background,
+            "instructions": (
+                "Inspect the whole background for source-supported potential benefits applicable to this "
+                "study, even when risks_benefits.benefits is empty. Return benefit_interpretation with "
+                "potential_benefits (source_path/source_excerpt exact quotation pairs) and rationale. "
+                "Preserve each applicable qualified possibility in this section, with uncertainty and no "
+                "guarantee of personal benefit. Historical evidence about other studies or treatments is "
+                "context, not proof of this study's benefit; never turn a hypothetical advantage into an "
+                "established result. Retrospective record review must not promise treatment benefit. "
+                "If no applicable benefit is stated, return an empty list and explain why; use authorized "
+                "fallback wording without inventing a benefit or requesting optional input.")}
+
+
+def interpreted_schedule_reference(reference: Mapping[str, Any], interpretation: Any) -> dict[str, Any]:
+    """Validate an extractive model mapping and return a separate display projection."""
+    contract = schedule_interpretation_contract(reference)
+    if not contract or not isinstance(interpretation, Mapping):
+        raise ValueError("Schedule interpretation has no authorized narrative source.")
+    assignments, unallocated = interpretation.get("assignments"), interpretation.get("unallocated")
+    if (not isinstance(assignments, list) or not isinstance(unallocated, list)
+            or not isinstance(interpretation.get("rationale"), str) or not interpretation["rationale"].strip()):
+        raise ValueError("Schedule interpretation requires assignments, unallocated and rationale.")
+    narrative_items = interpretation.get("narrative_items", [])
+    if (not isinstance(narrative_items, list) or any(not isinstance(item, Mapping) for item in narrative_items)
+            or any(type(item.get("source_index")) is not int for item in narrative_items)
+            or any(dict(item) not in contract["schedule_items"] for item in narrative_items)):
+        raise ValueError("Narrative schedule selections must identify exact whole string items by source field and index; typed rows cannot be replaced.")
+    inventory_reference = copy.deepcopy(dict(reference))
+    for path in {item["source_path"] for item in narrative_items}:
+        selected = {item["source_index"] for item in narrative_items if item["source_path"] == path}
+        inventory_reference["procedures"][path.split(".")[-1]] = [
+            item for index, item in enumerate(get_path(reference, path)) if index not in selected]
+    visits = normalized_visit_records(inventory_reference)
+    # Filtering display prose must not renumber surviving approved contacts.
+    originals = copy.deepcopy(normalized_visit_records(reference))
+    for visit in visits:
+        match = next((row for row in originals if all(row.get(key) == value
+                     for key, value in visit.items() if key != "visitNumber")), None)
+        if match is not None:
+            visit["visitNumber"] = match["visitNumber"]
+            originals.remove(match)
+    declared_visits = interpretation.get("visits", [])
+    if not isinstance(declared_visits, list):
+        raise ValueError("Declared source contacts must be a list.")
+    used_sources: set[str] = set()
+    for record in [*assignments, *unallocated, *declared_visits]:
+        if not isinstance(record, Mapping):
+            raise ValueError("Schedule interpretation entries must be objects.")
+        path, excerpt = record.get("source_path"), record.get("source_excerpt")
+        if (not isinstance(path, str) or path not in contract["sources"]
+                or not isinstance(excerpt, str) or not excerpt.strip()
+                or not any(excerpt in text for text in source_text_values(contract["sources"][path]))):
+            raise ValueError("Schedule interpretation must quote its exact approved source.")
+        used_sources.add(path)
+    for record in declared_visits:
+        label, timing = record.get("visit"), record.get("timing", "")
+        if (not isinstance(label, str) or not label.strip() or label not in record["source_excerpt"]
+                or any(row["visit"] == label for row in visits)
+                or not isinstance(timing, str) or timing and timing not in record["source_excerpt"]):
+            raise ValueError("A declared contact and its timing must be exact source phrases, without duplicating an approved contact.")
+        number = 1
+        while str(number) in {str(row["visitNumber"]) for row in visits}:
+            number += 1
+        visits.append({"visit": label, "timing": timing, "visitNumber": str(number), "procedures": []})
+    for record in assignments:
+        visit, activity = record.get("visit"), record.get("activity")
+        matches = [row for row in visits if row["visit"] == visit
+                   and ("visit_number" not in record or str(row["visitNumber"]) == str(record["visit_number"]))]
+        if (len(matches) != 1 or not isinstance(activity, str) or not activity.strip()
+                or activity not in record["source_excerpt"]):
+            raise ValueError("Schedule assignment needs one approved visit and an exact source activity.")
+        if activity not in matches[0]["procedures"]:
+            matches[0]["procedures"].append(activity)
+    required_values = {path: value for path, value in contract["sources"].items()
+                       if path in {"procedures.assessments", "procedures.evaluation"}
+                       or isinstance(get_path(reference, path), str)}
+    for item in narrative_items:
+        required_values.setdefault(item["source_path"], []).append(item["source_excerpt"])
+    if not set(required_values) <= used_sources or any(
+        not any(record["source_path"] == path and record["source_excerpt"] in text
+                for record in [*assignments, *unallocated])
+        for path, value in required_values.items() for text in source_text_values(value)
+    ):
+        raise ValueError("Every supplied narrative assessment field needs a mapping or an unallocated disposition.")
+    projected = copy.deepcopy(dict(reference))
+    procedures = projected.setdefault("procedures", {})
+    schedule_notes = []
+    for path in contract["sources"]:
+        key = path.split(".")[-1]
+        notes = [record["source_excerpt"] for record in unallocated if record["source_path"] == path]
+        if key in {"visit_schedule", "visit_schedule_table"}:
+            schedule_notes.extend(notes)
+            continue
+        original = procedures.get(key)
+        retained = [item for item in original if not isinstance(item, str)] if isinstance(original, list) else []
+        procedures[key] = retained + notes
+    if schedule_notes:
+        original = procedures.get("assessments")
+        retained = original if isinstance(original, list) else [original] if meaningful(original) else []
+        procedures["assessments"] = retained + schedule_notes
+    procedures["visit_schedule_table"] = visits
+    procedures["visit_schedule"] = visits
+    return projected
+
+
+def document_table_reference(reference: Mapping[str, Any], model: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Select the authenticated draft's display mapping; approval stays immutable."""
+    for section in model.get("protocol", []):
+        if section.get("section_id") == "evaluation-procedures" and section.get("schedule_interpretation") is not None:
+            return interpreted_schedule_reference(reference, section["schedule_interpretation"])
+    return reference
+
+
 def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
     """Return typed, source-derived Protocol table matrices for rendering and QA."""
     visits = normalized_visit_records(reference)
@@ -1901,6 +2073,10 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
          *[[note] * detail_columns for note in supplemental_notes]]
         if supplemental_notes else []
     )
+    # Table label presentation is shared by renderer and deterministic audit.
+    for row in assessment_rows[2 if matrix else 1:]:
+        if row and row[0]:
+            row[0] = row[0][0].upper() + row[0][1:]
     return {
         "schedule-of-assessments": {
             "section_id": "evaluation-procedures",
@@ -2751,6 +2927,11 @@ def _format_value(value: Any) -> str:
         return ""
     if isinstance(value, list) and all(isinstance(item, Mapping) for item in value):
         return _table(value)
+    if (isinstance(value, list) and any(isinstance(item, Mapping) for item in value)
+            and all(isinstance(item, (str, Mapping)) for item in value)):
+        rows = [{"entry_type": "record", "record": item} if isinstance(item, Mapping)
+                else {"entry_type": "text", "text": item} for item in value]
+        return "<!-- mixed-record-list:v1 -->\n" + _table(rows)
     if isinstance(value, list):
         return "\n".join(f"- {item}" for item in value)
     return str(value)
@@ -2786,7 +2967,7 @@ def source_truth_markdown(reference: Mapping[str, Any]) -> str:
         "",
         f"Preview only (do not edit): {title}",
         "",
-        "Edit only values inside the marked field blocks below. Lists use Markdown bullets and repeated records use Markdown tables.",
+        "Edit only values inside the marked field blocks below. Lists use Markdown bullets and repeated records use Markdown tables. Mixed record/text lists use typed tables: preserve their marker and entry_type column (record or text).",
         "",
         "## Editable Study Inputs Start Here",
         "",
@@ -2807,6 +2988,17 @@ def _parse_value(text: str) -> Any:
     value = text.strip()
     if not value:
         return None
+    marker = "<!-- mixed-record-list:v1 -->"
+    if value.startswith(marker):
+        rows = _parse_value(value[len(marker):])
+        if not isinstance(rows, list) or any(
+            not isinstance(row, Mapping) or row.get("entry_type") not in {"record", "text"}
+            or row["entry_type"] == "record" and not isinstance(row.get("record"), Mapping)
+            or row["entry_type"] == "text" and not isinstance(row.get("text"), str)
+            for row in rows
+        ):
+            raise ValueError("Mixed source lists require typed record or text rows; preserve the entry_type column.")
+        return [row["record"] if row["entry_type"] == "record" else row["text"] for row in rows]
     lines = [line.rstrip() for line in value.splitlines() if line.strip()]
     if len(lines) >= 2 and lines[0].lstrip().startswith("|") and re.match(r"^\|?\s*:?-+", lines[1]):
         columns = _split_table_line(lines[0])

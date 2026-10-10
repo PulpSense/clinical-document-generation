@@ -56,3 +56,27 @@ Installation checks, Linux dependencies, independent content and every-page
 reviews are unchanged. Fresh, separately authorized Linux Hermes runs with
 varied inputs remain necessary before claiming measured production reliability.
 The full suite and paid certification are not part of this focused change.
+
+Source routing now has behavioral coverage in `tests/test_source_routing.py`.
+All three branches and both applicable consent families exercise the public
+approval, drafting, rendering, independent-response validation and delivery path.
+Literal authored expectations cover prose and lists, alternate scalar schedule
+fields, mixed structured visits,
+explicit contacts without a separate inventory, repeated contact labels,
+unallocated conditions and qualified background benefits. Model interpretation
+remains outside Python. Source quotations, approved visit identity and retained
+structured rows constrain a separate display projection; the approved source
+bytes never change. Legacy approvals may supply explicit relationships in prose;
+ambiguous relationships remain notes, consistent with ADR 0012.
+The editable approval surface also preserves mixed record/text lists as typed
+tables rather than stringifying record objects into narrative text.
+
+The final content reviewer must audit raw facts against their intended artifact
+sections, not accept agreement with a generated projection as proof. Each routing
+assessment retains exact source and destination quotations. Missing or malformed
+assessments retry verification; clinical omissions retry the responsible drafting
+section. A public regression supplies a structurally valid but incomplete mapping,
+then verifies correction, changed artifact bytes and a fresh independent review.
+Recovery measures the rendered table projection rather than interpretation
+rationale or response metadata. These controlled tests do not measure fresh model
+judgment or guarantee successful delivery for every possible input.

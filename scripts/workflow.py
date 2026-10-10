@@ -45,6 +45,7 @@ from drafting import governing_resources, ingest_responses, invalidate_accepted_
 from prs_xml import generate as generate_xml
 from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
+from contracts import document_table_reference, protocol_table_contracts
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -7225,6 +7226,13 @@ def _recovery_action_observation(
                     "paragraphs": payload.get("paragraphs") or [],
                     "lists": payload.get("lists") or [],
                 }
+                if payload.get("schedule_interpretation") is not None:
+                    table_reference = document_table_reference(
+                        _read(revision_dir / "approved-reference.json"), {"protocol": [payload]})
+                    table = protocol_table_contracts(table_reference)["schedule-of-assessments"]
+                    semantic["schedule_table"] = {
+                        key: table[key] for key in ("rows", "detail_rows")
+                    }
             else:
                 semantic = payload
             key = f"{path.relative_to(revision_dir).as_posix()}#{target}"

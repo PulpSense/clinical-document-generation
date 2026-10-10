@@ -466,6 +466,32 @@ timing, and values before release.
   atomic-delivery, or exhausted bounded parent-response validation failure
   terminates the post-approval operation without client outputs.
 
+### Source interpretation during drafting
+
+Each worker must satisfy the source interpretation contracts in its section
+request. For `evaluation-procedures`, return `schedule_interpretation` when
+requested: map every explicit activity-to-visit relationship with exact source
+quotations, retain unallocated or ambiguous facts as notes, and preserve existing
+structured rows. Declare a contact absent from a legacy visit inventory only
+when its name and timing are explicitly quoted from approved narrative. Never
+invent a visit, infer an assignment, or change the approved source. Python uses
+the accepted mapping for display construction; the independent reviewer checks
+its meaning and completeness against the unchanged raw approved fields.
+
+For schedule lists mixing contact labels with prose, use `narrative_items` to
+identify each prose string by its exact field, list index and whole quotation.
+Interpret its relationships or retain its facts as notes. Preserve typed rows
+and genuine contact labels; a narrative sentence must not become a visit column.
+
+For a section with `benefit_context`, return `benefit_interpretation` and inspect
+the supplied background even when the dedicated benefits field is empty. Route
+applicable qualified possibilities to Protocol benefits and ICF benefits, or
+the Retrospective ethics section as appropriate. Preserve uncertainty and the
+absence of guaranteed personal benefit. Historical treatment results do not
+establish benefit from this study; record review must not promise treatment
+benefit. An explained empty interpretation is valid when no benefit applies.
+This interpretation is internal evidence, never diagnostic prose in a document.
+
 ## Independent verification
 
 After rendering, `generate` returns one package-wide content request plus one
@@ -474,6 +500,16 @@ concurrently so every-page image inspection stays off the serial critical path:
 
 - `clinical_content_verification`: checks source fidelity, every required section, unsupported claims, cross-document consistency, and participant-facing ICF language.
 - `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
+
+The content reviewer must complete `source_routing_assessments` for every bound
+obligation, enumerating material facts from raw source and quoting their actual
+destination passages. A projection matching itself or a bare section pass is
+insufficient. Check prose, list, and matrix representations, explicit visit
+assignments, qualifications, historical context and source-supplied potential
+benefits. Route an interpretation omission to its drafting section with
+`surface: source_interpretation`; reserve `surface: table` for construction
+that differs from an otherwise correct interpretation. Repairs must be rendered
+and independently reviewed again before publication.
 
 The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery. Before any content or visual response can become terminal, complete, recovery, or publication evidence, the workflow authenticates the exact request bytes and canonical payload hash against its workflow-owned request ledger; request or response self-declarations never establish authority.
 

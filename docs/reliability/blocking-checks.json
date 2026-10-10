@@ -191,6 +191,27 @@
           "test_atomic_delivery.py::test_publish_rejects_changed_bytes_after_evidence_and_preserves_prior_output"
         ]
       }
+    },
+    "source_routing": {
+      "authority": "Source-quoted display interpretation and independent raw-source-to-destination review",
+      "false_rejection_risk": "Optional omissions or legitimate paraphrases must not become word-match vetoes or extra source questions",
+      "duplicate_policy": "Hermes owns meaning; contracts constrain source quotations and identity; review audits raw source independently; approval bytes remain immutable",
+      "coverage": "test_source_routing.py",
+      "authority_contract": {
+        "requirement": "Preserve explicit visit relationships and applicable qualified benefits on their intended document surfaces",
+        "evidence": "Exact approved-source quotations, existing visit identities, current artifact passages and authenticated independent review",
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "drafting_or_verifier_transient_by_defect"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_public_lifecycle_preserves_routed_facts_and_clean_delivery"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_independent_source_mapping_defect_redrafts_and_rechecks_final_bytes"
+        ]
+      }
     }
   },
   "checks": [
@@ -375,9 +396,79 @@
       "family": "evidence"
     },
     {
+      "family": "source_routing",
+      "file": "scripts/contracts.py",
+      "function": "source_text_values",
+      "code_sha256": "1fb8f031949561d52bc8af6a1a0080be51ed7225c4c1bcc4656100f48f71f79a",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_authenticated_mapping_reaches_both_protocol_tables_and_quality"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_invalid_interpretations_are_rejected"
+        ]
+      }
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/contracts.py",
+      "function": "schedule_interpretation_contract",
+      "code_sha256": "3cdd5006574a0f075cd1225c5fb51baa1dcf7191a79e0d34b44c49462726e91f",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_authenticated_mapping_reaches_both_protocol_tables_and_quality"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_invalid_interpretations_are_rejected"
+        ]
+      }
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/contracts.py",
+      "function": "benefit_context_contract",
+      "code_sha256": "2a4c8d45c2140fbe8b37eae2515fc456b0705e459ba3ff79b31d449b56bb56c2",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_authenticated_mapping_reaches_both_protocol_tables_and_quality"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_invalid_interpretations_are_rejected"
+        ]
+      }
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/contracts.py",
+      "function": "interpreted_schedule_reference",
+      "code_sha256": "e4aab88ab56d9ff880b7477d6e346dd2f71dc595bc078172bd50b60bf633658a",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_authenticated_mapping_reaches_both_protocol_tables_and_quality"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_invalid_interpretations_are_rejected"
+        ]
+      }
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/contracts.py",
+      "function": "document_table_reference",
+      "code_sha256": "fca981afe2a9066feb5c83da3b12c36e08a05e16261cc02889c7b57379c6da45",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_authenticated_mapping_reaches_both_protocol_tables_and_quality"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_invalid_interpretations_are_rejected"
+        ]
+      }
+    },
+    {
       "file": "scripts/contracts.py",
       "function": "protocol_table_contracts",
-      "code_sha256": "81e97047891f27f99d0db1df5314abd90eae2e9387c3ea68a28ad1e6e7289fd4",
+      "code_sha256": "f3109593fd345f38528bdf7041e5d6c58fca8a8f0cf76c21fabf29675d8ee02c",
       "family": "structured",
       "behavioral_evidence": {
         "valid": [
@@ -405,6 +496,48 @@
       "function": "source_contract",
       "code_sha256": "866f9cd57fe763dd9a8522441bc1c29df98f4abe371d7f0f0b768b07e8677b0f",
       "family": "source"
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "_format_value",
+      "code_sha256": "416d7119c1c78ef7fc7585bcf7e1d05b6bc31a06aaf2e761180601108e25b5ae",
+      "family": "source_routing",
+      "authority_contract": {
+        "requirement": "Preserve record/text identity on editable approval round-trip.",
+        "evidence": "Typed mixed-list marker, row kinds and source record fields.",
+        "authority": "objective",
+        "resolution_authority": "deterministic_recheck_for_objective_defects",
+        "repair_owner": "source_readiness"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_editable_approval_preserves_mixed_records_and_narrative_strings"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_editable_approval_rejects_unknown_mixed_entry_type"
+        ]
+      }
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "_parse_value",
+      "code_sha256": "5a601db32f26e35f6ad79a8dc47511def7ba4cddb219fc6206f0b91ce474ce1e",
+      "family": "source_routing",
+      "authority_contract": {
+        "requirement": "Preserve record/text identity on editable approval round-trip.",
+        "evidence": "Typed mixed-list marker, row kinds and source record fields.",
+        "authority": "objective",
+        "resolution_authority": "deterministic_recheck_for_objective_defects",
+        "repair_owner": "source_readiness"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_editable_approval_preserves_mixed_records_and_narrative_strings"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_editable_approval_rejects_unknown_mixed_entry_type"
+        ]
+      }
     },
     {
       "file": "scripts/contracts.py",
@@ -574,19 +707,33 @@
     {
       "file": "scripts/drafting.py",
       "function": "_validate_paragraph",
-      "code_sha256": "d5e1fb2b3d2beac8ee5be5966b17c6529beee4c25b4ce6581fd7da1c5a70ca85",
+      "code_sha256": "578991d8e62f7ceaa537ad69b20694ac91aa78bd50a1b60e294077e21a3692aa",
       "family": "evidence"
     },
     {
       "file": "scripts/drafting.py",
       "function": "_validate_list",
-      "code_sha256": "74ffbfc269153baf39e4bd9096246f1e6b67e318f6596d01005de1f56ab50792",
+      "code_sha256": "cb94463e71184dc49979201664f00455e039f94d9bba6b6fc6f7d3e120cf5b2c",
       "family": "evidence"
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/drafting.py",
+      "function": "_source_interpretation_findings",
+      "code_sha256": "0efc5fc05d8ac86144cebe46457f7c76175840d27b0d6a033ccf00b6fa8dd14e",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_authenticated_mapping_reaches_both_protocol_tables_and_quality"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_invalid_interpretations_are_rejected"
+        ]
+      }
     },
     {
       "file": "scripts/drafting.py",
       "function": "validate_response",
-      "code_sha256": "05458f26c1b0f45e31388d3daa87e96849f4500db0be619c0a888306bb2da49a",
+      "code_sha256": "6070edc0039a3d3b8d3473439b7217edbe02d3431e2c34c7698eeea25d636916",
       "family": "evidence",
       "behavioral_evidence": {
         "valid": [
@@ -886,7 +1033,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "62c4ea39da6a370830e86fb8f3786e6ca6afd3e96f8e6745574bc74a6d83a6b5",
+      "code_sha256": "e11c879ccea1469dcaab31a58af0a78a2852dfb9449ff546d2cfa6599e882232",
       "family": "clinical",
       "behavioral_evidence": {
         "valid": [
@@ -904,6 +1051,48 @@
       "family": "review"
     },
     {
+      "family": "source_routing",
+      "file": "scripts/quality.py",
+      "function": "source_routing_obligations",
+      "code_sha256": "30f6db6c34a6f3ded9f8a6f153b967335b3f34231053fd56c1b9b1b03f09c8fb",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_independent_routing_audit_accepts_qualified_paraphrase"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_independent_routing_audit_rejects_missing_or_unbound_evidence"
+        ]
+      }
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/quality.py",
+      "function": "_bound_source_routing_obligations",
+      "code_sha256": "02c409724f68eb96efd95fef46192b6323caa75b3c43661c096dba49ddcaa0cc",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_independent_routing_audit_accepts_qualified_paraphrase"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_independent_routing_audit_rejects_missing_or_unbound_evidence"
+        ]
+      }
+    },
+    {
+      "family": "source_routing",
+      "file": "scripts/quality.py",
+      "function": "source_routing_assessment_errors",
+      "code_sha256": "2700db255be1f64d7d62945ab11132965f4447fe249eff10c0e67cb162dd06ff",
+      "behavioral_evidence": {
+        "valid": [
+          "test_source_routing.py::test_independent_routing_audit_accepts_qualified_paraphrase"
+        ],
+        "invalid": [
+          "test_source_routing.py::test_independent_routing_audit_rejects_missing_or_unbound_evidence"
+        ]
+      }
+    },
+    {
       "file": "scripts/quality.py",
       "function": "_source_field_inventory",
       "code_sha256": "a321d8fcb3b0795d9101d0077a35df5599d09c42f100a6cf98261057bba504a6",
@@ -912,14 +1101,14 @@
     {
       "file": "scripts/quality.py",
       "function": "verification_recovery_request_findings",
-      "code_sha256": "066bb3c29c202bbf87a29e7fc4c416194dbf9afa8d56a7e255c499e2bdecfaea",
+      "code_sha256": "090c86211267386bc226403cf243673d76dbc6b7ea2b88cbd85577fbe605fcfe",
       "family": "review"
     },
     {
       "family": "review",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "37b6f167d4b0eda6b39d60ba2349766dc4d457852a2b79348a69944ffa21c0ee"
+      "code_sha256": "b147ebd2489ab3db46f15b9b4b69b837d24cbcba064d7070e6a3b8307f1efa4d"
     },
     {
       "file": "scripts/quality.py",
@@ -1006,7 +1195,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "2f92e6cfc794c601d352d56da5529cc1532046971821e0e6dc4a1764d86c6806",
+      "code_sha256": "6352d868d1d8def0fce5874c709c2d2404f742e1e1a1e65ec87bc66ff369756b",
       "family": "review"
     },
     {
@@ -1133,7 +1322,7 @@
       "family": "structured",
       "file": "scripts/rendering.py",
       "function": "_assessment_matrix",
-      "code_sha256": "db9a2bf0c5a13036b1696f294ca960fe01f2e345ed210eab5988a3b0488064aa",
+      "code_sha256": "ea7fce766f2acecbbac004b6e00e357358d9ffe2da5c6b0b27491cf21b798499",
       "behavioral_evidence": {
         "valid": [
           "test_contextual_output_fixes.py::test_schedule_details_stay_inside_the_table_without_inferred_assignments"
@@ -1347,7 +1536,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
-      "code_sha256": "7e864688008d8cf71f6bd64ceb5e2bac29477e1826bfdebe7bdd7fa055854ee3",
+      "code_sha256": "97c23c51d77ba9e0ba5758fc4eb72fc3a1ccce27c10d004fc875daba938496fe",
       "family": "recovery"
     },
     {
@@ -1361,6 +1550,20 @@
       "function": "_complete_pending_recovery_attempts",
       "code_sha256": "8fec4e97cbcaf1edd47637f76ab426d6f5940becbb17e96a8f52c601b3f7ba0a",
       "family": "recovery"
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_unresolved_evidence_defects",
+      "code_sha256": "4b664728d0d8534058d721e6d15cc9fb613f3c3ccf59b825f5fed4772a4f3452",
+      "family": "recovery",
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
+        ],
+        "invalid": [
+          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
+        ]
+      }
     },
     {
       "file": "scripts/workflow.py",
@@ -1446,20 +1649,6 @@
       "function": "main",
       "code_sha256": "c0b0d3f0e012da31d35de697a51631d14ef9234ce0eaffc25d7bf346318f1ef7",
       "family": "recovery"
-    },
-    {
-      "file": "scripts/workflow.py",
-      "function": "_unresolved_evidence_defects",
-      "code_sha256": "4b664728d0d8534058d721e6d15cc9fb613f3c3ccf59b825f5fed4772a4f3452",
-      "family": "recovery",
-      "behavioral_evidence": {
-        "valid": [
-          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
-        ],
-        "invalid": [
-          "test_general_delivery_reliability.py::test_independent_review_recovery_tracks_evidence_progress"
-        ]
-      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

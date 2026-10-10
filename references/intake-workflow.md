@@ -53,9 +53,22 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   own fields. Missing optional procedures remain absent and use only authorized
   Fixed Clinical Boilerplate where permitted; they are not additional obligatory
   inputs or permission to invent operational policy.
+- Inspect background and rationale for study-specific qualified potential
+  benefits. Preserve applicable statements and their uncertainty in
+  `risks_benefits.benefits` as well as the original background; keep historical
+  findings distinct from expected study benefit and never promise personal
+  treatment benefit from retrospective record review. Absence of a dedicated
+  benefits label does not mean the source supplies no benefit. If none applies,
+  leave the field absent; do not invent one or request extra optional input.
 
 Before requesting approval, compare the proposed Source-of-Truth with the raw
 evidence for lost facts and changed relationships, and inspect its computed
 assessment table. Correct extraction omissions at this point. Ask one combined
 question only for Required Source Inputs or conflicts in supplied material facts;
 representation work and optional omissions do not justify extra questions.
+
+For reused, byte-identical approvals with explicit relationships still in prose,
+the drafting request may authorize a source-quoted display interpretation. This
+does not revise approval or reinterpret ambiguous evidence: unresolved assignments
+remain notes. The independent reviewer must reconcile raw source with the actual
+tables and intended narrative sections, including any qualified benefit clauses.

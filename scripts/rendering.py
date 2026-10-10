@@ -28,6 +28,7 @@ from pypdf import PdfReader
 from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 from contracts import bibliographic_citation_spans, protocol_bibliography
+from contracts import document_table_reference
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -352,7 +353,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
     irb = get_path(reference, "parties.irb", {}) or {}
     facility_fields = facility_projection(facility)
     facility_city = facility_fields["city"]
-    visits = normalized_visit_records(reference)
+    visits = normalized_visit_records(document_table_reference(reference, model))
     inclusion = _list(get_path(reference, "population.inclusion_criteria", []))
     interventions = [
         item for item in (get_path(reference, "design.interventions", []) or [])
@@ -3388,9 +3389,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     if matrix_mode:
         row_values = [list(row) for row in row_values]
         row_values[1][0] = ""
-    for row in row_values[header_rows:]:
-        if row and row[0]:
-            row[0] = row[0][0].upper() + row[0][1:]
     detail_start = len(row_values) if row_values else 1
     row_values.extend(detail_rows)
 
@@ -3578,9 +3576,10 @@ def _template_document(
             "sponsorName": "«Sponsor»",
         })
     generated_plain_paragraphs = _normalize_generated_placeholder_layout(document)
+    table_reference = document_table_reference(reference, model)
     if not icf:
-        _assessment_matrix(document, reference, authority_path)
-    _visit_rows(document, reference)
+        _assessment_matrix(document, table_reference, authority_path)
+    _visit_rows(document, table_reference)
     for paragraph in list(_all_paragraphs(document)):
         _replace_paragraph(paragraph, fields)
     _normalize_typed_bullet_paragraphs(document)

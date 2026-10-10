@@ -46,13 +46,17 @@ from contracts import (
     sterling_draft_word_budget,
     assessment_matrix,
     semantic_evidence_contract,
+    benefit_context_contract,
+    schedule_interpretation_contract,
+    interpreted_schedule_reference,
+    source_text_values,
 )
 
 
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v18-semantic-hypothesis"
+PROMPT_VERSION = "section-drafting-v19-source-routing"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -502,6 +506,10 @@ def _section_payload(
         "required": section.required,
         "allowed_modes": allowed,
         "minimum_evidence": minimum_evidence,
+        "optional_evidence": (["study.background"] if benefit_context_contract(reference, section.section_id) else []),
+        "benefit_context": benefit_context_contract(reference, section.section_id),
+        "schedule_interpretation": (schedule_interpretation_contract(reference)
+                                    if section.section_id == "evaluation-procedures" else None),
         "table_evidence": list(section.table_evidence),
         "fixed_boilerplate": boilerplate_items,
         "content_expectations": content_expectations,
@@ -1886,7 +1894,7 @@ def _validate_paragraph(
     if PLACEHOLDER.search(text) or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE):
         findings.append({"category": "drafting", "field": section_id, "issue": "Section contains a placeholder or internal drafting language.", "next_action": "Replace it with supported client-facing prose."})
     request_evidence = _allowed_evidence(request)
-    section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
+    section_evidence = {f"source:{path}" for path in [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]}
     invalid_evidence = sorted(set(map(str, evidence_refs)) - request_evidence)
     unrelated_evidence = sorted(set(map(str, evidence_refs)) - section_evidence) if evidence_refs else []
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
@@ -1916,7 +1924,7 @@ def _validate_list(
     findings: list[dict[str, Any]] = []
     if not items or any(not _substantive_list_item(item) for item in items):
         findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
-    section_evidence = {f"source:{path}" for path in contract.get("minimum_evidence", [])}
+    section_evidence = {f"source:{path}" for path in [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]}
     invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
     invalid_boilerplate = sorted(set(boilerplate_refs) - allowed_boilerplate)
@@ -2063,6 +2071,49 @@ def _icf_summary_detail_sentence_pairs(
     ]
 
 
+def _source_interpretation_findings(
+    request: Mapping[str, Any], contract: Mapping[str, Any], item: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Validate source authority; independent review decides semantic correctness."""
+    section_id = str(contract["section_id"])
+    errors: list[str] = []
+    if contract.get("schedule_interpretation"):
+        try:
+            interpreted_schedule_reference(request["approved_source"], item.get("schedule_interpretation"))
+        except (ValueError, TypeError, KeyError) as exc:
+            errors.append(str(exc))
+    elif item.get("schedule_interpretation") is not None:
+        errors.append("This section has no authorized schedule interpretation.")
+    if contract.get("benefit_context"):
+        interpretation = item.get("benefit_interpretation")
+        if (not isinstance(interpretation, Mapping)
+                or not isinstance(interpretation.get("potential_benefits"), list)
+                or not isinstance(interpretation.get("rationale"), str)
+                or not interpretation["rationale"].strip()):
+            errors.append("Benefit interpretation requires potential_benefits and rationale, including an explained empty list when none apply.")
+        else:
+            cited = set()
+            for key in ("paragraphs", "lists"):
+                records = item.get(key)
+                for record in records if isinstance(records, list) else []:
+                    refs = record.get("evidence_refs") if isinstance(record, Mapping) else None
+                    if isinstance(refs, list):
+                        cited.update(ref for ref in refs if isinstance(ref, str))
+            if interpretation["potential_benefits"] and "source:study.background" not in cited:
+                errors.append("Identified background benefits must be used and cited in this section's draft.")
+            for fact in interpretation["potential_benefits"]:
+                if (not isinstance(fact, Mapping) or fact.get("source_path") != "study.background"
+                        or not isinstance(fact.get("source_excerpt"), str) or not fact["source_excerpt"].strip()
+                        or not any(fact["source_excerpt"] in value for value in source_text_values(contract["benefit_context"]["value"]))):
+                    errors.append("A potential benefit must quote its exact approved background; do not invent a new source fact.")
+    elif item.get("benefit_interpretation") is not None:
+        errors.append("This section has no authorized benefit context interpretation.")
+    return [{"category": "drafting", "field": section_id, "target_ids": [section_id],
+             "code": "source-interpretation-invalid", "publication_disposition": "blocking", "issue": error,
+             "next_action": "Repair the interpretation from the unchanged approved evidence and the section's source interpretation contract; do not reopen intake."}
+            for error in errors]
+
+
 def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
@@ -2195,6 +2246,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         section_id = str(item["section_id"])
         section_finding_count = len(findings)
         outcome = str(item.get("outcome") or "")
+        findings.extend(_source_interpretation_findings(request, expected_contracts[section_id], item))
         if outcome == "source_gap":
             findings.append({"category": "drafting", "field": section_id, "issue": "Post-approval drafting attempted to reopen source intake.", "required": ", ".join(map(str, expected_contracts[section_id].get("minimum_evidence") or [])), "next_action": "Retry from the approved evidence and listed Fixed Clinical Boilerplate without requesting more reviewer input."})
             continue
@@ -2406,7 +2458,8 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             if finding_requires_repair(finding)
         ]
         if not blocking_section_findings:
-            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {}))})
+            accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {})),
+                             **{key: copy.deepcopy(item[key]) for key in ("schedule_interpretation", "benefit_interpretation") if key in item}})
     return {"kind": "sections", "drafts": accepted}, findings
 
 
@@ -2598,6 +2651,8 @@ def merged_drafts(
         draft = accepted_draft(revision_dir, section.section_id, expected_governing)
         entry["paragraphs"] = list(draft.get("paragraphs") or []) if draft else []
         entry["lists"] = list(draft.get("lists") or []) if draft else []
+        if draft and draft.get("schedule_interpretation") is not None:
+            entry["schedule_interpretation"] = copy.deepcopy(draft["schedule_interpretation"])
         protocol.append(entry)
     icf = {}
     for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))):
@@ -2729,6 +2784,10 @@ def response_template(request: Mapping[str, Any], *, model_id: str = "Hermes sub
             "outcome": "drafted",
             "paragraphs": [{"text": "", "evidence_refs": [], "boilerplate_refs": []}],
             "lists": [],
+            **({"schedule_interpretation": {"assignments": [], "unallocated": [], "rationale": ""}}
+               if section.get("schedule_interpretation") else {}),
+            **({"benefit_interpretation": {"potential_benefits": [], "rationale": ""}}
+               if section.get("benefit_context") else {}),
         } for section in request["section_contracts"]]
     return base
 
@@ -2966,6 +3025,21 @@ def recorded_acceptance_response(request: Mapping[str, Any]) -> dict[str, Any]:
         else:
             result.update({"outcome": "drafted", "paragraphs": []})
     for result, contract in zip(response["section_results"], request["section_contracts"]):
+        # Offline adapter only: preserve narrative source rather than pretend
+        # deterministic code can decide clinical relationships or benefits.
+        if contract.get("schedule_interpretation"):
+            result["schedule_interpretation"] = {
+                "assignments": [], "unallocated": [
+                    {"source_path": path, "source_excerpt": text}
+                    for path, value in contract["schedule_interpretation"]["sources"].items()
+                    for text in source_text_values(value)],
+                "rationale": "Controlled adapter retains narrative facts for the external reviewer double.",
+            }
+        if contract.get("benefit_context"):
+            result["benefit_interpretation"] = {
+                "potential_benefits": [],
+                "rationale": "Controlled adapter does not perform clinical interpretation; external review is synthetic.",
+            }
         section_id = str(contract.get("section_id"))
         if section_id == "icf.key-information-summary" or contract.get("source_coverage") in {"concept_reference", "method_group_summary"}:
             continue
