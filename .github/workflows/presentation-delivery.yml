@@ -18,17 +18,5 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - name: Check Python sources
         run: python -m compileall -q scripts
-      - name: Verify delivery and recovery contracts
-        run: >-
-          python -m pytest -q
-          tests/test_presentation_delivery.py
-          tests/test_construction_reliability.py
-          tests/test_editorial_publication.py
-          tests/test_reviewer_transport.py
-          tests/test_offline_reliability_gate.py
-          tests/test_source_routing.py
-          tests/test_general_construction_recovery.py
-          tests/test_output_recovery_contract.py
-          tests/test_projection_variations.py
-          tests/test_review_resolutions.py
-          tests/test_clean_delivery.py::test_confirmed_header_defect_is_reconstructed_and_independently_rechecked
+      - name: Verify focused AI quality lifecycle and objective contracts
+        run: python tests/offline_reliability_gate.py --report /tmp/clinical-focused-report.json

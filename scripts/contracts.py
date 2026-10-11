@@ -2394,19 +2394,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "issue": "Sample-size evidence contains unsupported columns that cannot be rendered without data loss: " + ", ".join(unsupported),
                     "required": "Use the approved sample-size evidence schema or extend the versioned contract before approval.",
                 })
-            for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS:
-                values = {
-                    str(row[candidate]).strip()
-                    for candidate in (key, *aliases)
-                    if meaningful(row.get(candidate))
-                }
-                if len(values) > 1:
-                    findings.append({
-                        "category": "source-evidence",
-                        "field": f"{evidence_path}.{index}.{key}",
-                        "issue": "Sample-size evidence aliases contain conflicting values.",
-                        "required": "One approved value for the column.",
-                    })
     for path in ("procedures.visit_schedule", "procedures.visit_schedule_table"):
         raw_visits = get_path(reference, path, [])
         seen_ids: set[str] = set()

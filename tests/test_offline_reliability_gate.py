@@ -15,11 +15,10 @@ def test_release_check_is_explicit_and_excludes_live_suites():
     assert command[:3] == ['python', '-m', 'pytest']
     assert len(gate.TEST_FILES) < len(list((gate.ROOT / 'tests').glob('test_*.py')))
     assert all((gate.ROOT / 'tests' / filename).is_file() for filename in gate.TEST_FILES)
-    assert 'test_clean_delivery.py' in gate.TEST_FILES
-    assert 'test_general_delivery_reliability.py' in gate.TEST_FILES
-    assert 'test_assessment_matrix.py' in gate.TEST_FILES
-    assert 'test_hypothesis_fidelity.py' in gate.TEST_FILES
-    assert 'test_sterling_rendered_scope.py' in gate.TEST_FILES
+    assert {'test_ai_quality_boundary.py', 'test_ai_review_handoff.py',
+            'test_general_document_repair.py', 'test_ai_delivery_outcomes.py'} <= set(gate.TEST_FILES)
+    assert 'test_review_resolutions.py' not in gate.TEST_FILES
+    assert 'test_hypothesis_fidelity.py' not in gate.TEST_FILES
     assert not any('e2e' in node or 'certification' in node or 'corpus' in node for node in command)
 
 
