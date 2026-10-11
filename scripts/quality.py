@@ -35,10 +35,11 @@ from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, country_name_aliases, document_set, finding_requires_repair, get_path, icf_contract, icf_retained_sections, meaningful, narrative_review_finding, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
 from drafting import accepted_cross_section_duplicate_findings, evidence_coverage_finding, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
+from rule_authority import attach_rule, semantic_rule, rule_contract_sha256
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 from contracts import benefit_context_contract, document_table_reference, source_text_values
-from drafting import merged_drafts
+from drafting import merged_drafts, sha256_value
 from contracts import canonical_review_surface, reviewed_presentation_only, internal_presentation_note
 
 
@@ -4830,15 +4831,17 @@ def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]
                 section_evidence_value(section.section_id, path, get_path(reference, path), reference),
                 all_items=section.source_coverage == "all_material_items" or path == "endpoints.other", reference=reference,
             ) for path in ungrounded_paths]
-            findings.append({
+            finding = {
                 "category": "content",
                 "field": section.section_id,
                 "target_ids": [section.section_id],
                 "evidence_diagnostics": diagnostics,
-                **({"code": "lexical-evidence-uncertainty", "publication_disposition": "warning"}
-                   if lexical_evidence_uncertainty(diagnostics) else {}),
                 "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
-            })
+            }
+            if lexical_evidence_uncertainty(diagnostics):
+                finding = attach_rule({**finding, "publication_disposition": "blocking"},
+                                      "protocol.source-coverage.lexical")
+            findings.append(finding)
     benefits_text = "\n".join(section_paragraphs.get("risks-benefits.benefits", []))
     if re.search(r"\b(?:compensat\w*|reimburs\w*|payment\w*)\b|\$\s*\d", benefits_text, re.I):
         findings.append(narrative_review_finding({
@@ -5738,6 +5741,7 @@ def create_verification_requests(
         "request_id": content_request_id,
         "task": "clinical_content_verification",
         "revision_id": revision_dir.name,
+        "generation_authority_sha256": sha256_value(governing_resources(repo_root, reference)),
         "review_set": review_set,
         "artifacts": content_files,
         "approved_source": reference,
@@ -5938,6 +5942,25 @@ def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, 
     return [dict(finding) for finding in findings if not _is_publication_warning(finding)]
 
 
+def _deterministic_review_partition(
+    findings: Iterable[Mapping[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Separate objective failures from registered semantic review evidence.
+
+    Do not use this for arbitrary reviewer findings: a reviewer cannot grant a
+    response waiver by copying production rule metadata.
+    """
+    objective, cautions = [], []
+    for finding in findings:
+        (cautions if semantic_rule(finding) or _is_publication_warning(finding)
+         else objective).append(dict(finding))
+    return objective, cautions
+
+
+def _review_uncertainty(finding: Mapping[str, Any]) -> bool:
+    return bool(semantic_rule(finding)) or finding.get("code") in UNCERTAINTY_CODES
+
+
 def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [
         {key: value for key, value in finding.items()
@@ -5979,13 +6002,13 @@ def _lexical_review_cautions(
     protocol = revision_dir / "candidate/protocol.docx"
     if protocol.is_file():
         try:
-            warnings += _warning_findings(deterministic_content_check(revision_dir, reference))
+            warnings += _deterministic_review_partition(deterministic_content_check(revision_dir, reference))[1]
         except (OSError, ValueError, zipfile.BadZipFile):
             # Construction/package checks own malformed candidates; no caution can approve them.
             pass
     records = {}
     for warning in warnings:
-        if warning.get("code") not in UNCERTAINTY_CODES:
+        if not _review_uncertainty(warning):
             continue
         identity = canonical_evidence_sha256(warning)
         section = str((warning.get("target_ids") or [warning.get("field") or ""])[0])
@@ -6042,6 +6065,9 @@ def _lexical_review_cautions(
             "source_evidence": source_evidence,
             "template_excerpt": template_excerpt,
             "rule_sha256": _uncertainty_rule_sha256(),
+            **({"rule_id": warning["rule_id"], "rule_version": warning["rule_version"],
+                "rule_contract_sha256": warning["rule_contract_sha256"],
+                "rule_contract": semantic_rule(warning)} if semantic_rule(warning) else {}),
         }
     return list(records.values())
 
@@ -6067,6 +6093,9 @@ def _uncertainty_resolution_records(
     request: Mapping[str, Any], response: Mapping[str, Any],
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Validate decisions against evidence in the authenticated review request."""
+    if request.get("generation_authority_sha256") != sha256_value(governing_resources(
+            Path(__file__).resolve().parents[1], request.get("approved_source") or {})):
+        return [], ["The review generation authority is stale."]
     cautions = {row["caution_sha256"]: row for row in request.get("lexical_review_cautions", [])}
     supplied = response.get("uncertainty_resolutions", [])
     if not isinstance(supplied, list):
@@ -6096,6 +6125,22 @@ def _uncertainty_resolution_records(
                 or caution["rule_sha256"] != _uncertainty_rule_sha256()):
             errors.append("The resolution source or rule identity is stale.")
             continue
+        if caution.get("rule_id"):
+            if (not semantic_rule(caution["caution"])
+                    or caution["rule_contract_sha256"] != rule_contract_sha256(caution["rule_id"])
+                    or any(key in decision and decision[key] != caution[key]
+                           for key in ("rule_id", "rule_version", "rule_contract_sha256"))):
+                errors.append("The resolution condition identity or authority is stale or mismatched.")
+                continue
+        if any(key in decision and decision[key] != caution.get(key)
+               for key in ("artifact", "section_id", "approved_source_sha256", "artifact_sha256",
+                           "section_sha256", "rule_sha256")):
+            errors.append("The resolution target or bound source/artifact evidence is mismatched.")
+            continue
+        if any(key in decision and decision[key] != request.get(key)
+               for key in ("revision_id", "generation_authority_sha256")):
+            errors.append("The resolution revision or generation authority is mismatched.")
+            continue
         target = (caution["artifact"], caution["section_id"])
         section_passed = any(
             (row.get("artifact"), row.get("section_id")) == target
@@ -6116,6 +6161,10 @@ def _uncertainty_resolution_records(
                 "artifact", "section_id", "approved_source_sha256", "artifact_sha256",
                 "section_sha256", "rule_sha256",
             )},
+            **{key: caution[key] for key in ("rule_id", "rule_version", "rule_contract_sha256")
+               if key in caution},
+            "revision_id": request["revision_id"],
+            "generation_authority_sha256": request.get("generation_authority_sha256"),
             "verification_request_id": request["request_id"],
             "request_sha256": request["request_sha256"],
             "producer": dict(response["producer"]),
@@ -6203,7 +6252,7 @@ def _unresolved_uncertainty_findings(
         "field": warning.get("field"), "target_ids": ["verification:content"],
         "issue": "Present this uncertainty and obtain a source-grounded reviewer decision.",
         "caution": dict(warning),
-    }, "verifier_transient") for warning in warnings if warning.get("code") in UNCERTAINTY_CODES]
+    }, "verifier_transient") for warning in warnings if _review_uncertainty(warning)]
 
 
 def _delivery_warning_partition(warnings: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -7131,7 +7180,7 @@ def final_exact_artifact_review_findings(
     if _exact_rendered_hashes(revision_dir, render_report) != dict(final_review.get("rendered_hashes") or {}):
         issues.append("Final rendered bytes changed after review.")
     deterministic_findings = deterministic_content_check(revision_dir, reference)
-    deterministic_warnings = _warning_findings(deterministic_findings)
+    deterministic_blockers, deterministic_warnings = _deterministic_review_partition(deterministic_findings)
     verification_findings, fresh_evidence = validate_verifications(revision_dir)
     fresh_warnings = (
         deterministic_warnings + _accepted_drafting_warnings(revision_dir, reference)
@@ -7139,7 +7188,7 @@ def final_exact_artifact_review_findings(
         + _warning_findings(verification_findings)
     )
     verification_findings = [
-        dict(item) for item in deterministic_findings if item not in deterministic_warnings
+        dict(item) for item in deterministic_blockers
     ] + _blocking_findings(verification_findings)
     verification_findings.extend(
         _final_verification_scope_findings(
@@ -7174,11 +7223,12 @@ def final_exact_artifact_review_findings(
 
 def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any], xml_report: Mapping[str, Any] | None) -> dict[str, Any]:
     deterministic_findings = deterministic_content_check(revision_dir, reference)
+    deterministic_blockers, deterministic_warnings = _deterministic_review_partition(deterministic_findings)
     warnings = (
-        _warning_findings(deterministic_findings) + _accepted_drafting_warnings(revision_dir, reference)
+        deterministic_warnings + _accepted_drafting_warnings(revision_dir, reference)
         + _render_warnings(render_report) + _warning_findings(render_report.get("findings", []))
     )
-    findings = _blocking_findings(deterministic_findings)
+    findings = deterministic_blockers
     findings.extend(_blocking_findings(render_report.get("findings", [])))
     if xml_report:
         findings.extend(

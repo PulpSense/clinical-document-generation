@@ -1094,7 +1094,7 @@
     {
       "file": "scripts/quality.py",
       "function": "deterministic_content_check",
-      "code_sha256": "e11c879ccea1469dcaab31a58af0a78a2852dfb9449ff546d2cfa6599e882232",
+      "code_sha256": "035890e8b79ec11fc2900c1e57bafcd64b93c10008f6f1918786623d8462e164",
       "family": "clinical",
       "behavioral_evidence": {
         "valid": [
@@ -1174,7 +1174,7 @@
       "family": "source_bound_construction",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "b57ebd3a4ef98f8898d1a5189f74cfb13ce629c7bbb1f9bdbe2727bd52a2e166",
+      "code_sha256": "b0a81492a6177d9adb286383118886b10446538770d44dcdaf7d9de8d8132fbc",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1205,7 +1205,7 @@
       "family": "presentation_delivery",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "08db47f7bc6a036f590aa29be8bfdb8a76fb920c8e11c147b4c87eacfb03fd09",
+      "code_sha256": "d941eac61fe076a2d198256b7ea3f61e8a25f7ab05f27cd805c6e2c03832f355",
       "authority_contract": {
         "authority": "mixed",
         "resolution_authority": "independent_source_grounded_review",
@@ -1247,7 +1247,7 @@
     {
       "file": "scripts/quality.py",
       "function": "_unresolved_uncertainty_findings",
-      "code_sha256": "50fd65ee44dcd0233016833a87913c7f205814d850bf93da59d5e40f1e728721",
+      "code_sha256": "04f744277d9c1f454b3e44d3760364b9e63593734fbf56d6e7999a830e85b818",
       "family": "review"
     },
     {
@@ -1286,13 +1286,13 @@
     {
       "file": "scripts/quality.py",
       "function": "final_exact_artifact_review_findings",
-      "code_sha256": "5f5705a7981a610df9cd0d40692f7e27b6fb4b0017d073480fdc8054b805b9a5",
+      "code_sha256": "a3af261b5960d0623768682068cabf76c9e0e1c3fddf7dc89f44ca061ed85bbd",
       "family": "delivery"
     },
     {
       "file": "scripts/quality.py",
       "function": "quality_report",
-      "code_sha256": "38be1f0f903b72361667e2e605de6537a768b744e01178fbaf2ff333ee2ad331",
+      "code_sha256": "4a990164d2bec2e31af98edf3fe67d522205ad45b7831447c38992cd21d7ac17",
       "family": "review"
     },
     {
