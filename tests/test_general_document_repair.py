@@ -5,13 +5,14 @@ from docx import Document
 import drafting
 import quality
 import workflow
+import pytest
 from test_clean_delivery import controlled_render, ROOT, CASES
 from test_handoff_quality import acceptance_verification
 
 
-def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None, render=None):
+def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None, render=None, case=None, draft=None, visual_review=None):
     monkeypatch.setattr(workflow, 'render_assurance', render or controlled_render)
-    source = quality.branch_acceptance_source(ROOT, next(case for case in CASES
+    source = quality.branch_acceptance_source(ROOT, case or next(case for case in CASES
         if (case['descriptor']['study_type'] == 'Retrospective') == retrospective))
     reference = tmp_path / 'reference/study.reference.json'
     reference.parent.mkdir(parents=True)
@@ -19,6 +20,7 @@ def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None,
     workflow.prepare(tmp_path)
     approved = workflow.approve(tmp_path, approved_by='fixture-owner')
     revision = tmp_path / 'revisions' / approved['revision_id']
+    approved_bytes = (revision / 'approved-reference.json').read_bytes()
     content_reviews = []
     repair_requests = []
     result = workflow.generate(tmp_path, require_promoted_runtime=False)
@@ -31,7 +33,7 @@ def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None,
                 repair_requests.append(request)
                 response = repair(request, revision)
             elif request['task'] in {'section_drafting', 'prs_narrative_drafting'}:
-                response = drafting.recorded_acceptance_response(request)
+                response = (draft or drafting.recorded_acceptance_response)(request)
             else:
                 response = acceptance_verification(request)
                 if request['task'] == 'clinical_content_verification':
@@ -46,10 +48,13 @@ def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None,
                         next(row for row in response['section_assessments'] if row['section_id'] == 'introduction')['status'] = 'blocked'
                     for row in response['section_assessments']:
                         row['notes'] = ['Independently reassessed native-content against the approved source.']
+                if request['task'] == 'rendered_page_visual_verification' and visual_review:
+                    response = visual_review(request, response, revision)
             path = revision / request['response_path']
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(response))
         result = workflow.generate(tmp_path, require_promoted_runtime=False)
+    assert (revision / 'approved-reference.json').read_bytes() == approved_bytes
     return result, revision, repair_requests, content_reviews
 
 
@@ -233,3 +238,74 @@ def test_repair_can_report_unresolved_concerns_without_destroying_usable_base(tm
     assert result['status'] == 'blocked' and result['stage'] == 'document_repair_unresolved', result
     assert result['candidate_outputs'] and (revision / 'candidate/protocol.docx').is_file()
     assert not (tmp_path / 'output').exists()
+
+
+@pytest.mark.parametrize('case', [case for case in CASES if case['descriptor']['profile'].startswith('rich')], ids=lambda case: case['descriptor']['fixture_id'])
+def test_real_injected_prose_is_removed_and_freshly_reviewed_across_families(tmp_path, monkeypatch, case):
+    defect = 'Participants receive an unsupported experimental drug.'
+    observations = []
+    def draft(request):
+        response = drafting.recorded_acceptance_response(request)
+        for row in response.get('section_results', []):
+            if row['section_id'] == 'introduction':
+                row['paragraphs'][0]['text'] += ' ' + defect
+        return response
+    def review(request, response, revision, count):
+        present = any(defect in p.text for p in Document(revision / 'candidate/protocol.docx').paragraphs)
+        observations.append(present)
+        if present:
+            response['status'] = 'blocked'
+            response['findings'] = [{'finding_id': 'native-content', 'category': 'content',
+                'artifact': 'protocol', 'target_ids': ['paragraph:17'], 'check': 'source_supported',
+                'location': 'Protocol introduction paragraph', 'issue': defect, 'material': True}]
+            next(row for row in response['section_assessments'] if row['section_id'] == 'introduction')['status'] = 'blocked'
+        return response
+    def repair(request, revision):
+        path = revision / request['workspace_path'] / 'protocol.docx'
+        doc = Document(path)
+        for paragraph in doc.paragraphs:
+            if defect in paragraph.text:
+                paragraph.text = paragraph.text.replace(' ' + defect, '')
+        doc.save(path)
+        return repair_response(request)
+    result, revision, repairs, reviews = lifecycle(tmp_path, monkeypatch, repair, case=case, draft=draft, review=review)
+    assert result['status'] == 'passed', result
+    assert observations == [True, False]
+    assert len(repairs) == 1 and len(reviews) == 2
+    assert next(row['sha256'] for row in reviews[0]['artifacts'] if row['artifact'] == 'protocol') != next(row['sha256'] for row in reviews[-1]['artifacts'] if row['artifact'] == 'protocol')
+    assert not any(defect in p.text for p in Document(tmp_path / 'output/protocol.docx').paragraphs)
+    assert json.loads((revision / 'approved-reference.json').read_text()) == repairs[0]['approved_source'] == reviews[-1]['approved_source']
+    expected = {'protocol.docx'} if case['descriptor']['study_type'] == 'Retrospective' else {'protocol.docx', 'icf.docx', 'study.xml'}
+    assert expected <= {path.name for path in (tmp_path / 'output').iterdir()}
+
+
+def test_layout_repair_rechecks_both_protocol_and_icf_against_new_native_files(tmp_path, monkeypatch):
+    from docx.shared import Pt
+    case = next(case for case in CASES if case['descriptor']['study_type'] == 'Prospective' and case['descriptor']['profile'].startswith('rich'))
+    seen = {'protocol': [], 'icf': []}
+    def visual(request, response, revision):
+        artifact = request['artifacts'][0]['artifact']
+        seen[artifact].append(request['artifacts'][0]['docx_sha256'])
+        if artifact == 'protocol' and len(seen[artifact]) == 1:
+            response['status'] = 'blocked'
+            response['findings'] = [{'finding_id': 'native-layout', 'category': 'visual',
+                'artifact': 'protocol', 'target_ids': ['layout:protocol'], 'check': 'native spacing concern',
+                'issue': 'Repair the visibly crowded paragraph spacing.', 'material': True,
+                'page': 1, 'element': 'First body paragraph', 'location': 'Protocol page 1, first body paragraph'}]
+            response['page_assessments'][0]['status'] = 'blocked'
+        elif artifact == 'protocol':
+            response['page_assessments'][0]['notes'] = ['native-layout: independently reinspected repaired page spacing.']
+        return response
+    def repair(request, revision):
+        path = revision / request['workspace_path'] / 'protocol.docx'
+        doc = Document(path)
+        doc.paragraphs[0].paragraph_format.space_after = Pt(12)
+        doc.save(path)
+        return repair_response(request)
+    result, revision, repairs, reviews = lifecycle(tmp_path, monkeypatch, repair, case=case,
+        review=lambda request, response, revision, count: response, visual_review=visual)
+    assert result['status'] == 'passed', result
+    assert len(repairs) == 1
+    assert len(seen['protocol']) == len(seen['icf']) == 2
+    assert seen['protocol'][0] != seen['protocol'][1]
+    assert Document(tmp_path / 'output/protocol.docx').paragraphs[0].paragraph_format.space_after.pt == 12

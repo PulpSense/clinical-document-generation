@@ -3409,7 +3409,7 @@ def _intake_review_guidance(reference: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "instructions": (
             "Before requesting Source-of-Truth approval, compare the original input evidence, "
-            "supplied candidate values and declared aliases with this obligatory-input checklist. "
+            "supplied candidate values, declared aliases and raw sample-size evidence rows with this obligatory-input checklist. "
             "AI determines whether facts are actually missing or conflicting; parser inability, "
             "paraphrases and different units or representations are not proof of a conflict. "
             "Ask one consolidated question for actual missing obligatory facts and unresolved material "
@@ -3427,6 +3427,11 @@ def _intake_review_guidance(reference: Mapping[str, Any]) -> dict[str, Any]:
              }} for requirement in requirements
         ],
         "field_candidates": copy.deepcopy(get_path(reference, "source.field_candidates", {})),
+        "sample_size_evidence": {
+            path: copy.deepcopy(get_path(reference, path))
+            for path in ("population.sample_size_evidence", "statistics.sample_size_evidence")
+            if get_path(reference, path) is not None
+        },
     }
 
 
@@ -3862,7 +3867,10 @@ def _candidate_outputs(revision_dir: Path) -> list[dict[str, Any]]:
 
 
 def _review_finding_locations(reference: Mapping[str, Any], finding: Mapping[str, Any]) -> list[str]:
-    """Name only document sections identified by the finding's governed targets."""
+    """Preserve reviewer supplied native locations alongside recognizable section names."""
+    nested = finding.get("verification_source_finding")
+    if isinstance(nested, Mapping):
+        finding = {**finding, **nested}
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     protocol_sections = {section.section_id: section for section in protocol_contract(branch)}
     icf_sections = {
@@ -3870,6 +3878,12 @@ def _review_finding_locations(reference: Mapping[str, Any], finding: Mapping[str
         for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra")))
     } if branch != "Retrospective" else {}
     locations: list[str] = []
+    for key in ("location", "element", "missing_content_anchor"):
+        supplied = finding.get(key)
+        if supplied:
+            text = json.dumps(supplied, ensure_ascii=False) if isinstance(supplied, (dict, list)) else str(supplied)
+            if text not in locations:
+                locations.append(text)
     targets = finding.get("target_ids") or [finding.get("field")]
     for raw in targets:
         target = str(raw)
@@ -4002,7 +4016,8 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
         for finding in located_findings:
             if not isinstance(finding, Mapping):
                 continue
-            issue = " ".join(str(finding.get("issue") or "").split())
+            nested = finding.get("verification_source_finding")
+            issue = " ".join(str(finding.get("issue") or (nested.get("issue") if isinstance(nested, Mapping) else "") or "").split())
             location = "; ".join(str(item) for item in finding.get("document_locations") or [])
             if issue:
                 finding_lines.append(f"- {location}: {issue}" if location else f"- {issue}")
@@ -6361,24 +6376,12 @@ def _semantic_response_matches_request(
             if isinstance(item, Mapping) and item.get("artifact")
         )
         return not supplied or supplied.issubset(expected_artifacts)
-    permitted = {
-        str(item.get("section_id"))
-        for item in request.get("sections", [])
-        if isinstance(item, Mapping)
+    expected_artifacts = {
+        str(item.get("artifact"))
+        for item in [*request.get("artifacts", []), *request.get("sections", [])]
+        if isinstance(item, Mapping) and item.get("artifact")
     }
-    if any(
-        str(item.get("path") or "").endswith("study.xml")
-        for item in request.get("artifacts", [])
-        if isinstance(item, Mapping)
-    ):
-        permitted.update(("prs.brief-summary", "prs.detailed-description"))
-    supplied_targets = {
-        str(target)
-        for item in findings
-        for target in (item.get("target_ids") or [])
-        if isinstance(item.get("target_ids"), list)
-    }
-    return not supplied_targets or supplied_targets.issubset(permitted)
+    return all(not item.get("artifact") or str(item["artifact"]) in expected_artifacts for item in findings)
 
 
 def _bind_available_verification_responses(revision_dir: Path) -> None:

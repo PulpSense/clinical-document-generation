@@ -14,26 +14,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 # Explicit selection prevents accidental execution of live certification/corpora.
 TEST_FILES = (
-    'test_evidence_diagnostics.py', 'test_evidence_variations.py', 'test_offline_reliability_gate.py',
-    'test_synopsis_recovery.py', 'test_layout_field_corrections.py', 'test_run07_reliability.py',
-    'test_assessment_matrix.py', 'test_hypothesis_fidelity.py', 'test_sterling_rendered_scope.py',
-    'test_visit_identifier_scope.py', 'test_bilateral_review_block.py', 'test_section_background_scope.py',
-    'test_run04_background_regressions.py', 'test_phase2_sterling_fidelity.py', 'test_sterling_template_comments.py',
-    'test_duration_reference_preservation.py', 'test_brad_editorial_feedback.py', 'test_contracts.py',
-    'test_handoff_quality.py', 'test_visit_inventory_review.py', 'test_reliability_maintenance.py',
-    'test_prs_quality_corrections.py', 'test_prs_xml.py', 'test_worker_readiness.py',
-    'test_mixed_visit_representations.py', 'test_semantic_evidence_recovery.py',
-    'test_concept_reference_grounding.py', 'test_review_contract_root_causes.py',
-    'test_owner_aware_recovery.py', 'test_review_resolutions.py', 'test_shared_output_projection.py',
-    'test_editorial_publication.py', 'test_phase1_repetition.py',
-    'test_contextual_output_fixes.py',
-    'test_bibliographic_evidence.py', 'test_clean_delivery.py', 'test_general_delivery_reliability.py',
-    'test_source_routing.py',
-    'test_reliability_campaign.py', 'test_reviewer_transport.py',
-    'test_construction_reliability.py',
-    'test_presentation_delivery.py',
-    'test_general_construction_recovery.py', 'test_output_recovery_contract.py', 'test_projection_variations.py',
+    'test_ai_quality_boundary.py', 'test_ai_review_handoff.py',
+    'test_general_document_repair.py', 'test_ai_delivery_outcomes.py',
+    'test_reviewer_transport.py', 'test_worker_readiness.py',
+    'test_offline_reliability_gate.py', 'test_ai_quality_campaign.py',
 )
+
 
 
 

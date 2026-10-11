@@ -5101,7 +5101,7 @@ def verification_recovery_request_findings(
         if str(response.get("status") or "").casefold() not in ({"passed", "blocked", "failed"} if optional else {"blocked", "failed"}):
             return issue("verification_response_invalid", "A substantive verification-derived recovery requires a blocked or failed response.")
         match_keys = (
-            "issue", "target_ids", "artifact", "page", "check", "element", "code",
+            "issue", "target_ids", "artifact", "page", "check", "element", "location", "missing_content_anchor", "code",
             "category", "recommended_action",
         )
         expected = {
@@ -5683,17 +5683,23 @@ def _prior_concern_review_errors(request: Mapping[str, Any], response: Mapping[s
         is_visual = concern.get("category") == "visual" or str(concern.get("check", "")) in VISUAL_CHECKS
         if visual != is_visual:
             continue
+        artifact = concern.get("artifact")
+        if visual and artifact and artifact not in {
+            row.get("artifact") for row in request.get("artifacts", []) if isinstance(row, Mapping)
+        }:
+            continue  # each visual task reviews only its own native document/pages
         identity = str(concern.get("finding_id") or "")
         if not identity:
             continue
         if any(isinstance(row, Mapping) and row.get("finding_id") == identity for row in reported):
             continue  # the concern remains reported, rather than silently cleared
         targets = concern.get("target_ids") or []
-        artifact = concern.get("artifact")
+        section_targets = {row.get("section_id") for row in request.get("sections", []) if isinstance(row, Mapping)}
+        scoped_targets = set(targets) & section_targets
         matched = any(
             isinstance(row, Mapping)
             and (not artifact or row.get("artifact") == artifact)
-            and (visual or not targets or row.get("section_id") in targets)
+            and (visual or not scoped_targets or row.get("section_id") in scoped_targets)
             and _notes_cite_finding(row.get("notes"), identity)
             for row in assessments
         )
@@ -5942,147 +5948,47 @@ def validate_verifications(
                     if (
                         artifact not in expected_artifacts
                         or not page_is_bound
-                        or check not in VISUAL_CHECKS
-                        or not element
                     ):
                         findings.append(recovery_finding({
                             **finding,
                             "target_ids": [verification_target],
                             "verification_request_id": request["request_id"],
-                            "issue": f"Verifier finding is missing governed visual repair routing. {finding['issue']}".strip(),
+                            "issue": f"Verifier finding does not identify an actual reviewed artifact/page. {finding['issue']}".strip(),
                         }, "verifier_transient"))
                     else:
                         finding["target_ids"] = [f"layout:{artifact}"]
                         findings.append(recovery_finding(finding, "visual_defect"))
                 else:
-                    supplied_targets = [
-                        str(target) for target in source.get("target_ids", []) if str(target).strip()
-                    ] if isinstance(source.get("target_ids"), list) else []
-                    permitted_targets = {
-                        str(section.get("section_id"))
-                        for section in request.get("sections", [])
-                        if isinstance(section, Mapping)
+                    expected_artifacts = {
+                        str(row.get("artifact"))
+                        for row in [*request.get("artifacts", []), *request.get("sections", [])]
+                        if isinstance(row, Mapping) and row.get("artifact")
                     }
-                    if any(str(artifact.get("path", "")).endswith("study.xml") for artifact in request.get("artifacts", []) if isinstance(artifact, Mapping)):
-                        permitted_targets.update(("prs.brief-summary", "prs.detailed-description", "prs.structured"))
-                    if not supplied_targets or any(target not in permitted_targets for target in supplied_targets):
+                    artifact = _text(source.get("artifact"))
+                    if artifact and artifact not in expected_artifacts:
+                        findings.append(recovery_finding({
+                            **finding, "target_ids": [verification_target],
+                            "issue": f"Verifier finding identifies an artifact outside this review. {finding['issue']}".strip(),
+                        }, "verifier_transient"))
+                    elif _remaining_client_limitation(source):
+                        findings.append({
+                            **finding, "category": "content", "check": "client_limitation",
+                            "remaining_limitation": True,
+                            "limitation_kind": source["limitation_kind"],
+                            "why_not_repairable": source["why_not_repairable"],
+                            "recommended_action": source["recommended_action"],
+                            "publication_disposition": "warning", "severity": "warning",
+                        })
+                    else:
+                        # Native locations, table names and checks are reviewer evidence,
+                        # never an admission registry for general document repair.
                         findings.append(recovery_finding({
                             **finding,
-                            "target_ids": [verification_target],
-                            "verification_request_id": request["request_id"],
-                            "issue": f"Verifier finding is missing a governed section target. {finding['issue']}".strip(),
-                        }, "verifier_transient"))
-                    else:
-                        finding["target_ids"] = supplied_targets
-                        source_category = _text(source.get("category")).casefold()
-                        source_check = _text(source.get("check")).casefold()
-                        legacy_repetition = (
-                            _text(source.get("code")) == "protocol-concept-repetition"
-                            and _text(source.get("disposition")).casefold() == "manual_review"
-                        )
-                        protocol_repetition = source_check == "concept_repetition" or legacy_repetition
-                        if _remaining_client_limitation(source):
-                            findings.append({
-                                **finding, "category": "content", "check": "client_limitation",
-                                "remaining_limitation": True,
-                                "limitation_kind": source["limitation_kind"],
-                                "why_not_repairable": source["why_not_repairable"],
-                                "recommended_action": source["recommended_action"],
-                                "publication_disposition": "warning", "severity": "warning",
-                            })
-                        elif protocol_repetition:
-                            required = (
-                                "concept_id", "primary_section", "secondary_section",
-                                "primary_paragraphs", "secondary_paragraphs", "treatment",
-                            )
-                            concept_id = _text(source.get("concept_id"))
-                            primary_section = _text(source.get("primary_section"))
-                            secondary_section = _text(source.get("secondary_section"))
-                            ownership = request.get("protocol_concept_ownership", {})
-                            primary_rules = ownership.get(primary_section, {}) if isinstance(ownership, Mapping) else {}
-                            secondary_rules = ownership.get(secondary_section, {}) if isinstance(ownership, Mapping) else {}
-                            governed_pair = (
-                                concept_id in primary_rules.get("owns", [])
-                                and concept_id in (
-                                    list(secondary_rules.get("brief_reference_only", []))
-                                    + list(secondary_rules.get("do_not_restate", []))
-                                )
-                            )
-                            structured_routing_valid = (
-                                supplied_targets == [secondary_section]
-                                and source_category == "content"
-                                and source_check == "concept_repetition"
-                                and _text(source.get("treatment")).casefold() == "excessive"
-                                and source.get("necessary") is False
-                                and source.get("concise") is False
-                            )
-                            if (
-                                any(not source.get(key) for key in required)
-                                or not governed_pair
-                                or not structured_routing_valid
-                            ):
-                                findings.append(recovery_finding({
-                                    **finding,
-                                    "target_ids": [verification_target],
-                                    "issue": f"Protocol repetition finding has invalid structured evidence or warning routing. {finding['issue']}".strip(),
-                                }, "verifier_transient"))
-                            else:
-                                findings.append(recovery_finding({
-                                    **finding, "category": source_category,
-                                    "check": source_check,
-                                    "verification_request_id": request["request_id"],
-                                }, "drafting_defect"))
-                        else:
-                            approved_source = request.get("approved_source") or {}
-                            branch = str(get_path(approved_source, "meta.study_type") or "")
-                            icf_family = str(get_path(approved_source, "meta.icf_template") or "Advarra")
-                            draftable_targets = {
-                                section_id
-                                for batch in batch_plan(branch, icf_family)
-                                for section_id in batch.section_ids
-                            }
-                            code_owned_targets = {
-                                (str(section.get("artifact") or ""), str(section.get("section_id") or ""))
-                                for section in request.get("sections", [])
-                                if isinstance(section, Mapping)
-                                and str(section.get("section_id") or "") not in draftable_targets
-                            }
-                            code_owned_finding = bool(supplied_targets) and all(
-                                (_text(source.get("artifact")), target) in code_owned_targets
-                                for target in supplied_targets
-                            )
-                            table_ids = source.get("table_ids")
-                            tables = request.get("code_owned_tables") or {}
-                            table_finding = (
-                                source.get("surface") == "table"
-                                and _text(source.get("artifact")) == "protocol"
-                                and isinstance(table_ids, list) and bool(table_ids)
-                                and all(isinstance(table_id, str) and table_id in tables for table_id in table_ids)
-                                and set(supplied_targets) == {tables[table_id]["section_id"] for table_id in table_ids}
-                            )
-                            if source.get("surface") == "table" and not table_finding:
-                                findings.append(recovery_finding({
-                                    **finding, "target_ids": [verification_target],
-                                    "issue": "The table finding does not identify its canonical table and owner section; re-localize the exact surface.",
-                                }, "verifier_transient"))
-                                continue
-                            recovery_class = (
-                                "deterministic_structure_defect"
-                                if set(supplied_targets) == {"prs.structured"} or code_owned_finding or table_finding
-                                else "drafting_defect"
-                            )
-                            findings.append(recovery_finding({
-                                **finding,
-                                **({"category": source_category} if source_category else {}),
-                                **({"check": source_check} if source_check else {}),
-                                "verification_request_id": request["request_id"],
-                                **(
-                                    {"recommended_action": source.get("recommended_action")}
-                                    if _text(source.get("recommended_action")) else {}
-                                ),
-                            }, recovery_class))
-        # Apply disposition only after authenticated response and governed target
-        # validation. The raw reviewer evidence remains unchanged and auditable.
+                            "category": _text(source.get("category")) or "content",
+                            "recommended_action": source.get("recommended_action"),
+                        }, "drafting_defect"))
+        # Apply disposition only after authenticated response and artifact/page
+        # identity validation. The raw reviewer evidence remains unchanged and auditable.
         for finding in findings:
             source = finding.get('verification_source_finding')
             if (finding.get('verification_request_id') == request['request_id']
@@ -6180,6 +6086,7 @@ def validate_verifications(
                 for item in valid_section_rows
                 if item.get("status") != "passed"
                 and str(item.get("section_id") or "") not in reported_targets
+                and not any(_notes_cite_finding(item.get("notes"), finding_id) for finding_id in reported_ids)
             ]
             uncovered_cross = [
                 str(item.get("check") or "")

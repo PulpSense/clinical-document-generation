@@ -141,3 +141,17 @@ def test_unusable_or_untrustworthy_package_is_unavailable(tmp_path, monkeypatch,
     assert result['status'] == 'blocked'
     assert not result.get('review_outputs')
     assert result['client_outputs'] == []
+
+
+def test_review_only_notice_preserves_actual_native_finding_location(tmp_path, monkeypatch):
+    run, _ = _candidate_run(tmp_path, monkeypatch, 'Retrospective')
+    monkeypatch.setattr(workflow, 'generate', lambda *_args, **_kw: {
+        'status': 'blocked', 'stage': 'document_repair_unresolved', 'client_outputs': [],
+        'findings': [{'verification_source_finding': {'artifact': 'protocol',
+            'target_ids': ['paragraph:17'], 'location': 'Protocol page 4, table 2, row 3',
+            'element': 'Visit timing cell', 'issue': 'Unresolved timing discrepancy.', 'material': True}}]})
+    result = operation(run)
+    assert result['status'] == 'review_required'
+    notice = (run / result['review_notice']).read_text()
+    assert 'Protocol page 4, table 2, row 3' in notice
+    assert 'Visit timing cell' in notice

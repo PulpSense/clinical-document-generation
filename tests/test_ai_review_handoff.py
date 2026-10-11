@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 import workflow
 from test_handoff_quality import fixture
 
@@ -61,7 +63,8 @@ def test_content_review_receives_actual_native_file_even_when_a_section_is_missi
     assert request['approved_source']['study']['title'] == fixture()['study']['title']
 
 
-def test_generic_content_pass_cannot_clear_an_explicit_substantive_finding(tmp_path):
+@pytest.mark.parametrize('target,extra', [('introduction', {}), ('paragraph:17', {}), ('table:ad-hoc:row3', {'surface': 'table', 'check': 'native-table-association'}), ('paragraph:12', {'check': 'concept_repetition'})])
+def test_generic_content_pass_cannot_clear_an_explicit_substantive_finding(tmp_path, target, extra):
     import quality
     from test_handoff_quality import acceptance_verification
     source = {'meta': {'study_type': 'Retrospective'}}
@@ -69,20 +72,21 @@ def test_generic_content_pass_cannot_clear_an_explicit_substantive_finding(tmp_p
     request = json.loads(request_path.read_text())
     response = acceptance_verification(request)
     response['findings'] = [{
-        'finding_id': 'missing-study-rationale', 'artifact': 'protocol', 'target_ids': ['introduction'],
+        'finding_id': 'missing-study-rationale', 'artifact': 'protocol', 'target_ids': [target],
         'check': 'substantive', 'material': True, 'issue': 'The approved rationale is absent.',
-        'missing_content_anchor': 'Introduction', 'recommended_action': 'Restore the approved rationale.',
+        'missing_content_anchor': 'Introduction', 'recommended_action': 'Restore the approved rationale.', **extra,
     }]
     (tmp_path / request['response_path']).write_text(json.dumps(response))
     findings, _ = quality.validate_verifications(tmp_path, request_paths=[request_path])
-    assert any(row.get('verification_source_finding', {}).get('finding_id') == 'missing-study-rationale' for row in findings)
+    assert any(row.get('verification_source_finding', {}).get('finding_id') == 'missing-study-rationale' and row.get('target_ids') == [target] for row in findings), findings
     assert not quality.verification_response_is_complete(tmp_path, request_path)
 
 
-def test_review_context_is_bound_with_source_and_artifact_request_identity(tmp_path):
+@pytest.mark.parametrize('target', ['introduction', 'paragraph:17'])
+def test_review_context_is_bound_with_source_and_artifact_request_identity(tmp_path, target):
     import quality
     from test_handoff_quality import acceptance_verification
-    context = {'prior_findings': [{'finding_id': 'timing', 'artifact': 'protocol', 'target_ids': ['introduction'], 'issue': 'Review timing.', 'material': True}], 'repair_author_evidence': 'The supplied timeline is preserved.'}
+    context = {'prior_findings': [{'finding_id': 'timing', 'artifact': 'protocol', 'target_ids': [target], 'issue': 'Review timing.', 'material': True}], 'repair_author_evidence': 'The supplied timeline is preserved.'}
     request_path = quality.create_verification_requests(
         tmp_path, {'meta': {'study_type': 'Retrospective'}}, {'artifacts': []}, review_context=context,
     )[0]
@@ -101,3 +105,41 @@ def test_review_context_is_bound_with_source_and_artifact_request_identity(tmp_p
     request['request_sha256'] = quality.verification_request_sha256(request)
     request_path.write_text(json.dumps(request))
     assert not quality.verification_response_is_complete(tmp_path, request_path)
+
+
+@pytest.mark.parametrize('standard_error', ['0.50', '7.5'])
+def test_sample_evidence_alias_meaning_is_handed_to_ai_with_raw_rows(tmp_path, standard_error):
+    source = fixture()
+    rows = [{'se': '0.5', 'standard_error': standard_error}]
+    source.setdefault('statistics', {})['sample_size_evidence'] = rows
+    reference = tmp_path / 'reference/study.reference.json'
+    reference.parent.mkdir()
+    reference.write_text(json.dumps(source))
+    result = workflow.prepare(tmp_path)
+    assert result['status'] == 'awaiting_approval', result
+    assert result['intake_review']['sample_size_evidence']['statistics.sample_size_evidence'] == rows
+
+
+def test_visual_concern_is_acknowledged_only_by_its_document_review(tmp_path):
+    from docx import Document
+    import quality
+    from test_clean_delivery import controlled_render
+    from test_handoff_quality import acceptance_verification
+    candidate = tmp_path / 'candidate'
+    candidate.mkdir()
+    for name in ('protocol', 'icf'):
+        doc = Document()
+        doc.add_paragraph('A readable document.')
+        doc.save(candidate / f'{name}.docx')
+    render = controlled_render(None, tmp_path)['render']
+    context = {'prior_findings': [{'finding_id': 'layout-concern', 'category': 'visual', 'artifact': 'protocol', 'target_ids': ['layout:protocol'], 'check': quality.VISUAL_CHECKS[0], 'issue': 'Inspect repaired table.', 'material': True}]}
+    requests = quality.create_verification_requests(tmp_path, fixture(), render, review_context=context)
+    for path in requests:
+        request = json.loads(path.read_text())
+        if request['task'] != 'rendered_page_visual_verification':
+            continue
+        response = acceptance_verification(request)
+        if request['artifacts'][0]['artifact'] == 'protocol':
+            response['page_assessments'][0]['notes'] = 'layout-concern: repaired table inspected on this actual page.'
+        (tmp_path / request['response_path']).write_text(json.dumps(response))
+        assert quality.verification_response_is_complete(tmp_path, path)
