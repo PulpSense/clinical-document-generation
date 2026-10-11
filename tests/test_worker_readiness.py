@@ -19,7 +19,7 @@ def test_readiness_checks_exact_worker_profile_and_never_records_credentials(tmp
     def run(command, **kwargs):
         captured.update(kwargs)
         return subprocess.CompletedProcess(command, 0, json.dumps({
-            "logged_in": logged_in, "provider": "openai-codex",
+            "logged_in": logged_in, "provider": "openai-codex", "inspection_readable": True,
             "access_token": "secret-not-for-logs",
         }), "secret-not-for-logs")
 
@@ -145,3 +145,15 @@ def test_worker_log_diagnosis_distinguishes_authentication_from_transient_failur
     log = tmp_path / "worker.log"
     log.write_text(message)
     assert workflow._worker_log_reports_authentication_failure([log]) is expected
+
+
+def test_worker_without_read_file_capability_stops_at_preflight(tmp_path, monkeypatch):
+    root = tmp_path / 'profile/skills/clinical-document-generation'
+    root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, '_managed_hermes_pair', lambda: (tmp_path / 'bin/hermes', Path('/fake/python')))
+    monkeypatch.setattr(workflow.subprocess, 'run', lambda command, **kwargs:
+        subprocess.CompletedProcess(command, 0, json.dumps({
+            'logged_in': True, 'provider': 'openai-codex', 'inspection_readable': False}), ''))
+    result = workflow._production_worker_readiness(root)
+    assert result['status'] == 'blocked'
+    assert 'read_file' in result['issue']

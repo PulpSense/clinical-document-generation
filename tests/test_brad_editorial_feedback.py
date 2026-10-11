@@ -87,8 +87,8 @@ def test_methods_and_schedule_requests_do_not_demand_irrelevant_restatement():
     assert any("operational detail" in item for item in sections["confidentiality"].content_expectations)
 
     boilerplate = json.loads((ROOT / "references/fixed-clinical-boilerplate.json").read_text())
-    assert "unscheduled visit" in boilerplate["sections"]["unscheduled"].casefold()
-    assert "unscheduled contact" not in boilerplate["sections"]["unscheduled"].casefold()
+    assert "activities permitted by this protocol" in boilerplate["sections"]["unscheduled"].casefold()
+    assert "additional study-related assessment is needed" not in boilerplate["sections"]["unscheduled"].casefold()
 
 
 def test_ambispective_descriptive_considerations_do_not_require_method_repetition():
@@ -143,19 +143,26 @@ def test_content_review_explicitly_checks_section_purpose_and_editorial_relevanc
     assert "section purpose" in instructions
     assert "redundant" in instructions
     assert "self-referential" in instructions
-    assert "unsupported clinical product claims" in instructions
-    assert "generic section 16 privacy prose" in instructions
-    assert "defines a completion trigger only if the source provides one" in instructions
-    assert "speculative claim that the untested study combination outperforms alternatives" in instructions
+    assert "unsupported claims" in instructions and "qualifications" in instructions
+    reviewed = {section['section_id']: section for section in request['sections']
+                if section['artifact'] == 'protocol' and section['section_id'] != 'protocol.shell'}
+    contracts = {section.section_id: section for section in protocol_contract('Prospective')}
+    assert reviewed
+    for section_id, section in reviewed.items():
+        assert section['content_expectations'] == list(contracts[section_id].content_expectations)
+    assert request['protocol_concept_ownership']
 
 
 def test_content_review_preserves_template_copy_sequence_and_flags_conditional_privacy_scope(tmp_path):
-    request = json.loads(create_verification_requests(tmp_path, _source(), {"artifacts": []})[0].read_text())
+    source = _source()
+    source['meta']['icf_template'] = 'Sterling'
+    request = json.loads(create_verification_requests(tmp_path, source, {"artifacts": []})[0].read_text())
     instructions = request["instructions"].casefold()
-    assert "copy of all pages" in instructions
-    assert "signed and dated copy" in instructions
-    assert "existing-record collection" in instructions
-    assert "privacy" in instructions
+    assert "consent-copy and signature language" in instructions
+    assert "source-supported boundaries on access to existing records" in instructions
+    clauses = request['sterling_clause_contract']['clauses']
+    statement = next(clause for clause in clauses if clause['section_id'] == 'icf.participant-authorization')
+    assert "I will receive a signed copy of this form." in statement['validation']['required_exact_texts']
 
 
 def test_optional_short_title_never_blocks_intake_and_long_titles_get_header_fallback():
@@ -336,7 +343,7 @@ def test_design_and_analysis_requests_keep_each_fact_in_its_own_section():
     bias = _section_payload(sections["study-design.bias"], boilerplate, source)
     method = _section_payload(sections["analysis-plan.methodology"], boilerplate, source)
     assert "design.treatment_assignment" in design["minimum_evidence"]
-    assert "design.study_design" not in bias["minimum_evidence"]
+    assert "design.study_design" in bias["minimum_evidence"]
     assert "before enrollment" in " ".join(design["content_expectations"])
     assert "do not repeat" in " ".join(bias["content_expectations"]).casefold()
     method_scope = next(item["value"] for item in method["evidence_scopes"] if item["path"] == "statistics.analysis_plan")
@@ -346,7 +353,7 @@ def test_design_and_analysis_requests_keep_each_fact_in_its_own_section():
 
 def test_editorial_contracts_do_not_feed_other_sections_into_introduction_or_closeout():
     sections = {item.section_id: item for item in protocol_contract("Prospective")}
-    assert sections["introduction"].evidence == ("study.background",)
+    assert sections["introduction"].evidence == ("study.background", "study.references")
     assert sections["introduction"].source_coverage == "rationale_summary"
     assert sections["objectives"].evidence == ("objectives.primary", "objectives.secondary")
     assert sections["endpoint-criteria.study-completion"].evidence == ("study.timeline", "study.completion")
@@ -363,7 +370,7 @@ def test_editorial_contracts_do_not_feed_other_sections_into_introduction_or_clo
     assert "visual acuity" not in scoped.casefold()
 
     bias = _section_payload(sections["study-design.bias"], boilerplate, source)
-    assert "design.study_design" not in bias["minimum_evidence"]
+    assert "design.study_design" in bias["minimum_evidence"]
     source["design"]["study_design"] = "Randomized, double-masked study with allocation concealment."
     controlled_bias = _section_payload(sections["study-design.bias"], boilerplate, source)
     assert "design.study_design" in controlled_bias["minimum_evidence"]

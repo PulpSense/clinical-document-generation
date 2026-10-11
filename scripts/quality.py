@@ -62,6 +62,7 @@ class ReviewEvidenceError(ValueError):
 
 VERIFY_SCHEMA = "hermes-verification/v1"
 RESPONSE_SCHEMA = "hermes-verification-response/v1"
+INSPECTION_FAILURE_TYPES = {"native_inspection_incomplete", "inspection_unavailable", "permission_denied"}
 FINAL_REVIEW_SCHEMA = "final-exact-artifact-review/v1"
 FINAL_REVIEW_SCOPE = "complete_branch_document_set"
 CONTENT_CHECKS = ("substantive", "source_supported", "no_invention", "no_internal_language", "cross_document_consistent")
@@ -444,6 +445,12 @@ def verification_request_authentication_findings(
             "verification_request_exact_bytes_mismatch",
             "Verification request bytes differ from the workflow-owned canonical request bytes.",
         )]
+    for inspection in request.get("native_inspection", []):
+        for path_key, hash_key in (("path", "sha256"), ("native_path", "native_sha256")):
+            path = revision_dir / str(inspection.get(path_key) or "")
+            if (not _revision_owned_nonsymlink_path(revision_dir, path)
+                    or not path.is_file() or sha256_file(path) != inspection.get(hash_key)):
+                return [finding("native_inspection_changed", "Native inspection evidence or its exact native file changed; rebuild the review from current bytes.")]
     return []
 
 
@@ -4672,13 +4679,16 @@ def content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]
             "section_id": section.section_id,
             "number": section.number,
             "title": section.title,
+            "content_expectations": list(section.content_expectations),
         }
         for section in protocol_contract(branch)
         if section_applies(reference, section)
     ]
     if branch != "Retrospective":
         choice = str(get_path(reference, "meta.icf_template", "Advarra"))
-        sections.extend({"artifact": "icf", "section_id": section.section_id, "number": section.number, "title": section.title} for section in icf_contract(branch, choice))
+        sections.extend({"artifact": "icf", "section_id": section.section_id, "number": section.number,
+                         "title": section.title, "content_expectations": list(section.content_expectations)}
+                        for section in icf_contract(branch, choice))
         sections.extend({"artifact": "icf", "section_id": section_id, "number": "", "title": title} for section_id, title in icf_retained_sections(branch, choice))
         sections.extend((
             {"artifact": "study.xml", "section_id": "prs.brief-summary", "number": "", "title": "Brief Summary"},
@@ -5144,6 +5154,54 @@ def _assert_safe_mutation_path(path: Path, *, directory: bool | None = None) -> 
             raise ValueError(f"Verification request path is unsafe: {current}")
 
 
+def _native_inspection_views(revision_dir: Path, artifacts: list[dict[str, Any]], review_set: int) -> list[dict[str, Any]]:
+    """Expose complete native XML through the worker's ordinary read-file path."""
+    views = []
+    for artifact in artifacts:
+        native = revision_dir / artifact["path"]
+        if native.suffix.casefold() not in {".docx", ".xml"}:
+            continue
+        if native.suffix.casefold() == ".docx":
+            with zipfile.ZipFile(native) as archive:
+                if archive.testzip() is not None:
+                    raise ValueError(f"Unreadable native package: {native.name}")
+                parts = {name: archive.read(name).decode("utf-8-sig")
+                         for name in archive.namelist() if name.endswith((".xml", ".rels"))}
+        else:
+            parts = {native.name: native.read_text(encoding="utf-8-sig")}
+        readable_parts = {}
+        for name, xml in parts.items():
+            root = ET.fromstring(xml.encode("utf-8"), parser=ET.XMLParser(resolve_entities=False, no_network=True))
+            # Word commonly stores a whole part on one enormous line. Expose
+            # XML as short lines so read_file pagination cannot omit its tail.
+            readable_parts[name] = ET.tostring(root, encoding="unicode", pretty_print=True).splitlines()
+        path = revision_dir / f"hermes/native-inspection/review-{review_set}/{native.name}.json"
+        payload = {"native_path": artifact["path"], "native_sha256": artifact["sha256"],
+                   "xml_parts": readable_parts}
+        _assert_safe_mutation_path(path, directory=False)
+        if path.exists() and _json(path) != payload:
+            raise ValueError("Native inspection identity collision; start a fresh review set.")
+        _write(path, payload)
+        views.append({"artifact": artifact["artifact"], **{key: payload[key] for key in ("native_path", "native_sha256")},
+                      "path": path.relative_to(revision_dir).as_posix(), "sha256": sha256_file(path)})
+    return views
+
+
+def retain_verification_response(revision_dir: Path, request_path: Path) -> None:
+    """Keep exact rejected bytes before retrying the immutable review request."""
+    request = _json(request_path)
+    response_path = revision_dir / str(request["response_path"])
+    if not _revision_owned_nonsymlink_path(revision_dir, response_path):
+        raise ValueError("Rejected verification response must be revision-owned.")
+    _assert_safe_mutation_path(response_path, directory=False)
+    if not response_path.is_file():
+        return
+    path = revision_dir / f"hermes/verification-rejections/{sha256_file(response_path)}.json"
+    _assert_safe_mutation_path(path, directory=False)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(response_path.read_bytes())
+
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -5180,6 +5238,14 @@ def create_verification_requests(
         authorized_boilerplate["sections"], reference)
     cross_document_checks = [] if branch == "Retrospective" else list(CROSS_DOCUMENT_CHECKS)
     content_request_id = f"{revision_dir.name}.review-{review_set}.verify.content"
+    template_preservation = ""
+    if branch != "Retrospective" and str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling":
+        template_preservation = (
+            "Sterling owns its reserved title, protocol number, investigator, site, telephone and sponsor "
+            "merge tags. Preserve them unfilled, including «Protocol_No» in repeated headers and the "
+            "study-identification block. They are intentional template content, not unfinished fields or "
+            "cross-document mismatches. Review study-specific content and usable signing space normally."
+        )
     content_instructions = (
         f"This is complete review set {review_set}. Act as an independent read-only reviewer of the "
         "actual hash-bound native files in artifacts, not just accepted drafts or their construction model. "
@@ -5192,6 +5258,9 @@ def create_verification_requests(
         "across Protocol, selected ICF and PRS values. XML structural validity does not establish value fidelity. "
         "Reconcile raw visit/assessment relationships and background benefits with actual tables and prose; "
         "source_routing_obligations are evidence context, not a required separate adjudication payload. "
+        "Review section purpose and content_expectations; identify redundant or self-referential text "
+        "that obscures study facts. Preserve applicable consent-copy and signature language and "
+        "source-supported boundaries on access to existing records. "
         "Do not infer defects from word overlap, short sections, repeated identifiers or a missing optional "
         "fact. Do not invent methods, policies or clinical requirements. Review sparse but complete input "
         "proportionately; concise faithful paraphrases and negations may pass. Distinguish source-supported "
@@ -5210,6 +5279,13 @@ def create_verification_requests(
         "material finding. If a repair author disputes a concern, independently reassess its source evidence "
         "and the current native output; explain why it is resolved or preserve the concern. "
         "Never edit files or approve on the repair author's assertion alone."
+        " The native_inspection files contain complete XML parts extracted directly from these exact "
+        "native bytes, including headers, footers, text boxes and relationships. Read them using read_file "
+        "with pagination as needed; this authorized read-only path needs no terminal, unzip or execute_code. "
+        "These are native evidence, not drafting summaries. If this path is also unavailable, return blocked "
+        "with error.type native_inspection_incomplete and error.message describing the denied operation; "
+        "do not turn a tooling failure into a clinical finding or claim a completed review. "
+        "Preserve explicit ethics approval status, qualified claims and supplied citation-to-bibliography links."
     )
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
         content_instructions += (
@@ -5220,13 +5296,9 @@ def create_verification_requests(
         )
     if str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling":
         content_instructions += (
-            " Sterling IRB owns the consent front-matter merge fields for title, protocol number, "
-            "investigator, site, telephones, and sponsor. Their exact template merge tags are intentional "
-            "and must remain unfilled; do not report those tags as missing drafted content or a "
-            "Protocol/ICF mismatch. Verify the site merge tags at their first-page positions; check the "
-            "actual supplied site address in the Protocol and the PRS location components. The fixed "
-            "introduction and INFORMATION clause are retained from "
-            "the template. The exact registry statement appears only when its approved source trigger "
+            " Verify Sterling's site merge tags at their template positions; check the supplied site "
+            "address in the Protocol and PRS location components. Retain its fixed introduction and "
+            "INFORMATION clause. The exact registry statement appears only when its approved source trigger "
             "is present. Continue reviewing all study-specific ICF sections against approved evidence."
         )
     payloads = [{
@@ -5237,6 +5309,7 @@ def create_verification_requests(
         "generation_authority_sha256": sha256_value(governing_resources(repo_root, reference)),
         "review_set": review_set,
         "artifacts": content_files,
+        "native_inspection": _native_inspection_views(revision_dir, content_files, review_set),
         "approved_source": reference,
         "source_field_inventory": _source_field_inventory(reference),
         "source_routing_obligations": _bound_source_routing_obligations(revision_dir, reference),
@@ -5305,6 +5378,10 @@ def create_verification_requests(
             "response_path": f"hermes/verification-responses/{request_id}.json",
         })
     for payload in payloads:
+        payload["template_preservation"] = template_preservation
+        payload["instructions"] += " " + template_preservation
+        if payload["task"] == "rendered_page_visual_verification":
+            payload["instructions"] += " Judge layout from these bound page images and renderer; a different local renderer's pagination alone does not establish a defect."
         if review_context:
             payload["review_context"] = dict(review_context)
             payload["instructions"] += (
@@ -5627,6 +5704,12 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
     if not _text(producer.get("model_id")) or not _text(producer.get("reviewer_id")):
         return False
     status = str(response.get("status") or "").casefold()
+    error = response.get("error")
+    if (status in {"blocked", "failed"} and isinstance(error, Mapping)
+            and error.get("type") in INSPECTION_FAILURE_TYPES and _text(error.get("message"))):
+        validation_findings, evidence = validate_verifications(revision_dir, request_paths=[request_path])
+        return bool(evidence) and bool(validation_findings) and all(
+            item.get("recovery_class") == "capability_gap" for item in validation_findings)
     if status == "passed":
         if verification_response_is_complete(revision_dir, request_path):
             return True
@@ -5854,6 +5937,17 @@ def validate_verifications(
             continue
         error = response.get("error") if isinstance(response.get("error"), Mapping) else {}
         error_type = _text(error.get("type")).casefold()
+        if (response.get("status") in {"blocked", "failed"}
+                and error_type in INSPECTION_FAILURE_TYPES and _text(error.get("message"))):
+            findings.append(recovery_finding({
+                "category": "environment", "field": request["task"], "code": error_type,
+                "target_ids": [verification_target], "verification_request_id": request["request_id"],
+                "issue": _text(error["message"]),
+            }, "capability_gap"))
+            evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(),
+                "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(),
+                "response_sha256": sha256_file(response_path), "producer": producer, "status": "inspection_incomplete"}
+            continue
         transient = str(response.get("status") or "").casefold() in TRANSIENT_REVIEW_STATUSES or error_type in {
             "api_unavailable", "connection_error", "rate_limit", "timeout", "service_unavailable"
         }

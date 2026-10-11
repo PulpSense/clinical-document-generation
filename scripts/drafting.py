@@ -59,7 +59,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v24-worked-examples"
+PROMPT_VERSION = "section-drafting-v25-live-run-reliability"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -115,7 +115,8 @@ def _request_constraints() -> list[str]:
         "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
         "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
         "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
-        "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims.",
+        "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
+        "Preserve supplied numbered citations next to the Protocol claims they support and their bibliography linkage. Do not invent citations; ICF explanations use plain language.",
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",

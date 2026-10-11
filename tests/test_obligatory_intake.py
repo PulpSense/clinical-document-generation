@@ -83,7 +83,7 @@ def test_optional_supplied_evidence_survives_preparation_and_review(tmp_path, br
 
 @pytest.mark.parametrize("branch", ["Prospective", "Ambispective"])
 @pytest.mark.parametrize("family", ["statistics", "population"])
-@pytest.mark.parametrize("evidence", ["not typed rows", [{"study": "Incomplete evidence"}]])
+@pytest.mark.parametrize("evidence", ["not typed rows"])
 def test_invalid_optional_supplied_evidence_still_blocks(tmp_path, branch, family, evidence):
     reference = reference_for(branch)
     for key in ("population", "statistics"):
@@ -95,7 +95,7 @@ def test_invalid_optional_supplied_evidence_still_blocks(tmp_path, branch, famil
 
 
 @pytest.mark.parametrize("field", ["provider_study_id", "study_type"])
-def test_missing_optional_intake_prs_value_still_fails_downstream_xml(tmp_path, field):
+def test_optional_prs_omission_remains_for_ai_review_with_valid_xml(tmp_path, field):
     reference = reference_for("Prospective")
     reference["regulatory"]["prs"].pop(field, None)
     if field == "provider_study_id":
@@ -109,5 +109,40 @@ def test_missing_optional_intake_prs_value_still_fails_downstream_xml(tmp_path, 
         reference,
         {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
     )
-    assert report["status"] == "blocked"
-    assert any(row["field"] == field and row["issue"] == "Required PRS value is empty." for row in report["findings"])
+    assert report["status"] == "passed"
+    assert not report["findings"]
+
+
+@pytest.mark.parametrize("branch", ["Prospective", "Ambispective"])
+def test_observational_intake_does_not_require_an_assigned_test_article(tmp_path, branch):
+    reference = reference_for(branch)
+    reference['regulatory']['prs']['study_type'] = 'Observational'
+    reference['design']['study_design'] = 'Observational home blood pressure diary; no study-assigned treatment.'
+    reference['design'].pop('intervention_name', None)
+    reference['design'].pop('intervention_type', None)
+    result = prepare_reference(tmp_path, reference)
+    assert result['status'] == 'awaiting_approval', result
+    assert not any(row['field'].startswith('design.intervention_')
+                   for row in result['intake_review']['obligatory_inputs'])
+    assert 'observational' in result['intake_review']['instructions'].lower()
+
+
+def test_interventional_intake_still_requires_test_article(tmp_path):
+    reference = reference_for('Prospective')
+    reference['regulatory']['prs']['study_type'] = 'Interventional'
+    reference['design'].pop('intervention_name', None)
+    result = prepare_reference(tmp_path, reference)
+    assert result['status'] == 'blocked'
+    assert any(row['field'] == 'design.intervention_name' for row in result['missing'])
+
+
+@pytest.mark.parametrize("family", ["population", "statistics"])
+def test_sparse_optional_evidence_rows_remain_for_ai_review(tmp_path, family):
+    reference = reference_for('Prospective')
+    for key in ('population', 'statistics'):
+        reference[key].pop('sample_size_evidence', None)
+    reference[family]['sample_size_evidence'] = [{'study': 'Incomplete evidence'}]
+    result = prepare_reference(tmp_path, reference)
+    assert result['status'] == 'awaiting_approval'
+    prepared = json.loads((tmp_path / 'reference/study.reference.json').read_text())
+    assert prepared[family]['sample_size_evidence'] == reference[family]['sample_size_evidence']

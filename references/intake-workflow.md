@@ -23,6 +23,12 @@ directly into the client templates.
 Apply these rules to every study branch during the Extraction Pass. Preserve the
 raw evidence and show the resulting facts in the editable Source-of-Truth.
 
+- Classify observational versus interventional design from explicit evidence in
+  `regulatory.prs.study_type`. Observational studies need no assigned test article.
+  Preserve a named routine product when supplied; otherwise a descriptive activity
+  name/type may be derived from explicit facts or left not applicable. Show these
+  normalizations for approval. Do not invent a treatment assignment. Ask about real
+  contradictions, such as a payment trigger inconsistent with the schedule.
 - Represent supplied visits as rows with `visit`, supplied `timing`, and
   `procedures` assigned to that visit. Convert explicit narrative relationships
   into rows: “Screening: history. Week 8: questionnaire” already supplies those

@@ -57,7 +57,7 @@ already exist and the chosen path is the first available collision-safe name.
 
 Preserve supplied files in the run's `input/` directory. Extract source-grounded values to `reference/study.reference.json` using [reference-schema.md](references/reference-schema.md). Read [intake-workflow.md](references/intake-workflow.md) when interpreting source files. Set `meta.study_type` to the actual supported branch; resolve the Advarra/Sterling choice before source review when an ICF is required.
 
-Compare the branch's obligatory checklist with preserved evidence. Resolve extraction omissions yourself; ask one consolidated question for genuinely missing obligatory facts or material source conflicts. Preserve coherent timelines, units, addresses and paraphrases even when a parser cannot interpret them. Complete inputs can be concise. Never invent a study fact to satisfy construction.
+Compare the branch's obligatory checklist with preserved evidence. Resolve extraction omissions yourself; ask one consolidated question for genuinely missing obligatory facts or material source conflicts. Preserve coherent timelines, units, addresses and paraphrases even when a parser cannot interpret them. Complete inputs can be concise. For an explicitly observational study, record `regulatory.prs.study_type` as `Observational`; no assigned test article is required. Derive harmless activity names/types from explicit facts or record not applicable, and show normalizations for approval. Never invent a study fact to satisfy construction.
 
 ### 2. Present the editable Source-of-Truth
 

@@ -1,18 +1,18 @@
 {
-  "version": "clinical-boilerplate-v13",
+  "version": "clinical-boilerplate-v14",
   "sections": {
     "bias": "Potential sources of selection, measurement, and analysis bias will be addressed through consistent eligibility criteria, predefined assessments, and the approved analysis plan.",
     "consent": "Written informed consent will be obtained before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
-    "unscheduled": "An unscheduled visit may occur when an additional study-related assessment is needed. The reason for the visit, assessments performed, and resulting actions will be documented in the study records.",
+    "unscheduled": "Any unscheduled study contact is limited to the activities permitted by this protocol. Its reason and any activities performed are documented in the study records.",
     "discontinued-subjects": "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements.",
     "discontinuation": "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements.",
     "publication": "Study results may be presented or published only in a form that protects participant confidentiality and follows the approved publication and data-governance requirements.",
     "safety-general": "An adverse event is an unfavorable medical occurrence reported during study participation, whether or not it is considered related to a study activity. A serious adverse event is an event that results in death, is life-threatening, requires or prolongs inpatient hospitalization, causes persistent or significant disability, or is an important medical event. A device quality complaint is a reported concern about the identity, quality, durability, reliability, safety, effectiveness, or performance of the study device.",
-    "safety-monitoring": "From consent through the final scheduled study contact, study personnel will ask about relevant health changes and concerns that may be related to study activities or the study device. Reported information will be documented with the available onset, seriousness, severity, relationship, action, and outcome information.",
+    "safety-monitoring": "Safety information is collected through the study activities and reporting procedures described in this protocol.",
     "safety-reporting": "The investigator will review reported events for seriousness and possible relationship to study activities or the study device. Serious events and device quality complaints will be communicated to the sponsor and reviewing ethics committee within the timelines required by the applicable approved procedures and governing requirements.",
-    "safety-followup": "Reported safety events and device quality complaints will be followed until resolution, stabilization, or a documented determination that further follow-up is not clinically meaningful, to the extent follow-up is permitted after withdrawal.",
-    "safety-analysis": "Safety findings will be summarized descriptively using the event categories, seriousness, severity, relationship, timing, action, and outcome information available in the study data. No inferential safety analysis is planned.",
-    "ethics": "The study will be conducted under the approved protocol, applicable institutional review board requirements, and applicable ethical and privacy protections.",
+    "safety-followup": "Any planned follow-up of safety events or quality complaints follows the study procedures and collection period described in this protocol.",
+    "safety-analysis": "Safety information available in the study data is summarized descriptively.",
+    "ethics": "Applicable ethics review requirements and ethical and privacy protections govern study conduct.",
     "ethics-confidentiality": "The study will be conducted under the approved protocol, applicable institutional review board requirements, and applicable ethical and privacy protections. Study records will use appropriate identifiers and access controls. Identifiable information will be available only to authorized personnel and oversight bodies as permitted by the approved protocol and applicable law.",
     "confidentiality-cross-reference": "Confidentiality protections for study records and participant information are described in Section 16.",
     "confidentiality": "Study records will be kept confidential.",
@@ -27,7 +27,7 @@
     "retrospective-safety": "The study does not assign an intervention. Safety information will be abstracted only when it is part of the approved data set; no new clinical safety procedure is introduced by the record review.",
     "costs": "Before you sign this form, the study team will explain whether any costs are associated with the research activities and which costs, if any, are your responsibility.",
     "alternatives": "Participation is voluntary. You may choose not to participate and may discuss available care options with your treating clinician."
-    ,"protocol-sparse-risks": "Participation may involve inconvenience or discomfort associated with the study procedures described in this protocol, as well as a risk of loss of confidentiality. The safeguards described in the protocol will be used to reduce these risks."
+    ,"protocol-sparse-risks": "Participation may involve inconvenience or discomfort associated with the study procedures described in this protocol, as well as a risk of loss of confidentiality."
     ,"protocol-sparse-benefits": "Participants may receive no direct benefit from taking part. Knowledge gained from the study may contribute to a better understanding of the condition, intervention, or procedures being evaluated."
     ,"icf-sparse-risks": "Taking part may involve inconvenience or discomfort from the study procedures described in this consent form. There is also a risk that private information could be disclosed, although safeguards will be used to protect it."
     ,"icf-sparse-benefits": "You may receive no direct benefit from taking part in this study. Information learned from the study may help researchers better understand the condition, intervention, or procedures being evaluated."

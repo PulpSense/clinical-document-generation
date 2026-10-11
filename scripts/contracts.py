@@ -19,8 +19,8 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.43-shared-output-projection"
-BOILERPLATE_VERSION = "clinical-boilerplate-v13"
+CONTRACT_VERSION = "clinical-documents-v2.44-applicable-intake-and-native-review"
+BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
 CONTRACTED_TEMPLATE_BUNDLE_SCHEMA = "contracted-template-bundle/v2"
@@ -337,7 +337,8 @@ class ContractedTemplateBundleError(ValueError):
         super().__init__(self.finding["issue"])
 
 
-# Source-intake requirements mirror the documented starred fields exactly.
+# Source-intake requirements mirror the documented starred fields, with
+# observational test-article applicability selected from structured AI intake.
 # Optional supplied evidence and PRS values retain their technical validators;
 # downstream output requirements must not become extra missing-input gates.
 PROSPECTIVE_REQUIRED: tuple[RequiredInput, ...] = (
@@ -410,7 +411,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
     specific = {
         "introduction": "Write one concise clinical-background paragraph: identify the setting, summarize relevant prior evidence with its stated uncertainty, then name the evidence gap that motivates this study. Do not repeat a speculative comparison claiming the untested study combination will outperform alternative treatment patterns. Leave the study title, hypothesis, and endpoint definitions to their owning sections.",
         "objectives": "State the approved study purpose and each supplied objective concisely. Study Design owns the hypothesis and endpoint definitions; this section describes what the study aims to learn.",
-        "subjects.population": "Describe the approved population and planned sample size without adding eligibility facts.",
+        "subjects.population": "Describe who or which records make up the approved population, using the supplied population and inclusion criteria, then give the planned sample size. A count alone is not a population description. Add no eligibility facts.",
         "subjects.inclusion": "Preserve every approved inclusion criterion and the approved minimum interval without participation in another study before screening as distinct, usable criteria.",
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and the supplied numerical age limits; keep the groups distinct.",
@@ -439,7 +440,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
             "with the exact approved party name, state only that party's approved safety-event responsibilities, "
             "and name no other responsible party; also explain the approved risks and safety boundary."
         ),
-        "ethics": "Identify the designated ethics review body and preserve supplied participant-impact facts, including any absence of direct benefit, compensation terms, and how research-related concerns are reported. Do not invent a waiver, injury-care payment, or additional oversight policy.",
+        "ethics": "Identify the designated ethics review body and preserve the explicit current approval, exemption and waiver status, including not submitted or not granted. A future obligation to obtain approval does not replace current status. Preserve supplied participant-impact facts, including any absence of direct benefit, compensation terms, and how research-related concerns are reported. Do not invent a waiver, injury-care payment, or additional oversight policy.",
         "quality-safety.analysis": (
             "Explain only the approved adverse-event or safety-analysis facts supplied for this subsection; "
             "do not restate unrelated efficacy endpoints, confidence intervals, sensor outcomes, usability, "
@@ -571,10 +572,10 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("investigator-agreement", "2.", "INVESTIGATOR AGREEMENT", role="container"),
     _section_spec("general-information", "3.", "GENERAL INFORMATION", role="summary", owned_concepts=("protocol-synopsis", "endpoint-inventory")),
     _section_spec("table-of-contents", "4.", "TABLE OF CONTENTS", role="container"),
-    _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background",), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
+    _section_spec("introduction", "5.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.references"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
     _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary"), owned_concepts=("study-objectives",), brief_reference_concepts=("clinical-rationale", "primary-endpoint", "endpoint-inventory"), do_not_restate_concepts=("clinical-rationale", "endpoint-inventory")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
-    _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
+    _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size", "population.inclusion_criteria")),
     _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
@@ -606,7 +607,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("quality-safety.reporting", "13.3.", "Procedures for Recording and Reporting AEs and SAEs", "protocol-analysis-and-oversight", ("safety.adverse_events",), "safety-reporting"),
     _section_spec("quality-safety.follow-up", "13.4.", "Follow-Up of Adverse Events and Quality Complaints", "protocol-analysis-and-oversight", ("safety.follow_up",), "safety-followup"),
     _section_spec("quality-safety.analysis", "13.5.", "Safety Analyses", "protocol-analysis-and-oversight", ("statistics.analysis_plan", "safety.adverse_events"), "safety-analysis"),
-    _section_spec("ethics", "14.", "GCP, ICH AND ETHICAL CONSIDERATIONS", boilerplate="ethics", role="container"),
+    _section_spec("ethics", "14.", "GCP, ICH AND ETHICAL CONSIDERATIONS", "protocol-analysis-and-oversight", ("parties.irb", "ethics", "regulatory.prs.oversight_info"), "ethics"),
     _section_spec("ethics.confidentiality", "14.1.", "Confidentiality", "protocol-analysis-and-oversight", ("ethics.confidentiality",), "confidentiality-cross-reference"),
     _section_spec("evaluation-procedures", "15.", "STANDARD EVALUATION PROCEDURES", "protocol-operations", ("procedures.assessments", "procedures.evaluation", "procedures.visit_schedule", "procedures.visit_schedule_table", "safety.monitoring", "safety.adverse_events", "procedures.consent")),
     _section_spec("confidentiality", "16.", "CONFIDENTIALITY", "protocol-analysis-and-oversight", ("confidentiality.data_handling", "risks_benefits.privacy"), "confidentiality"),
@@ -626,10 +627,10 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("title-page", "1.", "TITLE PAGE", role="container"),
     _section_spec("investigator-agreement", "2.", "INVESTIGATOR AGREEMENT", role="container"),
     _section_spec("table-of-contents", "3.", "TABLE OF CONTENTS", role="container"),
-    _section_spec("introduction", "4.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.unmet_need", "study.title", "study.hypothesis", "endpoints.primary"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
+    _section_spec("introduction", "4.", "INTRODUCTION", "protocol-foundations", ("study.background", "study.references", "study.unmet_need", "study.title", "study.hypothesis", "endpoints.primary"), owned_concepts=("clinical-rationale",), brief_reference_concepts=("study-objectives", "primary-endpoint")),
     _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary"), owned_concepts=("study-objectives", "endpoint-inventory"), brief_reference_concepts=("clinical-rationale", "primary-endpoint"), do_not_restate_concepts=("clinical-rationale",)),
     _section_spec("subjects", "6.", "SUBJECTS", role="container"),
-    _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size")),
+    _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size", "population.inclusion_criteria")),
     _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("study-design", "7.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.arms", "design.masking")),
@@ -643,7 +644,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("sample-size", "10.", "SAMPLE SIZE JUSTIFICATION", "protocol-analysis-and-oversight", ("population.sample_size", "population.sample_justification")),
     _section_spec("confidentiality", "11.", "CONFIDENTIALITY/PUBLICATION OF THE STUDY", "protocol-analysis-and-oversight", ("risks_benefits.privacy", "confidentiality.data_handling"), "confidentiality"),
     _section_spec("quality-safety", "12.", "QUALITY COMPLAINTS AND ADVERSE EVENTS", "protocol-analysis-and-oversight", ("risks_benefits.risks", "safety.roles"), "retrospective-safety"),
-    _section_spec("ethics", "13.", "GCP, ICH AND ETHICAL CONSIDERATIONS", "protocol-analysis-and-oversight", ("parties.irb.name", "risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement", "risks_benefits.injury_handling"), "ethics"),
+    _section_spec("ethics", "13.", "GCP, ICH AND ETHICAL CONSIDERATIONS", "protocol-analysis-and-oversight", ("parties.irb", "ethics", "risks_benefits.benefits", "risks_benefits.compensation_or_reimbursement", "risks_benefits.injury_handling"), "ethics"),
 )
 
 ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
@@ -2332,11 +2333,22 @@ def _safety_party_identity(value: str) -> str:
     return " ".join(words)
 
 
+def applicable_required_inputs(reference: Mapping[str, Any]) -> tuple[RequiredInput, ...]:
+    """Select required values from the AI-supplied structured study classification."""
+    if canonical_study_type(get_path(reference, "meta.study_type")) == "Retrospective":
+        return RETROSPECTIVE_REQUIRED
+    if get_path(reference, "regulatory.prs.study_type") == "Observational":
+        return tuple(item for item in PROSPECTIVE_REQUIRED if item.field not in {
+            "design.intervention_name", "design.intervention_type",
+        })
+    return PROSPECTIVE_REQUIRED
+
+
 def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     branch = canonical_study_type(get_path(reference, "meta.study_type"))
     if not branch:
         return [{"category": "source-evidence", "field": "meta.study_type", "issue": "Study type must be Prospective, Ambispective, or Retrospective.", "required": "One supported study type."}]
-    requirements = RETROSPECTIVE_REQUIRED if branch == "Retrospective" else PROSPECTIVE_REQUIRED
+    requirements = applicable_required_inputs(reference)
     findings: list[dict[str, Any]] = []
     candidates = get_path(reference, "source.field_candidates", {})
     candidates = candidates if isinstance(candidates, Mapping) else {}
@@ -2993,6 +3005,6 @@ __all__ = [
     "CONTRACT_VERSION", "CONTRACTED_TEMPLATE_BUNDLE_SCHEMA", "DOCUMENT_SETS", "FORBIDDEN_DRAFT_LANGUAGE", "LAYOUT_FAMILY_ARTIFACTS", "LAYOUT_REPAIR_RULES", "PACKAGED_FONT_ASSETS", "RECOVERY_POLICIES", "SAFETY_ROLE_RESPONSIBILITY_CONCEPTS", "VISUAL_CHECK_DISPOSITIONS",
     "BatchSpec", "ContractedTemplateBundleError", "ICF_RETAINED_SHELL_SECTIONS", "ICF_STUDY_SECTIONS", "PROTOCOL_1_TO_19", "RETROSPECTIVE_1_TO_13", "SectionSpec",
     "batch_plan", "protocol_bibliography", "bibliographic_citation_spans", "bibliography_reference_ids", "canonical_study_type", "contract_hash", "contract_payload", "contracted_template_bundle", "contextual_clinical_boilerplate", "country_name_aliases", "document_set",
-    "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
+    "evidence_available", "facility_projection", "get_path", "icf_summary_obligations", "applicable_required_inputs", "input_findings", "meaningful", "parse_source_truth", "protocol_concept_ownership", "source_evidence_coverage_map", "state_name_aliases",
     "icf_contract", "icf_retained_sections", "protocol_contract", "protocol_table_contracts", "recovery_finding", "repair_report", "section_applies", "set_path", "source_contract", "source_truth_markdown", "sterling_clause_contract", "sterling_clause_text",
 ]

@@ -27,6 +27,7 @@ import tempfile
 import threading
 import time
 import zipfile
+import uuid
 from xml.etree import ElementTree
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -48,8 +49,8 @@ from output_recovery import (apply_xml_repairs, source_path as normalize_source_
     adopt_native_repair, NativeRepairIntegrityError, restore_native_checkpoint, native_repair_response_valid, native_read, native_file, native_files)
 from quality import ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
-from quality import VERIFY_SCHEMA
-from contracts import document_table_reference, protocol_table_contracts, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, required_input_value
+from quality import VERIFY_SCHEMA, validate_verifications, retain_verification_response
+from contracts import document_table_reference, protocol_table_contracts, applicable_required_inputs, required_input_value
 from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note, review_concern
 
 
@@ -3404,15 +3405,17 @@ def _ensure_optional_review_fields(reference: dict[str, Any], branch: str | None
 
 def _intake_review_guidance(reference: Mapping[str, Any]) -> dict[str, Any]:
     """Expose original extraction evidence to AI; do not infer a clinical conflict."""
-    branch = canonical_study_type(get_path(reference, "meta.study_type"))
-    requirements = RETROSPECTIVE_REQUIRED if branch == "Retrospective" else PROSPECTIVE_REQUIRED
+    requirements = applicable_required_inputs(reference)
     return {
         "instructions": (
             "Before requesting Source-of-Truth approval, compare the original input evidence, "
             "supplied candidate values, declared aliases and raw sample-size evidence rows with this obligatory-input checklist. "
             "AI determines whether facts are actually missing or conflicting; parser inability, "
             "paraphrases and different units or representations are not proof of a conflict. "
-            "Ask one consolidated question for actual missing obligatory facts and unresolved material "
+            "For observational studies, an assigned test article is not required. AI may derive a descriptive "
+            "activity name or classification from explicit source facts, or record not applicable; show "
+            "these normalizations in the Source-of-Truth for approval. Preserve routine product use without "
+            "implying study assignment. Ask one consolidated question for actual missing obligatory facts and unresolved material "
             "source conflicts. Keep optional inputs optional. Resolve extraction omissions from supplied "
             "evidence yourself, then regenerate the editable file and obtain one explicit approval. "
             "Do not request approval of a source whose actual material conflicts remain unresolved."
@@ -3564,6 +3567,7 @@ def validate(run_dir: Path, **_: Any) -> dict[str, Any]:
 
 def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
     handoffs = []
+    feedback_findings = list(findings or [])
     for path in paths:
         request = _read(path)
         handoff = {
@@ -3575,6 +3579,12 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings
         if request.get("task") in {"clinical_content_verification", "rendered_page_visual_verification"}:
             handoff["request_id"] = str(request["request_id"])
             handoff["request_sha256"] = str(request["request_sha256"])
+            if (revision_dir / request["response_path"]).is_file():
+                validation, _ = validate_verifications(revision_dir, request_paths=[path])
+                feedback_findings.extend(item for item in validation if item not in feedback_findings)
+            handoff["response_repair_feedback"] = [item["issue"] for item in feedback_findings
+                if item.get("verification_request_id") == request["request_id"]
+                and item.get("recovery_class") == "verifier_transient"]
         if request.get("task") == "rendered_page_visual_verification":
             handoff["fallback_owner"] = "parent"
             handoff["completion_requirement"] = "inspect_every_bound_page_image"
@@ -3585,7 +3595,7 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings
         "revision_id": revision_dir.name,
         "requests": [item["request_path"] for item in handoffs],
         "handoffs": handoffs,
-        "findings": list(findings or []),
+        "findings": feedback_findings,
         "client_outputs": [],
     }
 
@@ -5252,10 +5262,7 @@ def _production_publish_quiet_response(
     }
     request = _read(revision_dir / str(handoff.get("request_path") or "")) if verification_task else None
     for candidate in reversed(candidates):
-        if request is not None and (
-            "revision_id" not in candidate
-            or candidate.get("schema_version") == VERIFY_SCHEMA
-        ):
+        if request is not None:
             # Hermes can finish a complete visual judgment while omitting the
             # workflow-owned revision field. Bind only a response that already
             # names the exact schema, request ID, hash, and task.
@@ -5264,7 +5271,7 @@ def _production_publish_quiet_response(
             )):
                 continue
             bound = _bind_verification_response_payload(request, candidate)
-            if bound is None or not _semantic_response_matches_request(request, bound):
+            if bound is None:
                 continue
             candidate = bound
         _write(response_path, candidate)
@@ -5272,6 +5279,10 @@ def _production_publish_quiet_response(
             revision_dir, handoff,
         ):
             return True
+        if request is not None:
+            # Preserve the authenticated response so the public validator can
+            # send precise schema/assessment feedback to the next worker.
+            return False
         response_path.unlink(missing_ok=True)
     return False
 
@@ -5302,7 +5313,9 @@ def _production_agent_prompt(
         task_rule = (
             "Act as an independent clinical-content verifier. Assess every bound section and "
             "cross-document check directly from the actual hash-bound native DOCX/XML files, including "
-            "tables, headers, footers and XML values, against approved evidence. Remain read-only and "
+            "tables, headers, footers and XML values, against approved evidence. "
+            "Use the request's complete native_inspection files through read_file, with pagination; "
+            "they expose every native XML part without terminal or execute_code permission. Remain read-only and "
             "independent from drafting and repair. Use top-level `passed` when no unresolved substantive "
             "concerns remain, or `blocked` when they do; ordinary style preferences do not block."
         )
@@ -5478,13 +5491,21 @@ class WorkerAuthenticationError(RuntimeError):
 
 
 def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
-    """Read authentication status in the exact worker profile without model calls."""
+    """Exercise the installed worker read tool in its safe-mode profile without model calls."""
     launcher, interpreter = _managed_hermes_pair()
     environment = _production_subprocess_environment(skill_root)
+    environment.update({"HERMES_SAFE_MODE": "1", "HERMES_IGNORE_USER_CONFIG": "1", "HERMES_IGNORE_RULES": "1"})
+    probe_path = Path(environment["TMPDIR"]) / f"native-inspection-{uuid.uuid4().hex}.json"
+    probe_token = uuid.uuid4().hex
+    _write(probe_path, {"native_inspection_probe": probe_token})
     probe = (
-        "import json; from hermes_cli.auth import get_auth_status, get_active_provider; "
-        "s=get_auth_status(); "
+        "import json\nfrom hermes_cli.auth import get_auth_status, get_active_provider\n"
+        "s=get_auth_status()\nreadable=False\ntry:\n"
+        " from tools.file_tools import read_file_tool\n"
+        f" readable={probe_token!r} in read_file_tool({str(probe_path)!r})\n"
+        "except Exception:\n pass\n"
         "print(json.dumps({'logged_in':s.get('logged_in') is True, "
+        "'inspection_readable':readable, "
         "'provider':str(get_active_provider() or '')}))"
     )
     try:
@@ -5492,20 +5513,32 @@ def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
             [str(interpreter), "-c", probe], cwd=launcher.parent.parent.parent,
             env=environment, text=True, capture_output=True, timeout=20, check=False,
         )
-        status = json.loads(completed.stdout) if completed.returncode == 0 else {}
+        status = json.loads(completed.stdout.strip().splitlines()[-1]) if completed.returncode == 0 and completed.stdout.strip() else {}
     except (OSError, ValueError, subprocess.TimeoutExpired):
         status = {}
+    finally:
+        probe_path.unlink(missing_ok=True)
     logged_in = isinstance(status, Mapping) and status.get("logged_in") is True
+    inspection_readable = isinstance(status, Mapping) and status.get("inspection_readable") is True
+    issue = ""
+    if not logged_in:
+        issue = (
+            "The isolated Hermes worker profile has no usable login, or its status could not be checked. "
+            "Verify the selected provider login in this profile before starting a fresh study operation."
+        )
+    elif not inspection_readable:
+        issue = (
+            "The installed worker read_file tool cannot read native inspection evidence in its safe-mode profile. "
+            "Restore this authorized read path before generation."
+        )
     return {
-        "status": "passed" if logged_in else "blocked",
+        "status": "passed" if logged_in and inspection_readable else "blocked",
         "logged_in": logged_in,
         "provider": str(status.get("provider") or "") if isinstance(status, Mapping) else "",
         "profile": environment["HERMES_HOME"],
-        "assurance": "read_only_auth_status_no_model_call",
-        "issue": "" if logged_in else (
-            "The isolated Hermes worker profile has no usable login, or its status could not be checked. "
-            "Verify the selected provider login in this profile before starting a fresh study operation."
-        ),
+        "inspection_readable": inspection_readable,
+        "assurance": "safe_mode_profile_read_file_probe_no_model_call",
+        "issue": issue,
     }
 
 
@@ -6180,7 +6213,7 @@ def run_production_desktop_operation(
         if readiness["status"] != "passed":
             blocked = {
                 "status": "blocked", "stage": "worker_readiness",
-                "findings": [{"category": "environment", "field": "worker_authentication", "issue": readiness["issue"]}],
+                "findings": [{"category": "environment", "field": "worker_readiness", "issue": readiness["issue"]}],
                 "client_outputs": [], "worker_readiness": readiness,
             }
             _write(run_dir / "logs/operation-preflight.json", blocked)
@@ -8334,6 +8367,10 @@ def _quality_retry(
             "client_outputs": [],
         }
     findings = [dict(item) for item in findings]
+    capability = [item for item in findings if item.get("recovery_class") == "capability_gap"]
+    if capability:
+        return _repair_block(run_dir, "review_tooling", capability,
+                             candidate_outputs=_candidate_outputs(revision_dir))
     original_findings = [dict(item) for item in findings]
     generation_state = working_reference.setdefault("generation", {})
     expected_target_category = {
@@ -9683,12 +9720,13 @@ def generate(
             paths = [path for path in (revision_dir / "hermes/verification-requests").glob("*.json")
                      if _read(path).get("request_id") in identities]
             if paths:
+                for path in paths:
+                    retain_verification_response(revision_dir, path)
                 _clear_verification_responses(revision_dir, request_ids=identities)
-                result = _awaiting(revision_dir, stage="independent_verification", paths=paths)
-                for handoff in result["handoffs"]:
-                    handoff["response_repair_feedback"] = [row["issue"] for row in technical_reviews
-                        if row.get("verification_request_id") == handoff.get("request_id")]
-                return result
+                # Desktop resume needs actual validator findings, not only
+                # handoff-local notes that a prior pending envelope can hide.
+                return _awaiting(revision_dir, stage="independent_verification", paths=paths,
+                                 findings=technical_reviews)
         actual = [row for row in final_quality["findings"] if row.get("verification_source_finding")]
         if actual and len(actual) == len(final_quality["findings"]):
             return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
