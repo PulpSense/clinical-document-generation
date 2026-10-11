@@ -91,6 +91,7 @@ def test_skill_requires_source_truth_as_file_not_inline_chat():
 
 def test_unsigned_linux_drop_in_is_provisioned_and_smoke_tested_before_generation():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
+    instructions += (ROOT / "references/runtime-and-release.md").read_text(encoding="utf-8")
     public_interface = instructions.index("## Public interface")
     provision = instructions.index(
         '"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate',
@@ -141,26 +142,15 @@ def test_skill_keeps_each_study_in_a_named_collision_safe_run_directory():
     assert "`client_outputs` lists only passed deliverables" in policy
 
 
-def test_skill_keeps_hermes_orchestration_context_path_only_and_bounded():
+def test_skill_describes_ai_quality_and_exact_byte_complete_outcomes():
     instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-    assert "Use the returned `handoffs` as routing metadata" in instructions
-    assert "Keep request contents out of the parent orchestration context" in instructions
-    assert "one request path to each subagent" in instructions
-    assert "bounded wait for every exact `response_path`" in instructions
-    assert "The next `generate` call is the authoritative response validator" in instructions
-
-
-def test_skill_documents_natural_pagination_exact_visual_bytes_and_runtime_safe_resume():
-    instructions = (ROOT / "SKILL.md").read_text(encoding="utf-8")
-    architecture = (ROOT / "docs/specs/render-assurance-fallbacks.md").read_text(encoding="utf-8")
-    for phrase in (
-        "natural content-driven pagination",
-        "exact DOCX, PDF, and page-image hashes",
-        "resolve_python_runtime",
-        "cross-process UTC deadline",
-    ):
-        assert phrase in instructions
-        assert phrase in architecture
+    assert "document_repair" in instructions
+    assert "every-page" in instructions
+    assert "review_delivery.confirmed" in instructions
+    assert "under 25 minutes" in instructions
+    assert "45-minute" in instructions
+    assert "source_review_reply.message" in instructions
+    assert "runtime-and-release.md" in instructions
 
 
 def test_governed_renderer_authorities_require_host_office_and_only_pdfium():

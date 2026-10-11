@@ -10,7 +10,7 @@ python3 scripts/workflow.py --run-dir <run-dir> --stage prepare
 
 If the result is `blocked`, present the returned missing-input checklist and
 ask the missing questions together. If it is `awaiting_approval`, attach the
-actual Markdown file at `review_delivery.absolute_path`. Do not paste its
+actual Markdown file at `review_delivery.absolute_path`, with the accessible `review_delivery.link` in chat or a channel upload for remote host-local files. Do not paste its
 contents into chat. Preserve all `<!-- field:... -->` markers so the reviewer
 can edit and return the file. Raw inputs, JSON, templates, drafts, and reports
 remain internal.
@@ -32,9 +32,7 @@ python3 scripts/workflow.py \
 ```
 
 Reviewer-edited marked values are authoritative. Do not silently correct or
-reinterpret them. Parser errors, missing obligatory inputs, conflicting source
-candidates, and cross-field inconsistencies block approval and are returned as
-one repair report.
+reinterpret them. Parser errors, missing obligatory inputs, and unusable input schemas block approval and are returned as one repair report. AI resolves actual material source conflicts; coherent paraphrases, timelines and units are not rejected by semantic code matchers.
 
 ## 3. Approval
 
@@ -63,11 +61,11 @@ python3 scripts/workflow.py --run-dir <run-dir> --stage generate
 When the result is `awaiting_hermes`, complete every returned JSON request at
 its declared response path and rerun `generate`. Continue until `passed` or a
 truthful blocker is returned. The enclosing Desktop operation may convert a
-blocked result with a complete, verified candidate into `review_required`.
+blocked or timed-out result with a complete, usable source-trustworthy candidate into `review_required`.
 
 This loop is internal. The next reviewer-facing response after approval must be
 the complete `client_outputs` package, the complete `review_outputs` package
-with its findings report, or one consolidated technical repair blocker.
+with its findings and incomplete-assessment notice, or one consolidated technical repair blocker.
 
 Return only `client_outputs` after `status: passed`. Never deliver partial
 documents, PDFs, page PNGs, drafts, or logs.

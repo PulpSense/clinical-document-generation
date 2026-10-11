@@ -1,5 +1,7 @@
 # Clinical Document Generation
 
+Spec #103 and ADR0022 supersede conflicting semantic-gate and specialized-recovery descriptions in historical specifications. AI owns document meaning, review and general-tool correction; code owns structure, integrity and delivery.
+
 This context describes the document-generation workflow for clinical study artifacts. It names the review, rendering, and template concepts that must stay precise because small wording drift can create real delivery risk.
 
 ## Language
@@ -92,7 +94,7 @@ _Avoid_: sample XML, generated XML, XML content source
 The documents required for a study branch: Prospective and Ambispective studies require a Protocol, ICF, and PRS XML, while Retrospective studies require a Protocol.
 _Avoid_: output bundle, artifact list, case documents
 
-The Branch Document Set is decided from the approved source and released atomically: every required document passes or no client-facing document is released.
+The Branch Document Set is decided from the approved source and delivered completely. Client-ready delivery requires final independent AI review; a complete usable source-trustworthy set with unresolved concerns or incomplete assessments is review-only. Partial, corrupt or source-untrustworthy sets remain unavailable.
 
 **Canonical Approved Source**:
 The final client-provided or client-edited Source-of-Truth Markdown is the authoritative study fact record after one explicit approval; structured references and format-specific fields are derived from that exact version for generation and validation. Any later source change invalidates approval and all generated material.
@@ -143,8 +145,9 @@ The mandatory evidence-backed result showing that the exact Generated Protocol a
 _Avoid_: render status, preflight pass, renderer availability
 
 **Visual QA**:
-The deterministic and visual-agent review of rendered evidence that rejects unresolved placeholders, clipped content, unexpected blank pages, orphaned headings, split table rows, overflowing tables, duplicate sections, inconsistent styles, missing headers or footers, and TOC/page mismatches. Natural content-driven pagination is allowed.
-_Avoid_: format check, PDF check, eyeballing
+Independent AI inspection of actual rendered page images for readability, clipping, table flow, template preservation, header/footer and TOC usability. Code verifies real page evidence and exact artifact bindings; presentation heuristics do not determine visual quality. Natural content-driven pagination is allowed.
+_Avoid_: heuristic page approval, sampled-page final review
+
 
 **Prospective Protocol Path**:
 The branch of the workflow that produces prospective-study protocol documents from reviewed source inputs.
@@ -291,20 +294,23 @@ The branch-aware pre-generation contract that confirms every obligatory input fo
 _Avoid_: quality score, metadata check, input cleanup, best-effort validation
 
 **Controlled Delivery Pipeline**:
-The auditable workflow that runs independent read-only content, structure, package, visual, and Word TOC review passes, regenerates failed documents through one controlled path, reruns affected gates, and filters client-facing outputs from Internal QA Artifacts.
-_Avoid_: post-processing, output cleanup, manual QA script
+The progression from complete approved source through construction, concurrent independent content/page review, AI repair using general tools, fresh final review and complete exact-byte delivery. A complete usable trustworthy unresolved package is explicitly review-only.
+_Avoid_: per-rule recovery framework
+
 
 **Deterministic Workflow Authority**:
-The code-owned boundary for mechanically enforceable values and structures, including section identifiers, required-fact checklists, tables, XML shape, verification envelopes, hashes, template placement, and repair routing. Models supply Source-Grounded Elaboration and independent review judgments, not protocol identity or control-plane data.
-_Avoid_: model-generated envelope, AI-owned XML structure, inferred repair target
+Code-owned required-value/schema, approval/source identity, native-file readability, complete inventory, XML structure, real render evidence, review-response identity and exact-byte delivery. AI supplies clinical, semantic and visual judgments.
+_Avoid_: semantic matcher authority, registered repair surfaces
+
 
 **Client Model Choice**:
 The model selected by the client at operation time for drafting and review. The skill does not require or pin a vendor, model family, or version, and records the model actually used so newer GPT, Anthropic, or other client-selected models do not require a skill change.
 _Avoid_: required model, pinned GPT version, model allowlist
 
 **Progress-Based Recovery Ladder**:
-The ordered set of governed recovery strategies for an Internal Reliability Defect. Each retry must be tied to a specific finding and make a material semantic change in evidence, strategy, or normalized candidate content. Raw package churn is not progress. When all safe deterministic strategies are present, the exact reviewer is re-prompted for reinspection and finer localization; repairable work continues within the original 45-minute ceiling.
-_Avoid_: three blind retries, identical rerun, global attempt exhaustion
+Historical name for the superseded specialized strategy ladder. Under #103 AI chooses productive safe general-tool repairs and reassesses ineffective actions within the original operation deadline. No universal repair-count limit or per-rule registry is required.
+_Avoid_: governed edit DSL, blind repeated rebuild
+
 
 **Final Exact-Artifact Review**:
 The mandatory package-wide content and cross-document review plus every-page visual review of every exact document proposed for delivery. Intermediate repair checks may be limited to changed sections or artifacts, but no earlier or partial review can replace this final complete pass.
@@ -319,8 +325,9 @@ A post-admission failure in drafting, document or XML construction, reviewer-res
 _Avoid_: source deficiency, client blocker, reapproval trigger
 
 **Permitted Terminal Blocker**:
-A fail-closed condition outside the admitted generation contract: corrupt or changed integrity evidence, unavailable required host software, a persistent model/API/network outage, inaccessible delivery storage, a pre-generation unsupported branch or template, the fixed 45-minute ceiling, a genuine unresolved visual defect, or a Desktop-parent visual callback that still has no accepted exact response after its one unchanged-request retry. An unresolved visual defect remains unpublished and becomes regression evidence for a product fix.
-_Avoid_: drafting exhaustion, a single malformed reviewer response before its governed retry, unknown internal routing, known pagination defect
+A condition preventing usable trustworthy complete files or required technical operation: corrupted/changed source identity, unreadable or incomplete native files, unsupported XML structure, unavailable tooling or transport. The original 45-minute ceiling ends generation; complete usable source-trustworthy files can still receive an honest review-only handoff with unresolved concerns and incomplete assessments.
+_Avoid_: semantic-code veto, deadline extension
+
 
 **Document Renderer**:
 The generation capability that turns an approved Branch Document Set into rendered client documents and produces package, visual, Word TOC, and format-specific quality evidence for verification.

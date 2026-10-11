@@ -135,5 +135,5 @@ study data.
 Test Retrospective Protocol and Prospective/Ambispective with Advarra/Sterling,
 including long/short narratives, differing visit structures, optional absences,
 and deliberately introduced defects. Preserve the lifecycle module ownership and
-model flexibility; shared construction recovery remains a private workflow dependency. A structural formatting test is not clinical or visual
+model flexibility; AI repair uses the general native workspace contract; legacy registered edit surfaces are superseded by #103. A structural formatting test is not clinical or visual
 certification.

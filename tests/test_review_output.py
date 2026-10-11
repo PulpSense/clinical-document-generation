@@ -14,22 +14,23 @@ import workflow
 
 
 def _candidate_run(tmp_path: Path, monkeypatch, study_type: str = "Prospective") -> tuple[Path, Path]:
-    monkeypatch.setattr(workflow, "contracted_template_bundle", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(workflow, "_approval_valid", lambda *_args, **_kwargs: (True, ""))
     run_dir = tmp_path / "run"
     reference_path = run_dir / "reference/study.reference.json"
     reference_path.parent.mkdir(parents=True)
-    reference_path.write_text(json.dumps({
-        "approval": {"revision_id": "r-approved"},
-        "meta": {"study_type": study_type},
-    }), encoding="utf-8")
+    from test_clean_delivery import ROOT, CASES
+    reference = quality.branch_acceptance_source(ROOT, next(case for case in CASES
+        if case['descriptor']['study_type'] == study_type))
+    reference['approval'] = {'revision_id': 'r-approved'}
+    reference_path.write_text(json.dumps(reference), encoding="utf-8")
+    bundle = workflow.contracted_template_bundle(ROOT, reference)
     candidate = run_dir / "revisions/r-approved/candidate"
     candidate.mkdir(parents=True)
     for name in workflow.document_set(study_type):
         if name.endswith(".xml"):
-            ElementTree.ElementTree(ElementTree.Element("clinical_study")).write(
-                candidate / name, encoding="utf-8", xml_declaration=True,
-            )
+            authority = bundle['prs_authority']
+            workflow.generate_xml(ROOT / authority['generation_template']['path'], candidate / name, reference, {},
+                structural_template=ROOT / authority['structural_reference']['path'])
             continue
         document = Document()
         document.add_paragraph(name)
@@ -61,11 +62,11 @@ def test_content_block_exports_complete_review_only_documents_and_findings(tmp_p
     report = json.loads((run_dir / result["review_findings"]).read_text())
     assert report["findings"] == [{
         "issue": "Required consent language is absent.",
-        "document_locations": ["Document location not specified by the check"],
+        "document_locations": ["Document location not specified by the reviewer"],
     }]
     readme = (run_dir / "review-output/READ-ME-FIRST.txt").read_text()
     assert "Required consent language is absent." in readme
-    assert "automated check" in readme.casefold()
+    assert "incomplete or unresolved stage" in readme.casefold()
     assert "review" in readme.casefold()
     for item in result["review_outputs"]:
         source = candidate / Path(item["path"]).name.removeprefix("REVIEW-ONLY-")
@@ -140,7 +141,7 @@ def test_desktop_operation_finishes_with_review_required_and_keeps_client_output
 
     result = workflow.run_desktop_operation(
         run_dir, handoff_runner=lambda _handoffs, _remaining: None,
-        opener=lambda _path: b"unused", budget_seconds=30.0,
+        opener=lambda path: Path(path).read_bytes(), budget_seconds=30.0,
         runtime_identity={"executable": "/test/python", "implementation": "CPython", "version": "3.13.0"},
         release_identity={"package_fingerprint": "test-release"},
     )
@@ -156,7 +157,7 @@ def test_desktop_operation_finishes_with_review_required_and_keeps_client_output
         assert "logs/desktop-operation.json" in bundle.namelist()
     resumed = workflow.run_desktop_operation(
         run_dir, handoff_runner=lambda _handoffs, _remaining: None,
-        opener=lambda _path: b"unused", budget_seconds=30.0,
+        opener=lambda path: Path(path).read_bytes(), budget_seconds=30.0,
         runtime_identity={"executable": "/test/python", "implementation": "CPython", "version": "3.13.0"},
         release_identity={"package_fingerprint": "test-release"},
     )
@@ -194,10 +195,10 @@ def test_warning_only_drafting_response_is_accepted_and_reported(tmp_path, monke
     assert drafting.ingest_responses(tmp_path) == []
     assert (tmp_path / "hermes/accepted/icf.background.json").is_file()
     assert not (tmp_path / "hermes/rejected/warning-request.json").exists()
-    assert quality._accepted_drafting_warnings(tmp_path) == [warning]
+    assert quality._accepted_drafting_warnings(tmp_path) == []
 
 
-def test_final_quality_keeps_unreviewed_history_and_requires_a_resolution(tmp_path, monkeypatch):
+def test_final_quality_does_not_require_retired_heuristic_resolutions(tmp_path, monkeypatch):
     accepted = tmp_path / "hermes/accepted/icf.background.json"
     accepted.parent.mkdir(parents=True)
     drafting_warning = {
@@ -219,6 +220,6 @@ def test_final_quality_keeps_unreviewed_history_and_requires_a_resolution(tmp_pa
 
     report = quality.quality_report(tmp_path, reference, render, None)
 
-    assert report["status"] == "blocked"
-    assert report["warnings"] == [drafting_warning, render_warning]
-    assert all(item['code'] == 'uncertainty_resolution_required' for item in report['findings'])
+    assert report["status"] == "passed"
+    assert report["warnings"] == []
+    assert report["findings"] == []
