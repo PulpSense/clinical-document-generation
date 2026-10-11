@@ -4747,8 +4747,6 @@ def _bound_source_routing_obligations(revision_dir: Path, reference: Mapping[str
         path = revision_dir / f"candidate/{item['artifact']}.docx"
         if path.is_file():
             passage = rendered_section_snapshot(path, item["section_id"])
-            if not _review_evidence_text(passage).strip():
-                raise ReviewEvidenceError(item["artifact"], item["section_id"])
             obligations.append({**item, "artifact_passage": passage})
     return obligations
 
@@ -5153,6 +5151,7 @@ def create_verification_requests(
     *,
     contracted_bundle: Mapping[str, Any] | None = None,
     review_set: int = 1,
+    review_context: Mapping[str, Any] | None = None,
 ) -> list[Path]:
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
     content_files = []
@@ -5181,128 +5180,36 @@ def create_verification_requests(
         authorized_boilerplate["sections"], reference)
     cross_document_checks = [] if branch == "Retrospective" else list(CROSS_DOCUMENT_CHECKS)
     content_request_id = f"{revision_dir.name}.review-{review_set}.verify.content"
-    content_instructions = f"This is complete review set {review_set}. Assess every listed section against every content check."
-    if cross_document_checks:
-        content_instructions += " Assess every cross-document check."
-    content_instructions += (
-        " Findings must include target_ids for affected section IDs. Every finding must include a unique finding_id "
-        "made from ASCII letters or digits separated only by single hyphens or underscores. Confirmed prose "
-        "omissions and material editorial defects require correction through drafting. Do not "
-        "report valid stylistic alternatives as defects. Document shell, header and footer findings belong to "
-        "the code-owned protocol.shell or icf.shell section. Keep essential findings blocked until repaired "
-        "and independently verified. Explicitly harmless presentation observations remain internal and do not "
-        "veto delivery; optional polishing joins a reconstruction only when an essential repair already requires it. "
-        "Safety, invention, contradiction, source-integrity, rendering, security, package, ledger and delivery "
-        "failures remain blocking. Approved source takes precedence over "
-        "applicable Fixed Clinical Boilerplate and retained template language; authorization is not a blanket "
-        "exemption from source fidelity. Fail expanded decision authority, added termination grounds, and "
-        "conflation of completion with withdrawal or discontinuation, even in verbatim boilerplate. "
-        "Assess semantic_evidence requirements against their exact source excerpts under source_supported and no_invention. "
-        "Assess every lexical_review_caution in its named section against the approved facts and exact artifact. "
-        "These are unresolved word-matching cautions, not established omissions. A faithful paraphrase may pass "
-        "For generated DOCX metadata errors, give source_path naming the approved evidence and affected_passage as the exact scalar value. "
-        "For generated XML field errors, give source_path naming the approved evidence, affected_passage as an exact XML element or subtree, "
-        "and document_locations with its native path. These enable scoped source-bound recovery. "
-        "For source omissions, report evidence_diagnostics with source_path and unobserved_values containing "
-        "one source_excerpt per unresolved fact (and missing_numbers or required_polarity when applicable). "
-        "Keep that evidence specific to the remaining defects so recovery can recognize material progress. "
-        "Meaning is mandatory; source word overlap or an incidental group-count word is not proof of fidelity. "
-        "Do not reject accurate paraphrases merely for omitting purpose/objective wording under a PURPOSE heading. "
-        "Separate prose defects from code-owned table defects. For a Protocol table finding, set surface to "
-        "table and table_ids to the affected canonical IDs from code_owned_tables; use their owner section IDs "
-        "in target_ids. These table values are reconstructed from approved facts, not repaired by rewriting prose. "
-        "Inspect code-owned values as well as drafted prose: supplied references must remain resolvable, "
-        "names must distinguish honorifics from given names, and unknown counts must not become zero. "
-        "Check the readable presentation of raw null slots, group counts and empty optional columns; "
-        "route confirmed assembly defects to the owning shell or table. Preserve meaningful negatives. "
-        "For a shell prose finding, quote the exact affected_passage and classify all five harm flags explicitly: "
-        "material, safety_critical, contradiction, obscures_required_information and materially_unusable. "
-        "Eligible generated display prose has a narrow source-bound editing route; fixed clauses and structured "
-        "values retain their construction authority. A missing noun is repairable wording, not missing source data. "
-        "Verify that PURPOSE actually explains the aim, hypothesis and main outcome. Reject missing material hypothesis "
-        "facts and strengthened qualifications or reversed negations with category content, check source_supported, "
-        "target_ids, contradiction true for changed meaning, and exact source/passage evidence. A recognized "
-        "semantic defect is blocking; do not recategorize it as an ordinary substantive warning. "
-        "Audit each supplied source field in source_field_inventory against its applicable document surfaces, "
-        "not only accepted drafts or protocol_table_contracts. Return source_routing_assessments with exactly "
-        "one row per source_routing_obligations entry: obligation_id, status (passed/failed), rationale, "
-        "and nonempty facts. Independently enumerate ALL material relationships or benefit clauses from the "
-        "raw source_values, including conditions, exclusions, historical context, qualified possibilities "
-        "and statements of no guaranteed benefit. Each fact needs source_path, source_excerpt (exact quotation), "
-        "affected_passage (exact quotation from this obligation's artifact_passage), and disposition "
-        "preserved, not_applicable, or defect. Explain nonapplicable clinical context in rationale; do not "
-        "use an empty benefits field as evidence that the background states no benefit. General knowledge-gain "
-        "boilerplate does not preserve a supplied study-specific qualified possibility. Historical findings "
-        "are not guaranteed participant benefits, especially in retrospective record review. "
-        "For visit_relationships, verify every explicit activity-to-visit assignment in prose, lists, or "
-        "matrices against this destination, including blanks, conditions and time windows. A one-cell prose "
-        "inventory is insufficient for the evaluation-procedures table when the source explicitly allocates "
-        "activities to visits. Truly unallocated facts may remain notes. Do not trust a generated table merely "
-        "because it matches its own projection. A mapping or routing defect requires a failed assessment "
-        "and content/source_supported finding on the destination target, surface source_interpretation, "
-        "with exact source and observed passage evidence; route it to drafting, not unchanged table construction. "
-        "Only assembly differences from an otherwise correct interpretation use surface table. "
-        "In activity-by-visit source matrices, X or other "
-        "declared binary marks encode activity-to-visit relationships; verify those relationships in the schedule "
-        "tables and clinical prose rather than requiring marker glyphs in prose. Blank cells do not assign an "
-        "activity to that visit; retain unallocated activity requirements as notes without inventing assignments. "
-        "Check full site-address components and sponsor/funder "
-        "roles, duplication and concatenation on front matter. Independently reconcile narrative assessments, "
-        "safety duties and structured visit IDs, timing and procedures with both schedule tables. Preserve "
-        "unallocated assessment requirements as notes without inventing visit assignments. Cite the source path "
-        "and affected surface for omissions or contradictions. Do not fail optional fields, dates, "
-        "instruments, scoring rules, denominators, or policies that are absent from the approved source; instead "
-        "fail only an unsupported affirmative claim or an omission of supplied material evidence. "
-        "Advarra template acknowledgement of a copy of all pages during consent and a signed and dated copy "
-        "after signing describe distinct events; do not call those statements contradictory on their own. "
-        "The fixed ICF privacy authorization covers information described in the form; do not infer "
-        "existing-record collection or specific access controls from that standard clause. Note uncertainty "
-        "about its study-specific applicability as a review caution; still fail affirmative unsupported "
-        "study-specific privacy practices or a source contradiction. A document-control date may "
-        "default from approval, while an unknown version must "
-        "remain blank and must not be failed merely for "
-        "being unknown. Set top-level status exactly `passed` when essential checks pass, including when only "
-        "explicitly harmless presentation observations remain; use `blocked` for essential failures. "
-        "Do not use `failed` as the top-level status. Every section and cross-document "
-        "assessment must still be present, using `passed` or `failed` for its individual status. For Protocol "
-        "concept repetition, use protocol_concept_ownership rather than a generic similarity percentage. A finding "
-        "must identify concept_id, primary_section, secondary_section, relevant primary_paragraphs and "
-        "secondary_paragraphs, classify the secondary treatment as necessary, concise, or excessive, and set "
-        "necessary and concise to explicit booleans. Route a confirmed excessive repetition only to the secondary "
-        "section unless the primary section is incomplete. Explain the actual readability harm rather than "
-        "reporting repetition solely because a phrase appears twice."
-        " Check each section purpose and editorial relevance: flag prose that answers another section's "
-        "question instead of its own, redundant narration of a source-derived table or notes, and "
-        "self-referential filler that conveys no approved clinical fact. Identify the exact passage and the "
-        "section or table that already carries its information. Flag a full title in a Protocol running "
-        "header despite an approved short title, unrelated phases in the Section 3 follow-up synopsis, "
-        "unsupported clinical product claims in the Introduction, an endpoint inventory in Objectives, "
-        "or a speculative claim that the untested study combination outperforms alternatives even when that "
-        "prediction appears in the approved background. The Introduction should establish the relevant "
-        "prior evidence and the gap, without restating the title, hypothesis, or endpoint definition. "
-        "a hypothesis repeated as a measurement method, an endpoint restatement in Section 9.3 "
-        "that names no source-supplied assessment activity, a cross-reference-only statistical consideration, "
-        "paired-summary repetition in Section 10.3 without a distinct interpretation point, "
-        "tautological participant-completion prose that never identifies the anticipated end of planned "
-        "follow-up, and Section 11 prose that repeats its sample-size evidence table or exposes an internal "
-        "source label, "
-        "duplicated schedule prose below the Section 15 table, and generic Section 16 privacy prose that "
-        "omits supplied operational detail. Section 18.5 states the source-supplied closeout timeline and "
-        "defines a completion trigger only if the source provides one; it does not repeat participant visits "
-        "or the exit form. Section 10.3 states an interpretation limit without repeating Section 10.2's "
-        "endpoint methods. A clinically unusable section is material; minor wording preferences are "
-        "not findings. For a nonmaterial editorial_relevance finding, explicitly set material, safety_critical, "
-        "contradiction, obscures_required_information and materially_unusable to false, and give affected_passage "
-        "and recommended_action. Harmless presentation observations are internal quality notes and do not "
-        "fail their section or the package. During an already required repair a registered display passage may receive one best-effort polish; "
-        "an ineffective optional edit is retained internally, followed by fresh complete review. "
-        "Confirmed material defects are repaired automatically and reviewed again. "
-        "Identify missing safeguards or unsupported claims using the corresponding content check. "
-        "Only a meaningful remaining external limitation may use check client_limitation with "
-        "remaining_limitation true, limitation_kind external_dependency or client_environment, "
-        "why_not_repairable, recommended_action, and all five material-harm flags explicitly false. "
-        "This cannot waive an omission, source conflict, unsupported claim, missing safeguard, failed review, "
-        "unusable layout, integrity failure or incomplete document set."
+    content_instructions = (
+        f"This is complete review set {review_set}. Act as an independent read-only reviewer of the "
+        "actual hash-bound native files in artifacts, not just accepted drafts or their construction model. "
+        "Open every DOCX and inspect body paragraphs, tables including nested cells, headers, footers and "
+        "text boxes; parse all XML values and relationships. Assess every listed section and cross-document "
+        "check against approved_source, source_field_inventory and applicable authorized template language. "
+        "Missing content is reviewable: use its expected section or native path as a missing-content anchor. "
+        "Check clinical meaning, substantive omissions, unsupported claims, quantities, units, timing anchors, "
+        "cohort totals and links, negations, qualifications, consent applicability, safeguards and consistency "
+        "across Protocol, selected ICF and PRS values. XML structural validity does not establish value fidelity. "
+        "Reconcile raw visit/assessment relationships and background benefits with actual tables and prose; "
+        "source_routing_obligations are evidence context, not a required separate adjudication payload. "
+        "Do not infer defects from word overlap, short sections, repeated identifiers or a missing optional "
+        "fact. Do not invent methods, policies or clinical requirements. Review sparse but complete input "
+        "proportionately; concise faithful paraphrases and negations may pass. Distinguish source-supported "
+        "hypotheses from established results; do not strengthen their claims. Review applicable consent and "
+        "template language in context, including required legal text and its study-specific substitutions. "
+        "For each substantive finding return unique finding_id, artifact, target_ids, check, issue, source_path "
+        "and source_excerpt or applicable template evidence, affected_passage or missing-content anchor, "
+        "document_locations when useful, and recommended_action. Describe the actual concern and correction "
+        "rather than requiring a pre-registered edit surface. Batch findings from the whole package. "
+        "Ordinary stylistic preferences are internal notes and require no repair or warning. If reporting a "
+        "harmless presentation observation, explicitly set material, safety_critical, contradiction, "
+        "obscures_required_information and materially_unusable to false and pass the affected assessments. "
+        "Return every requested section_assessment and cross_document_assessment with the requested checks. "
+        "Use top-level passed when substantive concerns are resolved; use blocked for substantive defects "
+        "and identify their failed assessments. A generic pass cannot conceal an explicitly unresolved "
+        "material finding. If a repair author disputes a concern, independently reassess its source evidence "
+        "and the current native output; explain why it is resolved or preserve the concern. "
+        "Never edit files or approve on the repair author's assertion alone."
     )
     if branch != "Retrospective" and not meaningful(get_path(reference, "procedures.completion")):
         content_instructions += (
@@ -5351,6 +5258,8 @@ def create_verification_requests(
         "cross_document_checks": cross_document_checks,
         "instructions": content_instructions,
         "reviewer_policy": {
+            "native_file_inspection_required": True,
+            "independent_from_repair_author": True,
             "producer_reviewer_id_required": True,
             "producer_model_id_required": True,
         },
@@ -5385,7 +5294,7 @@ def create_verification_requests(
             "page_renderer": artifacts[0].get("page_renderer", render_report.get("page_renderer")) if artifacts else render_report.get("page_renderer"),
             "artifacts": request_artifacts,
             "checks": list(VISUAL_CHECKS),
-            "instructions": f"This is complete review set {review_set}. Inspect every supplied page image for this document. Do not infer pass from file existence or document text. Every repairable failure must identify artifact, check, and the exact element text of the affected heading or table caption so the repair remains local. Route a split inside the Protocol Section 3 summary table with element exactly `3. GENERAL INFORMATION`. Require whole-word readable table headers at normal review scale; merely decipherable broken words are not sufficient. Any purported approved layout exception must cite its originating approval artifact and exact rule; a prior reviewer assertion or repair note repeating it is not approval provenance. Inspect sparse-body diagnostics as visual context, including isolated prose before a forced break and mostly empty terminal choice pages. Resolve every unknown TOC destination in toc_destinations by inspecting the cached TOC and the actual heading page images; unknown is not a passing destination check. Do not universally fail short title, signature or consent surfaces, and never delete consent content or usable signing space to save a page. A sentence continuing completely across a page boundary is not a content error; assess its layout and surrounding context instead.",
+            "instructions": f"This is complete review set {review_set}. Independently open and inspect every supplied page PNG for this document; file existence, extracted text and prior reviewer conclusions cannot establish visual approval. Assess every requested check on every page for readability, clipping, table usability, heading flow, headers/footers, signing space, template layout and actual TOC destinations. Natural pagination and short title, signature or consent pages may be correct. Preserve applicable consent content and usable signing space. Report substantive visual defects with artifact, page, check, element (visible heading/caption or a descriptive missing-content anchor), issue and recommended_action. No pre-registered layout rule is required. Batch actual defects; omit ordinary stylistic preferences. Reassess repaired files from these fresh images, independently of the repair author.",
             "reviewer_policy": {
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",
@@ -5396,6 +5305,14 @@ def create_verification_requests(
             "response_path": f"hermes/verification-responses/{request_id}.json",
         })
     for payload in payloads:
+        if review_context:
+            payload["review_context"] = dict(review_context)
+            payload["instructions"] += (
+                " Independently reassess the prior concerns and repair-author evidence in review_context "
+                "against these current native files/page images. Explain each substantive concern's "
+                "resolution in the relevant assessment notes or preserve it as a finding; a generic "
+                "pass or the repair author's claim alone does not resolve an explicit concern."
+            )
         payload["contracted_template_bundle"] = bundle
         payload["request_sha256"] = verification_request_sha256(payload)
     expected = {payload["request_id"]: payload for payload in payloads}
@@ -5740,6 +5657,44 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
             for item in validation_findings
         )
     return False
+
+
+def _prior_concern_review_errors(request: Mapping[str, Any], response: Mapping[str, Any]) -> list[str]:
+    """Require visible independent reassessment of actual prior concerns, not rule adjudications."""
+    context = request.get("review_context")
+    if not isinstance(context, Mapping):
+        return []
+    errors = []
+    visual = request.get("task") == "rendered_page_visual_verification"
+    assessments = response.get("page_assessments" if visual else "section_assessments", [])
+    reported = response.get("findings", [])
+    for prior in context.get("prior_findings", []):
+        if not isinstance(prior, Mapping):
+            continue
+        nested = prior.get("verification_source_finding")
+        concern = {**prior, **(nested if isinstance(nested, Mapping) else {})}
+        if reviewed_presentation_only(concern):
+            continue
+        is_visual = concern.get("category") == "visual" or str(concern.get("check", "")) in VISUAL_CHECKS
+        if visual != is_visual:
+            continue
+        identity = str(concern.get("finding_id") or "")
+        if not identity:
+            continue
+        if any(isinstance(row, Mapping) and row.get("finding_id") == identity for row in reported):
+            continue  # the concern remains reported, rather than silently cleared
+        targets = concern.get("target_ids") or []
+        artifact = concern.get("artifact")
+        matched = any(
+            isinstance(row, Mapping)
+            and (not artifact or row.get("artifact") == artifact)
+            and (visual or not targets or row.get("section_id") in targets)
+            and _notes_cite_finding(row.get("notes"), identity)
+            for row in assessments
+        )
+        if not matched:
+            errors.append(f"Prior substantive concern {identity} requires independent reassessment in the relevant assessment notes or a retained finding.")
+    return errors
 
 
 def validate_verifications(
@@ -6261,16 +6216,12 @@ def validate_verifications(
                 page.get("status") != "passed" for page in valid_page_rows
             ):
                 findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing visual response contains a non-passing page assessment."}, "verifier_transient"))
+        findings.extend(recovery_finding({
+            "category": "verification", "field": "review_context",
+            "target_ids": [verification_target], "verification_request_id": request["request_id"],
+            "issue": message,
+        }, "verifier_transient") for message in _prior_concern_review_errors(request, response))
         resolution_records, resolution_errors = ([], [])
-        if request["task"] == "clinical_content_verification":
-            routing_errors = source_routing_assessment_errors(request, response)
-            findings.extend(recovery_finding({
-                "category": "verification", "field": "source_routing_assessments",
-                "code": "source_routing_assessment_invalid", "target_ids": [verification_target],
-                "publication_disposition": "blocking",
-                "verification_request_id": request["request_id"], "issue": message,
-            }, "verifier_transient") for message in routing_errors)
-            resolution_errors.extend(routing_errors)
         _localize_recovery_findings(findings, resolution_records if not resolution_errors else [], request)
         evidence[evidence_key] = {
             "uncertainty_resolutions": resolution_records if not resolution_errors else [],
