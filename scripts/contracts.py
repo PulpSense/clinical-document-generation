@@ -79,31 +79,24 @@ def canonical_review_surface(value: Any) -> str:
             'body': 'document_shell', 'prose': 'narrative'}.get(surface, surface)
 
 
-def reviewed_presentation_only(finding: Mapping[str, Any]) -> bool:
-    """Interpret an authenticated review, never a deterministic finding producer.
+def review_concern(finding: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose the original AI concern with nested evidence taking precedence."""
+    nested = finding.get("verification_source_finding")
+    return {**finding, **(nested if isinstance(nested, Mapping) else {})}
 
-    Explicit harm assessments govern presentation. Essential checks and unknown
-    checks retain their authority even when a response claims harmlessness.
-    """
-    if not all(finding.get(flag) is False for flag in (
-        'material', 'safety_critical', 'contradiction',
-        'obscures_required_information', 'materially_unusable',
-    )) or finding.get('source_clarification_required'):
-        return False
-    category = finding.get('category')
-    if not isinstance(category, str) or category not in {'content', 'editorial'} or finding.get('code'):
-        return False
-    check = str(finding.get('check') or '').strip().casefold()
-    surface = canonical_review_surface(finding.get('surface'))
-    targets = finding.get('target_ids')
-    artifact = finding.get('artifact')
-    if not isinstance(artifact, str) or artifact not in {'protocol', 'icf', 'study.xml'}:
-        return False
-    shell = (surface == 'document_shell' and artifact in {'protocol', 'icf'}
-             and targets == [f"{finding['artifact']}.shell"])
-    return bool(
-        check in {'editorial_relevance', 'concept_repetition'}
-        or (check == 'substantive' and shell)
+
+def reviewed_presentation_only(finding: Mapping[str, Any]) -> bool:
+    """Respect authenticated explicit nonmaterial AI judgment, independent of check names."""
+    return (
+        all(finding.get(flag) is False for flag in (
+            'material', 'safety_critical', 'contradiction',
+            'obscures_required_information', 'materially_unusable',
+        ))
+        and not finding.get('source_clarification_required')
+        and finding.get('resolved') is not False
+        and finding.get('disposition') not in ('unresolved', 'confirmed_defect', 'source_clarification')
+        and finding.get('category') in {'content', 'editorial'}
+        and finding.get('artifact') in {'protocol', 'icf', 'study.xml'}
     )
 
 

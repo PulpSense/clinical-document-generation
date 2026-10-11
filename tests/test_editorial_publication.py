@@ -102,7 +102,7 @@ def test_icf_editorial_repetition_is_distinct_from_material_cost_disclosure(tmp_
     assert quality.verification_response_is_complete(tmp_path, path) is (not material)
 
 
-@pytest.mark.parametrize("mutation", ["material", "safety", "unknown", "wrong-owner", "missing-flag", "stale"])
+@pytest.mark.parametrize("mutation", ["material", "safety", "unknown", "wrong-owner", "missing-flag", "stale", "unresolved", "clarification"])
 def test_repetition_warning_preserves_material_and_response_guards(tmp_path, mutation):
     path, response_path, response = repetition_review(tmp_path, "Prospective", "Sterling")
     finding = response["findings"][0]
@@ -112,8 +112,11 @@ def test_repetition_warning_preserves_material_and_response_guards(tmp_path, mut
     if mutation == "wrong-owner": finding["primary_section"] = "introduction"
     if mutation == "missing-flag": del finding["material"]
     if mutation == "stale": response["request_sha256"] = "stale"
+    if mutation == "unresolved": finding["resolved"] = False
+    if mutation == "clarification": finding["source_clarification_required"] = True
     response_path.write_text(json.dumps(response))
-    assert not quality.verification_response_is_complete(tmp_path, path)
+    # Names and advisory ownership tags do not override explicit harmless AI judgment.
+    assert quality.verification_response_is_complete(tmp_path, path) is (mutation in {"unknown", "wrong-owner"})
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES)

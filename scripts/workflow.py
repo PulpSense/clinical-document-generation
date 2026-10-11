@@ -50,7 +50,7 @@ from quality import ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA
 from contracts import document_table_reference, protocol_table_contracts, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, required_input_value
-from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note
+from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note, review_concern
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -3868,9 +3868,7 @@ def _candidate_outputs(revision_dir: Path) -> list[dict[str, Any]]:
 
 def _review_finding_locations(reference: Mapping[str, Any], finding: Mapping[str, Any]) -> list[str]:
     """Preserve reviewer supplied native locations alongside recognizable section names."""
-    nested = finding.get("verification_source_finding")
-    if isinstance(nested, Mapping):
-        finding = {**finding, **nested}
+    finding = review_concern(finding)
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     protocol_sections = {section.section_id: section for section in protocol_contract(branch)}
     icf_sections = {
@@ -6362,7 +6360,13 @@ def _semantic_response_matches_request(
     request: Mapping[str, Any],
     response: Mapping[str, Any],
 ) -> bool:
-    findings = [item for item in response.get("findings", []) if isinstance(item, Mapping)]
+    raw_findings = response.get("findings")
+    if not isinstance(raw_findings, list) or any(
+        not isinstance(item, Mapping) or not isinstance(item.get("issue"), str)
+        or not item["issue"].strip() for item in raw_findings
+    ):
+        return False
+    findings = raw_findings
     if request.get("task") == "rendered_page_visual_verification":
         expected_artifacts = {
             str(item.get("artifact"))
@@ -9166,6 +9170,26 @@ def _begin_independent_review(
     return paths, []
 
 
+def _schedule_native_repair(run_dir: Path, revision_dir: Path, reference_path: Path,
+                            working_reference: dict[str, Any], reference: Mapping[str, Any],
+                            bundle: Mapping[str, Any], findings: list[dict[str, Any]],
+                            operation_deadline: float | None, clock: Callable[[], float],
+                            *, failure_stage: str, failure_category: str) -> dict[str, Any]:
+    """Persist one general-tool repair handoff for XML or independent AI findings."""
+    if operation_deadline is not None and clock() >= operation_deadline:
+        return {"status": "timeout", "stage": "document_repair", "findings": findings,
+                "candidate_outputs": _candidate_outputs(revision_dir), "client_outputs": []}
+    try:
+        repair_path = create_native_repair(revision_dir, working_reference.setdefault("generation", {}),
+            reference, bundle, findings,
+            None if operation_deadline is None else max(0.0, operation_deadline - clock()))
+    except (ValueError, OSError) as exc:
+        return _repair_block(run_dir, failure_stage, [{"category": failure_category, "issue": str(exc)}],
+                             candidate_outputs=_candidate_outputs(revision_dir))
+    _write(reference_path, working_reference)
+    return _awaiting(revision_dir, stage="document_repair", paths=[repair_path], findings=findings)
+
+
 def generate(
     run_dir: Path,
     *,
@@ -9465,19 +9489,10 @@ def generate(
                     return _repair_block(run_dir, 'internal_recovery_stalled', xml_report['findings'],
                                          candidate_outputs=_candidate_outputs(revision_dir))
                 if xml_report["status"] != "passed":
-                    if operation_deadline is not None and clock() >= operation_deadline:
-                        return {"status": "timeout", "stage": "document_repair", "findings": list(xml_report["findings"]),
-                                "candidate_outputs": _candidate_outputs(revision_dir), "client_outputs": []}
-                    # Structural XML diagnostics are tool feedback. AI may repair arbitrary
-                    # native nodes with general tools, without a registered scalar surface.
-                    try:
-                        repair_path = create_native_repair(revision_dir, state, reference, bundle,
-                            list(xml_report["findings"]),
-                            None if operation_deadline is None else max(0.0, operation_deadline - clock()))
-                    except (ValueError, OSError) as exc:
-                        return _repair_block(run_dir, "xml_structure", [{"category": "xml", "issue": str(exc)}], candidate_outputs=_candidate_outputs(revision_dir))
-                    _write(reference_path, working_reference)
-                    return _awaiting(revision_dir, stage="document_repair", paths=[repair_path], findings=list(xml_report["findings"]))
+                    # Structural XML diagnostics use the same general native tools.
+                    return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
+                        reference, bundle, list(xml_report["findings"]), operation_deadline, clock,
+                        failure_stage="xml_structure", failure_category="xml")
             restore_native_checkpoint(revision_dir, native_checkpoint, font_substitutions)
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
             _complete_pending_deterministic_reconstructions(
@@ -9676,16 +9691,9 @@ def generate(
                 return result
         actual = [row for row in final_quality["findings"] if row.get("verification_source_finding")]
         if actual and len(actual) == len(final_quality["findings"]):
-            if operation_deadline is not None and clock() >= operation_deadline:
-                return {"status": "timeout", "stage": "document_repair", "findings": actual,
-                        "candidate_outputs": _candidate_outputs(revision_dir), "client_outputs": []}
-            try:
-                repair_path = create_native_repair(revision_dir, state, reference, bundle, actual,
-                    None if operation_deadline is None else max(0.0, operation_deadline - clock()))
-            except (ValueError, OSError) as exc:
-                return _repair_block(run_dir, "integrity", [{"category": "integrity", "issue": str(exc)}], candidate_outputs=_candidate_outputs(revision_dir))
-            _write(reference_path, working_reference)
-            return _awaiting(revision_dir, stage="document_repair", paths=[repair_path], findings=actual)
+            return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
+                reference, bundle, actual, operation_deadline, clock,
+                failure_stage="integrity", failure_category="integrity")
         # Optional polish joins an already required reconstruction; a fully
         # verified package never depends on another cosmetic handoff or review.
         optional = _optional_construction_findings(revision_dir, final_quality, state)
