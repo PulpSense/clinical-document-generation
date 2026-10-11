@@ -298,8 +298,13 @@ def test_authenticated_source_conflict_stops_without_drafting_retry(tmp_path, mo
 
 
 @pytest.mark.parametrize('incomplete_resolution', [False, True])
-def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tmp_path, monkeypatch, incomplete_resolution):
+@pytest.mark.parametrize('branch,template', [
+    ('Prospective', 'Advarra'), ('Prospective', 'Sterling'),
+    ('Ambispective', 'Advarra'), ('Ambispective', 'Sterling'), ('Retrospective', ''),
+])
+def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tmp_path, monkeypatch, incomplete_resolution, branch, template):
     import rendering
+    from test_construction_reliability import source_for
     render_count = []
     review_count = []
     passage = 'Repeated repeated header'
@@ -338,10 +343,10 @@ def test_confirmed_header_defect_is_reconstructed_and_independently_rechecked(tm
         if incomplete_resolution and len(review_count) == 1:
             response['uncertainty_resolutions'] = []
         return response
-    source = json.loads((ROOT / CASES[0]['source_path']).read_text())
+    source = source_for(branch, template)
     result, _ = deliver(tmp_path, monkeypatch, source, review=review, render=render)
     assert result['status'] == 'passed', result
-    assert len(review_count) == 2
+    assert len(review_count) == 2 + int(incomplete_resolution)
     assert result['warnings'] == []
     assert passage not in Document(tmp_path / 'output/protocol.docx').sections[0].header.paragraphs[0].text
 

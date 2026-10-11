@@ -400,8 +400,9 @@ def _canonical_recovery_content_request(revision: Path) -> tuple[dict, dict]:
     ).read_text(encoding="utf-8"))
     candidate = revision / "candidate"
     candidate.mkdir(parents=True)
-    for name, data in (("protocol.docx", b"protocol"), ("icf.docx", b"icf"), ("study.xml", b"xml")):
-        (candidate / name).write_bytes(data)
+    from rendering import render_documents
+    render_documents(ROOT, revision, reference, {'protocol': [], 'icf': {}, 'prs': {}})
+    (candidate / 'study.xml').write_bytes(b'xml')
     request_id = f"{revision.name}.review-1.verify.content"
     request = {
         "schema_version": "hermes-verification-request/v2",
@@ -420,6 +421,7 @@ def _canonical_recovery_content_request(revision: Path) -> tuple[dict, dict]:
         "checks": list(CONTENT_CHECKS),
         "cross_document_checks": list(quality.CROSS_DOCUMENT_CHECKS),
         "semantic_evidence": quality.semantic_evidence_inventory(reference),
+        "source_routing_obligations": quality._bound_source_routing_obligations(revision, reference),
     }
     request["request_sha256"] = verification_request_sha256(request)
     path = revision / "hermes/verification-requests" / f"{request_id}.json"
@@ -698,3 +700,26 @@ def test_fabricated_recovery_finding_not_in_response_is_rejected(tmp_path):
         originating_finding=fabricated,
     )
     assert findings[0]["code"] == "verification_response_finding_mismatch"
+
+
+def test_matching_raw_finding_does_not_authorize_fabricated_localization(tmp_path):
+    revision = tmp_path / 'r-test'
+    reference, request = _canonical_recovery_content_request(revision)
+    source = {'issue': 'Correct this field.', 'target_ids': ['icf.procedures'],
+              'artifact': 'icf', 'check': 'substantive'}
+    _write_json(revision / request['response_path'], {
+        'schema_version': RESPONSE_SCHEMA, 'request_id': request['request_id'],
+        'request_sha256': request['request_sha256'], 'task': request['task'],
+        'revision_id': request['revision_id'], 'producer': {'model_id': 'model', 'reviewer_id': 'reviewer'},
+        'status': 'blocked', 'findings': [source],
+    })
+    finding = {**source, 'verification_request_id': request['request_id'],
+               'recovery_class': 'drafting_defect', 'verification_source_finding': source,
+               'affected_passage': 'Invented quotation',
+               'recovery_localization': {'caution_sha256s': ['forged'], 'request_sha256': request['request_sha256']}}
+    findings = verification_recovery_request_findings(
+        revision, request['request_id'], expected_task='clinical_content_verification',
+        current_review_set=1, reference=reference, render_report={}, bound_artifact='icf',
+        section_target_ids={'icf.procedures'}, originating_finding=finding,
+    )
+    assert findings[0]['code'] == 'verification_response_finding_mismatch'

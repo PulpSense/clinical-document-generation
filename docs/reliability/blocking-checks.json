@@ -1166,7 +1166,7 @@
     {
       "file": "scripts/quality.py",
       "function": "verification_recovery_request_findings",
-      "code_sha256": "8dec02a695bae41da2f32f8ecc56a79266f9512f9c54653571a67628576975e6",
+      "code_sha256": "7782bfaed80addbe2e21f2b95f420b7fa9fe79788b416fc85d2cf677fbcedbe5",
       "family": "presentation_delivery",
       "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
     },
@@ -1273,7 +1273,7 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "c5d2542f99023ed4646412514294a91e569e73c9b6ad147db5aa6c30ca92717c",
+      "code_sha256": "36ae86df9152040a3b0dc8f3d3c15ab9c1194349d20a7bf0a048746372d21dba",
       "family": "presentation_delivery",
       "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
     },
@@ -1638,7 +1638,7 @@
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
-      "code_sha256": "217ee7fffb1556f0aa802f2387558072c682f24506680dca1872baca4d0eab54",
+      "code_sha256": "a0bdd2373d3d072795c4aa96c6a622d9898a364846f25485c2bf38f75d003823",
       "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
@@ -1855,7 +1855,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "construction_repair_spec",
-      "code_sha256": "2197821e142f61a26c975b0603170f46d6279585fa8da52c8574fc29d41ff1ff",
+      "code_sha256": "c45603fcaa1d17e740fd4f84e210af7b732eb03d70dbd8a845b13a5244d1d87b",
       "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
@@ -1937,7 +1937,7 @@
     {
       "file": "scripts/drafting.py",
       "function": "_construction_finding_source",
-      "code_sha256": "3f55ebd99156368aea1ff6ad15c9c46e8cc1973cf481b26095b5779b493e3f46",
+      "code_sha256": "54a779da93e528a2fbf2c9af0d729cea91d1a936eb0b37959a9e6dc5c7c414f0",
       "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
@@ -2053,6 +2053,20 @@
       "code_sha256": "221cd41b8b76b6b8684136095b76f75415c99928ea04ecd624f574a66214dda4",
       "family": "source_bound_construction",
       "review_note": "Reviewed shared source-bound construction scope, native-span formatting, XML proposal preflight, chronological replay, per-field retry bounds and governed stale failure."
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_localize_recovery_findings",
+      "code_sha256": "b3b1c63563b881de652522118581b95c6a84ef6aa304b653058903de1c701c0b",
+      "family": "source_bound_construction",
+      "behavioral_evidence": {
+        "valid": [
+          "test_review_resolutions.py::test_validated_decision_localizes_missing_finding_passage_on_every_family"
+        ],
+        "invalid": [
+          "test_review_resolutions.py::test_missing_native_location_requests_review_instead_of_guessing"
+        ]
+      }
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

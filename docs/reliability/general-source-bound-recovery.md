@@ -86,3 +86,32 @@ Final focused results (unique cases, across scoped invocations):
   the checkout. No Linux installation or visual smoke was claimed.
 - Python compilation and staged whitespace checks passed. No full suite,
   acceptance corpus, paid certification or live Hermes campaign was run.
+
+## Recovery localization follow-up
+
+Recovery now reuses a unique exact passage from validated confirmed-defect
+decisions when the main finding omits it. Identical cautions for the same passage
+share localization; distinct passages or competing findings require reviewer
+clarification. Artifact and section scope must match. Faithful decisions and
+invalid or incomplete resolution evidence cannot authorize a correction.
+
+The original authenticated finding remains unchanged. Derived localization carries
+the caution identities and request hash, and recovery authentication recomputes
+that derivation from the bound response before using it. Progress observation and
+the source-bound DOCX/XML editor consume the derived passage. Native construction
+findings without an exact passage, or XML findings without their approved source
+path, retry independent verification instead of becoming a construction capability
+gap. This does not waive a defect or expand the editor's existing native scope.
+
+Artifact integrity is checked before source-routing passages are inspected.
+Recovery-ledger fixtures now contain actual DOCX candidates and current routing
+obligations. The outdated repetition test now supplies a material finding; existing
+paired tests retain harmless repetition as an internal observation.
+
+Focused validation: 200 passed and one Linux-only skip. This includes ten complete
+reconstruction/delivery cases across all five branch/template families, seven XML
+and metadata recovery cases, and 183 review, authority, editorial, field-contract,
+and offline-audit cases. CI includes the localization and complete reconstruction
+regressions. These use controlled model/review/render responses and do not prove
+live model judgement. No full suite, acceptance corpus, paid certification or live
+Hermes run was performed for this follow-up.

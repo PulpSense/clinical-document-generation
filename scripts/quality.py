@@ -5327,7 +5327,6 @@ def verification_recovery_request_findings(
             or list(request.get("checks") or []) != list(CONTENT_CHECKS)
             or list(request.get("cross_document_checks") or []) != expected_cross_document_checks
             or request.get("semantic_evidence") != semantic_evidence_inventory(reference)
-            or request.get("source_routing_obligations") != _bound_source_routing_obligations(revision_dir, reference)
             or request.get("approved_source") != reference
         ):
             return issue("verification_request_incomplete_scope", "The declared content verification request is not the unique complete package-wide request for the current branch and review set.")
@@ -5347,6 +5346,8 @@ def verification_recovery_request_findings(
             )
             if not exact_matches or not content_matches:
                 return issue("verification_request_stale_artifact", "The content verification request is not bound to the current exact candidate bytes.")
+        if request.get('source_routing_obligations') != _bound_source_routing_obligations(revision_dir, reference):
+            return issue('verification_request_incomplete_scope', 'The content review does not bind the current source-routing obligations.')
     else:
         expected_artifacts = {
             str(item.get("artifact") or ""): {
@@ -5520,6 +5521,14 @@ def verification_recovery_request_findings(
             )
         if not finding_matches:
             return issue("verification_response_finding_mismatch", "The proposed recovery finding is not present in the exact authenticated response.")
+        if originating_finding.get('recovery_localization'):
+            records, errors = _uncertainty_resolution_records(request, response)
+            replay = {key: value for key, value in originating_finding.items()
+                      if key not in {'affected_passage', 'recovery_localization'}}
+            _localize_recovery_findings([replay], records if not errors else [], request)
+            if (errors or replay.get('recovery_localization') != originating_finding['recovery_localization']
+                    or replay.get('affected_passage') != originating_finding.get('affected_passage')):
+                return issue('verification_response_finding_mismatch', 'Recovery localization differs from validated review evidence.')
     return []
 
 
@@ -6114,6 +6123,44 @@ def _uncertainty_resolution_records(
     if seen != set(cautions):
         errors.append("Every presented uncertainty needs an explicit source-grounded decision.")
     return records, errors
+
+
+def _localize_recovery_findings(
+    findings: list[dict[str, Any]], records: list[dict[str, Any]], request: Mapping[str, Any],
+) -> None:
+    """Reuse unique validated review evidence; ask the reviewer about ambiguity."""
+    current = [row for row in findings if row.get('verification_request_id') == request['request_id']
+               and row.get('recovery_class') in {'drafting_defect', 'deterministic_structure_defect'}
+               and row.get('publication_disposition') != 'warning']
+    # Routing an earlier finding must not make a later ambiguous one look unique.
+    original_targets = [dict(row) for row in current]
+    for finding in current:
+        source = dict(finding.get('verification_source_finding') or {})
+        targets = finding.get('target_ids', [])
+        matches = [record for record in records
+                   if record['disposition'] == 'confirmed_defect'
+                   and record['artifact'] == finding.get('artifact')
+                   and record['section_id'] in targets]
+        companions = [row for row in original_targets if row.get('artifact') == finding.get('artifact')
+                      and set(row.get('target_ids', [])) & set(targets)]
+        passages = {record['affected_passage'] for record in matches}
+        if not _text(source.get('affected_passage')) and len(passages) == len(companions) == 1:
+            finding['affected_passage'] = matches[0]['affected_passage']
+            finding['recovery_localization'] = {
+                'caution_sha256s': sorted({record['caution_sha256'] for record in matches}),
+                'request_sha256': matches[0]['request_sha256'],
+            }
+        native_target = any(target in {'protocol.shell', 'icf.shell', 'prs.structured'} for target in targets)
+        missing = not _text(source.get('affected_passage') or finding.get('affected_passage'))
+        if 'prs.structured' in targets:
+            missing = missing or not _text(source.get('source_path'))
+        if native_target and missing:
+            finding.update(recovery_finding({
+                **finding, 'target_ids': ['verification:content'],
+                'code': 'recovery_location_required',
+                'issue': 'Identify the exact affected_passage for this finding, and source_path for XML fields. '
+                         'The current review does not uniquely localize the correction. ' + finding['issue'],
+            }, 'verifier_transient'))
 
 
 def _reviewed_lexical_warnings(
@@ -6830,6 +6877,7 @@ def validate_verifications(
                 "verification_request_id": request["request_id"], "issue": message,
             }, "verifier_transient") for message in routing_errors)
             resolution_errors.extend(routing_errors)
+        _localize_recovery_findings(findings, resolution_records if not resolution_errors else [], request)
         if not resolution_errors:
             for decision in resolution_records:
                 if decision["disposition"] != "source_clarification":

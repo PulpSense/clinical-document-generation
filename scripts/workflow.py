@@ -7366,7 +7366,8 @@ def _recovery_action_observation(
                 contexts = rendered_section_snapshot(candidate_path, target)
             if target in {'protocol.shell', 'icf.shell'}:
                 source = finding.get('verification_source_finding') or finding
-                passage = str(source.get('affected_passage') or '').strip()
+                passage = str(source.get('affected_passage') or (
+                    finding.get('affected_passage') if finding.get('recovery_localization') else '') or '').strip()
                 # A change elsewhere in the document cannot establish progress
                 # on a shell sentence. Missing localization is no evidence of
                 # progress; the independent reviewer must identify the passage.

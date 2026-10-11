@@ -1,13 +1,15 @@
 """Source-grounded uncertainty decisions at the public verification boundary."""
 import json
+import pytest
 
 import quality
 from rendering import render_documents
 from test_handoff_quality import acceptance_verification, ROOT
 
 
-def review_candidate(tmp_path):
+def review_candidate(tmp_path, branch='Prospective', template='Advarra'):
     source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['meta'].update(study_type=branch, icf_template=template)
     source['procedures']['retention'] = 'Personnel will telephone participants before scheduled appointments.'
     render_documents(ROOT, tmp_path, source, {'protocol': [{
         'section_id': 'study-design.bias',
@@ -69,9 +71,92 @@ def test_resolution_cannot_quote_invented_passage_or_source(tmp_path):
         assert not quality.verification_response_is_complete(tmp_path, path)
 
 
-def test_confirmed_editorial_defect_requires_repair_instead_of_delivery_caution(tmp_path):
+@pytest.mark.parametrize('branch,template', [
+    ('Prospective', 'Advarra'), ('Prospective', 'Sterling'),
+    ('Ambispective', 'Advarra'), ('Ambispective', 'Sterling'), ('Retrospective', ''),
+])
+def test_validated_decision_localizes_missing_finding_passage_on_every_family(tmp_path, branch, template):
+    path, request, response = review_candidate(tmp_path, branch, template)
+    response['status'] = 'blocked'
+    response['findings'] = [{'finding_id': 'repair-bias', 'artifact': 'protocol', 'category': 'content',
+                             'check': 'substantive', 'target_ids': ['study-design.bias'],
+                             'issue': 'Correct the supplied method.'}]
+    for row in response['section_assessments']:
+        if row['section_id'] == 'study-design.bias': row['status'] = 'blocked'
+    caution = next(row for row in request['lexical_review_cautions'] if row['section_id'] == 'study-design.bias')
+    for decision in response['uncertainty_resolutions']:
+        if decision['caution_sha256'] == caution['caution_sha256']:
+            decision.update(faithful_decision(request), caution_sha256=caution['caution_sha256'],
+                            disposition='confirmed_defect')
+    (tmp_path / request['response_path']).write_text(json.dumps(response))
+    findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
+    finding = next(row for row in findings if row.get('check') == 'substantive')
+    assert finding['affected_passage'] == faithful_decision(request)['affected_passage']
+    assert finding['recovery_localization']['request_sha256'] == request['request_sha256']
+    # Preserve the original authenticated reviewer response.
+    assert 'affected_passage' not in json.loads((tmp_path / request['response_path']).read_text())['findings'][0]
+
+
+@pytest.mark.parametrize('target', ['protocol.shell', 'icf.shell', 'prs.structured'])
+@pytest.mark.parametrize('mode', ['missing', 'ambiguous', 'faithful', 'other-artifact', 'other-section'])
+def test_missing_native_location_requests_review_instead_of_guessing(target, mode):
+    finding = {'verification_request_id': 'review-1', 'artifact': 'protocol', 'target_ids': [target],
+               'recovery_class': 'deterministic_structure_defect', 'issue': 'Correct this field.',
+               'verification_source_finding': {}}
+    record = {'disposition': 'confirmed_defect', 'artifact': 'protocol', 'section_id': target,
+              'affected_passage': 'Wrong value', 'caution_sha256': 'caution', 'request_sha256': 'bound-request'}
+    records = [] if mode == 'missing' else [record]
+    if mode == 'ambiguous': records.append(dict(record, affected_passage='Another value'))
+    if mode == 'faithful': record['disposition'] = 'faithful'
+    if mode == 'other-artifact': record['artifact'] = 'icf'
+    if mode == 'other-section': record['section_id'] = 'subjects'
+    quality._localize_recovery_findings([finding], records, {'request_id': 'review-1'})
+    assert finding['recovery_class'] == 'verifier_transient'
+    assert finding['target_ids'] == ['verification:content']
+    assert finding['code'] == 'recovery_location_required'
+    assert not finding['verification_source_finding'].get('affected_passage')
+
+
+@pytest.mark.parametrize('target', ['protocol.shell', 'icf.shell', 'prs.structured'])
+def test_repeated_cautions_share_one_location_without_changing_supplied_source_scope(target):
+    finding = {'verification_request_id': 'review-1', 'artifact': 'protocol', 'target_ids': [target],
+               'recovery_class': 'deterministic_structure_defect', 'issue': 'Correct this field.',
+               'verification_source_finding': {'source_path': 'parties.principal_investigator.name'}}
+    record = {'disposition': 'confirmed_defect', 'artifact': 'protocol', 'section_id': target,
+              'affected_passage': 'Wrong value', 'caution_sha256': 'one', 'request_sha256': 'bound-request'}
+    quality._localize_recovery_findings([finding], [record, dict(record, caution_sha256='two')],
+                                       {'request_id': 'review-1'})
+    assert finding['recovery_class'] == 'deterministic_structure_defect'
+    assert finding['affected_passage'] == 'Wrong value'
+    assert finding['verification_source_finding']['source_path'] == 'parties.principal_investigator.name'
+    assert finding['recovery_localization']['caution_sha256s'] == ['one', 'two']
+
+
+def test_one_decision_cannot_localize_two_findings_in_the_same_section():
+    first = {'verification_request_id': 'review-1', 'artifact': 'protocol', 'target_ids': ['protocol.shell'],
+             'recovery_class': 'deterministic_structure_defect', 'issue': 'Correct this field.',
+             'verification_source_finding': {}}
+    second = dict(first)
+    record = {'disposition': 'confirmed_defect', 'artifact': 'protocol', 'section_id': 'protocol.shell',
+              'affected_passage': 'Wrong value', 'caution_sha256': 'one', 'request_sha256': 'bound-request'}
+    quality._localize_recovery_findings([first, second], [record], {'request_id': 'review-1'})
+    assert first['recovery_class'] == second['recovery_class'] == 'verifier_transient'
+
+
+def test_localization_preserves_explicit_finding_passage():
+    finding = {'verification_request_id': 'review-1', 'artifact': 'icf', 'target_ids': ['icf.shell'],
+               'recovery_class': 'deterministic_structure_defect', 'issue': 'Correct this field.',
+               'verification_source_finding': {'affected_passage': 'Explicit quotation'}}
+    quality._localize_recovery_findings([finding], [], {'request_id': 'review-1'})
+    assert finding['verification_source_finding']['affected_passage'] == 'Explicit quotation'
+    assert finding['recovery_class'] == 'deterministic_structure_defect'
+
+
+def test_material_editorial_defect_requires_repair_instead_of_delivery_caution(tmp_path):
     from test_editorial_publication import repetition_review
-    path, _, _ = repetition_review(tmp_path, 'Prospective', 'Advarra')
+    path, response_path, response = repetition_review(tmp_path, 'Prospective', 'Advarra')
+    response['findings'][0]['material'] = True
+    response_path.write_text(json.dumps(response))
     findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
     defect = next(item for item in findings if item.get('check') == 'concept_repetition')
     assert defect.get('publication_disposition') != 'warning'

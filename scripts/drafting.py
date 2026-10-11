@@ -596,6 +596,8 @@ def _construction_finding_source(finding: Any) -> Mapping[str, Any] | None:
     if not isinstance(finding, Mapping):
         return None
     source = finding.get('verification_source_finding') or finding
+    if isinstance(source, Mapping) and finding.get('recovery_localization') and not source.get('affected_passage'):
+        source = {**source, 'affected_passage': finding.get('affected_passage')}
     if (not isinstance(source, Mapping) or finding.get('recovery_class') != 'deterministic_structure_defect'
             or canonical_review_surface(source.get('surface')) != 'document_shell'
             or source.get('source_clarification_required')
@@ -628,6 +630,8 @@ def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_inde
     finding = findings[finding_index]
     sequence = 1 + sum(name.startswith('hermes/accepted/construction-') for name in manifest['files'])
     raw = finding.get('verification_source_finding') or finding
+    if isinstance(raw, Mapping) and finding.get('recovery_localization') and not raw.get('affected_passage'):
+        raw = {**raw, 'affected_passage': finding.get('affected_passage')}
     if (finding.get('recovery_class') == 'deterministic_structure_defect'
             and finding.get('artifact') == 'study.xml' and finding.get('target_ids') == ['prs.structured']
             and isinstance(raw, Mapping) and not raw.get('source_clarification_required')):
