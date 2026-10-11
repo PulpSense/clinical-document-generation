@@ -59,7 +59,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v22-source-bound-construction"
+PROMPT_VERSION = "section-drafting-v23-ai-owned-quality"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -112,14 +112,14 @@ def _request_ledger_path(revision_dir: Path, request_id: str) -> Path:
 def _request_constraints() -> list[str]:
     return [
         "The Source-of-Truth is approved and source intake is closed. Do not request additional reviewer input.",
-        "Use only supplied approved evidence and listed Fixed Clinical Boilerplate.",
+        "Use only supplied approved evidence and applicable template/Fixed Clinical Boilerplate. Align shared population, groups, quantities, timing, procedures and outcomes across the Protocol, selected ICF and PRS narratives; preserve relationships and qualifications rather than copying wording.",
         "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
         "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
         "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims.",
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
-        "Write separately contracted sections independently; do not repeat an exact sentence or paragraph, including any exact list item, across target sections unless the listed Fixed Clinical Boilerplate explicitly requires it. When contracts cover overlapping facts, express each section's distinct purpose without copying schedule prose verbatim.",
+        "Write to each section's purpose and ownership. State facts fully where owned and summarize or cross-reference them elsewhere. Necessary identifiers, quantities, timings and consent language may recur; avoid redundant narration.",
         "Use participant-facing language for ICF sections.",
         "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
         "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
@@ -128,7 +128,7 @@ def _request_constraints() -> list[str]:
         "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and do not reproduce the endpoint inventory outside Study Design unless scientific meaning requires it.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
         "Write clinical content that serves the section purpose. Omit self-referential filler, generic transitions, and repeated conclusions that add no source-supported information.",
-        "Use reference_detail_target_words only as a soft compression signal; semantic source coverage governs acceptance, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
+        "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
         "Do not use an evidence reference unless the returned prose or list actually contains the material fact it supports.",
@@ -479,19 +479,6 @@ def _section_payload(
                 "Identify the expectation as the researchers' hypothesis or use 'researchers expect'. "
                 "Label the primary measurement 'main outcome' or 'primary endpoint' and explain it in plain language."
             )
-    if section.section_id == "study-design.bias":
-        design_text = str(get_path(reference, "design.study_design") or "")
-        # A design label supplies no bias-control method. Explicit allocation,
-        # masking, or assessment controls remain source evidence when present.
-        has_bias_control = bool(re.search(
-            r"\b(?:randomi[sz](?:ed|ation)|allocation concealment|"
-            r"(?:single|double)[ -]mask(?:ed|ing)|independent assessor|"
-            r"central review|standardized assessment)\b",
-            design_text,
-            re.I,
-        ))
-        if meaningful(get_path(reference, "statistics.bias_minimization")) or not has_bias_control:
-            minimum_evidence = [path for path in minimum_evidence if path != "design.study_design"]
     if section.section_id == "endpoint-criteria.completion" and meaningful(get_path(reference, "procedures.completion")):
         minimum_evidence = [path for path in minimum_evidence if path == "procedures.completion"]
     if section.section_id == "endpoint-criteria.completion" and not meaningful(get_path(reference, "procedures.completion")):

@@ -61,10 +61,9 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   benefits label does not mean the source supplies no benefit. If none applies,
   leave the field absent; do not invent one or request extra optional input.
 
-Before requesting approval, compare the proposed Source-of-Truth with the raw
+Before requesting approval, consume `prepare.intake_review`: inspect its obligatory-input checklist, supplied representations and raw field candidates. AI determines actual missing facts and conflicts, including disagreement among candidate sources. Compare the proposed Source-of-Truth with the raw
 evidence for lost facts and changed relationships, and inspect its computed
-assessment table. Correct extraction omissions at this point. Ask one combined
-question only for Required Source Inputs or conflicts in supplied material facts;
+assessment table. Correct extraction omissions at this point. Ask one consolidated question for Required Source Inputs or actual unresolved conflicts in supplied material facts;
 representation work and optional omissions do not justify extra questions.
 
 For reused, byte-identical approvals with explicit relationships still in prose,
@@ -72,3 +71,7 @@ the drafting request may authorize a source-quoted display interpretation. This
 does not revise approval or reinterpret ambiguous evidence: unresolved assignments
 remain notes. The independent reviewer must reconcile raw source with the actual
 tables and intended narrative sections, including any qualified benefit clauses.
+
+## Source review handoff
+
+For `awaiting_approval`, attach/upload `review_delivery.absolute_path` and use `source_review_reply.message`, which contains `review_delivery.link`. Keep the clickable link in the chat reply when the client can access that file. If local attachments are unsupported, use the supported accessible-file upload/link mechanism. Ask the client to review/edit and approve that exact file once; preserve its markers and actual bytes. Source facts stay in the editable artifact, rather than a chat transcription.

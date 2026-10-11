@@ -48,7 +48,7 @@ from output_recovery import apply_xml_repairs, source_path as normalize_source_p
 from quality import ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA
-from contracts import document_table_reference, protocol_table_contracts
+from contracts import document_table_reference, protocol_table_contracts, PROSPECTIVE_REQUIRED, RETROSPECTIVE_REQUIRED, required_input_value
 from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note
 
 
@@ -3401,9 +3401,38 @@ def _ensure_optional_review_fields(reference: dict[str, Any], branch: str | None
                 outcome.setdefault("analysis_method", "")
 
 
+def _intake_review_guidance(reference: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose original extraction evidence to AI; do not infer a clinical conflict."""
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    requirements = RETROSPECTIVE_REQUIRED if branch == "Retrospective" else PROSPECTIVE_REQUIRED
+    return {
+        "instructions": (
+            "Before requesting Source-of-Truth approval, compare the original input evidence, "
+            "supplied candidate values and declared aliases with this obligatory-input checklist. "
+            "AI determines whether facts are actually missing or conflicting; parser inability, "
+            "paraphrases and different units or representations are not proof of a conflict. "
+            "Ask one consolidated question for actual missing obligatory facts and unresolved material "
+            "source conflicts. Keep optional inputs optional. Resolve extraction omissions from supplied "
+            "evidence yourself, then regenerate the editable file and obtain one explicit approval. "
+            "Do not request approval of a source whose actual material conflicts remain unresolved."
+        ),
+        "obligatory_inputs": [
+            {"field": requirement.field, "label": requirement.label or requirement.field,
+             "value": copy.deepcopy(required_input_value(reference, requirement)),
+             "supplied_representations": {
+                 path: copy.deepcopy(get_path(reference, path))
+                 for path in (requirement.field, *requirement.aliases)
+                 if get_path(reference, path) is not None
+             }} for requirement in requirements
+        ],
+        "field_candidates": copy.deepcopy(get_path(reference, "source.field_candidates", {})),
+    }
+
+
 def prepare(run_dir: Path, *, today: date | None = None, **_: Any) -> dict[str, Any]:
     """Validate mandatory inputs and create the reviewer-editable source file."""
     run_dir = run_dir.resolve(); reference_path, reference = _reference(run_dir)
+    intake_review = _intake_review_guidance(reference)
     contract = source_contract(reference, derive_prs_study_type=True)
     if contract["status"] != "passed":
         reference_dir = run_dir / "reference"
@@ -3422,6 +3451,7 @@ def prepare(run_dir: Path, *, today: date | None = None, **_: Any) -> dict[str, 
             "status": "blocked",
             "stage": "input_collection" if contract["source_gaps"] else "technical_validation",
             "study_type": contract.get("study_type"),
+            "intake_review": intake_review,
             "missing": contract["source_gaps"],
             "source_gaps": contract["source_gaps"],
             "technical_findings": contract["technical_findings"],
@@ -3450,12 +3480,18 @@ def prepare(run_dir: Path, *, today: date | None = None, **_: Any) -> dict[str, 
         "path": relative_source,
         "absolute_path": source.resolve().as_posix(),
         "filename": source.name,
+        "link": f"[{source.name}](<{source.resolve().as_posix()}>)",
         "mime_type": "text/markdown",
         "editable": True,
         "inline_chat": False,
         "must_attach": True,
     }
-    return {"status": "awaiting_approval", "stage": "source_review", "study_type": contract.get("study_type"), "source_of_truth": relative_source, "review_delivery": review_delivery, "client_outputs": []}
+    source_review_reply = {
+        "message": f"Please review or edit the Source-of-Truth: {review_delivery['link']}\n\nApprove this file when the study facts are correct.",
+        "attachments": [dict(review_delivery)],
+        "inline_source": False,
+    }
+    return {"status": "awaiting_approval", "stage": "source_review", "study_type": contract.get("study_type"), "source_of_truth": relative_source, "review_delivery": review_delivery, "source_review_reply": source_review_reply, "intake_review": intake_review, "client_outputs": []}
 
 
 def approve(run_dir: Path, *, approved_by: str = "client", source_md: Path | None = None, **_: Any) -> dict[str, Any]:
@@ -5148,9 +5184,10 @@ def _production_agent_prompt(
     elif task == "clinical_content_verification":
         task_rule = (
             "Act as an independent clinical-content verifier. Assess every bound section and "
-            "cross-document check directly from the request evidence. Use top-level status exactly "
-            "`passed` when there are no findings or exactly `blocked` when findings exist; never use "
-            "`failed` as the top-level status."
+            "cross-document check directly from the actual hash-bound native DOCX/XML files, including "
+            "tables, headers, footers and XML values, against approved evidence. Remain read-only and "
+            "independent from drafting and repair. Use top-level `passed` when no unresolved substantive "
+            "concerns remain, or `blocked` when they do; ordinary style preferences do not block."
         )
     else:
         task_rule = "Draft only the requested sections from the closed approved evidence package."
