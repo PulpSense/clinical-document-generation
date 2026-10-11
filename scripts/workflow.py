@@ -44,7 +44,8 @@ from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLI
 from drafting import governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from drafting import construction_repair_spec, construction_retry_spec, create_construction_repair_request
 from prs_xml import generate as generate_xml, validate_output as validate_xml_output, quality_report as xml_quality_report
-from output_recovery import apply_xml_repairs, source_path as normalize_source_path
+from output_recovery import (apply_xml_repairs, source_path as normalize_source_path, create_native_repair,
+    adopt_native_repair, NativeRepairIntegrityError, restore_native_checkpoint, native_repair_response_valid, native_read, native_file, native_files)
 from quality import ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA
@@ -3646,6 +3647,7 @@ def _candidate_fingerprint(
     contracted_bundle: Mapping[str, Any],
     font_substitutions: Mapping[str, str] | None = None,
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
+    native_checkpoint: Mapping[str, Any] | None = None,
 ) -> tuple[str, dict[str, Any]]:
     implementation_files = [repo_root / "scripts" / name for name in sorted(PRODUCTION_MODULES)]
     accepted_files = sorted((revision_dir / "hermes/accepted").glob("*.json"))
@@ -3656,6 +3658,7 @@ def _candidate_fingerprint(
         "implementation": {path.name: sha256_file(path) for path in implementation_files},
         "accepted_drafts": {path.relative_to(revision_dir).as_posix(): sha256_file(path) for path in accepted_files},
         "merged_model_sha256": sha256_value(model),
+        "native_checkpoint": dict(native_checkpoint or {}),
         "font_substitutions": dict(sorted((font_substitutions or {}).items())),
         "layout_repairs": {
             str(artifact): _normalized_layout_repair_records(repairs)
@@ -5090,6 +5093,14 @@ def _production_response_is_bound(
     producer_model_id = str(producer.get("model_id") or "").strip()
     if not producer_model_id:
         return False
+    if str(handoff.get("task") or "") == "document_repair":
+        if not native_repair_response_valid(request, response):
+            return False
+        try:
+            native_files(revision_dir / request["workspace_path"], list(request["base_files"]))
+        except (ValueError, OSError, KeyError):
+            return False
+        return True
     if str(handoff.get("task") or "") in {
         "clinical_content_verification", "rendered_page_visual_verification",
     }:
@@ -5189,6 +5200,19 @@ def _production_agent_prompt(
             "independent from drafting and repair. Use top-level `passed` when no unresolved substantive "
             "concerns remain, or `blocked` when they do; ordinary style preferences do not block."
         )
+    elif task == "document_repair":
+        task_rule = (
+            "Act as the repair author, not the independent reviewer. Inspect the current complete native "
+            "candidate, all findings and approved source/template evidence. Use terminal/document/XML libraries "
+            "or run-local scripts freely to correct paragraphs, tables, headers/footers, metadata or XML. "
+            "Write native outputs only inside request.workspace_path and scripts only inside request.tools_path, "
+            "both relative to the Run revision. These are the only writable run areas. Preserve exact required "
+            "file inventory, approved facts and applicable template/legal language. No registered edit surface "
+            "or typed edit proposal is required. Return hermes-response/v2 with all request bindings, "
+            "status completed, disputed or needs_review, summary and producer identity. For disputes supply "
+            "source-grounded explanations in disputes. Independent reviewers reassess actual corrected bytes. "
+            "Respect remaining_seconds and reserve time for final rendering/review/delivery."
+        )
     else:
         task_rule = "Draft only the requested sections from the closed approved evidence package."
     layout_notes = [
@@ -5236,7 +5260,7 @@ def _production_agent_prompt(
         f"Read the request completely. {task_rule}{layout_rule} Bind the exact schema_version, request_id, "
         "request_sha256, task, revision_id, target, and evidence "
         "reference exactly. producer.model_id must record the actual model used for this response, and "
-        "producer.reviewer_id must record the independent reviewer role for this response."
+        "producer.reviewer_id must record the actual author/reviewer role for this task."
         f"{response_write_rule}{verification_rule}{repair_rule} The validator interpreter is dependency-complete; do not search "
         "the filesystem for Python or dependency paths. Do not modify production code or "
         "approved source material."
@@ -5622,6 +5646,13 @@ def _production_dispatch_handoffs(
 ) -> None:
     """Run one concurrent Hermes wave under a read-only candidate boundary."""
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
+    repair_wave = any(handoff.get("task") == "document_repair" for handoff in handoffs)
+    release_manifest_hash = None
+    if repair_wave:
+        initial_integrity = _manifest_integrity(skill_root)
+        if initial_integrity:
+            raise RuntimeError("Installed skill integrity failed before document repair: " + str(initial_integrity))
+        release_manifest_hash = sha256_file(skill_root / RELEASE_MANIFEST)
     deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
     logs = run_dir / "logs/hermes-agents"
     logs.mkdir(parents=True, exist_ok=True)
@@ -5682,11 +5713,20 @@ def _production_dispatch_handoffs(
             )
             profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
             profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
+            writable_roots = [hermes_home, run_dir]
+            if handoff.get("task") == "document_repair":
+                request = native_read(native_file(revision_dir, str(handoff["request_path"])))
+                writable_roots = [hermes_home, cache_dir]
+                for key in ("workspace_path", "tools_path"):
+                    area = revision_dir / str(request[key])
+                    if area.is_symlink() or not area.is_dir() or not area.resolve().is_relative_to(revision_dir.resolve()):
+                        raise ValueError("Native repair editable area escapes its revision.")
+                    writable_roots.append(area)
+            writable_rules = " ".join(
+                f"(subpath {json.dumps(str(area.resolve()))})" for area in writable_roots)
             profile.write(
-                "(deny file-write* (require-not (require-any "
-                f"(subpath {json.dumps(str(hermes_home.resolve()))}) "
-                f"(subpath {json.dumps(str(run_dir.resolve()))}) "
-                "(literal \"/dev/null\"))))\n"
+                "(deny file-write* (require-not (require-any " + writable_rules
+                + " (literal \"/dev/null\"))))\n"
             )
             profile.write(
                 f"(deny file-write* (literal {json.dumps(str(_production_authentication_path()))}))\n"
@@ -5843,6 +5883,12 @@ def _production_dispatch_handoffs(
             raise RuntimeError(
                 "One or more production workers could not be fully reaped."
             ) from cleanup_errors[0]
+        if repair_wave and (
+            not (skill_root / RELEASE_MANIFEST).is_file()
+            or sha256_file(skill_root / RELEASE_MANIFEST) != release_manifest_hash
+            or _manifest_integrity(skill_root)
+        ):
+            raise RuntimeError("Installed skill files changed during document repair; reject this worker result.")
 
 
 def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
@@ -9011,12 +9057,13 @@ def _complete_pending_deterministic_reconstructions(
 def _begin_independent_review(
     revision_dir: Path, reference: Mapping[str, Any],
     render_report: Mapping[str, Any], bundle: Mapping[str, Any], review_set: int,
+    review_context: Mapping[str, Any] | None = None,
 ) -> tuple[list[Path], list[dict[str, Any]]]:
     """Send usable candidates directly to independent AI review."""
     try:
         paths = create_verification_requests(
             revision_dir, reference, render_report,
-            contracted_bundle=bundle, review_set=review_set,
+            contracted_bundle=bundle, review_set=review_set, review_context=review_context,
         )
     except ReviewEvidenceError as exc:
         return [], [exc.finding]
@@ -9104,6 +9151,44 @@ def generate(
                 dict(state.get("pending_recovery_plan") or {}).get("findings") or []
             ),
         )
+    if state.get("pending_native_repair"):
+        try:
+            outcome = adopt_native_repair(revision_dir, state, reference, bundle, SCRIPT_DIR.parent)
+        except NativeRepairIntegrityError as exc:
+            return _repair_block(run_dir, "integrity", [{"category": "integrity", "issue": str(exc)}], candidate_outputs=_candidate_outputs(revision_dir))
+        except (ValueError, OSError, json.JSONDecodeError) as exc:
+            pending_path = revision_dir / state["pending_native_repair"]["path"]
+            request = _read(pending_path)
+            # Technical feedback is transport/tool feedback, never a clinical finding.
+            response_path = revision_dir / request["response_path"]
+            feedback_identity = sha256_value({
+                "issue": str(exc),
+                "response": sha256_file(response_path) if response_path.is_file() else None,
+                "workspace": {path.name: sha256_file(path) for path in
+                    (revision_dir / request["workspace_path"]).glob("*") if path.is_file() and not path.is_symlink()},
+            })
+            if state.get("native_repair_feedback_identity") == feedback_identity:
+                return _repair_block(run_dir, "document_repair_no_progress", request["findings"],
+                    candidate_outputs=_candidate_outputs(revision_dir))
+            state["native_repair_feedback_identity"] = feedback_identity
+            _write(reference_path, working_reference)
+            if response_path.is_file() and not response_path.is_symlink():
+                shutil.copy2(response_path, pending_path.parent / "last-invalid-response.json")
+                response_path.unlink()
+            result = _awaiting(revision_dir, stage="document_repair", paths=[pending_path])
+            result["handoffs"][0]["response_repair_feedback"] = [str(exc)]
+            result["technical_feedback"] = str(exc)
+            return result
+        if outcome == "pending":
+            return _awaiting(revision_dir, stage="document_repair", paths=[revision_dir / state["pending_native_repair"]["path"]])
+        if outcome == "needs_review":
+            _write(reference_path, working_reference)
+            return _repair_block(run_dir, "document_repair_unresolved", state["native_repair_unresolved"]["findings"], candidate_outputs=_candidate_outputs(revision_dir))
+        _reset_verification_set(revision_dir)
+        for name in ("candidate-build.json", "candidate-structure.json"):
+            (revision_dir / name).unlink(missing_ok=True)
+        state["review_set"] = int(state.get("review_set", 1)) + 1
+        _write(reference_path, working_reference)
     attempts = state.setdefault("attempts", {})
     # Count-only exhaustion from earlier runtimes is non-authoritative. Progress
     # and the persisted deadline govern recovery; retain history but do not stop.
@@ -9167,11 +9252,22 @@ def generate(
         str(source): str(target)
         for source, target in dict(state.get("font_substitutions") or {}).items()
     }
+    native_checkpoint = state.get("native_checkpoint")
     layout_repairs = {
         str(artifact): tuple(_normalized_layout_repair_records(rules))
         for artifact, rules in dict(state.get("layout_repairs") or {}).items()
         if isinstance(rules, list)
     }
+    if native_checkpoint:
+        # Validate immutable accepted bytes before trusting cache identities.
+        try:
+            candidate_root = revision_dir / "candidate"
+            if candidate_root.is_symlink() or any(path.is_symlink() for path in candidate_root.iterdir()):
+                raise ValueError("Native candidate contains a symlinked path.")
+            if native_files(revision_dir / native_checkpoint["path"], list(native_checkpoint["files"])) != native_checkpoint["files"]:
+                raise ValueError("Accepted native repair checkpoint changed.")
+        except (ValueError, OSError) as exc:
+            return _repair_block(run_dir, "integrity", [{"category": "integrity", "issue": str(exc)}])
     fingerprint, governing = _candidate_fingerprint(
         SCRIPT_DIR.parent,
         revision_dir,
@@ -9180,6 +9276,7 @@ def generate(
         contracted_bundle=bundle,
         font_substitutions=font_substitutions,
         layout_repairs=layout_repairs,
+        native_checkpoint=native_checkpoint,
     )
     try:
         prior_build = _read(revision_dir / "candidate-build.json")
@@ -9260,51 +9357,32 @@ def generate(
                     )
                     xml_report = {**xml_report, **xml_quality_report(revision_dir / 'candidate/study.xml', reference),
                                   'status': 'blocked' if xml_findings else 'passed', 'findings': xml_findings}
+                if native_checkpoint:
+                    restore_native_checkpoint(revision_dir, native_checkpoint, font_substitutions)
+                    xml_findings = validate_xml_output(revision_dir / 'candidate/study.xml', reference,
+                        SCRIPT_DIR.parent / str(bundle['prs_authority']['structural_reference']['path']),
+                        generation_template=SCRIPT_DIR.parent / str(bundle['prs_authority']['generation_template']['path']))
+                    xml_report = {**xml_report, "status": "blocked" if xml_findings else "passed", "findings": xml_findings}
                 if xml_report["status"] != "passed" and any(
                         row.get('repair_kind') == 'xml_fields' for row in model.get('construction_repairs', [])):
                     _finalize_pending_recovery_for_terminal(revision_dir, reference_path, working_reference)
                     return _repair_block(run_dir, 'internal_recovery_stalled', xml_report['findings'],
                                          candidate_outputs=_candidate_outputs(revision_dir))
                 if xml_report["status"] != "passed":
-                    _complete_pending_deterministic_reconstructions(
-                        reference_path,
-                        working_reference,
-                        revision_dir,
-                        outcome="blocked",
-                    )
-                    _complete_pending_recovery_attempts(
-                        revision_dir,
-                        reference_path,
-                        working_reference,
-                        require_candidate_change=False,
-                        outcome_status="construction_failed",
-                    )
-                    findings = [
-                        recovery_finding(
-                            {
-                                **finding,
-                                "category": "xml",
-                                "target_ids": ["prs.structured"],
-                            },
-                            "deterministic_structure_defect",
-                        )
-                        for finding in xml_report["findings"]
-                    ]
-                    return _quality_retry(
-                        run_dir,
-                        reference_path,
-                        working_reference,
-                        reference,
-                        revision_dir,
-                        attempts,
-                        findings,
-                        "xml",
-                        contracted_bundle=bundle,
-                        operation_deadline=operation_deadline,
-                        clock=clock,
-                        stage_observer=stage_observer,
-                        require_promoted_runtime=require_promoted_runtime,
-                    )
+                    if operation_deadline is not None and clock() >= operation_deadline:
+                        return {"status": "timeout", "stage": "document_repair", "findings": list(xml_report["findings"]),
+                                "candidate_outputs": _candidate_outputs(revision_dir), "client_outputs": []}
+                    # Structural XML diagnostics are tool feedback. AI may repair arbitrary
+                    # native nodes with general tools, without a registered scalar surface.
+                    try:
+                        repair_path = create_native_repair(revision_dir, state, reference, bundle,
+                            list(xml_report["findings"]),
+                            None if operation_deadline is None else max(0.0, operation_deadline - clock()))
+                    except (ValueError, OSError) as exc:
+                        return _repair_block(run_dir, "xml_structure", [{"category": "xml", "issue": str(exc)}], candidate_outputs=_candidate_outputs(revision_dir))
+                    _write(reference_path, working_reference)
+                    return _awaiting(revision_dir, stage="document_repair", paths=[repair_path], findings=list(xml_report["findings"]))
+            restore_native_checkpoint(revision_dir, native_checkpoint, font_substitutions)
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
             _complete_pending_deterministic_reconstructions(
                 reference_path,
@@ -9345,6 +9423,7 @@ def generate(
             )
             if partial_repair:
                 document_report = _merge_artifact_reports(prior_build.get("document_report", {}), document_report)
+            restore_native_checkpoint(revision_dir, native_checkpoint, resolved)
             return document_report
 
         renderer_pins: dict[str, Any] = {}
@@ -9387,6 +9466,7 @@ def generate(
                 contracted_bundle=bundle,
                 font_substitutions=font_substitutions,
                 layout_repairs=layout_repairs,
+                native_checkpoint=native_checkpoint,
             )
             structure = _record_candidate_structure(revision_dir, fingerprint, governing, bundle, document_report, xml_report, document_set(get_path(reference, "meta.study_type")))
         assurance_report, render_report = _merge_partial_assurance(prior_build or {}, assurance_report, partial_repair)
@@ -9463,6 +9543,7 @@ def generate(
     _write(reference_path, working_reference)
     _, early_findings = _begin_independent_review(
         revision_dir, reference, render_report, bundle, review_set,
+        review_context=state.get("native_review_context"),
     )
     if early_findings:
         return _quality_retry(
@@ -9482,6 +9563,33 @@ def generate(
         if source_conflicts:
             return _repair_block(run_dir, "source_review", final_quality["findings"],
                                  candidate_outputs=_candidate_outputs(revision_dir))
+        technical_reviews = [row for row in final_quality["findings"]
+                             if row.get("recovery_class") == "verifier_transient"]
+        if technical_reviews:
+            # Retry the exact independent task envelope, retaining repair context.
+            # The retired recovery router may otherwise rewrite away that context.
+            identities = {row.get("verification_request_id") for row in technical_reviews}
+            paths = [path for path in (revision_dir / "hermes/verification-requests").glob("*.json")
+                     if _read(path).get("request_id") in identities]
+            if paths:
+                _clear_verification_responses(revision_dir, request_ids=identities)
+                result = _awaiting(revision_dir, stage="independent_verification", paths=paths)
+                for handoff in result["handoffs"]:
+                    handoff["response_repair_feedback"] = [row["issue"] for row in technical_reviews
+                        if row.get("verification_request_id") == handoff.get("request_id")]
+                return result
+        actual = [row for row in final_quality["findings"] if row.get("verification_source_finding")]
+        if actual and len(actual) == len(final_quality["findings"]):
+            if operation_deadline is not None and clock() >= operation_deadline:
+                return {"status": "timeout", "stage": "document_repair", "findings": actual,
+                        "candidate_outputs": _candidate_outputs(revision_dir), "client_outputs": []}
+            try:
+                repair_path = create_native_repair(revision_dir, state, reference, bundle, actual,
+                    None if operation_deadline is None else max(0.0, operation_deadline - clock()))
+            except (ValueError, OSError) as exc:
+                return _repair_block(run_dir, "integrity", [{"category": "integrity", "issue": str(exc)}], candidate_outputs=_candidate_outputs(revision_dir))
+            _write(reference_path, working_reference)
+            return _awaiting(revision_dir, stage="document_repair", paths=[repair_path], findings=actual)
         # Optional polish joins an already required reconstruction; a fully
         # verified package never depends on another cosmetic handoff or review.
         optional = _optional_construction_findings(revision_dir, final_quality, state)
