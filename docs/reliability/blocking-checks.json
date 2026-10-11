@@ -1,6 +1,6 @@
 {
   "schema_version": "blocking-check-audit/v3",
-  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in six production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
+  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in the declared production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
   "baseline_commit": "b35761d",
   "families": {
     "source": {
@@ -233,6 +233,29 @@
         "invalid": [
           "test_presentation_delivery.py::test_presentation_policy_cannot_hide_essential_or_incomplete_review",
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed"
+        ]
+      }
+    },
+    "source_bound_construction": {
+      "authority": "Authenticated archived candidate and immutable scoped approved evidence; independent final review",
+      "false_rejection_risk": "Ambiguous native locations and unsupported scalar transformations require independent localization; valid scalar edits do not imply semantic approval",
+      "duplicate_policy": "Shared constrained construction handoff; native field identity bounds overlapping retries and chronological replay",
+      "coverage": "test_general_construction_recovery.py; test_output_recovery_contract.py; test_projection_variations.py",
+      "authority_contract": {
+        "requirement": "Correct source-resolvable generated construction defects without changing approved facts or protected template structure",
+        "evidence": "Exact archived candidate hashes, registered native locations, scoped approved scalars and authenticated producer response",
+        "authority": "objective",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "source_bound_construction_editor"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_general_construction_recovery.py::test_xml_field_defect_receives_source_bound_edit_and_clean_delivery",
+          "test_general_construction_recovery.py::test_generated_metadata_fields_recover_without_editing_approved_source"
+        ],
+        "invalid": [
+          "test_output_recovery_contract.py::test_recovery_handoff_rejects_ungrounded_or_unbounded_edits",
+          "test_output_recovery_contract.py::test_recovery_rejects_changed_archive_or_request"
         ]
       }
     }
@@ -772,8 +795,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "ee945a8105f65bffa483a277144d643f1fd447bad3d28d49c54425224d84a1ad",
-      "family": "presentation_delivery",
+      "code_sha256": "be21dfa4e284d910d2c4cdd98bd2f13114c9870f779bb138422ad065c8ce76ca",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -784,7 +807,7 @@
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       },
-      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+      "review_note": "Reviewed shared source-bound construction scope, native-span formatting, XML proposal preflight, chronological replay, per-field retry bounds and governed stale failure."
     },
     {
       "file": "scripts/drafting.py",
@@ -839,10 +862,10 @@
       }
     },
     {
-      "family": "structured",
+      "family": "source_bound_construction",
       "file": "scripts/prs_xml.py",
       "function": "_contact_fields",
-      "code_sha256": "efb8c559b51148e3a2663bfdcd95dde6a8e29d79a0f5a0cc1042e5cdfbd3bc4b",
+      "code_sha256": "785bdbbd6e86e33527dde11fc0bb2e7ffc5ea1aff7bcf492dd68c0b08d53ce88",
       "behavioral_evidence": {
         "valid": [
           "test_shared_output_projection.py::test_explicit_person_components_override_full_display_name"
@@ -850,7 +873,8 @@
         "invalid": [
           "test_shared_output_projection.py::test_xml_scalar_corruption_is_detected"
         ]
-      }
+      },
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "family": "structured",
@@ -1147,10 +1171,10 @@
       "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
     },
     {
-      "family": "presentation_delivery",
+      "family": "source_bound_construction",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "7ae0e68f3c4a4f72ac311686b1fec1f1912aa54fccb1fe1c0baaae9aa33db4b5",
+      "code_sha256": "b57ebd3a4ef98f8898d1a5189f74cfb13ce629c7bbb1f9bdbe2727bd52a2e166",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1161,7 +1185,7 @@
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       },
-      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/quality.py",
@@ -1400,8 +1424,8 @@
     {
       "file": "scripts/rendering.py",
       "function": "render_documents",
-      "code_sha256": "0115728e3995ff4faecc1ba7c9e0aa45d1df1680e8260bcbf95602296f0f5b20",
-      "family": "render",
+      "code_sha256": "3f4ff454ee126e4fe86a75a5ec2bad185082ac0477a9feb1f2776f2c67af53f5",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1411,7 +1435,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/workflow.py",
@@ -1613,8 +1638,8 @@
     {
       "file": "scripts/workflow.py",
       "function": "_recovery_action_observation",
-      "code_sha256": "bc6ed1102afee21fef32c2cafd34d5b3f013872d3da7285ee0c0f437242edf05",
-      "family": "recovery",
+      "code_sha256": "217ee7fffb1556f0aa802f2387558072c682f24506680dca1872baca4d0eab54",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1624,7 +1649,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Reviewed positive native field registration through paragraph copies, attached-node-only scope, stripped temporary markers, exact scalar progress and preserved formatting; complete public metadata lifecycle."
     },
     {
       "file": "scripts/workflow.py",
@@ -1671,8 +1697,8 @@
     {
       "file": "scripts/workflow.py",
       "function": "_quality_retry",
-      "code_sha256": "2a3e8bd78110b3233e3aa7713c8610961b055d1fcad02a7451fe0fe38585f95e",
-      "family": "recovery",
+      "code_sha256": "c6a28a1efb5a759928993f08cfc7426d9e71494efa84e466865e5565dbf4e4b4",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1682,7 +1708,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/workflow.py",
@@ -1713,8 +1740,8 @@
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "f52aea50a910005aa2b79969147d3cc6f03c034b5345d9bc84eb222f1babe625",
-      "family": "presentation_delivery",
+      "code_sha256": "280e4cdc67653ee8bb6cceb38dd44d1c4f71d537e1ca28c6d495968821ddbcbd",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1725,7 +1752,7 @@
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
       },
-      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
+      "review_note": "Reviewed shared source-bound construction scope, native-span formatting, XML proposal preflight, chronological replay, per-field retry bounds and governed stale failure."
     },
     {
       "file": "scripts/workflow.py",
@@ -1762,8 +1789,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "_construction_request_payload",
-      "code_sha256": "a7d0554888778be5b88b5cefd127b74de82e2e9289afea4ae56f3bacfe37ddec",
-      "family": "recovery",
+      "code_sha256": "3bac86415288fde43d8e2adf4667c7d2397e3e20f4c23650ea162986b4531f02",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1773,7 +1800,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/drafting.py",
@@ -1794,8 +1822,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "_validate_construction_response",
-      "code_sha256": "bf1050bb6cabc507c9bf78d0a38fd1517da75d003dec68d8a44eac51971da27d",
-      "family": "recovery",
+      "code_sha256": "bb7fd446ba7f56bec0a136f56467861c2bccb66ffa69f11f9b2ca885c10478dc",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1805,7 +1833,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/drafting.py",
@@ -1826,8 +1855,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "construction_repair_spec",
-      "code_sha256": "bc2de84fbafb04480516f9d89537b3d111e9fdf9d63a9dbfaa5aee30a0b14c29",
-      "family": "recovery",
+      "code_sha256": "2197821e142f61a26c975b0603170f46d6279585fa8da52c8574fc29d41ff1ff",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1837,7 +1866,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/drafting.py",
@@ -1874,8 +1904,8 @@
     {
       "file": "scripts/rendering.py",
       "function": "_template_document",
-      "code_sha256": "4b566d06cb60e4dc51d39bd2823ec8239ee7ea64fbe95dc21973a096d00f48d7",
-      "family": "structured",
+      "code_sha256": "414a129b03481c9a80ae5f6031f5b4a35d6c439bb555d4dbe5e131e3505c41c8",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1885,7 +1915,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Reviewed positive native field registration through paragraph copies, attached-node-only scope, stripped temporary markers, exact scalar progress and preserved formatting; complete public metadata lifecycle."
     },
     {
       "file": "scripts/workflow.py",
@@ -1906,8 +1937,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "_construction_finding_source",
-      "code_sha256": "54373c9b552f4bb864deb8bf8ff3333b3fde1d734e288d12284f73249af01b0a",
-      "family": "presentation_delivery",
+      "code_sha256": "3f55ebd99156368aea1ff6ad15c9c46e8cc1973cf481b26095b5779b493e3f46",
+      "family": "source_bound_construction",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family"
@@ -1916,7 +1947,7 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed"
         ]
       },
-      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
     },
     {
       "file": "scripts/contracts.py",
@@ -1959,6 +1990,69 @@
       "code_sha256": "c4e04392afb13469b78842a1ec104fc91c9c87b3cb796a3870a963855adc6af2",
       "family": "presentation_delivery",
       "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "source_path",
+      "code_sha256": "a23c7bebcfde521341a080a3880721f5d504bdb9b894d73a97d565e0acfc1087",
+      "family": "source_bound_construction",
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "xml_fields",
+      "code_sha256": "2410062c987b15dd5eb5f9bf222c12e0395849c2115ccc23d22e02cb42bb5f92",
+      "family": "source_bound_construction",
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "_signature",
+      "code_sha256": "9f396b185ef701acfb36f2d2b955255649885127ad4eebfd4b9ee744446fea1e",
+      "family": "source_bound_construction",
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "xml_repair_spec",
+      "code_sha256": "367e1340f930a3ee572950106eb2de7825fa02184e9a55acc1e0ce24f14fd21e",
+      "family": "source_bound_construction",
+      "review_note": "Native localized scalar scope excludes stable, provider, organization, secondary and registry study identifiers; paired identifier rejection tests."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "_scalars",
+      "code_sha256": "701d03e29f8b0aee226ec8d1cda818764b49b881c77244392e1c0d30e9036add",
+      "family": "source_bound_construction",
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "validate_field_edits",
+      "code_sha256": "4d8207e44812374fb1b4e0bc32cf1541ae21e8ff9ebacb5aa678e33868ec5f44",
+      "family": "source_bound_construction",
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "apply_xml_repairs",
+      "code_sha256": "4c006d4153a29af7806f68835fa8f8120fd4b15d3c444206e5d6d232efb2b465",
+      "family": "source_bound_construction",
+      "review_note": "Reviewed shared source-bound construction scope, native-span formatting, XML proposal preflight, chronological replay, per-field retry bounds and governed stale failure."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "docx_repair_spec",
+      "code_sha256": "81a300268db0f4df48d9aaab426bc9932915aaba1028106b98ee5f38c42dd04d",
+      "family": "source_bound_construction",
+      "review_note": "Owner-authorized shared construction recovery reviewed against exact source scope, immutable archive, stable retry identity, native formatting and fresh complete verification."
+    },
+    {
+      "file": "scripts/output_recovery.py",
+      "function": "xml_proposal_findings",
+      "code_sha256": "221cd41b8b76b6b8684136095b76f75415c99928ea04ecd624f574a66214dda4",
+      "family": "source_bound_construction",
+      "review_note": "Reviewed shared source-bound construction scope, native-span formatting, XML proposal preflight, chronological replay, per-field retry bounds and governed stale failure."
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",

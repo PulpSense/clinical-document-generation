@@ -35,6 +35,7 @@ TEST_FILES = (
     'test_reliability_campaign.py', 'test_reviewer_transport.py',
     'test_construction_reliability.py',
     'test_presentation_delivery.py',
+    'test_general_construction_recovery.py', 'test_output_recovery_contract.py', 'test_projection_variations.py',
 )
 
 
@@ -88,7 +89,7 @@ def blocking_check_inventory(root: Path = ROOT) -> list[dict[str, str]]:
                 '_optional_construction_findings', '_study_descriptor',
                 '_warning_findings',
             }
-            if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers:
+            if not {'issue', 'blocked', 'publication_disposition'} & strings and node.name not in shared_helpers and path.name != 'output_recovery.py':
                 continue
             # AST dumps change when Python adds fields (for example, type_params in
             # 3.12). Hash the source instead so one audit works on every runtime.

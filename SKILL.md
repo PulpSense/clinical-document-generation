@@ -165,7 +165,7 @@ under `skills.clinical_document_generation`, and records the activation in
 The bound certification report contains a deterministic
 `release-certification-evidence/v1` bundle. Its canonical inventory retains the
 exact release manifest, preflight report and logs, deterministic/layout evidence,
-Python/renderer/six-module/configuration identities, synthetic fixture sources
+Python/renderer/production-module/configuration identities, synthetic fixture sources
 and approvals, all three raw case/state/manifest records, output bytes, drafting
 and verification exchanges, parent-process completion records, PDFs, and every
 reviewed page image. The complete canonical report is signed with the external
@@ -220,7 +220,7 @@ deterministic structural evidence only: it cannot substitute for clinical
 verification, genuine every-page image inspection, production certification, or
 exact-byte Desktop confirmation.
 
-The six production modules are:
+The production modules are:
 
 ```text
 scripts/
@@ -229,7 +229,8 @@ scripts/
 ├── drafting.py   # scoped Hermes requests, response validation, retries
 ├── rendering.py  # Protocol and ICF Word rendering
 ├── quality.py    # renderer, page images, content/visual verification
-└── prs_xml.py    # PRS mapping, structure, repeated blocks, validation
+├── prs_xml.py    # PRS mapping, structure, repeated blocks, validation
+└── output_recovery.py # source-bound scalar correction and native field application
 ```
 
 Do not add a second workflow entrypoint. The installation-owned `runtime/`
@@ -433,8 +434,8 @@ timing, and values before release.
 - Repairable post-approval drafting, deterministic construction, layout, and
   reviewer-response failures retry within the one persisted 45-minute Desktop
   operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap,
-  except optional construction prose polishing (one proposal per stable
-  renderer passage) and the Desktop-parent visual callback: after its initial callback, exactly one
+  except source-bound construction corrections (three proposals per stable
+  target; optional polishing uses one proposal per renderer passage) and the Desktop-parent visual callback: after its initial callback, exactly one
   unchanged-request parent retry is permitted, with callback consumption persisted per exact request across process resume, before missing or invalid response evidence
   becomes `missing_parent_visual_review_response`.
 - Invalid draft: retry only failed section IDs in their existing batch.
@@ -453,6 +454,19 @@ timing, and values before release.
   visual reviews before delivery, including after a rejected or unchanged proposal.
   Only independently confirmed harmless presentation notes may remain internally;
   a failed proposal never waives an essential failure or authorizes a blind fresh run.
+- Source-resolvable construction defects: a `section_drafting` request with
+  `construction_repair.kind: xml_fields` or `docx_fields` requests `field_edits`, not prose.
+  Return a nonempty list of objects with the exact inventoried `path`, `before`,
+  replacement `after`, and approved `source_path`. Replacements use exact scoped
+  approved scalar values; empty text removes unsupported generated values, never
+  explicitly supplied facts. Preserve native structure, surrounding text and identifiers. The workflow
+  authenticates and persists accepted edits, reapplies them after rebuilding,
+  validates the corrected structure, and obtains fresh full independent reviews.
+  Registered generated prose uses the existing one-paragraph response, including
+  material source-supported corrections. Protected template text and arbitrary
+  document locations are outside the construction editor. Material corrections
+  have up to three source-bound proposals within the existing operation deadline;
+  unsuccessful proposals are not approval. Optional polish remains best effort.
 - Visual defect: localize the exact document, page, element, check, and layout
   target; apply the narrowest untried safe Word-native strategy; rebuild the
   affected artifact; and rerun rendered-page verification.

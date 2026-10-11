@@ -134,6 +134,6 @@ study data.
 
 Test Retrospective Protocol and Prospective/Ambispective with Advarra/Sterling,
 including long/short narratives, differing visit structures, optional absences,
-and deliberately introduced defects. Preserve the six production modules and
-model flexibility. A structural formatting test is not clinical or visual
+and deliberately introduced defects. Preserve the lifecycle module ownership and
+model flexibility; shared construction recovery remains a private workflow dependency. A structural formatting test is not clinical or visual
 certification.

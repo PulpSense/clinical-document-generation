@@ -6,7 +6,7 @@ The repository root is the skill root. Install the whole repository—not only `
 
 ## Architecture
 
-`scripts/workflow.py` is the only public entrypoint. Production code is limited to six Python files:
+`scripts/workflow.py` is the only public entrypoint. The lifecycle owners and shared construction editor are explicit production modules:
 
 ```text
 scripts/
@@ -15,7 +15,8 @@ scripts/
 ├── drafting.py
 ├── rendering.py
 ├── quality.py
-└── prs_xml.py
+├── prs_xml.py
+└── output_recovery.py
 ```
 
 There is no hidden runtime package and no alternative lifecycle.
@@ -164,7 +165,7 @@ missing, relative, non-executable, or symlinked command and never substitutes a
 local filesystem read.
 
 The harness creates the preflight evidence by checking a clean candidate commit,
-compiling exactly the six production modules, running the identical-content
+compiling all declared production modules, running the identical-content
 five-family Layout Preservation corpus, running the deterministic ten-case Branch
 Acceptance Corpus and its historical regressions, and then running the complete repository suite. The resulting
 `release-certification-corpus.json` is the only full-corpus pass signal. It binds

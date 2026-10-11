@@ -27,6 +27,7 @@ from pypdf import PdfReader
 
 from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
+from output_recovery import DOCX_SOURCE_FIELDS
 from contracts import bibliographic_citation_spans, protocol_bibliography
 from contracts import document_table_reference
 
@@ -768,6 +769,20 @@ def _heading_level(paragraph: Paragraph) -> int | None:
         return None
     match = re.search(r"(\d+)$", paragraph.style.name)
     return int(match.group(1)) if match else 1
+
+
+
+def _replace_native_span(paragraph: Paragraph, before: str, after: str) -> None:
+    """Replace one registered span without rebuilding surrounding Word runs."""
+    start = paragraph.text.index(before)
+    stop = start + len(before)
+    offset = 0
+    for run in paragraph.runs:
+        end = offset + len(run.text)
+        if offset < stop and end > start:
+            left, right = max(0, start - offset), min(len(run.text), stop - offset)
+            run.text = run.text[:left] + (after if offset <= start < end else '') + run.text[right:]
+        offset = end
 
 
 def _set_paragraph_text(paragraph: Paragraph, text: str) -> None:
@@ -3565,6 +3580,7 @@ def _template_document(
     boilerplate: Mapping[str, str],
     layout_repair_rules: Iterable[Mapping[str, str]] = (),
     construction_passages: list[dict[str, Any]] | None = None,
+    construction_fields: list[dict[str, Any]] | None = None,
 ) -> Document:
     """Populate the selected Contracted Template without replacing its Layout Contract."""
     document = Document(template_path)
@@ -3603,6 +3619,22 @@ def _template_document(
                 and _heading_level(paragraph) is None):
             identity = hashlib.sha256(f'{template_path.name}:{index}:{paragraph.text}'.encode()).hexdigest()[:20]
             tracked.append((f'display-{identity}', paragraph, source_paths))
+    scalar_fields = []
+    field_marker = '{urn:pulpsense:construction-recovery}fields'
+    seen_fields = set()
+    for index, paragraph in enumerate(_all_paragraphs(document)):
+        if paragraph._p in seen_fields:
+            continue
+        seen_fields.add(paragraph._p)
+        for token in TOKEN.findall(paragraph.text):
+            key = token.strip('{}')
+            evidence = DOCX_SOURCE_FIELDS.get(key)
+            value = fields.get(key, '')
+            if evidence and value and '«' not in value:
+                identity = hashlib.sha256(f'{template_path.name}:{index}:{key}'.encode()).hexdigest()[:20]
+                registered = json.loads(paragraph._p.get(field_marker, '[]'))
+                registered.append([f'field-{identity}', value, evidence])
+                paragraph._p.set(field_marker, json.dumps(registered))
     table_reference = document_table_reference(reference, model)
     if not icf:
         _assessment_matrix(document, table_reference, authority_path)
@@ -3718,6 +3750,43 @@ def _template_document(
                 'passage_id': passage_id, 'artifact': artifact, 'section_id': f'{artifact}.shell',
                 'text': paragraph.text, 'base_text': base_text, 'source_paths': source_paths,
             })
+    roots = {document.element}
+    roots.update(paragraph._p.getroottree().getroot() for section in document.sections
+                 for paragraph in [*section.header.paragraphs, *section.footer.paragraphs])
+    for root in roots:
+        for element in root.iter(qn('w:p')):
+            registered = element.attrib.pop(field_marker, None)
+            if registered:
+                paragraph = Paragraph(element, document)
+                scalar_fields.extend((identity, paragraph, value, evidence)
+                                     for identity, value, evidence in json.loads(registered))
+    if not icf:
+        controls = next((table for table in document.tables if table.rows
+                         and table.rows[0].cells[0].text.strip().casefold() == 'protocol number'), None)
+        if controls is not None:
+            for row in controls.rows:
+                evidence = {'protocol number': 'meta.protocol_number', 'protocol date': 'meta.date',
+                            'protocol version': 'meta.version'}.get(row.cells[0].text.strip().casefold())
+                if evidence and len(row.cells) > 1 and row.cells[1].paragraphs:
+                    paragraph = row.cells[1].paragraphs[0]
+                    scalar_fields = [item for item in scalar_fields if item[1]._p is not paragraph._p]
+                    scalar_fields.append((f'control-{evidence}', paragraph, paragraph.text, evidence))
+    for identity, paragraph, base_value, evidence in scalar_fields:
+        if not any(parent in roots for parent in paragraph._p.iterancestors()) or paragraph.text.count(base_value) != 1:
+            continue
+        value = base_value
+        for repair in model.get('construction_repairs', []):
+            if repair.get('artifact') != artifact or repair.get('repair_kind') != 'docx_fields':
+                continue
+            for edit in repair['after']:
+                if edit['path'] != identity:
+                    continue
+                if edit['before'] != value or paragraph.text.count(value) != 1:
+                    raise LayoutRepairTargetError('Construction field repair is stale for its native span.')
+                _replace_native_span(paragraph, value, edit['after'])
+                value = edit['after']
+        if construction_fields is not None:
+            construction_fields.append({'path': identity, 'before': value, 'source_path': evidence})
     _set_update_fields(document)
     return document
 
@@ -3987,6 +4056,7 @@ def render_documents(
             continue
         try:
             construction_passages: list[dict[str, Any]] = []
+            construction_fields: list[dict[str, Any]] = []
             document = _template_document(
                 reference,
                 model,
@@ -3996,6 +4066,7 @@ def render_documents(
                 boilerplate=boilerplate,
                 layout_repair_rules=normalized_repairs.get(kind, ()),
                 construction_passages=construction_passages,
+                construction_fields=construction_fields,
             )
         except LayoutRepairTargetError as exc:
             results.append({
@@ -4027,7 +4098,7 @@ def render_documents(
                 "issue": "Required source-bound section icf.procedures is missing or empty.",
             })
         blocking_findings = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
-        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"], "construction_passages": construction_passages})
+        results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"], "construction_passages": construction_passages, "construction_fields": construction_fields})
     return {
         "status": "passed" if all(item["status"] == "passed" for item in results) else "blocked",
         "contracted_template_bundle": bundle,

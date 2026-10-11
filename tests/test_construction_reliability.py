@@ -104,7 +104,8 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
     if repair_mode == 'changed_meaning':
         assert result['status'] != 'passed', result
         assert not result.get('client_outputs') and not (tmp_path / 'output/icf.docx').exists()
-        assert len(repairs) == 1 and len(reviews) == 2
+        # An essential meaning failure receives the shared bounded construction route.
+        assert len(repairs) == 3 and len(reviews) == 2
         return
     assert result['status'] == 'passed', result
     assert len(repairs) == 1

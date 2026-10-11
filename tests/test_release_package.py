@@ -1329,7 +1329,7 @@ def test_release_package_can_be_installed_and_imported_without_checkout(tmp_path
         archive.extractall(install_dir)
     skill_dir = install_dir / "clinical-document-generation"
     result = subprocess.run(
-        [sys.executable, "-m", "py_compile", "scripts/workflow.py", "scripts/contracts.py", "scripts/drafting.py", "scripts/rendering.py", "scripts/quality.py", "scripts/prs_xml.py"],
+        [sys.executable, "-m", "py_compile", *[f"scripts/{name}" for name in sorted(workflow.PRODUCTION_MODULES)]],
         cwd=skill_dir,
         text=True,
         capture_output=True,

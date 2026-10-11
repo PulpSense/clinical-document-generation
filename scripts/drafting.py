@@ -14,6 +14,7 @@ import json
 import math
 import re
 import unicodedata
+from output_recovery import xml_repair_spec, docx_repair_spec, validate_field_edits, xml_proposal_findings
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -58,9 +59,9 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v21-presentation-delivery"
+PROMPT_VERSION = "section-drafting-v22-source-bound-construction"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
-IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
+IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py")
 
 
 def _canonical(value: Any) -> bytes:
@@ -597,9 +598,8 @@ def _construction_finding_source(finding: Any) -> Mapping[str, Any] | None:
     source = finding.get('verification_source_finding') or finding
     if (not isinstance(source, Mapping) or finding.get('recovery_class') != 'deterministic_structure_defect'
             or canonical_review_surface(source.get('surface')) != 'document_shell'
-            or not all(source.get(flag) is False for flag in (
-                'material', 'safety_critical', 'contradiction',
-                'obscures_required_information', 'materially_unusable'))):
+            or source.get('source_clarification_required')
+            or source.get('check') not in {'source_supported', 'no_invention', 'substantive', 'editorial_relevance'}):
         return None
     return source
 
@@ -626,6 +626,18 @@ def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_inde
             or not isinstance(manifest.get('files'), Mapping)):
         return None
     finding = findings[finding_index]
+    sequence = 1 + sum(name.startswith('hermes/accepted/construction-') for name in manifest['files'])
+    raw = finding.get('verification_source_finding') or finding
+    if (finding.get('recovery_class') == 'deterministic_structure_defect'
+            and finding.get('artifact') == 'study.xml' and finding.get('target_ids') == ['prs.structured']
+            and isinstance(raw, Mapping) and not raw.get('source_clarification_required')):
+        path = attempt / 'candidate/study.xml'
+        if path.is_symlink() or not path.is_file() or sha256_file(path) != manifest['files'].get('candidate/study.xml'):
+            return None
+        reference = _read_json(revision_dir / 'approved-reference.json')
+        spec = xml_repair_spec(path, reference, raw)
+        return ({**spec, 'attempt_path': attempt_path, 'finding_index': finding_index,
+                 'finding': dict(finding), 'related_findings': [dict(finding)], 'sequence': sequence} if spec else None)
     source = _construction_finding_source(finding)
     if source is None:
         return None
@@ -646,6 +658,12 @@ def construction_repair_spec(revision_dir: Path, attempt_path: str, finding_inde
     rows = report.get('artifacts') if isinstance(report, Mapping) else None
     if not isinstance(rows, list):
         return None
+    scalar_rows = [item for row in rows if isinstance(row, Mapping) and row.get('artifact') == artifact
+                   for item in row.get('construction_fields', [])]
+    field_spec = docx_repair_spec(scalar_rows, source, artifact)
+    if field_spec:
+        return {**field_spec, 'attempt_path': attempt_path, 'finding_index': finding_index,
+                'finding': dict(finding), 'related_findings': [dict(finding)], 'sequence': sequence}
     matches = [item for row in rows if isinstance(row, Mapping) and row.get('artifact') == artifact
                for item in (row.get('construction_passages') or []) if isinstance(item, Mapping)
                and item.get('text') == passage and item.get('section_id') == section_id]
@@ -697,7 +715,8 @@ def _construction_request_payload(
     for path in spec['source_paths']:
         set_path(scoped, path, copy.deepcopy(get_path(reference, path)))
     target = spec['section_id']
-    batch_id = f"construction-{spec['artifact']}-{spec['passage_id']}"
+    passage_key = sha256_value(spec['passage_id'])[:16] if spec.get('kind') in {'xml_fields', 'docx_fields'} else spec['passage_id']
+    batch_id = f"construction-{spec['artifact']}-{passage_key}"
     request_id = _request_id(revision_dir.name, batch_id, {target: attempt}, 'construction-repair', sha256_value(governing))
     payload = {
         'schema_version': REQUEST_SCHEMA, 'request_id': request_id, 'revision_id': revision_dir.name,
@@ -719,6 +738,12 @@ def _construction_request_payload(
         ],
         'response_path': f'hermes/responses/{request_id}.json',
     }
+    if spec.get('kind') in {'xml_fields', 'docx_fields'}:
+        payload['constraints'] = [
+            'Return field_edits, each with exact path, before, after and source_path. Edit only inventoried leaves.',
+            'Use exact approved scalar values. Empty after may remove unsupported generated text, with source evidence.',
+            'Preserve all other values, XML shape, identifiers and approved inputs. Fresh independent review is mandatory.',
+        ]
     payload['request_sha256'] = request_sha256(payload)
     return payload
 
@@ -739,6 +764,18 @@ def create_construction_repair_request(
 
 def _validate_construction_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     spec = request['construction_repair']
+    if spec.get('kind') in {'xml_fields', 'docx_fields'}:
+        try:
+            edits = validate_field_edits(spec, response.get('field_edits'), request['approved_source'])
+        except ValueError as exc:
+            return None, [{**spec['finding'], 'issue': str(exc)}]
+        return {
+            'kind': 'construction', 'repair_kind': spec['kind'], 'section_id': spec['section_id'],
+            'artifact': spec['artifact'], 'passage_id': spec['passage_id'], 'after': edits,
+            'attempt': int(request['attempts'][spec['section_id']]), 'sequence': spec['sequence'],
+            'producer': dict(response['producer']), 'governing_resources': dict(request['governing_resources']),
+            'request_id': request['request_id'], 'request_sha256': request['request_sha256'],
+        }, []
     rows = response.get('section_results')
     row = rows[0] if isinstance(rows, list) and len(rows) == 1 and isinstance(rows[0], Mapping) else {}
     paragraphs = row.get('paragraphs')
@@ -746,6 +783,11 @@ def _validate_construction_response(request: Mapping[str, Any], response: Mappin
     text = str(paragraph.get('text') or '').strip()
     expected_refs = {f'source:{path}' for path in spec['source_paths'] if meaningful(get_path(request['approved_source'], path))}
     numbers = lambda value: re.findall(r'(?<!\w)\d[\d,]*(?:\.\d+)?(?!\w)', value)
+    source_numbers = numbers(json.dumps(request['approved_source'], ensure_ascii=False))
+    material = any(spec['finding'].get(flag) or (spec['finding'].get('verification_source_finding') or {}).get(flag)
+                   for flag in ('material', 'contradiction', 'safety_critical', 'obscures_required_information', 'materially_unusable'))
+    numeric_valid = (all(number in source_numbers for number in numbers(text)) if material
+                     else numbers(text) == numbers(spec['before']))
     if (row.get('section_id') != spec['section_id'] or row.get('outcome') != 'drafted'
             or row.get('lists') or paragraph.get('boilerplate_refs')
             or not isinstance(paragraph.get('evidence_refs'), list)
@@ -753,8 +795,8 @@ def _validate_construction_response(request: Mapping[str, Any], response: Mappin
             or set(paragraph.get('evidence_refs') or []) != expected_refs
             or not text or text.split() == spec['before'].split() or len(text.split()) > 150
             or re.search(r'[\n\r{}<>«»]', text) or INTERNAL_REPAIR_LANGUAGE.search(text)
-            or numbers(text) != numbers(spec['before'])):
-        finding = {**spec['finding'], 'issue': 'Construction editor must return one changed plain paragraph preserving exact quantities and scoped evidence.'}
+            or not numeric_valid):
+        finding = {**spec['finding'], 'issue': 'Construction editor must return one changed plain paragraph preserving scoped approved facts and quantities.'}
         return None, [finding]
     return {
         'kind': 'construction', 'section_id': spec['section_id'], 'artifact': spec['artifact'],
@@ -2698,6 +2740,16 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
         try:
             response = _read_json(response_path)
             accepted, response_findings = validate_response(request, response)
+            if accepted and accepted.get('repair_kind') == 'xml_fields':
+                reference = _read_json(revision_dir / 'approved-reference.json')
+                root = Path(__file__).resolve().parents[1]
+                authority = contracted_template_bundle(root, reference)['prs_authority']
+                response_findings = xml_proposal_findings(
+                    revision_dir / request['construction_repair']['attempt_path'] / 'candidate/study.xml',
+                    reference, accepted, root / authority['structural_reference']['path'],
+                    root / authority['generation_template']['path'])
+                if response_findings:
+                    accepted = None
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             accepted, response_findings = None, [{
                 "category": "drafting",
@@ -2880,7 +2932,7 @@ def merged_drafts(
         if not _trusted_request_valid(revision_dir, request, expected_governing) or errors or accepted != record:
             raise ValueError('Construction correction is not authenticated.')
         repairs.append(record)
-    repairs.sort(key=lambda item: (item['attempt'], item['request_id']))
+    repairs.sort(key=lambda item: (item.get('sequence', 0), item['attempt'], item['request_id']))
     return {"protocol": protocol, "icf": icf, "prs": prs, 'construction_repairs': repairs}
 
 

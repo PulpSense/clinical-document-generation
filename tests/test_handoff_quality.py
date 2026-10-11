@@ -1334,7 +1334,7 @@ def test_complete_bundle_is_part_of_governing_resources():
     assert "assets/client-templates/reference/advarra-icf-reference.docx" in bundle["resource_hashes"]
     assert set(resources["implementation_sha256"]) == {
         f"scripts/{name}"
-        for name in ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
+        for name in ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py")
     }
 
 

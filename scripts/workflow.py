@@ -43,7 +43,8 @@ if str(SCRIPT_DIR) not in sys.path: sys.path.insert(0, str(SCRIPT_DIR))
 from contracts import BUNDLED_FONT_FILES, LAYOUT_FAMILY_ARTIFACTS, RECOVERY_POLICIES, VISUAL_CHECK_DISPOSITIONS, ContractedTemplateBundleError, LAYOUT_REPAIR_RULES, batch_plan, canonical_study_type, contracted_template_bundle, document_set, get_path, icf_contract, icf_retained_sections, parse_source_truth, protocol_contract, recovery_finding, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import governing_resources, ingest_responses, invalidate_accepted_targets, merged_drafts, missing_drafts, pending_requests, recorded_acceptance_response, schedule_requests, sha256_file, sha256_value
 from drafting import construction_repair_spec, construction_retry_spec, create_construction_repair_request
-from prs_xml import generate as generate_xml
+from prs_xml import generate as generate_xml, validate_output as validate_xml_output, quality_report as xml_quality_report
+from output_recovery import apply_xml_repairs, source_path as normalize_source_path
 from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA
@@ -87,7 +88,7 @@ PDF_PAGE_RENDERER = {
     "platform": "manylinux_2_17_x86_64",
 }
 PRODUCTION_MODULES = {
-    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py",
+    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
@@ -425,7 +426,7 @@ def _package_release_tree(
     actual_modules = {path.name for path in (repo_root / "scripts").glob("*.py")}
     if actual_modules != PRODUCTION_MODULES:
         raise ValueError(
-            "Release packaging requires exactly the six production Python modules: "
+            "Release packaging requires the declared production Python modules: "
             + ", ".join(sorted(PRODUCTION_MODULES))
         )
     exact_files = {"SKILL.md", "README.md", "CONTEXT.md", "requirements.txt", "agents/openai.yaml"}
@@ -3610,7 +3611,7 @@ def _candidate_fingerprint(
     font_substitutions: Mapping[str, str] | None = None,
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
 ) -> tuple[str, dict[str, Any]]:
-    implementation_files = [repo_root / "scripts" / name for name in ("workflow.py", "contracts.py", "drafting.py", "rendering.py", "quality.py", "prs_xml.py")]
+    implementation_files = [repo_root / "scripts" / name for name in sorted(PRODUCTION_MODULES)]
     accepted_files = sorted((revision_dir / "hermes/accepted").glob("*.json"))
     payload = {
         "approved_reference_sha256": sha256_file(revision_dir / "approved-reference.json"),
@@ -7370,6 +7371,15 @@ def _recovery_action_observation(
                 # on a shell sentence. Missing localization is no evidence of
                 # progress; the independent reviewer must identify the passage.
                 contexts = [row for row in contexts if passage and row.get('paragraph') == passage]
+                evidence = source.get('source_path')
+                build_path = revision_dir / 'candidate-build.json'
+                if isinstance(evidence, str) and build_path.is_file():
+                    build = _read(build_path)
+                    field_contexts = [dict(field) for row in (build.get('document_report') or {}).get('artifacts', [])
+                                      if row.get('artifact') == artifact for field in row.get('construction_fields', [])
+                                      if field.get('source_path') == normalize_source_path(evidence)]
+                    if field_contexts:
+                        contexts = field_contexts
             target_identities[f"candidate/{artifact}.docx#{target}"] = sha256_value(contexts)
 
     structural_paths = []
@@ -8627,15 +8637,18 @@ def _quality_retry(
             if spec:
                 editor_attempts = generation_state.setdefault('construction_editor_attempts', {})
                 key = f"{spec['artifact']}:{spec['passage_id']}"
-                if key in scheduled_passages:
+                keys = ([f"{spec['artifact']}:field:{row['path']}" for row in spec['fields']]
+                        if spec.get('kind') in {'xml_fields', 'docx_fields'} else [key])
+                if scheduled_passages.intersection(keys):
                     continue
-                scheduled_passages.add(key)
-                attempt = int(editor_attempts.get(key, 0)) + 1
+                scheduled_passages.update(keys)
+                attempt = max(int(editor_attempts.get(item, 0)) for item in keys) + 1
                 if attempt > 3:
                     return finish(_repair_block(run_dir, 'internal_recovery_stalled', [{
-                        **finding, 'issue': 'Three localized construction prose corrections did not resolve the independently reviewed defect.',
+                        **finding, 'issue': 'Three source-bound construction corrections did not resolve the independently reviewed defect.',
                     }], candidate_outputs=_candidate_outputs(revision_dir)))
-                editor_attempts[key] = attempt
+                for item in keys:
+                    editor_attempts[item] = attempt
                 construction_actions.append({'attempt_path': spec['attempt_path'],
                                              'finding_index': spec['finding_index'], 'attempt': attempt})
                 continue
@@ -9195,6 +9208,8 @@ def generate(
                     return classification_block
                 return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, findings, "rendering", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
             xml_report = prior_build.get("xml_report") if partial_repair else None
+            if any(row.get("repair_kind") == "xml_fields" for row in model.get("construction_repairs", [])):
+                xml_report = None  # Reapply corrections from the generated base, never onto already edited bytes.
             if canonical_study_type(reference.get("meta", {}).get("study_type")) != "Retrospective":
                 if xml_report is None or not (revision_dir / "candidate/study.xml").is_file():
                     prs_authority = bundle["prs_authority"]
@@ -9206,6 +9221,27 @@ def generate(
                         model.get("prs", {}),
                         structural_template=SCRIPT_DIR.parent / str(prs_authority["structural_reference"]["path"]),
                     )
+                if any(row.get('repair_kind') == 'xml_fields' for row in model.get('construction_repairs', [])):
+                    try:
+                        apply_xml_repairs(revision_dir / 'candidate/study.xml', model['construction_repairs'])
+                    except (ValueError, OSError) as exc:
+                        _finalize_pending_recovery_for_terminal(revision_dir, reference_path, working_reference)
+                        return _repair_block(run_dir, 'source_integrity', [{
+                            'category': 'request-integrity', 'artifact': 'study.xml',
+                            'target_ids': ['prs.structured'], 'issue': str(exc),
+                        }], candidate_outputs=_candidate_outputs(revision_dir))
+                    xml_findings = validate_xml_output(
+                        revision_dir / 'candidate/study.xml', reference,
+                        SCRIPT_DIR.parent / str(bundle['prs_authority']['structural_reference']['path']),
+                        generation_template=SCRIPT_DIR.parent / str(bundle['prs_authority']['generation_template']['path']),
+                    )
+                    xml_report = {**xml_report, **xml_quality_report(revision_dir / 'candidate/study.xml', reference),
+                                  'status': 'blocked' if xml_findings else 'passed', 'findings': xml_findings}
+                if xml_report["status"] != "passed" and any(
+                        row.get('repair_kind') == 'xml_fields' for row in model.get('construction_repairs', [])):
+                    _finalize_pending_recovery_for_terminal(revision_dir, reference_path, working_reference)
+                    return _repair_block(run_dir, 'internal_recovery_stalled', xml_report['findings'],
+                                         candidate_outputs=_candidate_outputs(revision_dir))
                 if xml_report["status"] != "passed":
                     _complete_pending_deterministic_reconstructions(
                         reference_path,

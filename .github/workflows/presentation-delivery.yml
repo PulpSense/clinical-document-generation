@@ -27,3 +27,6 @@ jobs:
           tests/test_reviewer_transport.py
           tests/test_offline_reliability_gate.py
           tests/test_source_routing.py
+          tests/test_general_construction_recovery.py
+          tests/test_output_recovery_contract.py
+          tests/test_projection_variations.py

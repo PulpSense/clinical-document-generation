@@ -188,6 +188,26 @@ def _person_degrees(value: Mapping[str, Any]) -> str:
 
 def _contact_fields(value: Mapping[str, Any]) -> dict[str, str]:
     first, middle, last = _name(_mapping_value(value, "name", "full_name"))
+    supplied_first = _mapping_value(value, "first_name", "given_name")
+    supplied_last = _mapping_value(value, "last_name", "family_name", "surname")
+    if supplied_first or supplied_last:
+        remaining = " ".join(part for part in (first, middle, last) if part).split()
+        consistent = True
+        if supplied_first:
+            prefix = supplied_first.split()
+            consistent = remaining[:len(prefix)] == prefix
+            remaining = remaining[len(prefix):] if consistent else []
+            first = supplied_first
+        if supplied_last:
+            suffix = supplied_last.split()
+            consistent = consistent and remaining[-len(suffix):] == suffix
+            remaining = remaining[:-len(suffix)] if consistent else []
+            last = supplied_last
+        if not supplied_first:
+            first = remaining.pop(0) if remaining else ''
+        if not supplied_last:
+            last = remaining.pop() if remaining else ''
+        middle = ' '.join(remaining) if consistent else ''
     return {
         "first_name": _mapping_value(value, "first_name", "given_name") or first,
         "middle_name": _text(value["middle_name"]) if "middle_name" in value else middle,
