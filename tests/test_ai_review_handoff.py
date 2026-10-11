@@ -178,3 +178,46 @@ def test_explicit_nonmaterial_style_judgment_has_no_code_check_name_requirement(
     findings, _ = quality.validate_verifications(tmp_path, request_paths=[request_path])
     assert all(row.get('code') == 'nonmaterial-presentation' and row.get('publication_disposition') == 'warning' for row in findings), findings
     assert quality.verification_response_is_complete(tmp_path, request_path)
+
+
+@pytest.mark.parametrize('category', ['visual', None])
+@pytest.mark.parametrize('mutation', ['harmless', 'wrong-page', 'material', 'unresolved', 'stale'])
+def test_visual_style_preferences_are_internal_after_page_identity_validation(tmp_path, category, mutation):
+    from docx import Document
+    import quality
+    from test_clean_delivery import controlled_render
+    from test_handoff_quality import acceptance_verification
+    candidate = tmp_path / 'candidate'
+    candidate.mkdir()
+    doc = Document()
+    doc.add_paragraph('Readable document.')
+    doc.save(candidate / 'protocol.docx')
+    source = {'meta': {'study_type': 'Retrospective'}}
+    render = controlled_render(None, tmp_path)['render']
+    requests = quality.create_verification_requests(tmp_path, source, render)
+    visual_path = next(path for path in requests if json.loads(path.read_text())['task'] == 'rendered_page_visual_verification')
+    for path in requests:
+        request = json.loads(path.read_text())
+        response = acceptance_verification(request)
+        if path == visual_path:
+            concern = {'finding_id':'spacing-choice', 'artifact':'protocol', 'page':1,
+                'element':'Introduction paragraph', 'check':'spacing_preference',
+                'issue':'The current spacing is readable; an alternative is purely stylistic.',
+                'material':False, 'safety_critical':False, 'contradiction':False,
+                'obscures_required_information':False, 'materially_unusable':False}
+            if category is not None:
+                concern['category'] = category
+            if mutation == 'wrong-page': concern['page'] = 9
+            if mutation == 'material': concern['material'] = True
+            if mutation == 'unresolved': concern['resolved'] = False
+            if mutation == 'stale': response['request_sha256'] = 'stale'
+            response['findings'] = [concern]
+        (tmp_path / request['response_path']).write_text(json.dumps(response))
+    if mutation == 'harmless':
+        report = quality.quality_report(tmp_path, source, render, None)
+        assert report['status'] == 'passed', report
+        assert report['warnings'] == []
+        assert any(row.get('code') == 'nonmaterial-presentation' for row in report['internal_diagnostics'])
+        assert quality.verification_response_is_complete(tmp_path, visual_path)
+    else:
+        assert not quality.verification_response_is_complete(tmp_path, visual_path)

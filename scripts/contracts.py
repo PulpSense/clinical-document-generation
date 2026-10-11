@@ -95,7 +95,6 @@ def reviewed_presentation_only(finding: Mapping[str, Any]) -> bool:
         and not finding.get('source_clarification_required')
         and finding.get('resolved') is not False
         and finding.get('disposition') not in ('unresolved', 'confirmed_defect', 'source_clarification')
-        and finding.get('category') in {'content', 'editorial'}
         and finding.get('artifact') in {'protocol', 'icf', 'study.xml'}
     )
 

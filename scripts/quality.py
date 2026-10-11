@@ -5992,7 +5992,7 @@ def validate_verifications(
         for finding in findings:
             source = finding.get('verification_source_finding')
             if (finding.get('verification_request_id') == request['request_id']
-                    and finding.get('recovery_class') in {'drafting_defect', 'deterministic_structure_defect'}
+                    and finding.get('recovery_class') in {'drafting_defect', 'deterministic_structure_defect', 'visual_defect'}
                     and isinstance(source, Mapping) and reviewed_presentation_only(source)):
                 finding.update(code='nonmaterial-presentation', publication_disposition='warning',
                                severity='internal', authority='independent_review')
