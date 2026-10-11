@@ -702,7 +702,7 @@ def test_fabricated_recovery_finding_not_in_response_is_rejected(tmp_path):
     assert findings[0]["code"] == "verification_response_finding_mismatch"
 
 
-def test_matching_raw_finding_does_not_authorize_fabricated_localization(tmp_path):
+def test_legacy_localization_metadata_is_non_authoritative(tmp_path):
     revision = tmp_path / 'r-test'
     reference, request = _canonical_recovery_content_request(revision)
     source = {'issue': 'Correct this field.', 'target_ids': ['icf.procedures'],
@@ -722,4 +722,6 @@ def test_matching_raw_finding_does_not_authorize_fabricated_localization(tmp_pat
         current_review_set=1, reference=reference, render_report={}, bound_artifact='icf',
         section_target_ids={'icf.procedures'}, originating_finding=finding,
     )
-    assert findings[0]['code'] == 'verification_response_finding_mismatch'
+    # The raw finding remains bound to its real response; retired caution metadata
+    # does not grant a separate edit authority or veto general native-file repair.
+    assert findings == []
