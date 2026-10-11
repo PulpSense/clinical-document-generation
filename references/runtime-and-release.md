@@ -188,4 +188,3 @@ scripts/
 Do not add a second workflow entrypoint. The installation-owned `runtime/`
 directory contains only the manifest-bound PDFium runtime and packaged fonts
 used by Render Assurance; host Word or LibreOffice remains the DOCX renderer.
-
