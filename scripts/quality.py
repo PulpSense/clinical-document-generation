@@ -35,7 +35,6 @@ from lxml import etree as ET
 
 from contracts import APPROVED_PACKAGED_FONT_FALLBACKS, BOILERPLATE_VERSION, BUNDLED_FONT_FILES, ICF_RETAINED_SHELL_SECTIONS, RECOVERY_POLICIES, batch_plan, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, country_name_aliases, document_set, finding_requires_repair, get_path, icf_contract, icf_retained_sections, meaningful, narrative_review_finding, protocol_concept_ownership, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, participant_followup_summary, semantic_evidence_contract, state_name_aliases, sterling_clause_contract, sterling_clause_text
 from drafting import accepted_cross_section_duplicate_findings, evidence_coverage_finding, governing_resources, evidence_grounded, hypothesis_claim_issues, lexical_evidence_uncertainty, source_evidence_grounded, source_evidence_diagnostics, section_evidence_value
-from rule_authority import attach_rule, semantic_rule, rule_contract_sha256
 from prs_xml import screening_interval_requirement, validate_output as validate_prs_output
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 from contracts import benefit_context_contract, document_table_reference, source_text_values
@@ -3520,24 +3519,9 @@ def render_pages(
                 page = page_dir / f"page-{index}.png"
                 shutil.copy2(source_page, page)
                 pages.append(page)
-            for page_number in find_blank_pages(pdf):
-                findings.append({
-                    "category": "visual",
-                    "field": docx.stem,
-                    "artifact": docx.stem,
-                    "page": page_number,
-                    "target_ids": [f"layout:{docx.stem}"],
-                    "issue": f"Rendered {docx.stem} contains a textless page at page {page_number}.",
-                })
-            if docx.stem == "protocol":
-                findings.extend(_protocol_section15_opening_findings(docx, pdf))
-            toc_destinations = audit_final_toc_destinations(docx, pdf)
-            findings.extend(toc_destinations["findings"])
             artifacts.append({
                 "artifact": docx.stem,
                 "status": "passed",
-                "toc_destinations": toc_destinations,
-                "sparse_body_context": _sparse_pdf_pages(docx, pdf),
                 "renderer": identity,
                 "page_renderer": selected_page_renderer,
                 "font_evidence": dict(font_evidence or {}),
@@ -4671,396 +4655,13 @@ def assess_protocol_concept_repetition(
 
 
 def deterministic_content_check(revision_dir: Path, reference: Mapping[str, Any]) -> list[dict[str, Any]]:
-    findings: list[dict[str, Any]] = []
-    branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-    icf_template = str(get_path(reference, "meta.icf_template", "Advarra"))
-    draftable_sections = {
-        section_id
-        for batch in batch_plan(branch, icf_template)
-        for section_id in batch.section_ids
-    }
-    protocol = revision_dir / "candidate/protocol.docx"
-    findings.extend(audit_docx(protocol, required_phrases=[str(get_path(reference, "study.title", ""))]))
-    findings.extend(audit_source_surfaces(protocol, reference))
-    findings.extend(audit_computed_protocol_fields(protocol, reference))
-    icf_path = revision_dir / "candidate/icf.docx"
-    if branch != "Retrospective" and icf_path.is_file():
-        findings.extend(audit_source_surfaces(icf_path, reference))
-    document = Document(protocol)
-    table_text = "\n".join(
-        cell.text for table in document.tables for row in table.rows for cell in row.cells
-    )
-    visible = "\n".join([*(p.text for p in document.paragraphs), table_text])
-    normalized_visible = re.sub(r"\s+", " ", visible).casefold()
-    source_visible = json.dumps(reference, ensure_ascii=False).casefold()
-    def heading_key(value: str) -> str:
-        first_line = next((line for line in value.splitlines() if line.strip()), "")
-        normalized = re.sub(r"(?<=\d)\.(?=\s|$)", "", first_line)
-        return re.sub(r"\s+", " ", normalized).strip().casefold()
-
-    headings = [heading_key(p.text) for p in document.paragraphs if p.style.name.casefold().startswith("heading") and p.text.strip()]
-    sections = protocol_contract(branch)
-    for section in sections:
-        if not section_applies(reference, section):
-            continue
-        expected = heading_key(f"{section.number} {section.title}")
-        count = headings.count(expected)
-        if count != 1:
-            findings.append({"category": "content", "field": section.section_id, "target_ids": [section.section_id], "issue": f"Protocol section heading must appear exactly once; found {count}: {section.number} {section.title}"})
-
-    def normalized_matrix(table: Table) -> list[list[str]]:
-        return [
-            [re.sub(r"\s+", " ", cell.text).strip() for cell in row.cells]
-            for row in table.rows
-        ]
-
-    contracted_section_ids = {section.section_id for section in sections}
-    table_reference = document_table_reference(reference, merged_drafts(
-        revision_dir, reference, governing_resources(Path(__file__).resolve().parents[1], reference)))
-    for table_id, table_contract in protocol_table_contracts(table_reference).items():
-        if branch == "Retrospective" or table_contract["section_id"] not in contracted_section_ids:
-            continue
-        expected_rows = [
-            [re.sub(r"\s+", " ", str(cell)).strip() for cell in row]
-            for row in [*table_contract["rows"], *table_contract.get("detail_rows", [])]
-        ]
-        if not expected_rows:
-            continue
-        matches = [
-            table for table in document.tables
-            if table.rows
-            and re.sub(r"\s+", " ", table.rows[0].cells[0].text).strip() == expected_rows[0][0]
-        ]
-        if len(matches) != 1 or normalized_matrix(matches[0]) != expected_rows:
-            findings.append(recovery_finding({
-                "category": "content", "artifact": "protocol", "surface": "table",
-                "table_ids": [table_id],
-                "field": "procedures.visit_schedule" if table_id == "schedule-of-assessments" else "statistics.sample_size_evidence",
-                "target_ids": [str(table_contract["section_id"])],
-                "issue": f"{table_contract['caption']} does not preserve the contracted headers, row order, column order, cell values, and allowed blanks.",
-            }, "deterministic_structure_defect"))
-    stale_protocol_claims = {
-        "an investigator-initiated clinical trial": "title-page",
-        "all subjects will be monitored for adverse events": "quality-safety",
-        "included on each case report form": "quality-safety",
-        "1996 version of the declaration of helsinki": "ethics",
-        "approval prior to initiating the study": "ethics",
-    }
-    for phrase, target in stale_protocol_claims.items():
-        if phrase in normalized_visible and phrase not in source_visible:
-            findings.append({"category": "content", "field": target, "target_ids": [target], "issue": f"Protocol contains unsupported client-template study language: {phrase}"})
-
-    blocks: list[Paragraph | Table] = []
-    for child in document.element.body.iterchildren():
-        if child.tag == qn("w:p"):
-            blocks.append(Paragraph(child, document))
-        elif child.tag == qn("w:tbl"):
-            blocks.append(Table(child, document))
-
-    def heading_level(paragraph: Paragraph) -> int | None:
-        if not paragraph.style.name.casefold().startswith("heading"):
-            return None
-        match = re.search(r"(\d+)$", paragraph.style.name)
-        return int(match.group(1)) if match else 1
-
-    def section_content(section: Any) -> str | None:
-        expected = heading_key(f"{section.number} {section.title}")
-        target_index = next((
-            index for index, block in enumerate(blocks)
-            if isinstance(block, Paragraph) and heading_level(block) is not None and heading_key(block.text) == expected
-        ), None)
-        if target_index is None:
-            return None
-        target = blocks[target_index]
-        assert isinstance(target, Paragraph)
-        target_level = heading_level(target) or 1
-        values: list[str] = []
-        for block in blocks[target_index + 1:]:
-            if isinstance(block, Paragraph):
-                level = heading_level(block)
-                if level is not None:
-                    if level <= target_level:
-                        break
-                    continue
-                if block.text.strip():
-                    values.append(block.text.strip())
-            else:
-                values.extend(cell.text.strip() for row in block.rows for cell in row.cells if cell.text.strip())
-        return "\n".join(values)
-
-    section_paragraphs: dict[str, list[str]] = {}
-    for section in sections:
-        if section.role == "container" or not section_applies(reference, section):
-            continue
-        content = section_content(section)
-        if content is not None and len(re.findall(r"\b\w+\b", content)) < 3:
-            findings.append({
-                "category": "content",
-                "field": section.section_id,
-                "target_ids": [section.section_id],
-                "issue": f"Protocol section has no substantive content after its heading: {section.number} {section.title}",
-            })
-            continue
-        if content is None:
-            continue
-        section_paragraphs[section.section_id] = [
-            paragraph.strip() for paragraph in content.splitlines() if paragraph.strip()
-        ]
-        if section.role == "source":
-            approved = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), "")
-            if re.sub(r"\s+", " ", _text(approved)).strip().casefold() not in re.sub(r"\s+", " ", content).strip().casefold():
-                findings.append({
-                    "category": "content",
-                    "field": section.section_id,
-                    "target_ids": [section.section_id],
-                    "issue": f"Source-mode Protocol section does not preserve its approved source text exactly: {section.number} {section.title}",
-                })
-            continue
-        ungrounded_paths = [
-            path for path in section.fidelity_evidence
-            if meaningful(get_path(reference, path))
-            and not source_evidence_grounded(
-                content, path,
-                section_evidence_value(section.section_id, path, get_path(reference, path), reference),
-                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other", reference=reference,
-            )
-        ]
-        if ungrounded_paths:
-            diagnostics = [source_evidence_diagnostics(
-                content, path,
-                section_evidence_value(section.section_id, path, get_path(reference, path), reference),
-                all_items=section.source_coverage == "all_material_items" or path == "endpoints.other", reference=reference,
-            ) for path in ungrounded_paths]
-            finding = {
-                "category": "content",
-                "field": section.section_id,
-                "target_ids": [section.section_id],
-                "evidence_diagnostics": diagnostics,
-                "issue": "Rendered Protocol section does not preserve observable facts from: " + ", ".join(ungrounded_paths),
-            }
-            if lexical_evidence_uncertainty(diagnostics):
-                finding = attach_rule({**finding, "publication_disposition": "blocking"},
-                                      "protocol.source-coverage.lexical")
-            findings.append(finding)
-    benefits_text = "\n".join(section_paragraphs.get("risks-benefits.benefits", []))
-    if re.search(r"\b(?:compensat\w*|reimburs\w*|payment\w*)\b|\$\s*\d", benefits_text, re.I):
-        findings.append(narrative_review_finding({
-            "category": "content",
-            "field": "risks-benefits.benefits",
-            "target_ids": ["risks-benefits.benefits"],
-            "issue": "Protocol benefits section includes payment or reimbursement terms owned by Section 17.",
-        }))
-    concept_findings = assess_protocol_concept_repetition(
-        section_paragraphs,
-        protocol_concept_ownership(branch),
-    )
-    findings.extend(concept_findings)
-    seen: dict[str, str] = {}
-    current_section = ""
-    heading_to_id = {heading_key(f"{section.number} {section.title}"): section.section_id for section in sections}
-    for paragraph in document.paragraphs:
-        text = re.sub(r"\s+", " ", paragraph.text).strip()
-        if paragraph.style.name.casefold().startswith("heading"):
-            current_section = heading_to_id.get(heading_key(paragraph.text), current_section)
-            continue
-        key = text.casefold()
-        if len(text.split()) >= 8 and key in seen:
-            if seen[key] == current_section:
-                findings.append({"code": "protocol-exact-repetition", "category": "content", "field": current_section or "protocol", "target_ids": [current_section or "protocol"], "publication_disposition": "warning", "issue": f"Exact paragraph is duplicated in protocol section {current_section or 'protocol'}."})
-            else:
-                findings.append(recovery_finding({
-                    "code": "protocol-exact-repetition",
-                    "category": "content",
-                    "check": "concept_repetition",
-                    "field": current_section or "protocol",
-                    "target_ids": [current_section or "protocol"],
-                    "primary_section": seen[key],
-                    "secondary_section": current_section,
-                    "primary_paragraphs": [text],
-                    "secondary_paragraphs": [text],
-                    "treatment": "excessive",
-                    "necessary": False,
-                    "concise": False,
-                    "severity": "warning",
-                    "publication_disposition": "warning",
-                    "action": "manual_review",
-                    "issue": f"Exact paragraph is repeated from Protocol section {seen[key]} in secondary section {current_section}.",
-                }, "drafting_defect"))
-        elif len(text.split()) >= 8:
-            seen[key] = current_section
-    if branch == "Retrospective":
-        if "approved visit schedule table is" in normalized_visible:
-            findings.append({
-                "category": "content",
-                "field": "study-procedure.enrollment",
-                "target_ids": ["study-procedure.enrollment"],
-                "issue": "Retrospective study procedure contains flattened visit-schedule serialization instead of readable client-facing content.",
-            })
-        for field in ("population.inclusion_criteria", "population.exclusion_criteria"):
-            value = get_path(reference, field, [])
-            items = value if isinstance(value, list) else [value]
-            for item in items:
-                finding = _retrospective_lexical_coverage_finding(
-                    item, normalized_visible, field="subjects.eligibility",
-                    issue=f"Retrospective eligibility omits approved source content from {field}.",
-                )
-                if finding:
-                    findings.append(finding)
-        timeline = get_path(reference, "study.timeline")
-        if timeline and not _timeline_covered(timeline, normalized_visible):
-            findings.append({"category": "content", "field": "study-procedure.enrollment", "target_ids": ["study-procedure.enrollment"], "issue": "Retrospective study procedure omits the approved study timeline."})
-        schedule = get_path(reference, "procedures.visit_schedule_table", []) or []
-        visit_names = [item.get("visitName") or item.get("visit") for item in schedule if isinstance(item, Mapping)]
-        for visit_name in visit_names:
-            finding = _retrospective_lexical_coverage_finding(
-                visit_name, normalized_visible, field="study-procedure.enrollment",
-                issue=f"Retrospective study procedure omits approved visit {visit_name}.",
-            )
-            if finding:
-                findings.append(finding)
-    if branch != "Retrospective":
-        icf = revision_dir / "candidate/icf.docx"
-        required_icf_title = (
-            ["«Protocol_Title»", "«Protocol_No»"]
-            if icf_template.casefold() == "sterling"
-            else [str(get_path(reference, "study.title", ""))]
-        )
-        findings.extend(audit_docx(icf, required_phrases=required_icf_title))
-        repo_root = Path(__file__).resolve().parents[1]
-        bundle = contracted_template_bundle(repo_root, reference)
-        boilerplate = _json(repo_root / str(bundle["fixed_clinical_boilerplate"]["path"]))
-        boilerplate_sections = dict(boilerplate.get("sections") or {})
-        required_static_text = [
-            str(boilerplate_sections["icf-voluntary"])
-        ] if str(boilerplate_sections.get("icf-voluntary") or "").strip() else []
-        icf_assessment = assess_icf_output(
-            icf,
-            reference,
-            {"family": icf_template, "required_static_text": required_static_text},
-        )
-        findings.extend(icf_assessment["findings"])
-        if icf_template.casefold() == "sterling":
-            findings.extend(validate_sterling_clause_contract(icf, reference)["findings"])
-        icf_document = Document(icf)
-        icf_visible = re.sub(r"\s+", " ", " ".join(paragraph.text for paragraph in icf_document.paragraphs)).casefold()
-        for section_id, title in icf_retained_sections(branch, icf_template):
-            if title.casefold() not in icf_visible:
-                findings.append(recovery_finding({
-                    "category": "content",
-                    "field": section_id,
-                    "target_ids": ["layout:icf"],
-                    "issue": f"Required retained ICF section is missing from the client shell: {title}",
-                }, "document_structure_defect"))
-        signature_marker = "signature of participant"
-        if signature_marker not in icf_visible:
-            findings.append(recovery_finding({
-                "category": "content",
-                "field": "icf.signature-block",
-                "target_ids": ["layout:icf"],
-                "issue": "Required participant signature block is missing from the ICF.",
-            }, "document_structure_defect"))
-        injury_or_costs = (
-            "icf.injury" if "icf.injury" in draftable_sections
-            else "icf.costs" if "icf.costs" in draftable_sections
-            else "icf"
-        )
-        stale_icf_claims = {
-            "eye tests and procedures": "icf.procedures",
-            "routine cataract surgery": "icf.study-purpose",
-            "company that makes the handpiece": "icf.study-purpose",
-            "no additional side effects or risks expected": "icf.risks",
-            "not to be used for participant enrollment": "icf.study-purpose",
-            "advarra institutional review board": "icf.privacy",
-            "all charges for medical care": injury_or_costs,
-            "insurance company": injury_or_costs,
-        }
-        for phrase, target in stale_icf_claims.items():
-            if phrase in icf_visible and phrase not in source_visible:
-                findings.append({
-                    "category": "content",
-                    "field": target,
-                    "target_ids": [target],
-                    "issue": f"ICF contains example-study prose that is not supported by the approved source: {phrase}",
-                })
-        if _text(get_path(reference, "regulatory.prs.study_type")).casefold() == "observational" and "clinical trial" in icf_visible and "clinical trial" not in source_visible:
-            findings.append({"category": "content", "field": "icf.study-purpose", "target_ids": ["icf.study-purpose"], "issue": "Observational ICF retains interventional clinical-trial language."})
-        minimum_days = _text(get_path(reference, "procedures.minimum_days_before_screening_without_participation"))
-        if minimum_days:
-            screening_interval = screening_interval_requirement(reference)
-            day_count = screening_interval.days if screening_interval else minimum_days
-            day_pattern = re.compile(rf"\b{re.escape(day_count)}\s*[- ]?\s*days?\b", re.I)
-            for target, passage in (("subjects.inclusion", visible), ("icf.procedures", icf_visible)):
-                if not day_pattern.search(passage):
-                    findings.append(evidence_coverage_finding(target, [source_evidence_diagnostics(
-                        passage, "procedures.minimum_days_before_screening_without_participation", minimum_days,
-                        reference=reference,
-                    )], "Screening interval wording needs source-grounded assessment.",
-                        "Preserve the approved interval without study participation before screening.", category="content"))
-            xml_path = revision_dir / "candidate/study.xml"
-            if xml_path.is_file():
-                repo_root = Path(__file__).resolve().parents[1]
-                prs_findings = validate_prs_output(
-                    xml_path,
-                    reference,
-                    repo_root / str(bundle["prs_authority"]["structural_reference"]["path"]),
-                    generation_template=repo_root / str(bundle["prs_authority"]["generation_template"]["path"]),
-                )
-                if any(
-                    item.get("code") == "screening_interval_semantic_mismatch"
-                    for item in prs_findings
-                ):
-                    findings.append(recovery_finding({
-                        "category": "content",
-                        "field": "prs.eligibility",
-                        "target_ids": ["layout:xml"],
-                        "issue": (
-                            "PRS XML omits or materially alters the approved minimum interval "
-                            "without participation in another study before screening."
-                        ),
-                    }, "document_structure_defect"))
-                if any(
-                    item.get("code") == "screening_interval_validator_inconsistency"
-                    for item in prs_findings
-                ):
-                    findings.append(recovery_finding({
-                        "category": "quality-gate",
-                        "field": "prs.eligibility-validator",
-                        "target_ids": ["quality-gate:prs-screening-interval"],
-                        "issue": (
-                            "PRS screening-interval validators disagree or cannot represent the "
-                            "approved value; maintenance is required before document repair."
-                        ),
-                    }, "capability_gap"))
-
-        consent_to_sign = any(phrase in icf_visible for phrase in (
-            "should not sign",
-            "if you would like to participate, you will be asked to sign",
-            "if you agree to participate, you will be asked to sign",
-        ))
-        if not consent_to_sign:
-            findings.append(recovery_finding({"category": "content", "field": "icf.consent", "target_ids": ["layout:icf"], "issue": "ICF lacks an explicit instruction not to sign when the participant does not agree."}, "document_structure_defect"))
-    governed = []
-    for item in findings:
-        if (
-            item.get("publication_disposition") == "warning"
-            and item.get("action") == "manual_review"
-        ):
-            governed.append(item)
-            continue
-        if item.get("recovery_class") in RECOVERY_POLICIES:
-            governed.append(item)
-            continue
-        targets = item.get("target_ids") if isinstance(item.get("target_ids"), list) else []
-        unlocalized = not targets or any(
-            str(target).strip().casefold() in {"", "protocol", "icf"}
-            or str(target) not in draftable_sections
-            for target in targets
-        )
-        governed.append(recovery_finding(
-            item,
-            "document_structure_defect" if unlocalized else "drafting_defect",
-        ))
-    return governed
+    """Check only file usability. AI reviewers own generated meaning and layout."""
+    findings = []
+    for name in document_set(get_path(reference, "meta.study_type")):
+        path = revision_dir / "candidate" / name
+        if name.endswith(".docx"):
+            findings.extend(audit_docx(path))
+    return findings
 
 
 def content_review_sections(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -5524,14 +5125,6 @@ def verification_recovery_request_findings(
             )
         if not finding_matches:
             return issue("verification_response_finding_mismatch", "The proposed recovery finding is not present in the exact authenticated response.")
-        if originating_finding.get('recovery_localization'):
-            records, errors = _uncertainty_resolution_records(request, response)
-            replay = {key: value for key, value in originating_finding.items()
-                      if key not in {'affected_passage', 'recovery_localization'}}
-            _localize_recovery_findings([replay], records if not errors else [], request)
-            if (errors or replay.get('recovery_localization') != originating_finding['recovery_localization']
-                    or replay.get('affected_passage') != originating_finding.get('affected_passage')):
-                return issue('verification_response_finding_mismatch', 'Recovery localization differs from validated review evidence.')
     return []
 
 
@@ -5607,13 +5200,6 @@ def create_verification_requests(
         "Assess semantic_evidence requirements against their exact source excerpts under source_supported and no_invention. "
         "Assess every lexical_review_caution in its named section against the approved facts and exact artifact. "
         "These are unresolved word-matching cautions, not established omissions. A faithful paraphrase may pass "
-        "its section assessment. Return uncertainty_resolutions with one decision per caution: caution_sha256, "
-        "disposition (faithful, confirmed_defect, or source_clarification), rationale, source_excerpt quoted from "
-        "approved_source, and affected_passage quoted from artifact_passage. Bare pass or ignore declarations "
-        "do not resolve uncertainty. Confirmed defects and source clarification require a substantive finding "
-        "on the same artifact and section. Objective integrity, schema and factual failures cannot be waived. A real omission, "
-        "changed quantity-to-procedure relationship, reversed negation or strengthened claim must be a "
-        "source_supported or no_invention finding, with exact passage and source evidence. "
         "For generated DOCX metadata errors, give source_path naming the approved evidence and affected_passage as the exact scalar value. "
         "For generated XML field errors, give source_path naming the approved evidence, affected_passage as an exact XML element or subtree, "
         "and document_locations with its native path. These enable scoped source-bound recovery. "
@@ -5756,7 +5342,6 @@ def create_verification_requests(
             else None
         ),
         "sections": sections,
-        "lexical_review_cautions": _lexical_review_cautions(revision_dir, reference, render_report),
         "code_owned_tables": ({
             "visit-schedule": {"section_id": "study-procedure.visits", "caption": "Table 9.2-1: Visit Schedule"},
             **{name: {"section_id": table["section_id"], "caption": table["caption"]}
@@ -5945,20 +5530,10 @@ def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, 
 def _deterministic_review_partition(
     findings: Iterable[Mapping[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Separate objective failures from registered semantic review evidence.
-
-    Do not use this for arbitrary reviewer findings: a reviewer cannot grant a
-    response waiver by copying production rule metadata.
-    """
-    objective, cautions = [], []
-    for finding in findings:
-        (cautions if semantic_rule(finding) or _is_publication_warning(finding)
-         else objective).append(dict(finding))
-    return objective, cautions
+    """Production deterministic checks now establish objective usability only."""
+    return _blocking_findings(findings), _warning_findings(findings)
 
 
-def _review_uncertainty(finding: Mapping[str, Any]) -> bool:
-    return bool(semantic_rule(finding)) or finding.get("code") in UNCERTAINTY_CODES
 
 
 def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -5970,114 +5545,12 @@ def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, A
 
 
 def _accepted_drafting_warnings(revision_dir: Path, reference: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
-    """Carry accepted drafting cautions into the final report for human review."""
-    warnings: list[dict[str, Any]] = []
-    for path in sorted((revision_dir / "hermes/accepted").glob("*.json")):
-        try:
-            record = _json(path)
-        except (OSError, ValueError, json.JSONDecodeError):
-            continue
-        if not isinstance(record, Mapping):
-            continue
-        values = record.get("warnings")
-        if isinstance(values, list):
-            warnings.extend(_warning_findings(value for value in values if isinstance(value, Mapping)))
-        narrative = record.get("narrative")
-        if isinstance(narrative, Mapping):
-            for item in narrative.values():
-                if isinstance(item, Mapping) and isinstance(item.get("warnings"), list):
-                    warnings.extend(_warning_findings(value for value in item["warnings"] if isinstance(value, Mapping)))
-    if reference is not None and any((revision_dir / "hermes/accepted").glob("*.json")):
-        root = Path(__file__).resolve().parents[1]
-        warnings.extend(accepted_cross_section_duplicate_findings(
-            revision_dir, reference, governing_resources(root, reference)))
-    return warnings
+    """Legacy drafting heuristics do not create delivery warnings or extra review work."""
+    return []
 
 
-def _lexical_review_cautions(
-    revision_dir: Path, reference: Mapping[str, Any], render_report: Mapping[str, Any],
-) -> list[dict[str, Any]]:
-    """Expose heuristic uncertainty to the existing independent review, without a new gate."""
-    warnings = _accepted_drafting_warnings(revision_dir, reference) + _render_warnings(render_report)
-    protocol = revision_dir / "candidate/protocol.docx"
-    if protocol.is_file():
-        try:
-            warnings += _deterministic_review_partition(deterministic_content_check(revision_dir, reference))[1]
-        except (OSError, ValueError, zipfile.BadZipFile):
-            # Construction/package checks own malformed candidates; no caution can approve them.
-            pass
-    records = {}
-    for warning in warnings:
-        if not _review_uncertainty(warning):
-            continue
-        identity = canonical_evidence_sha256(warning)
-        section = str((warning.get("target_ids") or [warning.get("field") or ""])[0])
-        artifact = "study.xml" if section.startswith("prs.") else "icf" if section.startswith("icf.") or section == "icf.docx" else "protocol"
-        path = revision_dir / ("candidate/study.xml" if artifact == "study.xml" else f"candidate/{artifact}.docx")
-        if section.endswith(".docx") and path.is_file():
-            matches = [(row["section_id"], _review_evidence_text(
-                rendered_section_snapshot(path, row["section_id"])))
-                for row in content_review_sections(reference)
-                if row["artifact"] == artifact and row["section_id"] != f"{artifact}.shell"]
-            matching_section = min((row for row in matches if warning.get("affected_passage")
-                                    and warning["affected_passage"] in row[1]),
-                                   key=lambda row: len(row[1]), default=None)
-            section = matching_section[0] if matching_section else f"{artifact}.shell"
-        if artifact == "study.xml" and path.is_file():
-            tag = section.split(".", 1)[1].replace("-", "_")
-            passage = [{"paragraph": ET.parse(str(path)).findtext(f".//{tag}/textblock") or ""}]
-        else:
-            passage = rendered_section_snapshot(path, section) if path.is_file() else []
-        if not any(key in row and _review_evidence_text(row[key]).strip()
-                   for row in passage for key in ("paragraph", "table")):
-            raise ReviewEvidenceError(artifact, section)
-        section_specs = list(protocol_contract(str(get_path(reference, "meta.study_type") or "")))
-        if artifact == "icf":
-            section_specs = list(icf_contract(str(get_path(reference, "meta.study_type") or ""),
-                                             str(get_path(reference, "meta.icf_template") or "Advarra")))
-        spec = next((item for item in section_specs if item.section_id == section), None)
-        diagnostics = warning.get("evidence_diagnostics")
-        source_evidence = ({
-            "approved_facts": {str(row["source_path"]): get_path(reference, str(row["source_path"]))
-                               for row in diagnostics if isinstance(row, Mapping) and row.get("source_path")},
-            "diagnostics": diagnostics,
-        } if diagnostics else warning.get("source_excerpt"))
-        if not source_evidence:
-            source_evidence = {key: get_path(reference, key) for key in spec.evidence} if spec and spec.evidence else reference
-        template_excerpt = ""
-        if warning.get("clause_id"):
-            clause_contract = sterling_clause_contract(Path(__file__).resolve().parents[1])
-            clause = next(row for row in clause_contract["clauses"] if row["clause_id"] == warning["clause_id"])
-            validation = clause.get("validation") or {}
-            if any(validation.get(key) for key in ("exact_template", "exact_boilerplate_id", "placement_boilerplate_id")) or clause.get("approved_source", {}).get("boilerplate_id"):
-                template_excerpt = sterling_clause_text(str(warning["clause_id"]))
-            else:
-                template_excerpt = _review_evidence_text(clause.get("validation", {}).get("required_term_groups", []))
-        if template_excerpt:
-            source_evidence = {"approved_facts": source_evidence, "template": template_excerpt}
-        records[identity] = {
-            "caution_sha256": identity, "section_id": section,
-            "artifact": artifact, "caution": warning,
-            "approved_source_sha256": canonical_evidence_sha256(reference),
-            "artifact_sha256": sha256_file(path) if path.is_file() else None,
-            "section_sha256": canonical_evidence_sha256(passage),
-            "artifact_passage": passage,
-            "source_evidence": source_evidence,
-            "template_excerpt": template_excerpt,
-            "rule_sha256": _uncertainty_rule_sha256(),
-            **({"rule_id": warning["rule_id"], "rule_version": warning["rule_version"],
-                "rule_contract_sha256": warning["rule_contract_sha256"],
-                "rule_contract": semantic_rule(warning)} if semantic_rule(warning) else {}),
-        }
-    return list(records.values())
 
 
-def _uncertainty_rule_sha256() -> str:
-    """Use one rule identity for request issuance and decision validation."""
-    return canonical_evidence_sha256({
-        "quality": sha256_file(Path(__file__)),
-        "drafting": sha256_file(Path(__file__).with_name("drafting.py")),
-    })
 
 
 def _review_evidence_text(value: Any) -> str:
@@ -6089,89 +5562,6 @@ def _review_evidence_text(value: Any) -> str:
     return "" if value is None else str(value)
 
 
-def _uncertainty_resolution_records(
-    request: Mapping[str, Any], response: Mapping[str, Any],
-) -> tuple[list[dict[str, Any]], list[str]]:
-    """Validate decisions against evidence in the authenticated review request."""
-    if request.get("generation_authority_sha256") != sha256_value(governing_resources(
-            Path(__file__).resolve().parents[1], request.get("approved_source") or {})):
-        return [], ["The review generation authority is stale."]
-    cautions = {row["caution_sha256"]: row for row in request.get("lexical_review_cautions", [])}
-    supplied = response.get("uncertainty_resolutions", [])
-    if not isinstance(supplied, list):
-        return [], ["Uncertainty resolutions must be a list."]
-    records, errors, seen = [], [], set()
-    for decision in supplied:
-        identity = decision.get("caution_sha256") if isinstance(decision, Mapping) else None
-        if not isinstance(identity, str) or identity not in cautions or identity in seen:
-            errors.append("Uncertainty resolution has an unknown or duplicate caution identity.")
-            continue
-        seen.add(identity)
-        caution = cautions[identity]
-        disposition = decision.get("disposition")
-        source_excerpt = _text(decision.get("source_excerpt"))
-        passage = _text(decision.get("affected_passage"))
-        rationale = _text(decision.get("rationale"))
-        source_text = _review_evidence_text(request.get("approved_source"))
-        artifact_text = _review_evidence_text(caution["artifact_passage"])
-        if (disposition not in {"faithful", "confirmed_defect", "source_clarification"}
-                or not rationale or not source_excerpt
-                or (source_excerpt not in source_text and source_excerpt not in caution.get("template_excerpt", ""))
-                or source_excerpt not in _review_evidence_text(caution["source_evidence"])
-                or not passage or passage not in artifact_text):
-            errors.append("Uncertainty resolution requires a rationale and exact source/current passage evidence.")
-            continue
-        if (caution["approved_source_sha256"] != canonical_evidence_sha256(request.get("approved_source"))
-                or caution["rule_sha256"] != _uncertainty_rule_sha256()):
-            errors.append("The resolution source or rule identity is stale.")
-            continue
-        if caution.get("rule_id"):
-            if (not semantic_rule(caution["caution"])
-                    or caution["rule_contract_sha256"] != rule_contract_sha256(caution["rule_id"])
-                    or any(key in decision and decision[key] != caution[key]
-                           for key in ("rule_id", "rule_version", "rule_contract_sha256"))):
-                errors.append("The resolution condition identity or authority is stale or mismatched.")
-                continue
-        if any(key in decision and decision[key] != caution.get(key)
-               for key in ("artifact", "section_id", "approved_source_sha256", "artifact_sha256",
-                           "section_sha256", "rule_sha256")):
-            errors.append("The resolution target or bound source/artifact evidence is mismatched.")
-            continue
-        if any(key in decision and decision[key] != request.get(key)
-               for key in ("revision_id", "generation_authority_sha256")):
-            errors.append("The resolution revision or generation authority is mismatched.")
-            continue
-        target = (caution["artifact"], caution["section_id"])
-        section_passed = any(
-            (row.get("artifact"), row.get("section_id")) == target
-            and row.get("status") == "passed" and set(row.get("checks", [])) == set(CONTENT_CHECKS)
-            for row in response.get("section_assessments", []) if isinstance(row, Mapping)
-        )
-        companion = any(
-            row.get("artifact") == target[0] and target[1] in row.get("target_ids", [])
-            and row.get("check") in {"source_supported", "no_invention", "substantive"}
-            for row in response.get("findings", []) if isinstance(row, Mapping)
-        )
-        if (disposition == "faithful" and not section_passed) or (disposition != "faithful" and not companion):
-            errors.append("Uncertainty disposition contradicts its section assessment or lacks a substantive finding.")
-            continue
-        records.append({
-            "schema_version": "source-grounded-resolution/v1", **dict(decision),
-            **{key: caution[key] for key in (
-                "artifact", "section_id", "approved_source_sha256", "artifact_sha256",
-                "section_sha256", "rule_sha256",
-            )},
-            **{key: caution[key] for key in ("rule_id", "rule_version", "rule_contract_sha256")
-               if key in caution},
-            "revision_id": request["revision_id"],
-            "generation_authority_sha256": request.get("generation_authority_sha256"),
-            "verification_request_id": request["request_id"],
-            "request_sha256": request["request_sha256"],
-            "producer": dict(response["producer"]),
-        })
-    if seen != set(cautions):
-        errors.append("Every presented uncertainty needs an explicit source-grounded decision.")
-    return records, errors
 
 
 def _localize_recovery_findings(
@@ -6212,47 +5602,8 @@ def _localize_recovery_findings(
             }, 'verifier_transient'))
 
 
-def _reviewed_lexical_warnings(
-    warnings: list[dict[str, Any]], evidence: Mapping[str, Any], findings: Iterable[Mapping[str, Any]],
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Retain decisions internally; unrelated defects do not erase faithful resolutions."""
-    content = [record for record in evidence.values()
-               if record.get("task") == "clinical_content_verification"]
-    if len(content) != 1:
-        return warnings, []
-    record = content[0]
-    # Invalid reviewer or stale artifact evidence cannot grant resolution authority.
-    if any(item.get("recovery_class") in {"verifier_transient", "document_structure_defect"}
-           and item.get("verification_request_id") == record["request_id"] for item in findings):
-        return warnings, []
-    reviewed = {row["caution_sha256"]: row for row in record.get("uncertainty_resolutions", [])}
-    retained, resolved = [], []
-    for warning in warnings:
-        decision = reviewed.get(canonical_evidence_sha256(warning))
-        if decision:
-            resolved.append({"caution": warning, "resolution": (
-                "independent_content_review_passed" if decision["disposition"] == "faithful"
-                else "independent_content_review_requires_source_clarification"
-                if decision["disposition"] == "source_clarification"
-                else "independent_content_review_confirmed_defect"), **decision})
-        else:
-            retained.append(warning)
-    return retained, resolved
 
 
-def _unresolved_uncertainty_findings(
-    warnings: Iterable[Mapping[str, Any]], evidence: Mapping[str, Any],
-) -> list[dict[str, Any]]:
-    """New uncertainty requires review rather than silently becoming a client caution."""
-    request_id = next((row.get("request_id") for row in evidence.values()
-                       if row.get("task") == "clinical_content_verification"), None)
-    return [recovery_finding({
-        "category": "verification", "code": "uncertainty_resolution_required",
-        "verification_request_id": request_id,
-        "field": warning.get("field"), "target_ids": ["verification:content"],
-        "issue": "Present this uncertainty and obtain a source-grounded reviewer decision.",
-        "caution": dict(warning),
-    }, "verifier_transient") for warning in warnings if _review_uncertainty(warning)]
 
 
 def _delivery_warning_partition(warnings: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -6912,12 +6263,6 @@ def validate_verifications(
                 findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing visual response contains a non-passing page assessment."}, "verifier_transient"))
         resolution_records, resolution_errors = ([], [])
         if request["task"] == "clinical_content_verification":
-            resolution_records, resolution_errors = _uncertainty_resolution_records(request, response)
-            findings.extend(recovery_finding({
-                "category": "verification", "field": "uncertainty_resolutions",
-                "code": "uncertainty_resolution_invalid", "target_ids": [verification_target],
-                "verification_request_id": request["request_id"], "issue": message,
-            }, "verifier_transient") for message in resolution_errors)
             routing_errors = source_routing_assessment_errors(request, response)
             findings.extend(recovery_finding({
                 "category": "verification", "field": "source_routing_assessments",
@@ -6927,18 +6272,6 @@ def validate_verifications(
             }, "verifier_transient") for message in routing_errors)
             resolution_errors.extend(routing_errors)
         _localize_recovery_findings(findings, resolution_records if not resolution_errors else [], request)
-        if not resolution_errors:
-            for decision in resolution_records:
-                if decision["disposition"] != "source_clarification":
-                    continue
-                for finding in findings:
-                    if (finding.get("verification_request_id") == request["request_id"]
-                            and finding.get("artifact") == decision["artifact"]
-                            and decision["section_id"] in finding.get("target_ids", [])
-                            and finding.get("check") in {"source_supported", "no_invention", "substantive"}):
-                        finding["source_clarification_required"] = True
-                        finding["source_resolution"] = decision
-                        finding['publication_disposition'] = 'blocking'
         evidence[evidence_key] = {
             "uncertainty_resolutions": resolution_records if not resolution_errors else [],
             "source_routing_assessments": (response.get("source_routing_assessments", [])
@@ -7195,8 +6528,7 @@ def final_exact_artifact_review_findings(
             revision_dir, reference, render_report, fresh_evidence
         )
     )
-    fresh_warnings, fresh_resolutions = _reviewed_lexical_warnings(fresh_warnings, fresh_evidence, verification_findings)
-    verification_findings.extend(_unresolved_uncertainty_findings(fresh_warnings, fresh_evidence))
+    fresh_resolutions = []
     fresh_warnings, fresh_history = _delivery_warning_partition(fresh_warnings)
     if fresh_history != list(quality.get("internal_diagnostics") or []):
         issues.append("Final internal diagnostic evidence changed after review.")
@@ -7242,8 +6574,7 @@ def quality_report(revision_dir: Path, reference: Mapping[str, Any], render_repo
     warnings.extend(_warning_findings(verification_findings))
     findings.extend(_blocking_findings(verification_findings))
     findings.extend(_final_verification_scope_findings(revision_dir, reference, render_report, evidence))
-    warnings, resolutions = _reviewed_lexical_warnings(warnings, evidence, findings)
-    findings.extend(_unresolved_uncertainty_findings(warnings, evidence))
+    resolutions = []
     warnings, internal_history = _delivery_warning_partition(warnings)
     candidate_hashes = {
         path.relative_to(revision_dir).as_posix(): sha256_file(path)

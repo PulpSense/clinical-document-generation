@@ -1,6 +1,6 @@
 {
   "schema_version": "blocking-check-audit/v3",
-  "scope": "Direct blocking/finding producers and shared evidence/normalization helpers in the declared production modules; nested checks fingerprinted within owning functions. External model judgement and host capability remain runtime obligations.",
+  "scope": "Historical source fingerprint audit. Retired from developer and runtime enforcement by #104.",
   "baseline_commit": "b35761d",
   "families": {
     "source": {
@@ -2070,5 +2070,7 @@
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",
-  "authority_contract_inheritance": "Each producer resolves its family authority contract plus explicit per-producer overrides. Paired tests are behavioral evidence at that family seam, not exhaustive clinical certification."
+  "authority_contract_inheritance": "Each producer resolves its family authority contract plus explicit per-producer overrides. Paired tests are behavioral evidence at that family seam, not exhaustive clinical certification.",
+  "status": "superseded",
+  "superseded_by": "spec #103; docs/reliability/spec-103-cleanup.md"
 }

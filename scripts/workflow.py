@@ -45,7 +45,7 @@ from drafting import governing_resources, ingest_responses, invalidate_accepted_
 from drafting import construction_repair_spec, construction_retry_spec, create_construction_repair_request
 from prs_xml import generate as generate_xml, validate_output as validate_xml_output, quality_report as xml_quality_report
 from output_recovery import apply_xml_repairs, source_path as normalize_source_path
-from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, validate_sterling_clause_contract, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA
 from contracts import document_table_reference, protocol_table_contracts
@@ -88,7 +88,7 @@ PDF_PAGE_RENDERER = {
     "platform": "manylinux_2_17_x86_64",
 }
 PRODUCTION_MODULES = {
-    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py", "rule_authority.py",
+    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
@@ -8975,22 +8975,7 @@ def _begin_independent_review(
     revision_dir: Path, reference: Mapping[str, Any],
     render_report: Mapping[str, Any], bundle: Mapping[str, Any], review_set: int,
 ) -> tuple[list[Path], list[dict[str, Any]]]:
-    """Apply existing Sterling checks before spending independent review calls."""
-    protocol_path = revision_dir / "candidate/protocol.docx"
-    if protocol_path.is_file():
-        computed_findings = audit_computed_protocol_fields(protocol_path, reference)
-        if computed_findings:
-            return [], computed_findings
-    if (
-        canonical_study_type(get_path(reference, "meta.study_type")) != "Retrospective"
-        and str(get_path(reference, "meta.icf_template", "")).casefold() == "sterling"
-    ):
-        findings = validate_sterling_clause_contract(
-            revision_dir / "candidate/icf.docx", reference,
-        )["findings"]
-        blocking = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
-        if blocking:
-            return [], blocking
+    """Send usable candidates directly to independent AI review."""
     try:
         paths = create_verification_requests(
             revision_dir, reference, render_report,

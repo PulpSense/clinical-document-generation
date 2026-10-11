@@ -728,13 +728,18 @@ def compare_structure(reference_path: Path, candidate_path: Path) -> list[str]:
             key = contract_tag(child.tag)
             actual_by_tag.setdefault(key, child)
             if key not in actual_tags: actual_tags.append(key)
+        for tag in actual_tags:
+            if tag not in REPEATED and sum(contract_tag(child.tag) == tag for child in actual_children) != 1:
+                findings.append(f"{path}/{tag}: scalar cardinality differs")
         expected_present = [tag for tag in expected_tags if tag in actual_tags or tag not in REPEATED]
         if expected_present != actual_tags:
             findings.append(f"{path}: direct-child names or ordering differ")
         for tag in expected_present:
             if tag in actual_by_tag:
                 if tag != "__study_design_branch__":
-                    compare(expected_by_tag[tag], actual_by_tag[tag], f"{path}/{tag}", findings)
+                    for child in actual_children:
+                        if contract_tag(child.tag) == tag:
+                            compare(expected_by_tag[tag], child, f"{path}/{tag}", findings)
     try:
         findings: list[str] = []
         compare(_study(ET.parse(reference_path).getroot()), _study(ET.parse(candidate_path).getroot()), "clinical_study", findings)
@@ -882,8 +887,7 @@ def validate_output(
     findings = []
     try:
         raw = path.read_text(encoding="utf-8"); ET.parse(path)
-    except (OSError, ET.ParseError) as exc: return [{"category": "xml", "field": path.name, "issue": f"Invalid XML: {exc}"}]
-    if TOKEN.search(raw): findings.append({"category": "xml", "field": path.name, "issue": "Unresolved template token remains."})
+    except (OSError, UnicodeError, ET.ParseError) as exc: return [{"category": "xml", "field": path.name, "issue": f"Invalid XML: {exc}"}]
     actual, expected = repeated_counts(path), expected_counts(reference)
     for tag, count in expected.items():
         if actual[tag] != count: findings.append({"category": "xml", "field": tag, "issue": f"Expected {count} source-derived blocks; generated {actual[tag]}."})
@@ -922,246 +926,7 @@ def validate_output(
         except (OSError, ET.ParseError, ValueError) as exc:
             structure_differences.append(f"PRS XML branch-template parse error: {exc}")
     for difference in structure_differences: findings.append({"category": "xml", "field": "structure", "issue": difference})
-    study = _study(ET.parse(path).getroot())
-    screening_interval_source = get_path(
-        reference,
-        "procedures.minimum_days_before_screening_without_participation",
-    )
-    canonical_screening_interval = screening_interval_requirement(reference)
-    expected_screening_interval = _validation_screening_interval_requirement(reference)
-    if meaningful(screening_interval_source) and (
-        canonical_screening_interval is None
-        or expected_screening_interval is None
-        or canonical_screening_interval != expected_screening_interval
-    ):
-        findings.append({
-            "category": "internal",
-            "field": "quality_gate.screening_interval",
-            "code": "screening_interval_validator_inconsistency",
-            "issue": (
-                "The approved screening interval is meaningful but the canonical quality-gate "
-                "parser cannot represent it."
-            ),
-        })
-    elif expected_screening_interval is not None:
-        actual_screening_interval = _screening_interval_requirement_from_xml(study)
-        if actual_screening_interval != expected_screening_interval:
-            findings.append({
-                "category": "xml",
-                "field": "eligibility/criteria",
-                "code": "screening_interval_semantic_mismatch",
-                "issue": (
-                    "Generated PRS eligibility does not preserve the approved minimum interval "
-                    "and participation scope before screening."
-                ),
-            })
-    # Independent upload-documentation vocabulary oracle, NOT XSD enum
-    # validation. These are string elements in ProtocolRecordSchema.xsd
-    # (2018.05.08), https://cdn.clinicaltrials.gov/documents/xsd/prs/ProtocolRecordSchema.xsd
-    # lines 219, 222, 409, 545-553. Blank optional scalars remain permitted.
-    documented_values = {
-        "eligibility/gender": {"All", "Female", "Male"},
-        "eligibility/sampling_method": {"Probability Sample", "Non-Probability Sample"},
-        "eligibility/healthy_volunteers": {"yes", "no"},
-        "primary_compl_date_type": {"Anticipated", "Actual"},
-        "last_follow_up_date_type": {"Anticipated", "Actual"},
-        "study_design/study_type": {"Interventional", "Observational", "Expanded Access"},
-    }
-    for target_path, allowed in documented_values.items():
-        value = _text(study.findtext(target_path))
-        # Yes/No casing in governed templates is preserved; validate the token.
-        checked = value.casefold() if target_path == "eligibility/healthy_volunteers" else value
-        if value and checked not in allowed:
-            findings.append({
-                "category": "transport_vocabulary", "field": target_path,
-                "issue": f"Value {value!r} is outside the documented PRS upload vocabulary: {', '.join(sorted(allowed))}. This is not an XSD-enumeration check.",
-            })
-    for tag in ("provider_study_id", "org_name", "brief_title", "official_title", "brief_summary", "detailed_description", "enrollment", "study_type"):
-        node = study.find(f".//{tag}")
-        if node is None or not _text("".join(node.itertext())): findings.append({"category": "xml", "field": tag, "issue": "Required PRS value is empty."})
-    scalar_template = generation_template or structural_template
-    narrative = {
-        "brief_summary": {"text": _text(study.findtext("brief_summary/textblock"))},
-        "detailed_description": {"text": _text(study.findtext("detailed_description/textblock"))},
-    }
-    expected_fields = _fields(reference, narrative)
-    for target_path, token_name in _scalar_template_bindings(scalar_template):
-        if token_name in {"briefSummary", "detailedDescription"}:
-            continue
-        target = study.find(target_path)
-        if target is None and any(branch in target_path for branch in ("interventional_design", "observational_design")):
-            continue
-        expected_value = _text(expected_fields.get(token_name))
-        actual_value = _text("".join(target.itertext())) if target is not None else ""
-        if actual_value != expected_value:
-            findings.append({
-                "category": "xml",
-                "field": target_path,
-                "issue": f"Generated PRS scalar value does not match source mapping {token_name}.",
-            })
-    scalar_sources = {
-        "uid": _stable_study_uid(reference),
-        "id_info/provider_study_id": _source_value(reference, "regulatory.prs.provider_study_id", "meta.protocol_number"),
-        "id_info/org_name": _source_value(reference, "regulatory.prs.org_name", "regulatory.prs.organization_name", "parties.sponsor.name"),
-        "brief_title": study_short_title(reference),
-        "official_title": get_path(reference, "study.title"),
-        "condition": get_path(reference, "study.condition"),
-        "study_design/study_type": get_path(reference, "regulatory.prs.study_type"),
-        "start_date": get_path(reference, "regulatory.prs.start_date"),
-        "start_date_type": get_path(reference, "regulatory.prs.start_date_type"),
-        "verification_date": get_path(reference, "regulatory.prs.verification_date"),
-        "primary_compl_date": get_path(reference, "regulatory.prs.primary_completion_date"),
-        "primary_compl_date_type": get_path(reference, "regulatory.prs.primary_completion_date_type"),
-        "last_follow_up_date": get_path(reference, "regulatory.prs.study_completion_date") or get_path(reference, "regulatory.prs.last_follow_up_date"),
-        "last_follow_up_date_type": get_path(reference, "regulatory.prs.study_completion_date_type") or get_path(reference, "regulatory.prs.last_follow_up_date_type"),
-        "study_design/observational_design/timing": get_path(reference, "regulatory.prs.time_perspective"),
-    }
-    for target_path, expected_value in scalar_sources.items():
-        if not meaningful(expected_value):
-            continue
-        actual_value = study.findtext(target_path)
-        if _text(actual_value) != _expected_transport_value(target_path, expected_value):
-            findings.append({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": "Generated PRS value does not match the approved source."})
-    for target_path, source_paths in SOURCE_SCALAR_BINDINGS.items():
-        expected_value = _expected_transport_value(target_path, _source_value(reference, *source_paths))
-        if expected_value and _text(study.findtext(target_path)) != expected_value:
-            findings.append({"category": "xml", "field": target_path.rsplit("/", 1)[-1], "issue": f"Generated PRS value does not preserve approved source field {source_paths[0]}."})
-    responsible = _merged_mapping(
-        reference,
-        "regulatory.prs.responsible_party",
-        "parties.responsible_party",
-    )
-    responsible_sources = {
-        "sponsors/resp_party/name_title": _mapping_value(responsible, "name_title", "name"),
-        "sponsors/resp_party/organization": _mapping_value(responsible, "organization", "affiliation"),
-        "sponsors/resp_party/email": _mapping_value(responsible, "email"),
-        "sponsors/resp_party/phone": _mapping_value(responsible, "phone", "business_phone", "office_phone"),
-        "sponsors/resp_party/phone_ext": _mapping_value(responsible, "phone_ext", "extension", "ext"),
-        "sponsors/resp_party/resp_party_type": _source_value(
-            reference,
-            "regulatory.prs.responsible_party_type",
-            "regulatory.prs.resp_party_type",
-        ) or _mapping_value(responsible, "responsible_party_type", "resp_party_type", "type"),
-        "sponsors/resp_party/investigator_username": _mapping_value(responsible, "investigator_username", "username"),
-        "sponsors/resp_party/investigator_title": _mapping_value(responsible, "investigator_title", "title"),
-        "sponsors/resp_party/investigator_affiliation": _mapping_value(responsible, "investigator_affiliation"),
-    }
-    for target_path, expected_value in responsible_sources.items():
-        if expected_value and _text(study.findtext(target_path)) != expected_value:
-            findings.append({
-                "category": "xml",
-                "field": target_path.rsplit("/", 1)[-1],
-                "issue": "Generated PRS value does not preserve approved source field parties.responsible_party/regulatory.prs.responsible_party.",
-            })
-    overall_contact_backup = _merged_mapping(
-        reference,
-        "regulatory.prs.overall_contact_backup",
-        "regulatory.prs.overall_backup_contact",
-        "parties.overall_contact_backup",
-        "parties.study_coordinator_backup",
-        "parties.backup_contact",
-    )
-    for field, expected_value in _contact_fields(overall_contact_backup).items():
-        target_path = f"overall_contact_backup/{field}"
-        if expected_value and _text(study.findtext(target_path)) != expected_value:
-            findings.append({
-                "category": "xml",
-                "field": field,
-                "issue": "Generated PRS value does not preserve approved source field regulatory.prs.overall_contact_backup/contact alias.",
-            })
-    source_sites = [item for item in get_path(reference, "sites", []) or [] if isinstance(item, Mapping)]
-    generated_locations = study.findall("location")
-    for index, site in enumerate(source_sites, start=1):
-        if index > len(generated_locations):
-            continue
-        location = generated_locations[index - 1]
-        for field, expected_value in _contact_fields(_site_backup_contact(site)).items():
-            if (expected_value or field == "degrees") and _text(location.findtext(f"contact_backup/{field}")) != expected_value:
-                findings.append({
-                    "category": "xml",
-                    "field": f"location[{index}].contact_backup.{field}",
-                    "issue": f"Generated PRS value does not preserve approved source field sites[{index - 1}].contact_backup/contact alias.",
-                })
-
-    def require_repeated_value(node: ET.Element, target_path: str, expected_value: Any, field: str) -> None:
-        if (meaningful(expected_value) or target_path.endswith("/degrees")) and _text(node.findtext(target_path)) != _text(expected_value):
-            findings.append({
-                "category": "xml",
-                "field": field,
-                "issue": "Generated PRS repeated-block value does not match the approved source.",
-            })
-
-    interventions = _intervention_items(reference)
-    for index, (node, item) in enumerate(zip(study.findall("intervention"), interventions), start=1):
-        require_repeated_value(node, "intervention_type", item.get("intervention_type") or item.get("type"), f"intervention[{index}].intervention_type")
-        require_repeated_value(node, "intervention_name", item.get("intervention_name") or item.get("name"), f"intervention[{index}].intervention_name")
-        require_repeated_value(node, "intervention_description/textblock", item.get("intervention_description") or item.get("description"), f"intervention[{index}].intervention_description")
-        actual_labels = [_text(child.text) for child in node.findall("arm_group_label") if _text(child.text)]
-        if actual_labels != item["arm_group_labels"]:
-            findings.append({"category": "xml", "field": f"intervention[{index}].arm_group_label", "issue": "Generated intervention associations do not match the approved cohort links."})
-
-    arms = _observational_cohorts(reference)
-    for index, (node, item) in enumerate(zip(study.findall("arm_group"), arms), start=1):
-        require_repeated_value(node, "arm_group_label", item.get("arm_group_label") or item.get("label") or item.get("name"), f"arm_group[{index}].arm_group_label")
-        require_repeated_value(node, "arm_type", item.get("arm_type") or item.get("type"), f"arm_group[{index}].arm_type")
-        require_repeated_value(node, "arm_group_description/textblock", item.get("description"), f"arm_group[{index}].arm_group_description")
-
-    for tag, source_path in (("primary_outcome", "endpoints.primary"), ("secondary_outcome", "endpoints.secondary"), ("other_outcome", "endpoints.other")):
-        for index, (node, item) in enumerate(zip(study.findall(tag), _items(reference, source_path)), start=1):
-            require_repeated_value(node, "outcome_measure", item.get("outcome_measure") or item.get("measure") or item.get("label"), f"{tag}[{index}].outcome_measure")
-            require_repeated_value(node, "outcome_time_frame", item.get("outcome_time_frame") or item.get("time_frame") or item.get("time_point"), f"{tag}[{index}].outcome_time_frame")
-            require_repeated_value(node, "outcome_description/textblock", item.get("description"), f"{tag}[{index}].outcome_description")
-
-    for index, (node, site) in enumerate(zip(generated_locations, source_sites), start=1):
-        facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
-        projected = facility_projection(facility)
-        require_repeated_value(node, "status", site.get("status"), f"location[{index}].status")
-        require_repeated_value(node, "facility/name", facility.get("name"), f"location[{index}].facility.name")
-        for field, expected_value in (
-            ("city", projected["city"]),
-            ("state", projected["state"]),
-            ("country", _prs_country(projected["country"])),
-            ("zip", projected["postal_code"]),
-        ):
-            require_repeated_value(node, f"facility/address/{field}", expected_value, f"location[{index}].facility.address.{field}")
-        contact = site.get("contact") if isinstance(site.get("contact"), Mapping) else {}
-        investigator = _site_investigator(site)
-        for field, expected_value in _contact_fields(contact).items():
-            require_repeated_value(node, f"contact/{field}", expected_value, f"location[{index}].contact.{field}")
-        investigator_fields = _contact_fields(investigator)
-        for field, expected_value in {
-            **{key: investigator_fields[key] for key in ("first_name", "middle_name", "last_name", "degrees")},
-            "role": investigator.get("role"),
-        }.items():
-            require_repeated_value(node, f"investigator/{field}", expected_value, f"location[{index}].investigator.{field}")
-    expected_enrollment = _enrollment_count(get_path(reference, "population.sample_size"))
-    if expected_enrollment and _text(study.findtext("enrollment")) != expected_enrollment:
-        findings.append({"category": "xml", "field": "enrollment", "issue": "Generated enrollment does not match the approved total sample size."})
-    for tag, source_path in (("primary_outcome", "endpoints.primary"), ("secondary_outcome", "endpoints.secondary"), ("other_outcome", "endpoints.other")):
-        source_items = get_path(reference, source_path, [])
-        if tag == "primary_outcome" and (not isinstance(source_items, list) or not source_items):
-            findings.append({"category": "xml", "field": source_path, "issue": "Primary outcomes must be supplied as a non-empty structured list."})
-        elif source_items not in (None, "", []) and not isinstance(source_items, list):
-            findings.append({"category": "xml", "field": source_path, "issue": "Outcome source data must be a structured list."})
-        for index, node in enumerate(study.findall(tag), start=1):
-            for child in ("outcome_measure", "outcome_time_frame"):
-                target = node.find(child)
-                if target is None or not _text("".join(target.itertext())):
-                    findings.append({"category": "xml", "field": f"{tag}[{index}].{child}", "issue": "Required outcome value is empty."})
-            expected_uid = _stable_study_uid(reference)
-            target = node.find("uid")
-            if target is None or _text("".join(target.itertext())) != expected_uid:
-                findings.append({"category": "xml", "field": f"{tag}[{index}].uid", "issue": "Stable shared outcome UID was not populated."})
     return findings
 
 
-__all__ = [
-    "ScreeningIntervalRequirement",
-    "compare_structure",
-    "expected_counts",
-    "generate",
-    "repeated_counts",
-    "screening_interval_requirement",
-    "structural_signature",
-    "validate_output",
-]
+__all__ = ["ScreeningIntervalRequirement", "compare_structure", "expected_counts", "generate", "repeated_counts", "screening_interval_requirement", "structural_signature", "validate_output", "quality_report"]

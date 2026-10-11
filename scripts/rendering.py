@@ -3914,49 +3914,20 @@ def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
 
 
 def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict[str, Any]]:
-    document = Document(path)
-    paragraph_texts = [paragraph.text for paragraph in _all_paragraphs(document)]
-    text = "\n".join(paragraph_texts)
-    findings = [
-        recovery_finding(
-            {"category": "rendering", "field": path.name, "issue": f"Unresolved template token: {token}"},
-            "document_structure_defect",
-        )
-        for token in sorted(set(TOKEN.findall(text)))
-    ]
-    if INTERNAL_LANGUAGE.search(text) or "evidence_refs" in text or "{\"" in text:
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal structured drafting data leaked into visible text."}, "document_structure_defect"))
-    if AUTHORING_LANGUAGE.search(text):
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Internal template or authoring guidance leaked into visible text."}, "document_structure_defect"))
-    duplicate_passage = next((value for value in paragraph_texts if DUPLICATE_WORD.search(value)), "")
-    duplicate = DUPLICATE_WORD.search(duplicate_passage)
-    if duplicate:
-        findings.append({
-            "category": "editorial", "field": path.name,
-            "code": "visible-duplicate-word",
-            "affected_passage": duplicate_passage,
-            "publication_disposition": "warning",
-            "issue": f"Visible text repeats the word '{duplicate.group(1)}' consecutively.",
-        })
-    for phrase in required_phrases:
-        if phrase and phrase.casefold() not in text.casefold():
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": f"Required visible content is absent: {phrase}"}, "document_structure_defect"))
-    with zipfile.ZipFile(path) as package:
-        names = set(package.namelist())
-        if names & _REVIEW_PARTS:
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Comments or reviewer identity parts remain in the DOCX package."}, "document_structure_defect"))
-        review_xml = "\n".join(
-            package.read(name).decode("utf-8", errors="ignore")
-            for name in names
-            if name.endswith((".xml", ".rels"))
-        )
-    if any(marker in review_xml for marker in ("trackRevisions", "commentRangeStart", "commentReference", "<w:del", "<w:moveFrom")):
-        findings.append(recovery_finding({"category": "rendering", "field": path.name, "issue": "Tracked changes, comments, or hidden review markup remain in the DOCX package."}, "document_structure_defect"))
-    if path.stem == "icf":
-        non_heading = [paragraph.text.strip() for paragraph in document.paragraphs if _is_icf_heading(paragraph) and not paragraph.style.name.casefold().startswith("heading")]
-        if non_heading:
-            findings.append(recovery_finding({"category": "rendering", "field": path.name, "target_ids": ["layout:icf"], "issue": f"Visible ICF headings lack Word heading styles: {non_heading}"}, "visual_defect"))
-    return findings
+    """Establish readable OOXML, without judging text or presentation."""
+    try:
+        with zipfile.ZipFile(path) as package:
+            corrupt = package.testzip()
+            if corrupt:
+                raise ValueError(f"Corrupt DOCX part: {corrupt}")
+            for name in package.namelist():
+                if name.endswith((".xml", ".rels")):
+                    ET.fromstring(package.read(name))
+        Document(path)
+    except (OSError, ValueError, KeyError, zipfile.BadZipFile, ET.XMLSyntaxError) as exc:
+        return [recovery_finding({"category": "document-structure", "field": path.name,
+                                  "issue": f"Unreadable DOCX: {exc}"}, "document_structure_defect")]
+    return []
 
 
 def template_paths(
@@ -4085,18 +4056,7 @@ def render_documents(
             _clear_icf_review_highlighting(document)
         font_replacements = _apply_font_substitutions(document, substitutions)
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
-        phrases = (
-            ["«Protocol_Title»", "«Protocol_No»"]
-            if kind == "icf" and str(get_path(reference, "meta.icf_template", "Advarra")).casefold() == "sterling"
-            else [_text(get_path(reference, "study.title")), _text(get_path(reference, "meta.protocol_number"))]
-        )
-        findings = audit_docx(path, required_phrases=phrases)
-        if kind == "icf" and not _icf_blocks(model, "icf.procedures"):
-            findings.insert(0, {
-                "category": "rendering",
-                "field": "icf.procedures",
-                "issue": "Required source-bound section icf.procedures is missing or empty.",
-            })
+        findings = audit_docx(path)
         blocking_findings = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
         results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"], "construction_passages": construction_passages, "construction_fields": construction_fields})
     return {

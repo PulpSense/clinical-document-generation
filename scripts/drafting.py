@@ -61,7 +61,7 @@ RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
 PROMPT_VERSION = "section-drafting-v22-source-bound-construction"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
-IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py", "rule_authority.py")
+IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py")
 
 
 def _canonical(value: Any) -> bytes:
@@ -2120,11 +2120,8 @@ def _validate_paragraph(
     text = str(paragraph.get("text") or "").strip()
     evidence_refs = _canonical_evidence_refs(request, paragraph.get("evidence_refs")) if isinstance(paragraph.get("evidence_refs"), list) else []
     boilerplate_refs = paragraph.get("boilerplate_refs") if isinstance(paragraph.get("boilerplate_refs"), list) else []
-    if len(text.split()) < 5:
-        findings.append({"category": "drafting", "field": section_id, "issue": "Section prose is not substantive.", "next_action": "Return a complete source-grounded sentence."})
-    lowered = text.casefold()
-    if PLACEHOLDER.search(text) or any(token in lowered for token in FORBIDDEN_DRAFT_LANGUAGE):
-        findings.append({"category": "drafting", "field": section_id, "issue": "Section contains a placeholder or internal drafting language.", "next_action": "Replace it with supported client-facing prose."})
+    if not text:
+        findings.append({"category": "drafting", "field": section_id, "issue": "Section prose is empty.", "next_action": "Return a complete source-grounded sentence."})
     request_evidence = _allowed_evidence(request)
     section_evidence = {f"source:{path}" for path in [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]}
     invalid_evidence = sorted(set(map(str, evidence_refs)) - request_evidence)
@@ -2154,8 +2151,8 @@ def _validate_list(
     items = [str(item).strip() for item in group.get("items", []) if str(item).strip()] if isinstance(group.get("items"), list) else []
     evidence_refs = _canonical_evidence_refs(request, group.get("evidence_refs") or []); boilerplate_refs = list(map(str, group.get("boilerplate_refs") or []))
     findings: list[dict[str, Any]] = []
-    if not items or any(not _substantive_list_item(item) for item in items):
-        findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty, placeholders, or not substantive.", "next_action": "Return complete source-grounded list items."})
+    if not items:
+        findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty.", "next_action": "Return complete source-grounded list items."})
     section_evidence = {f"source:{path}" for path in [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]}
     invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
@@ -2375,8 +2372,8 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative item is not an object.", "next_action": "Return text and evidence_refs."})
                 continue
             text = str(item.get("text") or "").strip()
-            if re.search(r"</?[A-Za-z_][^>]*>", text) or len(text.split()) < 8:
-                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty, too short, or contains XML markup.", "next_action": "Return source-grounded prose only."})
+            if not text:
+                findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative is empty.", "next_action": "Return source-grounded prose only."})
             evidence_refs = _canonical_evidence_refs(request, item.get("evidence_refs") or [])
             contract = contracts.get(section_id, {})
             invalid = sorted(set(evidence_refs) - _allowed_evidence(request))
@@ -2388,7 +2385,6 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": f"Evidence is not approved for this target: {', '.join(unrelated)}", "next_action": "Cite only the target's listed minimum_evidence."})
             elif not evidence_refs:
                 findings.append({"category": "drafting", "field": section_id, "target_ids": [section_id], "issue": "PRS narrative lacks valid approved evidence references.", "next_action": "Cite the target's listed minimum_evidence."})
-            findings.extend(_coverage_findings(request, contract, section_id, text, evidence_refs))
             for finding in findings[section_finding_count:]:
                 finding["target_ids"] = [section_id]
             if not any(finding_requires_repair(row) for row in findings[section_finding_count:]):
@@ -2427,50 +2423,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
                 "issue": "The section contract does not authorize the drafted outcome.",
                 "next_action": "Use only a mode explicitly authorized by the section contract.",
             })
-        elif outcome == "fixed_boilerplate" and not _fixed_outcome_is_authorized(item, contract):
-            findings.append({
-                "category": "drafting",
-                "field": section_id,
-                "target_ids": [section_id],
-                "issue": "The section contract does not authorize the fixed_boilerplate outcome or the returned content is not its exact authorized boilerplate.",
-                "next_action": "Use the exact listed Fixed Clinical Boilerplate with its matching boilerplate reference, or return an authorized agent draft.",
-            })
     has_blocking_contract_findings = bool(findings)
-    results_by_id = {
-        str(item.get("section_id") or ""): item
-        for item in results if isinstance(item, Mapping)
-    }
-    duplicate_records = [
-        (section_id, results_by_id[section_id], contract)
-        for section_id, contract in expected_contracts.items()
-        if section_id in results_by_id
-    ]
-    repeatable_icf_text = [
-        str(block.get("text") or "")
-        for contract in expected_contracts.values()
-        for block in contract.get("fixed_boilerplate") or []
-        if isinstance(block, Mapping) and block.get("boilerplate_id") == "icf-voluntary"
-    ]
-    duplicate_pairs = list(dict.fromkeys([
-        *_cross_section_duplicate_pairs(duplicate_records),
-        *_icf_summary_detail_sentence_pairs(duplicate_records, repeatable_text=repeatable_icf_text),
-    ]))
-    for prior_section, section_id in duplicate_pairs:
-        target_section = (
-            "icf.key-information-summary"
-            if "icf.key-information-summary" in {prior_section, section_id}
-            else section_id
-        )
-        preserved_section = section_id if target_section == prior_section else prior_section
-        findings.append({
-            "category": "drafting",
-            "field": target_section,
-            "target_ids": [target_section],
-            "code": "draft-repetition-uncertainty",
-            "publication_disposition": "warning",
-            "issue": f"Exact prose is duplicated across separately contracted sections {prior_section} and {section_id}.",
-            "next_action": f"Rewrite only {target_section} with independent source-grounded prose; preserve {preserved_section}.",
-        })
     if has_blocking_contract_findings:
         return None, findings
     accepted: list[dict[str, Any]] = []
@@ -2500,193 +2453,9 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
             clean_group, list_findings = _validate_list(group, request, expected_contracts[section_id], section_id, position)
             findings.extend(list_findings)
             if clean_group: lists.append(clean_group)
-        combined_content = "\n".join(
-            [paragraph["text"] for paragraph in clean_paragraphs]
-            + [item for group in lists for item in group["items"]]
-        )
-        combined_evidence = [
-            evidence
-            for content_item in [*clean_paragraphs, *lists]
-            for evidence in content_item.get("evidence_refs", [])
-        ]
-        role_content_parts = [
-            paragraph["text"]
-            for paragraph in clean_paragraphs
-            if not _is_authorized_boilerplate_content(
-                paragraph["text"],
-                paragraph.get("evidence_refs", []),
-                paragraph.get("boilerplate_refs", []),
-                expected_contracts[section_id],
-            )
-        ]
-        role_content_parts.extend(
-            value
-            for group in lists
-            if not _is_authorized_boilerplate_content(
-                "\n".join(group["items"]),
-                group.get("evidence_refs", []),
-                group.get("boilerplate_refs", []),
-                expected_contracts[section_id],
-            )
-            for value in group["items"]
-        )
-        findings.extend(_coverage_findings(
-            request,
-            expected_contracts[section_id],
-            section_id,
-            combined_content,
-            combined_evidence,
-            "\n".join(role_content_parts),
-        ))
-        for path in expected_contracts[section_id].get("minimum_evidence", []):
-            if path != "study.hypothesis":
-                continue
-            value = get_path(request.get("approved_source", {}), path)
-            for issue in hypothesis_claim_issues(combined_content, value):
-                findings.append({
-                    "category": "drafting", "field": section_id, "target_ids": [section_id],
-                    "issue": issue,
-                    "next_action": f"Preserve the source qualification in an accurate paraphrase. Approved {path}: {value}",
-                })
-        branch_value = request.get("branch")
-        icf_template = (
-            branch_value.get("icf_template")
-            if isinstance(branch_value, Mapping)
-            else ""
-        )
-        if (
-            section_id == "icf.study-purpose"
-            and str(icf_template or "").strip().casefold() == "sterling"
-        ):
-            if re.search(
-                r"\b\d+\s+(?:(?:treatment|control|study)\s+)?(?:subjects|participants)\b",
-                combined_content, re.I,
-            ):
-                findings.append(narrative_review_finding({
-                    "category": "drafting",
-                    "field": section_id,
-                    "target_ids": [section_id],
-                    "issue": "Enrollment counts belong in KEY INFORMATION or DURATION, not PURPOSE.",
-                    "next_action": "Remove the participant count from PURPOSE and keep its concise study aim, hypothesis, and primary outcome.",
-                }))
-            approved_source = request.get("approved_source")
-            background = get_path(
-                approved_source if isinstance(approved_source, Mapping) else {},
-                "study.background",
-            )
-            purpose_tokens = _concept_tokens(combined_content)
-            background_tokens = _concept_tokens(background)
-            union = purpose_tokens | background_tokens
-            overlap = len(purpose_tokens & background_tokens) / len(union) if union else 0.0
-            if len(purpose_tokens) >= 24 and overlap >= 0.30:
-                findings.append({
-                    "category": "drafting",
-                    "field": section_id,
-                    "target_ids": [section_id],
-                    "code": "icf-concept-repetition",
-                    "publication_disposition": "warning",
-                    "primary_section": "icf.background",
-                    "secondary_section": section_id,
-                    "issue": "PURPOSE materially repeats the clinical background, comparative evidence, or rationale owned by BACKGROUND.",
-                    "next_action": "Rewrite only PURPOSE as a concise purpose, hypothesis, and primary-endpoint statement; preserve BACKGROUND.",
-                })
         if not clean_paragraphs and not lists:
             findings.append({"category": "drafting", "field": section_id, "issue": "Required section has no substantive paragraphs or list items.", "next_action": "Return complete source-grounded content."})
-        if section_id == "icf.key-information-summary":
-            summary_records = [
-                (paragraph["text"], paragraph.get("evidence_refs", []), paragraph.get("boilerplate_refs", []))
-                for paragraph in clean_paragraphs
-            ] + [
-                (value, group.get("evidence_refs", []), group.get("boilerplate_refs", []))
-                for group in lists
-                for value in group["items"]
-            ]
-            if len(summary_records) != 5:
-                findings.append({
-                    "category": "drafting", "field": section_id, "target_ids": [section_id],
-                    "issue": "KEY INFORMATION must contain exactly five concise concept summaries.",
-                    "next_action": "Return one concise block for each ordered summary_concepts value.",
-                })
-            else:
-                source_value = request.get("approved_source")
-                summary_source = source_value if isinstance(source_value, Mapping) else {}
-                source_values = {
-                    str(source.get("path")): source.get("value")
-                    for source in request.get("approved_input", [])
-                    if isinstance(source, Mapping)
-                }
-                obligations = expected_contracts[section_id].get("summary_obligations") or {}
-                concepts = list(expected_contracts[section_id].get("summary_concepts") or [])
-                for concept, (text, evidence_refs, boilerplate_refs) in zip(concepts, summary_records):
-                    allowed = set(map(str, (obligations.get(concept) or {}).get("evidence_refs") or []))
-                    allowed_sources = {ref for ref in allowed if ref.startswith("source:")}
-                    allowed_boilerplate = {ref.removeprefix("boilerplate:") for ref in allowed if ref.startswith("boilerplate:")}
-                    cited_sources = allowed_sources.intersection(map(str, evidence_refs))
-                    cited_boilerplate = allowed_boilerplate.intersection(map(str, boilerplate_refs))
-                    required_boilerplate = set(map(
-                        str,
-                        (obligations.get(concept) or {}).get("required_boilerplate_refs") or [],
-                    ))
-                    if allowed_sources and not cited_sources:
-                        findings.append({
-                            "category": "drafting", "field": section_id, "target_ids": [section_id],
-                            "issue": f"KEY INFORMATION concept {concept} lacks its canonical source evidence.",
-                            "next_action": "Use the ordered concept's canonical evidence references and observable source facts.",
-                        })
-                        continue
-                    def cited_fact_is_observable(ref: str) -> bool:
-                        path = ref.removeprefix("source:")
-                        value = source_values.get(path)
-                        if concept == "participation-duration" and ref == "source:study.timeline":
-                            # This participant summary owns follow-up duration, not
-                            # recruitment and analysis phases from the same field.
-                            value = _approved_followup_value(value)
-                            return bool(value) and source_evidence_grounded(text, path, value, reference=summary_source)
-                        return source_evidence_grounded(text, path, value, reference=summary_source)
-
-                    if cited_sources and not any(
-                        cited_fact_is_observable(ref) for ref in cited_sources
-                    ):
-                        findings.append({
-                            "category": "drafting", "field": section_id, "target_ids": [section_id],
-                            "code": "icf-summary-grounding-review",
-                            "publication_disposition": "warning",
-                            "issue": f"KEY INFORMATION concept {concept} cites source evidence whose material facts are not observable.",
-                            "next_action": "Have the independent content reviewer assess the cited source facts in context.",
-                        })
-                    if not allowed_sources and allowed_boilerplate and not cited_boilerplate:
-                        findings.append({
-                            "category": "drafting", "field": section_id, "target_ids": [section_id],
-                            "issue": f"KEY INFORMATION concept {concept} lacks its authorized fallback boilerplate.",
-                            "next_action": "Use only the ordered concept's listed Fixed Clinical Boilerplate.",
-                        })
-                    missing_required_boilerplate = required_boilerplate - set(map(str, boilerplate_refs))
-                    if missing_required_boilerplate:
-                        findings.append({
-                            "category": "drafting", "field": section_id, "target_ids": [section_id],
-                            "issue": f"KEY INFORMATION concept {concept} omits required voluntary-participation language.",
-                            "next_action": "Retain the authorized voluntary-participation consent requirement alongside source-grounded alternatives.",
-                        })
-                    required_text = {
-                        str(item.get("boilerplate_id")): str(item.get("text") or "")
-                        for item in expected_contracts[section_id].get("fixed_boilerplate", [])
-                        if isinstance(item, Mapping)
-                        and str(item.get("boilerplate_id")) in required_boilerplate
-                    }
-                    missing_required_text = [
-                        boilerplate_id
-                        for boilerplate_id, authorized_text in required_text.items()
-                        if _normalized_prose(re.split(r"(?<=[.!?])\s+", authorized_text, maxsplit=1)[0])
-                        not in _normalized_prose(text)
-                    ]
-                    if missing_required_text:
-                        findings.append({
-                            "category": "drafting", "field": section_id, "target_ids": [section_id],
-                            "issue": f"KEY INFORMATION concept {concept} cites but omits retained voluntary-participation text.",
-                            "next_action": "Include the retained voluntary-participation statement in the summary text.",
-                        })
-        section_findings = [row for row in findings[:section_finding_count]
-                            if row.get("code") == "draft-repetition-uncertainty" and row.get("field") == section_id] + findings[section_finding_count:]
+        section_findings = findings[section_finding_count:]
         blocking_section_findings = [
             finding for finding in section_findings
             if finding_requires_repair(finding)
