@@ -39,7 +39,7 @@ from prs_xml import screening_interval_requirement, validate_output as validate_
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 from contracts import benefit_context_contract, document_table_reference, source_text_values
 from drafting import merged_drafts, sha256_value
-from contracts import canonical_review_surface, reviewed_presentation_only, internal_presentation_note
+from contracts import canonical_review_surface, reviewed_presentation_only, internal_presentation_note, review_concern
 
 
 def _review_evidence_finding(artifact: str, section_id: str) -> dict[str, Any]:
@@ -5676,8 +5676,7 @@ def _prior_concern_review_errors(request: Mapping[str, Any], response: Mapping[s
     for prior in context.get("prior_findings", []):
         if not isinstance(prior, Mapping):
             continue
-        nested = prior.get("verification_source_finding")
-        concern = {**prior, **(nested if isinstance(nested, Mapping) else {})}
+        concern = review_concern(prior)
         if reviewed_presentation_only(concern):
             continue
         is_visual = concern.get("category") == "visual" or str(concern.get("check", "")) in VISUAL_CHECKS
@@ -5877,8 +5876,9 @@ def validate_verifications(
             continue
         raw_issues = response.get("findings")
         issues: list[Any] = list(raw_issues) if isinstance(raw_issues, list) else []
-        malformed_finding = any(
-            isinstance(item, Mapping) and (
+        malformed_finding = not isinstance(raw_issues, list) or any(
+            not isinstance(item, Mapping) or not isinstance(item.get('issue'), str)
+            or not item['issue'].strip() or (
                 any(key in item and not isinstance(item[key], str)
                     for key in ('category', 'artifact', 'check', 'surface'))
                 or 'target_ids' in item and (
@@ -5891,7 +5891,7 @@ def validate_verifications(
             findings.append(recovery_finding({
                 'category': 'reviewer-transient', 'field': 'findings',
                 'target_ids': [verification_target], 'verification_request_id': request['request_id'],
-                'issue': 'Review finding labels must be strings and target_ids must be a list of strings.',
+                'issue': 'Review findings must be a list of objects with a nonempty issue string; labels must be strings and target_ids must be a list of strings.',
             }, 'verifier_transient'))
             continue
         if response.get("status") != "passed" or issues:

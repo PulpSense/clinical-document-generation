@@ -143,3 +143,38 @@ def test_visual_concern_is_acknowledged_only_by_its_document_review(tmp_path):
             response['page_assessments'][0]['notes'] = 'layout-concern: repaired table inspected on this actual page.'
         (tmp_path / request['response_path']).write_text(json.dumps(response))
         assert quality.verification_response_is_complete(tmp_path, path)
+
+
+@pytest.mark.parametrize('malformed', [{'material': True, 'issue': 'Dose incorrect'}, None, 'Dose incorrect', 3, '<missing>', [None], [3], ['Dose incorrect'], [{'material': True}], [{'issue': ' '}], [{'issue': 'Dose incorrect', 'check': {}}]])
+def test_authenticated_review_rejects_malformed_findings_collection_with_tool_feedback(tmp_path, malformed):
+    import quality
+    from test_handoff_quality import acceptance_verification
+    request_path = quality.create_verification_requests(tmp_path, {'meta': {'study_type': 'Retrospective'}}, {'artifacts': []})[0]
+    request = json.loads(request_path.read_text())
+    response = acceptance_verification(request)
+    if malformed == '<missing>':
+        response.pop('findings')
+    else:
+        response['findings'] = malformed
+    (tmp_path / request['response_path']).write_text(json.dumps(response))
+    findings, _ = quality.validate_verifications(tmp_path, request_paths=[request_path])
+    assert any(row.get('recovery_class') == 'verifier_transient' and row.get('field') == 'findings'
+               and 'list' in row.get('issue', '') for row in findings), findings
+    assert not quality.verification_response_is_complete(tmp_path, request_path)
+
+
+@pytest.mark.parametrize('category', ['content', 'editorial'])
+def test_explicit_nonmaterial_style_judgment_has_no_code_check_name_requirement(tmp_path, category):
+    import quality
+    from test_handoff_quality import acceptance_verification
+    request_path = quality.create_verification_requests(tmp_path, {'meta': {'study_type': 'Retrospective'}}, {'artifacts': []})[0]
+    request = json.loads(request_path.read_text())
+    response = acceptance_verification(request)
+    response['findings'] = [{'finding_id':'style-choice', 'category':category, 'artifact':'protocol',
+        'target_ids':['introduction'], 'check':'word_choice', 'issue':'Either wording is stylistically acceptable.',
+        'material':False, 'safety_critical':False, 'contradiction':False,
+        'obscures_required_information':False, 'materially_unusable':False}]
+    (tmp_path / request['response_path']).write_text(json.dumps(response))
+    findings, _ = quality.validate_verifications(tmp_path, request_paths=[request_path])
+    assert all(row.get('code') == 'nonmaterial-presentation' and row.get('publication_disposition') == 'warning' for row in findings), findings
+    assert quality.verification_response_is_complete(tmp_path, request_path)

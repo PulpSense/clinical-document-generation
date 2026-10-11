@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 from xml.etree import ElementTree as ET
 
-from contracts import get_path
+from contracts import get_path, review_concern
 
 
 def source_path(value: str) -> str:
@@ -252,8 +252,7 @@ def create_native_repair(revision: Path, state: dict[str, Any], reference: Mappi
     (root / 'tools').mkdir()
     prior = []
     for row in findings:
-        nested = row.get('verification_source_finding')
-        concern = {**row, **(nested if isinstance(nested, Mapping) else {})}
+        concern = review_concern(row)
         concern['finding_id'] = concern.get('finding_id') or f"concern-{native_digest(concern)[:16]}"
         prior.append(concern)
     trusted = {name: native_hash(native_file(revision, name))

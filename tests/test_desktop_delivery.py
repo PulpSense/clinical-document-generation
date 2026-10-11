@@ -1560,7 +1560,7 @@ def test_external_parent_visual_reviewer_rejects_semantic_only_unbound_response(
     assert not response_path.exists()
 
 
-@pytest.mark.parametrize("invalid_kind", ("malformed", "wrong-request", "stale", "wrong-revision"))
+@pytest.mark.parametrize("invalid_kind", ("malformed", "wrong-request", "stale", "wrong-revision", "findings-object"))
 def test_external_parent_visual_reviewer_rejects_invalid_or_unbound_response(
     tmp_path,
     invalid_kind,
@@ -1602,6 +1602,8 @@ def test_external_parent_visual_reviewer_rejects_invalid_or_unbound_response(
         response["request_sha256"] = "0" * 64
     elif invalid_kind == "wrong-revision":
         response["revision_id"] = "r2"
+    if invalid_kind == "findings-object":
+        response["findings"] = {"material": True, "issue": "Dose incorrect"}
     output = "not-json" if invalid_kind == "malformed" else json.dumps(response)
     command = tmp_path / "parent-reviewer"
     command.write_text(
