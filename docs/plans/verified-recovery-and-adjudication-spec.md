@@ -1,5 +1,7 @@
 # Spec: Verified recovery and adjudication for every blocker
 
+> **Superseded:** [#103](https://github.com/PulpSense/clinical-document-generation/issues/103) and [the replacement specification](ai-owned-clinical-document-quality-spec.md) are authoritative. #91 and remaining implementation tickets #93–#102 are closed as superseded. Completed #92 remains historical work; cleanup #104 assesses its implementation. The specification below is retained for history, not implementation.
+
 ## Problem and outcome
 
 Complete approved studies still stop on small output defects or valid paraphrases. The 2026-10-11 audit identifies shared causes: semantic adjudication is opt-in for selected warning codes; some repair targets lack an executable editing capability; repeated reconstruction can reproduce the same defect; and the function-level inventory does not prove resolution for each emitted condition.
