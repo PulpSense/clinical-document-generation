@@ -1,6 +1,6 @@
 # Local Handoff
 
-Use the repository root as the Hermes skill directory and follow `SKILL.md`.
+Use the verified candidate or activated Hermes skill root and follow `SKILL.md`. The development checkout is a separate maintenance surface.
 
 ## Requirements
 
@@ -26,21 +26,22 @@ When `prepare` returns `awaiting_approval`, attach or upload the exact file at
 `review_delivery.absolute_path`. Never paste the Source-of-Truth into chat; its
 field markers must remain in an editable `.md` file.
 
-When `generate` returns `awaiting_hermes`, read all returned request JSON files,
-run one subagent per request, save each exact response to its `response_path`,
-and rerun `generate`. Drafting batches and content/visual verification requests
-may run concurrently when returned together.
-
-If a delegated visual reviewer fails or times out, the parent inspects every
-page PNG bound by that exact request and writes the response. Deterministic
-checks alone never satisfy the visual request.
-
-Only return paths in `client_outputs` after `status: passed`. Keep revision
-state, requests, responses, PDFs, page images, and reports internal.
-
-## Release check
+For ordinary generation, use the bounded adapter instead of a separate open-ended loop:
 
 ```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --manual-review --run-dir <run-dir>
+```
+
+Independent content and every-page visual review use actual final files/evidence. AI repairs native files using [general-document-repair.md](general-document-repair.md). Preserve source approval and the original 45-minute deadline. Under 25 minutes is the measured normal target, excluding approval wait.
+
+Deliver every client-ready attachment only after confirmed exact-byte delivery. For `review_required`, deliver every complete labeled review-only file plus its findings and notice; transfer confirmation does not establish clinical approval. Corrupt, incomplete or source-untrustworthy files remain unavailable. Keep previews, draft/review requests and logs internal.
+
+## Owner-requested release maintenance
+
+The full development suite requires explicit owner approval; ordinary generation runs no test suite.
+
+```bash
+# Only with explicit full-suite approval:
 python3 -m pytest -q
 python3 scripts/workflow.py --release-gate
 ```
@@ -49,8 +50,6 @@ If the gate returns `awaiting_hermes`, complete every returned content and
 rendered-page verification request using real content/image inspection, then
 resume it with `python3 scripts/workflow.py --release-gate --release-gate-root
 <evidence_root>`. The gate never fabricates visual approval and must ultimately
-pass all ten branch/family/richness cases. A missing renderer, unassessed page, invalid
-response binding, missing section, unresolved token, XML mismatch, or
-approval/source-hash mismatch blocks all client outputs. Renderer and tool
+pass all ten branch/family/richness cases. A missing renderer, unassessed page or incomplete AI review cannot establish client-ready status. Corrupt files, invalid response/source bindings, incomplete inventory and unsupported XML structure remain objective technical failures. Semantic and presentation judgments belong to independent AI review. Renderer and tool
 office failures may advance between Word and LibreOffice, but PDFium failure stops with one diagnostic; a complete candidate is
 retained internally when the Delivery Gate remains unresolved.

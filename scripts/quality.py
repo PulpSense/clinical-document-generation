@@ -5524,10 +5524,10 @@ def _localize_recovery_findings(
 
 
 def _delivery_warning_partition(warnings: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Reference length goals are internal diagnostics, not client limitations."""
+    """Only an explicitly assessed remaining external limitation accompanies delivery."""
     remaining, history = [], []
     for warning in warnings:
-        (history if warning.get("code") in INTERNAL_DIAGNOSTIC_CODES else remaining).append(dict(warning))
+        (remaining if _remaining_client_limitation(warning) else history).append(dict(warning))
     return remaining, history
 
 

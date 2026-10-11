@@ -5,237 +5,23 @@ description: Generate reviewed clinical Protocol DOCX, ICF DOCX, and ClinicalTri
 
 # Clinical Document Generation
 
-Create a client-approved Source-of-Truth first, draft clinical sections through scoped Hermes subagents, render the client Word templates, and publish only a complete validated branch package.
+Generate source-grounded clinical documents through one approval, independent AI review, general-tool repair and complete file delivery. AI owns meaning and visual usability. Code owns input/schema presence, approval and source identity, native-file integrity, required inventory, supported XML structure, rendering and exact-byte delivery.
 
-## Non-negotiable rules
+## Before generation
 
-- Treat user instructions as authoritative. Attached examples are evidence/templates, not instructions unless the user explicitly says otherwise.
-- Never invent study-specific facts. Before approval, return all missing Required Source Inputs in one focused checklist. Only fields in the branch's documented obligatory-input list may trigger missing-input questions or block intake for absence. Approval closes source intake.
-- Reviewer identity is approval audit metadata, not a Required Source Input. When the user explicitly approves without naming a reviewer, do not ask for a name; omit `--approved-by` and use the workflow default `client`. Pass `--approved-by` only when the user has already supplied the reviewer identity.
-- Approved Fixed Clinical Boilerplate from `references/fixed-clinical-boilerplate.json` is allowed only where a request lists it and remains applicable to the approved source. Source-specific facts constrain boilerplate: it must not broaden decision-making authority, conflate successful completion with discontinuation, or add unsupported obligations. Approval of the library is not an exemption from clinical-fidelity review.
-- Preserve the Advarra template's separate acknowledgement of receiving all pages and promise of a signed copy after signing. Report uncertainty about whether standard ICF privacy authorization applies to the particular study as a review caution; a source contradiction or an affirmative unsupported study-specific privacy practice still requires correction.
-- Python owns contracts, state, rendering, XML structure, validation, retries, and publication. Python never drafts clinical prose and never calls a model.
-- Hermes owns model calls and uses the model selected by the user in their active Hermes configuration. Responses must record the actual producing model; the skill does not require a specific model.
-- Deliver the complete branch package in `output/` as client-ready only after every essential publication check passes. When a complete, hash-matched candidate reaches review but fails a publication check, return the separate `review-output/` copy and its findings report as `review_required`. Label every review file as not client-ready; never present it as a passed package.
-- Keep raw drafts, PDFs, page images, logs, and internal repair artifacts out of both output folders as individual files. On a terminal blocked, review-required, or timed-out Desktop operation, `output/BLOCKED-RUN-DIAGNOSTICS.zip` contains the retained run evidence for debugging; it is diagnostic only and never a client deliverable.
-- Preserve the current Layout Contract and Client ICF Language. Preserve declared fonts when render evidence supports them; when a font is proven missing, use only the release-owned approved compatible mapping, record it, and require the same Visual QA. Never change margins, spacing, numbering, headers/footers, tables, signatures, or TOC behavior to escape a defect. Apply only the narrowly authorized quality corrections in `references/quality-corrections.md`; they do not permit font shrinking, deletion of consent text, or arbitrary page-count targets.
-- After approval, use one persistent Desktop operation. Aim for 10–20 minutes; 20 minutes remains successful, while 45 minutes is the hard correctness ceiling. Twenty minutes is not a cutoff.
-- Normal generation is not software maintenance. During ordinary client generation, the installed skill and its templates, contracts, tests, and implementation remain read-only; only the run workspace and isolated runtime caches may be written. When the owner explicitly requests development maintenance, Hermes may edit the Git-managed development checkout and push committed changes directly to the authorized Git/GitHub branch. Do not build a ZIP merely because a development edit was committed or pushed. Repackage and re-certify only when the owner explicitly requests a distributable or installable release, or before the change is installed or activated; Hermes must never edit the active certified release in place.
-- For ordinary client document generation, use `--manual-review`. This complete unsigned client workflow does not require a certification key or `PROMOTION-RECORD.json`. Run certification, signing, `--bind-certification`, or `--install-release` only when the user explicitly requests a formally certified release; a missing signing key is never a generation blocker.
+Run commands from this skill folder using the validated absolute Python 3.10+ interpreter in `CLINICAL_PYTHON`. Read [runtime-and-release.md](references/runtime-and-release.md) for first-host setup, a fresh unsigned candidate, renderer/runtime failure, or explicitly requested packaging, certification or installation. Preserve its Linux dependencies, font/renderer contracts and manual-candidate provisioning checks. Ordinary client generation uses `--manual-review`; installation and certification are separate owner-authorized operations.
+
+The installed skill, templates and runtime implementation stay read-only during generation. AI repairs actual document files and scripts inside the run's declared workspace. Preserve approved facts, applicable client legal language, typography and template hierarchy. Clinical guidance and authorized layout corrections are in [quality-corrections.md](references/quality-corrections.md); consult it when drafting or repairing affected content. Review applicability against the source rather than treating a phrase matcher as clinical authority.
 
 ## Branch outputs
 
-| Study type | Required client outputs |
-|---|---|
+| Study type | Complete required set |
+| --- | --- |
 | Prospective | `protocol.docx`, `icf.docx`, `study.xml` |
 | Ambispective | `protocol.docx`, `icf.docx`, `study.xml` |
 | Retrospective | `protocol.docx` |
 
-Prospective and Ambispective use the same obligatory input contract. Retrospective uses its separate contract. For prospective/ambispective studies, select only an existing Advarra or Sterling ICF template.
-
-The authoritative missing-input lists are `references/starred-fillout-required-inputs.md`
-(Prospective/Ambispective) and `references/retrospective-required-inputs.md`
-(Retrospective). Do not promote optional schema fields or downstream output
-requirements into obligatory source inputs. In particular, sample-size evidence
-tables, PRS provider study ID/protocol number, and PRS classification are not
-obligatory intake fields. The documented sample-size justification remains
-required. Preserve supplied optional data and validate its types, consistency,
-and controlled vocabulary. Parser, branch/template selection, approval,
-rendering, XML, and clinical-quality failures remain technical blockers; they
-are not permission to request missing optional clinical inputs.
-
-If both optional Provider Study ID and protocol number are absent for a
-Prospective/Ambispective source, `prepare` assigns one stable `ADM-...`
-workflow-owned administrative identifier from approved identity fields and
-shows it in the editable Source-of-Truth. This closes PRS constructability
-without asking for optional data or inventing a clinical fact.
-
-## Public interface
-
-Run commands from this skill folder. `scripts/workflow.py` is the only CLI entrypoint.
-Provision a new Hermes host once before generation by creating a dedicated
-Python environment in writable storage and installing the pinned runtime
-dependencies. This explicit setup operation is separate from document
-generation. On the client Linux host, use:
-
-```bash
-/usr/local/bin/uv venv /opt/data/clinical-document-runtime --python /usr/bin/python3.13
-/usr/local/bin/uv pip install --python /opt/data/clinical-document-runtime/bin/python python-docx==1.2.0 lxml==6.1.1 pypdf==6.10.0
-export CLINICAL_PYTHON=/opt/data/clinical-document-runtime/bin/python
-cd /absolute/path/to/hermes/skills/clinical-document-generation
-"$CLINICAL_PYTHON" scripts/workflow.py --provision-candidate
-"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
-```
-
-Run the final two commands once after every fresh extraction of an unsigned
-client ZIP and require both JSON results to report `"status": "passed"` before
-generation. `--provision-candidate` installs only the archive's hash-bound
-Linux x86_64 PDFium wheel into that extracted skill; it does not download a
-renderer or modify the host Python environment. `--verify-installation` then
-smoke-tests the exact DOCX-to-PDF-to-page-image path through the host's Word or
-LibreOffice installation. Do not use `--install-release` for this unsigned
-drop-in path. That command remains reserved for a signed, fully certified
-archive.
-`--verify-installation` returns a smoke report; do not write that report as
-`INSTALLATION-ASSURANCE.json` or create `PROMOTION-RECORD.json` for an unsigned
-candidate. Those files are governed promotion state. On the Hermes host, a
-rootless office launcher under the profile's `clinical-office-runtime/bin`
-is discoverable during manual review even when isolated workers use a restricted
-`PATH`.
-
-The release carries its pinned Linux x86_64 PDFium page renderer. Microsoft
-Word or LibreOffice remains the host prerequisite for DOCX-to-PDF rendering.
-Resolve one supported interpreter first and retain its absolute path; do not
-delegate launch to an ambiguous `python3` command. The Desktop launcher uses
-`workflow.resolve_python_runtime`, launches with the returned `executable`,
-and passes the returned identity to `run_desktop_operation` so every resume is
-recorded. In the examples below, `CLINICAL_PYTHON` is that validated absolute
-Python 3.10+ path.
-
-Before starting a study Desktop operation, verify the selected provider login in
-the same isolated `HERMES_HOME` used by its workers. A login in the dashboard's
-profile does not establish a login in another profile. The shipped adapter
-records `logs/worker-readiness.json` before creating the study deadline; resolve
-a failed login there and start a fresh operation. An authentication rejection
-during generation stops immediately with `worker_authentication`.
-
-```bash
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage validate
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --desktop-operation --manual-review --desktop-opener-command <opener> --parent-visual-review-command <reviewer>
-"$CLINICAL_PYTHON" scripts/workflow.py --format-conformance --format-conformance-root <evidence-root>
-"$CLINICAL_PYTHON" scripts/workflow.py --release-gate
-"$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
-"$CLINICAL_PYTHON" scripts/workflow.py --bind-certification /absolute/path/release-certification-corpus.json --release-archive /absolute/path/clinical-document-generation-release.zip
-"$CLINICAL_PYTHON" scripts/workflow.py --install-release /absolute/path/clinical-document-generation-release.zip --skills-dir /absolute/path/to/hermes/skills --hermes-config /absolute/path/to/hermes/config.yaml
-"$CLINICAL_PYTHON" scripts/workflow.py --verify-installation
-"$CLINICAL_PYTHON" scripts/workflow.py --rollback-release --skills-dir /absolute/path/to/hermes/skills
-```
-
-`--package-release` creates the immutable candidate from the current clean
-commit. Provision the extracted certification candidate with
-`--provision-candidate`, run the full real corpus, and set
-`CLINICAL_DOCUMENT_CERTIFICATION_PRIVATE_KEY` to the authorized external RSA
-private-key JSON before embedding its passing report with `--bind-certification`.
-The private key must never be copied into the repository, archive, evidence
-bundle, logs, or installation. Only that one certified archive may be activated
-with `--install-release`; direct extraction is not a
-supported update path. Installation verifies host Word or LibreOffice, installs
-the one manifest-bound `pypdfium2` wheel offline, verifies every extracted file
-against the immutable wheel-derived inventory, and runs page rendering in a
-killable worker with governed time, page, pixel, dimension, output, and process
-resource limits. Before staging or archive access, installation requires the
-current resolved Python 3.10+ interpreter and records its implementation,
-version, resolved executable path, and executable SHA-256 in installation
-assurance. It runs an end-to-end render/page-image smoke, reruns manifest,
-certification, and runtime-integrity verification immediately after each
-provisioner/verifier hook and before invoking the next hook, rejecting a symbolic
-link at the skill root or any manifest-owned path
-component, and only then writes installation records. Before the first namespace
-mutation, installation durably commits an inode-bound activation journal with an
-atomic JSON replacement and parent-directory sync. The atomic candidate-to-active
-rename is the activation commit point. Every ordinary failure before it restores
-the exact prior active and previous releases and removes only transient history
-created by that attempt; an interrupted process is reconciled from the journal
-before any later staging. Inode identity distinguishes a committed candidate from
-the prior active release even when their package fingerprints match. Failures
-cleaning deterministic fingerprint-named displaced state or the transaction
-journal after that commit point are reported as successful activation with
-deferred-cleanup findings; they never become false installation failures. The
-newly activated release remains selected. A failed smoke leaves the previous
-verified release active. One rollback operation completely revalidates the
-immutable previous release's manifest, certification/evidence, and PDFium runtime,
-copies it to an isolated system-temporary directory outside the live release
-namespace, completely verifies that copy, runs executable
-integration smoke only against the copy, and completely revalidates the copy after
-smoke. The retained previous release is also completely revalidated after the
-callback and immediately before the swap. Rollback then
-commits an atomic previous-to-active swap. A durable inode-bound rollback journal restores a failed
-pre-commit swap on retry or recognizes an already committed rollback. The suspect
-release is quarantined under its fingerprint without rewriting retained run
-revisions. The archive contains
-`RELEASE-MANIFEST.json` and the bound `RELEASE-CERTIFICATION.json`. Installation
-also requires Hermes `skills.external_dirs` to name only the promoted active
-path, validates recorded model provenance plus the certified reasoning/safe-mode/turn settings declared
-under `skills.clinical_document_generation`, and records the activation in
-`PROMOTION-RECORD.json`.
-
-The bound certification report contains a deterministic
-`release-certification-evidence/v1` bundle. Its canonical inventory retains the
-exact release manifest, preflight report and logs, deterministic/layout evidence,
-Python/renderer/production-module/configuration identities, synthetic fixture sources
-and approvals, all three raw case/state/manifest records, output bytes, drafting
-and verification exchanges, parent-process completion records, PDFs, and every
-reviewed page image. The complete canonical report is signed with the external
-private key; binding and installation verify that detached signature against
-`references/release-certification-public-key.json`, whose exact bytes are bound
-by the immutable release manifest. Signer and verifier derive its key identity
-through one shared canonical hash of algorithm, exponent, and modulus. They then
-independently decode and rehash every item, cross-check all semantic links, and
-reject unsigned, missing, substituted,
-ambiguous, stale, or unrelated evidence. The bundle is limited to 512 files,
-32 MiB per file, and 128 MiB total. It rejects symlinks and path aliases and
-must not retain credentials, private session logs, editable-checkout debris, or
-client/patient data; fixture provenance must explicitly be synthetic and
-non-private.
-
-Before either binding or installation extracts an archive, the archive is limited
-to 1,024 members, 64 MiB per ordinary member, 195,734,187 bytes for the encoded
-certification report, 329,951,915 uncompressed bytes in total, and a 100:1 maximum
-compression ratio. Any excess fails before extraction.
-
-The manifest
-hashes every packaged file and records implementation, template, contract,
-font, renderer, harness, and model provenance. It excludes development
-environments, credentials, source/patient data, old runs, and tests.
-
-Run certification in the fixed order Retrospective, Ambispective–Sterling,
-Prospective–Advarra. Retrospective must remain below 15 minutes. The approved
-Ambispective and Prospective exception permits completion through 18 minutes
-only when rendering, every-page Visual QA, formatting preservation, content,
-delivery, and every other certification gate pass unchanged.
-
-The release gate never fabricates verifier approval. If it returns
-`awaiting_hermes`, run the returned content and every-page visual verification
-requests, save their exact responses, then resume the same corpus with:
-
-```bash
-"$CLINICAL_PYTHON" scripts/workflow.py --release-gate --release-gate-root <evidence_root>
-```
-
-Before live certification, `--format-conformance` runs the immutable matrix in
-`references/format-conformance-matrix.json`. It covers Retrospective Protocol,
-Prospective–Advarra, Prospective–Sterling, Ambispective–Advarra, and
-Ambispective–Sterling using exact hash-addressed fixtures, templates, and client
-authorities. It also compares every generated DOCX with an approved normalized
-OOXML baseline under `references/format-baselines/`, covering section geometry,
-styles, numbering, headers/footers, fields/TOC, page furniture, table geometry,
-signature/legal placement, paragraph rhythm, and relational pagination controls
-without relying on whole-DOCX equality. Every governed heading is bound to its
-actual first substantive paragraph, table, or child heading on the same rendered
-page; missing successors and unrelated page text fail. Its `structural_passed` result is
-deterministic structural evidence only: it cannot substitute for clinical
-verification, genuine every-page image inspection, production certification, or
-exact-byte Desktop confirmation.
-
-The production modules are:
-
-```text
-scripts/
-├── workflow.py   # lifecycle, approval, immutable revisions, publication
-├── contracts.py  # inputs, branches, sections, Source-of-Truth Markdown
-├── drafting.py   # scoped Hermes requests, response validation, retries
-├── rendering.py  # Protocol and ICF Word rendering
-├── quality.py    # renderer, page images, content/visual verification
-├── prs_xml.py    # PRS mapping, structure, repeated blocks, validation
-└── output_recovery.py # source-bound scalar correction and native field application
-```
-
-Do not add a second workflow entrypoint. The installation-owned `runtime/`
-directory contains only the manifest-bound PDFium runtime and packaged fonts
-used by Render Assurance; host Word or LibreOffice remains the DOCX renderer.
+Prospective/Ambispective use the selected Advarra or Sterling ICF template and [starred-fillout-required-inputs.md](references/starred-fillout-required-inputs.md). Retrospective uses [retrospective-required-inputs.md](references/retrospective-required-inputs.md). These lists define obligatory inputs; optional fields stay optional. If both optional Provider Study ID and protocol number are absent, preparation assigns a stable visible `ADM-...` administrative identifier, not a clinical fact.
 
 ## Run directory policy
 
@@ -265,411 +51,54 @@ Apply these rules:
 Folder selection is complete only after confirming the proposed path does not
 already exist and the chosen path is the first available collision-safe name.
 
-## Full loop
+## Ordinary workflow
 
-### 1. Preserve and normalize inputs
+### 1. Interpret the source
 
-Create `<run-dir>/reference/study.reference.json` from the user’s supplied facts. Preserve raw material under `<run-dir>/input/` when available. Use the field names documented in `references/reference-schema.md`; do not add generated prose under the source fields.
+Preserve supplied files in the run's `input/` directory. Extract source-grounded values to `reference/study.reference.json` using [reference-schema.md](references/reference-schema.md). Read [intake-workflow.md](references/intake-workflow.md) when interpreting source files. Set `meta.study_type` to the actual supported branch; resolve the Advarra/Sterling choice before source review when an ICF is required.
 
-Before `prepare`, follow the representation rules in `references/intake-workflow.md`
-for narrative or structured schedules, person names, references, study groups,
-and short titles. Resolve source relationships during extraction so every
-document receives the same reviewer-visible facts.
+Compare the branch's obligatory checklist with preserved evidence. Resolve extraction omissions yourself; ask one consolidated question for genuinely missing obligatory facts or material source conflicts. Preserve coherent timelines, units, addresses and paraphrases even when a parser cannot interpret them. Complete inputs can be concise. Never invent a study fact to satisfy construction.
 
-Set `meta.study_type` to exactly `Prospective`, `Ambispective`, or `Retrospective`. For prospective/ambispective studies, set `meta.icf_template` to `Advarra` or `Sterling` based on the user’s choice or clear evidence. Do not guess between templates.
-
-Preserve any supplied site address exactly in the source. An unambiguous full US mailing address can be projected into PRS city, state, postal code, and country without changing the approved text. If a supplied comma-delimited address cannot be separated safely, resolve that existing site field before approval; never invent location components during XML generation.
-
-For prospective/ambispective studies, preserve `regulatory.prs.study_type` as `Observational` or `Interventional` when explicit source evidence supplies it; during preparation, an unambiguous classification in `design.study_design` populates the review field. If neither classification is explicit, leave it unresolved without a missing-input question or intake blocker. Never infer it from uncertain or negated design text, and never restore a reviewer-cleared value. A supplied unsupported classification still fails controlled-vocabulary validation, and missing or invalid required PRS output values still fail downstream XML validation. `meta.study_type` describes the workflow branch and is not a PRS classification.
-
-### 2. Prepare the Source-of-Truth
-
-Run:
+### 2. Present the editable Source-of-Truth
 
 ```bash
 "$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage prepare
 ```
 
-- If `status` is `blocked`, inspect the single `missing_inputs` report. Ask together only for missing or conflicting documented obligatory inputs. Report technical validation failures separately; do not turn missing optional fields into intake questions or weaken downstream safety/quality gates.
-- Before requesting approval, consume `intake_review`: use its existing obligatory checklist, supplied representations and raw candidate evidence to assess actual completeness and material source conflicts. Ask one consolidated question only for genuinely missing obligatory facts or unresolved material conflicts. Resolve extraction omissions from supplied evidence yourself; optional blanks and parser limitations are not missing facts. Regenerate the file after resolving conflicts.
-- If `status` is `awaiting_approval`, attach/upload `review_delivery.absolute_path` as the editable `.md` review artifact and send `source_review_reply.message`, including the returned `review_delivery.link`, then stop for the one explicit approval. The reply should look like: `Please review or edit the Source-of-Truth: [source-of-truth.md](<accessible file path>). Approve this file when the study facts are correct.` Use the actual returned filename and link; an inaccessible host-local path must be uploaded through the channel's supported file mechanism.
-- Do not paste the Source-of-Truth contents into chat. A chat transcription is not the review artifact and cannot be approved.
-- Preserve the Markdown file exactly, including every `<!-- field:... -->` marker. The reviewer edits values inside those markers and returns or approves that file.
-- If the channel cannot attach local files, provide a clickable file link to `review_delivery.absolute_path`. If neither attachment nor a file link is possible, report a delivery blocker; never substitute inline text.
+Read `intake_review` and assess its raw conflict/candidate evidence against source. `awaiting_approval` means the file was prepared, not that AI completed intake assessment. For actual missing obligatory inputs, present the single consolidated checklist; technical schema failures receive separate tool feedback.
 
-The client may edit values only inside the field markers. Never reinterpret or silently “clean up” reviewer-edited values.
+Attach/upload `review_delivery.absolute_path` as the editable Markdown file and expose `review_delivery.link` in chat when the recipient can access it. A remote host-local path needs the channel upload mechanism. Use `source_review_reply.message` and its attachment payload; report a delivery blocker if neither attachment nor accessible link is possible. Do not paste the Source-of-Truth contents into chat. Preserve every field marker and stop for separate explicit approval.
 
-### 3. Record explicit approval
+Example reply: “Please review the attached editable Source-of-Truth: {review_delivery.link}. You can edit its marked values or approve this exact file.”
 
-Only after a separate explicit approval action, run:
+### 3. Bind approval
 
 ```bash
-"$CLINICAL_PYTHON" scripts/workflow.py \
-  --run-dir <run-dir> \
-  --stage approve
+"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage approve
 ```
 
-Reviewer identity is optional audit metadata. If the user explicitly supplies a reviewer name, append `--approved-by "<reviewer>"`. Otherwise, do not ask for one; the workflow records the default `client` identity.
+For an uploaded edited file, append `--source-md <path>`. Use `--approved-by` only if the user supplied reviewer identity; otherwise the default is `client`. Approval binds exact saved bytes and creates an immutable revision. Approval closes intake; preserve the approved source throughout generation and repair.
 
-If the reviewer uploads an edited Markdown file, preserve it and add `--source-md <path>`. Approval binds the exact file hash and creates an immutable revision. Any later Source-of-Truth change invalidates approval.
-
-After approval, continue the internal generation and review loop autonomously. Return a complete `client_outputs` package when it passes. If a complete candidate remains under review, return `review_outputs` together with the exact findings report and its review-only status. Report a technical blocker when no complete candidate can be constructed safely.
-
-### 4. Run the bounded Desktop operation
-
-The Desktop parent must use the shipped
-`scripts/workflow.py --desktop-operation --manual-review --run-dir <run-dir>` adapter for the
-entire post-approval lifecycle. Its production API is
-`workflow.run_production_desktop_operation`; callers supply only the actual
-Desktop file opener and, when required, the Desktop-parent visual fallback.
-The adapter owns the safe-mode Hermes launcher, read-only candidate sandbox,
-response authentication, and process cleanup. The operation persists its start
-and cross-process UTC deadline
-under the run workspace, so retries and resume calls cannot reset either. It
-records every compatible runtime identity used to resume. Persisted monotonic
-timestamps are never treated as portable; monotonic time is used only inside
-one process and converted to the persisted UTC anchor.
-
-For ordinary client generation, use `--manual-review` from a provisioned
-candidate skill root. This mode
-uses the same drafting, template rendering, content checks, and every-page
-Visual QA, but labels the operation `manual_pre_release` and permits the
-candidate's verified page-renderer runtime without `PROMOTION-RECORD.json`.
-Its outputs are the client-review deliverables. Formal promotion, certification,
-signing, and certified installation remain separate operations and are never
-started by manual-review mode unless the user explicitly requests them.
-
-The operation also persists the promoted release fingerprint, or the candidate
-manifest fingerprint for `manual_pre_release`, plus the exact pending stage and
-handoffs, drafting and verification attempts, delivery attempts, stage timings,
-soft-budget diagnostics, cleanup evidence, and the terminal result. A missing
-response redispatches only its unchanged request identity;
-changed request bytes fail closed. Soft stage budgets may trigger diagnostics
-or the parent visual fallback, but only the original UTC deadline terminates
-the operation. A late worker or opener completion cannot change a terminal
-result or confirm delivery after that deadline.
-
-Release Certification calls `run_production_desktop_operation` from an
-extracted, hash-verified candidate release built from the exact commit recorded
-in its manifest and binds its fingerprint. The corpus controller may prepare
-fixtures and reduce evidence but must not inject a test-only worker launcher. It must not
-import or launch the editable checkout, and it does not replace the operation's
-45-minute deadline with a harness timeout. The certification adapter must wire
-visual fallback to a Desktop-parent review callback; it must never redispatch
-that fallback through the worker launcher. A valid operation above 15 minutes
-may deliver but receives a non-certifying runtime outcome.
-
-Resolve the installed skill root from the currently loaded `SKILL.md` location
-or runtime entrypoint. Never copy a repository path from prior run evidence or
-assume macOS path separators. A machine-local launcher may record the resolved
-absolute path for that one host and operation, but that launcher is run evidence
-and must not be packaged or reused on another machine.
-
-`generate` is the deterministic inner step used by that operation. Do not run
-an independent open-ended `generate` loop as the normal delivery path. When
-developing or diagnosing the inner lifecycle outside a client request, its CLI
-form is:
+### 4. Generate, independently review and repair
 
 ```bash
-"$CLINICAL_PYTHON" scripts/workflow.py --run-dir <run-dir> --stage generate --manual-review
+"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --manual-review --run-dir <run-dir>
 ```
 
-The workflow advances deterministically until it passes, blocks, or returns `status: awaiting_hermes` with one or more request paths.
+Use this bounded Desktop adapter for the entire ordinary post-approval lifecycle. It owns provider readiness, authenticated worker requests, supported runtime identity, rendering and cleanup. The same persisted UTC start/deadline and pending request identity survive resume; record the promoted release fingerprint, or the candidate manifest fingerprint for `manual_pre_release`.
 
-For every `awaiting_hermes` response:
+For returned work, read the exact request and write its response at the declared path. Hermes uses the user's configured model and records actual author/model identity. Section authors receive scoped evidence, purpose, relationships and applicable fixed boilerplate. Source facts constrain boilerplate. Independent content and every-page visual reviews run concurrently when their evidence is available; the content reviewer inspects actual native files including tables, headers/footers and XML values. Visual reviewers inspect actual bound page images. Use the bounded parent fallback described by the adapter when required; missing images or responses are incomplete review.
 
-1. Use the returned `handoffs` as routing metadata. Resolve each `request_path` and `response_path` relative to `revisions/<revision_id>/`.
-2. Keep request contents out of the parent orchestration context. The parent must route paths without reading request JSON; each assigned subagent reads its own request completely.
-3. Send one request path to each subagent and dispatch all returned handoffs concurrently. Never combine multiple request files in one subagent. If the delegation limit is lower than the handoff count, start one isolated `hermes chat -q` background process per handoff in the same turn instead of shrinking the wave.
-4. Give each subagent the absolute request path, revision directory, exact response path, and task. Require exact response JSON with no Markdown commentary and validation with the repository validator before completion. For `task: prs_narrative_drafting`, the response must use a `narrative` object containing exactly `brief_summary` and `detailed_description`; do not return `section_results` for PRS requests.
-5. Keep the parent turn alive with one bounded wait for every exact `response_path`. A handoff is complete when its exact response file contains parseable JSON bound to the request ID, hash, task, and revision. At that point, terminate and reap only that owned worker within the cleanup reserve, then advance without waiting for its final chat self-report. If a delegated visual reviewer fails or times out, the Desktop parent must inspect every page image bound by that same unchanged request and return the complete outer verification-response object. The external parent-review launcher must stream the reviewer's raw stdout unchanged; it must not choose the last decoded JSON object or save a nested `finding` object. The installed workflow selects and atomically saves only the unique object accepted by the existing response validator and binding checks. A parent callback is complete only after every declared response path passes those checks. If a callback returns or raises without accepted responses, retry the parent once with the exact original request; if any response remains absent or invalid, stop immediately with `missing_parent_visual_review_response` rather than waiting for the operation deadline. Deterministic checks alone never count as Visual QA. A missing drafting response at the operation deadline is one consolidated technical blocker and does not consume a drafting retry.
-6. Rerun `--stage generate`. The next `generate` call is the authoritative response validator; it accepts valid drafts, schedules targeted retries for rejected drafts, and returns the next handoff wave.
+A substantive AI concern triggers `document_repair`. Read [general-document-repair.md](references/general-document-repair.md) for its workspace, response and concern-continuity contract. Use general DOCX/XML libraries or run-local scripts to correct actual paragraphs, tables, headers/footers or XML nodes. Batch real findings, explain source-grounded disputes, and return `needs_review` if no productive safe correction remains. Keep native-file inventory and source identity intact. A separate reviewer reassesses disputes; a generic pass cannot erase an explicit unresolved concern. Ordinary stylistic preferences need no repair cycle or client warning.
 
-Repeat until the workflow passes or blocks. A missing drafting or delegated-worker response remains pending and does not consume a drafting retry; the bounded Desktop-parent rule above governs a missing parent visual response.
+The workflow adopts corrected bytes, checks native files/XML, invalidates stale evidence, rerenders changed DOCX and obtains fresh independent final package-wide content and every-page review. Accepted corrections must survive later construction. Attempting a correction is not evidence of success.
 
-`awaiting_hermes` is internal orchestration state. Do not expose its requests, findings, drafting decisions, or progress questions to the reviewer.
+### 5. Deliver the complete package
 
-During normal generation, use the provisioned `CLINICAL_PYTHON`; do not patch
-code or templates, install packages,
-run the repository development test suite, create a recovery operation, or
-start a new deadline. An implementation defect becomes one technical blocker
-for separate maintenance. Emit concise stage changes and a brief update at
-least once per minute during a healthy wait.
+- **Client-ready:** `status: passed`, `stage: desktop_delivery`, `delivery.confirmed: true`; complete usable branch set, objective checks and fresh final independent reviews passed, substantive concerns resolved, exact reviewed bytes retrieved. Expose every `desktop_reply.attachments` file as a clickable accessible link or uploaded attachment. Keep fixed defects, dismissed concerns and style preferences internal.
+- **Review-only:** `status: review_required`; expose every `review_outputs` file plus `review_notice` and `review_findings`. State “Review copy — not client-ready,” list unresolved concerns with supplied locations, and identify incomplete assessments. Exact-byte `review_delivery.confirmed` establishes transfer only, never clinical approval. Notices remain outside clinical documents.
+- **Unavailable:** no complete trustworthy usable set; report one consolidated technical blocker and retained diagnostic evidence. Partial, corrupted or source-untrustworthy files are not a delivered package.
 
-## Why the work is split this way
+Keep previews, PDFs, page images, draft/review requests and logs internal. Repeated terminal handoff validates the saved exact files; it never regenerates or resets the operation. Preserve prior successful outputs and prior operations.
 
-For Prospective and Ambispective studies, the first drafting wave uses four parallel subagents:
-
-1. `protocol-foundations`
-2. `protocol-operations`
-3. `protocol-analysis-and-oversight`
-4. `icf-narrative`
-
-After Foundations is accepted, a fifth subagent handles only the two PRS narrative values. Retrospective studies use the three Protocol batches and skip ICF/PRS.
-
-This is the cost/quality balance approved for the skill:
-
-- A single Protocol agent carries too much context and makes section omissions harder to isolate.
-- One agent per tiny section adds avoidable cost and inconsistency.
-- Three coherent Protocol batches let agents specialize while Python assembles one ordered contract.
-- One ICF batch keeps participant language consistent across the consent form.
-- The PRS narrative agent cannot alter XML; Python preserves the client-approved taxonomy and structure.
-
-Subagents return section-level structured content, never a whole document. The workflow validates section IDs, request hashes, evidence references, boilerplate references, completeness, and forbidden placeholders before accepting a response.
-
-For source-rich protocol sections, each drafting contract includes an
-`approved_source_word_count` and a conservative `reference_detail_target_words`
-soft compression signal. Semantic source coverage, not word count, governs
-acceptance: retain the supplied clinical, statistical, visit, eligibility,
-safety, retention, injury, and intervention detail without padding, repetition,
-invention, or source-gap commentary. The Document Section Contract owns the
-optional source-mode Section 8.3 and renders supplied treatment assignment
-verbatim. Its typed table contracts render structured visit/procedure
-relationships as the complete Schedule of Assessments and structured
-sample-size evidence as its own Section 11 table. Both tables must preserve the
-contracted headers, row and column order, cell associations, allowed blanks,
-timing, and values before release.
-
-## Retry behavior
-
-- Repairable post-approval drafting, deterministic construction, layout, and
-  reviewer-response failures retry within the one persisted 45-minute Desktop
-  operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap,
-  except source-bound construction corrections (three proposals per stable
-  target; optional polishing uses one proposal per renderer passage) and the Desktop-parent visual callback: after its initial callback, exactly one
-  unchanged-request parent retry is permitted, with callback consumption persisted per exact request across process resume, before missing or invalid response evidence
-  becomes `missing_parent_visual_review_response`.
-- Invalid draft: retry only failed section IDs in their existing batch.
-- Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
-- Content contradiction: retry only implicated sections unless the approved source conflicts.
-- Generated display prose: during an essential repair, when an independent reviewer identifies a nonmaterial
-  shell wording defect, the workflow may issue a `section_drafting` request with
-  `construction_repair`. Follow its exact paragraph, scoped approved evidence and
-  response contract. Return one corrected plain paragraph; preserve quantities,
-  units, negations and meaning. The renderer registers eligible prose positively;
-  retained clauses, headings, tables, signatures and XML are outside this editor.
-  Accepted corrections persist across candidate rebuilding. Unchanged or invalid
-  proposals close the optional edit without reopening intake or blocking delivery.
-  Changes elsewhere in a document do not establish progress on that passage.
-  Rerender accepted corrections and obtain fresh complete content and every-page
-  visual reviews before delivery, including after a rejected or unchanged proposal.
-  Only independently confirmed harmless presentation notes may remain internally;
-  a failed proposal never waives an essential failure or authorizes a blind fresh run.
-- Source-resolvable construction defects: a `section_drafting` request with
-  `construction_repair.kind: xml_fields` or `docx_fields` requests `field_edits`, not prose.
-  Return a nonempty list of objects with the exact inventoried `path`, `before`,
-  replacement `after`, and approved `source_path`. Replacements use exact scoped
-  approved scalar values; empty text removes unsupported generated values, never
-  explicitly supplied facts. Preserve native structure, surrounding text and identifiers. The workflow
-  authenticates and persists accepted edits, reapplies them after rebuilding,
-  validates the corrected structure, and obtains fresh full independent reviews.
-  Registered generated prose uses the existing one-paragraph response, including
-  material source-supported corrections. Protected template text and arbitrary
-  document locations are outside the construction editor. Material corrections
-  have up to three source-bound proposals within the existing operation deadline;
-  unsuccessful proposals are not approval. Optional polish remains best effort.
-- Visual defect: localize the exact document, page, element, check, and layout
-  target; apply the narrowest untried safe Word-native strategy; rebuild the
-  affected artifact; and rerun rendered-page verification.
-- Reuse unaffected accepted drafts.
-- Every attempted repair records the actual strategy. A repeated finding must
-  select a stronger untried governed strategy; identical raw DOCX ZIP bytes or
-  ZIP-metadata churn never establish meaningful progress. Valid DOCX progress is
-  measured from normalized member names and content hashes.
-- When all safe deterministic strategies for one exact localized target are
-  already present, re-prompt only the exact visual reviewer to reinspect and
-  localize the unchanged artifact. Do not mutate the document blindly or consume
-  a new complete review set.
-- If any content or visual reviewer finds a governed repairable defect, preserve
-  the failed evidence, repair only the implicated draft/layout target, then rerun
-  the package-wide content review and every document-scoped visual review against
-  the repaired candidate. Never reuse a pass from an earlier set.
-- A transient API or structurally incomplete verification response retries only
-  that reviewer within the current set and does not consume a new complete review
-  set. A governed finding whose effective recovery target is missing, empty,
-  wrong-category, or unsupported instead fails explicitly before any recovery
-  attempt or journal is created. The bounded Desktop-parent exception above
-  applies after delegated visual review has already fallen back to the parent.
-- Only the persisted 45-minute deadline or a non-repairable integrity, source,
-  renderer, safety, unsupported-template, unsupported-recovery-route,
-  atomic-delivery, or exhausted bounded parent-response validation failure
-  terminates the post-approval operation without client outputs.
-
-### Source interpretation during drafting
-
-Each worker must satisfy the source interpretation contracts in its section
-request. For `evaluation-procedures`, return `schedule_interpretation` when
-requested: map every explicit activity-to-visit relationship with exact source
-quotations, retain unallocated or ambiguous facts as notes, and preserve existing
-structured rows. Declare a contact absent from a legacy visit inventory only
-when its name and timing are explicitly quoted from approved narrative. Never
-invent a visit, infer an assignment, or change the approved source. Python uses
-the accepted mapping for display construction; the independent reviewer checks
-its meaning and completeness against the unchanged raw approved fields.
-
-For schedule lists mixing contact labels with prose, use `narrative_items` to
-identify each prose string by its exact field, list index and whole quotation.
-Interpret its relationships or retain its facts as notes. Preserve typed rows
-and genuine contact labels; a narrative sentence must not become a visit column.
-
-For a section with `benefit_context`, return `benefit_interpretation` and inspect
-the supplied background even when the dedicated benefits field is empty. Route
-applicable qualified possibilities to Protocol benefits and ICF benefits, or
-the Retrospective ethics section as appropriate. Preserve uncertainty and the
-absence of guaranteed personal benefit. Historical treatment results do not
-establish benefit from this study; record review must not promise treatment
-benefit. An explained empty interpretation is valid when no benefit applies.
-This interpretation is internal evidence, never diagnostic prose in a document.
-
-## Independent verification
-
-After rendering, `generate` returns one package-wide content request plus one
-document-scoped visual request for each rendered DOCX. Run all requests
-concurrently so every-page image inspection stays off the serial critical path:
-
-- `clinical_content_verification`: checks source fidelity, every required section, unsupported claims, cross-document consistency, and participant-facing ICF language.
-- `rendered_page_visual_verification`: each request inspects every supplied page PNG for one Protocol or ICF document and every listed check.
-
-The content reviewer must complete `source_routing_assessments` for every bound
-obligation, enumerating material facts from raw source and quoting their actual
-destination passages. A projection matching itself or a bare section pass is
-insufficient. Check prose, list, and matrix representations, explicit visit
-assignments, qualifications, historical context and source-supplied potential
-benefits. Route an interpretation omission to its drafting section with
-`surface: source_interpretation`; reserve `surface: table` for construction
-that differs from an otherwise correct interpretation. Repairs must be rendered
-and independently reviewed again before publication.
-
-The visual verifier must use image inspection. File existence, DOCX text extraction, or PDF page count alone is not visual review. Visual QA is bound to the exact DOCX, PDF, and page-image hashes, and its response must include every page number and exact PNG hash with every requested check. Any changed document, PDF, or page image invalidates earlier evidence; missing or stale assessments block delivery. Before any content or visual response can become terminal, complete, recovery, or publication evidence, the workflow authenticates the exact request bytes and canonical payload hash against its workflow-owned request ledger; request or response self-declarations never establish authority.
-
-Every independent verification response records both `producer.model_id` for the actual selected model and `producer.reviewer_id` for the independent reviewer role. These identities are mandatory, distinct bindings in Final Exact-Artifact Review; neither field selects or restricts which model the client may use.
-
-Each request records its one-based `review_set`. A genuine finding invalidates
-the entire prior verification set after its evidence is archived; all reviewers
-then run concurrently on the repaired candidate. A structurally incomplete
-verification response is retried as reviewer-transient. Once a finding declares
-a governed Recovery Class, however, its effective target is normalized and
-validated before archival; a missing, empty, wrong-category, or unsupported
-route returns an explicit blocker without creating an attempt or journal, while
-valid companion findings remain unchanged and unclaimed as repaired. Every
-verifier-originated or verification-routed finding must carry its nonempty
-`verification_request_id`; before archival the workflow resolves that identity
-exactly once in the current authenticated request inventory and verifies its
-request hash, task, review-set identity, and Run Revision binding. Pure
-deterministic and drafting findings remain governed by their own route contracts
-and do not fabricate a verification identity. Invalid routing is never silently
-ignored or guessed by the workflow.
-
-The Generation Manifest contains one hash-bound monotonic gate ledger in this
-fixed order: clinical fidelity; content completeness and consistency; DOCX/PRS
-structure; exact-artifact rendering; every-page Visual QA; exact-byte atomic
-delivery. Each gate records its evidence hash, retry owner, terminal status, and
-stable machine-readable findings. A later gate cannot pass while an earlier gate
-is pending or blocked. A blocked record is terminal and immutable; a governed
-retry starts a new retained attempt rather than replacing or erasing that failed
-evidence. Each archived attempt stores its blocked ledger, and every later ledger
-binds the ordered predecessor ledger hashes and blocked findings under the same
-Run Revision attempt identity. The working reference also binds every retained
-attempt directory to its manifest and ledger identities; missing, mutated,
-duplicated, or forked attempt history blocks retry, resume, and publication.
-Publication reconciles the complete candidate
-inventory with exactly one passed render row and nonempty page evidence for each
-DOCX, then rehashes every candidate DOCX/XML, PDF, and
-page image against the accepted build immediately before staging, then rehashes
-the staged client bytes before the atomic swap. Desktop confirmation advances
-only the final pending gate and is persisted in the Desktop operation result.
-Terminal replay revalidates both prepared and final ledgers and permits only that
-one delivery-gate transition.
-
-The deterministic render gate rejects pages with no meaningful body content, even when running headers or page numbers are present. Visual review must evaluate sparse continuation, signature, and consent pages according to their actual content and function. A sentence continuing across pages is not a content error; preserve meaningful choices and usable signature space rather than treating every sparse page as blank.
-
-Candidate construction does not depend on the render environment. Build the complete Protocol/ICF/XML candidate first, then resolve DOCX rendering through host Microsoft Word or LibreOffice. Tool failure may advance between those office renderers; a successfully rendered visual defect stays bound to that renderer and enters repair instead of switching to obtain an easier pass. Page rendering always uses the release-owned `pypdfium2` 5.13.0 runtime. If PDFium fails, stop with the governed diagnostic; never discover or use another PDF backend.
-
-Font evidence is tri-state. `available` preserves the declared font; `missing` selects the explicit release-owned compatible Liberation mapping and writes that substitution into the candidate; `unknown` preserves the declared font and decides capability through the disposable render smoke. Heuristic host substitutions are not accepted, and “cannot inspect” is never treated as “missing.” The manifest records renderer attempts, the one PDFium identity, font evidence, substitutions, exact artifact hashes, and page-image review. Installation owns offline PDFium provisioning and verifies the host office prerequisite; normal generation remains read-only.
-
-## Word template authorities
-
-- Every Protocol branch uses the bundled Protocol client authority for page geometry, typography, headers/footers, heading hierarchy, document-control surfaces, and table design.
-- Protocol body sections use natural content-driven pagination and the Client Template Authority's spacing rhythm. Preserve the template's page breaks except the narrowly authorized Section 15 correction in `references/quality-corrections.md`; ensure the Table of Contents and its first following body section each begin at a page boundary without adding breaks before later body sections. Keep every heading with its first substantive paragraph, list, or table.
-- Advarra ICF output uses the bundled Advarra authority; Sterling output uses the bundled Sterling authority.
-- For Sterling ICF, preserve the IRB-owned front-matter merge tags for title, protocol number, investigator, site, phone, and sponsor. Retain the template's fixed consent introduction and INFORMATION wording without model drafting. Insert the exact template ClinicalTrials.gov statement only when its approved source trigger applies; do not copy the template's mutually exclusive or study-specific example options into the output.
-- Sterling output must satisfy `references/sterling-clause-contract.json`. Validate substantive body language and section placement, not headings or signatures alone. Insert conditional or source-dependent clauses only when their declared approved-input trigger is present; never retain an untriggered template option or invent legal, regulatory, payment, injury, privacy, authorization, or contact terms. Exact governed clauses may be moved intact to repair placement, but a materially altered or missing safeguard requires targeted redrafting or blocks delivery.
-- Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
-- ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
-- ICF section ownership is template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Introduction summarizes approved background and the evidence gap without repeating a speculative comparison for the untested combination; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Section 15 prose briefly introduces its source-derived table and only genuinely unallocated notes. Study Completion states the supplied closeout timeline and defines a completion trigger only when supplied, without repeating visits or the exit form. Summary of benefits owns potential clinical benefit; Section 17 owns payment and reimbursement. General Statistical Considerations states a source-supported interpretation point without repeating endpoint methods. Short role-specific references are allowed. Repetition heuristics request independent meaning and readability review. Accept valid stylistic alternatives. Repair material editorial defects through their owning section; retain explicitly harmless presentation observations internally under the delivery policy below.
-- `meta.date` defaults once, during `prepare`, to `dd MMM yyyy`. `meta.version` remains blank unless the approved source supplies it.
-
-## PRS XML authority
-
-- Keep `assets/client-templates/reference/prs-manual-reference.xml` as the client-derived structural architecture authority. Use `assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml` only as the generation/format template whose populated output must validate against that structural reference.
-- Python alone owns XML tags, ordering, optional nodes, namespaces, escaping, and repeated blocks.
-- Derive intervention, arm, primary/secondary/other outcome, and location counts from the approved source—not from generated fields.
-- Validate every source-backed value inside every intervention, arm, outcome,
-  and location block in addition to validating repeated-block counts and the
-  client template's tag order and structure.
-- The PRS subagent may return only `brief_summary` and `detailed_description` prose.
-- Any XML failure blocks the complete Prospective/Ambispective package.
-
-## Completion
-
-Artifact validation and delivery are separate obligations. `generate` may
-produce a passing Generation Manifest, but the Desktop operation is successful
-only after the actual opener retrieves every `desktop_reply.attachments` file
-and confirms its byte length and SHA-256 against that manifest. Retry transfer
-of the same validated bytes within the remaining deadline; never regenerate to
-repair transport. The final reply must expose exactly those attachments as
-openable Desktop files, not inline-code paths, and must not include QA artifacts.
-
-`status: passed` at `stage: desktop_delivery` with
-`delivery.confirmed: true` is the client-ready delivery state. Record elapsed
-time and its runtime classification. A 10–20 minute result meets the normal
-target; a successful result above 20 minutes is diagnostic evidence but remains
-within the operation until the 45-minute correctness ceiling.
-Normal client-ready delivery has a clean message. Keep fixed defects, dismissed
-false alarms, reference length goals, and repair history in the internal evidence.
-For each `lexical_review_cautions` item, the content reviewer must return an
-`uncertainty_resolutions` decision with its `caution_sha256`, `disposition`
-(`faithful`, `confirmed_defect`, or `source_clarification`), a source-grounded
-`rationale`, an exact `source_excerpt` from its approved or template evidence,
-and an `affected_passage` from the current artifact passage. A bare pass or
-request to ignore a checker is insufficient. Code binds the decision to the
-source, section, artifact, rule, request, and reviewer; changed evidence requires
-fresh review. An authenticated `source_clarification` with a substantive companion
-finding stops at `source_review`; preserve the approved source and obtain the
-missing source decision before proceeding. Review every section and every
-rendered page even when code passes.
-
-Correct material prose defects through drafting, deterministic
-cell/mapping and document shell defects through construction, and layout defects
-through rendering. Use `protocol.shell` or `icf.shell` for running headers and
-footers; identify the exact visible passage and location.
-Verify changed output and obtain final independent exact-artifact review; an
-attempted correction alone never establishes success. Reviewers cannot waive an
-objective factual, exact-text, structure, integrity, or delivery failure.
-
-For a harmless presentation observation, set the known review check and all five
-harm flags explicitly false: `material`, `safety_critical`, `contradiction`,
-`obscures_required_information`, and `materially_unusable`. Keep the exact passage
-and rationale in the review. Such notes pass their section and remain in the
-internal audit without client warnings or document annotations. Registered
-generated prose may receive one scoped polish alongside an already required
-essential repair, followed by fresh full reviews. Once essential checks pass,
-deliver immediately without another cosmetic handoff or review cycle;
-ineffective polish does not veto the complete verified package. This does not
-apply to missing facts, consent safeguards, source conflicts, objective failures,
-unknown concerns or incomplete content/page reviews. Ordinary stylistic
-preferences need no finding.
-
-If a passed result contains `warnings`, disclose each meaningful remaining
-limitation with its `document_locations` and plain-language concern, outside the
-documents. Only an explicit nonmaterial external limitation may use the review
-check `client_limitation`: include `remaining_limitation: true`, a
-`limitation_kind` of `external_dependency` or `client_environment`,
-`why_not_repairable`, `recommended_action`, and explicit false values for
-`material`, `safety_critical`, `contradiction`, `obscures_required_information`,
-and `materially_unusable`. This does not waive a clinical defect or incomplete
-verification. Do not add a caution for an issue already fixed or dismissed.
-
-If `status: review_required`, make every file in `review_outputs` individually accessible to the recipient; list each exact path or attach each file. Include the `review_findings` path. For each flagged concern, quote its `document_locations` from that report beside a plain-language explanation (for example, “Protocol §13.3 — Procedures for Recording and Reporting AEs and SAEs”). If the check supplied no document location, say so instead of guessing a section. The diagnostic ZIP is additional evidence, not a substitute for the individual review files. State that automated checks can sometimes flag a valid document, and ask the recipient to compare each concern with the approved source and relevant passage. Label the files as review copies until the concern is resolved; they are not client-ready deliverables. If `status: blocked` without review outputs, report the diagnostic ZIP, one consolidated technical blocker, and the repair report; state that no complete review files were produced. Never present partial or unbound candidates as usable documents.
-
-If the persisted 45-minute operation deadline is reached, stop and preserve the failed run unchanged. Explain concisely which stage did not complete, what blocker or pending work remained, and that no partial documents are approved for delivery. If the deadline is the only terminal cause and the remaining work appears safely retryable, ask whether the user wants to start a fresh generation attempt using the exact same approved Source-of-Truth. Do not continue automatically, reset or extend the terminated operation, reuse stale verification results, or request new clinical inputs. If the findings indicate an implementation, integrity, security, renderer, unsupported-template, atomic-delivery, or environmental problem, explain the required correction instead of recommending a blind retry.
+Aim for **under 25 minutes** from generation start through confirmed complete delivery, excluding the human approval wait. Use recorded `elapsed_seconds`, stage timings and repair history; report clean and repaired runs separately. This target is not a demonstrated promise or approval waiver. The original **45-minute** ceiling remains fixed across processes. At the ceiling stop generation/repair and return a complete usable trustworthy review-only set when available, with honest unresolved/incomplete notices. Otherwise return unavailable with diagnostics. A later retry is a separate owner decision and must not be reported as success in the terminated operation.

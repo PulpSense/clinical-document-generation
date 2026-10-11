@@ -3231,14 +3231,14 @@ def test_desktop_operation_requires_the_exact_branch_output_set_before_opening_f
     assert opened == []
 
 
-def test_runtime_target_is_ten_to_twenty_minutes_with_a_forty_five_minute_ceiling():
+def test_runtime_target_is_under_twenty_five_minutes_with_a_forty_five_minute_ceiling():
     assert workflow.NORMAL_RUNTIME_TARGET_MIN_SECONDS == 600.0
-    assert workflow.NORMAL_RUNTIME_TARGET_MAX_SECONDS == 1200.0
+    assert workflow.NORMAL_RUNTIME_TARGET_MAX_SECONDS == 1500.0
     assert workflow.DESKTOP_OPERATION_BUDGET_SECONDS == 2700.0
     assert workflow.performance_classification(599.0) == "below_target_window"
     assert workflow.performance_classification(600.0) == "target_window"
     assert workflow.performance_classification(1200.0) == "target_window"
-    assert workflow.performance_classification(1200.001) == "above_target_within_deadline"
+    assert workflow.performance_classification(1500.0) == "above_target_within_deadline"
     assert workflow.performance_classification(2700.0) == "above_target_within_deadline"
     assert workflow.performance_classification(2700.001) == "deadline_exceeded"
 

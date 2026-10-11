@@ -56,7 +56,7 @@ from contracts import canonical_review_surface, finding_requires_repair, interna
 REFERENCE = Path("reference/study.reference.json")
 DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
-NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1200.0
+NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1500.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 2700.0
 FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
@@ -247,7 +247,7 @@ def performance_classification(elapsed_seconds: float) -> str:
         return "deadline_exceeded"
     if elapsed_seconds < NORMAL_RUNTIME_TARGET_MIN_SECONDS:
         return "below_target_window"
-    if elapsed_seconds <= NORMAL_RUNTIME_TARGET_MAX_SECONDS:
+    if elapsed_seconds < NORMAL_RUNTIME_TARGET_MAX_SECONDS:
         return "target_window"
     return "above_target_within_deadline"
 
@@ -3890,15 +3890,15 @@ def _review_finding_locations(reference: Mapping[str, Any], finding: Mapping[str
             continue
         if location not in locations:
             locations.append(location)
-    return locations or ["Document location not specified by the check"]
+    return locations or ["Document location not specified by the reviewer"]
 
 
 def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
     """Expose a complete candidate for review without approving it."""
-    if str(result.get("status")) != "blocked" or str(result.get("stage")) in {
+    if str(result.get("status")) not in {"blocked", "timeout"} or str(result.get("stage")) in {
         "approval", "approval_gate", "source_integrity", "integrity", "revision",
         "worker_readiness", "worker_authentication", "delivery",
-        "terminal_delivery_validation",
+        "terminal_delivery_validation", "document_repair_integrity",
     }:
         return {}
     try:
@@ -3939,6 +3939,13 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
                 Document(path)
             elif path.suffix.casefold() == ".xml":
                 ElementTree.parse(path)
+                authority = bundle.get("prs_authority")
+                if not isinstance(authority, Mapping):
+                    return {}
+                if validate_xml_output(path, reference,
+                    SCRIPT_DIR.parent / str(authority["structural_reference"]["path"]),
+                    generation_template=SCRIPT_DIR.parent / str(authority["generation_template"]["path"])):
+                    return {}
     except (OSError, ValueError, KeyError, ContractedTemplateBundleError, PackageNotFoundError, zipfile.BadZipFile, ElementTree.ParseError):
         return {}
 
@@ -3952,16 +3959,34 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
             source = revision_dir / relative
             target = staging / f"REVIEW-ONLY-{source.name}"
             shutil.copy2(source, target)
+            if sha256_file(target) != paths[relative].get("sha256"):
+                raise ValueError("Candidate bytes changed while staging review-only delivery.")
             outputs.append({
                 "path": f"review-output/{target.name}",
                 "sha256": sha256_file(target),
                 "bytes": target.stat().st_size,
                 "delivery_status": "review_only_not_client_ready",
+                "filename": target.name,
+                "absolute_path": (destination / target.name).as_posix(),
+                "link": f"[{target.name}](<{(destination / target.name).as_posix()}>)",
             })
+        pending = result.get("pending_result") or {}
+        all_findings = list(result.get("findings") or [])
+        if isinstance(pending, Mapping):
+            all_findings.extend(pending.get("findings") or [])
+        generation = reference.get("generation") or {}
+        if result.get("manifest") is None and pending.get("status") != "passed":
+            all_findings.extend((generation.get("native_review_context") or {}).get("prior_findings") or [])
+        pending_repair = generation.get("pending_native_repair") or {}
+        if pending_repair.get("path"):
+            all_findings.extend(native_read(native_file(revision_dir, pending_repair["path"])).get("findings") or [])
+        # Stable source-grounded concern identities can recur in pending and history.
+        all_findings = list({sha256_value(item): item for item in all_findings}.values())
+        incomplete = [str(result.get("pending_stage") or result.get("stage") or "final independent review")]
         located_findings = [
             {**dict(finding), "document_locations": _review_finding_locations(reference, finding)}
             if isinstance(finding, Mapping) else finding
-            for finding in result.get("findings") or []
+            for finding in all_findings
         ]
         _write(staging / "findings.json", {
             "status": "review_only_not_client_ready",
@@ -3969,6 +3994,8 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
             "findings": located_findings,
             "candidate_revision": revision_id,
             "candidate_evidence": snapshot_path.name,
+            "incomplete_assessments": incomplete,
+            "source_sha256": reference.get("approval", {}).get("source_sha256"),
             "files": outputs,
         })
         finding_lines = []
@@ -3981,9 +4008,9 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
                 finding_lines.append(f"- {location}: {issue}" if location else f"- {issue}")
         (staging / "READ-ME-FIRST.txt").write_text(
             "REVIEW COPY — NOT CLIENT READY\n"
-            "The automated publication checks flagged the following concern(s):\n"
+            "Unresolved concerns or incomplete assessments:\n"
             + ("\n".join(finding_lines) if finding_lines else "- See findings.json for the exact result.")
-            + "\n\nAn automated check can sometimes flag a valid document. "
+            + "\n\nIncomplete or unresolved stage: " + ", ".join(incomplete) + ". "
             "Compare each concern with the approved source and the relevant document passage. "
             "These files remain review copies until the concern is resolved; they are not confirmed client-ready. "
             "See findings.json for the complete findings.\n",
@@ -3993,12 +4020,46 @@ def _review_copy(run_dir: Path, result: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "review_outputs": outputs,
             "review_findings": "review-output/findings.json",
+            "review_notice": "review-output/READ-ME-FIRST.txt",
+            "review_findings_sha256": sha256_file(destination / "findings.json"),
+            "review_notice_sha256": sha256_file(destination / "READ-ME-FIRST.txt"),
+            "review_findings_link": f"[Review findings](<{destination.as_posix()}/findings.json>)",
+            "review_notice_link": f"[Review notice](<{destination.as_posix()}/READ-ME-FIRST.txt>)",
         }
     except OSError as exc:
         return {"review_copy_error": str(exc)}
     finally:
         if staging.exists():
             shutil.rmtree(staging)
+
+
+def _confirm_review_delivery(run_dir: Path, result: Mapping[str, Any], opener: Callable[[str], bytes]) -> dict[str, Any]:
+    """Retrieve the complete review-only package and its external notices, without quality approval."""
+    rows = list(result.get("review_outputs") or [])
+    if not rows:
+        raise ValueError("Review-only package contains no documents.")
+    _, reference = _reference(run_dir)
+    bundle = contracted_template_bundle(SCRIPT_DIR.parent, reference)
+    if not _approval_valid(run_dir, reference, contracted_bundle=bundle)[0]:
+        raise ValueError("Review-only source approval is no longer trustworthy.")
+    expected = {"REVIEW-ONLY-" + name for name in document_set(get_path(reference, "meta.study_type"))}
+    if {Path(str(row.get("path") or "")).name for row in rows} != expected or len(rows) != len(expected):
+        raise ValueError("Review-only package inventory is incomplete.")
+    for field in ("review_findings", "review_notice"):
+        rows.append({"path": result.get(field), "sha256": result.get(field + "_sha256")})
+    for row in rows:
+        path = native_file(run_dir, str(row.get("path") or ""))
+        if path.is_symlink() or not path.is_file() or sha256_file(path) != row.get("sha256"):
+            raise ValueError("Review-only files no longer match their recorded identity.")
+        try:
+            data = opener(path.as_posix())
+        except Exception as exc:
+            raise ValueError(f"Review-only transfer could not retrieve its files: {exc}") from exc
+        if not isinstance(data, bytes) or hashlib.sha256(data).hexdigest() != row.get("sha256"):
+            raise ValueError("Review-only transfer did not retrieve the exact files.")
+        if row.get("bytes") is not None and len(data) != row["bytes"]:
+            raise ValueError("Review-only transfer byte count differs.")
+    return {"confirmed": True, "delivery_status": "review_only_not_client_ready", "files": len(rows)}
 
 
 def _terminal_diagnostic_archive(run_dir: Path) -> dict[str, Any]:
@@ -4449,6 +4510,12 @@ def run_desktop_operation(
                     }],
                     "client_outputs": [],
                 }
+        if prior_result.get("status") == "review_required":
+            try:
+                _confirm_review_delivery(run_dir, prior_result, opener)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                return {"status": "blocked", "stage": "terminal_delivery_validation",
+                        "findings": [{"category": "delivery", "issue": str(exc)}], "client_outputs": []}
         return prior_result
     started_at_epoch, deadline_at_epoch, persisted_budget, runtime_history, stage_history = (
         _desktop_deadline_state(
@@ -4574,6 +4641,12 @@ def run_desktop_operation(
         measured = {
             **result,
             "elapsed_seconds": round(elapsed, 3),
+            "stage_timings": copy.deepcopy(stage_timings),
+            "attempt_counters": copy.deepcopy(attempt_counters),
+            "repair_cycles": int(attempt_counters.get("repair_cycles") or 0),
+            "changed_native_repairs": int(attempt_counters.get("changed_native_repairs") or 0),
+            "dispute_cycles": int(attempt_counters.get("dispute_cycles") or 0),
+            "under_25_minutes": elapsed < NORMAL_RUNTIME_TARGET_MAX_SECONDS,
             "performance_classification": performance_classification(elapsed),
             "target_window_seconds": [
                 NORMAL_RUNTIME_TARGET_MIN_SECONDS,
@@ -4585,14 +4658,6 @@ def run_desktop_operation(
             "runtime": current_runtime,
             "release_identity": current_release_identity,
         }
-        if measured.get("status") == "blocked":
-            try:
-                review_copy = _review_copy(run_dir, measured)
-            except Exception as exc:
-                review_copy = {"review_copy_error": f"{type(exc).__name__}: {exc}"}
-            measured.update(review_copy)
-            if review_copy.get("review_outputs"):
-                measured["status"] = "review_required"
         if elapsed > persisted_budget and measured.get("status") == "passed":
             current_stage = "cleanup"
             measured.update({
@@ -4606,6 +4671,28 @@ def run_desktop_operation(
                 "client_outputs": [],
             })
             measured.pop("desktop_reply", None)
+        if measured.get("status") in {"blocked", "timeout"}:
+            try:
+                review_copy = _review_copy(run_dir, measured)
+            except Exception as exc:
+                review_copy = {"review_copy_error": f"{type(exc).__name__}: {exc}"}
+            measured.update(review_copy)
+            if review_copy.get("review_outputs"):
+                measured["terminal_cause"] = measured["status"]
+                try:
+                    delivery_started = clock()
+                    measured["review_delivery"] = _confirm_review_delivery(run_dir, measured, opener)
+                    record_timing("desktop_delivery", clock() - delivery_started)
+                    measured["stage_timings"] = copy.deepcopy(stage_timings)
+                    measured["status"] = "review_required"
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    measured["review_copy_error"] = str(exc)
+                    for field in ("review_outputs", "review_findings", "review_notice", "review_delivery"):
+                        measured.pop(field, None)
+        elapsed = max(0.0, epoch_now() - started_at_epoch)
+        measured.update({"elapsed_seconds": round(elapsed, 3),
+                         "performance_classification": performance_classification(elapsed),
+                         "under_25_minutes": elapsed < NORMAL_RUNTIME_TARGET_MAX_SECONDS})
         terminal_status = str(measured.get("status", "blocked"))
         saved = save(terminal_status, measured)
         if terminal_status in {"blocked", "review_required", "timeout"}:
@@ -4643,6 +4730,10 @@ def run_desktop_operation(
         generation = operation_reference.get("generation")
         if not isinstance(generation, Mapping):
             return
+        native_history = generation.get("native_repair_history") or []
+        attempt_counters["repair_cycles"] = len(native_history)
+        attempt_counters["changed_native_repairs"] = sum(row.get("before") != row.get("after") for row in native_history)
+        attempt_counters["dispute_cycles"] = sum(row.get("before") == row.get("after") for row in native_history)
         attempt_counters["generation"] = {
             str(target): int(attempt)
             for target, attempt in dict(generation.get("attempts") or {}).items()
@@ -5016,6 +5107,7 @@ def run_desktop_operation(
                 "client_outputs": [],
             })
         reply = result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
+        delivery_started = clock()
         delivery = confirm_desktop_delivery(
             manifest,
             reply,
@@ -5023,6 +5115,7 @@ def run_desktop_operation(
             deadline=process_deadline_monotonic,
             clock=clock,
         )
+        record_timing("desktop_delivery", clock() - delivery_started)
         attempt_counters["delivery"] = int(delivery.get("attempts") or 0)
         if remaining_seconds() <= 0:
             current_stage = "desktop_delivery"
