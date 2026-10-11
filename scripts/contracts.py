@@ -2624,6 +2624,7 @@ _PRS_RESOURCES = {
 }
 
 _BOILERPLATE_RESOURCE = "references/fixed-clinical-boilerplate.json"
+_DRAFTING_EXAMPLES_RESOURCE = "references/drafting-examples.json"
 
 
 def _sha256_path(path: Path) -> str:
@@ -2727,6 +2728,7 @@ def contracted_template_bundle(repo_root: Path, reference: Mapping[str, Any]) ->
         else None
     )
     boilerplate = resource(_BOILERPLATE_RESOURCE)
+    drafting_examples = resource(_DRAFTING_EXAMPLES_RESOURCE)
     sterling_clauses = (
         resource(STERLING_CLAUSE_CONTRACT_RESOURCE)
         if icf_family == "Sterling"
@@ -2810,6 +2812,7 @@ def contracted_template_bundle(repo_root: Path, reference: Mapping[str, Any]) ->
             "version": BOILERPLATE_VERSION,
             **boilerplate,
         },
+        "drafting_examples": drafting_examples,
         "sterling_clause_contract": sterling_clauses,
         "approved_font_plan": approved_font_plan,
         "layout_preservation_baseline": layout_preservation_baseline,

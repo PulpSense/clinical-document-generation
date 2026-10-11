@@ -59,7 +59,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v23-ai-owned-quality"
+PROMPT_VERSION = "section-drafting-v24-worked-examples"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -121,6 +121,7 @@ def _request_constraints() -> list[str]:
         "Return structured section content, not a whole document or document markup.",
         "Write to each section's purpose and ownership. State facts fully where owned and summarize or cross-reference them elsewhere. Necessary identifiers, quantities, timings and consent language may recur; avoid redundant narration.",
         "Use participant-facing language for ICF sections.",
+        "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
         "For icf.key-information-summary, draft directly from its canonical summary obligations; keep each concept concise and never copy a complete detailed-section sentence or paragraph.",
         "For a Sterling ICF, BACKGROUND owns lens descriptions, comparative evidence, the evidence gap, and rationale. PURPOSE must be concise and limited to the purpose, hypothesis, and primary endpoint; do not restate BACKGROUND.",
         "ICF PROCEDURES owns detailed study activities and DURATION owns timing. Do not repeat their detail in PURPOSE, ALTERNATIVE TREATMENTS, VOLUNTARY PARTICIPATION/WITHDRAWAL, or the participant statement unless the Sterling Clause Contract explicitly requires it.",
@@ -830,6 +831,7 @@ def create_drafting_request(
         contracted_bundle=bundle,
     )
     scoped = _scoped_source(reference, batch.field_families)
+    examples = _read_json(repo_root / bundle["drafting_examples"]["path"])
     governing = governing_resources(repo_root, reference, contracted_bundle=bundle)
     request_id = _request_id(revision_id, batch.batch_id, attempts, wave, sha256_value(governing))
     response_path = revision_dir / "hermes/responses" / f"{request_id}.json"
@@ -861,6 +863,8 @@ def create_drafting_request(
             for section in sections
         ],
         "section_contracts": sections,
+        "writing_examples": [example for example in examples["examples"]
+                             if example["section_id"] in targets],
         "accepted_context": accepted_context(revision_dir, batch, governing),
         "prior_target_drafts": [draft for target in targets if (draft := accepted_draft(revision_dir, target, governing))],
         "findings": [dict(item) for item in findings],

@@ -1,0 +1,85 @@
+{
+  "description": "Synthetic writing examples adapted from the earlier n8n workflow. Source snippets are complete for the illustrated passage, not complete study inputs. Examples demonstrate prose and organization, not required wording or additional clinical facts.",
+  "examples": [
+    {
+      "section_id": "introduction",
+      "source": {
+        "study.background": "Prior studies compared two cataract surgery handpieces at different pressure settings. Evidence for the newer handpiece at a lower pressure setting remains limited."
+      },
+      "prose": "Prior studies have compared cataract surgery handpieces at different pressure settings. Limited evidence for the newer handpiece at a lower setting leaves uncertainty about its performance in that setting."
+    },
+    {
+      "section_id": "subjects.population",
+      "source": {
+        "population.study_population": "Adults aged 50 years or older undergoing sequential bilateral cataract surgery.",
+        "population.sample_size": "70 eyes from 35 participants; both eyes of each participant are included."
+      },
+      "prose": "The study population comprises adults aged 50 years or older undergoing sequential bilateral cataract surgery. Planned enrollment is 35 participants, contributing 70 eyes, with both eyes of each participant included."
+    },
+    {
+      "section_id": "subjects.eligibility",
+      "source": {
+        "population.inclusion_criteria": "Adults aged 50 years or older; able to provide written informed consent.",
+        "population.exclusion_criteria": "Previous refractive surgery; participation in another clinical study within 30 days before screening."
+      },
+      "lists": [
+        {
+          "label": "Inclusion criteria",
+          "items": ["Age 50 years or older.", "Able to provide written informed consent."]
+        },
+        {
+          "label": "Exclusion criteria",
+          "items": ["Previous refractive surgery.", "Participation in another clinical study within 30 days before screening."]
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.design",
+      "source": {
+        "design.study_design": "Single-site observational comparison of patients receiving Treatment A or Treatment B as part of routine care. Treatment is selected by the treating clinician before enrollment; enrollment does not change treatment.",
+        "endpoints.primary": "Change in symptom score from baseline to Month 1.",
+        "endpoints.secondary": "Participant satisfaction at Month 1."
+      },
+      "prose": "This single-site observational study compares patients receiving Treatment A or Treatment B during routine care. The treating clinician selects treatment before enrollment, and study enrollment does not change that choice. The primary endpoint is change in symptom score from baseline to Month 1. The secondary endpoint is participant satisfaction at Month 1."
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "source": {
+        "procedures.visit_schedule": "Baseline: consent, eligibility review and symptom questionnaire. Month 1, Day 30 plus or minus 7 days: symptom and satisfaction questionnaires."
+      },
+      "prose": "At baseline, participants provide consent, undergo eligibility review and complete the symptom questionnaire. At Month 1, scheduled for Day 30 plus or minus 7 days, they complete the symptom and satisfaction questionnaires."
+    },
+    {
+      "section_id": "analysis-plan.methodology",
+      "source": {
+        "statistics.analysis_plan": "Summarize paired-eye differences using descriptive statistics. Report means and standard deviations for continuous measures and counts and percentages for categorical measures.",
+        "endpoints.primary": "Difference in aspiration time between eyes.",
+        "endpoints.secondary": "Difference in fluid volume between eyes."
+      },
+      "prose": "Paired-eye differences in aspiration time and fluid volume will be summarized descriptively using means and standard deviations. Categorical measures will be summarized as counts and percentages."
+    },
+    {
+      "section_id": "icf.procedures",
+      "source": {
+        "procedures.visit_schedule": "Baseline: written consent before study questionnaires. Month 1, Day 30 plus or minus 7 days: symptom questionnaire.",
+        "design.intervention_description": "Treatment is routine care and is not assigned or changed by this study."
+      },
+      "prose": "At the first visit, you will provide written consent before completing the study questionnaires. You will complete a symptom questionnaire about one month later, on Day 30, up to seven days earlier or later. The study does not choose or change your routine treatment."
+    },
+    {
+      "section_id": "icf.risks",
+      "source": {
+        "risks_benefits.risks": "The questionnaire may cause temporary discomfort when discussing symptoms.",
+        "risks_benefits.risk_mitigation": "Participants may skip any question or stop the questionnaire."
+      },
+      "prose": "You may feel temporarily uncomfortable answering questions about your symptoms. You may skip any question or stop the questionnaire."
+    },
+    {
+      "section_id": "icf.benefits",
+      "source": {
+        "risks_benefits.benefits": "No direct benefit is expected. Findings may help researchers understand patient-reported recovery."
+      },
+      "prose": "You are not expected to benefit directly from taking part. The findings may help researchers understand how patients describe their recovery."
+    }
+  ]
+}
