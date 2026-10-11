@@ -1,0 +1,5 @@
+# AI owns document meaning and repair
+
+Spec #103 supersedes #91 and conflicting content-gate/recovery requirements in ADRs 0005, 0019 and 0021. Code retains required-value/schema, approval/source identity, readable files, complete package, installation/render capability, PRS structural contract and exact reviewed-byte delivery checks. AI owns semantic intake interpretation, section content, clinical fidelity, consent applicability and rendered-page quality; lexical, numerical-source, word-count, consent-text and presentation heuristics cannot veto review or publication.
+
+AI repairs run-local artifacts with general document tools, followed by fresh independent content and page review. This replaces per-condition rule registries, mandatory heuristic adjudications and specialized repair routing. Complete usable source-trustworthy packages may be review-only when substantive concerns or assessments remain unresolved; corrupted, incomplete or source-untrustworthy packages remain unavailable. The normal target is under 25 minutes, with the same cross-process 45-minute ceiling; neither speed nor live quality is established by controlled local tests.

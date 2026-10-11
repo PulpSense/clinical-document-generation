@@ -1,3 +1,5 @@
+> Superseded by spec #103. Historical #91/#92 migration plan; no runtime rule registry or migration requirement remains. See [current cleanup boundary](spec-103-cleanup.md).
+
 # Condition authority migration inventory
 
 Spec #91; foundation #92. This is a migration map, not a declaration that all

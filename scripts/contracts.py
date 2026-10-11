@@ -2351,9 +2351,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
     for requirement in requirements:
         if not _valid_required_value(requirement.field, required_input_value(reference, requirement)):
             findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input is missing.", "required": requirement.label or requirement.field})
-        signatures = {_candidate_signature(value) for value in candidates.get(requirement.field, []) if _candidate_signature(value)}
-        if len(signatures) > 1:
-            findings.append({"category": "source-evidence", "field": requirement.field, "issue": "Required Source Input has conflicting source candidates.", "required": "One reviewer-selected value."})
     if branch != "Retrospective":
         prs_study_type = get_path(reference, "regulatory.prs.study_type")
         if meaningful(prs_study_type) and str(prs_study_type) not in PRS_STUDY_TYPES.values():
@@ -2363,24 +2360,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "issue": "PRS study type must be Observational or Interventional.",
                 "required": "Observational or Interventional.",
             })
-        for index, site in enumerate(get_path(reference, "sites", []) or []):
-            if not isinstance(site, Mapping):
-                continue
-            facility = site.get("facility")
-            if not isinstance(facility, Mapping):
-                continue
-            address = facility.get("address")
-            if not isinstance(address, str) or not re.search(r"[,;\n]", address):
-                continue
-            projection = facility_projection(facility)
-            if not projection["city"] or not projection["country"]:
-                findings.append({
-                    "category": "source-evidence",
-                    "field": f"sites[{index}].facility.address",
-                    "issue": "Supplied site address cannot be separated into PRS location components.",
-                    "required": "Provide the site city and country as explicit facility fields; include state and postal code when supplied.",
-                })
-    sample_size = _sample_size_signature(get_path(reference, "population.sample_size"))
     for evidence_path in ("population.sample_size_evidence", "statistics.sample_size_evidence"):
         rows = get_path(reference, evidence_path, [])
         if meaningful(rows) and not isinstance(rows, list):
@@ -2428,58 +2407,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                         "issue": "Sample-size evidence aliases contain conflicting values.",
                         "required": "One approved value for the column.",
                     })
-        evidence_sizes = {_sample_size_signature(row) for row in rows if _sample_size_signature(row)}
-        if sample_size and any(value != sample_size for value in evidence_sizes):
-            findings.append({"category": "source-evidence", "field": evidence_path, "issue": "Sample-size evidence conflicts with the approved planned sample size.", "required": "Evidence rows that use the same participant count as population.sample_size."})
-    combined_records = _sample_size_evidence_records(reference)
-    combined_evidence = [row for _path, _index, row in combined_records]
-    if branch != "Retrospective" and combined_evidence:
-        present_columns = {
-            key
-            for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
-            if any(_table_value(row, key, aliases) for row in combined_evidence)
-        }
-        detailed_present = set(DETAILED_SAMPLE_SIZE_COLUMNS) & present_columns
-        legacy_present = set(LEGACY_SAMPLE_SIZE_COLUMNS) & present_columns
-        schema = DETAILED_SAMPLE_SIZE_COLUMNS if detailed_present else LEGACY_SAMPLE_SIZE_COLUMNS
-        missing = [column for column in schema if column not in present_columns]
-        if missing:
-            findings.append({
-                "category": "source-evidence",
-                "field": "statistics.sample_size_evidence",
-                "issue": "Sample-size evidence is missing required table columns: " + ", ".join(missing),
-                "required": "A complete detailed evidence schema or the complete approved legacy evidence schema.",
-            })
-        if detailed_present and legacy_present:
-            findings.append({
-                "category": "source-evidence",
-                "field": "statistics.sample_size_evidence",
-                "issue": "Sample-size evidence mixes detailed and legacy table schemas.",
-                "required": "Use one complete approved sample-size evidence schema per study.",
-            })
-        column_aliases = {
-            key: aliases for key, _label, aliases in SAMPLE_SIZE_EVIDENCE_COLUMNS
-        }
-        aggregate_labels = {"average", "pooled", "combined", "overall"}
-        for evidence_path, source_index, row in combined_records:
-            allowed_blanks: set[str] = set()
-            if schema == DETAILED_SAMPLE_SIZE_COLUMNS:
-                label = _table_value(row, "study", column_aliases["study"]).casefold()
-                if label in aggregate_labels:
-                    allowed_blanks = {"timepoint", "se"}
-            row_missing = [
-                column
-                for column in schema
-                if column not in allowed_blanks
-                and not _table_value(row, column, column_aliases[column])
-            ]
-            if row_missing:
-                findings.append({
-                    "category": "source-evidence",
-                    "field": f"{evidence_path}.{source_index}",
-                    "issue": "Sample-size evidence row is missing required values: " + ", ".join(row_missing),
-                    "required": "Populate every required cell; only aggregate rows may leave timepoint and SE blank.",
-                })
     for path in ("procedures.visit_schedule", "procedures.visit_schedule_table"):
         raw_visits = get_path(reference, path, [])
         seen_ids: set[str] = set()
@@ -2493,7 +2420,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                                  "required": "Reconcile duplicate approved visit identifiers; do not silently renumber.",
                                  "source_values": {path: copy.deepcopy(raw_visits)}})
             seen_ids.add(identifier)
-    findings.extend(timeline_findings(reference))
     if branch != "Retrospective":
         choice = str(get_path(reference, "meta.icf_template", "")).strip().casefold()
         if choice not in {"advarra", "sterling"}:
@@ -2531,19 +2457,6 @@ def input_findings(reference: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "semicolon-separated assess_safety_events/report_safety_events concepts."
                 ),
             })
-    count = get_path(reference, "design.number_of_sites")
-    sites = _site_group(reference, "site_facilities")
-    try:
-        count_number = int(str(count).strip())
-    except (TypeError, ValueError):
-        count_number = None
-    if branch != "Retrospective" and count_number is not None and sites and count_number != len(sites):
-        findings.append({"category": "source-evidence", "field": "design.number_of_sites", "issue": f"Site count is {count_number}, but {len(sites)} facility entries were approved.", "required": "Consistent site count and facility rows."})
-    design_text = str(get_path(reference, "design.study_design", "")).casefold()
-    if count_number == 1 and "multicenter" in design_text:
-        findings.append({"category": "source-evidence", "field": "design.study_design", "issue": "Study design says multicenter but the approved site count is one.", "required": "A consistent center description and site count."})
-    if count_number and count_number > 1 and ("single-center" in design_text or "single center" in design_text):
-        findings.append({"category": "source-evidence", "field": "design.study_design", "issue": "Study design says single-center but the approved site count is greater than one.", "required": "A consistent center description and site count."})
     return findings
 
 
@@ -2568,7 +2481,8 @@ def source_contract(
     if derive_prs_study_type and branch != "Retrospective" and not meaningful(raw_prs_study_type):
         if prs_study_type := _prs_study_type_from_design(normalized):
             set_path(normalized, "regulatory.prs.study_type", prs_study_type)
-    findings = [*alias_findings, *input_findings(normalized)]
+    # AI resolves semantic alias/candidate conflicts before the single approval.
+    findings = input_findings(normalized)
     if require_approval:
         if str(get_path(normalized, "approval.status", "")).casefold() != "approved":
             findings.append({"category": "approval", "field": "approval.status", "issue": "The current Source-of-Truth Markdown has not been explicitly approved.", "required": "Explicit approval of the current file."})
