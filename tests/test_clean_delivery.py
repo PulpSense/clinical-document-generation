@@ -42,7 +42,45 @@ def controlled_render(_root, revision, *_args, **_kwargs):
             'font_substitutions': {}, 'candidate': {'files': []}, 'render': render, 'findings': []}
 
 
-def deliver(tmp_path, monkeypatch, source, review=None, draft=None, render=None):
+def with_material_repair(review, draft):
+    """Pair optional polish with an actual essential repair in controlled replays."""
+    intro_requests = []
+    content_reviews = []
+
+    def material_draft(request):
+        response = draft(request)
+        if request.get('construction_repair'):
+            return response
+        intro = next((row for row in response.get('section_results', [])
+                      if row.get('section_id') == 'introduction'), None)
+        if intro:
+            intro_requests.append(request['request_id'])
+            if len(intro_requests) == 1:
+                intro['paragraphs'][0]['text'] += ' Participants are assigned randomly to an experimental treatment.'
+        return response
+
+    def material_review(request):
+        response = review(request)
+        if request['task'] != 'clinical_content_verification':
+            return response
+        content_reviews.append(request['request_id'])
+        if len(content_reviews) == 1:
+            response['status'] = 'blocked'
+            response['findings'].append({
+                'finding_id': 'unsupported-treatment-assignment', 'category': 'content',
+                'artifact': 'protocol', 'target_ids': ['introduction'], 'check': 'source_supported',
+                'material': True, 'contradiction': True,
+                'issue': 'The Introduction invents experimental randomized treatment assignment.',
+                'recommended_action': 'Use the approved background without inventing treatment assignment.',
+            })
+            for row in response['section_assessments']:
+                if row['section_id'] == 'introduction': row['status'] = 'blocked'
+        return response
+
+    return material_review, material_draft
+
+
+def deliver(tmp_path, monkeypatch, source, review=None, draft=None, render=None, generate_options=None):
     monkeypatch.setattr(workflow, 'render_assurance', render or controlled_render)
     reference = tmp_path / 'reference/study.reference.json'
     reference.parent.mkdir(parents=True)
@@ -51,7 +89,8 @@ def deliver(tmp_path, monkeypatch, source, review=None, draft=None, render=None)
     assert prepared['status'] == 'awaiting_approval', prepared
     approved = workflow.approve(tmp_path, approved_by='controlled-fixture-owner')
     revision = tmp_path / 'revisions' / approved['revision_id']
-    result = workflow.generate(tmp_path, require_promoted_runtime=False)
+    options = {'require_promoted_runtime': False, **(generate_options or {})}
+    result = workflow.generate(tmp_path, **options)
     # A finite replay guard catches an accidental retry cycle without changing
     # the production deadline or repair policy.
     for _ in range(12):
@@ -64,7 +103,7 @@ def deliver(tmp_path, monkeypatch, source, review=None, draft=None, render=None)
             path = revision / request['response_path']
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(response))
-        result = workflow.generate(tmp_path, require_promoted_runtime=False)
+        result = workflow.generate(tmp_path, **options)
     return result, revision
 
 

@@ -35,6 +35,7 @@ from contracts import (
     contextual_clinical_boilerplate,
     get_path,
     finding_requires_repair,
+    canonical_review_surface,
     narrative_review_finding,
     icf_contract,
     icf_summary_obligations,
@@ -57,7 +58,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v20-construction-prose"
+PROMPT_VERSION = "section-drafting-v21-presentation-delivery"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py")
 
@@ -595,7 +596,7 @@ def _construction_finding_source(finding: Any) -> Mapping[str, Any] | None:
         return None
     source = finding.get('verification_source_finding') or finding
     if (not isinstance(source, Mapping) or finding.get('recovery_class') != 'deterministic_structure_defect'
-            or source.get('surface') != 'document_shell'
+            or canonical_review_surface(source.get('surface')) != 'document_shell'
             or not all(source.get(flag) is False for flag in (
                 'material', 'safety_critical', 'contradiction',
                 'obscures_required_information', 'materially_unusable'))):
@@ -2748,10 +2749,12 @@ def ingest_responses(revision_dir: Path, expected_governing: Mapping[str, Any] |
             finding for finding in response_findings
             if finding_requires_repair(finding)
         ]
-        if blocking_response_findings:
-            findings.extend(blocking_response_findings)
+        if blocking_response_findings or request.get('construction_repair') and response_findings:
+            # A rejected optional polish is closed and retained for audit too.
+            # It must neither be accepted nor keep the request pending forever.
+            findings.extend(response_findings if request.get('construction_repair') else blocking_response_findings)
             rejected = revision_dir / "hermes/rejected" / response_path.name
-            _write_json(rejected, {"request": request_path.name, "findings": blocking_response_findings})
+            _write_json(rejected, {"request": request_path.name, "findings": response_findings})
             continue
         if not accepted:
             continue

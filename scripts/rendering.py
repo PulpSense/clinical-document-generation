@@ -824,9 +824,9 @@ def _study_descriptor(reference: Mapping[str, Any]) -> str:
         topic = re.split(r"\s*[—–:]\s*", intervention_type, maxsplit=1)[-1].strip()
         if topic.casefold() in {"medical device", "device"}:
             description = f"{branch} observational study involving a medical device"
-        elif topic:
-            description = f"{branch} observational study of {topic}"
         else:
+            # The intervention type is an administrative category, not a
+            # clinical subject. A generic descriptor is accurate for any input.
             description = f"{branch} observational study"
     else:
         description = " ".join(part for part in (branch, registry_type, "study") if part)

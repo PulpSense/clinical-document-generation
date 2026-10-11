@@ -73,6 +73,49 @@ def finding_requires_repair(finding: Mapping[str, Any]) -> bool:
     return finding.get("publication_disposition") != "warning"
 
 
+def canonical_review_surface(value: Any) -> str:
+    surface = re.sub(r'[\s-]+', '_', str(value or '').strip().casefold())
+    return {'shell': 'document_shell', 'document_body': 'document_shell',
+            'body': 'document_shell', 'prose': 'narrative'}.get(surface, surface)
+
+
+def reviewed_presentation_only(finding: Mapping[str, Any]) -> bool:
+    """Interpret an authenticated review, never a deterministic finding producer.
+
+    Explicit harm assessments govern presentation. Essential checks and unknown
+    checks retain their authority even when a response claims harmlessness.
+    """
+    if not all(finding.get(flag) is False for flag in (
+        'material', 'safety_critical', 'contradiction',
+        'obscures_required_information', 'materially_unusable',
+    )) or finding.get('source_clarification_required'):
+        return False
+    category = finding.get('category')
+    if not isinstance(category, str) or category not in {'content', 'editorial'} or finding.get('code'):
+        return False
+    check = str(finding.get('check') or '').strip().casefold()
+    surface = canonical_review_surface(finding.get('surface'))
+    targets = finding.get('target_ids')
+    artifact = finding.get('artifact')
+    if not isinstance(artifact, str) or artifact not in {'protocol', 'icf', 'study.xml'}:
+        return False
+    shell = (surface == 'document_shell' and artifact in {'protocol', 'icf'}
+             and targets == [f"{finding['artifact']}.shell"])
+    return bool(
+        check in {'editorial_relevance', 'concept_repetition'}
+        or (check == 'substantive' and shell)
+    )
+
+
+def internal_presentation_note(finding: Mapping[str, Any]) -> bool:
+    """Recognize the effective disposition of an already authenticated review."""
+    source = finding.get('verification_source_finding')
+    return (finding.get('code') == 'nonmaterial-presentation'
+            and finding.get('publication_disposition') == 'warning'
+            and not finding.get('source_clarification_required')
+            and isinstance(source, Mapping) and reviewed_presentation_only(source))
+
+
 def recovery_finding(
     finding: Mapping[str, Any],
     recovery_class: str,

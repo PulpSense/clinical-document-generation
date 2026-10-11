@@ -433,25 +433,26 @@ timing, and values before release.
 - Repairable post-approval drafting, deterministic construction, layout, and
   reviewer-response failures retry within the one persisted 45-minute Desktop
   operation deadline. There is no fixed per-target, reviewer, or complete-review-set cap,
-  except localized construction prose editing (at most three proposals per stable
+  except optional construction prose polishing (one proposal per stable
   renderer passage) and the Desktop-parent visual callback: after its initial callback, exactly one
   unchanged-request parent retry is permitted, with callback consumption persisted per exact request across process resume, before missing or invalid response evidence
   becomes `missing_parent_visual_review_response`.
 - Invalid draft: retry only failed section IDs in their existing batch.
 - Post-approval source-shortfall response: reject it as an invalid draft and retry only the affected section using approved evidence and its listed Fixed Clinical Boilerplate. Never reopen reviewer intake.
 - Content contradiction: retry only implicated sections unless the approved source conflicts.
-- Generated display prose: when an independent reviewer identifies a nonmaterial
+- Generated display prose: during an essential repair, when an independent reviewer identifies a nonmaterial
   shell wording defect, the workflow may issue a `section_drafting` request with
   `construction_repair`. Follow its exact paragraph, scoped approved evidence and
   response contract. Return one corrected plain paragraph; preserve quantities,
   units, negations and meaning. The renderer registers eligible prose positively;
   retained clauses, headings, tables, signatures and XML are outside this editor.
   Accepted corrections persist across candidate rebuilding. Unchanged or invalid
-  proposals consume the three-proposal allowance, without reopening intake.
+  proposals close the optional edit without reopening intake or blocking delivery.
   Changes elsewhere in a document do not establish progress on that passage.
   Rerender accepted corrections and obtain fresh complete content and every-page
-  visual reviews before delivery. A failed proposal or exhausted allowance does
-  not approve the candidate or authorize a blind fresh run.
+  visual reviews before delivery, including after a rejected or unchanged proposal.
+  Only independently confirmed harmless presentation notes may remain internally;
+  a failed proposal never waives an essential failure or authorizes a blind fresh run.
 - Visual defect: localize the exact document, page, element, check, and layout
   target; apply the narrowest untried safe Word-native strategy; rebuild the
   affected artifact; and rerun rendered-page verification.
@@ -580,7 +581,7 @@ Font evidence is tri-state. `available` preserves the declared font; `missing` s
 - Sterling output must satisfy `references/sterling-clause-contract.json`. Validate substantive body language and section placement, not headings or signatures alone. Insert conditional or source-dependent clauses only when their declared approved-input trigger is present; never retain an untriggered template option or invent legal, regulatory, payment, injury, privacy, authorization, or contact terms. Exact governed clauses may be moved intact to repair placement, but a materially altered or missing safeguard requires targeted redrafting or blocks delivery.
 - Protocol templates provide the shell and design. Accepted source-bound Section Drafts replace every clinical leaf body; client-example study facts are never reused.
 - ICF templates retain their applicable client regulatory and consent language. Every accepted ICF Section Draft must also be visible, while example-study eye, cataract, intervention, cost, payment, or alternative-treatment statements are removed unless the approved source itself supports them.
-- ICF section ownership is template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Introduction summarizes approved background and the evidence gap without repeating a speculative comparison for the untested combination; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Section 15 prose briefly introduces its source-derived table and only genuinely unallocated notes. Study Completion states the supplied closeout timeline and defines a completion trigger only when supplied, without repeating visits or the exit form. Summary of benefits owns potential clinical benefit; Section 17 owns payment and reimbursement. General Statistical Considerations states a source-supported interpretation point without repeating endpoint methods. Short role-specific references are allowed. Repetition heuristics request independent meaning and readability review. Accept valid stylistic alternatives; correct confirmed editorial defects through their owning section before final review.
+- ICF section ownership is template-family specific: KEY INFORMATION is a concise independent summary. In Sterling, BACKGROUND owns context, comparative evidence, the evidence gap, and rationale, while PURPOSE owns only a concise purpose, hypothesis, and primary-endpoint statement. The Advarra authority has no standalone BACKGROUND heading, so its PURPOSE section owns concise approved background context before the same purpose, hypothesis, and primary-endpoint content. PROCEDURES owns detailed activities; DURATION owns timing. Protocol General Information is a compact synopsis; Introduction summarizes approved background and the evidence gap without repeating a speculative comparison for the untested combination; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Methods owns what is measured, when, and how; Analysis Data Sets owns population/dataset inclusion; Statistical Methodology owns analysis. Section 15 prose briefly introduces its source-derived table and only genuinely unallocated notes. Study Completion states the supplied closeout timeline and defines a completion trigger only when supplied, without repeating visits or the exit form. Summary of benefits owns potential clinical benefit; Section 17 owns payment and reimbursement. General Statistical Considerations states a source-supported interpretation point without repeating endpoint methods. Short role-specific references are allowed. Repetition heuristics request independent meaning and readability review. Accept valid stylistic alternatives. Repair material editorial defects through their owning section; retain explicitly harmless presentation observations internally under the delivery policy below.
 - `meta.date` defaults once, during `prepare`, to `dd MMM yyyy`. `meta.version` remains blank unless the approved source supplies it.
 
 ## PRS XML authority
@@ -623,13 +624,26 @@ finding stops at `source_review`; preserve the approved source and obtain the
 missing source decision before proceeding. Review every section and every
 rendered page even when code passes.
 
-Correct confirmed prose and editorial defects through drafting, deterministic
+Correct material prose defects through drafting, deterministic
 cell/mapping and document shell defects through construction, and layout defects
 through rendering. Use `protocol.shell` or `icf.shell` for running headers and
 footers; identify the exact visible passage and location.
 Verify changed output and obtain final independent exact-artifact review; an
 attempted correction alone never establishes success. Reviewers cannot waive an
 objective factual, exact-text, structure, integrity, or delivery failure.
+
+For a harmless presentation observation, set the known review check and all five
+harm flags explicitly false: `material`, `safety_critical`, `contradiction`,
+`obscures_required_information`, and `materially_unusable`. Keep the exact passage
+and rationale in the review. Such notes pass their section and remain in the
+internal audit without client warnings or document annotations. Registered
+generated prose may receive one scoped polish alongside an already required
+essential repair, followed by fresh full reviews. Once essential checks pass,
+deliver immediately without another cosmetic handoff or review cycle;
+ineffective polish does not veto the complete verified package. This does not
+apply to missing facts, consent safeguards, source conflicts, objective failures,
+unknown concerns or incomplete content/page reviews. Ordinary stylistic
+preferences need no finding.
 
 If a passed result contains `warnings`, disclose each meaningful remaining
 limitation with its `document_locations` and plain-language concern, outside the

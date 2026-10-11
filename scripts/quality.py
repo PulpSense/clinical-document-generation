@@ -39,6 +39,7 @@ from prs_xml import screening_interval_requirement, validate_output as validate_
 from rendering import audit_docx, refresh_toc_from_pdf, rendered_section_snapshot, template_paths
 from contracts import benefit_context_contract, document_table_reference, source_text_values
 from drafting import merged_drafts
+from contracts import canonical_review_surface, reviewed_presentation_only, internal_presentation_note
 
 
 def _review_evidence_finding(artifact: str, section_id: str) -> dict[str, Any]:
@@ -78,7 +79,7 @@ UNCERTAINTY_CODES = {
     "protocol-concept-repetition", "protocol-exact-repetition", "icf-concept-repetition",
     "visible-duplicate-word", "icf-exact-generated-duplication", "draft-repetition-uncertainty",
 }
-INTERNAL_DIAGNOSTIC_CODES = {"sterling-clause-word-goal"}
+INTERNAL_DIAGNOSTIC_CODES = {"sterling-clause-word-goal", "nonmaterial-presentation"}
 TRANSIENT_REVIEW_STATUSES = {"retryable_error", "transient_error", "unavailable", "temporarily_unavailable"}
 _MAC_FONT_NAMES: set[str] | None = None
 _WINDOWS_FONT_NAMES: set[str] | None = None
@@ -5180,13 +5181,16 @@ def source_routing_assessment_errors(request: Mapping[str, Any], response: Mappi
                 errors.append(f"{row['obligation_id']} must quote exact raw source and this destination's actual passage.")
         reported = response.get("findings")
         sections = response.get("section_assessments")
-        companion = any(isinstance(item.get("target_ids"), list)
-                        and item.get("artifact") == obligation["artifact"]
-                        and obligation["section_id"] in item.get("target_ids", [])
-                        for item in reported if isinstance(item, Mapping)) if isinstance(reported, list) else False
+        affected = [item for item in reported if isinstance(item, Mapping)
+                    and isinstance(item.get("target_ids"), list)
+                    and item.get("artifact") == obligation["artifact"]
+                    and obligation["section_id"] in item["target_ids"]] if isinstance(reported, list) else []
+        companion = any(not reviewed_presentation_only(item) for item in affected)
+        presentation_only = bool(affected) and not companion
         section_passed = any(item.get("artifact") == obligation["artifact"]
                              and item.get("section_id") == obligation["section_id"]
-                             and item.get("status") == "passed"
+                             and (item.get("status") == "passed"
+                                  or (item.get("status") in ("blocked", "failed") and presentation_only))
                              for item in sections if isinstance(item, Mapping)) if isinstance(sections, list) else False
         defects = any(isinstance(fact, Mapping) and fact.get("disposition") == "defect" for fact in facts)
         if (row["status"] == "passed" and (not section_passed or defects or companion)
@@ -5490,7 +5494,8 @@ def verification_recovery_request_findings(
     if originating_finding is not None and originating_finding.get("recovery_class") in {
         "drafting_defect", "visual_defect", "deterministic_structure_defect",
     }:
-        if str(response.get("status") or "").casefold() not in {"blocked", "failed"}:
+        optional = internal_presentation_note(originating_finding)
+        if str(response.get("status") or "").casefold() not in ({"passed", "blocked", "failed"} if optional else {"blocked", "failed"}):
             return issue("verification_response_invalid", "A substantive verification-derived recovery requires a blocked or failed response.")
         match_keys = (
             "issue", "target_ids", "artifact", "page", "check", "element", "code",
@@ -5577,10 +5582,11 @@ def create_verification_requests(
     content_instructions += (
         " Findings must include target_ids for affected section IDs. Every finding must include a unique finding_id "
         "made from ASCII letters or digits separated only by single hyphens or underscores. Confirmed prose "
-        "omissions, excessive repetition and editorial defects require correction through drafting. Do not "
+        "omissions and material editorial defects require correction through drafting. Do not "
         "report valid stylistic alternatives as defects. Document shell, header and footer findings belong to "
-        "the code-owned protocol.shell or icf.shell section and require construction repair. Keep findings at top-level status blocked until repaired "
-        "and independently verified; resolved internal findings do not belong in the delivery message. "
+        "the code-owned protocol.shell or icf.shell section. Keep essential findings blocked until repaired "
+        "and independently verified. Explicitly harmless presentation observations remain internal and do not "
+        "veto delivery; optional polishing joins a reconstruction only when an essential repair already requires it. "
         "Safety, invention, contradiction, source-integrity, rendering, security, package, ledger and delivery "
         "failures remain blocking. Approved source takes precedence over "
         "applicable Fixed Clinical Boilerplate and retained template language; authorization is not a blanket "
@@ -5654,8 +5660,9 @@ def create_verification_requests(
         "study-specific privacy practices or a source contradiction. A document-control date may "
         "default from approval, while an unknown version must "
         "remain blank and must not be failed merely for "
-        "being unknown. Set top-level status exactly `passed` when there are no findings or exactly `blocked` when "
-        "there is one or more findings; do not use `failed` as the top-level status. Every section and cross-document "
+        "being unknown. Set top-level status exactly `passed` when essential checks pass, including when only "
+        "explicitly harmless presentation observations remain; use `blocked` for essential failures. "
+        "Do not use `failed` as the top-level status. Every section and cross-document "
         "assessment must still be present, using `passed` or `failed` for its individual status. For Protocol "
         "concept repetition, use protocol_concept_ownership rather than a generic similarity percentage. A finding "
         "must identify concept_id, primary_section, secondary_section, relevant primary_paragraphs and "
@@ -5685,7 +5692,10 @@ def create_verification_requests(
         "endpoint methods. A clinically unusable section is material; minor wording preferences are "
         "not findings. For a nonmaterial editorial_relevance finding, explicitly set material, safety_critical, "
         "contradiction, obscures_required_information and materially_unusable to false, and give affected_passage "
-        "and recommended_action. Confirmed defects are repaired automatically and reviewed again. "
+        "and recommended_action. Harmless presentation observations are internal quality notes and do not "
+        "fail their section or the package. During an already required repair a registered display passage may receive one best-effort polish; "
+        "an ineffective optional edit is retained internally, followed by fresh complete review. "
+        "Confirmed material defects are repaired automatically and reviewed again. "
         "Identify missing safeguards or unsupported claims using the corresponding content check. "
         "Only a meaningful remaining external limitation may use check client_limitation with "
         "remaining_limitation true, limitation_kind external_dependency or client_environment, "
@@ -5918,7 +5928,8 @@ def _blocking_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, 
 
 def _warning_findings(findings: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [
-        {key: value for key, value in finding.items() if key != "verification_source_finding"}
+        {key: value for key, value in finding.items()
+         if key != "verification_source_finding" or finding.get('code') == 'nonmaterial-presentation'}
         for finding in findings if _is_publication_warning(finding)
     ]
 
@@ -5997,7 +6008,7 @@ def _lexical_review_cautions(
             "diagnostics": diagnostics,
         } if diagnostics else warning.get("source_excerpt"))
         if not source_evidence:
-            source_evidence = {key: get_path(reference, key) for key in spec.evidence} if spec else reference
+            source_evidence = {key: get_path(reference, key) for key in spec.evidence} if spec and spec.evidence else reference
         template_excerpt = ""
         if warning.get("clause_id"):
             clause_contract = sterling_clause_contract(Path(__file__).resolve().parents[1])
@@ -6441,8 +6452,32 @@ def validate_verifications(
             }, "verifier_transient"))
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "transient", "contracted_template_bundle": request.get("contracted_template_bundle")}
             continue
+        if not isinstance(response.get('status'), str) or response['status'] not in {'passed', 'blocked', 'failed'}:
+            findings.append(recovery_finding({
+                'category': 'reviewer-transient', 'field': 'status',
+                'target_ids': [verification_target], 'verification_request_id': request['request_id'],
+                'issue': 'Independent review must use a recognized terminal status.',
+            }, 'verifier_transient'))
+            continue
         raw_issues = response.get("findings")
         issues: list[Any] = list(raw_issues) if isinstance(raw_issues, list) else []
+        malformed_finding = any(
+            isinstance(item, Mapping) and (
+                any(key in item and not isinstance(item[key], str)
+                    for key in ('category', 'artifact', 'check', 'surface'))
+                or 'target_ids' in item and (
+                    not isinstance(item['target_ids'], list)
+                    or any(not isinstance(target, str) for target in item['target_ids'])
+                )
+            ) for item in issues
+        )
+        if malformed_finding:
+            findings.append(recovery_finding({
+                'category': 'reviewer-transient', 'field': 'findings',
+                'target_ids': [verification_target], 'verification_request_id': request['request_id'],
+                'issue': 'Review finding labels must be strings and target_ids must be a list of strings.',
+            }, 'verifier_transient'))
+            continue
         if response.get("status") != "passed" or issues:
             for item in issues or [{"issue": "Verifier did not pass the artifact."}]:
                 source = item if isinstance(item, Mapping) else {"issue": item}
@@ -6465,6 +6500,8 @@ def validate_verifications(
                     "surface", "table_ids",
                 ):
                     if key in source: finding[key] = source[key]
+                if 'surface' in finding:
+                    finding['surface'] = canonical_review_surface(finding['surface'])
                 if category == "visual":
                     expected_artifacts = {
                         str(artifact.get("artifact"))
@@ -6634,6 +6671,15 @@ def validate_verifications(
                                     if _text(source.get("recommended_action")) else {}
                                 ),
                             }, recovery_class))
+        # Apply disposition only after authenticated response and governed target
+        # validation. The raw reviewer evidence remains unchanged and auditable.
+        for finding in findings:
+            source = finding.get('verification_source_finding')
+            if (finding.get('verification_request_id') == request['request_id']
+                    and finding.get('recovery_class') in {'drafting_defect', 'deterministic_structure_defect'}
+                    and isinstance(source, Mapping) and reviewed_presentation_only(source)):
+                finding.update(code='nonmaterial-presentation', publication_disposition='warning',
+                               severity='internal', authority='independent_review')
         for artifact in request.get("artifacts", []):
             if request["task"] == "clinical_content_verification":
                 path = revision_dir / str(artifact.get("path"))
@@ -6704,8 +6750,9 @@ def validate_verifications(
                 for item in valid_section_rows
             }
             passing_finding_targets = sorted(
-                target for target in reported_targets
-                if section_status.get(target) == "passed"
+                target for reported in reported_findings if not reviewed_presentation_only(reported)
+                for target in (reported['target_ids'] if isinstance(reported.get('target_ids'), list) else [])
+                if isinstance(target, str) and section_status.get(target) == "passed"
             )
             if passing_finding_targets:
                 findings.append(recovery_finding({
@@ -6791,6 +6838,7 @@ def validate_verifications(
                             and finding.get("check") in {"source_supported", "no_invention", "substantive"}):
                         finding["source_clarification_required"] = True
                         finding["source_resolution"] = decision
+                        finding['publication_disposition'] = 'blocking'
         evidence[evidence_key] = {
             "uncertainty_resolutions": resolution_records if not resolution_errors else [],
             "source_routing_assessments": (response.get("source_routing_assessments", [])

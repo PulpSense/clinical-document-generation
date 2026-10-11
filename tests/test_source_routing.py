@@ -353,6 +353,42 @@ def test_independent_routing_audit_accepts_qualified_paraphrase():
     assert not quality.source_routing_assessment_errors(audit_request(), audit_response())
 
 
+def presentation_note(target='icf.benefits', artifact='icf'):
+    return {
+        'finding_id': 'benefit-wording', 'category': 'editorial', 'check': 'editorial_relevance',
+        'artifact': artifact, 'surface': 'narrative', 'target_ids': [target],
+        'issue': 'The qualified benefit could be expressed more concisely.',
+        'material': False, 'safety_critical': False, 'contradiction': False,
+        'obscures_required_information': False, 'materially_unusable': False,
+    }
+
+
+@pytest.mark.parametrize('section_status', ['passed', 'blocked', 'failed'])
+def test_routing_audit_keeps_preserved_facts_separate_from_harmless_wording(section_status):
+    response = audit_response()
+    response['findings'] = [presentation_note()]
+    response['section_assessments'][0]['status'] = section_status
+    assert not quality.source_routing_assessment_errors(audit_request(), response)
+
+
+@pytest.mark.parametrize('mutation', ['material', 'missing-flag', 'unknown-check', 'source-check',
+                                     'fact-defect', 'false-failure', 'missing-section', 'missing-source'])
+def test_routing_presentation_note_cannot_replace_required_fact_verification(mutation):
+    response = audit_response()
+    note = presentation_note()
+    response['findings'] = [note]
+    response['section_assessments'][0]['status'] = 'blocked'
+    if mutation == 'material': note['material'] = True
+    elif mutation == 'missing-flag': note.pop('contradiction')
+    elif mutation == 'unknown-check': note['check'] = 'unknown'
+    elif mutation == 'source-check': note['check'] = 'source_supported'
+    elif mutation == 'fact-defect': response['source_routing_assessments'][0]['facts'][0]['disposition'] = 'defect'
+    elif mutation == 'false-failure': response['source_routing_assessments'][0]['status'] = 'failed'
+    elif mutation == 'missing-section': response['section_assessments'] = []
+    else: response['source_routing_assessments'][0]['facts'][0]['source_excerpt'] = 'Invented benefit'
+    assert quality.source_routing_assessment_errors(audit_request(), response)
+
+
 @pytest.mark.parametrize('mutation', ['bare_pass', 'wrong_section', 'fake_source', 'ignored_defect', 'duplicate', 'malformed_id'])
 def test_independent_routing_audit_rejects_missing_or_unbound_evidence(mutation):
     request, response = audit_request(), audit_response()
@@ -407,9 +443,20 @@ def routed_response(request):
 
 
 @pytest.mark.parametrize('branch,family', BRANCHES)
-def test_public_lifecycle_preserves_routed_facts_and_clean_delivery(tmp_path, monkeypatch, branch, family):
+@pytest.mark.parametrize('harmless_note', [False, True])
+def test_public_lifecycle_preserves_routed_facts_and_clean_delivery(tmp_path, monkeypatch, branch, family, harmless_note):
     source = source_for_routing(branch, family)
-    result, revision = deliver(tmp_path, monkeypatch, source, draft=routed_response)
+    def review(request):
+        response = acceptance_verification(request)
+        if harmless_note and request['task'] == 'clinical_content_verification':
+            target = 'ethics' if branch == 'Retrospective' else 'risks-benefits.benefits'
+            response['status'] = 'blocked'
+            response['findings'] = [presentation_note(target, 'protocol')]
+            next(row for row in response['section_assessments']
+                 if row['artifact'] == 'protocol' and row['section_id'] == target)['status'] = 'blocked'
+        return response
+
+    result, revision = deliver(tmp_path, monkeypatch, source, draft=routed_response, review=review)
     assert result['status'] == 'passed', result
     assert not result.get('warnings')
     approved = json.loads((revision / 'approved-reference.json').read_text())

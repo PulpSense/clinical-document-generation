@@ -48,6 +48,7 @@ from quality import ReviewEvidenceError, audit_computed_protocol_fields, CERTIFI
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA
 from contracts import document_table_reference, protocol_table_contracts
+from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -7814,6 +7815,7 @@ def _complete_pending_recovery_attempts(
                     "deterministic_structure_defect",
                 }
                 and not made_progress
+                and not internal_presentation_note(finding)
             ):
                 no_progress.append({
                     **finding,
@@ -9076,6 +9078,7 @@ def generate(
         finding if finding.get("category") in {"source-evidence", "request-integrity"} or finding.get('recovery_class') == 'deterministic_structure_defect'
         else recovery_finding(finding, "drafting_defect")
         for finding in ingest_responses(revision_dir, expected_governing)
+        if finding_requires_repair(finding) or finding.get('category') == 'request-integrity'
     ]
     if drafting_findings:
         source_gaps = [item for item in drafting_findings if item.get("category") in {"source-evidence", "request-integrity"}]
@@ -9420,7 +9423,10 @@ def generate(
         if source_conflicts:
             return _repair_block(run_dir, "source_review", final_quality["findings"],
                                  candidate_outputs=_candidate_outputs(revision_dir))
-        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, final_quality["findings"], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
+        # Optional polish joins an already required reconstruction; a fully
+        # verified package never depends on another cosmetic handoff or review.
+        optional = _optional_construction_findings(revision_dir, final_quality, state)
+        return _quality_retry(run_dir, reference_path, working_reference, reference, revision_dir, attempts, [*final_quality["findings"], *optional], "quality", contracted_bundle=bundle, operation_deadline=operation_deadline, clock=clock, stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime)
     observe_stage("independent_verification")
     try:
         published = _publish(
@@ -9442,6 +9448,47 @@ def generate(
         }
     observe_stage("delivery")
     return published
+
+
+def _optional_construction_findings(
+    revision_dir: Path, final_quality: Mapping[str, Any], state: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Offer one polish only for exact, registered, generated display passages.
+
+    The final quality report has authenticated these observations. The repair
+    spec subsequently rechecks the archived bytes and native paragraph scope.
+    """
+    if not any(finding_requires_repair(finding)
+               and finding.get('recovery_class') in {
+                   'drafting_defect', 'deterministic_structure_defect', 'visual_defect',
+               } for finding in final_quality.get('findings') or []):
+        return []
+    build = _read(revision_dir / 'candidate-build.json')
+    rows = (build.get('document_report') or {}).get('artifacts') or []
+    selected = []
+    attempted = state.get('construction_editor_attempts') or {}
+    for finding in final_quality.get('internal_diagnostics') or []:
+        if not internal_presentation_note(finding) or finding.get('recovery_class') != 'deterministic_structure_defect':
+            continue
+        source = finding['verification_source_finding']
+        if canonical_review_surface(source.get('surface')) != 'document_shell':
+            continue
+        artifact = finding.get('artifact')
+        if finding.get('target_ids') != [f'{artifact}.shell']:
+            continue
+        matches = [passage for row in rows if row.get('artifact') == artifact
+                   for passage in row.get('construction_passages') or []
+                   if passage.get('text') == source.get('affected_passage')
+                   and passage.get('section_id') == f'{artifact}.shell']
+        if len(matches) != 1:
+            continue
+        document = revision_dir / f'candidate/{artifact}.docx'
+        if sum(p.text == source.get('affected_passage') for p in Document(document).paragraphs) != 1:
+            continue
+        key = f"{artifact}:{matches[0]['passage_id']}"
+        if int(attempted.get(key, 0)) == 0:
+            selected.append(dict(finding))
+    return selected
 
 
 def _save_recorded_handoff(revision_dir: Path, request_path: Path) -> None:

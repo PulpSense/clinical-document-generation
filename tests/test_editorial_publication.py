@@ -1,10 +1,9 @@
-"""Confirmed editorial defects are repaired before clean client-ready delivery."""
+"""Harmless editorial notes stay internal; material review still governs delivery."""
 import json
 from pathlib import Path
 
 import pytest
 import quality
-import workflow
 from rendering import protocol_section_snapshot, render_documents
 from test_handoff_quality import acceptance_verification
 
@@ -14,8 +13,8 @@ FAMILIES = [("Retrospective", "Advarra"), ("Prospective", "Advarra"),
             ("Ambispective", "Sterling")]
 
 
-def repetition_review(root, branch, template, render_report=None):
-    source = {"meta": {"study_type": branch, "icf_template": template}}
+def repetition_review(root, branch, template, render_report=None, approved_source=None):
+    source = approved_source or {"meta": {"study_type": branch, "icf_template": template}}
     paths = quality.create_verification_requests(root, source, render_report or {"artifacts": []})
     path = paths[0]
     for visual_path in paths[1:]:
@@ -47,10 +46,11 @@ def repetition_review(root, branch, template, render_report=None):
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES)
-def test_confirmed_repetition_cannot_publish_before_repair(tmp_path, monkeypatch, branch, template):
+def test_confirmed_harmless_repetition_does_not_veto_final_verification(tmp_path, monkeypatch, branch, template):
     from test_atomic_delivery import _publish_fixture
     # Byte sentinels isolate publication from clinical/visual content assessment.
-    # Real requests, artifact bindings, final review and atomic publication run.
+    # Real requests, artifact bindings and final review run; complete public
+    # delivery is covered by test_presentation_delivery.py.
     monkeypatch.setattr(quality, "deterministic_content_check", lambda *_args: [])
     run, revision, source = _publish_fixture(tmp_path)
     source["meta"].update(study_type=branch, icf_template=template)
@@ -63,24 +63,25 @@ def test_confirmed_repetition_cannot_publish_before_repair(tmp_path, monkeypatch
         build["render_report"]["artifacts"] = [row for row in build["render_report"]["artifacts"] if row["artifact"] == "protocol"]
     build_path.write_text(json.dumps(build))
     (revision / "approved-reference.json").write_text(json.dumps(source))
-    repetition_review(revision, branch, template, build["render_report"])
+    repetition_review(revision, branch, template, build["render_report"], approved_source=source)
     report = quality.quality_report(revision, source, build["render_report"], None)
-    assert report["status"] == "blocked"
+    assert report["status"] == "passed", report
     assert report["warnings"] == []
-    assert any(item.get("recovery_class") == "drafting_defect" for item in report["findings"])
-    with pytest.raises(RuntimeError, match="final verification is incomplete"):
-        workflow._publish(run, revision, source, report)
+    assert report['findings'] == []
+    assert any(item.get('code') == 'nonmaterial-presentation' for item in report['internal_diagnostics'])
+    assert quality.final_exact_artifact_review_findings(revision, source, build['render_report'], report) == []
     assert (run / "output/protocol.docx").read_bytes() == b"old protocol"
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES)
-def test_structured_minor_repetition_routes_to_repair_without_optional_labels(tmp_path, branch, template):
+def test_structured_minor_repetition_is_internal_without_optional_labels(tmp_path, branch, template):
     path, _, _ = repetition_review(tmp_path, branch, template)
     findings, _ = quality.validate_verifications(tmp_path, request_paths=[path])
     assert len(findings) == 1
     assert findings[0]["recovery_class"] == "drafting_defect"
     assert findings[0]["target_ids"] == ["analysis-plan.considerations"]
-    assert not quality.verification_response_is_complete(tmp_path, path)
+    assert findings[0]['publication_disposition'] == 'warning'
+    assert quality.verification_response_is_complete(tmp_path, path)
 
 
 @pytest.mark.parametrize("branch,template", FAMILIES[1:])
@@ -98,7 +99,7 @@ def test_icf_editorial_repetition_is_distinct_from_material_cost_disclosure(tmp_
         "obscures_required_information": False, "materially_unusable": False,
     }]
     response_path.write_text(json.dumps(response))
-    assert not quality.verification_response_is_complete(tmp_path, path)
+    assert quality.verification_response_is_complete(tmp_path, path) is (not material)
 
 
 @pytest.mark.parametrize("mutation", ["material", "safety", "unknown", "wrong-owner", "missing-flag", "stale"])

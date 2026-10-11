@@ -10,7 +10,7 @@ import quality
 import drafting
 import rendering
 import workflow
-from test_clean_delivery import deliver
+from test_clean_delivery import deliver, with_material_repair
 from test_handoff_quality import acceptance_verification
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,27 +99,31 @@ def test_generated_display_prose_is_repaired_persisted_and_fully_reviewed(tmp_pa
             return response
         return drafting.recorded_acceptance_response(request)
 
+    review, draft = with_material_repair(review, draft)
     result, revision = deliver(tmp_path, monkeypatch, source, review=review, draft=draft)
-    if repair_mode not in {'faithful', 'multiple_findings', 'eventual'}:
+    if repair_mode == 'changed_meaning':
         assert result['status'] != 'passed', result
         assert not result.get('client_outputs') and not (tmp_path / 'output/icf.docx').exists()
-        assert len(repairs) <= 3
-        if repair_mode == 'changed_meaning':
-            assert len(reviews) == 2  # A syntactically valid edit still needs semantic review.
-        else:
-            assert len(repairs) == 3 and len(reviews) == 1
+        assert len(repairs) == 1 and len(reviews) == 2
         return
     assert result['status'] == 'passed', result
-    assert len(repairs) == (2 if repair_mode == 'eventual' else 1)
+    assert len(repairs) == 1
     if repair_mode == 'multiple_findings': assert len(repairs[0]['findings']) == 4
     assert len(reviews) == 2
-    assert 'The study is expected to include 40 participants (planned).' in '\n'.join(
+    expected = ('The study is expected to include 40 participants (planned).'
+                if repair_mode in {'faithful', 'multiple_findings'} else 'The study is expected to include 40 (planned).')
+    assert expected in '\n'.join(
         p.text for p in Document(tmp_path / 'output/icf.docx').paragraphs)
     assert json.loads((revision / 'approved-reference.json').read_text())['population']['sample_size'] == '40 (planned)'
     manifest = json.loads((tmp_path / result['manifest']).read_text())
     assert quality.final_exact_artifact_review_findings(
         revision, json.loads((revision / 'approved-reference.json').read_text()),
         json.loads((revision / 'candidate-build.json').read_text())['render_report'], manifest['quality']) == []
+    if repair_mode not in {'faithful', 'multiple_findings'}:
+        assert manifest['quality']['internal_diagnostics']
+        assert result['warnings'] == []
+        assert list((revision / 'hermes/rejected').glob('*.json'))
+        return
     # An on-disk correction is never trusted independently of its bound response.
     record_path = next((revision / 'hermes/accepted').glob('construction-*.json'))
     record = json.loads(record_path.read_text())
@@ -162,7 +166,7 @@ def test_unrelated_document_change_does_not_count_as_localized_shell_progress(tm
                 'finding_id': 'protected-shell-replay', 'category': 'content', 'artifact': 'icf',
                 'target_ids': ['icf.shell'], 'check': 'editorial_relevance', 'surface': 'document_shell',
                 'affected_passage': protected, 'issue': 'Controlled finding on protected template text.',
-                'material': False, 'safety_critical': False, 'contradiction': False,
+                'material': True, 'safety_critical': False, 'contradiction': False,
                 'obscures_required_information': False, 'materially_unusable': False,
             }]
             for row in response['section_assessments']:
@@ -253,6 +257,7 @@ def test_localized_repair_covers_each_document_family(tmp_path, monkeypatch, bra
         return response
 
     monkeypatch.setattr(workflow, 'render_documents', constructor)
+    review, draft = with_material_repair(review, draft)
     result, revision = deliver(tmp_path, monkeypatch, source, review=review, draft=draft)
     assert result['status'] == 'passed', result
     assert len(edits) == 1 and len(reviewed) == 2

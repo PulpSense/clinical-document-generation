@@ -212,6 +212,29 @@
           "test_source_routing.py::test_independent_source_mapping_defect_redrafts_and_rechecks_final_bytes"
         ]
       }
+    },
+    "presentation_delivery": {
+      "authority": "Authenticated independent review with five explicit false harm assessments; known presentation checks only",
+      "false_rejection_risk": "Optional wording improvements and synonymous reviewer surface labels must not veto otherwise verified complete delivery",
+      "duplicate_policy": "Shared presentation disposition owns classification; positive renderer provenance owns optional single-passage polish; final exact-artifact review remains mandatory",
+      "coverage": "test_presentation_delivery.py; test_construction_reliability.py; test_editorial_publication.py",
+      "authority_contract": {
+        "requirement": "Complete clean delivery with harmless presentation observations retained internally; material, integrity and incomplete-review failures remain blocking",
+        "evidence": "Authenticated exact reviewer response, explicit harm assessments, generated passage provenance, current complete content and page reviews",
+        "authority": "mixed",
+        "resolution_authority": "independent_source_grounded_review_for_meaning; deterministic_recheck_for_objective_defects",
+        "repair_owner": "construction_polish_for_registered_prose; essential_owner_for_material_defects"
+      },
+      "behavioral_evidence": {
+        "valid": [
+          "test_presentation_delivery.py::test_harmless_uneditable_observation_delivers_complete_clean_package",
+          "test_presentation_delivery.py::test_ineffective_optional_polish_finishes_fresh_reviews_and_delivers"
+        ],
+        "invalid": [
+          "test_presentation_delivery.py::test_presentation_policy_cannot_hide_essential_or_incomplete_review",
+          "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed"
+        ]
+      }
     }
   },
   "checks": [
@@ -749,8 +772,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "ingest_responses",
-      "code_sha256": "fbc9692faba399a8571997384c3252d9dab4802b7b8bd5598811f5b84659daf5",
-      "family": "evidence",
+      "code_sha256": "ee945a8105f65bffa483a277144d643f1fd447bad3d28d49c54425224d84a1ad",
+      "family": "presentation_delivery",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -760,7 +783,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
     },
     {
       "file": "scripts/drafting.py",
@@ -1095,15 +1119,19 @@
       "family": "source_routing",
       "file": "scripts/quality.py",
       "function": "source_routing_assessment_errors",
-      "code_sha256": "2700db255be1f64d7d62945ab11132965f4447fe249eff10c0e67cb162dd06ff",
+      "code_sha256": "adb3293bd778f0fffe61d7c9a1572996e3a6b42955a0118a14e17ea76257d881",
       "behavioral_evidence": {
         "valid": [
-          "test_source_routing.py::test_independent_routing_audit_accepts_qualified_paraphrase"
+          "test_source_routing.py::test_independent_routing_audit_accepts_qualified_paraphrase",
+          "test_source_routing.py::test_routing_audit_keeps_preserved_facts_separate_from_harmless_wording",
+          "test_source_routing.py::test_public_lifecycle_preserves_routed_facts_and_clean_delivery"
         ],
         "invalid": [
-          "test_source_routing.py::test_independent_routing_audit_rejects_missing_or_unbound_evidence"
+          "test_source_routing.py::test_independent_routing_audit_rejects_missing_or_unbound_evidence",
+          "test_source_routing.py::test_routing_presentation_note_cannot_replace_required_fact_verification"
         ]
-      }
+      },
+      "review_note": "Separate explicitly harmless presentation companions from factual routing failures; exact source/destination evidence and essential defects remain mandatory."
     },
     {
       "file": "scripts/quality.py",
@@ -1114,14 +1142,15 @@
     {
       "file": "scripts/quality.py",
       "function": "verification_recovery_request_findings",
-      "code_sha256": "090c86211267386bc226403cf243673d76dbc6b7ea2b88cbd85577fbe605fcfe",
-      "family": "review"
+      "code_sha256": "8dec02a695bae41da2f32f8ecc56a79266f9512f9c54653571a67628576975e6",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
     },
     {
-      "family": "review",
+      "family": "presentation_delivery",
       "file": "scripts/quality.py",
       "function": "create_verification_requests",
-      "code_sha256": "fea166c05d6baab49b2849662c60ae913ebf368d0971fd7381cec35c5398a7e3",
+      "code_sha256": "7ae0e68f3c4a4f72ac311686b1fec1f1912aa54fccb1fe1c0baaae9aa33db4b5",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1131,7 +1160,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
     },
     {
       "file": "scripts/quality.py",
@@ -1148,10 +1178,10 @@
       }
     },
     {
-      "family": "review",
+      "family": "presentation_delivery",
       "file": "scripts/quality.py",
       "function": "_lexical_review_cautions",
-      "code_sha256": "92482c94ba20f29dbce0743c9432404737478bd92f161902708d268de2dfcab2",
+      "code_sha256": "08db47f7bc6a036f590aa29be8bfdb8a76fb920c8e11c147b4c87eacfb03fd09",
       "authority_contract": {
         "authority": "mixed",
         "resolution_authority": "independent_source_grounded_review",
@@ -1160,12 +1190,13 @@
       },
       "behavioral_evidence": {
         "valid": [
-          "test_general_delivery_reliability.py::test_independent_clinical_inputs_deliver_all_reviewed_artifacts_cleanly"
+          "test_presentation_delivery.py::test_generated_cover_cautions_include_approved_display_evidence"
         ],
         "invalid": [
-          "test_general_delivery_reliability.py::test_real_omission_is_repaired_and_reverified_for_each_family"
+          "test_presentation_delivery.py::test_presentation_policy_cannot_hide_essential_or_incomplete_review"
         ]
-      }
+      },
+      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
     },
     {
       "file": "scripts/quality.py",
@@ -1218,8 +1249,9 @@
     {
       "file": "scripts/quality.py",
       "function": "validate_verifications",
-      "code_sha256": "6352d868d1d8def0fce5874c709c2d2404f742e1e1a1e65ec87bc66ff369756b",
-      "family": "review"
+      "code_sha256": "c5d2542f99023ed4646412514294a91e569e73c9b6ad147db5aa6c30ca92717c",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
     },
     {
       "file": "scripts/quality.py",
@@ -1603,8 +1635,9 @@
     {
       "file": "scripts/workflow.py",
       "function": "_complete_pending_recovery_attempts",
-      "code_sha256": "8fec4e97cbcaf1edd47637f76ab426d6f5940becbb17e96a8f52c601b3f7ba0a",
-      "family": "recovery"
+      "code_sha256": "af5581911cc774f9680ea31517436bdbd34b5923e9230810f1e91fe9f0b93fa1",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
     },
     {
       "file": "scripts/workflow.py",
@@ -1680,8 +1713,8 @@
     {
       "file": "scripts/workflow.py",
       "function": "generate",
-      "code_sha256": "6a0f46c6c1d3c8bc7b793d6d975a1ab6a39ce7af7cbbc718a9473b28a56beb51",
-      "family": "recovery",
+      "code_sha256": "f52aea50a910005aa2b79969147d3cc6f03c034b5345d9bc84eb222f1babe625",
+      "family": "presentation_delivery",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family",
@@ -1691,7 +1724,8 @@
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed",
           "test_construction_reliability.py::test_unrelated_document_change_does_not_count_as_localized_shell_progress"
         ]
-      }
+      },
+      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
     },
     {
       "file": "scripts/workflow.py",
@@ -1872,8 +1906,8 @@
     {
       "file": "scripts/drafting.py",
       "function": "_construction_finding_source",
-      "code_sha256": "dde7e35dad90b50338fa9998ca2e8b6cb889a480909d16ef63a5dfadf6a5f666",
-      "family": "recovery",
+      "code_sha256": "54373c9b552f4bb864deb8bf8ff3333b3fde1d734e288d12284f73249af01b0a",
+      "family": "presentation_delivery",
       "behavioral_evidence": {
         "valid": [
           "test_construction_reliability.py::test_localized_repair_covers_each_document_family"
@@ -1881,7 +1915,50 @@
         "invalid": [
           "test_construction_reliability.py::test_generated_display_prose_is_repaired_persisted_and_fully_reviewed"
         ]
-      }
+      },
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "canonical_review_surface",
+      "code_sha256": "1623ef57bb06d3ef21b556895c86bd74f9ea42e1c6dcd307b1f358c84dc7ddb2",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "reviewed_presentation_only",
+      "code_sha256": "b725283e7e4eddbb964c10a45836c9ac58845d1f5f5816c49a758415cdbb5774",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
+    },
+    {
+      "file": "scripts/contracts.py",
+      "function": "internal_presentation_note",
+      "code_sha256": "6623703c30a5e64a26af02800a3ae3fd77199350dd071ade8167cd0980ca32e6",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+    },
+    {
+      "file": "scripts/quality.py",
+      "function": "_warning_findings",
+      "code_sha256": "226ddde445ee9ba3b1f03fe84e3523686eacb9a4516abc46d56523aa56347782",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+    },
+    {
+      "file": "scripts/rendering.py",
+      "function": "_study_descriptor",
+      "code_sha256": "cb0bae5ecae134a2abb8e6cec0b50ecd632f4b7d40a1eeb46c1089f4f336618a",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized presentation-delivery policy; paired valid delivery and essential-failure tests in family contract."
+    },
+    {
+      "file": "scripts/workflow.py",
+      "function": "_optional_construction_findings",
+      "code_sha256": "c4e04392afb13469b78842a1ec104fc91c9c87b3cb796a3870a963855adc6af2",
+      "family": "presentation_delivery",
+      "review_note": "Reviewed for current owner-authorized delivery policy: exact independent review, essential-failure guards, nonblocking presentation and approved context."
     }
   ],
   "fingerprint_method": "SHA-256 of UTF-8 function source lines, including decorators; independent of Python AST dump format",
