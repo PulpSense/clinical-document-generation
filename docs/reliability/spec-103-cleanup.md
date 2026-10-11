@@ -16,8 +16,8 @@ This is the current runtime boundary; #91 and the prior rule-migration/fingerpri
 | `tests/offline_reliability_gate.py` producer fingerprint enforcement | Removed; ordinary developer test command and Linux office discovery remain. Historical JSON audit is explicitly retired. |
 | #92 inventory documentation | Superseded history, not an acceptance checklist for #103. |
 
-## Remaining integration work
+## Implemented integration boundaries
 
-#105 improves intake and drafting instructions, independent review and source handoff. #106 replaces the old recovery owner/edit-surface machinery with general tools; #104 does not expand it. #107 integrates review-only delivery and skill guidance. #108 reconciles the selected offline test list and historical semantic-rule tests with the new lifecycle and prepares live Linux evidence. Tests that explicitly expect phrase/numeral/word-count/consent/layout code vetoes or rule resolutions are obsolete, not reasons to restore those gates.
+#105 implements intake and drafting instructions, independent review and source handoff. #106 replaces the old recovery owner/edit-surface machinery with general tools. #107 integrates review-only delivery and skill guidance. #108 reconciles the selected offline test list and historical semantic-rule tests with the new lifecycle and prepares the owner-run Linux evidence plan. See [implementation results](spec-103-implementation-results.md). Tests that explicitly expect phrase/numeral/word-count/consent/layout code vetoes or rule resolutions are obsolete, not reasons to restore those gates.
 
 Focused boundary tests use controlled rendering and reviewer adapters. They prove routing, file integrity and identity preservation; they do not establish live AI judgment, production readiness or elapsed-time claims. No installation, activation, paid run or full suite was performed.

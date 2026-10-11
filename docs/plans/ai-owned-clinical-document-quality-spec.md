@@ -1,6 +1,6 @@
 # Spec: AI-owned clinical document quality and repair
 
-Status: published as [GitHub issue #103](https://github.com/PulpSense/clinical-document-generation/issues/103), labeled `ready-for-agent`. Implementation tickets: #104–#108.
+Status: implemented on `codex/ai-owned-quality-integration` for [GitHub issue #103](https://github.com/PulpSense/clinical-document-generation/issues/103). Tickets #104–#108 are complete. Live Linux installation, AI quality and timing evidence remain pending; see [implementation results](../reliability/spec-103-implementation-results.md).
 
 ## Outcome and scope
 
@@ -74,8 +74,8 @@ Provide the owner a small fixed Linux run plan spanning all five families, clean
 
 ## Implementation tickets
 
-- [ ] #104 — Cleanup implemented #92 and retire semantic code gates
-- [ ] #105 — Implement AI-owned intake, section drafting and independent review
-- [ ] #106 — Enable AI-directed repair with general document tools
-- [ ] #107 — Integrate complete delivery, review-only fallback and concise skill instructions
-- [ ] #108 — Verify the simplified lifecycle locally and prepare owner-run Linux timing evidence
+- [x] #104 — Cleanup implemented #92 and retire semantic code gates
+- [x] #105 — Implement AI-owned intake, section drafting and independent review
+- [x] #106 — Enable AI-directed repair with general document tools
+- [x] #107 — Integrate complete delivery, review-only fallback and concise skill instructions
+- [x] #108 — Verify the simplified lifecycle locally and prepare owner-run Linux timing evidence
