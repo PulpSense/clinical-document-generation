@@ -5665,6 +5665,11 @@ def _prior_concern_review_errors(request: Mapping[str, Any], response: Mapping[s
     if not isinstance(context, Mapping):
         return []
     errors = []
+    authors = context.get("repair_authors", [context.get("repair_author", {})])
+    producer = response.get("producer", {})
+    if any(isinstance(author, Mapping) and author.get("reviewer_id")
+           and author.get("reviewer_id") == producer.get("reviewer_id") for author in authors):
+        errors.append("A repair author cannot provide the independent final review.")
     visual = request.get("task") == "rendered_page_visual_verification"
     assessments = response.get("page_assessments" if visual else "section_assessments", [])
     reported = response.get("findings", [])
@@ -6222,7 +6227,7 @@ def validate_verifications(
             "issue": message,
         }, "verifier_transient") for message in _prior_concern_review_errors(request, response))
         resolution_records, resolution_errors = ([], [])
-        _localize_recovery_findings(findings, resolution_records if not resolution_errors else [], request)
+        # General native repair inspects actual files; no registered-surface localization is required.
         evidence[evidence_key] = {
             "uncertainty_resolutions": resolution_records if not resolution_errors else [],
             "source_routing_assessments": (response.get("source_routing_assessments", [])
