@@ -88,7 +88,7 @@ PDF_PAGE_RENDERER = {
     "platform": "manylinux_2_17_x86_64",
 }
 PRODUCTION_MODULES = {
-    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
+    "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py", "rule_authority.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
