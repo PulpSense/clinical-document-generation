@@ -57,10 +57,13 @@ def test_visual_fallback_starts_while_content_reviewer_is_still_running(tmp_path
 
     def fallback(items, remaining):
         fallback_started.set()
-        (tmp_path / 'revisions/r1' / visual['response_path']).write_text(json.dumps(response))
+        path = tmp_path / 'revisions/r1' / visual['response_path']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(response))
 
-    workflow.run_desktop_operation(tmp_path, handoff_runner=primary,
+    result = workflow.run_desktop_operation(tmp_path, handoff_runner=primary,
         fallback_handoff_runner=fallback, opener=lambda _: b'', budget_seconds=30)
+    assert result['stage'] == 'quality'
     assert content_observed_fallback == [True]
 
 
@@ -282,7 +285,9 @@ def test_parent_fallback_has_a_separate_bounded_budget_for_complete_page_review(
         budgets.append(remaining)
         if remaining < 300:
             raise TimeoutError('Controlled complete-page inspection needs five minutes.')
-        (tmp_path / 'revisions/r1' / visual['response_path']).write_text(json.dumps(response))
+        path = tmp_path / 'revisions/r1' / visual['response_path']
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(response))
     result = workflow.run_desktop_operation(tmp_path, handoff_runner=primary,
         fallback_handoff_runner=fallback, opener=lambda _: b'', budget_seconds=2700)
     assert result['stage'] == 'quality'
