@@ -60,6 +60,7 @@ NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1500.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 2700.0
 CONTENT_REVIEW_WORKER_BUDGET_SECONDS = 12 * 60
+PARENT_VISUAL_WORKER_BUDGET_SECONDS = 8 * 60
 FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
     "drafting": 480.0,
@@ -4984,7 +4985,7 @@ def run_desktop_operation(
                                 attempt_counters["parent_visual_callbacks"].get(key) or 0
                             ) + 1
                         save("running")
-                        parent_budget = min(parent_remaining, soft_budgets.get("independent_verification", 240.0))
+                        parent_budget = min(parent_remaining, PARENT_VISUAL_WORKER_BUDGET_SECONDS)
                         try:
                             if fallback_handoff_runner is not None:
                                 fallback_handoff_runner(eligible, parent_budget)

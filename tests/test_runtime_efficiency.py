@@ -265,3 +265,25 @@ def test_content_only_review_wave_has_a_worker_budget_within_operation_deadline(
         opener=lambda _: b'', budget_seconds=2700)
     assert result['status'] == 'blocked'
     assert budgets and all(0 < budget <= 720 for budget in budgets)
+
+
+def test_parent_fallback_has_a_separate_bounded_budget_for_complete_page_review(tmp_path, monkeypatch):
+    visual, _, response = _visual_handoff_fixture(tmp_path, 'protocol')
+    results = iter([
+        {'status': 'awaiting_hermes', 'stage': 'independent_verification', 'revision_id': 'r1',
+         'handoffs': [visual]},
+        {'status': 'blocked', 'stage': 'quality', 'findings': [], 'client_outputs': []},
+    ])
+    monkeypatch.setattr(workflow, 'generate', lambda *_args, **_kwargs: next(results))
+    budgets = []
+    def primary(items, remaining):
+        raise RuntimeError('Delegated visual worker exited.')
+    def fallback(items, remaining):
+        budgets.append(remaining)
+        if remaining < 300:
+            raise TimeoutError('Controlled complete-page inspection needs five minutes.')
+        (tmp_path / 'revisions/r1' / visual['response_path']).write_text(json.dumps(response))
+    result = workflow.run_desktop_operation(tmp_path, handoff_runner=primary,
+        fallback_handoff_runner=fallback, opener=lambda _: b'', budget_seconds=2700)
+    assert result['stage'] == 'quality'
+    assert budgets == [480]
