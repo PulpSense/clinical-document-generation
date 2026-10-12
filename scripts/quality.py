@@ -5257,6 +5257,11 @@ def create_verification_requests(
         "cohort totals and links, negations, qualifications, consent applicability, safeguards and consistency "
         "across Protocol, selected ICF and PRS values. XML structural validity does not establish value fidelity. "
         "Reconcile raw visit/assessment relationships and background benefits with actual tables and prose; "
+        "Assess table usability independently of fact presence: explicit visit-to-activity associations "
+        "must be readable as table cells, using an activity matrix or clearly labeled visit rows. "
+        "Do not accept raw field/value dumps as a usable schedule merely because every fact is present. "
+        "Unassigned narrative details may remain clearly labeled notes; do not invent visit assignments. "
+        "Code-generated tables are subject to this review, not presumed correct. "
         "source_routing_obligations are evidence context, not a required separate adjudication payload. "
         "Review section purpose and content_expectations; identify redundant or self-referential text "
         "that obscures study facts. Preserve applicable consent-copy and signature language and "
@@ -5367,7 +5372,7 @@ def create_verification_requests(
             "page_renderer": artifacts[0].get("page_renderer", render_report.get("page_renderer")) if artifacts else render_report.get("page_renderer"),
             "artifacts": request_artifacts,
             "checks": list(VISUAL_CHECKS),
-            "instructions": f"This is complete review set {review_set}. Independently open and inspect every supplied page PNG for this document; file existence, extracted text and prior reviewer conclusions cannot establish visual approval. Assess every requested check on every page for readability, clipping, table usability, heading flow, headers/footers, signing space, template layout and actual TOC destinations. Natural pagination and short title, signature or consent pages may be correct. Preserve applicable consent content and usable signing space. Report substantive visual defects with artifact, page, check, element (visible heading/caption or a descriptive missing-content anchor), issue and recommended_action. No pre-registered layout rule is required. Batch actual defects; omit ordinary stylistic preferences. Reassess repaired files from these fresh images, independently of the repair author.",
+            "instructions": f"This is complete review set {review_set}. Independently open and inspect every supplied page PNG for this document; file existence, extracted text and prior reviewer conclusions cannot establish visual approval. Assess every requested check on every page for readability, clipping, table usability, heading flow, headers/footers, signing space, template layout and actual TOC destinations. Check that visit-to-activity associations can be scanned in labeled cells; raw field/value dumps are not a usable substitute for a schedule table. Treat lost table usability as an actual defect, not an ordinary stylistic preference; do not assume a code-generated table is correct. Natural pagination and short title, signature or consent pages may be correct. Preserve applicable consent content and usable signing space. Report substantive visual defects with artifact, page, check, element (visible heading/caption or a descriptive missing-content anchor), issue and recommended_action. No pre-registered layout rule is required. Batch actual defects; omit ordinary stylistic preferences. Reassess repaired files from these fresh images, independently of the repair author.",
             "reviewer_policy": {
                 "image_inspection_required": True,
                 "delegated_failure_fallback": "parent_reviews_the_same_bound_page_images",

@@ -1496,7 +1496,8 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     """Combine the approved visit inventory and procedure relationships.
 
     The explicit schedule table owns row order; extra procedure-schedule visits
-    follow it. Merge only unambiguous equal name/timing rows with compatible
+    follow it. Explicit assessment/evaluation visit records and matrices use
+    the same projection. Merge only unambiguous equal name/timing rows with compatible
     supplied IDs/fields. A matrix header may match a unique qualified narrative
     visit; the narrative then supplies clinical order and precise timing. Never
     turn narrative assessments into numbered visits or merge ambiguous contacts.
@@ -1506,15 +1507,25 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     matrix_table = False
     matched_table: set[int] = set()
     narrative_order: list[dict[str, Any]] = []
-    for path in ("procedures.visit_schedule_table", "procedures.visit_schedule"):
+    for path in ("procedures.visit_schedule_table", "procedures.visit_schedule",
+                 "procedures.assessments", "procedures.evaluation"):
         raw = get_path(reference, path, [])
         decoded = assessment_matrix(raw, get_path(reference, "procedures.visits", []) or [])
+        supplemental = path in {"procedures.assessments", "procedures.evaluation"}
         if path.endswith("visit_schedule_table"):
             matrix_table = decoded is not None
         source_rows = decoded["visits"] if decoded is not None else [
             row if isinstance(row, Mapping) else {"visit": row}
             for row in raw if isinstance(row, Mapping) or isinstance(row, str) and row.strip()
         ] if isinstance(raw, list) else []
+        if supplemental and isinstance(raw, Mapping):
+            source_rows = [raw]
+        if supplemental and decoded is None:
+            # These fields also carry free prose and unassigned assessments.
+            # Only explicit visit records authorize activity-to-visit marks.
+            source_rows = [row for row in source_rows if
+                           meaningful(row.get("visit") or row.get("visitName"))
+                           and "procedures" in row]
         source_keys = [
             (str(row.get("visit") or row.get("visitName") or "").strip(),
              str(row.get("timing") or row.get("visitWindow") or "").strip())
@@ -1544,7 +1555,7 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
                                for key, value in record.items()
                                if key not in {"procedures", "visitName", "visitWindow"})]
             alias = False
-            if not matches and matrix_table and decoded is None:
+            if not matches and matrix_table and decoded is None and path.endswith("visit_schedule"):
                 matches = [candidate for candidate in visits[:table_count]
                            if _matrix_visit_alias(candidate, record)
                            and sum(_matrix_visit_alias(candidate, other) for other in source_rows) == 1]
@@ -1575,10 +1586,11 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
                 visits.append(record)
                 if path.endswith("visit_schedule"):
                     narrative_order.append(record)
-        if path.endswith("visit_schedule_table"):
-            table_count = len(visits)
-    if matrix_table and narrative_order and all(id(row) in matched_table for row in visits[:table_count]):
-        visits = narrative_order
+        if path.endswith("visit_schedule") and matrix_table and narrative_order and all(
+            id(row) in matched_table for row in visits[:table_count]
+        ):
+            visits = narrative_order
+        table_count = len(visits)
     used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
     for index, record in enumerate(visits, 1):
         if not meaningful(record.get("visitNumber")):
@@ -2040,10 +2052,25 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
 
     for item in inventory:
         if "record" in item:
+            record = item["record"]
+            name = str(record.get("visit") or record.get("visitName") or "").strip()
+            timing = str(record.get("timing") or record.get("visitWindow") or "").strip()
+            if name and "procedures" in record and any(
+                visit["visit"] == name and visit["timing"] == timing for visit in visits
+            ):
+                # The explicit relationship is already rendered as real cells.
+                # Keep additional approved metadata, never serialize the whole
+                # visit object back into a second one-column schedule.
+                extra = {key: value for key, value in record.items() if key not in {
+                    "visit", "visitName", "timing", "visitWindow", "procedures", "visitNumber"}}
+                if not extra:
+                    continue
+                item = {**item, "record": extra}
             unallocated.append(item)
-            supplemental_notes.append("; ".join(
+            note = "; ".join(
                 f"{key}: {json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value}"
-                for key, value in item["record"].items()))
+                for key, value in item["record"].items())
+            supplemental_notes.append(f"{name}: {note}" if name and item["record"] != record else note)
             continue
         key = re.sub(r"\s+", " ", item["activity"]).strip().casefold().rstrip(".")
         if key in represented or fully_allocated_visit_note(item["activity"]):
