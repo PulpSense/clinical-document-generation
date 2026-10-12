@@ -59,6 +59,7 @@ DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1500.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 2700.0
+CONTENT_REVIEW_WORKER_BUDGET_SECONDS = 12 * 60
 FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
     "drafting": 480.0,
@@ -4985,11 +4986,11 @@ def run_desktop_operation(
                         save("running")
                         try:
                             if fallback_handoff_runner is not None:
-                                fallback_handoff_runner(eligible, parent_remaining)
+                                fallback_handoff_runner(eligible, min(parent_remaining, soft_budgets.get("independent_verification", 240.0)))
                             else:
                                 handoff_runner(
                                     [{**item, "reviewer_owner": "parent"} for item in eligible],
-                                    parent_remaining,
+                                    min(parent_remaining, soft_budgets.get("independent_verification", 240.0)),
                                 )
                         except Exception as parent_exc:
                             errors.append(str(parent_exc))
@@ -5022,7 +5023,7 @@ def run_desktop_operation(
                     if supports_parent_fallback and fallback_owned and non_fallback:
                         with ThreadPoolExecutor(max_workers=1) as executor:
                             hard_future = executor.submit(
-                                handoff_runner, non_fallback, remaining,
+                                handoff_runner, non_fallback, min(remaining, CONTENT_REVIEW_WORKER_BUDGET_SECONDS),
                             )
                             for delegated, timeout in (
                                 (fresh_fallback_owned, soft_timeout),
@@ -5035,7 +5036,10 @@ def run_desktop_operation(
                                     raise
                                 except Exception:
                                     pass
+                            parent_block = run_bounded_parent_review(fallback_owned)
                             hard_future.result()
+                            if parent_block is not None:
+                                return finish(parent_block)
                     elif supports_parent_fallback and fallback_owned:
                         for delegated, timeout in (
                             (fresh_fallback_owned, soft_timeout),
@@ -5373,6 +5377,11 @@ def _production_agent_prompt(
     )
     return (
         "Complete one isolated clinical-document Hermes handoff.\n"
+        "Use supported equivalent tools or correct tool arguments when a call fails. "
+        "For large evidence files, paginate reads and batch independent inspections. "
+        "Preserve the task's read/write boundaries and exact request bindings. "
+        "Return actionable tool/response feedback when no supported route succeeds; "
+        "changing tools never establishes clinical or visual approval.\n"
         f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
         f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
@@ -6911,7 +6920,7 @@ def _restore_verification_requests_for_retry(
 
 
 def _reset_verification_set(revision_dir: Path) -> None:
-    """Remove the current bound set so every reviewer assesses the repaired candidate."""
+    """Reset content/failed reviews, retaining passing visual evidence for exact-byte reuse."""
     request_root = revision_dir / "hermes/verification-requests"
     response_root = revision_dir / "hermes/verification-responses"
     for request_path in request_root.glob("*.json"):
@@ -6919,12 +6928,17 @@ def _reset_verification_set(revision_dir: Path) -> None:
             request = _read(request_path)
         except (OSError, ValueError, json.JSONDecodeError):
             request = {}
+        if (request.get("task") == "rendered_page_visual_verification"
+                and verification_response_is_complete(revision_dir, request_path)):
+            continue
         response_path = request.get("response_path")
         if response_path:
             (revision_dir / str(response_path)).unlink(missing_ok=True)
         request_path.unlink(missing_ok=True)
+    retained = {str(_read(path).get("response_path")) for path in request_root.glob("*.json")}
     for response_path in response_root.glob("*.json"):
-        response_path.unlink(missing_ok=True)
+        if response_path.relative_to(revision_dir).as_posix() not in retained:
+            response_path.unlink(missing_ok=True)
 
 
 def _normalized_layout_repair_records(repairs: Iterable[Mapping[str, Any]]) -> list[dict[str, str]]:
@@ -9593,6 +9607,7 @@ def generate(
             candidate_font_substitutions=font_substitutions,
             rebuild_candidate=rebuild_with_substitutions,
             artifact_names=partial_repair or None,
+            reuse_render_report=(state.get("render_assurance") or {}).get("render"),
             deadline_seconds=remaining,
             deadline_monotonic=operation_deadline,
             clock=clock,

@@ -3351,10 +3351,46 @@ def _sparse_pdf_pages(docx_path: Path, pdf_path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+
+def _retained_render_artifacts(
+    revision_dir: Path, report: Mapping[str, Any], docx_paths: list[Path],
+    offices: list[dict[str, Any]], pages: list[dict[str, Any]],
+    fonts: Mapping[str, Any], substitutions: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    """Rehash complete render evidence under currently available renderer identities."""
+    retained = []
+    if report.get("status") != "passed":
+        return retained
+    for docx in docx_paths:
+        rows = [row for row in report.get("artifacts", [])
+                if isinstance(row, Mapping) and row.get("artifact") == docx.stem]
+        if len(rows) != 1:
+            continue
+        row = rows[0]
+        try:
+            if (row.get("status") != "passed" or row.get("renderer") not in offices
+                    or row.get("page_renderer") not in pages
+                    or row.get("font_evidence") != dict(fonts)
+                    or row.get("font_substitutions") != dict(substitutions)
+                    or row.get("docx") != docx.relative_to(revision_dir).as_posix()
+                    or not row.get("pages")
+                    or row.get("page_count") != len(row["pages"])
+                    or [page.get("page") for page in row["pages"]] != list(range(1, len(row["pages"]) + 1))):
+                continue
+            files = [(row[key], row[f"{key}_sha256"]) for key in ("docx", "pdf")]
+            files.extend((page["path"], page["sha256"]) for page in row["pages"])
+            if all(_revision_owned_nonsymlink_path(revision_dir, revision_dir / path)
+                   and sha256_file(revision_dir / path) == digest for path, digest in files):
+                retained.append(dict(row))
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return retained
+
 def render_pages(
     revision_dir: Path,
     *,
     artifact_names: Iterable[str] | None = None,
+    reuse_render_report: Mapping[str, Any] | None = None,
     contracted_bundle: Mapping[str, Any] | None = None,
     renderer_identity: Mapping[str, Any] | None = None,
     page_renderer_identity: Mapping[str, Any] | None = None,
@@ -3382,12 +3418,6 @@ def render_pages(
         for path in sorted((revision_dir / "candidate").glob("*.docx"))
         if not selected_artifacts or path.stem in selected_artifacts
     ]
-    if selected_artifacts:
-        for docx in docx_paths:
-            (render_root / f"{docx.stem}.pdf").unlink(missing_ok=True)
-            shutil.rmtree(render_root / docx.stem, ignore_errors=True)
-    elif render_root.exists():
-        shutil.rmtree(render_root)
     renderer_candidates = [dict(item) for item in (renderer_identities or [])]
     if renderer_identity is not None:
         renderer_candidates = [dict(renderer_identity), *[item for item in renderer_candidates if dict(item) != dict(renderer_identity)]]
@@ -3426,6 +3456,18 @@ def render_pages(
                 }
         return {"status": "blocked", "renderer": renderer_candidates[0], "findings": [{"category": "renderer", "field": "page_renderer", "issue": "No supported PDF page renderer is available."}]}
 
+    retained = _retained_render_artifacts(
+        revision_dir, reuse_render_report or {}, docx_paths, renderer_candidates, page_candidates,
+        font_evidence or {}, font_substitutions or {},
+    )
+    retained_names = {row["artifact"] for row in retained}
+    docx_paths = [path for path in docx_paths if path.stem not in retained_names]
+    if selected_artifacts or retained:
+        for docx in docx_paths:
+            (render_root / f"{docx.stem}.pdf").unlink(missing_ok=True)
+            shutil.rmtree(render_root / docx.stem, ignore_errors=True)
+    elif render_root.exists():
+        shutil.rmtree(render_root)
     renderer_attempts: list[dict[str, Any]] = []
     page_attempts: list[dict[str, Any]] = []
     for renderer_index, identity in enumerate(renderer_candidates, 1):
@@ -3510,7 +3552,7 @@ def render_pages(
             }
 
         findings: list[dict[str, Any]] = []
-        artifacts = []
+        artifacts = list(retained)
         if not selected_artifacts and render_root.exists():
             shutil.rmtree(render_root)
         render_root.mkdir(parents=True, exist_ok=True)
@@ -3548,6 +3590,7 @@ def render_pages(
             "page_renderer": selected_page_renderer,
             "page_renderer_attempts": page_attempts,
             "artifacts": artifacts,
+            "reused_artifacts": sorted(retained_names),
             "findings": findings,
         }
     return {
@@ -3568,6 +3611,7 @@ def render_assurance(
     candidate_font_substitutions: Mapping[str, str] | None = None,
     rebuild_candidate: Any = None,
     artifact_names: Iterable[str] | None = None,
+    reuse_render_report: Mapping[str, Any] | None = None,
     renderer_identities: Iterable[Mapping[str, Any]] | None = None,
     page_renderer_identities: Iterable[Mapping[str, Any]] | None = None,
     deadline_seconds: float = 180.0,
@@ -3743,6 +3787,7 @@ def render_assurance(
     render_report = render_pages(
         revision_dir,
         artifact_names=artifact_names,
+        reuse_render_report=reuse_render_report,
         contracted_bundle=bundle,
         renderer_identities=office_candidates,
         page_renderer_identities=(
@@ -5202,6 +5247,51 @@ def retain_verification_response(revision_dir: Path, request_path: Path) -> None
     path.write_bytes(response_path.read_bytes())
 
 
+
+def _has_visual_concern(context: Mapping[str, Any], artifact: str) -> bool:
+    for prior in context.get("prior_findings", []):
+        if not isinstance(prior, Mapping):
+            return True
+        concern = review_concern(prior)
+        if (concern.get("category") == "visual" or concern.get("check") in VISUAL_CHECKS):
+            if not concern.get("artifact") or concern["artifact"] == artifact:
+                return True
+    return False
+
+
+def _reuse_visual_request(revision_dir: Path, proposed: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Retain original independently passed evidence; never manufacture a new review."""
+    if proposed.get("task") != "rendered_page_visual_verification":
+        return None
+    artifacts = proposed.get("artifacts") or []
+    if len(artifacts) != 1 or not isinstance(artifacts[0], Mapping):
+        return None
+    artifact = str(artifacts[0].get("artifact") or "")
+    if _has_visual_concern(proposed.get("review_context") or {}, artifact):
+        return None
+    bindings = ("task", "revision_id", "source_identity_sha256", "generation_authority_sha256",
+                "artifacts", "renderer", "page_renderer", "checks", "contracted_template_bundle")
+    for path in sorted((revision_dir / "hermes/verification-requests").glob("*.json")):
+        if path.is_symlink():
+            continue
+        prior = _json(path)
+        if (prior.get("task") != proposed["task"]
+                or not isinstance(prior.get("review_set"), int)
+                or not 1 <= prior["review_set"] < proposed["review_set"]
+                or not prior.get("source_identity_sha256")
+                or not prior.get("generation_authority_sha256")
+                or any(prior.get(key) != proposed.get(key) for key in bindings)):
+            continue
+        response_path = revision_dir / str(prior.get("response_path") or "")
+        if not _revision_owned_nonsymlink_path(revision_dir, response_path):
+            continue
+        response = _json(response_path)
+        if (response.get("status") == "passed" and not response.get("findings")
+                and not _prior_concern_review_errors(proposed, response)
+                and verification_response_is_complete(revision_dir, path)):
+            return prior
+    return None
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -5383,6 +5473,8 @@ def create_verification_requests(
             "response_path": f"hermes/verification-responses/{request_id}.json",
         })
     for payload in payloads:
+        payload["source_identity_sha256"] = canonical_evidence_sha256(reference)
+        payload["generation_authority_sha256"] = payloads[0]["generation_authority_sha256"]
         payload["template_preservation"] = template_preservation
         payload["instructions"] += " " + template_preservation
         if payload["task"] == "rendered_page_visual_verification":
@@ -5397,6 +5489,7 @@ def create_verification_requests(
             )
         payload["contracted_template_bundle"] = bundle
         payload["request_sha256"] = verification_request_sha256(payload)
+    payloads = [_reuse_visual_request(revision_dir, payload) or payload for payload in payloads]
     expected = {payload["request_id"]: payload for payload in payloads}
     mutation_roots = (
         revision_dir / "hermes",
@@ -6241,6 +6334,9 @@ def validate_verifications(
             "task": request.get("task"),
             "request_id": request.get("request_id"),
             "review_set": request.get("review_set"),
+            "source_identity_sha256": request.get("source_identity_sha256"),
+            "generation_authority_sha256": request.get("generation_authority_sha256"),
+            "review_context": request.get("review_context", {}),
             "request": request_path.relative_to(revision_dir).as_posix(),
             "request_sha256": sha256_file(request_path),
             "request_body_sha256": request.get("request_sha256"),
@@ -6270,7 +6366,7 @@ def _final_verification_scope_findings(
     render_report: Mapping[str, Any],
     evidence: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
-    """Require one fresh complete review set over the exact branch package."""
+    """Require fresh package content review and exact independently reviewed visual evidence."""
     expected_names = set(document_set(get_path(reference, "meta.study_type")))
     expected_paths = {f"candidate/{name}" for name in expected_names}
     expected_visual = {Path(name).stem for name in expected_names if name.endswith(".docx")}
@@ -6345,9 +6441,25 @@ def _final_verification_scope_findings(
         )
     ):
         issues.append("Final review requires one document-scoped visual review with the complete rendered page inventory for every final DOCX.")
-    review_sets = {item.get("review_set") for item in records}
-    if len(review_sets) != 1 or not all(isinstance(value, int) and value >= 1 for value in review_sets):
-        issues.append("All final review responses must belong to the same complete review set.")
+    content_set = content[0].get("review_set") if len(content) == 1 else None
+    if not isinstance(content_set, int) or content_set < 1:
+        issues.append("Final content review must identify a valid current review set.")
+    for item in visual:
+        visual_set = item.get("review_set")
+        if not isinstance(visual_set, int) or not isinstance(content_set, int) or not 1 <= visual_set <= content_set:
+            issues.append("Visual review cannot belong to a future or invalid review set.")
+        elif visual_set != content_set and (
+            item.get("source_identity_sha256") != canonical_evidence_sha256(reference)
+            or not item.get("generation_authority_sha256")
+            or item.get("generation_authority_sha256") != content[0].get("generation_authority_sha256")
+            or set(item.get("checks") or []) != set(VISUAL_CHECKS)
+            or _has_visual_concern(content[0].get("review_context") or {},
+                                   str((item.get("artifacts") or [{}])[0].get("artifact") or ""))
+            or any(author.get("reviewer_id") == item.get("producer_reviewer_id")
+                   for author in (content[0].get("review_context") or {}).get("repair_authors", [])
+                   if isinstance(author, Mapping))
+        ):
+            issues.append("Reused visual review must preserve approved source, generation authority and every visual check.")
     if any(
         not str(item.get("request_id") or "").strip()
         or not str(item.get("producer_model_id") or "").strip()

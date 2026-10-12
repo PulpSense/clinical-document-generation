@@ -231,7 +231,6 @@ def _request_matches_approved_reference(
             bundle = expected_governing.get("contracted_template_bundle")
             if not isinstance(bundle, Mapping):
                 return False
-        scoped = _scoped_source(reference, batch.field_families)
         expected_contracts = _expected_section_contracts(
             repo_root,
             reference,
@@ -239,6 +238,7 @@ def _request_matches_approved_reference(
             targets,
             contracted_bundle=bundle,
         )
+        scoped = _draft_scoped_source(reference, batch.field_families, expected_contracts)
         expected_task = "prs_narrative_drafting" if batch.artifact == "prs" else "section_drafting"
         request_id = str(request.get("request_id") or "")
         wave = str(request.get("wave") or "")
@@ -260,7 +260,7 @@ def _request_matches_approved_reference(
             request.get("prompt_version") == PROMPT_VERSION,
             request.get("governing_resources") == expected_governing,
             request.get("approved_source") == scoped,
-            request.get("approved_input") == _source_items(scoped),
+            request.get("approved_input") == _draft_source_items(scoped, expected_contracts),
             contracts == expected_contracts,
             request.get("constraints") == _request_constraints(),
             request.get("response_path") == f"hermes/responses/{request_id}.json",
@@ -340,6 +340,28 @@ def _source_items(value: Any, prefix: str = "") -> list[dict[str, Any]]:
                 items.extend(_source_items(child, path))
             else:
                 items.append({"path": path, "value": child, "sha256": sha256_value(child)})
+    return items
+
+
+
+def _draft_scoped_source(reference: Mapping[str, Any], families: Iterable[str],
+                         sections: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    roots = set(families)
+    roots.update(str(path).split(".")[0] for section in sections
+                 for path in [*section.get("minimum_evidence", []), *section.get("optional_evidence", [])])
+    return _scoped_source(reference, sorted(roots))
+
+
+def _draft_source_items(source: Mapping[str, Any], sections: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Make declared object references as citable as their scoped approved leaves."""
+    items = _source_items(source)
+    known = {item["path"] for item in items}
+    for section in sections:
+        for path in [*section.get("minimum_evidence", []), *section.get("optional_evidence", [])]:
+            value = get_path(source, str(path))
+            if path not in known and isinstance(value, Mapping) and value:
+                items.append({"path": path, "value": copy.deepcopy(value), "sha256": sha256_value(value)})
+                known.add(path)
     return items
 
 
@@ -831,7 +853,7 @@ def create_drafting_request(
         targets,
         contracted_bundle=bundle,
     )
-    scoped = _scoped_source(reference, batch.field_families)
+    scoped = _draft_scoped_source(reference, batch.field_families, sections)
     examples = _read_json(repo_root / bundle["drafting_examples"]["path"])
     governing = governing_resources(repo_root, reference, contracted_bundle=bundle)
     request_id = _request_id(revision_id, batch.batch_id, attempts, wave, sha256_value(governing))
@@ -849,7 +871,7 @@ def create_drafting_request(
         "prompt_version": PROMPT_VERSION,
         "governing_resources": governing,
         "attempts": {target: int(attempts[target]) for target in targets},
-        "approved_input": _source_items(scoped),
+        "approved_input": _draft_source_items(scoped, sections),
         "approved_source": scoped,
         "source_evidence_coverage_map": source_evidence_coverage_map(reference),
         "evidence_checklist": [
@@ -912,6 +934,14 @@ def pending_requests(revision_dir: Path, expected_governing: Mapping[str, Any] |
 
 def _allowed_evidence(request: Mapping[str, Any]) -> set[str]:
     return {f"source:{item.get('path')}" for item in request.get("approved_input", []) if isinstance(item, Mapping)}
+
+
+def _section_evidence(request: Mapping[str, Any], contract: Mapping[str, Any]) -> set[str]:
+    paths = [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]
+    return {
+        ref for ref in _allowed_evidence(request)
+        if any(ref == f"source:{path}" or ref.startswith(f"source:{path}.") for path in paths)
+    }
 
 
 def _canonical_evidence_refs(request: Mapping[str, Any], refs: Iterable[Any]) -> list[str]:
@@ -2115,7 +2145,7 @@ def _validate_paragraph(
     if not text:
         findings.append({"category": "drafting", "field": section_id, "issue": "Section prose is empty.", "next_action": "Return a complete source-grounded sentence."})
     request_evidence = _allowed_evidence(request)
-    section_evidence = {f"source:{path}" for path in [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]}
+    section_evidence = _section_evidence(request, contract)
     invalid_evidence = sorted(set(map(str, evidence_refs)) - request_evidence)
     unrelated_evidence = sorted(set(map(str, evidence_refs)) - section_evidence) if evidence_refs else []
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
@@ -2145,7 +2175,7 @@ def _validate_list(
     findings: list[dict[str, Any]] = []
     if not items:
         findings.append({"category": "drafting", "field": section_id, "issue": "List items are empty.", "next_action": "Return complete source-grounded list items."})
-    section_evidence = {f"source:{path}" for path in [*contract.get("minimum_evidence", []), *contract.get("optional_evidence", [])]}
+    section_evidence = _section_evidence(request, contract)
     invalid_evidence = sorted(set(evidence_refs) - _allowed_evidence(request)); unrelated = sorted(set(evidence_refs) - section_evidence)
     allowed_boilerplate = {item["boilerplate_id"] for item in contract.get("fixed_boilerplate", []) if isinstance(item, Mapping)}
     invalid_boilerplate = sorted(set(boilerplate_refs) - allowed_boilerplate)
