@@ -279,7 +279,7 @@ def test_real_injected_prose_is_removed_and_freshly_reviewed_across_families(tmp
     assert expected <= {path.name for path in (tmp_path / 'output').iterdir()}
 
 
-def test_layout_repair_rechecks_both_protocol_and_icf_against_new_native_files(tmp_path, monkeypatch):
+def test_layout_repair_rechecks_changed_protocol_and_retains_unchanged_icf_review(tmp_path, monkeypatch):
     from docx.shared import Pt
     case = next(case for case in CASES if case['descriptor']['study_type'] == 'Prospective' and case['descriptor']['profile'].startswith('rich'))
     seen = {'protocol': [], 'icf': []}
@@ -306,6 +306,7 @@ def test_layout_repair_rechecks_both_protocol_and_icf_against_new_native_files(t
         review=lambda request, response, revision, count: response, visual_review=visual)
     assert result['status'] == 'passed', result
     assert len(repairs) == 1
-    assert len(seen['protocol']) == len(seen['icf']) == 2
+    assert len(seen['protocol']) == 2
+    assert len(seen['icf']) == 1
     assert seen['protocol'][0] != seen['protocol'][1]
     assert Document(tmp_path / 'output/protocol.docx').paragraphs[0].paragraph_format.space_after.pt == 12

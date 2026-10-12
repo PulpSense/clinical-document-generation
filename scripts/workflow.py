@@ -4984,13 +4984,14 @@ def run_desktop_operation(
                                 attempt_counters["parent_visual_callbacks"].get(key) or 0
                             ) + 1
                         save("running")
+                        parent_budget = min(parent_remaining, soft_budgets.get("independent_verification", 240.0))
                         try:
                             if fallback_handoff_runner is not None:
-                                fallback_handoff_runner(eligible, min(parent_remaining, soft_budgets.get("independent_verification", 240.0)))
+                                fallback_handoff_runner(eligible, parent_budget)
                             else:
                                 handoff_runner(
                                     [{**item, "reviewer_owner": "parent"} for item in eligible],
-                                    min(parent_remaining, soft_budgets.get("independent_verification", 240.0)),
+                                    parent_budget,
                                 )
                         except Exception as parent_exc:
                             errors.append(str(parent_exc))
@@ -5053,10 +5054,10 @@ def run_desktop_operation(
                             except Exception:
                                 pass
                     else:
-                        handoff_runner(
-                            dispatch_handoffs,
-                            soft_timeout if supports_parent_fallback else remaining,
-                        )
+                        dispatch_budget = soft_timeout if supports_parent_fallback else remaining
+                        if any(item.get("task") == "clinical_content_verification" for item in dispatch_handoffs):
+                            dispatch_budget = min(dispatch_budget, CONTENT_REVIEW_WORKER_BUDGET_SECONDS)
+                        handoff_runner(dispatch_handoffs, dispatch_budget)
                 finally:
                     record_timing(stage, clock() - handoff_started)
                     record_soft_budget_event(stage)

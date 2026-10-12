@@ -313,8 +313,8 @@ _Avoid_: governed edit DSL, blind repeated rebuild
 
 
 **Final Exact-Artifact Review**:
-The mandatory package-wide content and cross-document review plus every-page visual review of every exact document proposed for delivery. Intermediate repair checks may be limited to changed sections or artifacts, but no earlier or partial review can replace this final complete pass.
-_Avoid_: sampled pages, reused final pass, unchanged-file assumption
+The mandatory fresh package-wide content and cross-document review plus independently passing every-page visual assessments of every exact DOCX proposed for delivery. After repair, changed DOCX require fresh rendering and visual review. An original visual assessment may remain valid only with identical native/PDF/page bytes, current renderer identities, approved source and generation authority, no new applicable visual concern, and independent reviewer identity. Retained assessments preserve their original request, response and review-set identities.
+_Avoid_: sampled pages, assumed unchanged files, fictional fresh review
 
 **Readiness Contract**:
 The agreed evidence and scope boundary that determines when all three study branches are ready and whether a later report is an Internal Reliability Defect, a reference defect, or a new requirement. Once an approved source passes the Source Completeness Gate for a supported branch and Contracted Template, unchanged clinical input may not be blamed for a later internal workflow failure.

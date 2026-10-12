@@ -3553,7 +3553,7 @@ def render_pages(
 
         findings: list[dict[str, Any]] = []
         artifacts = list(retained)
-        if not selected_artifacts and render_root.exists():
+        if not selected_artifacts and not retained and render_root.exists():
             shutil.rmtree(render_root)
         render_root.mkdir(parents=True, exist_ok=True)
         for docx, source_pdf in pdfs.items():

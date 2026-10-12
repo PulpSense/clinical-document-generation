@@ -116,7 +116,7 @@ def test_unchanged_visual_evidence_survives_a_native_repair(tmp_path, monkeypatc
         assert {r['review_set'] for r in visual_reviews} == {1}
 
 
-@pytest.mark.parametrize('change', ['none', 'docx', 'pdf', 'page', 'renderer', 'substitutions', 'incomplete'])
+@pytest.mark.parametrize('change', ['none', 'docx', 'pdf', 'page', 'renderer', 'substitutions', 'incomplete', 'mixed'])
 def test_render_reuse_requires_exact_files_and_current_renderer(tmp_path, governed_pdfium, change):
     from docx import Document
     from test_render_assurance import _bundle, _structural_validation, _write_text_pdf
@@ -125,6 +125,8 @@ def test_render_reuse_requires_exact_files_and_current_renderer(tmp_path, govern
     doc = Document()
     doc.add_paragraph('A complete candidate.')
     doc.save(candidate / 'protocol.docx')
+    if change == 'mixed':
+        doc.save(candidate / 'icf.docx')
     exports = []
     office = {'kind': 'LibreOffice', 'path': '/controlled/office'}
 
@@ -142,7 +144,7 @@ def test_render_reuse_requires_exact_files_and_current_renderer(tmp_path, govern
 
     def run(reuse=None):
         return quality.render_assurance(ROOT, tmp_path, {}, contracted_bundle=_bundle(),
-            structural_validation=_structural_validation(tmp_path, 'protocol.docx'),
+            structural_validation=_structural_validation(tmp_path, *sorted(p.name for p in candidate.iterdir())),
             renderer_identities=[office], page_renderer_identities=[governed_pdfium],
             font_probe=lambda *_args, **_kwargs: (True, 'available'),
             office_exporter=export, page_exporter=rasterize, blank_page_detector=lambda _: [],
@@ -151,8 +153,8 @@ def test_render_reuse_requires_exact_files_and_current_renderer(tmp_path, govern
     first = run()
     assert first['status'] == 'passed'
     prior = copy.deepcopy(first['render'])
-    row = prior['artifacts'][0]
-    if change == 'docx':
+    row = next(row for row in prior['artifacts'] if row['artifact'] == 'protocol')
+    if change in {'docx', 'mixed'}:
         doc.add_paragraph('Changed native content.')
         doc.save(candidate / 'protocol.docx')
     elif change in {'pdf', 'page'}:
@@ -166,7 +168,12 @@ def test_render_reuse_requires_exact_files_and_current_renderer(tmp_path, govern
         row['pages'] = []
     second = run(prior)
     assert second['status'] == 'passed', second
-    assert len(exports) == (1 if change == 'none' else 2)
+    assert len(exports) == (3 if change == 'mixed' else 1 if change == 'none' else 2)
+    for artifact in second['render']['artifacts']:
+        for key in ('docx', 'pdf'):
+            assert quality.sha256_file(tmp_path / artifact[key]) == artifact[key + '_sha256']
+        for page in artifact['pages']:
+            assert quality.sha256_file(tmp_path / page['path']) == page['sha256']
 
 
 def test_drafting_includes_declared_evidence_outside_legacy_batch_families(tmp_path):
@@ -241,3 +248,20 @@ def test_object_citations_do_not_authorize_unrelated_or_nonexistent_evidence(tmp
     row.update(evidence_refs=['source:' + citation], boilerplate_refs=[])
     _, findings = drafting.validate_response(request, response)
     assert findings
+
+
+def test_content_only_review_wave_has_a_worker_budget_within_operation_deadline(tmp_path, monkeypatch):
+    handoff = {'task': 'clinical_content_verification', 'request_id': 'r1.content',
+               'request_sha256': 'a' * 64, 'request_path': 'content.json', 'response_path': 'content-response.json'}
+    monkeypatch.setattr(workflow, 'generate', lambda *_args, **_kwargs: {
+        'status': 'awaiting_hermes', 'stage': 'independent_verification',
+        'revision_id': 'r1', 'handoffs': [handoff]})
+    monkeypatch.setattr(workflow.time, 'sleep', lambda _: None)
+    budgets = []
+    def runner(items, remaining):
+        budgets.append(remaining)
+        raise RuntimeError('Controlled stalled reviewer.')
+    result = workflow.run_desktop_operation(tmp_path, handoff_runner=runner,
+        opener=lambda _: b'', budget_seconds=2700)
+    assert result['status'] == 'blocked'
+    assert budgets and all(0 < budget <= 720 for budget in budgets)

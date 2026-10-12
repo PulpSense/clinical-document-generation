@@ -2143,7 +2143,7 @@ def test_measured_mixed_verifier_wave_retains_completed_work_and_falls_back_only
     }
     assert timeouts_by_tasks == {
         ("rendered_page_visual_verification", "rendered_page_visual_verification"): 240.0,
-        ("clinical_content_verification",): 1_800.0,
+        ("clinical_content_verification",): 720.0,
     }
     assert parent_reviews == [icf_handoff, icf_handoff]
     assert state["soft_budget_events"] == [{
