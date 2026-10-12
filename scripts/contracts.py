@@ -1893,7 +1893,7 @@ def document_table_reference(reference: Mapping[str, Any], model: Mapping[str, A
     return reference
 
 
-def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentation: Any = None) -> dict[str, dict[str, Any]]:
     """Return typed, source-derived Protocol table matrices for rendering and QA."""
     visits = normalized_visit_records(reference)
     assessment_rows: list[list[str]] = []
@@ -2127,19 +2127,19 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
         if evidence_rows and selected_columns
         else []
     )
-    # Keep unallocated source detail inside the owned table, without inventing
-    # activity-to-visit relationships. Repeated values represent a merged row
-    # in Word's logical cell grid and can be checked like the matrix itself.
-    detail_columns = len(assessment_rows[0]) if assessment_rows else 1
-    detail_rows = (
-        [["Approved assessment and safety details"] * detail_columns,
-         *[[note] * detail_columns for note in supplemental_notes]]
-        if supplemental_notes else []
-    )
+    # Preserve unique qualifications as prose beside the matrix. They are not
+    # visit/activity relationships and must not become merged table rows.
+    detail_rows: list[list[str]] = []
     # Table label presentation is shared by renderer and deterministic audit.
     for row in assessment_rows[2 if matrix else 1:]:
         if row and row[0]:
             row[0] = row[0][0].upper() + row[0][1:]
+    if assessment_presentation is not None:
+        labels, supplemental_notes = _assessment_display_edits(
+            assessment_presentation, [str(row[0]) for row in assessment_rows[2 if matrix else 1:]],
+            supplemental_notes)
+        for row in assessment_rows[2 if matrix else 1:]:
+            row[0] = labels.get(row[0], row[0])
     return {
         "schedule-of-assessments": {
             "section_id": "evaluation-procedures",
@@ -2159,6 +2159,52 @@ def protocol_table_contracts(reference: Mapping[str, Any]) -> dict[str, dict[str
             "rows": sample_rows,
         },
     }
+
+
+def _assessment_display_edits(presentation: Any, labels: list[str], notes: list[str]) -> tuple[dict[str, str], list[str]]:
+    """Bind model-authored display edits to existing facts; AI review owns meaning."""
+    if not isinstance(presentation, Mapping):
+        raise ValueError("Assessment presentation must be an object.")
+    edits = {}
+    for key, originals in (("activity_labels", labels), ("notes", notes)):
+        records = presentation.get(key, [])
+        if not isinstance(records, list):
+            raise ValueError("Assessment display edits must be lists.")
+        selected = {}
+        for record in records:
+            if (not isinstance(record, Mapping)
+                    or record.get("source_text") not in originals
+                    or record["source_text"] in selected
+                    or not isinstance(record.get("display_text"), str)
+                    or key == "activity_labels" and not record["display_text"].strip()
+                    or not isinstance(record.get("rationale"), str) or not record["rationale"].strip()):
+                raise ValueError("Assessment display edits require one exact existing label/note, display text and rationale.")
+            selected[record["source_text"]] = record["display_text"].strip()
+        edits[key] = selected
+    return edits["activity_labels"], list(dict.fromkeys(
+        display for note in notes if (display := edits["notes"].get(note, note))))
+
+
+def assessment_presentation_contract(reference: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Offer optional model-owned polish without lexical delivery rules."""
+    if canonical_study_type(get_path(reference, "meta.study_type")) == "Retrospective":
+        return None  # Its Protocol has no Section 15 schedule matrix.
+    table = protocol_table_contracts(reference)["schedule-of-assessments"]
+    return {
+        "activity_labels": [row[0] for row in table["rows"][table["header_rows"]:]],
+        "notes": table["supplemental_notes"],
+        "instructions": (
+            "Optionally return assessment_presentation with activity_labels and notes edit lists. "
+            "Each edit has source_text (exact existing table label or note), display_text, and rationale. "
+            "Use standalone clinical wording, preserving clinical facts, units, qualifications and visit associations. "
+            "Remove internal synopsis/source references from display labels and notes. Omit a note with empty "
+            "display_text only when all its material information is already represented. Keep unique safety, "
+            "timing and footnote explanations in adjacent prose. Keep genuine numbered forms, instrument names, "
+            "citations and explained footnotes. Remove a numeral only when source context confirms an orphan "
+            "footnote marker; uncertainty means retain it. Code does not strip numbers or judge equivalence. "
+            "If schedule_interpretation changes the inventory, edit exact labels/notes in that derived inventory. "
+            "Omitting this optional object preserves existing wording. Independent final review assesses fidelity; "
+            "harmless editorial differences do not block publication.")}
 
 
 def _site_group(reference: Mapping[str, Any], kind: str) -> Any:

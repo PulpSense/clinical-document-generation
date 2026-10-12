@@ -70,9 +70,9 @@ def test_string_visit_inventory_drives_both_tables_without_splitting_prose(tmp_p
     schedule = next(rows for rows in tables if rows[0][0] == 'Approved visit or assessment')
     inventory = next(rows for rows in tables if rows[0][0].replace(' ', '') == 'VisitNumber')
     assert [row[0] for row in schedule[1:1 + len(visits)]] == visits
-    assert schedule[1 + len(visits):] == [['Approved assessment and safety details'], [narrative]]
+    assert schedule[1 + len(visits):] == []
     assert [row[1] for row in inventory[1:]] == visits
-    assert narrative in '\n'.join(cell for table in tables for row in table for cell in row)
+    assert narrative in [paragraph.text for paragraph in document.paragraphs]
     assert source == original
 
 

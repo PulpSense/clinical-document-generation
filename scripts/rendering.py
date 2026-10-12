@@ -1107,6 +1107,11 @@ def _replace_protocol_leaf_bodies(
 ) -> None:
     """Use the client shell for design and accepted section drafts for clinical body content."""
     drafts = {str(item.get("section_id")): item for item in model.get("protocol", []) if isinstance(item, Mapping)}
+    assessment_table = protocol_table_contracts(
+        document_table_reference(reference, model),
+        drafts.get("evaluation-procedures", {}).get("assessment_presentation"),
+    )["schedule-of-assessments"]
+    assessment_notes = assessment_table["supplemental_notes"]
     table_sections = {"study-procedure.visits", "quality-safety.reporting", "evaluation-procedures"}
     table_caption_keys = {
         "study-procedure.visits": {_layout_target_key("Table 9.2-1. Visit Schedule")},
@@ -1130,7 +1135,9 @@ def _replace_protocol_leaf_bodies(
         if section.section_id == "evaluation-procedures":
             # The source-derived matrix and notes own the activity and timing
             # detail. A neutral introduction cannot misdescribe table columns.
-            blocks = [("The scheduled visits and study activities are shown in Table 15.1.", False)]
+            introduction = ("The scheduled visits and study activities are shown in Table 15.1."
+                            if assessment_table["rows"] else "Study assessments are described below.")
+            blocks = [(introduction, False)]
         if branch == "Retrospective" and section.section_id == "subjects.eligibility":
             blocks = _retrospective_eligibility_blocks(reference)
         if branch == "Retrospective" and section.section_id == "study-procedure.enrollment":
@@ -1216,8 +1223,7 @@ def _replace_protocol_leaf_bodies(
                 ):
                     caption_open = True
                     continue
-                if (section.section_id == "evaluation-procedures" and paragraph.text in
-                        protocol_table_contracts(reference)["schedule-of-assessments"].get("supplemental_notes", [])):
+                if section.section_id == "evaluation-procedures" and paragraph.text in assessment_notes:
                     continue
                 if section.section_id in table_sections and caption_open:
                     continue
@@ -3399,24 +3405,35 @@ def _repair_section15_table_opening(document: Document, target: str) -> None:
     _prevent_row_split(table.rows[0])
 
 
-def _assessment_matrix(document: Document, reference: Mapping[str, Any], authority_path: Path) -> None:
+def _assessment_matrix(document: Document, reference: Mapping[str, Any], authority_path: Path, presentation: Any = None) -> None:
     """Populate Table 15.1 only from approved visit/procedure relationships."""
     placeholder = next((paragraph for paragraph in document.paragraphs if "{visitsTable}" in paragraph.text), None)
     if placeholder is None:
         return
-    table_contract = protocol_table_contracts(reference)["schedule-of-assessments"]
+    table_contract = protocol_table_contracts(reference, presentation)["schedule-of-assessments"]
     row_values = [list(row) for row in table_contract["rows"]]
     header_rows = int(table_contract["header_rows"])
-    detail_rows = table_contract.get("detail_rows", [])
-    if not row_values and not detail_rows:
+    notes = table_contract.get("supplemental_notes", [])
+    def insert_notes() -> None:
+        for text in notes:
+            paragraph = document.add_paragraph()
+            _copy_paragraph_design(paragraph, placeholder)
+            paragraph.add_run(text)
+            placeholder._p.addprevious(paragraph._p)
+
+    if not row_values:
+        previous = placeholder._p.getprevious()
+        if (previous is not None and previous.tag == qn("w:p")
+                and _layout_target_key(Paragraph(previous, document).text)
+                == _layout_target_key(table_contract["caption"])):
+            previous.getparent().remove(previous)
+        insert_notes()
         placeholder._element.getparent().remove(placeholder._element)
         return
     matrix_mode = header_rows == 2
     if matrix_mode:
         row_values = [list(row) for row in row_values]
         row_values[1][0] = ""
-    detail_start = len(row_values) if row_values else 1
-    row_values.extend(detail_rows)
 
     authority = Document(authority_path)
     design = authority.tables[-1]
@@ -3490,15 +3507,6 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
             cell_width.set(qn("w:type"), "dxa")
     for index, grid_column in enumerate(table._tbl.tblGrid.gridCol_lst):
         grid_column.set(qn("w:w"), str(widths[index]))
-    for row in table.rows[detail_start:]:
-        if len(row.cells) > 1:
-            # Clear copies before merging so Word does not concatenate them.
-            for cell in row.cells[1:]:
-                cell.text = ""
-            merged = row.cells[0].merge(row.cells[-1])
-            for paragraph in merged.paragraphs[1:]:
-                if not paragraph.text:
-                    paragraph._p.getparent().remove(paragraph._p)
     for cell in table._tbl.tr_lst[-1].tc_lst:
         properties = cell.get_or_add_tcPr()
         borders = properties.find(qn("w:tcBorders"))
@@ -3512,6 +3520,7 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
         for key, value in (("w:val", "double"), ("w:sz", "6"), ("w:space", "0"), ("w:color", "auto")):
             bottom.set(qn(key), value)
     placeholder._p.addprevious(table._tbl)
+    insert_notes()
     placeholder._element.getparent().remove(placeholder._element)
 
 
@@ -3637,7 +3646,9 @@ def _template_document(
                 paragraph._p.set(field_marker, json.dumps(registered))
     table_reference = document_table_reference(reference, model)
     if not icf:
-        _assessment_matrix(document, table_reference, authority_path)
+        presentation = next((section.get("assessment_presentation") for section in model.get("protocol", [])
+                             if section.get("section_id") == "evaluation-procedures"), None)
+        _assessment_matrix(document, table_reference, authority_path, presentation)
     _visit_rows(document, table_reference)
     for paragraph in list(_all_paragraphs(document)):
         _replace_paragraph(paragraph, fields)

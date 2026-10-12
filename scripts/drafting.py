@@ -44,6 +44,8 @@ from contracts import (
     normalized_visit_records,
     protocol_contract,
     protocol_table_contracts,
+    assessment_presentation_contract,
+    document_table_reference,
     source_evidence_coverage_map,
     sterling_draft_word_budget,
     assessment_matrix,
@@ -129,7 +131,7 @@ def _request_constraints() -> list[str]:
         "For Protocol sections, follow concept_ownership: explain owned concepts completely, keep brief_reference_only concepts concise, and do not re-explain do_not_restate concepts. Endpoint names, visit names and timing, identifiers, quantities, safety terms, and brief traceability cross-references may recur.",
         "Protocol General Information is a compact synopsis; Objectives states the study purpose and objectives; Study Design owns the grouped endpoint inventory; Study Methods and Measurements owns what is measured, when, and how; Analysis Data Sets owns which observations enter populations or datasets; Statistical Methodology owns how endpoints are summarized or analyzed. Group shared-method endpoints and do not reproduce the endpoint inventory outside Study Design unless scientific meaning requires it.",
         "Satisfy every section's content_expectations and cover every material value named by minimum_evidence, except that Section 15's source-derived table and notes carry its detailed inventory. Its adjacent prose should briefly introduce the table without restating its rows or notes.",
-        "Write clinical content that serves the section purpose. Omit self-referential filler, generic transitions, and repeated conclusions that add no source-supported information.",
+        "Write standalone clinical content that serves the section purpose. Refer to the study and its procedures directly, rather than to the synopsis, approved source, or drafting process. Preserve genuine numbered instruments/forms, citations and explained footnotes; remove a suspected orphan marker only when its source context supports that interpretation. Omit self-referential filler and redundant narration. These editorial preferences are not publication gates.",
         "Use reference_detail_target_words only as a soft compression signal; independent AI review assesses substantive completeness, and concise complete prose must not be padded, repeated, or invented to meet a length target.",
         "Explicitly distinguish the study objective, hypothesis, and endpoints when they describe different constructs.",
         "When the approved source does not define an instrument, scoring rule, denominator, missing-data method, date, or version, do not invent one or expose an internal source-gap note.",
@@ -530,6 +532,8 @@ def _section_payload(
         "optional_evidence": (["study.background"] if benefit_context_contract(reference, section.section_id) else []),
         "benefit_context": benefit_context_contract(reference, section.section_id),
         "schedule_interpretation": (schedule_interpretation_contract(reference)
+                                    if section.section_id == "evaluation-procedures" else None),
+        "assessment_presentation": (assessment_presentation_contract(reference)
                                     if section.section_id == "evaluation-procedures" else None),
         "table_evidence": list(section.table_evidence),
         "fixed_boilerplate": boilerplate_items,
@@ -2335,6 +2339,15 @@ def _source_interpretation_findings(
             errors.append(str(exc))
     elif item.get("schedule_interpretation") is not None:
         errors.append("This section has no authorized schedule interpretation.")
+    if item.get("assessment_presentation") is not None:
+        if not contract.get("assessment_presentation"):
+            errors.append("This section has no authorized assessment presentation.")
+        else:
+            try:
+                projected = document_table_reference(request["approved_source"], {"protocol": [item]})
+                protocol_table_contracts(projected, item["assessment_presentation"])
+            except (ValueError, TypeError, KeyError) as exc:
+                errors.append(str(exc))
     if contract.get("benefit_context"):
         interpretation = item.get("benefit_interpretation")
         if (not isinstance(interpretation, Mapping)
@@ -2484,7 +2497,7 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         ]
         if not blocking_section_findings:
             accepted.append({"section_id": section_id, "attempt": int(request.get("attempts", {}).get(section_id, 1)), "batch_id": request.get("batch_id"), "artifact": request.get("artifact"), "outcome": outcome, "paragraphs": clean_paragraphs, "lists": lists, "warnings": [dict(finding) for finding in section_findings if finding.get("publication_disposition") == "warning"], "producer": dict(producer), "request_id": request.get("request_id"), "request_sha256": request.get("request_sha256"), "governing_resources": dict(request.get("governing_resources", {})),
-                             **{key: copy.deepcopy(item[key]) for key in ("schedule_interpretation", "benefit_interpretation") if key in item}})
+                             **{key: copy.deepcopy(item[key]) for key in ("schedule_interpretation", "benefit_interpretation", "assessment_presentation") if key in item}})
     return {"kind": "sections", "drafts": accepted}, findings
 
 
@@ -2708,8 +2721,9 @@ def merged_drafts(
         draft = accepted_draft(revision_dir, section.section_id, expected_governing)
         entry["paragraphs"] = list(draft.get("paragraphs") or []) if draft else []
         entry["lists"] = list(draft.get("lists") or []) if draft else []
-        if draft and draft.get("schedule_interpretation") is not None:
-            entry["schedule_interpretation"] = copy.deepcopy(draft["schedule_interpretation"])
+        for key in ("schedule_interpretation", "assessment_presentation"):
+            if draft and draft.get(key) is not None:
+                entry[key] = copy.deepcopy(draft[key])
         protocol.append(entry)
     icf = {}
     for section in icf_contract(branch, str(get_path(reference, "meta.icf_template", "Advarra"))):

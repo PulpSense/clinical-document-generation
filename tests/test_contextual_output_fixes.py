@@ -79,7 +79,7 @@ def test_xml_does_not_accept_a_job_title_in_an_expected_blank_degree(tmp_path, p
 
 @pytest.mark.parametrize('branch,family', COMBINATIONS[1:])
 @pytest.mark.parametrize('structured', [False, True, None])
-def test_schedule_details_stay_inside_the_table_without_inferred_assignments(tmp_path, branch, family, structured):
+def test_schedule_details_are_prose_without_inferred_assignments(tmp_path, branch, family, structured):
     source = source_for(branch, family)
     if structured:
         source['procedures']['visit_schedule'] = [
@@ -90,28 +90,16 @@ def test_schedule_details_stay_inside_the_table_without_inferred_assignments(tmp
         source['procedures']['visit_schedule'] = []
     original = copy.deepcopy(source)
     rendering.render_documents(ROOT, tmp_path, source, {'protocol': [], 'icf': {}, 'prs': {}})
-    prs_xml.generate(ROOT / 'assets/client-templates/prs/clinicaltrials_prs_full_placeholder_template.xml',
-                     tmp_path / 'candidate/study.xml', source,
-                     {'brief_summary': 'Summary.', 'detailed_description': 'Description.'})
-    path = tmp_path / 'candidate/protocol.docx'
-    document = Document(path)
-    header = ('Approved assessment and safety details' if structured is None else
-              'Activity' if structured else 'Approved visit or assessment')
-    schedule = next(t for t in document.tables if t.cell(0, 0).text.strip() == header)
+    document = Document(tmp_path / 'candidate/protocol.docx')
     note = source['procedures']['assessments']
-    row = next((r for r in schedule.rows if r.cells[0].text == note), None)
-    assert row is not None, 'Approved assessment detail belongs inside Table 15.1'
-    assert len(row._tr.tc_lst) == 1, 'Unallocated detail must span the full table width'
-    assert not any(p.text == note for p in document.paragraphs)
+    assert note in [p.text for p in document.paragraphs]
+    schedules = [t for t in document.tables if t.cell(0, 0).text.strip() in {'Activity', 'Approved visit or assessment'}]
+    assert not any(note in c.text for t in schedules for row in t.rows for c in row.cells)
+    if structured:
+        schedule = next(t for t in document.tables if t.cell(0, 0).text.strip() == 'Activity')
+        assert ['Consent', 'X', ''] in [[c.text for c in r.cells] for r in schedule.rows]
+        assert ['Questionnaire', '', 'X'] in [[c.text for c in r.cells] for r in schedule.rows]
     assert source == original
-    assert not any('schedule-of-assessments' in f.get('table_ids', [])
-                   for f in quality.deterministic_content_check(tmp_path, source))
-    # Losing a detail is still a construction defect, even when X marks match.
-    row.cells[0].text = ''
-    document.save(path)
-    findings = [f for f in quality.deterministic_content_check(tmp_path, source)
-                if 'schedule-of-assessments' in f.get('table_ids', [])]
-    assert findings and all(f['owner'] == 'construction' for f in findings)
 
 
 @pytest.mark.parametrize('branch,family', COMBINATIONS)

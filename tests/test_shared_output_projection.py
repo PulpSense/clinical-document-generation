@@ -58,8 +58,8 @@ def test_public_assembly_preserves_references_and_uses_readable_fields(tmp_path,
     assert not any('None;' in c or 'control: 0' in c for t in tables for row in t for c in row)
     if branch != 'Retrospective':
         inventory = next(t for t in tables if t[0][0] == 'Approved visit or assessment')
-        assert inventory == [['Approved visit or assessment'], ['Screening'], ['Week 8 follow-up'],
-                             ['Approved assessment and safety details'], [source['procedures']['assessments']]]
+        assert inventory == [['Approved visit or assessment'], ['Screening'], ['Week 8 follow-up']]
+        assert source['procedures']['assessments'] in prose
         inventory_table = next(t for t in protocol.tables if t.cell(0, 0).text == 'Approved visit or assessment')
         for row in inventory_table.rows[1:]:
             assert row.cells[0]._tc.tcPr.find(qn('w:shd')) is None
@@ -123,7 +123,7 @@ def test_structured_schedule_keeps_real_timing_and_assignments(tmp_path, branch,
     rows = {r.cells[0].text: [c.text for c in r.cells[1:]] for r in table.rows[2:]}
     assert rows['Blood draw (5 mL)'] == ['X', '']
     assert rows['Questionnaire'] == ['', 'X']
-    assert table.rows[-1].cells[0].text == 'Additional assessment if clinically indicated.'
+    assert 'Additional assessment if clinically indicated.' in [p.text for p in document.paragraphs]
     visits = next(t for t in document.tables if t.cell(0, 0).text == 'Visit Number')
     assert visits.cell(2, 2).text == 'Week 8 ±7 days'
 
