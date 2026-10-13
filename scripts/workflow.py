@@ -4425,6 +4425,7 @@ def run_desktop_operation(
     *,
     handoff_runner: Callable[[list[Mapping[str, Any]], float], Any],
     fallback_handoff_runner: Callable[[list[Mapping[str, Any]], float], Any] | None = None,
+    parent_visual_callback_available: bool = True,
     opener: Callable[[str], bytes],
     operation_id: str = "default",
     budget_seconds: float = DESKTOP_OPERATION_BUDGET_SECONDS,
@@ -4444,6 +4445,9 @@ def run_desktop_operation(
     validates the immutable delivery manifest. The persisted deadline uses a
     UTC epoch so another process or compatible runtime cannot reset it.
     Monotonic time is converted to that epoch only within this process.
+    ``parent_visual_callback_available`` is caller-reported configuration presence,
+    not an image-capability attestation. False blocks only unresolved visual
+    fallback; a bound delegated response still completes without a parent.
     """
     run_dir = run_dir.resolve()
     clock = clock or time.monotonic
@@ -5108,6 +5112,18 @@ def run_desktop_operation(
                     candidates: Sequence[Mapping[str, Any]],
                 ) -> dict[str, Any] | None:
                     pending = unresolved_parent_handoffs(candidates)
+                    if pending and not parent_visual_callback_available:
+                        return {
+                            "status": "blocked", "stage": "parent_visual_review",
+                            "findings": [{
+                                "category": "environment",
+                                "field": str(item.get("response_path") or "parent_visual_review"),
+                                "code": "parent_visual_callback_unavailable",
+                                "verification_request_id": item.get("request_id"),
+                                "issue": "Delegated Visual QA is incomplete and no Desktop-parent visual callback is configured; no parent image-review attempt was made.",
+                            } for item in pending],
+                            "client_outputs": [],
+                        }
                     errors: list[str] = []
                     while pending:
                         eligible = []
@@ -5234,6 +5250,7 @@ def run_desktop_operation(
                 save("running")
                 authentication_failed = False
                 content_recovered_in_parallel = False
+                parent_block = None
 
                 def dispatch_review_wave(items: list[Mapping[str, Any]], budget: float) -> None:
                     scheduled, ordinary = [], []
@@ -5279,8 +5296,6 @@ def run_desktop_operation(
                                     pass
                             parent_block = run_bounded_parent_review(fallback_owned)
                             hard_future.result()
-                            if parent_block is not None:
-                                return finish(parent_block)
                     elif supports_parent_fallback and fallback_owned:
                         for delegated, timeout in (
                             (fresh_fallback_owned, soft_timeout),
@@ -5307,6 +5322,10 @@ def run_desktop_operation(
                     record_timing(stage, clock() - handoff_started)
                     record_soft_budget_event(stage)
                     save("running")
+                # Complete wave accounting before saving/archiving any terminal
+                # outcome. A return inside the try runs this finally afterwards.
+                if parent_block is not None:
+                    return finish(parent_block)
                 if supports_parent_fallback:
                     parent_block = run_bounded_parent_review(fallback_owned)
                     if parent_block is not None:
@@ -6851,6 +6870,7 @@ def run_production_desktop_operation(
         run_dir,
         handoff_runner=route,
         fallback_handoff_runner=fallback,
+        parent_visual_callback_available=parent_visual_reviewer is not None,
         opener=opener,
         operation_id=operation_id,
         runtime_identity=runtime_identity,
@@ -6864,6 +6884,10 @@ def run_production_desktop_operation(
     return {
         **result,
         "parent_visual_review": parent_review_record,
+        "parent_visual_callback": {
+            "configured": parent_visual_reviewer is not None,
+            "image_capability_validation": "not_attested" if parent_visual_reviewer is not None else "unavailable",
+        },
         "review_mode": "manual_pre_release" if manual_review else "governed_delivery",
         "host_mode": host_mode,
     }

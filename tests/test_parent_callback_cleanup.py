@@ -74,6 +74,62 @@ def test_parent_callback_reaps_sigterm_ignoring_descendant_and_retains_output(tm
                 os.kill(pid, signal.SIGKILL)
 
 
+@pytest.mark.skipif(sys.platform != 'linux', reason='Linux callback timeout/fallback regression')
+def test_desktop_timeout_falls_back_to_real_callback_and_reaps_both_attempts(tmp_path, monkeypatch):
+    from test_desktop_delivery import _visual_handoff_fixture
+    handoff, _, _ = _visual_handoff_fixture(tmp_path, 'protocol')
+    revision = tmp_path / 'revisions/r1'
+    pids = tmp_path / 'callback-pids.jsonl'
+    command = tmp_path / 'callback'
+    command.write_text(
+        f'#!{sys.executable}\n'
+        'import json, os, subprocess, sys, time\n'
+        'child = subprocess.Popen([sys.executable, "-B", "-c", '
+        '"import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(60)"], '
+        'start_new_session=True)\n'
+        f'with open({str(pids)!r}, "a") as f: f.write(json.dumps([os.getpid(), child.pid]) + "\\n")\n'
+        'print("no image judgment produced", flush=True)\n'
+        'time.sleep(60)\n'
+    )
+    command.chmod(0o700)
+    reviewer = workflow.command_parent_visual_reviewer(command)
+    monkeypatch.setattr(workflow, 'generate', lambda *a, **k: {
+        'status': 'awaiting_hermes', 'stage': 'independent_verification',
+        'revision_id': 'r1', 'handoffs': [handoff],
+    })
+    budgets = []
+    def invoke(items, budget):
+        budgets.append(budget)
+        reviewer(items, budget, revision, {})
+    started = time.monotonic()
+    try:
+        result = workflow.run_desktop_operation(
+            tmp_path, handoff_runner=invoke, fallback_handoff_runner=invoke,
+            opener=lambda _: b'unused', budget_seconds=2.0,
+            stage_soft_budgets={'independent_verification': 0.4},
+        )
+        state = json.loads((tmp_path / 'logs/desktop-operation.json').read_text())
+        assert result['status'] == state['status'] == 'blocked'
+        assert result['findings'][0]['code'] == 'missing_parent_visual_review_response'
+        assert len(budgets) == 2 and budgets[0] == 0.4 and 0 < budgets[1] < 2.0
+        assert state['attempt_counters']['parent_visual_callbacks'] == {handoff['request_sha256']: 1}
+        assert state['deadline_at_epoch'] - state['started_at_epoch'] == 2.0
+        assert time.monotonic() - started < 6.0
+        diagnostics = [json.loads(p.read_text()) for p in (tmp_path / 'logs/parent-visual-reviewer').glob('*.json')]
+        assert len(diagnostics) == 2
+        assert all(d['timed_out'] and d['cleanup_complete'] and not d['cleanup_errors'] for d in diagnostics)
+        assert all(d['stdout'] == 'no image judgment produced\n' for d in diagnostics)
+        assert len(pids.read_text().splitlines()) == 2
+        assert all(not _alive(pid) for row in pids.read_text().splitlines() for pid in json.loads(row))
+        assert not (revision / handoff['response_path']).exists()
+    finally:
+        if pids.exists():
+            for row in pids.read_text().splitlines():
+                for pid in json.loads(row):
+                    if _alive(pid):
+                        os.kill(pid, signal.SIGKILL)
+
+
 @pytest.mark.skipif(sys.platform != 'linux', reason='Linux subreaper ownership regression')
 def test_parent_callback_owns_double_fork_but_not_unrelated_host_child(tmp_path):
     revision = tmp_path / 'revisions/r1'

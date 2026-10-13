@@ -2307,6 +2307,114 @@ def test_mutated_visual_request_cannot_suppress_parent_fallback(tmp_path, monkey
     assert parent_reviews == [handoff, handoff]
 
 
+@pytest.mark.parametrize("concurrent_content", [False, True])
+def test_parent_failure_persists_terminal_state_after_wave_accounting(
+    tmp_path, monkeypatch, concurrent_content,
+):
+    handoff, _, _ = _visual_handoff_fixture(tmp_path, "protocol")
+    handoffs = [handoff]
+    if concurrent_content:
+        handoffs.append({"task": "clinical_content_verification", "request_path": "missing.json"})
+    monkeypatch.setattr(workflow, "generate", lambda *_args, **_kwargs: {
+        "status": "awaiting_hermes", "stage": "independent_verification",
+        "revision_id": "r1", "handoffs": handoffs,
+    })
+    def failed_parent(*_args):
+        raise RuntimeError("callback transport failed")
+    result = workflow.run_desktop_operation(
+        tmp_path, handoff_runner=lambda *_args: None,
+        fallback_handoff_runner=failed_parent, opener=lambda _: b"unused",
+        budget_seconds=30, clock=lambda: 0.0, wall_clock=lambda: 1000.0,
+    )
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert result["status"] == "blocked"
+    assert state["status"] == result["status"]
+    assert state["result"]["stage_timings"]["independent_verification"]["invocations"] >= 1
+    assert state["deadline_at_epoch"] == 1030.0
+    with ZipFile(tmp_path / result["diagnostic_archive"]["path"]) as archive:
+        archived = json.loads(archive.read("logs/desktop-operation.json"))
+    assert archived["status"] == state["status"]
+    assert archived["result"]["stage_timings"] == state["result"]["stage_timings"]
+
+
+@pytest.mark.parametrize("failure", ["deadline", "authentication", "launch"])
+def test_early_handoff_terminal_outcomes_follow_finally_and_preserve_deadline(
+    tmp_path, monkeypatch, failure,
+):
+    now = [0.0]
+    monkeypatch.setattr(workflow, "generate", lambda *a, **k: {
+        "status": "awaiting_hermes", "stage": "drafting",
+        "handoffs": [{"request_path": "draft.json"}],
+    })
+    def dispatch(*_args):
+        if failure == "deadline":
+            now[0] = 11.0
+            raise RuntimeError("worker timed out")
+        if failure == "authentication":
+            raise workflow.WorkerAuthenticationError("login unavailable")
+        raise workflow.WorkerLaunchUnavailableError("launcher unavailable")
+    result = workflow.run_desktop_operation(
+        tmp_path, handoff_runner=dispatch, opener=lambda _: b"unused",
+        budget_seconds=10.0, clock=lambda: now[0], wall_clock=lambda: 1000.0,
+    )
+    state = json.loads((tmp_path / "logs/desktop-operation.json").read_text())
+    assert state["status"] == result["status"] == ("timeout" if failure == "deadline" else "blocked")
+    assert result["stage"] == {"deadline": "hermes_handoff", "authentication": "worker_authentication", "launch": "review_tooling"}[failure]
+    assert state["deadline_at_epoch"] == 1010.0
+    assert state["result"]["stage_timings"]["drafting"]["invocations"] >= 2
+    with ZipFile(tmp_path / result["diagnostic_archive"]["path"]) as archive:
+        archived = json.loads(archive.read("logs/desktop-operation.json"))
+    assert archived["status"] == state["status"]
+    assert archived["result"]["stage_timings"] == state["result"]["stage_timings"]
+
+
+@pytest.mark.parametrize("delegated_response", [False, True])
+def test_production_missing_parent_does_not_count_phantom_callbacks(
+    tmp_path, monkeypatch, delegated_response,
+):
+    run = tmp_path / "run"
+    handoff, _, response = _visual_handoff_fixture(run, "protocol")
+    reference = run / "reference/study.reference.json"
+    reference.parent.mkdir(parents=True)
+    reference.write_text(json.dumps({"approval": {"revision_id": "r1"}}))
+    root = tmp_path / "skill"
+    root.mkdir()
+    monkeypatch.setattr(workflow, "_installed_release_identity", lambda _: {
+        "package_fingerprint": "installed", "git_commit": "abc", "source": "test",
+    })
+    monkeypatch.setattr(workflow, "resolve_python_runtime", lambda **_: {
+        "executable": sys.executable, "version_info": [3, 11, 0],
+    })
+    monkeypatch.setattr(workflow, "_pdfium_runtime_integrity", lambda *a, **k: {"status": "passed"})
+    outcomes = iter([
+        {"status": "awaiting_hermes", "stage": "independent_verification",
+         "revision_id": "r1", "handoffs": [handoff]},
+        {"status": "blocked", "stage": "quality", "findings": [], "client_outputs": []},
+    ])
+    monkeypatch.setattr(workflow, "generate", lambda *a, **k: next(outcomes))
+    def dispatch(*_args, **_kwargs):
+        if delegated_response:
+            path = run / "revisions/r1" / handoff["response_path"]
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(response))
+    monkeypatch.setattr(workflow, "_production_dispatch_handoffs", dispatch)
+    result = workflow.run_production_desktop_operation(
+        run, skill_root=root, opener=lambda _: b"unused",
+    )
+    state = json.loads((run / "logs/desktop-operation.json").read_text())
+    assert state["attempt_counters"]["parent_visual_callbacks"] == {}
+    assert state["status"] == result["status"]
+    assert result["parent_visual_review"] is None
+    assert result["parent_visual_callback"] == {
+        "configured": False, "image_capability_validation": "unavailable",
+    }
+    if delegated_response:
+        assert result["stage"] == "quality"
+    else:
+        assert result["findings"][0]["code"] == "parent_visual_callback_unavailable"
+        assert "initial callback" not in result["findings"][0]["issue"]
+
+
 def test_parent_fallback_exception_gets_one_bounded_retry_then_blocks(tmp_path, monkeypatch):
     handoff, _, _ = _visual_handoff_fixture(tmp_path, "protocol")
     monkeypatch.setattr(workflow, "generate", lambda _run_dir, **_kwargs: {
