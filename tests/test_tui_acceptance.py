@@ -11,6 +11,66 @@ from readiness_injection import campaign_adapter
 from hermes_tui_host_checks import collect
 
 
+# Controlled subprocess tools model the Hermes wire format and whole-file
+# overwrite guard, not live host assurance or the complete file-tool API.
+_FAKE_FILE_TOOLS = '''import hashlib
+import json
+from pathlib import Path
+
+_baselines = {}
+
+def _digest(path):
+ return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def read_file_tool(path, offset=1, limit=100):
+ p = Path(path).resolve()
+ lines = p.read_text().splitlines()
+ selected = lines[offset-1:offset-1+limit]
+ truncated = offset-1+limit < len(lines)
+ if offset == 1 and not truncated:
+  _baselines[p] = _digest(p)
+ return json.dumps({'content': '\\n'.join(f'{i}|{line}' for i, line in enumerate(selected, offset)),
+                    'total_lines': len(lines), 'truncated': truncated})
+
+def write_file_tool(path, content):
+ p = Path(path).resolve()
+ if p.exists() and _baselines.get(p) != _digest(p):
+  return json.dumps({'error': 'Read the full current file before overwrite', 'verified': False})
+ p.parent.mkdir(parents=True, exist_ok=True)
+ p.write_text(content)
+ verified = p.read_bytes() == content.encode()
+ if verified:
+  _baselines[p] = _digest(p)
+ return json.dumps({'bytes_written': len(content.encode()), 'verified': verified,
+                    'resolved_path': str(p), 'files_modified': [str(p)]})
+'''
+
+
+def test_controlled_file_tools_require_full_current_read_before_overwrite(tmp_path):
+    tools = {}
+    exec(_FAKE_FILE_TOOLS, tools)
+    read = tools['read_file_tool']
+    write = tools['write_file_tool']
+    path = tmp_path / 'checkpoint.json'
+    path.write_text('')
+    refused = json.loads(write(str(path), 'new'))
+    assert refused['error'] and refused['verified'] is False
+    assert path.read_text() == ''
+    assert json.loads(read(str(path)))['content'] == ''
+    assert json.loads(write(str(path), 'one\ntwo'))['verified'] is True
+    path.write_text('changed\nagain')
+    assert json.loads(write(str(path), 'stale'))['error']
+    partial = json.loads(read(str(path), limit=1))
+    assert partial['content'] == '1|changed' and partial['truncated'] is True
+    assert json.loads(write(str(path), 'partial'))['error']
+    full = json.loads(read(str(path)))
+    assert full['total_lines'] == 2 and full['truncated'] is False
+    assert json.loads(write(str(path), 'complete'))['verified'] is True
+    new = tmp_path / 'native-probe.py'
+    assert json.loads(write(str(new), 'pass'))['verified'] is True
+
+
+
 def host_report(identity):
     return {'schema_version': 'hermes-tui-host-checks/v1', 'status': 'passed', 'host_mode': 'hermes-tui',
         'candidate_identity': identity, 'recipient_delivery_verified': False, 'os_isolation_verified': False,
@@ -94,7 +154,7 @@ def test_host_check_exercises_real_tool_process_native_edit_and_cleanup(tmp_path
     tools = hermes / 'tools'
     tools.mkdir(parents=True)
     (tools / '__init__.py').write_text('')
-    (tools / 'file_tools.py').write_text('from pathlib import Path\ndef read_file_tool(path,offset=1,limit=100):\n return "".join(Path(path).read_text().splitlines(True)[offset-1:offset-1+limit])\ndef write_file_tool(path,value):\n Path(path).write_text(value)\n')
+    (tools / 'file_tools.py').write_text(_FAKE_FILE_TOOLS)
     launcher = hermes / '.venv/bin/hermes'
     monkeypatch.setattr('hermes_tui_host_checks.platform.system', lambda: 'Linux')
     monkeypatch.setattr(workflow, '_managed_hermes_pair', lambda: (launcher, Path(sys.executable)))
