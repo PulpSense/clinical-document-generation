@@ -214,3 +214,18 @@ def test_checkpoint_preparation_rejects_unsafe_paths_without_changing_evidence(t
         workflow._prepare_worker_checkpoint(revision, relative)
     assert sentinel.read_bytes() == b'original evidence'
     assert sorted(p.name for p in outside.iterdir()) == ['saved.json']
+
+
+def test_native_worker_imports_leave_installed_runtime_unchanged(tmp_path):
+    import sys
+    root = tmp_path / 'profile/skills/clinical-document-generation'
+    module = root / 'runtime/python/pypdfium2/__init__.py'
+    module.parent.mkdir(parents=True)
+    module.write_text('VERSION = "probe"\n')
+    environment = workflow._production_subprocess_environment(root)
+    program = 'import sys; sys.path.insert(0, sys.argv[1]); import pypdfium2; assert pypdfium2.VERSION == "probe"'
+    for _ in range(2):
+        result = subprocess.run([sys.executable, '-c', program, str(module.parent.parent)],
+            env=environment, capture_output=True, text=True)
+        assert result.returncode == 0, result.stderr
+        assert sorted(str(p.relative_to(root / 'runtime')) for p in (root / 'runtime').rglob('*') if p.is_file()) == ['python/pypdfium2/__init__.py']

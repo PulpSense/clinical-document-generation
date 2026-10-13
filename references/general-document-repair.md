@@ -7,12 +7,22 @@ The bound `hermes-response/v2` reports `completed`, `disputed` or `needs_review`
 
 Malformed tool/response results receive actionable feedback without clinical findings or adoption. An identical ineffective technical response/workspace after feedback returns `document_repair_no_progress`; an author reporting no productive safe correction returns `document_repair_unresolved`. Both preserve the original candidate for #107's usability/trust assessment and complete review-only delivery. Source/base/integrity mutation remains unavailable. Repeated unchanged substantive actions carry reassessment feedback into the next AI pass; there is no universal repair-count limit. Every pass retains the original operation deadline and asks the author to reserve final verification/delivery time.
 
-Production repair workers can write only declared native/script work areas and
+Default isolated production repair workers can write only declared native/script work areas and
 private dispatch runtime state. Linux uses the same ordinary Bubblewrap boundary
 as review workers, with a private network namespace and governed provider bridge;
 Darwin uses its native sandbox profile. Installed integrity and source/base hashes
 are also verified before adoption. Actual installed enforcement and capabilities
 require bound installation probe evidence before admission; local controlled tests
 alone do not establish Linux readiness. Installed code is never a repair surface.
+Restricted Hermes TUI mode instead uses the host-managed boundary documented in
+[runtime-and-release.md](runtime-and-release.md#restricted-hermes-tui-compatibility);
+OS write/network denial is not claimed in that mode.
+
+Run native Python tools with `-B`, including alongside `-I`. Managed worker and
+parent environments suppress bytecode writes, and the PDFium worker uses `-B`.
+Imports must leave the installed runtime inventory unchanged across inspection,
+repair and rerendering. Do not delete or ignore unexpected runtime files during
+generation; a contaminated installation requires a fresh verified replacement.
+
 
 Focused public lifecycle tests use actual python-docx/ElementTree editing with controlled reviewers/renderers. They demonstrate native edits, dispute reassessment, newly introduced XML defects, reconstruction preservation, malformed edits, stale responses, source/base mutation and reviewer independence. These adapters establish control flow and byte preservation, not live AI quality or latency.

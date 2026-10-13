@@ -2412,6 +2412,7 @@ def _pdfium_worker_command(request_path: Path) -> list[str]:
     release_root = Path(__file__).resolve().parents[1]
     return [
         sys.executable,
+        "-B",
         str(release_root / "scripts/workflow.py"),
         "--internal-pdfium-worker",
         str(request_path),

@@ -5652,7 +5652,8 @@ def _production_agent_prompt(
             "request_id", "request_sha256", "task")}, ensure_ascii=False) + f"; revision_id={revision_dir.name}. "
            if task in {"clinical_content_verification", "rendered_page_visual_verification"} else "")
         + f"{response_write_rule}{verification_rule}{repair_rule} The validator interpreter is dependency-complete; do not search "
-        "the filesystem for Python or dependency paths. Do not modify production code or "
+        "the filesystem for Python or dependency paths. Run native Python tools with -B, "
+        "including when using -I, so import caches cannot modify the installed runtime. Do not modify production code or "
         "approved source material."
     )
 
@@ -5683,6 +5684,9 @@ def _production_subprocess_environment(skill_root: Path) -> dict[str, str]:
         "XDG_DATA_HOME": str(hermes_home / ".local/share"),
         "XDG_STATE_HOME": str(hermes_home / ".local/state"),
         "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+        # Native repair/inspection subprocesses may import the packaged runtime.
+        # Python cache writes would otherwise invalidate its exact inventory.
+        "PYTHONDONTWRITEBYTECODE": "1",
     })
     for name in (".tmp", ".cache", ".config", ".local/share", ".local/state"):
         (hermes_home / name).mkdir(parents=True, exist_ok=True)
@@ -6958,6 +6962,7 @@ def command_parent_visual_reviewer(
         })
         completed = subprocess.run(
             [str(command), str(request_path)],
+            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
             check=False,
             timeout=max(1.0, remaining_seconds),
             stdout=subprocess.PIPE,
