@@ -43,6 +43,10 @@ def inject_native(candidate_dir: Path, seed: dict, ledger_dir: Path):
     if len(nodes) != seed.get('expected_matches', 1):
         raise ValueError('Predeclared native seed selector is missing or ambiguous.')
     for node in nodes:
+        if seed.get('required_text'):
+            texts = node.xpath('.//w:t/text()', namespaces=seed.get('namespaces', {}))
+            if seed['required_text'] not in ' '.join(texts):
+                raise ValueError('The predeclared material clinical row is absent; preserve an unexecuted challenge.')
         attribute = seed.get('attribute')
         actual = node.get(attribute) if attribute else node.text
         before = seed.get('before')
@@ -232,7 +236,13 @@ def campaign_adapter(workflow, planned, run_dir: Path, opener):
                 directory.mkdir()
                 (directory / 'real-final.bin').write_bytes(path.read_bytes())
                 (directory / 'real-checkpoint.bin').write_bytes(checkpoint.read_bytes())
+                original_final = path.read_bytes()
                 path.write_bytes(b'{')
+                saved = workflow.content_review_unit_result(revision, revision / handoff['request_path'])
+                if not saved or not (saved['section_assessments'] or saved['cross_document_assessments'] or saved['findings']):
+                    path.write_bytes(original_final)
+                    record('fault_not_executed_no_consumable_checkpoint', request_id=request['request_id'])
+                    raise RuntimeError('F1 requires authenticated consumable saved progress; the fault was not executed')
                 interrupted = True
                 record('truncate_real_final_and_interrupt_parent', request_id=request['request_id'])
                 raise ParentInterruption()
@@ -266,6 +276,8 @@ def campaign_adapter(workflow, planned, run_dir: Path, opener):
                 record('transient_actual_recipient_transport_failure')
                 raise OSError('Predeclared transient recipient retrieval fault')
             return opener(path)
+        if hasattr(opener, 'capability_executable'):
+            retrieval.capability_executable = opener.capability_executable
         replacements = {'render_assurance': render, 'create_verification_requests': requests,
             '_production_subprocess_environment': environment, '_production_publish_quiet_response': publish,
             '_production_dispatch_handoffs': dispatch, '_production_sandbox_prefix': prefix}

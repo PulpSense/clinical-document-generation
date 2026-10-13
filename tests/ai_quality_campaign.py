@@ -60,12 +60,14 @@ def supplemental_seed_plan(case_id, source):
     if case_id == 'Q3':
         return [text_seed('Q3.1', 'protocol.docx', 'Reminder calls support follow-up.', ''),
             dict(seed_id='Q3.2', artifact='protocol.docx', part='word/header1.xml', namespaces=w,
-                 xpath='(//w:p)[1]', operation='replace_paragraph',
-                 after='Study title: Unsupported substituted clinical study', check_before=False,
-                 source_path='study.title', approved_value=source['study']['title'])]
+                 xpath=f'(//w:t[text()={json.dumps(source["study"]["short_title"])}])[1]',
+                 before=source['study']['short_title'], after='Unsupported substituted clinical study',
+                 source_path='study.short_title')]
     if case_id == 'Q4':
-        return [dict(seed_id='Q4.1', artifact='icf.docx', part='word/document.xml', namespaces=w,
-                     xpath='(//w:tbl/w:tr)[1]', operation='exact_row_height', twips=1, check_before=False)]
+        return [dict(seed_id='Q4.1', artifact='protocol.docx', part='word/document.xml', namespaces=w,
+                     xpath='(//w:tbl/w:tr[.//w:t[contains(., "Month 3")]])[1]',
+                     required_text='Month 3', source_path='procedures.visit_schedule_table',
+                     operation='exact_row_height', twips=1, check_before=False)]
     if case_id == 'D1':
         return [{'seed_id': 'D1.1', 'finding_id': 'D1-harmless-paraphrase', 'artifact': 'protocol',
             'target_ids': ['ethics'], 'check': 'source_supported', 'material': True,

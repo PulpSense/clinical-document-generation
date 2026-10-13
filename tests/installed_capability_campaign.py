@@ -136,6 +136,9 @@ time.sleep(60)
 
 def collect(workflow, root, opener, parent_reviewer, approved_by):
     from worker_capabilities import REQUIRED_CAPABILITIES, digest
+    integrity = workflow._manifest_integrity(root)
+    if integrity:
+        raise ValueError('Installed candidate inventory differs from its immutable manifest: ' + str(integrity))
     identity = workflow._worker_capability_identity(root)
     base = root.parent.parent / 'clinical-capabilities' / identity['package_manifest_sha256']
     attempt = base / ('attempt-' + uuid.uuid4().hex)

@@ -6086,6 +6086,31 @@ def _open_production_worker_logs(logs: Path, request_id: str) -> tuple[Any, Any]
     return stdout, stderr
 
 
+def _production_worker_usage(state: Path) -> dict[str, Any]:
+    """Read only installed Hermes metadata; never export message/credential contents."""
+    import sqlite3
+    database = state / 'state.db'
+    unavailable = {'read_calls': None, 'tokens': None, 'tool_calls': None,
+                   'provenance': 'installed_worker_metadata_unavailable'}
+    if database.is_symlink() or not database.is_file():
+        return unavailable
+    try:
+        connection = sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=1)
+        try:
+            tools = {str(name): int(count) for name, count in connection.execute(
+                "SELECT tool_name, COUNT(*) FROM messages WHERE role='tool' AND tool_name IS NOT NULL GROUP BY tool_name")}
+            tokens = connection.execute('SELECT SUM(input_tokens), SUM(output_tokens) FROM sessions').fetchone()
+        finally:
+            connection.close()
+        return {'read_calls': tools.get('read_file', 0), 'tool_calls': tools,
+            'tokens': {'input': tokens[0], 'output': tokens[1]} if tokens else None,
+            'provenance': 'installed_Hermes_state_db_metadata',
+            'accounting_note': 'Recorded runtime counts; termination may precede final in-flight token accounting.',
+            'inventory': {p.name: sha256_file(p) for p in (database, Path(str(database) + '-wal')) if p.is_file()}}
+    except (OSError, ValueError, sqlite3.DatabaseError):
+        return unavailable
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -6099,6 +6124,7 @@ def _production_dispatch_handoffs(
 ) -> None:
     """Run one concurrent Hermes wave under a read-only candidate boundary."""
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
+    worker_states: dict[int, Path] = {}
     repair_wave = any(handoff.get("task") == "document_repair" for handoff in handoffs)
     release_manifest_hash = None
     if repair_wave:
@@ -6288,6 +6314,7 @@ def _production_dispatch_handoffs(
             raise
         assert profile is not None and proxy is not None
         assert stdout_handle is not None and stderr_handle is not None
+        worker_states[process.pid] = worker_state
         processes.append((process, handoff, stdout_handle, stderr_handle, Path(profile.name), started, proxy))
     try:
         pending = list(processes)
@@ -6368,6 +6395,7 @@ def _production_dispatch_handoffs(
                         "started_monotonic": started,
                         "ended_monotonic": ended,
                         "elapsed_seconds": round(ended - started, 3),
+                        "worker_usage": _production_worker_usage(worker_states[process.pid]),
                         "returncode": process.returncode,
                         "response_exists": response_path.is_file(),
                         "stdout_log": Path(str(stdout_handle.name)).relative_to(run_dir).as_posix(),

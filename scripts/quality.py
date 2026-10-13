@@ -5511,7 +5511,8 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
             for row in _source_field_inventory(scoped_source)],
         readable_native_evidence=passages, native_inspection=[],
         native_inspection_fallback=parent["native_inspection"],
-        review_context=context, authorized_boilerplate=parent["authorized_boilerplate"],
+        review_context=context, authorized_boilerplate=({"parent_request_path": parent_path.relative_to(revision_dir).as_posix(),
+            "field": "authorized_boilerplate"} if full_source else parent["authorized_boilerplate"]),
         contracted_template_bundle=parent["contracted_template_bundle"],
         review_rules=parent["instructions"], sterling_clause_contract=({"parent_request_path": parent_path.relative_to(revision_dir).as_posix(),
             "field": "sterling_clause_contract"} if parent.get("sterling_clause_contract")
@@ -5521,7 +5522,7 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
           "first: inline passages or staged path/sha256 references are extracted from exact native files. "
           "Read staged references in bounded groups; do not infer a pass from the index. Full approved source "
           "is in canonical_source_evidence.parent_request_path and its lossless bounded index. Read any staged "
-          "sterling_clause_contract parent field before judging applicable consent language. Tables remain structured "
+          "authorized_boilerplate and sterling_clause_contract parent fields before judging applicable language. Tables remain structured "
           "and shell/XML evidence includes native locations. Use full native inspection fallback or the canonical "
           "parent approved source if more context is necessary; missing expected content is reviewable. "
           "Do not review unrelated sections or reread all formatting XML. Return explicit independent judgments "
@@ -5534,8 +5535,10 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
           "prior concerns in review_context, explaining resolutions in assessment notes. " + parent["template_preservation"])
     unit["parent_request_path"] = parent_path.relative_to(revision_dir).as_posix()
     unit["workload"] = {"inline_serialized_bytes": len(json.dumps(unit, ensure_ascii=False).encode()),
-        "staged_native_bytes": sum((revision_dir / view["path"]).stat().st_size for view in passages
-                                   if "path" in view),
+        "staged_native_bytes": sum((revision_dir / path).stat().st_size for view in passages
+            if (path := view.get("path") or (view.get("passage", {}).get("staged_path")
+                if isinstance(view.get("passage"), Mapping) else None))),
+        "canonical_parent_bytes": parent_path.stat().st_size,
         "assigned_sections": len(sections), "assigned_cross_checks": len(cross_checks),
         "available_page_count": sum(count for artifact, count in plan.get("page_count_by_artifact", {}).items()
                                     if cross_checks or any(row["artifact"] == artifact for row in sections)),
