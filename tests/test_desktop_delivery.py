@@ -711,15 +711,15 @@ def test_linux_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, mon
     monkeypatch.setattr(workflow.platform, "system", lambda: "Linux")
     launcher = Path("/opt/hermes/.venv/bin/hermes")
     interpreter = launcher.parent / "python"
-    setpriv = Path("/usr/bin/setpriv")
+    bwrap = Path("/usr/bin/bwrap")
     managed = tmp_path / "managed"
     managed.mkdir()
-    for name in ("hermes", "setpriv"):
+    for name in ("hermes", "bwrap"):
         executable = managed / name
         executable.write_text("#!/bin/sh\n", encoding="utf-8")
         executable.chmod(0o700)
     (managed / "python").symlink_to(Path(sys.executable))
-    fixtures = {launcher: managed / "hermes", interpreter: managed / "python", setpriv: managed / "setpriv"}
+    fixtures = {launcher: managed / "hermes", interpreter: managed / "python", bwrap: managed / "bwrap"}
     is_file, is_symlink, access = Path.is_file, Path.is_symlink, os.access
     monkeypatch.setattr(Path, "is_file", lambda path: is_file(fixtures.get(path, path)))
     monkeypatch.setattr(Path, "is_symlink", lambda path: is_symlink(fixtures.get(path, path)))
@@ -733,12 +733,15 @@ def test_linux_production_launcher_and_sandbox_ignore_ambient_path(tmp_path, mon
     monkeypatch.setenv("PATH", str(attacker))
 
     assert workflow._managed_hermes_pair() == (launcher, interpreter)
-    assert workflow._production_sandbox_prefix(tmp_path / "profile.sb") == [
-        str(setpriv), "--no-new-privs", "--inh-caps=-all", "--ambient-caps=-all",
-    ]
-    (managed / "setpriv").unlink()
-    with pytest.raises(RuntimeError, match="privilege-isolation executable is unavailable"):
-        workflow._production_sandbox_prefix(tmp_path / "profile.sb")
+    policy = tmp_path / "profile.json"
+    policy.write_text(json.dumps({"readable": [], "writable": [], "protected": [],
+        "proxy_socket": str(tmp_path / "proxy.sock"), "proxy_port": 3128, "cwd": str(tmp_path)}))
+    prefix = workflow._production_sandbox_prefix(policy)
+    assert prefix[0] == str(bwrap)
+    assert "--unshare-all" in prefix
+    (managed / "bwrap").unlink()
+    with pytest.raises(RuntimeError, match="Bubblewrap"):
+        workflow._production_sandbox_prefix(policy)
     (managed / "hermes").unlink()
     with pytest.raises(RuntimeError, match="virtual-environment launcher is unavailable"):
         workflow._managed_hermes_pair()
@@ -827,7 +830,7 @@ def test_production_sandbox_read_policy_is_allowlisted(
     assert completed.returncode == 0, completed.stderr
     response_dir = run_dir / "revision/hermes/responses"
     response_dir.mkdir(parents=True)
-    relative_response = "revision/hermes/responses/probe.json"
+    relative_response = str(Path(captured["environment"]["TMPDIR"]) / "runtime-marker.json")
     allowed_write = subprocess.run(
         [
             "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),
@@ -837,7 +840,12 @@ def test_production_sandbox_read_policy_is_allowlisted(
         cwd=run_dir, capture_output=True, check=False,
     )
     assert allowed_write.returncode == 0, allowed_write.stderr
-    assert (run_dir / relative_response).read_text(encoding="utf-8") == "passed"
+    assert Path(relative_response).read_text(encoding="utf-8") == "passed"
+    denied_review_write = subprocess.run([
+        "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]), "/usr/bin/python3", "-c",
+        "from pathlib import Path; Path('revision/hermes/responses/probe.json').write_text('blocked')"],
+        cwd=run_dir, capture_output=True, check=False)
+    assert denied_review_write.returncode != 0
     denied_skill_write = subprocess.run(
         [
             "/usr/bin/sandbox-exec", "-f", str(captured["profile_path"]),

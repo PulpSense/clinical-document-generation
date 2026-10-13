@@ -18,7 +18,7 @@ TEST_FILES = (
     'test_general_document_repair.py', 'test_ai_delivery_outcomes.py',
     'test_reviewer_transport.py', 'test_worker_readiness.py',
     'test_offline_reliability_gate.py', 'test_ai_quality_campaign.py',
-    'test_content_review_recovery.py', 'test_review_scheduler.py',
+    'test_content_review_recovery.py', 'test_review_scheduler.py', 'test_readiness_recovery.py', 'test_worker_boundary.py',
 )
 
 

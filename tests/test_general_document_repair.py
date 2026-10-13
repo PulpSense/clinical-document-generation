@@ -247,9 +247,9 @@ def test_real_injected_prose_is_removed_and_freshly_reviewed_across_families(tmp
     observations = []
     def draft(request):
         response = drafting.recorded_acceptance_response(request)
-        for row in response.get('section_results', []):
-            if row['section_id'] == 'introduction':
-                row['paragraphs'][0]['text'] += ' ' + defect
+        if any(row['section_id'] == 'introduction' for row in response.get('section_results', [])):
+            from readiness_injection import inject_drafting_response
+            return inject_drafting_response(request, response, defect, tmp_path / 'seed-ledger' / request['request_id'])
         return response
     def review(request, response, revision, count):
         present = any(defect in p.text for p in Document(revision / 'candidate/protocol.docx').paragraphs)

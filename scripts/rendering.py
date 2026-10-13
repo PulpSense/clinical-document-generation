@@ -252,10 +252,12 @@ def protocol_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
             elif active and paragraph_level is not None and paragraph_level <= level:
                 break
             if active:
-                snapshot.append({"paragraph": paragraph.text, "style": paragraph.style.name})
+                snapshot.append({"location": "word/document.xml:" + element.getroottree().getpath(element),
+                                 "paragraph": paragraph.text, "style": paragraph.style.name})
         elif active and element.tag == qn("w:tbl"):
             table = Table(element, document)
-            snapshot.append({"table": [[cell.text for cell in row.cells] for row in table.rows]})
+            snapshot.append({"location": "word/document.xml:" + element.getroottree().getpath(element),
+                             "table": [[cell.text for cell in row.cells] for row in table.rows]})
     return snapshot
 
 
@@ -294,14 +296,16 @@ def rendered_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
     if heading is None:
         return []
     elements, _ = _icf_section_elements(document, heading, _STERLING_ICF_HEADING_KEYS | _ADVARRA_ICF_HEADING_KEYS)
-    snapshot = [{"heading": heading.text}]
+    snapshot = [{"heading": heading.text, "location": "word/document.xml:" + heading._p.getroottree().getpath(heading._p)}]
     for element in elements:
         if element.tag == qn("w:p"):
             paragraph = Paragraph(element, document)
-            snapshot.append({"paragraph": paragraph.text, "style": paragraph.style.name})
+            snapshot.append({"location": "word/document.xml:" + element.getroottree().getpath(element),
+                                 "paragraph": paragraph.text, "style": paragraph.style.name})
         elif element.tag == qn("w:tbl"):
             table = Table(element, document)
-            snapshot.append({"table": [[cell.text for cell in row.cells] for row in table.rows]})
+            snapshot.append({"location": "word/document.xml:" + element.getroottree().getpath(element),
+                             "table": [[cell.text for cell in row.cells] for row in table.rows]})
     return snapshot
 
 

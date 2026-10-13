@@ -188,3 +188,36 @@ scripts/
 Do not add a second workflow entrypoint. The installation-owned `runtime/`
 directory contains only the manifest-bound PDFium runtime and packaged fonts
 used by Render Assurance; host Word or LibreOffice remains the DOCX renderer.
+
+
+## Installed worker capability evidence
+
+Spec #114 requires owner-authorized probes before clinical admission. Ordinary
+generation neither provisions dependencies nor runs a maintenance/model suite.
+The tiny authentication/read probe is diagnostic only. Admission additionally
+requires `clinical-capabilities/<package-manifest-sha256>/assurance.json` under
+the isolated Hermes profile, outside the immutable skill package.
+
+The `worker-capabilities/v1` report records `identity` (package manifest hash,
+Hermes launcher/interpreter hashes, configuration hash and actual selected model,
+compatible Python hash, office renderer hash, host font hashes and installed
+Hermes tool hashes) and `capabilities`. Use the exact identity returned by the
+installed probe collector; never hand-author passing observations. Each capability
+has `status: passed` and nonempty `evidence_files` with report-relative paths and
+SHA-256 hashes. Retain requests, raw results, actual observer identity and outcomes;
+never credentials. Changing any bound dependency or evidence invalidates admission.
+
+Exercise every capability listed in `scripts/worker_capabilities.py` through the
+actual installed ordinary adapter: worker launch, realistic bounded reads,
+checkpoint write/readback, actual page-image inspection, DOCX/XML execution,
+genuine parent fallback, actual recipient attachment retrieval, sentinel write
+denials, permitted/denied network routes, and worker/child termination. Reviewer
+writes are limited to its declared checkpoint; the parent publishes final JSON.
+Repair authors can also edit declared native/script workspaces. Include source,
+installed-code, sibling-review and earlier-run sentinel denials. Narrow runtime
+state belongs to each dispatch. A local self-read cannot establish recipient
+access, and serialized image bytes cannot establish actual image inspection.
+
+The consolidated campaign and its exact host probe collector require independent
+review before execution. Missing evidence is an accurate capability blocker,
+not permission to fabricate a report or use certification-only isolation.

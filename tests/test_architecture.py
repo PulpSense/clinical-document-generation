@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def test_production_architecture_has_declared_lifecycle_and_recovery_owners():
     names = sorted(path.name for path in (ROOT / "scripts").glob("*.py"))
-    assert names == ["contracts.py", "drafting.py", "output_recovery.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py"]
+    assert names == ["contracts.py", "drafting.py", "output_recovery.py", "prs_xml.py", "quality.py", "rendering.py", "worker_boundary.py", "worker_capabilities.py", "workflow.py"]
 
 
 def test_contracts_is_the_only_governed_resource_selector():

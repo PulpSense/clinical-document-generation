@@ -30,3 +30,27 @@ def test_report_rejects_duplicate_operation_ids_instead_of_double_counting_resum
     import pytest
     with pytest.raises(ValueError, match='Duplicate operation'):
         campaign.summarize([{'operation_id': 'same'}, {'operation_id': 'same'}])
+
+
+def test_readiness_plan_preserves_all_twenty_baselines_and_eight_supplements():
+    manifest = campaign.readiness_plan({'commit': 'controlled-candidate'})
+    assert len(manifest['baseline_operations']) == 20
+    assert len(manifest['supplemental_operations']) == 8
+    assert len({p['planned_operation_id'] for p in manifest['baseline_operations']}) == 20
+    assert {p['case_id'] for p in manifest['supplemental_operations']} == {'Q1', 'Q2', 'Q3', 'Q4', 'F1', 'F2', 'F3', 'D1'}
+    empty = campaign.summarize_readiness(manifest, [])
+    assert empty['readiness'] == 'incomplete'
+    assert empty['planned_groups']['clean']['rate'] is None
+    assert len(empty['planned_groups']['clean']['missing']) == 10
+
+
+def test_later_success_never_replaces_failed_first_operation_in_readiness_denominator():
+    manifest = campaign.readiness_plan({'commit': 'controlled-candidate'})
+    planned = manifest['baseline_operations'][0]['planned_operation_id']
+    rows = [dict(operation_id='first', planned_operation_id=planned, status='failed', elapsed_seconds=20),
+            dict(operation_id='retry', planned_operation_id=planned, retry_of='first', status='passed',
+                 elapsed_seconds=100, independent_audit_passed=True, delivery_confirmed=True)]
+    report = campaign.summarize_readiness(manifest, rows)
+    assert report['planned_groups']['clean']['planned_denominator'] == 10
+    assert report['planned_groups']['clean']['expected_outcomes_with_audit_and_retrieval'] == 0
+    assert report['operations'] == 2

@@ -93,6 +93,7 @@ PDF_PAGE_RENDERER = {
 }
 PRODUCTION_MODULES = {
     "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
+    "worker_boundary.py", "worker_capabilities.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
@@ -4346,6 +4347,10 @@ def _run_content_review_schedule(
             cross = progress["remaining_cross_document_checks"]
             jobs = [([], cross[index:index + plan["max_cross_checks"]])
                     for index in range(0, len(cross), plan["max_cross_checks"])]
+        feedback = []
+        for prior_path in paths:
+            for diagnostic in sorted((revision_dir / "hermes/review-feedback" / prior_path.stem).glob("*.json")):
+                feedback.extend(_read(diagnostic).get("errors", []))
         handoffs = []
         for sections, checks in jobs[:plan["max_parallel_units"]]:
             scope = {"sections": sections, "cross_document_checks": checks}
@@ -4357,15 +4362,16 @@ def _run_content_review_schedule(
             handoffs.append({"request_path": path.relative_to(revision_dir).as_posix(),
                 "response_path": request["response_path"], "request_id": request["request_id"],
                 "request_sha256": request["request_sha256"], "task": request["task"],
-                "review_unit_id": scope_id, "reviewer_owner": "replacement" if previous or state["no_progress"] else "scheduled",
+                "review_unit_id": scope_id, "reviewer_owner": "replacement" if feedback or previous or state["no_progress"] else "scheduled",
                 "review_resume": {"reading_strategy": "readable_native_passages", "remaining_sections": sections,
                     "remaining_cross_document_checks": checks, "completed_section_count": 0},
                 "review_attempt": previous + 1,
-                "response_repair_feedback": (["Previous work for this scope was incomplete or unconsumable. "
+                "response_repair_feedback": (list(dict.fromkeys(feedback)) + ["Previous work for this scope was incomplete or unconsumable. "
                     "Copy exact identity/producer, assess every requested check, and explicitly reassess applicable "
                     "prior finding IDs in relevant assessment notes; retained findings must cover nonpassing judgments."]
-                    if previous or state["no_progress"] else [])})
+                    if feedback or previous or state["no_progress"] else [])})
         available = remaining_seconds()
+        wave_started = time.monotonic()
         if available <= 30:
             break
         budget = min(float(plan["unit_budget_seconds"]), (available - 30) / 2)
@@ -4382,7 +4388,12 @@ def _run_content_review_schedule(
         gained = after["completed"] - progress["completed"]
         state["no_progress"] = 0 if gained > 0 else state["no_progress"] + 1
         state["waves"].append({"assigned_sections": sum(len(s) for s, c in jobs[:plan["max_parallel_units"]]),
-            "completed_assessments": after["completed"], "gained_assessments": gained, "budget_seconds": budget})
+            "completed_assessments": after["completed"], "gained_assessments": gained, "budget_seconds": budget,
+            "elapsed_seconds": time.monotonic() - wave_started,
+            "remaining_seconds_before_wave": available, "remaining_seconds_after_wave": remaining_seconds(),
+            "remaining_sections": len(after["remaining_sections"]),
+            "remaining_cross_checks": len(after["remaining_cross_document_checks"]),
+            "workloads": [_read(revision_dir / h["request_path"]).get("workload") for h in handoffs]})
         _write(ledger_path, state)
     content_review_schedule_result(revision_dir, parent_path, [revision_dir / value for value in state["requests"]])
 
@@ -5410,6 +5421,8 @@ def _production_response_is_bound(
         response = _read(response_path)
     except (OSError, ValueError, json.JSONDecodeError):
         return False
+    if not isinstance(response, Mapping):
+        return False
     producer = response.get("producer")
     if not isinstance(producer, Mapping):
         return False
@@ -5668,15 +5681,8 @@ def _production_sandbox_prefix(profile: Path) -> list[str]:
     if platform.system() == "Darwin":
         return [str(_production_sandbox_executable()), "-f", str(profile)]
     if platform.system() == "Linux":
-        setpriv = Path("/usr/bin/setpriv")
-        if setpriv.is_symlink() or not setpriv.is_file() or not os.access(setpriv, os.X_OK):
-            raise RuntimeError("The governed Linux privilege-isolation executable is unavailable.")
-        return [
-            str(setpriv),
-            "--no-new-privs",
-            "--inh-caps=-all",
-            "--ambient-caps=-all",
-        ]
+        from worker_boundary import linux_prefix
+        return linux_prefix(profile)
     raise RuntimeError("The governed OS sandbox is unsupported on this platform.")
 
 
@@ -5728,6 +5734,39 @@ class WorkerAuthenticationError(RuntimeError):
     """A confirmed worker login defect cannot be repaired by redispatch."""
 
 
+def _worker_capability_assurance(skill_root: Path) -> dict[str, Any]:
+    """Revalidate expensive installation probes against their actual dependencies."""
+    from worker_capabilities import validate_assurance
+    try:
+        launcher, _ = _managed_hermes_pair()
+        profile = skill_root.parent.parent
+        selected_renderer = renderer(environment=_production_subprocess_environment(skill_root), skill_root=skill_root)
+        if not selected_renderer:
+            raise ValueError("No installed office renderer is available.")
+        # The ordinary Linux route uses the host font inventory; changing any
+        # font bytes invalidates cached page inspection evidence.
+        font_list = subprocess.run(['/usr/bin/fc-list', '--format', '%{file}\n'],
+            capture_output=True, text=True, timeout=20, check=True)
+        fonts = sorted(set(font_list.stdout.splitlines()))
+        if not fonts:
+            raise ValueError("Installed font identity could not be established.")
+        tools_root = launcher.parent.parent.parent / 'tools'
+        tool_files = sorted(tools_root.rglob('*.py'))
+        if not tool_files:
+            raise ValueError("Installed Hermes tool identities are unavailable.")
+        identity = {"package_manifest_sha256": sha256_file(skill_root / RELEASE_MANIFEST),
+            "hermes": _managed_hermes_identity(),
+            "configuration_sha256": sha256_file(profile / 'config.yaml'),
+            "runtime": {"executable": sys.executable, "sha256": sha256_file(Path(sys.executable).resolve())},
+            "renderer": {**selected_renderer, "sha256": sha256_file(Path(selected_renderer['path']))},
+            "fonts": {name: sha256_file(Path(name)) for name in fonts},
+            "tools": {str(p.relative_to(tools_root)): sha256_file(p) for p in tool_files}}
+        evidence = profile / 'clinical-capabilities' / identity['package_manifest_sha256'] / 'assurance.json'
+        return validate_assurance(evidence, identity)
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        return {"status": "blocked", "issue": f"Cannot establish installed lifecycle capability identity: {exc}"}
+
+
 def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
     """Exercise the installed worker read tool in its safe-mode profile without model calls."""
     launcher, interpreter = _managed_hermes_pair()
@@ -5769,13 +5808,17 @@ def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
             "The installed worker read_file tool cannot read native inspection evidence in its safe-mode profile. "
             "Restore this authorized read path before generation."
         )
+    capabilities = _worker_capability_assurance(skill_root) if logged_in and inspection_readable else {"status": "blocked"}
+    if not issue and capabilities["status"] != "passed":
+        issue = capabilities.get("issue", "Installed lifecycle capability assurance is incomplete.")
     return {
-        "status": "passed" if logged_in and inspection_readable else "blocked",
+        "status": "passed" if logged_in and inspection_readable and capabilities["status"] == "passed" else "blocked",
+        "capability_assurance": capabilities,
         "logged_in": logged_in,
         "provider": str(status.get("provider") or "") if isinstance(status, Mapping) else "",
         "profile": environment["HERMES_HOME"],
         "inspection_readable": inspection_readable,
-        "assurance": "safe_mode_profile_read_file_probe_no_model_call",
+        "assurance": "profile_authentication_plus_identity_bound_installed_lifecycle_evidence",
         "issue": issue,
     }
 
@@ -5822,7 +5865,7 @@ class _ProductionConnectProxyHandler(socketserver.BaseRequestHandler):
             client.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
             return
         server = self.server
-        if not isinstance(server, _ProductionConnectProxyServer):
+        if not isinstance(server, (_ProductionConnectProxyServer, _ProductionUnixConnectProxyServer)):
             return
         expected = f"{server.governed_host}:{server.governed_port}"
         if method != "CONNECT" or target.casefold() != expected.casefold() or version not in {"HTTP/1.0", "HTTP/1.1"}:
@@ -5867,20 +5910,31 @@ class _ProductionConnectProxyServer(socketserver.ThreadingTCPServer):
         super().__init__(("127.0.0.1", 0), _ProductionConnectProxyHandler)
 
 
+class _ProductionUnixConnectProxyServer(socketserver.ThreadingUnixStreamServer):
+    daemon_threads = True
+
+    def __init__(self, host: str, port: int, path: Path):
+        self.governed_host = host
+        self.governed_port = port
+        super().__init__(str(path), _ProductionConnectProxyHandler)
+
+
 @dataclass
 class _ProductionConnectProxy:
-    server: _ProductionConnectProxyServer
+    server: _ProductionConnectProxyServer | _ProductionUnixConnectProxyServer
     thread: threading.Thread
 
     @property
     def port(self) -> int:
-        return int(self.server.server_address[1])
+        return 3128 if isinstance(self.server, _ProductionUnixConnectProxyServer) else int(self.server.server_address[1])
 
     def close(self) -> None:
         errors: list[BaseException] = []
         for action in (
             self.server.shutdown,
             self.server.server_close,
+            lambda: (Path(self.server.server_address).unlink(missing_ok=True)
+                     if isinstance(self.server, _ProductionUnixConnectProxyServer) else None),
             lambda: self.thread.join(timeout=5.0),
         ):
             try:
@@ -5899,8 +5953,10 @@ class _ProductionConnectProxy:
 def _start_production_connect_proxy(
     host: str = PRODUCTION_HERMES_NETWORK_HOST,
     port: int = PRODUCTION_HERMES_NETWORK_PORT,
+    *, unix_path: Path | None = None,
 ) -> _ProductionConnectProxy:
-    server = _ProductionConnectProxyServer(host, port)
+    server = (_ProductionUnixConnectProxyServer(host, port, unix_path) if unix_path
+              else _ProductionConnectProxyServer(host, port))
     thread = None
     try:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -6066,7 +6122,9 @@ def _production_dispatch_handoffs(
             profile = tempfile.NamedTemporaryFile(
                 "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
             )
-            proxy = _start_production_connect_proxy()
+            proxy_socket = Path(profile.name + ".sock") if platform.system() == "Linux" else None
+            proxy = (_start_production_connect_proxy(unix_path=proxy_socket) if proxy_socket
+                     else _start_production_connect_proxy())
             profile.write("(version 1)\n(allow default)\n")
             profile.write("(deny network*)\n")
             profile.write(f"(allow network-outbound (remote tcp \"localhost:{proxy.port}\"))\n")
@@ -6090,10 +6148,23 @@ def _production_dispatch_handoffs(
             )
             profile.write(f"(allow file-read* (literal {json.dumps(str(interpreter_link_root))}))\n")
             profile.write(f"(allow file-read* (subpath {json.dumps(str(managed_interpreter_root))}))\n")
-            writable_roots = [hermes_home, run_dir]
+            request = (native_read(native_file(revision_dir, str(handoff["request_path"])))
+                if handoff.get("task") in {"clinical_content_verification", "rendered_page_visual_verification", "document_repair"}
+                else {})
+            worker_state = cache_dir / (request_id + "-" + uuid.uuid4().hex)
+            worker_state.mkdir()
+            writable_roots = [worker_state]
+            for relative in [(request.get("review_transport") or {}).get("progress_path")]:
+                if relative:
+                    target = revision_dir / relative
+                    if not target.resolve().is_relative_to(revision_dir.resolve()) or target.is_symlink():
+                        raise ValueError("Worker audit path escapes its revision.")
+                    native_file(revision_dir, relative)
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.touch(exist_ok=True)
+                    writable_roots.append(target)
             if handoff.get("task") == "document_repair":
                 request = native_read(native_file(revision_dir, str(handoff["request_path"])))
-                writable_roots = [hermes_home, cache_dir]
                 for key in ("workspace_path", "tools_path"):
                     area = revision_dir / str(request[key])
                     if area.is_symlink() or not area.is_dir() or not area.resolve().is_relative_to(revision_dir.resolve()):
@@ -6114,6 +6185,21 @@ def _production_dispatch_handoffs(
                 resolved = shutil.which(executable)
                 if resolved:
                     profile.write(f"(deny process-exec (literal {json.dumps(resolved)}))\n")
+            if platform.system() == "Linux":
+                readable = [skill_root, run_dir, hermes_install_root, hermes_home,
+                            runtime_root, managed_interpreter_root, interpreter_link_root]
+                authentication = (hermes_home / 'auth.json').resolve() if (hermes_home / 'auth.json').is_file() else _production_authentication_path()
+                protected = [skill_root]
+                if authentication.is_file():
+                    readable.append(authentication)
+                    protected.append(authentication)
+                profile.seek(0)
+                profile.truncate()
+                json.dump({"readable": [str(p.resolve()) for p in dict.fromkeys(readable)],
+                    "writable": [str(p.resolve()) for p in writable_roots],
+                    "protected": [str(p.resolve()) for p in protected],
+                    "proxy_socket": str(proxy_socket), "proxy_port": proxy.port,
+                    "cwd": str(workspace_root)}, profile)
             profile.close()
             command = [
                 str(managed_python), str(hermes_launcher), "chat", "-q",
@@ -6131,6 +6217,19 @@ def _production_dispatch_handoffs(
                 command.extend(("--skills", str(configuration["skill"])))
             stdout_handle, stderr_handle = _open_production_worker_logs(logs, request_id)
             worker_environment = dict(environment)
+            # All mutable Hermes state belongs to this dispatch, never the
+            # shared profile, earlier workers, source or installed skill.
+            for name, suffix in (("HERMES_HOME", ""), ("HOME", ""), ("TMPDIR", ".tmp"),
+                    ("XDG_CACHE_HOME", ".cache"), ("XDG_CONFIG_HOME", ".config"),
+                    ("XDG_DATA_HOME", ".local/share"), ("XDG_STATE_HOME", ".local/state")):
+                directory = worker_state / suffix
+                directory.mkdir(parents=True, exist_ok=True)
+                worker_environment[name] = str(directory)
+            authentication = (hermes_home / 'auth.json').resolve() if (hermes_home / 'auth.json').is_file() else _production_authentication_path()
+            if authentication.is_file():
+                (worker_state / "auth.json").symlink_to(authentication)
+            if (hermes_home / 'config.yaml').is_file():
+                (worker_state / 'config.yaml').symlink_to((hermes_home / 'config.yaml').resolve())
             worker_environment.update({
                 "HTTPS_PROXY": f"http://127.0.0.1:{proxy.port}",
                 "HTTP_PROXY": f"http://127.0.0.1:{proxy.port}",

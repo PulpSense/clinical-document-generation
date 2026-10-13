@@ -36,13 +36,15 @@ study inputs
 
 See [SKILL.md](SKILL.md) for the exact Hermes orchestration and retry loop.
 
-Spec [#81](https://github.com/PulpSense/clinical-document-generation/issues/81)
-supersedes the routine editorial-warning delivery policy in ADR 0019. Lexical
-and repetition proxies request independent source-grounded decisions. Confirmed
-prose/editorial defects are repaired, table defects go to construction, and
-objective integrity, clinical quantity, template, XML and final-byte safeguards
-remain blocking. Resolutions and reference length diagnostics stay internal;
-only meaningful remaining external limitations accompany delivery.
+Spec [#103](https://github.com/PulpSense/clinical-document-generation/issues/103)
+and ADR0022 govern ordinary generation. AI reviews meaning, consent applicability,
+clinical fidelity and visual usability, and repairs native files using general tools.
+Code checks schema/presence, source approval and identity, native readability,
+complete inventory, XML structure, review/render evidence and exact-byte delivery.
+Lexical, numeral, word-count and layout heuristics cannot veto publication.
+A complete usable trustworthy set with unresolved concerns or incomplete assessments
+is review-only. An incomplete, corrupt or source-untrustworthy set is unavailable.
+Historical certification results retain their original scope and dates.
 
 ## Runtime
 
@@ -108,6 +110,14 @@ The certification controller uses the host-native kernel boundary: macOS uses
 `sandbox-exec`; Linux requires a trusted `bwrap`/Bubblewrap executable. On Linux
 it mounts the host read-only, permits writes only to the certification run and
 its isolated cache, and fails closed when Bubblewrap is unavailable.
+
+The ordinary Linux worker path also requires trusted host Bubblewrap. It uses
+private PID/network namespaces, a read-only host view, per-dispatch runtime state
+and exact checkpoint/native-work write exceptions. Its sole provider route is a
+Unix-socket CONNECT bridge restricted to the governed host; direct network access
+is isolated. Missing boundary/capability evidence rejects admission. Actual
+installed enforcement must be exercised using disposable sentinels, not inferred
+from these launch flags. See [installed capability evidence](references/runtime-and-release.md#installed-worker-capability-evidence).
 
 One real certification tracer requires an extracted, hash-valid candidate rather than the
 editable checkout:
@@ -215,7 +225,7 @@ validator and binding checks. If a response is absent or invalid, the workflow
 retries the parent once with the unchanged request, then blocks immediately with
 `missing_parent_visual_review_response` if the retry still has no accepted response.
 
-The normal approval-to-accessible-files target is 10–20 minutes. The target is
+The normal approval-to-accessible-files target is under 25 minutes. The target is
 not a cutoff. The complete operation, including retries, verification,
 attachment retrieval, and owned-process cleanup, has a 45-minute ceiling.
 Normal generation runs with the installed skill read-only and may write only to
@@ -227,7 +237,8 @@ operation to obtain a new deadline.
 
 ```bash
 "$CLINICAL_PYTHON" -m py_compile scripts/*.py
-"$CLINICAL_PYTHON" -m pytest -q
+"$CLINICAL_PYTHON" tests/offline_reliability_gate.py --timeout 900
+# Full repository tests require explicit owner approval.
 "$CLINICAL_PYTHON" scripts/workflow.py --release-gate
 # Build a clean release archive outside the checkout
 "$CLINICAL_PYTHON" scripts/workflow.py --package-release /absolute/path/clinical-document-generation-release.zip
@@ -307,8 +318,11 @@ model. The host also needs `agent.reasoning_effort: medium` and at least 80 agen
 turns. A mismatch stops before activation with one configuration finding.
 
 Independent verification review sets and reviewer retries remain uncapped within
-the one persisted 45-minute deadline. The sole bounded exception is the
-Desktop-parent visual fallback: one initial callback plus exactly one
+the one persisted 45-minute deadline. Bounded content review uses at most three sections or two cross-document checks
+per unit and three concurrent units; valid checkpoints survive malformed sibling
+files and invalid assessments receive specific feedback without scope credit.
+Repeated no-progress waves stop honestly with review-only output when usable.
+The Desktop-parent visual fallback has one bounded exception: one initial callback plus exactly one
 unchanged-request retry. A genuine content or visual defect triggers a targeted
 repair followed by a fresh package-wide content review and fresh every-page
 visual reviews for every DOCX; transient API failures retry only the affected
@@ -321,7 +335,7 @@ material only for active and immediately previous releases; displaced older
 releases become lightweight identity and certification records under
 `release-history/`.
 
-The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return only the workflow’s `client_outputs` after `status: passed`.
+The Hermes runtime needs permission to execute Python, spawn drafting/verification subagents, and read/write run directories. Do not expose internal drafts, rendered PDFs, page PNGs, or logs to clients; return the complete `client_outputs` after `status: passed`, or all labeled `review_outputs` with external findings/incomplete-assessment notices after `status: review_required`. Confirm retrieval for either outcome.
 
 ## Delivery reliability evidence
 

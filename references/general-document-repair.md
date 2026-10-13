@@ -7,6 +7,12 @@ The bound `hermes-response/v2` reports `completed`, `disputed` or `needs_review`
 
 Malformed tool/response results receive actionable feedback without clinical findings or adoption. An identical ineffective technical response/workspace after feedback returns `document_repair_no_progress`; an author reporting no productive safe correction returns `document_repair_unresolved`. Both preserve the original candidate for #107's usability/trust assessment and complete review-only delivery. Source/base/integrity mutation remains unavailable. Repeated unchanged substantive actions carry reassessment feedback into the next AI pass; there is no universal repair-count limit. Every pass retains the original operation deadline and asks the author to reserve final verification/delivery time.
 
-Production repair workers receive explicit editing instructions and only workspace/tools writes in the Darwin sandbox profile. The existing Linux `setpriv` launcher does not enforce that profile's filesystem permissions; installed release integrity is checked before and after a repair worker wave, and source/base hashes are verified before adoption on every platform. This preserves the existing Linux runtime contract and detects mutation; it does not claim new Linux filesystem isolation. Installed skill/runtime code is never an authorized repair surface.
+Production repair workers can write only declared native/script work areas and
+private dispatch runtime state. Linux uses the same ordinary Bubblewrap boundary
+as review workers, with a private network namespace and governed provider bridge;
+Darwin uses its native sandbox profile. Installed integrity and source/base hashes
+are also verified before adoption. Actual installed enforcement and capabilities
+require bound installation probe evidence before admission; local controlled tests
+alone do not establish Linux readiness. Installed code is never a repair surface.
 
 Focused public lifecycle tests use actual python-docx/ElementTree editing with controlled reviewers/renderers. They demonstrate native edits, dispute reassessment, newly introduced XML defects, reconstruction preservation, malformed edits, stale responses, source/base mutation and reviewer independence. These adapters establish control flow and byte preservation, not live AI quality or latency.

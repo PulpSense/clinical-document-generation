@@ -5484,7 +5484,8 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
         passages.append({"artifact": row["artifact"], "section_id": row["section_id"],
                          "native_path": native["path"], "native_sha256": native["sha256"], "passage": passage})
     if cross_checks:
-        passages = [_json(revision_dir / view["path"]) for view in plan["readable_native"]]
+        passages = copy.deepcopy(plan["readable_native"])
+        scoped_source = {"meta": copy.deepcopy(source["meta"])}
     context = copy.deepcopy(parent.get("review_context") or {})
     context["prior_findings"] = [finding for finding in context.get("prior_findings", [])
         if _prior_concern_in_review_scope(finding, parent, sections, cross_checks)]
@@ -5493,6 +5494,10 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
         "generation_authority_sha256", "artifacts", "checks", "template_preservation", "reviewer_policy")}
     unit.update(request_id=request_id, parent_request_id=parent["request_id"],
         parent_request_sha256=parent["request_sha256"], review_unit_id=unit_id, **scope,
+        canonical_source_evidence={"parent_request_path": parent_path.relative_to(revision_dir).as_posix(),
+            "parent_request_sha256": parent["request_sha256"],
+            "bounded_index_path": parent["review_transport"]["index_path"],
+            "bounded_index_sha256": parent["review_transport"]["index_sha256"]},
         approved_source=scoped_source, source_field_inventory=[{"source_path": row["source_path"]}
             for row in _source_field_inventory(scoped_source)],
         readable_native_evidence=passages, native_inspection=[],
@@ -5503,7 +5508,9 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
             if cross_checks or any(row["artifact"] == "icf" for row in sections) else None),
         response_path=f"hermes/content-review-responses/{request_id}.json",
         instructions="Complete ONLY the assigned sections and cross-document checks. Read readable_native_evidence "
-          "first: it is extracted from the exact native files, not drafting summaries. Tables remain structured "
+          "first: inline passages or staged path/sha256 references are extracted from exact native files. "
+          "Read staged references in bounded groups; do not infer a pass from the index. Full approved source "
+          "is in canonical_source_evidence.parent_request_path and its lossless bounded_views. Tables remain structured "
           "and shell/XML evidence includes native locations. Use full native inspection fallback or the canonical "
           "parent approved source if more context is necessary; missing expected content is reviewable. "
           "Do not review unrelated sections or reread all formatting XML. Return explicit independent judgments "
@@ -5515,6 +5522,12 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
           "must identify a finding; never claim completion for uninspected evidence. Independently reassess "
           "prior concerns in review_context, explaining resolutions in assessment notes. " + parent["template_preservation"])
     unit["parent_request_path"] = parent_path.relative_to(revision_dir).as_posix()
+    unit["workload"] = {"inline_serialized_bytes": len(json.dumps(unit, ensure_ascii=False).encode()),
+        "staged_native_bytes": sum((revision_dir / view["path"]).stat().st_size for view in passages
+                                   if "path" in view),
+        "assigned_sections": len(sections), "assigned_cross_checks": len(cross_checks),
+        "tokens": None, "read_calls": None,
+        "measurement_note": "Bytes measure assigned evidence, not actual model consumption. Token/read counts require worker telemetry."}
     unit["review_transport"] = _review_transport(revision_dir, unit)
     unit["request_sha256"] = verification_request_sha256(unit)
     path = revision_dir / f"hermes/content-review-requests/{request_id}.json"
@@ -5526,6 +5539,43 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
     _write(path, unit)
     _write(ledger, {"request_sha256": unit["request_sha256"], "request_file_sha256": sha256_file(path)})
     return path
+
+
+def _content_assessment_consistency(sections: Sequence[Mapping[str, Any]],
+                                    crosses: Sequence[Mapping[str, Any]],
+                                    issues: Sequence[Mapping[str, Any]]) -> tuple[dict[Any, str], set[str]]:
+    """One disposition rule for unit credit and final package validation."""
+    errors, contradictory = {}, set()
+    substantive = [f for f in issues if not reviewed_presentation_only(f)]
+    for row in [*sections, *crosses]:
+        section = "section_id" in row
+        key = (row.get("artifact"), row["section_id"]) if section else row["check"]
+        covering = [f for f in substantive if
+            (section and (not f.get("artifact") or f["artifact"] == row.get("artifact"))
+             and row["section_id"] in (f.get("target_ids") or []))
+            or (not section and f.get("check") == row["check"])
+            or _notes_cite_finding(row.get("notes"), f.get("finding_id", ""))]
+        if row["status"] == "passed" and covering:
+            errors[key] = f"Reported substantive findings contradict passing assessment {key}."
+            contradictory.update(f.get("finding_id", "") for f in covering)
+        elif row["status"] != "passed" and not covering:
+            errors[key] = f"Every non-passing assessment must be covered by a substantive reported finding; uncovered assessment {key}."
+    return errors, contradictory
+
+
+def _record_review_unit_feedback(revision_dir: Path, unit: Mapping[str, Any], path: Path,
+                                 errors: Sequence[str]) -> None:
+    """Preserve rejected bytes and precise contract feedback without overwriting attempts."""
+    raw = path.read_bytes()
+    digest = hashlib.sha256(raw).hexdigest()
+    directory = revision_dir / "hermes/review-feedback" / unit["request_id"]
+    _assert_safe_mutation_path(directory, directory=True)
+    directory.mkdir(parents=True, exist_ok=True)
+    raw_path = directory / f"{digest}.bin"
+    _assert_safe_mutation_path(raw_path, directory=False)
+    raw_path.write_bytes(raw)
+    _write(directory / f"{digest}.json", {"response_path": path.relative_to(revision_dir).as_posix(),
+        "response_sha256": digest, "errors": list(errors)})
 
 
 def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
@@ -5554,10 +5604,17 @@ def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
         response_paths = [revision_dir / unit["review_transport"]["progress_path"],
                           revision_dir / unit["response_path"]]
         rows, cross, findings, proofs = {}, {}, {}, []
+        accepted_producer = {}
         for path in response_paths:
             if not path.is_file() or not _revision_owned_nonsymlink_path(revision_dir, path):
                 continue
-            response = _json(path)
+            try:
+                response = _json(path)
+                if not isinstance(response, Mapping):
+                    raise ValueError("Response must be a JSON object.")
+            except (OSError, ValueError) as exc:
+                _record_review_unit_feedback(revision_dir, unit, path, [f"Unreadable response: {exc}"])
+                continue
             if (response.get("schema_version") != RESPONSE_SCHEMA
                     or any(response.get(key) != unit[key] for key in ("request_id", "request_sha256", "task", "revision_id"))
                     or response.get("status") not in {"passed", "blocked", "failed", "in_progress"}):
@@ -5594,6 +5651,12 @@ def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
                 continue
             if response["status"] in {"blocked", "failed"} and not response.get("error") and not issues and all(r["status"] == "passed" for r in [*assessments, *crosses]):
                 continue
+            invalid, contradictory = _content_assessment_consistency(assessments, crosses, issues)
+            if invalid:
+                _record_review_unit_feedback(revision_dir, unit, path, list(invalid.values()))
+                assessments = [r for r in assessments if (r["artifact"], r["section_id"]) not in invalid]
+                crosses = [r for r in crosses if r["check"] not in invalid]
+                issues = [r for r in issues if r["finding_id"] not in contradictory]
             scoped_context = copy.deepcopy(unit.get("review_context") or {})
             scoped_context["prior_findings"] = [f for f in scoped_context.get("prior_findings", [])
                 if _prior_concern_in_review_scope(f, parent, assessments, [r["check"] for r in crosses])]
@@ -5604,23 +5667,39 @@ def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
             proof = {"request": unit_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(unit_path),
                      "response": path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(path)}
             proofs.append(proof)
+            accepted_producer = producer
+            prior_ids = {f.get("finding_id") for f in (parent.get("review_context") or {}).get("prior_findings", [])}
+            # New identities include the attempt; explicit retained concerns keep
+            # their identity through every unit and subsequent repair cycle.
+            prefix = hashlib.sha256(unit["request_id"].encode()).hexdigest()[:16]
+            identities = {}
+            for issue in issues:
+                identity = issue["finding_id"]
+                mapped = identity if identity in prior_ids else prefix + "-" + identity
+                while mapped in prior_ids and mapped != identity:
+                    mapped = "new-" + mapped
+                identities[identity] = mapped
             for r in assessments:
                 key = (r["artifact"], r["section_id"])
+                linked = [identities[issue["finding_id"]] for issue in issues
+                          if _notes_cite_finding(r.get("notes"), issue["finding_id"])]
+                if linked:
+                    r = {**r, "notes": [_text(r.get("notes")), *linked]}
                 if key not in rows or r["status"] != "passed": rows[key] = {**r, "producer": producer}
             for r in crosses:
                 r = dict(r)
-                linked = [unit["review_unit_id"] + "-" + issue["finding_id"] for issue in issues
+                linked = [identities[issue["finding_id"]] for issue in issues
                           if _notes_cite_finding(r.get("notes"), issue["finding_id"])]
                 if linked:
                     r["notes"] = [_text(r.get("notes")), *linked]
                 if r["check"] not in cross or r["status"] != "passed": cross[r["check"]] = {**r, "producer": producer}
             for r in issues:
-                finding_id = unit["review_unit_id"] + "-" + r["finding_id"]
+                finding_id = identities[r["finding_id"]]
                 findings[finding_id] = {**r, "finding_id": finding_id}
         if not proofs or not (rows or cross or findings):
             return None
         return {"section_assessments": list(rows.values()), "cross_document_assessments": list(cross.values()),
-                "findings": list(findings.values()), "proofs": proofs, "producer": producer,
+                "findings": list(findings.values()), "proofs": proofs, "producer": accepted_producer,
                 "complete": len(rows) == len(unit["sections"]) and len(cross) == len(unit["cross_document_checks"])}
     except (OSError, ValueError, KeyError, TypeError):
         return None
@@ -6813,62 +6892,11 @@ def validate_verifications(
                     "verification_request_id": request["request_id"],
                     "issue": "Every content finding must have a unique valid finding_id.",
                 }, "verifier_transient"))
-            reported_targets: set[str] = set()
-            for reported in reported_findings:
-                raw_targets = reported.get("target_ids")
-                if isinstance(raw_targets, list):
-                    reported_targets.update(
-                        str(target) for target in raw_targets if str(target).strip()
-                    )
-            section_status = {
-                str(item.get("section_id") or ""): str(item.get("status") or "")
-                for item in valid_section_rows
-            }
-            passing_finding_targets = sorted(
-                target for reported in reported_findings if not reviewed_presentation_only(reported)
-                for target in (reported['target_ids'] if isinstance(reported.get('target_ids'), list) else [])
-                if isinstance(target, str) and section_status.get(target) == "passed"
-            )
-            if passing_finding_targets:
-                findings.append(recovery_finding({
-                    "category": "verification",
-                    "field": request["task"],
-                    "target_ids": [verification_target],
-                    "verification_request_id": request["request_id"],
-                    "issue": (
-                        "Reported findings contradict passing section assessments; "
-                        f"passing section assessment targets={passing_finding_targets}."
-                    ),
-                }, "verifier_transient"))
-            uncovered_sections = [
-                str(item.get("section_id") or "")
-                for item in valid_section_rows
-                if item.get("status") != "passed"
-                and str(item.get("section_id") or "") not in reported_targets
-                and not any(_notes_cite_finding(item.get("notes"), finding_id) for finding_id in reported_ids)
-            ]
-            uncovered_cross = [
-                str(item.get("check") or "")
-                for item in valid_cross_rows
-                if item.get("status") != "passed"
-                and (
-                    not any(
-                        _notes_cite_finding(item.get("notes"), finding_id)
-                        for finding_id in reported_ids
-                    )
-                )
-            ]
-            if uncovered_sections or uncovered_cross:
-                findings.append(recovery_finding({
-                    "category": "verification",
-                    "field": request["task"],
-                    "target_ids": [verification_target],
-                    "verification_request_id": request["request_id"],
-                    "issue": (
-                        "Every non-passing assessment must be covered by a reported finding; "
-                        f"uncovered sections={uncovered_sections}, uncovered cross-document checks={uncovered_cross}."
-                    ),
-                }, "verifier_transient"))
+            consistency, _ = _content_assessment_consistency(valid_section_rows, valid_cross_rows, reported_findings)
+            for issue in consistency.values():
+                findings.append(recovery_finding({"category": "verification", "field": request["task"],
+                    "target_ids": [verification_target], "verification_request_id": request["request_id"],
+                    "issue": issue}, "verifier_transient"))
             if response.get("status") == "passed" and any(
                 item.get("status") != "passed" for item in [*valid_section_rows, *valid_cross_rows]
             ):

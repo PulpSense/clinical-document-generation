@@ -12,6 +12,7 @@ import workflow
 def test_readiness_checks_exact_worker_profile_and_never_records_credentials(tmp_path, monkeypatch, logged_in):
     root = tmp_path / "profile/skills/clinical-document-generation"
     root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, "_worker_capability_assurance", lambda root: {"status": "passed", "evidence_kind": "controlled_fixture"})
     launcher = tmp_path / "hermes/bin/hermes"
     monkeypatch.setattr(workflow, "_managed_hermes_pair", lambda: (launcher, Path("/fake/python")))
     captured = {}
@@ -157,3 +158,32 @@ def test_worker_without_read_file_capability_stops_at_preflight(tmp_path, monkey
     result = workflow._production_worker_readiness(root)
     assert result['status'] == 'blocked'
     assert 'read_file' in result['issue']
+
+
+def test_successful_tiny_read_does_not_substitute_for_lifecycle_capabilities(tmp_path, monkeypatch):
+    root = tmp_path / 'profile/skills/clinical-document-generation'
+    root.mkdir(parents=True)
+    monkeypatch.setattr(workflow, '_managed_hermes_pair', lambda: (tmp_path / 'bin/hermes', Path('/fake/python')))
+    monkeypatch.setattr(workflow.subprocess, 'run', lambda command, **kwargs:
+        subprocess.CompletedProcess(command, 0, json.dumps({
+            'logged_in': True, 'provider': 'openai-codex', 'inspection_readable': True}), ''))
+    monkeypatch.setattr(workflow, '_worker_capability_assurance', lambda root: {
+        'status': 'blocked', 'issue': 'Unproven lifecycle capability: page_image_inspection.'})
+    result = workflow._production_worker_readiness(root)
+    assert result['status'] == 'blocked'
+    assert 'page_image_inspection' in result['issue']
+
+
+def test_capability_evidence_invalidates_on_dependency_or_probe_change(tmp_path):
+    from worker_capabilities import REQUIRED_CAPABILITIES, digest, validate_assurance
+    proof = tmp_path / 'probe.json'
+    proof.write_text('{"controlled_probe": true}')
+    path = tmp_path / 'assurance.json'
+    identity = {'package': 'candidate', 'hermes': 'selected-configuration'}
+    path.write_text(json.dumps({'schema_version': 'worker-capabilities/v1', 'identity': identity,
+        'capabilities': {name: {'status': 'passed', 'evidence_files': [{'path': proof.name, 'sha256': digest(proof)}]}
+                         for name in REQUIRED_CAPABILITIES}}))
+    assert validate_assurance(path, identity)['status'] == 'passed'
+    assert validate_assurance(path, {**identity, 'hermes': 'changed'})['status'] == 'blocked'
+    proof.write_text('changed')
+    assert validate_assurance(path, identity)['status'] == 'blocked'
