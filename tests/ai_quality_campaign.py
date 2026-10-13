@@ -207,8 +207,11 @@ def collect_readiness_runs(manifest, runs_root):
             if state['operation_id'] != metadata['operation_id']:
                 raise ValueError('Desktop operation identity changed')
             expected_fingerprint = manifest['candidate_identity'].get('package_fingerprint')
-            if not expected_fingerprint or state.get('release_identity', {}).get('package_fingerprint') != expected_fingerprint:
+            release = state.get('release_identity', {})
+            if not expected_fingerprint or release.get('package_fingerprint') != expected_fingerprint:
                 raise ValueError('Installed candidate fingerprint differs')
+            if release.get('git_commit') != manifest['candidate_identity'].get('git_commit'):
+                raise ValueError('Installed candidate commit differs')
             result = state.get('result', {})
             study_type = expected_source['meta']['study_type']
             inventory = ['protocol.docx'] if study_type == 'Retrospective' else ['protocol.docx', 'icf.docx', 'study.xml']
@@ -275,7 +278,15 @@ def collect_readiness_runs(manifest, runs_root):
         except (OSError, ValueError, KeyError, TypeError, StopIteration) as exc:
             errors.append({'run_directory': str(run), 'issue': str(exc)})
     unmatched = [str(p) for p in sorted(runs_root.rglob('desktop-operation*.json')) if p.resolve() not in matched_states]
-    report = summarize_readiness(manifest, records)
+    try:
+        report = summarize_readiness(manifest, records)
+    except ValueError as exc:
+        # Conflicts cannot erase already collected failures or disappear from
+        # the ledger. Keep every observation, with all rates unmeasured until
+        # the owner reconciles the duplicate/first-operation identities.
+        report = summarize_readiness(manifest, [])
+        report.update(operation_records=records, operations=len(records), reconciliation_conflicted=True)
+        errors.append({'scope': 'operation_reconciliation', 'issue': str(exc)})
     return {**report, 'evidence_errors': errors, 'unmatched_operation_states': unmatched,
             'readiness': 'incomplete', 'collector_scope': 'exact retained bytes and independent audit records; owner verdict still requires every gate'}
 

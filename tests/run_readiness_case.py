@@ -47,6 +47,11 @@ def main():
     actual = workflow._installed_release_identity(root)
     if actual['package_fingerprint'] != manifest['candidate_identity']['package_fingerprint']:
         raise ValueError('Installed bytes differ from the frozen candidate')
+    if actual.get('git_commit') != manifest['candidate_identity'].get('git_commit'):
+        raise ValueError('Installed commit differs from the frozen archive candidate')
+    manifest_bytes = (root / workflow.RELEASE_MANIFEST).read_bytes()
+    if hashlib.sha256(manifest_bytes).hexdigest() != manifest['candidate_identity'].get('package_manifest_sha256'):
+        raise ValueError('Installed manifest bytes differ from the declared archive candidate')
     if manifest['candidate_identity'].get('installed_worker_identity') != workflow._worker_capability_identity(root):
         raise ValueError('Freeze the actual installed worker/model configuration identity before observing operations')
     metadata_path = run / 'campaign-case.json'

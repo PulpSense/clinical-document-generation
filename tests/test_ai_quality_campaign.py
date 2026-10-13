@@ -73,3 +73,27 @@ def test_collector_rejects_changed_frozen_manifest(tmp_path):
     manifest['baseline_operations'].pop()
     with pytest.raises(ValueError, match='manifest'):
         campaign.collect_readiness_runs(manifest, tmp_path)
+
+
+def test_collector_preserves_duplicate_failed_observations_with_honest_reconciliation_error(tmp_path):
+    import json
+    manifest = campaign.readiness_plan({'git_commit': 'controlled-candidate', 'package_fingerprint': 'fixed'})
+    assignment = manifest['baseline_operations'][0]
+    source = next(c['source'] for c in manifest['cases'] if c['case_id'] == assignment['case_id'])
+    for name in ('first-directory', 'duplicate-directory'):
+        run = tmp_path / name
+        (run / 'logs').mkdir(parents=True)
+        (run / 'campaign-source.json').write_text(json.dumps(source))
+        (run / 'campaign-case.json').write_text(json.dumps({
+            'operation_id': 'same-operation', 'planned_operation_id': assignment['planned_operation_id'],
+            'manifest_sha256': manifest['manifest_sha256'], 'source_sha256': assignment['source_sha256'],
+            'candidate_identity': manifest['candidate_identity']}))
+        (run / 'logs/desktop-operation.json').write_text(json.dumps({'operation_id': 'same-operation',
+            'status': 'failed', 'release_identity': {'package_fingerprint': 'fixed', 'git_commit': 'controlled-candidate'}}))
+    report = campaign.collect_readiness_runs(manifest, tmp_path)
+    assert report['operations'] == 2
+    assert len(report['operation_records']) == 2
+    assert report['reconciliation_conflicted']
+    assert any('Duplicate operation' in row['issue'] for row in report['evidence_errors'])
+    assert report['planned_groups']['clean']['rate'] is None
+    assert report['readiness'] == 'incomplete'

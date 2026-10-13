@@ -5765,7 +5765,16 @@ def _worker_capability_identity(skill_root: Path) -> dict[str, Any]:
     hermes_code = {str(p.relative_to(tools_root.parent)): sha256_file(p)
         for p in sorted(tools_root.parent.rglob('*.py'))
         if not set(p.relative_to(tools_root.parent).parts) & {'.venv', 'venv', '__pycache__', '.git'}}
-    identity = {"hermes_code": hermes_code, "package_manifest_sha256": sha256_file(skill_root / RELEASE_MANIFEST),
+    from importlib.metadata import distribution
+    native_tools = {}
+    for package in ('python-docx', 'lxml', 'pypdf'):
+        installed = distribution(package)
+        files = {str(item): sha256_file(installed.locate_file(item)) for item in (installed.files or [])
+            if str(item).endswith(('.py', '.so', '.pyd', '.dll', '/METADATA', '/WHEEL'))}
+        if not files:
+            raise ValueError(f'Native tool inventory is unavailable: {package}')
+        native_tools[package] = {'version': installed.version, 'files': files}
+    identity = {"native_tools": native_tools, "hermes_code": hermes_code, "package_manifest_sha256": sha256_file(skill_root / RELEASE_MANIFEST),
         "hermes": _managed_hermes_identity(), "pdfium": pdfium['identity'],
         "pdfium_metadata_sha256": sha256_file(skill_root / 'runtime/PDF-RENDERER.json'),
         "configuration_sha256": sha256_file(profile / 'config.yaml'),

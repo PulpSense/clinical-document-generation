@@ -5494,7 +5494,8 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
     if cross_checks:
         passages = copy.deepcopy(plan["readable_native"])
     if full_source:
-        scoped_source = {"meta": copy.deepcopy(source["meta"])}
+        scoped_source = {"meta": copy.deepcopy(source["meta"]),
+            "study": {key: copy.deepcopy(source["study"][key]) for key in ('title', 'short_title') if key in source['study']}}
     context = copy.deepcopy(parent.get("review_context") or {})
     context["prior_findings"] = [finding for finding in context.get("prior_findings", [])
         if _prior_concern_in_review_scope(finding, parent, sections, cross_checks)]
