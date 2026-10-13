@@ -11,7 +11,8 @@ import workflow
 
 
 @pytest.mark.skipif(platform.system() != 'Linux', reason='Actual Linux kernel enforcement requires Linux')
-def test_ordinary_linux_worker_can_only_write_declared_audit_and_native_areas(tmp_path):
+@pytest.mark.parametrize('role', ['reviewer', 'repair_author'])
+def test_ordinary_linux_worker_can_only_write_declared_audit_and_native_areas(tmp_path, role):
     workspace = tmp_path / 'study'
     workspace.mkdir()
     audit = workspace / 'audit.json'
@@ -33,23 +34,33 @@ for p in paths:
  try: Path(p).write_text('marker')
  except OSError: pass
  else: raise AssertionError('protected write succeeded: '+p)
-audit.write_text('checkpoint'); (repair/'native-marker').write_text('marker')
+role=sys.argv[4]
+if role=='reviewer':
+ audit.write_text('checkpoint')
+ try: (repair/'native-marker').write_text('marker')
+ except OSError: pass
+ else: raise AssertionError('Reviewer edited native work')
+else:
+ (repair/'native-marker').write_text('marker')
+ try: audit.write_text('marker')
+ except OSError: pass
+ else: raise AssertionError('Repair author edited another audit')
 try: socket.create_connection(('1.1.1.1',443),timeout=0.2)
 except OSError: pass
 else: raise AssertionError('direct network escape')
 s=socket.create_connection(('127.0.0.1',3128)); s.sendall(b'CONNECT example.org:443 HTTP/1.1\\r\\n\\r\\n'); assert b'403' in s.recv(1024)
 '''
-    policy.write_text(json.dumps({'readable': [str(tmp_path)], 'writable': [str(audit), str(repair)],
+    policy.write_text(json.dumps({'readable': [str(tmp_path)], 'writable': [str(audit)] if role == 'reviewer' else [str(repair)],
         'protected': [], 'proxy_socket': str(proxy_socket), 'proxy_port': proxy.port, 'cwd': str(workspace)}))
     try:
         prefix = workflow._production_sandbox_prefix(policy)
         result = subprocess.run([*prefix, sys.executable, '-c', script,
-            json.dumps([str(p) for p in protected]), str(audit), str(repair)],
+            json.dumps([str(p) for p in protected]), str(audit), str(repair), role],
             capture_output=True, text=True, timeout=15)
         assert result.returncode == 0, result.stderr
     finally:
         proxy.close()
-    assert audit.read_text() == 'checkpoint'
+    assert audit.read_text() == ('checkpoint' if role == 'reviewer' else '')
     assert all(p.read_text() == 'sentinel' for p in protected)
 
 

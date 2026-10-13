@@ -217,3 +217,58 @@ def test_long_complete_package_has_lossless_staged_native_and_source_routes(tmp_
     canonical = json.loads((tmp_path / json.loads(units[-1].read_text())['canonical_source_evidence']['parent_request_path']).read_text())
     assert canonical['approved_source'] == source
     assert 'UNIQUE END OF SOURCE' in canonical['approved_source']['study']['background']
+
+
+@pytest.mark.parametrize('aggregation', ['checkpoint', 'schedule'])
+def test_presentation_restatement_preserves_substantive_evidence(tmp_path, aggregation):
+    parent_path, parent, source = candidate(tmp_path, FAMILIES[-1])
+    concern = {'finding_id': 'saved-fact', 'artifact': 'protocol', 'target_ids': ['title-page'],
+               'material': True, 'issue': 'Saved substantive source concern'}
+    if aggregation == 'schedule':
+        parent_path = quality.create_verification_requests(tmp_path, source, {'artifacts': []}, review_set=2,
+            review_context={'prior_findings': [concern]})[0]
+        parent = json.loads(parent_path.read_text())
+    paths = []
+    for attempt in (1, 2):
+        path = quality.create_content_review_unit(tmp_path, parent_path, parent['sections'][:1], [], attempt)
+        unit = json.loads(path.read_text())
+        response = acceptance_verification(unit)
+        response['findings'] = [copy.deepcopy(concern)]
+        if attempt == 1:
+            response['status'] = 'blocked'
+            response['section_assessments'][0]['status'] = 'blocked'
+        else:
+            response['findings'][0].update({flag: False for flag in (
+                'material', 'safety_critical', 'contradiction', 'obscures_required_information', 'materially_unusable')})
+        if aggregation == 'checkpoint':
+            if attempt == 1:
+                first_path, first_unit, first_response = path, unit, response
+                continue
+            path, unit = first_path, first_unit
+            response.update({key: unit[key] for key in ('request_id', 'request_sha256')})
+            (tmp_path / unit['review_transport']['progress_path']).write_text(json.dumps(first_response))
+        final = tmp_path / unit['response_path']
+        final.parent.mkdir(parents=True, exist_ok=True)
+        final.write_text(json.dumps(response))
+        paths.append(path)
+    if aggregation == 'schedule':
+        for sections, checks in ([([row], []) for row in parent['sections'][1:]]
+                                 + [([], [check]) for check in parent['cross_document_checks']]):
+            path = quality.create_content_review_unit(tmp_path, parent_path, sections, checks, 1)
+            unit = json.loads(path.read_text())
+            final = tmp_path / unit['response_path']
+            final.parent.mkdir(parents=True, exist_ok=True)
+            final.write_text(json.dumps(acceptance_verification(unit)))
+            paths.append(path)
+        assembled = quality.content_review_schedule_result(tmp_path, parent_path, paths)
+        assert assembled['complete']
+        result = assembled['response']
+    else:
+        result = quality.content_review_unit_result(tmp_path, paths[0])
+    assert result['section_assessments'][0]['status'] == 'blocked'
+    assert len(result['findings']) == 1
+    assert result['findings'][0]['material'] is True
+    assert result['findings'][0]['issue'] == concern['issue']
+    if aggregation == 'schedule':
+        findings, _ = quality.validate_verifications(tmp_path, request_paths=[parent_path])
+        assert not [f for f in findings if f.get('recovery_class') == 'verifier_transient'], findings

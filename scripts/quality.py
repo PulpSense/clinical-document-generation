@@ -5598,6 +5598,14 @@ def _record_review_unit_feedback(revision_dir: Path, unit: Mapping[str, Any], pa
         "response_sha256": digest, "errors": list(errors)})
 
 
+def _retain_content_finding(findings: dict[str, Any], finding: Mapping[str, Any]) -> None:
+    """Keep substantive support for retained nonpassing judgments in this review set."""
+    identity = finding["finding_id"]
+    previous = findings.get(identity)
+    if previous is None or reviewed_presentation_only(previous) or not reviewed_presentation_only(finding):
+        findings[identity] = dict(finding)
+
+
 def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
                                _authenticated_parent: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
     """Authenticate completed or partial worker judgments, never infer a pass."""
@@ -5715,7 +5723,7 @@ def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
                 if r["check"] not in cross or r["status"] != "passed": cross[r["check"]] = {**r, "producer": producer}
             for r in issues:
                 finding_id = identities[r["finding_id"]]
-                findings[finding_id] = {**r, "finding_id": finding_id}
+                _retain_content_finding(findings, {**r, "finding_id": finding_id})
         if not proofs or not (rows or cross or findings):
             return None
         return {"section_assessments": list(rows.values()), "cross_document_assessments": list(cross.values()),
@@ -5748,7 +5756,7 @@ def content_review_schedule_result(revision_dir: Path, parent_path: Path,
             if r["check"] not in cross or r["status"] != "passed": cross[r["check"]] = r
             producer = r["producer"]
         for r in result["findings"]:
-            findings[r["finding_id"]] = r
+            _retain_content_finding(findings, r)
     missing = [r for r in parent["sections"] if (r["artifact"], r["section_id"]) not in rows]
     missing_cross = [r for r in parent["cross_document_checks"] if r not in cross]
     complete = not missing and not missing_cross
