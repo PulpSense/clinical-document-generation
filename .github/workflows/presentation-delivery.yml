@@ -20,7 +20,7 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - name: Check Python sources
         run: python -m compileall -q scripts
-      - name: Verify ordinary Linux worker role boundaries
-        run: python -m pytest tests/test_worker_boundary.py -q
+      - name: Verify Linux worker boundaries and restricted Hermes compatibility
+        run: python -m pytest tests/test_worker_boundary.py tests/test_hermes_tui.py tests/test_worker_readiness.py -q
       - name: Verify focused AI quality lifecycle and objective contracts
         run: python tests/offline_reliability_gate.py --timeout 1200 --report /tmp/clinical-focused-report.json

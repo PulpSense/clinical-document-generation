@@ -4087,7 +4087,9 @@ def _confirm_review_delivery(run_dir: Path, result: Mapping[str, Any], opener: C
             raise ValueError("Review-only transfer did not retrieve the exact files.")
         if row.get("bytes") is not None and len(data) != row["bytes"]:
             raise ValueError("Review-only transfer byte count differs.")
-    return {"confirmed": True, "delivery_status": "review_only_not_client_ready", "files": len(rows)}
+    local = getattr(opener, "local_outputs_only", False)
+    return {"confirmed": not local, "bytes_verified": True, "recipient_delivery_verified": not local,
+            "delivery_status": "review_only_locally_available" if local else "review_only_not_client_ready", "files": len(rows)}
 
 
 def _terminal_diagnostic_archive(run_dir: Path) -> dict[str, Any]:
@@ -4237,9 +4239,12 @@ def confirm_desktop_delivery(
         if not opened_current:
             findings.append(recovery_finding({"category": "delivery", "field": item["filename"], "issue": last_issue or "Desktop file transfer failed."}, "transport_fault"))
             break
+    local = getattr(opener, "local_outputs_only", False)
     return {
-        "status": "confirmed" if not findings else "blocked",
-        "confirmed": not findings,
+        "status": ("locally_available" if local else "confirmed") if not findings else "blocked",
+        "confirmed": not findings and not local,
+        "bytes_verified": not findings,
+        "recipient_delivery_verified": not findings and not local,
         "opened": opened,
         "attempts": total_attempts,
         "findings": findings,
@@ -4607,7 +4612,7 @@ def run_desktop_operation(
                     or prepared_ledger["predecessors"] != final_ledger["predecessors"]
                     or prepared_ledger["records"][:-1] != final_ledger["records"][:-1]
                     or prepared_ledger["records"][-1]["terminal_status"] != "pending"
-                    or final_ledger["records"][-1]["terminal_status"] != "passed"
+                    or final_ledger["records"][-1]["terminal_status"] != ("pending" if getattr(opener, "local_outputs_only", False) else "passed")
                     or len(final_ledger["predecessors"]) != len(expected_attempts)
                 ):
                     raise ValueError("Persisted Desktop gate-ledger lineage or terminal transition is invalid.")
@@ -4616,7 +4621,7 @@ def run_desktop_operation(
                     raise ValueError(set_finding["issue"])
                 reply = prior_result.get("desktop_reply") or desktop_attachment_reply(manifest, run_dir=run_dir)
                 delivery = confirm_desktop_delivery(manifest, reply, opener)
-                if not delivery.get("confirmed"):
+                if not _output_access_satisfied(delivery):
                     issue = str((delivery.get("findings") or [{}])[0].get("issue") or "Terminal delivery could not be reconfirmed.")
                     raise ValueError(issue)
             except (OSError, TypeError, ValueError, json.JSONDecodeError) as exc:
@@ -4817,6 +4822,12 @@ def run_desktop_operation(
         measured.update({"elapsed_seconds": round(elapsed, 3),
                          "performance_classification": performance_classification(elapsed),
                          "under_25_minutes": elapsed < NORMAL_RUNTIME_TARGET_MAX_SECONDS})
+        if getattr(opener, "local_outputs_only", False):
+            measured["recipient_delivery_verified"] = False
+            measured["delivery_status"] = "locally_available" if measured.get("client_outputs") or measured.get("review_outputs") else "unavailable"
+            if isinstance(measured.get("desktop_reply"), Mapping):
+                measured["desktop_reply"] = {**measured["desktop_reply"], "type": "host_local_files",
+                    "message": "Files are saved on the Hermes host; recipient download or attachment transfer is not verified."}
         terminal_status = str(measured.get("status", "blocked"))
         saved = save(terminal_status, measured)
         if terminal_status in {"blocked", "review_required", "timeout"}:
@@ -5380,13 +5391,15 @@ def run_desktop_operation(
             continue
         final = {
             **result,
-            "status": "passed" if delivery["confirmed"] else "blocked",
-            "stage": "desktop_delivery",
+            "status": "passed" if _output_access_satisfied(delivery) else "blocked",
+            "stage": "local_output_availability" if getattr(opener, "local_outputs_only", False) else "desktop_delivery",
             "delivery": delivery,
             "deadline_at_epoch": deadline_at_epoch,
         }
         prepared_ledger = manifest.get("gate_ledger")
-        if isinstance(prepared_ledger, Mapping):
+        if isinstance(prepared_ledger, Mapping) and getattr(opener, "local_outputs_only", False):
+            final["gate_ledger"] = dict(prepared_ledger)
+        if isinstance(prepared_ledger, Mapping) and not getattr(opener, "local_outputs_only", False):
             gate_findings = [
                 {
                     "code": "EXACT_BYTE_ATOMIC_DELIVERY_FAILED",
@@ -5410,7 +5423,7 @@ def run_desktop_operation(
                 },
                 findings=gate_findings,
             )
-        if not delivery["confirmed"]:
+        if not _output_access_satisfied(delivery):
             final["client_outputs"] = []
             final.pop("desktop_reply", None)
         return finish(final)
@@ -5683,8 +5696,12 @@ def _production_sandbox_executable() -> Path:
     return sandbox
 
 
-def _production_sandbox_prefix(profile: Path) -> list[str]:
-    """Return the platform-native worker isolation launch prefix."""
+def _production_sandbox_prefix(profile: Path, *, host_mode: str = "isolated") -> list[str]:
+    """Return isolation, or explicitly selected host-managed TUI execution."""
+    if host_mode == "hermes-tui":
+        return []
+    if host_mode != "isolated":
+        raise ValueError("Unknown worker host mode.")
     if platform.system() == "Darwin":
         return [str(_production_sandbox_executable()), "-f", str(profile)]
     if platform.system() == "Linux":
@@ -5796,7 +5813,7 @@ def _worker_capability_assurance(skill_root: Path) -> dict[str, Any]:
         return {"status": "blocked", "issue": f"Cannot establish installed lifecycle capability identity: {exc}"}
 
 
-def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
+def _production_worker_readiness(skill_root: Path, *, host_mode: str = "isolated") -> dict[str, Any]:
     """Exercise the installed worker read tool in its safe-mode profile without model calls."""
     launcher, interpreter = _managed_hermes_pair()
     environment = _production_subprocess_environment(skill_root)
@@ -5837,7 +5854,14 @@ def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
             "The installed worker read_file tool cannot read native inspection evidence in its safe-mode profile. "
             "Restore this authorized read path before generation."
         )
-    capabilities = _worker_capability_assurance(skill_root) if logged_in and inspection_readable else {"status": "blocked"}
+    if host_mode == "hermes-tui":
+        capabilities = {"status": "passed", "evidence_kind": "host_managed_tui_preflight",
+            "os_isolation_verified": False, "recipient_delivery_verified": False,
+            "limitations": "Host permissions and worker instructions govern access; no namespace or recipient assurance is claimed."}
+    elif host_mode == "isolated":
+        capabilities = _worker_capability_assurance(skill_root) if logged_in and inspection_readable else {"status": "blocked"}
+    else:
+        raise ValueError("Unknown worker host mode.")
     if not issue and capabilities["status"] != "passed":
         issue = capabilities.get("issue", "Installed lifecycle capability assurance is incomplete.")
     return {
@@ -5847,7 +5871,8 @@ def _production_worker_readiness(skill_root: Path) -> dict[str, Any]:
         "provider": str(status.get("provider") or "") if isinstance(status, Mapping) else "",
         "profile": environment["HERMES_HOME"],
         "inspection_readable": inspection_readable,
-        "assurance": "profile_authentication_plus_identity_bound_installed_lifecycle_evidence",
+        "assurance": "host_managed_tui_preflight" if host_mode == "hermes-tui" else "profile_authentication_plus_identity_bound_installed_lifecycle_evidence",
+        "host_mode": host_mode,
         "issue": issue,
     }
 
@@ -6130,16 +6155,18 @@ def _production_dispatch_handoffs(
     run_dir: Path,
     runtime_identity: Mapping[str, Any],
     expected_managed_hermes_identity: Mapping[str, str] | None = None,
+    host_mode: str = "isolated",
 ) -> None:
-    """Run one concurrent Hermes wave under a read-only candidate boundary."""
+    """Run a Hermes wave with explicit host assurance and authenticated results."""
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
     worker_states: dict[int, Path] = {}
     repair_wave = any(handoff.get("task") == "document_repair" for handoff in handoffs)
     release_manifest_hash = None
-    if repair_wave:
+    integrity_guard = repair_wave or host_mode == "hermes-tui"
+    if integrity_guard:
         initial_integrity = _manifest_integrity(skill_root)
         if initial_integrity:
-            raise RuntimeError("Installed skill integrity failed before document repair: " + str(initial_integrity))
+            raise RuntimeError("Installed skill integrity failed before worker dispatch: " + str(initial_integrity))
         release_manifest_hash = sha256_file(skill_root / RELEASE_MANIFEST)
     deadline = time.monotonic() + max(0.0, remaining_seconds - 5.0)
     logs = run_dir / "logs/hermes-agents"
@@ -6177,7 +6204,7 @@ def _production_dispatch_handoffs(
             profile = tempfile.NamedTemporaryFile(
                 "w", prefix="clinical-production-adapter-", suffix=".sb", delete=False,
             )
-            proxy_socket = Path(profile.name + ".sock") if platform.system() == "Linux" else None
+            proxy_socket = Path(profile.name + ".sock") if platform.system() == "Linux" and host_mode == "isolated" else None
             proxy = (_start_production_connect_proxy(unix_path=proxy_socket) if proxy_socket
                      else _start_production_connect_proxy())
             profile.write("(version 1)\n(allow default)\n")
@@ -6292,7 +6319,7 @@ def _production_dispatch_handoffs(
                 "NO_PROXY": "",
             })
             process = subprocess.Popen(
-                [*_production_sandbox_prefix(Path(profile.name)), *command],
+                [*(_production_sandbox_prefix(Path(profile.name), host_mode=host_mode) if host_mode != "isolated" else _production_sandbox_prefix(Path(profile.name))), *command],
                 cwd=workspace_root,
                 env=worker_environment,
                 stdout=stdout_handle,
@@ -6416,12 +6443,12 @@ def _production_dispatch_handoffs(
             raise RuntimeError(
                 "One or more production workers could not be fully reaped."
             ) from cleanup_errors[0]
-        if repair_wave and (
+        if integrity_guard and (
             not (skill_root / RELEASE_MANIFEST).is_file()
             or sha256_file(skill_root / RELEASE_MANIFEST) != release_manifest_hash
             or _manifest_integrity(skill_root)
         ):
-            raise RuntimeError("Installed skill files changed during document repair; reject this worker result.")
+            raise RuntimeError("Installed skill files changed during worker dispatch; reject this worker result.")
 
 
 def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
@@ -6528,9 +6555,16 @@ def run_production_desktop_operation(
     skill_root: Path | None = None,
     certification_preflight: Path | None = None,
     manual_review: bool = False,
+    host_mode: str = "isolated",
 ) -> dict[str, Any]:
     """Shipped host adapter for normal, manual-review, and certification execution."""
+    if host_mode not in {"isolated", "hermes-tui"}:
+        raise ValueError("Unknown worker host mode.")
+    if host_mode == "hermes-tui" and (not manual_review or certification_preflight is not None):
+        raise ValueError("hermes-tui is only supported for explicitly selected manual candidate generation.")
     run_dir = run_dir.expanduser().resolve()
+    if host_mode == "hermes-tui":
+        opener = local_output_reader(run_dir)
     untrusted_root = (skill_root or SCRIPT_DIR.parent).expanduser().absolute()
     if any(path.is_symlink() for path in (
         untrusted_root, untrusted_root.parent, untrusted_root.parent.parent,
@@ -6602,9 +6636,10 @@ def run_production_desktop_operation(
     state_path = desktop_operation_state_path(run_dir, operation_id)
     prior_state = _read(state_path) if state_path.is_file() else {}
     if prior_state.get("status") not in {"passed", "review_required", "timeout"}:
-        readiness = _production_worker_readiness(root)
+        readiness = (_production_worker_readiness(root, host_mode=host_mode)
+                     if host_mode != "isolated" else _production_worker_readiness(root))
         assurance = readiness.get('capability_assurance')
-        if isinstance(assurance, Mapping) and assurance.get('status') == 'passed':
+        if host_mode == 'isolated' and isinstance(assurance, Mapping) and assurance.get('status') == 'passed':
             callbacks = {'recipient_opener': opener, 'parent_visual_reviewer': parent_visual_reviewer}
             actual = {}
             for name, callback in callbacks.items():
@@ -6641,6 +6676,7 @@ def run_production_desktop_operation(
             handoffs, remaining_seconds, revision_dir(), configuration,
             skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
             expected_managed_hermes_identity=managed_hermes_identity,
+            **({"host_mode": host_mode} if host_mode != "isolated" else {}),
         )
 
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
@@ -6682,7 +6718,7 @@ def run_production_desktop_operation(
         opener=opener,
         operation_id=operation_id,
         runtime_identity=runtime_identity,
-        release_identity={**identity, "hermes_configuration": configuration},
+        release_identity={**identity, "hermes_configuration": configuration, **({"host_mode": host_mode} if host_mode != "isolated" else {})},
         cleanup=lambda _status, _remaining: {
             "owned_processes_reaped": True,
             "late_responses_ignored": True,
@@ -6693,7 +6729,27 @@ def run_production_desktop_operation(
         **result,
         "parent_visual_review": parent_review_record,
         "review_mode": "manual_pre_release" if manual_review else "governed_delivery",
+        "host_mode": host_mode,
     }
+
+
+def local_output_reader(run_dir: Path) -> Callable[[str], bytes]:
+    """Verify manifest files locally; this is never recipient retrieval evidence."""
+    root = run_dir.resolve()
+    def read_output(path: str) -> bytes:
+        candidate = Path(path)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        if candidate.is_symlink() or not candidate.resolve().is_relative_to(root):
+            raise ValueError("Local output escapes the run directory.")
+        return candidate.read_bytes()
+    read_output.local_outputs_only = True
+    return read_output
+
+
+def _output_access_satisfied(delivery: Mapping[str, Any]) -> bool:
+    return bool(delivery.get("confirmed") or
+                (delivery.get("status") == "locally_available" and delivery.get("bytes_verified") is True))
 
 
 def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
@@ -10527,6 +10583,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source-md")
     parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter")
     parser.add_argument("--manual-review", action="store_true", help="generate local pre-release review outputs from a provisioned candidate without requiring promotion")
+    parser.add_argument("--host-mode", choices=("isolated", "hermes-tui"), default="isolated", help="explicit host-managed TUI mode generates local files without namespace or recipient-delivery claims")
     parser.add_argument("--desktop-opener-command")
     parser.add_argument("--parent-visual-review-command")
     parser.add_argument("--operation-id", default="default")
@@ -10555,6 +10612,8 @@ def main(argv: list[str] | None = None) -> int:
         args.desktop_operation or (args.stage == "generate" and args.run_dir)
     ):
         parser.error("--manual-review is supported only with --desktop-operation or --stage generate")
+    if args.host_mode == "hermes-tui" and not (args.desktop_operation and args.manual_review):
+        parser.error("--host-mode hermes-tui requires --desktop-operation --manual-review")
     if args.internal_pending_activation_smoke and not args.verify_installation:
         parser.error("internal pending activation smoke requires --verify-installation")
     if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
@@ -10595,16 +10654,17 @@ def main(argv: list[str] | None = None) -> int:
         result = rollback_release(Path(args.skills_dir))
     elif args.desktop_operation:
         if not args.run_dir: parser.error("--run-dir is required with --desktop-operation")
-        if not args.desktop_opener_command: parser.error("--desktop-opener-command is required with --desktop-operation")
-        if not args.parent_visual_review_command: parser.error("--parent-visual-review-command is required with --desktop-operation")
+        if args.host_mode == "isolated" and not args.desktop_opener_command: parser.error("--desktop-opener-command is required with --desktop-operation")
+        if args.host_mode == "isolated" and not args.parent_visual_review_command: parser.error("--parent-visual-review-command is required with --desktop-operation")
         result = run_production_desktop_operation(
             Path(args.run_dir),
             operation_id=args.operation_id,
-            opener=command_desktop_opener(Path(args.desktop_opener_command)),
+            opener=command_desktop_opener(Path(args.desktop_opener_command)) if args.desktop_opener_command else None,
             parent_visual_reviewer=command_parent_visual_reviewer(
                 Path(args.parent_visual_review_command)
-            ),
+            ) if args.parent_visual_review_command else None,
             manual_review=args.manual_review,
+            host_mode=args.host_mode,
         )
     elif args.release_gate: result = run_release_gate(SCRIPT_DIR.parent, evidence_root=Path(args.release_gate_root) if args.release_gate_root else None)
     elif args.format_conformance: result = run_format_conformance(SCRIPT_DIR.parent, evidence_root=Path(args.format_conformance_root) if args.format_conformance_root else None)

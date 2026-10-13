@@ -23,6 +23,37 @@ The installed skill, templates and runtime implementation stay read-only during 
 
 Prospective/Ambispective use the selected Advarra or Sterling ICF template and [starred-fillout-required-inputs.md](references/starred-fillout-required-inputs.md). Retrospective uses [retrospective-required-inputs.md](references/retrospective-required-inputs.md). These lists define obligatory inputs; optional fields stay optional. If both optional Provider Study ID and protocol number are absent, preparation assigns a stable visible `ADM-...` administrative identifier, not a clinical fact.
 
+## Existing Hermes terminal hosts
+
+When the authorized host is a restricted Linux Hermes TUI without Bubblewrap
+namespaces or an attachment channel, use the explicit manual-candidate mode:
+
+```bash
+"$CLINICAL_PYTHON" scripts/workflow.py --desktop-operation --manual-review \
+  --host-mode hermes-tui --run-dir <run-dir>
+```
+
+Read [runtime-and-release.md](references/runtime-and-release.md) for this mode's
+assurance limits and replacement checks. It uses ordinary Hermes safe-mode
+workers with private state, source/request authentication, package-integrity
+checks and process cleanup. Host permissions and instructions govern writes;
+OS isolation and restricted networking are not established. Never change
+installed files, approved source, sibling reviews or earlier runs. Do not run
+the privileged installed capability campaign as a prerequisite for this mode.
+
+Independent content and actual page-image review still govern clinical status.
+Supply `--parent-visual-review-command` when a genuine image-capable parent
+callback exists. If delegated visual review fails and no parent is available,
+retain incomplete review and publish usable documents as review-only. Never
+invent a visual pass or impersonate a parent reviewer.
+
+The TUI verifies exact local output bytes and returns their host paths. Report
+“files saved on the Hermes host” with the clinical status and review notices;
+local paths are not recipient-accessible download links. If the actual channel
+can upload files, transfer the final files through it separately and record the
+real result. Otherwise state that recipient transfer remains unverified. Do
+not invent an attachment route or claim the files were delivered.
+
 ## Run directory policy
 
 Keep every study run under `/opt/data/clinical-document-runs/`, with exactly one

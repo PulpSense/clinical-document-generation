@@ -2,6 +2,33 @@
 
 Read for a new host, fresh candidate extraction, runtime failure, or an explicitly requested release/installation operation. Ordinary study generation resumes in SKILL.md after verified provisioning. Certification timing criteria here are separate from the under-25-minute ordinary target.
 
+## Restricted Hermes TUI compatibility
+
+Owner-authorized unsigned manual candidates support `--host-mode hermes-tui`
+with `--desktop-operation --manual-review`. Select this explicitly on existing
+restricted Linux hosts; the default isolated mode still requires its full
+installed lifecycle evidence. TUI mode does not require Bubblewrap, namespace
+permission, a recipient opener, or a synthetic paid capability campaign.
+Provisioning and installation rendering checks still apply after replacement.
+Use the existing Linux interpreter, office runtime, fonts and configured model.
+
+TUI preflight checks actual profile authentication and installed evidence reads.
+Worker capabilities are observed during the real operation; a failed tool is
+review feedback or an honest blocker, not a fabricated assurance-cache pass.
+Workers retain private mutable Hermes state and controlled process cleanup.
+Source/request/artifact hashes authenticate judgments, and every worker wave
+checks installed package integrity before and after execution. These detect
+changes; they do not establish OS-enforced write or network denial. Safe mode
+and host permissions are the execution boundary. This mode is excluded from
+certification and promoted execution.
+
+Final local files are checked against the exact manifest bytes. Terminal state
+records `recipient_delivery_verified: false`, local availability and no recipient
+confirmation. The recipient-delivery gate remains pending. Resuming the same
+operation rechecks those bytes and preserves the original deadline. Genuine
+independent native and page-image review is still required for clinical approval;
+missing parent visual fallback yields incomplete review, never an assumed pass.
+
 ## Public interface
 
 Run commands from this skill folder. `scripts/workflow.py` is the only CLI entrypoint.

@@ -111,13 +111,22 @@ The certification controller uses the host-native kernel boundary: macOS uses
 it mounts the host read-only, permits writes only to the certification run and
 its isolated cache, and fails closed when Bubblewrap is unavailable.
 
-The ordinary Linux worker path also requires trusted host Bubblewrap. It uses
+The default isolated Linux worker path also requires trusted host Bubblewrap. It uses
 private PID/network namespaces, an allowlisted read-only filesystem, per-dispatch runtime state
 and exact checkpoint/native-work write exceptions. Its sole provider route is a
 Unix-socket CONNECT bridge restricted to the governed host; direct network access
 is isolated. Missing boundary/capability evidence rejects admission. Actual
 installed enforcement must be exercised using disposable sentinels, not inferred
 from these launch flags. See [installed capability evidence](references/runtime-and-release.md#installed-worker-capability-evidence).
+
+Existing restricted Hermes terminals can explicitly use
+`--desktop-operation --manual-review --host-mode hermes-tui`. This generates
+and independently reviews documents with the existing Linux runtime and verifies
+exact local output bytes. It requires neither privileged namespaces nor an
+attachment channel. OS isolation/network denial and recipient transfer remain
+unverified, and the recipient-delivery ledger stays pending. This mode cannot
+certify or activate a promoted release. See
+[restricted TUI compatibility](references/runtime-and-release.md#restricted-hermes-tui-compatibility).
 
 One real certification tracer requires an extracted, hash-valid candidate rather than the
 editable checkout:
