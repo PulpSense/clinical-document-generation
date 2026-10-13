@@ -47,7 +47,7 @@ from drafting import construction_repair_spec, construction_retry_spec, create_c
 from prs_xml import generate as generate_xml, validate_output as validate_xml_output, quality_report as xml_quality_report
 from output_recovery import (apply_xml_repairs, source_path as normalize_source_path, create_native_repair,
     adopt_native_repair, NativeRepairIntegrityError, restore_native_checkpoint, native_repair_response_valid, native_read, native_file, native_files)
-from quality import ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import content_review_resume, retain_verification_response, ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA, validate_verifications, retain_verification_response
 from contracts import document_table_reference, protocol_table_contracts, applicable_required_inputs, required_input_value
@@ -59,7 +59,7 @@ DESKTOP_DELIVERY_RETRIES = 2
 NORMAL_RUNTIME_TARGET_MIN_SECONDS = 600.0
 NORMAL_RUNTIME_TARGET_MAX_SECONDS = 1500.0
 DESKTOP_OPERATION_BUDGET_SECONDS = 2700.0
-CONTENT_REVIEW_WORKER_BUDGET_SECONDS = 12 * 60
+CONTENT_REVIEW_WORKER_BUDGET_SECONDS = 6 * 60
 PARENT_VISUAL_WORKER_BUDGET_SECONDS = 8 * 60
 FORMAT_CONFORMANCE_TIMEOUT_SECONDS = 10 * 60
 DESKTOP_STAGE_SOFT_BUDGETS = {
@@ -3587,6 +3587,8 @@ def _awaiting(revision_dir: Path, *, stage: str, paths: Sequence[Path], findings
             handoff["response_repair_feedback"] = [item["issue"] for item in feedback_findings
                 if item.get("verification_request_id") == request["request_id"]
                 and item.get("recovery_class") == "verifier_transient"]
+        if request.get("task") == "clinical_content_verification" and request.get("review_transport"):
+            handoff["review_transport"] = request["review_transport"]
         if request.get("task") == "rendered_page_visual_verification":
             handoff["fallback_owner"] = "parent"
             handoff["completion_requirement"] = "inspect_every_bound_page_image"
@@ -4565,6 +4567,7 @@ def run_desktop_operation(
         "generation": dict(raw_attempt_counters.get("generation") or {}),
         "handoff_dispatches": dict(raw_attempt_counters.get("handoff_dispatches") or {}),
         "parent_visual_callbacks": dict(raw_attempt_counters.get("parent_visual_callbacks") or {}),
+        "content_review_callbacks": dict(raw_attempt_counters.get("content_review_callbacks") or {}),
         "delivery": int(raw_attempt_counters.get("delivery") or 0),
     }
     raw_feedback_attempts = persisted.get("handoff_feedback_attempts")
@@ -5018,14 +5021,75 @@ def run_desktop_operation(
                         "client_outputs": [],
                     }
 
+                def recover_content_review() -> None:
+                    for item in handoffs:
+                        if item.get("task") != "clinical_content_verification" or not revision_id:
+                            continue
+                        revision = run_dir / "revisions" / revision_id
+                        request_path = revision / str(item.get("request_path") or "")
+                        if not request_path.is_file():
+                            continue
+                        request = _read(request_path)
+                        if not request.get("review_transport"):
+                            continue  # Older revisions retain their original contract.
+                        key = str(request["request_sha256"])
+                        for _ in range(3):
+                            # A complete substantive review belongs to document
+                            # repair, not reviewer replacement. Tool failures do not.
+                            if verification_response_is_terminal(revision, request_path):
+                                response = _read(revision / request["response_path"])
+                                progress = revision / request["review_transport"]["progress_path"]
+                                if (not response.get("error") and not progress.exists()
+                                        and not progress.with_suffix("").exists()):
+                                    break
+                            resume = content_review_resume(revision, request_path)
+                            if verification_response_is_terminal(revision, request_path):
+                                response = _read(revision / request["response_path"])
+                                if not response.get("error"):
+                                    break
+                            attempts = int(attempt_counters["content_review_callbacks"].get(key) or 0)
+                            available = remaining_seconds()
+                            if attempts >= 2 or available <= 0:
+                                # Preserve a bound tooling result, so generate
+                                # produces the complete review-only package.
+                                if not verification_response_is_terminal(revision, request_path):
+                                    retain_verification_response(revision, request_path)
+                                    _write(revision / request["response_path"], {
+                                        **{name: request[name] for name in ("request_id", "request_sha256", "revision_id", "task")},
+                                        "schema_version": RESPONSE_SCHEMA, "status": "blocked",
+                                        "producer": {"model_id": "workflow", "reviewer_id": "review-transport"},
+                                        "error": {"type": "native_inspection_incomplete",
+                                                  "message": "Independent review remains incomplete after bounded replacement attempts or deadline exhaustion."},
+                                        "findings": [], "section_assessments": [], "cross_document_assessments": [],
+                                    })
+                                break
+                            retain_verification_response(revision, request_path)
+                            attempt_counters["content_review_callbacks"][key] = attempts + 1
+                            resume_path = revision / f"hermes/review-progress/{request['request_id']}/scope-{attempts + 1}.json"
+                            _write(resume_path, resume)
+                            replacement = {**item, "reviewer_owner": "replacement", "review_resume": resume,
+                                           "review_resume_path": resume_path.relative_to(revision).as_posix(),
+                                           "review_attempt": attempts + 1}
+                            save("running")
+                            callback = fallback_handoff_runner or handoff_runner
+                            try:
+                                callback([replacement], min(available / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS))
+                            except WorkerAuthenticationError:
+                                raise
+                            except Exception:
+                                # A worker can return partial progress even when
+                                # its final response is missing or incomplete.
+                                pass
+
                 bounded_parent_review_runner = run_bounded_parent_review
                 handoff_started = clock()
                 save("running")
+                authentication_failed = False
                 try:
                     if supports_parent_fallback and fallback_owned and non_fallback:
                         with ThreadPoolExecutor(max_workers=1) as executor:
                             hard_future = executor.submit(
-                                handoff_runner, non_fallback, min(remaining, CONTENT_REVIEW_WORKER_BUDGET_SECONDS),
+                                handoff_runner, non_fallback, min(remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS),
                             )
                             for delegated, timeout in (
                                 (fresh_fallback_owned, soft_timeout),
@@ -5057,9 +5121,14 @@ def run_desktop_operation(
                     else:
                         dispatch_budget = soft_timeout if supports_parent_fallback else remaining
                         if any(item.get("task") == "clinical_content_verification" for item in dispatch_handoffs):
-                            dispatch_budget = min(dispatch_budget, CONTENT_REVIEW_WORKER_BUDGET_SECONDS)
+                            dispatch_budget = min(dispatch_budget, remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS)
                         handoff_runner(dispatch_handoffs, dispatch_budget)
+                except WorkerAuthenticationError:
+                    authentication_failed = True
+                    raise
                 finally:
+                    if not authentication_failed:
+                        recover_content_review()
                     record_timing(stage, clock() - handoff_started)
                     record_soft_budget_event(stage)
                     save("running")
@@ -5358,7 +5427,7 @@ def _production_agent_prompt(
         else ""
     )
     response_write_rule = (
-        " Do not call write_file, patch, or terminal to publish the response. Return the exact "
+        " Return the exact "
         "response JSON as your final answer with no Markdown fence or surrounding prose. The "
         "Desktop parent writes that final JSON atomically to the bound response path."
     )
@@ -5370,6 +5439,23 @@ def _production_agent_prompt(
         if task in {"clinical_content_verification", "rendered_page_visual_verification"}
         else " The next generate invocation is the authoritative response validator."
     )
+    transport_rule = ""
+    if task == "clinical_content_verification":
+        request = _read(revision_dir / str(handoff["request_path"]))
+        transport = request.get("review_transport") or {}
+        transport_rule = (
+            " Read the bounded reading index at " + revision_path + "/" + str(transport.get("index_path", ""))
+            + " first. It contains the exact instructions, identities, evidence packet paths and progress path. "
+            "Use bounded packets if any read truncates; concatenating text_chunks recovers all original evidence. "
+            "Save each completed small group of independent assessments using write_file to the progress_path "
+            "as bound response JSON with status in_progress. This audit checkpoint is the only writable review file; "
+            "native documents and source remain read-only. After compaction read the saved checkpoint and continue. "
+            "Return completed assessments even if other inspection cannot finish. Report substantive defects normally. "
+        ) if transport else ""
+        if handoff.get("review_resume"):
+            transport_rule += " Fresh independent replacement: read outstanding scope at " + revision_path + "/" + str(handoff["review_resume_path"]) + "; " \
+                              "inspect exact native evidence yourself for those judgments. Prior saved assessments are " \
+                              "retained by the workflow, not approvals to invent missing judgments."
     feedback = handoff.get("response_repair_feedback") or []
     repair_rule = (
         " Response contract corrections from the previous validation: "
@@ -5387,11 +5473,15 @@ def _production_agent_prompt(
         f"Certified skill: {skill_path}\nRun revision: {revision_path}\n"
         f"Request: {request_path}\nResponse: {response_path}\nTask: {task}\n\n"
         f"Read {skill_path}/SKILL.md and load the clinical-document-generation skill. "
-        f"Read the request completely. {task_rule}{layout_rule} Bind the exact schema_version, request_id, "
+        f"Read all assigned review evidence using its bounded route when supplied. {task_rule}{layout_rule} Bind the exact schema_version, request_id, "
         "request_sha256, task, revision_id, target, and evidence "
         "reference exactly. producer.model_id must record the actual model used for this response, and "
         "producer.reviewer_id must record the actual author/reviewer role for this task."
-        f"{response_write_rule}{verification_rule}{repair_rule} The validator interpreter is dependency-complete; do not search "
+        f"{transport_rule} "
+        + ("Exact response identity: " + json.dumps({key: handoff.get(key) for key in (
+            "request_id", "request_sha256", "task")}, ensure_ascii=False) + f"; revision_id={revision_dir.name}. "
+           if task in {"clinical_content_verification", "rendered_page_visual_verification"} else "")
+        + f"{response_write_rule}{verification_rule}{repair_rule} The validator interpreter is dependency-complete; do not search "
         "the filesystem for Python or dependency paths. Do not modify production code or "
         "approved source material."
     )
@@ -6253,6 +6343,9 @@ def run_production_desktop_operation(
         nonlocal parent_review_record
         parent_review_record = None
         active_revision = revision_dir()
+        if handoffs and all(item.get("task") == "clinical_content_verification" for item in handoffs):
+            route(handoffs, remaining_seconds)
+            return
         if parent_visual_reviewer is None:
             raise RuntimeError(
                 "Delegated Visual QA failed; a genuine Desktop-parent reviewer callback is required."

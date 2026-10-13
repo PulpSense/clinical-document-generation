@@ -451,6 +451,18 @@ def verification_request_authentication_findings(
             if (not _revision_owned_nonsymlink_path(revision_dir, path)
                     or not path.is_file() or sha256_file(path) != inspection.get(hash_key)):
                 return [finding("native_inspection_changed", "Native inspection evidence or its exact native file changed; rebuild the review from current bytes.")]
+    transport = request.get("review_transport") or {}
+    if transport:
+        index = revision_dir / str(transport.get("index_path") or "")
+        if (not _revision_owned_nonsymlink_path(revision_dir, index) or not index.is_file()
+                or sha256_file(index) != transport.get("index_sha256")):
+            return [finding("review_packet_changed", "Bounded review reading index changed.")]
+    for view in transport.get("views", []):
+        for packet in view.get("packets", []):
+            path = revision_dir / str(packet.get("path") or "")
+            if (not _revision_owned_nonsymlink_path(revision_dir, path)
+                    or not path.is_file() or sha256_file(path) != packet.get("sha256")):
+                return [finding("review_packet_changed", "Bounded review reading evidence changed.")]
     return []
 
 
@@ -5292,6 +5304,62 @@ def _reuse_visual_request(revision_dir: Path, proposed: Mapping[str, Any]) -> di
             return prior
     return None
 
+def _bounded_review_view(revision_dir: Path, directory: Path, name: str, value: Any) -> dict[str, Any]:
+    """Lossless reading alternative: short JSON strings in small immutable files."""
+    text = json.dumps(value, ensure_ascii=False, indent=2)
+    # UTF-8 and JSON escaping can expand characters. These bounds also cover
+    # non-ASCII sources and long XML text nodes without relying on line paging.
+    chunks = [text[index:index + 64] for index in range(0, len(text), 64)]
+    packets = []
+    for index in range(0, len(chunks), 20):
+        payload = {"text_chunks": chunks[index:index + 20]}
+        data = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        digest = hashlib.sha256(data).hexdigest()
+        path = directory / f"{digest}.json"
+        _assert_safe_mutation_path(path, directory=False)
+        if path.exists() and path.read_bytes() != data:
+            raise ValueError("Review reading packet identity collision.")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        packets.append({"path": path.relative_to(revision_dir).as_posix(), "sha256": digest})
+    return {"name": name, "packets": packets}
+
+
+def _review_transport(revision_dir: Path, request: Mapping[str, Any]) -> dict[str, Any]:
+    directory = revision_dir / "hermes/review-packets" / str(request["request_id"])
+    views = [_bounded_review_view(revision_dir, directory, "request", request)]
+    for native in request.get("native_inspection", []):
+        views.append(_bounded_review_view(revision_dir, directory, native["path"],
+                                          _json(revision_dir / native["path"])))
+    index_path = directory / "index.json"
+    index = {"request_id": request["request_id"], "revision_id": request["revision_id"],
+             "task": request["task"], "response_path": request["response_path"],
+             "instructions_chunks": [request["instructions"][i:i + 64]
+                                     for i in range(0, len(request["instructions"]), 64)],
+             "views": views, "progress_path": f"hermes/review-progress/{request['request_id']}.json"}
+    _assert_safe_mutation_path(index_path, directory=False)
+    if index_path.exists() and _json(index_path) != index:
+        raise ValueError("Review reading index identity collision.")
+    _write(index_path, index)
+    progress_parent = revision_dir / "hermes/review-progress"
+    _assert_safe_mutation_path(progress_parent, directory=True)
+    progress_parent.mkdir(parents=True, exist_ok=True)
+    return {
+        "schema_version": "bounded-review-reading/v1",
+        "index_path": index_path.relative_to(revision_dir).as_posix(),
+        "index_sha256": sha256_file(index_path),
+        "views": views,
+        "progress_path": f"hermes/review-progress/{request['request_id']}.json",
+        "reading_rule": "Read packets in order per view. Concatenate text_chunks exactly to recover "
+                        "the complete original JSON; no text is summarized or omitted. Use this route "
+                        "when whole-file or line reads truncate. Save completed independent assessments "
+                        "to progress_path after each small group using the bound response schema and "
+                        "identity. Candidate and approved source remain read-only. Read saved progress "
+                        "after context compaction; return remaining assessments and findings. A checkpoint "
+                        "is progress, never clinical approval. Report substantive defects normally.",
+    }
+
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -5488,6 +5556,8 @@ def create_verification_requests(
                 "pass or the repair author's claim alone does not resolve an explicit concern."
             )
         payload["contracted_template_bundle"] = bundle
+        if payload["task"] == "clinical_content_verification":
+            payload["review_transport"] = _review_transport(revision_dir, payload)
         payload["request_sha256"] = verification_request_sha256(payload)
     payloads = [_reuse_visual_request(revision_dir, payload) or payload for payload in payloads]
     expected = {payload["request_id"]: payload for payload in payloads}
@@ -5601,6 +5671,145 @@ def create_verification_requests(
         _write(ledger_path, proposed_ledgers[str(payload["request_id"])])
         result.append(path)
     return result
+
+
+def content_review_resume(revision_dir: Path, request_path: Path) -> dict[str, Any]:
+    """Checkpoint independent judgments; assemble only complete, still-bound evidence.
+
+    A tooling error never becomes a clinical assessment. Original responses are
+    retained; only explicit section/check judgments can fill review coverage.
+    """
+    request = _json(request_path)
+    counts: dict[str, int] = {}
+    for active_path in (revision_dir / "hermes/verification-requests").glob("*.json"):
+        active = _json(active_path)
+        active_id = str(active.get("request_id") or "")
+        counts[active_id] = counts.get(active_id, 0) + 1
+    authentication = verification_request_authentication_findings(
+        revision_dir, request_path, request, request_id_counts=counts)
+    if authentication:
+        raise ValueError(authentication[0]["issue"])
+    transport = request.get("review_transport")
+    if request.get("task") != "clinical_content_verification" or not isinstance(transport, Mapping):
+        raise ValueError("Content review has no supported checkpoint transport.")
+    progress_path = revision_dir / str(transport["progress_path"])
+    directory = progress_path.with_suffix("")
+    response_path = revision_dir / str(request["response_path"])
+    for path in (progress_path, response_path):
+        if not _revision_owned_nonsymlink_path(revision_dir, path):
+            raise ValueError("Review progress must be revision-owned.")
+        _assert_safe_mutation_path(path, directory=False)
+    _assert_safe_mutation_path(directory, directory=True)
+    directory.mkdir(parents=True, exist_ok=True)
+    expected_sections = {(r["artifact"], r["section_id"]) for r in request["sections"]}
+    expected_cross = set(request.get("cross_document_checks", []))
+    identity = ("request_id", "request_sha256", "revision_id", "task")
+    context = request.get("review_context") or {}
+    prior_authors = context.get("repair_authors", [context.get("repair_author", {})])
+
+    def valid(response: Any) -> bool:
+        if not isinstance(response, Mapping) or response.get("schema_version") != RESPONSE_SCHEMA:
+            return False
+        producer = response.get("producer")
+        if (any(response.get(key) != request[key] for key in identity)
+                or not isinstance(producer, Mapping)
+                or not _text(producer.get("model_id")) or not _text(producer.get("reviewer_id"))
+                or any(isinstance(author, Mapping) and author.get("reviewer_id") == producer.get("reviewer_id")
+                       for author in prior_authors)):
+            return False
+        if response.get("status") not in {"passed", "blocked", "failed", "in_progress"}:
+            return False
+        sections = response.get("section_assessments", [])
+        cross = response.get("cross_document_assessments", [])
+        findings = response.get("findings", [])
+        if not all(isinstance(rows, list) for rows in (sections, cross, findings)):
+            return False
+        section_ids, cross_ids = [], []
+        for row in sections:
+            if (not isinstance(row, Mapping) or row.get("status") not in {"passed", "blocked", "failed"}
+                    or not isinstance(row.get("checks"), list)
+                    or any(not isinstance(check, str) for check in row["checks"])
+                    or set(row["checks"]) != set(CONTENT_CHECKS)):
+                return False
+            if not isinstance(row.get("artifact"), str) or not isinstance(row.get("section_id"), str):
+                return False
+            section_ids.append((row.get("artifact"), row.get("section_id")))
+        for row in cross:
+            if not isinstance(row, Mapping) or row.get("status") not in {"passed", "blocked", "failed"}:
+                return False
+            if not isinstance(row.get("check"), str):
+                return False
+            cross_ids.append(row["check"])
+        if (len(set(section_ids)) != len(section_ids) or not set(section_ids) <= expected_sections
+                or len(set(cross_ids)) != len(cross_ids) or not set(cross_ids) <= expected_cross):
+            return False
+        if (response.get("status") in {"blocked", "failed"} and not response.get("error")
+                and not findings and not any(row["status"] != "passed" for row in [*sections, *cross])):
+            return False
+        return all(isinstance(row, Mapping) and _text(row.get("issue"))
+                   and _valid_finding_id(_text(row.get("finding_id"))) for row in findings)
+
+    # Validate identities before retaining anything as reusable review progress.
+    for path in (progress_path, response_path):
+        if not path.is_file():
+            continue
+        try:
+            raw = path.read_bytes()
+            response = json.loads(raw)
+        except (OSError, ValueError):
+            continue
+        if valid(response) and any(response.get(key) for key in (
+                "section_assessments", "cross_document_assessments", "findings")):
+            snapshot = directory / f"attempt-{hashlib.sha256(raw).hexdigest()}.json"
+            _assert_safe_mutation_path(snapshot, directory=False)
+            if not snapshot.exists():
+                snapshot.write_bytes(raw)
+    sections, cross, findings = {}, {}, {}
+    evidence, producers = [], []
+    for snapshot in sorted(directory.glob("attempt-*.json")):
+        if not _revision_owned_nonsymlink_path(revision_dir, snapshot):
+            raise ValueError("Review checkpoint evidence escapes its revision.")
+        raw = snapshot.read_bytes()
+        if snapshot.stem != "attempt-" + hashlib.sha256(raw).hexdigest():
+            raise ValueError("Review checkpoint evidence changed.")
+        response = json.loads(raw)
+        if not valid(response):
+            raise ValueError("Review checkpoint binding is invalid.")
+        producer = dict(response["producer"])
+        producers.append(producer)
+        evidence.append({"path": snapshot.relative_to(revision_dir).as_posix(),
+                         "sha256": sha256_file(snapshot), "producer": producer})
+        for key, rows, destination in (
+            (lambda r: (r["artifact"], r["section_id"]), response.get("section_assessments", []), sections),
+            (lambda r: r["check"], response.get("cross_document_assessments", []), cross),
+        ):
+            for row in rows:
+                row_key = key(row)
+                # An unresolved blocked judgment cannot disappear through a
+                # later partial pass. It goes to normal independent repair.
+                if row_key not in destination or row["status"] != "passed":
+                    destination[row_key] = {**row, "producer": producer}
+        for row in response.get("findings", []):
+            finding_id = row["finding_id"]
+            if finding_id in findings and findings[finding_id] != row:
+                raise ValueError("Independent checkpoints have conflicting finding identities.")
+            findings[finding_id] = row
+    remaining_sections = [r for r in request["sections"] if (r["artifact"], r["section_id"]) not in sections]
+    remaining_cross = [r for r in request.get("cross_document_checks", []) if r not in cross]
+    complete = not remaining_sections and not remaining_cross
+    if complete and producers:
+        merged = {key: request[key] for key in identity}
+        merged.update(schema_version=RESPONSE_SCHEMA, producer=producers[-1],
+                      section_assessments=list(sections.values()), cross_document_assessments=list(cross.values()),
+                      findings=list(findings.values()), review_progress_evidence=evidence,
+                      status="blocked" if findings or any(r["status"] != "passed" for r in [*sections.values(), *cross.values()]) else "passed")
+        # Publish only explicit judgments; the normal complete response validator
+        # still owns independence, prior-concern reassessment and publication.
+        _write(response_path, merged)
+    return {"reading_strategy": "bounded_packets", "progress_path": transport["progress_path"],
+            "remaining_sections": remaining_sections, "remaining_cross_document_checks": remaining_cross,
+            "completed_section_count": len(sections), "completed_cross_document_count": len(cross),
+            "checkpoint_evidence": evidence, "coverage_complete": complete}
 
 
 def pending_verifications(revision_dir: Path) -> list[Path]:
@@ -6032,6 +6241,25 @@ def validate_verifications(
             findings.append(recovery_finding({"category": "verification", "field": "producer.reviewer_id", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Verifier reviewer identity is missing."}, "verifier_transient"))
         if malformed_response:
             evidence[evidence_key] = {"request": request_path.relative_to(revision_dir).as_posix(), "request_sha256": sha256_file(request_path), "response": response_path.relative_to(revision_dir).as_posix(), "response_sha256": sha256_file(response_path), "producer": producer, "status": "malformed", "contracted_template_bundle": request.get("contracted_template_bundle")}
+            continue
+        checkpoint_invalid = False
+        checkpoint_rows = response.get("review_progress_evidence", [])
+        if not isinstance(checkpoint_rows, list):
+            checkpoint_invalid = True
+            checkpoint_rows = []
+        for checkpoint in checkpoint_rows:
+            if not isinstance(checkpoint, Mapping):
+                checkpoint_invalid = True
+                continue
+            checkpoint_path = revision_dir / str(checkpoint.get("path") or "")
+            if (not _revision_owned_nonsymlink_path(revision_dir, checkpoint_path)
+                    or not checkpoint_path.is_file() or sha256_file(checkpoint_path) != checkpoint.get("sha256")):
+                checkpoint_invalid = True
+        if checkpoint_invalid:
+            findings.append(recovery_finding({"category": "verification", "field": request["task"],
+                "code": "review_checkpoint_changed", "target_ids": [verification_target],
+                "verification_request_id": request["request_id"],
+                "issue": "Saved independent review evidence changed; complete fresh inspection is required."}, "verifier_transient"))
             continue
         error = response.get("error") if isinstance(response.get("error"), Mapping) else {}
         error_type = _text(error.get("type")).casefold()
