@@ -51,7 +51,7 @@ from quality import create_content_review_unit, content_review_unit_result, cont
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA, validate_verifications, retain_verification_response
 from contracts import document_table_reference, protocol_table_contracts, applicable_required_inputs, required_input_value
-from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note, review_concern
+from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note, review_concern, reviewed_presentation_only
 
 
 REFERENCE = Path("reference/study.reference.json")
@@ -4327,7 +4327,8 @@ def _run_content_review_schedule(
     for _ in range(maximum_waves):
         paths = [revision_dir / value for value in state["requests"]]
         progress = content_review_schedule_result(revision_dir, parent_path, paths)
-        if progress["complete"] or progress["findings"] or remaining_seconds() <= 0:
+        if (progress["complete"] or any(not reviewed_presentation_only(f) for f in progress["findings"])
+                or remaining_seconds() <= 0):
             break
         if state["no_progress"] >= plan["max_no_progress_attempts"]:
             break
@@ -4855,6 +4856,25 @@ def run_desktop_operation(
     # Persist before any operation work can be interrupted; otherwise a restart
     # could create a fresh correctness budget.
     save("running")
+    # A process interruption may leave an authenticated partial parent response.
+    # Finish its durable queue before generation interprets that snapshot as a
+    # terminal tooling result. The persisted operation deadline still applies.
+    for handoff in pending_handoffs:
+        if handoff.get("task") != "clinical_content_verification":
+            continue
+        revision_dir = run_dir / "revisions" / current_approval_identity["revision_id"]
+        parent_path = revision_dir / str(handoff.get("request_path") or "")
+        if not parent_path.is_file() or not _read(parent_path).get("review_plan"):
+            continue
+        schedule_path = revision_dir / f"hermes/review-schedules/{_read(parent_path)['request_id']}.json"
+        if schedule_path.is_file() and remaining_seconds() > 0:
+            resumed_at = clock()
+            try:
+                _run_content_review_schedule(revision_dir, parent_path, handoff_runner,
+                    fallback_handoff_runner or handoff_runner, remaining_seconds)
+            finally:
+                record_timing("independent_verification", clock() - resumed_at)
+                save("running")
     while True:
         remaining = remaining_seconds()
         if remaining <= 0:
@@ -9939,7 +9959,8 @@ def generate(
             return _repair_block(run_dir, "source_review", final_quality["findings"],
                                  candidate_outputs=_candidate_outputs(revision_dir))
         partial_defects = [row for row in final_quality["findings"]
-                           if row.get("partial_review") and row.get("verification_source_finding")]
+                           if row.get("partial_review") and row.get("verification_source_finding")
+                           and not internal_presentation_note(row)]
         if partial_defects and all(row in partial_defects or row.get("code") == "review_coverage_incomplete"
                                    for row in final_quality["findings"]):
             return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,

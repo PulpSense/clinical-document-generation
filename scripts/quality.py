@@ -5415,6 +5415,28 @@ def _content_review_plan(revision_dir: Path, request: Mapping[str, Any]) -> dict
             "max_no_progress_attempts": 2, "readable_native": views}
 
 
+def _prior_concern_in_review_scope(prior: Mapping[str, Any], parent: Mapping[str, Any],
+                                   sections: Sequence[Mapping[str, Any]], checks: Sequence[str]) -> bool:
+    """Give every prior concern an owner, including unknown native locations."""
+    concern = review_concern(prior)
+    artifact = concern.get("artifact")
+    targets = set(concern.get("target_ids") or [])
+    localized = {row["section_id"] for row in parent["sections"]
+                 if row["section_id"] in targets and (not artifact or row["artifact"] == artifact)}
+    if localized:
+        return any(row["section_id"] in localized and (not artifact or row["artifact"] == artifact)
+                   for row in sections)
+    parent_checks = parent["cross_document_checks"]
+    if concern.get("check") in parent_checks:
+        return concern["check"] in checks
+    owner = "prs.structured" if artifact == "study.xml" else f"{artifact}.shell"
+    if any(row["section_id"] == owner for row in parent["sections"]):
+        return any(row["section_id"] == owner for row in sections)
+    if parent_checks:
+        return parent_checks[0] in checks
+    return any(row["section_id"] == "protocol.shell" for row in sections)
+
+
 def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: list[dict[str, Any]],
                                cross_checks: list[str], attempt: int) -> Path:
     """Create a small immutable independent task under a canonical parent review."""
@@ -5464,12 +5486,8 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
     if cross_checks:
         passages = [_json(revision_dir / view["path"]) for view in plan["readable_native"]]
     context = copy.deepcopy(parent.get("review_context") or {})
-    section_ids = {row["section_id"] for row in sections}
-    artifacts = {row["artifact"] for row in sections}
     context["prior_findings"] = [finding for finding in context.get("prior_findings", [])
-        if set(finding.get("target_ids") or []) & section_ids
-        or (not finding.get("target_ids") and finding.get("artifact") in artifacts
-            and any(row["section_id"].endswith(".shell") for row in sections))]
+        if _prior_concern_in_review_scope(finding, parent, sections, cross_checks)]
     unit = {key: copy.deepcopy(parent[key]) for key in (
         "schema_version", "task", "revision_id", "review_set", "source_identity_sha256",
         "generation_authority_sha256", "artifacts", "checks", "template_preservation", "reviewer_policy")}
@@ -5576,11 +5594,9 @@ def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
                 continue
             if response["status"] in {"blocked", "failed"} and not response.get("error") and not issues and all(r["status"] == "passed" for r in [*assessments, *crosses]):
                 continue
-            assessed_ids = {r["section_id"] for r in assessments}
             scoped_context = copy.deepcopy(unit.get("review_context") or {})
             scoped_context["prior_findings"] = [f for f in scoped_context.get("prior_findings", [])
-                if set(f.get("target_ids") or []) & assessed_ids
-                or (not f.get("target_ids") and any(r["section_id"].endswith(".shell") for r in assessments))]
+                if _prior_concern_in_review_scope(f, parent, assessments, [r["check"] for r in crosses])]
             if _prior_concern_review_errors({**unit, "review_context": scoped_context}, response):
                 continue
             if len({r["finding_id"] for r in issues}) != len(issues):
@@ -5641,8 +5657,8 @@ def content_review_schedule_result(revision_dir: Path, parent_path: Path,
     response.update(schema_version=RESPONSE_SCHEMA, producer=producer,
         section_assessments=list(rows.values()), cross_document_assessments=list(cross.values()),
         findings=list(findings.values()), review_unit_evidence=proofs, scheduler_partial=not complete,
-        status="passed" if complete and not findings and all(r["status"] == "passed" for r in [*rows.values(), *cross.values()]) else "blocked")
-    if not complete and not findings:
+        status="passed" if complete and all(reviewed_presentation_only(f) for f in findings.values()) and all(r["status"] == "passed" for r in [*rows.values(), *cross.values()]) else "blocked")
+    if not complete and all(reviewed_presentation_only(f) for f in findings.values()):
         response["error"] = {"type": "native_inspection_incomplete",
                              "message": f"Independent review incomplete: {len(missing)} sections and {len(missing_cross)} cross-document checks remain."}
     response["review_coverage"] = {"remaining_sections": missing, "remaining_cross_document_checks": missing_cross}
@@ -6379,13 +6395,20 @@ def _prior_concern_review_errors(request: Mapping[str, Any], response: Mapping[s
         targets = concern.get("target_ids") or []
         section_targets = {row.get("section_id") for row in request.get("sections", []) if isinstance(row, Mapping)}
         scoped_targets = set(targets) & section_targets
-        matched = any(
+        check = concern.get("check")
+        cross_check = not visual and not scoped_targets and check in request.get("cross_document_checks", [])
+        matched = not cross_check and any(
             isinstance(row, Mapping)
             and (not artifact or row.get("artifact") == artifact)
             and (visual or not scoped_targets or row.get("section_id") in scoped_targets)
             and _notes_cite_finding(row.get("notes"), identity)
             for row in assessments
         )
+        if not visual and not scoped_targets and not matched:
+            matched = any(isinstance(row, Mapping)
+                and (not cross_check or row.get("check") == check)
+                and _notes_cite_finding(row.get("notes"), identity)
+                for row in response.get("cross_document_assessments", []))
         if not matched:
             errors.append(f"Prior substantive concern {identity} requires independent reassessment in the relevant assessment notes or a retained finding.")
     return errors

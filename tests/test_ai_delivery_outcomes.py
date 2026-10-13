@@ -100,11 +100,14 @@ def test_unresolved_general_repair_delivers_every_usable_branch_file(tmp_path, m
             else:
                 response = acceptance_verification(request)
                 if request['task'] == 'clinical_content_verification':
-                    response['status'] = 'blocked'
-                    response['findings'] = [{'finding_id':'visit-concern', 'artifact':'protocol',
-                        'check':'source_supported', 'target_ids':['introduction'], 'material':True,
-                        'issue':'The approved visit timing needs correction.'}]
-                    next(row for row in response['section_assessments'] if row['section_id']=='introduction')['status']='blocked'
+                    introduction = next((row for row in response['section_assessments']
+                                         if row['artifact'] == 'protocol' and row['section_id'] == 'introduction'), None)
+                    if introduction is not None:
+                        response['status'] = 'blocked'
+                        response['findings'] = [{'finding_id':'visit-concern', 'artifact':'protocol',
+                            'check':'source_supported', 'target_ids':['introduction'], 'material':True,
+                            'issue':'The approved visit timing needs correction.'}]
+                        introduction['status'] = 'blocked'
             response_path = revision / request['response_path']
             response_path.parent.mkdir(exist_ok=True, parents=True)
             response_path.write_text(json.dumps(response))

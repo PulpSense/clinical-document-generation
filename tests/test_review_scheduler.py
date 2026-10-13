@@ -231,3 +231,59 @@ def test_interrupted_parent_resumes_units_without_resetting_approval_or_deadline
     assert final['deadline_at_epoch'] == original['deadline_at_epoch']
     assert final['approval_identity'] == original['approval_identity']
     assert (revision / 'approved-reference.json').read_bytes() == approved_bytes
+
+
+def test_nonmaterial_finding_does_not_stop_required_review(tmp_path, monkeypatch):
+    emitted = []
+    def worker(request, response, revision, *args):
+        if not emitted:
+            emitted.append(True)
+            response['findings'] = [{'finding_id': 'editorial', 'artifact': 'protocol',
+                'target_ids': [request['sections'][0]['section_id']], 'issue': 'Harmless style preference',
+                **{key: False for key in ('material', 'safety_critical', 'contradiction',
+                    'obscures_required_information', 'materially_unusable')}}]
+        return response
+    result, revision, _ = operation(tmp_path, monkeypatch, FAMILIES[-1], worker, worker)
+    assert result['status'] == 'passed', result
+    assert not result.get('warnings')
+    parent = next((revision / 'hermes/verification-requests').glob('*content.json'))
+    assert quality.verification_response_is_complete(revision, parent)
+
+
+@pytest.mark.parametrize('family,location', [(family, location) for family in FAMILIES
+    for location in ('cross', 'unknown-section', 'xml')
+    if location != 'xml' or family[0] != 'Retrospective'])
+def test_prior_concerns_reach_responsible_unit_and_require_reassessment(tmp_path, family, location):
+    from test_handoff_quality import acceptance_verification
+    _, _, source = candidate(tmp_path, family)
+    concern = {'finding_id': 'prior-fact', 'issue': 'Prior substantive concern', 'material': True}
+    if location == 'cross':
+        concern['check'] = 'cross_document_consistency'
+    elif location == 'unknown-section':
+        concern.update(artifact='protocol', target_ids=['unknown-native-location'])
+    else:
+        concern.update(artifact='study.xml', target_ids=['unknown-xml-location'])
+    paths = quality.create_verification_requests(tmp_path, source, {'artifacts': []}, review_set=2,
+        review_context={'prior_findings': [concern]})
+    parent_path = paths[0]
+    parent = json.loads(parent_path.read_text())
+    units = [quality.create_content_review_unit(tmp_path, parent_path, [row], [], 1)
+             for row in parent['sections']]
+    units += [quality.create_content_review_unit(tmp_path, parent_path, [], [check], 1)
+              for check in parent['cross_document_checks']]
+    responsible = []
+    for path in units:
+        request = json.loads(path.read_text())
+        if not request['review_context']['prior_findings']:
+            continue
+        responsible.append(path)
+        response = acceptance_verification(request)
+        response_path = tmp_path / request['response_path']
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.write_text(json.dumps(response))
+        assert quality.content_review_unit_result(tmp_path, path) is None
+        for row in [*response['section_assessments'], *response['cross_document_assessments']]:
+            row['notes'] = ['Independently reassessed prior-fact against the exact current native bytes.']
+        response_path.write_text(json.dumps(response))
+        assert quality.content_review_unit_result(tmp_path, path)['complete']
+    assert responsible, 'No reviewer received the prior concern'
