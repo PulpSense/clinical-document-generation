@@ -5310,9 +5310,19 @@ def _bounded_review_view(revision_dir: Path, directory: Path, name: str, value: 
     # UTF-8 and JSON escaping can expand characters. These bounds also cover
     # non-ASCII sources and long XML text nodes without relying on line paging.
     chunks = [text[index:index + 64] for index in range(0, len(text), 64)]
+    batches, batch, byte_count = [], [], 32
+    for chunk in chunks:
+        encoded_size = len(json.dumps(chunk, ensure_ascii=False).encode("utf-8")) + 6
+        if batch and byte_count + encoded_size > 10000:
+            batches.append(batch)
+            batch, byte_count = [], 32
+        batch.append(chunk)
+        byte_count += encoded_size
+    if batch:
+        batches.append(batch)
     packets = []
-    for index in range(0, len(chunks), 20):
-        payload = {"text_chunks": chunks[index:index + 20]}
+    for batch in batches:
+        payload = {"text_chunks": batch}
         data = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
         digest = hashlib.sha256(data).hexdigest()
         path = directory / f"{digest}.json"

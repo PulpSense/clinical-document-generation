@@ -4628,37 +4628,40 @@ def run_desktop_operation(
         feedback = sorted(str(value) for value in item.get("response_repair_feedback", []))
         return request_key, sha256_value(feedback)
 
+    operation_state_lock = threading.RLock()
+
     def save(status: str, result: Mapping[str, Any] | None = None) -> dict[str, Any]:
-        payload = {
-            "operation_id": operation_id,
-            "started_at_epoch": started_at_epoch,
-            "deadline_at_epoch": deadline_at_epoch,
-            "started_at": datetime.fromtimestamp(started_at_epoch, timezone.utc).isoformat(),
-            "deadline_at": datetime.fromtimestamp(deadline_at_epoch, timezone.utc).isoformat(),
-            "budget_seconds": persisted_budget,
-            "actual_budget_seconds": persisted_budget,
-            "requested_budget_seconds": requested_budget_seconds,
-            "runtime": current_runtime,
-            "runtime_history": runtime_history,
-            "release_identity": current_release_identity,
-            "approval_identity": current_approval_identity,
-            "status": status,
-            "stage": current_stage,
-            "stage_history": stage_history,
-            "stage_timings": stage_timings,
-            "attempt_counters": attempt_counters,
-            "pending_handoffs": pending_handoffs,
-            "handoff_feedback_attempts": handoff_feedback_attempts,
-            "soft_budgets": soft_budgets,
-            "soft_budget_events": soft_budget_events,
-            "release_transitions": release_transitions,
-        }
-        if cleanup_evidence:
-            payload["cleanup"] = cleanup_evidence
-        if result is not None:
-            payload["result"] = dict(result)
-        _write(state_path, payload)
-        return dict(result or payload)
+        with operation_state_lock:
+            payload = {
+                "operation_id": operation_id,
+                "started_at_epoch": started_at_epoch,
+                "deadline_at_epoch": deadline_at_epoch,
+                "started_at": datetime.fromtimestamp(started_at_epoch, timezone.utc).isoformat(),
+                "deadline_at": datetime.fromtimestamp(deadline_at_epoch, timezone.utc).isoformat(),
+                "budget_seconds": persisted_budget,
+                "actual_budget_seconds": persisted_budget,
+                "requested_budget_seconds": requested_budget_seconds,
+                "runtime": current_runtime,
+                "runtime_history": runtime_history,
+                "release_identity": current_release_identity,
+                "approval_identity": current_approval_identity,
+                "status": status,
+                "stage": current_stage,
+                "stage_history": stage_history,
+                "stage_timings": stage_timings,
+                "attempt_counters": attempt_counters,
+                "pending_handoffs": pending_handoffs,
+                "handoff_feedback_attempts": handoff_feedback_attempts,
+                "soft_budgets": soft_budgets,
+                "soft_budget_events": soft_budget_events,
+                "release_transitions": release_transitions,
+            }
+            if cleanup_evidence:
+                payload["cleanup"] = cleanup_evidence
+            if result is not None:
+                payload["result"] = dict(result)
+            _write(state_path, payload)
+            return dict(result or payload)
 
     def finish(result: Mapping[str, Any]) -> dict[str, Any]:
         nonlocal current_stage, cleanup_evidence
@@ -4984,9 +4987,10 @@ def run_desktop_operation(
                                 item.get("request_sha256") or item.get("request_id")
                                 or item.get("request_path") or ""
                             )
-                            attempt_counters["parent_visual_callbacks"][key] = int(
-                                attempt_counters["parent_visual_callbacks"].get(key) or 0
-                            ) + 1
+                            with operation_state_lock:
+                                attempt_counters["parent_visual_callbacks"][key] = int(
+                                    attempt_counters["parent_visual_callbacks"].get(key) or 0
+                                ) + 1
                         save("running")
                         parent_budget = min(parent_remaining, PARENT_VISUAL_WORKER_BUDGET_SECONDS)
                         try:
@@ -5064,7 +5068,8 @@ def run_desktop_operation(
                                     })
                                 break
                             retain_verification_response(revision, request_path)
-                            attempt_counters["content_review_callbacks"][key] = attempts + 1
+                            with operation_state_lock:
+                                attempt_counters["content_review_callbacks"][key] = attempts + 1
                             resume_path = revision / f"hermes/review-progress/{request['request_id']}/scope-{attempts + 1}.json"
                             _write(resume_path, resume)
                             replacement = {**item, "reviewer_owner": "replacement", "review_resume": resume,
@@ -5085,12 +5090,25 @@ def run_desktop_operation(
                 handoff_started = clock()
                 save("running")
                 authentication_failed = False
+                content_recovered_in_parallel = False
+
+                def run_content_wave() -> None:
+                    nonlocal content_recovered_in_parallel
+                    worker_authentication_failed = False
+                    try:
+                        handoff_runner(non_fallback, min(remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS))
+                    except WorkerAuthenticationError:
+                        worker_authentication_failed = True
+                        raise
+                    finally:
+                        if not worker_authentication_failed:
+                            recover_content_review()
+                        content_recovered_in_parallel = True
+
                 try:
                     if supports_parent_fallback and fallback_owned and non_fallback:
                         with ThreadPoolExecutor(max_workers=1) as executor:
-                            hard_future = executor.submit(
-                                handoff_runner, non_fallback, min(remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS),
-                            )
+                            hard_future = executor.submit(run_content_wave)
                             for delegated, timeout in (
                                 (fresh_fallback_owned, soft_timeout),
                             ):
@@ -5127,7 +5145,7 @@ def run_desktop_operation(
                     authentication_failed = True
                     raise
                 finally:
-                    if not authentication_failed:
+                    if not authentication_failed and not content_recovered_in_parallel:
                         recover_content_review()
                     record_timing(stage, clock() - handoff_started)
                     record_soft_budget_event(stage)
@@ -5427,7 +5445,7 @@ def _production_agent_prompt(
         else ""
     )
     response_write_rule = (
-        " Return the exact "
+        " Do not call write_file, patch, or terminal to publish the response. Return the exact "
         "response JSON as your final answer with no Markdown fence or surrounding prose. The "
         "Desktop parent writes that final JSON atomically to the bound response path."
     )
@@ -6341,11 +6359,11 @@ def run_production_desktop_operation(
 
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
         nonlocal parent_review_record
-        parent_review_record = None
         active_revision = revision_dir()
         if handoffs and all(item.get("task") == "clinical_content_verification" for item in handoffs):
             route(handoffs, remaining_seconds)
             return
+        parent_review_record = None
         if parent_visual_reviewer is None:
             raise RuntimeError(
                 "Delegated Visual QA failed; a genuine Desktop-parent reviewer callback is required."

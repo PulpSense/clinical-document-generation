@@ -50,7 +50,7 @@ def test_complete_review_evidence_has_bounded_lossless_reading_route(tmp_path, f
     assert quality.verification_response_is_complete(tmp_path, path)
 
 
-def operation(tmp_path, monkeypatch, family, primary_review, fallback_review, *, clock=None):
+def operation(tmp_path, monkeypatch, family, primary_review, fallback_review, *, clock=None, visual_review=None):
     import drafting
     from pathlib import Path
     monkeypatch.setattr(workflow, 'render_assurance', controlled_render)
@@ -79,6 +79,8 @@ def operation(tmp_path, monkeypatch, family, primary_review, fallback_review, *,
                         response = fallback_review(request, response, revision, handoff)
                     else:
                         response = primary_review(request, response, revision)
+                if request['task'] == 'rendered_page_visual_verification' and visual_review:
+                    response = visual_review(request, response, revision, fallback)
             if response is not None:
                 path = revision / request['response_path']
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -271,3 +273,27 @@ def test_bare_blocked_judgment_is_not_promoted_from_complete_rows(tmp_path, monk
     result, revision, scopes = operation(tmp_path, monkeypatch, FAMILIES[-1], blocked, blocked)
     assert result['status'] == 'review_required', result
     assert len(scopes) == 2
+
+
+
+def test_content_replacement_starts_while_slow_visual_fallback_continues(tmp_path, monkeypatch):
+    import threading
+    now = [0.0]
+    replacement_started = threading.Event()
+    started_at = []
+    def content(request, response, revision, handoff):
+        started_at.append(now[0])
+        replacement_started.set()
+        return response
+    def visual(request, response, revision, fallback):
+        if not fallback:
+            raise RuntimeError('Visual worker exited without a response.')
+        # The final parent visual review can consume nearly all the deadline;
+        # content fallback must already have started concurrently.
+        assert replacement_started.wait(1), 'Content replacement was delayed behind visual fallback'
+        now[0] = 179.0
+        return response
+    result, revision, scopes = operation(tmp_path, monkeypatch, FAMILIES[0],
+        lambda *args: None, content, clock=lambda: now[0], visual_review=visual)
+    assert result['status'] == 'passed', result
+    assert started_at == [0.0]
