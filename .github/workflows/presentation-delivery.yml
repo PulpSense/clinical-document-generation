@@ -19,4 +19,4 @@ jobs:
       - name: Check Python sources
         run: python -m compileall -q scripts
       - name: Verify focused AI quality lifecycle and objective contracts
-        run: python tests/offline_reliability_gate.py --report /tmp/clinical-focused-report.json
+        run: python tests/offline_reliability_gate.py --timeout 900 --report /tmp/clinical-focused-report.json

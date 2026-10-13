@@ -47,7 +47,7 @@ from drafting import construction_repair_spec, construction_retry_spec, create_c
 from prs_xml import generate as generate_xml, validate_output as validate_xml_output, quality_report as xml_quality_report
 from output_recovery import (apply_xml_repairs, source_path as normalize_source_path, create_native_repair,
     adopt_native_repair, NativeRepairIntegrityError, restore_native_checkpoint, native_repair_response_valid, native_read, native_file, native_files)
-from quality import content_review_resume, retain_verification_response, ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
+from quality import create_content_review_unit, content_review_unit_result, content_review_schedule_result, content_review_resume, retain_verification_response, ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA, validate_verifications, retain_verification_response
 from contracts import document_table_reference, protocol_table_contracts, applicable_required_inputs, required_input_value
@@ -4308,6 +4308,84 @@ def _parent_visual_response_is_bound(
     )
 
 
+def _run_content_review_schedule(
+    revision_dir: Path, parent_path: Path,
+    dispatch: Callable[[list[Mapping[str, Any]], float], Any],
+    replacement_dispatch: Callable[[list[Mapping[str, Any]], float], Any],
+    remaining_seconds: Callable[[], float],
+) -> None:
+    """Bound work per worker; productive progress has no package-wide retry cap."""
+    parent = _read(parent_path)
+    plan = parent["review_plan"]
+    ledger_path = revision_dir / f"hermes/review-schedules/{parent['request_id']}.json"
+    state = _read(ledger_path) if ledger_path.is_file() else {
+        "parent_request_sha256": parent["request_sha256"], "requests": [], "waves": [], "no_progress": 0,
+    }
+    if state.get("parent_request_sha256") != parent["request_sha256"]:
+        raise ValueError("Review scheduler resume identity changed.")
+    maximum_waves = len(parent["sections"]) + len(parent["cross_document_checks"]) + 3
+    for _ in range(maximum_waves):
+        paths = [revision_dir / value for value in state["requests"]]
+        progress = content_review_schedule_result(revision_dir, parent_path, paths)
+        if progress["complete"] or progress["findings"] or remaining_seconds() <= 0:
+            break
+        if state["no_progress"] >= plan["max_no_progress_attempts"]:
+            break
+        # Reducing a stalled group to single sections changes strategy, instead
+        # of giving another worker the same oversized incomplete package.
+        size = 1 if state["no_progress"] else plan["max_sections"]
+        jobs = []
+        remaining = progress["remaining_sections"]
+        if remaining:
+            for artifact in dict.fromkeys(r["artifact"] for r in remaining):
+                selected = [r for r in remaining if r["artifact"] == artifact]
+                for index in range(0, len(selected), size):
+                    jobs.append((selected[index:index + size], []))
+        else:
+            cross = progress["remaining_cross_document_checks"]
+            jobs = [([], cross[index:index + plan["max_cross_checks"]])
+                    for index in range(0, len(cross), plan["max_cross_checks"])]
+        handoffs = []
+        for sections, checks in jobs[:plan["max_parallel_units"]]:
+            scope = {"sections": sections, "cross_document_checks": checks}
+            scope_id = sha256_value(scope)[:16]
+            previous = sum(f".unit-{scope_id}." in value for value in state["requests"])
+            path = create_content_review_unit(revision_dir, parent_path, sections, checks, previous + 1)
+            request = _read(path)
+            state["requests"].append(path.relative_to(revision_dir).as_posix())
+            handoffs.append({"request_path": path.relative_to(revision_dir).as_posix(),
+                "response_path": request["response_path"], "request_id": request["request_id"],
+                "request_sha256": request["request_sha256"], "task": request["task"],
+                "review_unit_id": scope_id, "reviewer_owner": "replacement" if previous or state["no_progress"] else "scheduled",
+                "review_resume": {"reading_strategy": "readable_native_passages", "remaining_sections": sections,
+                    "remaining_cross_document_checks": checks, "completed_section_count": 0},
+                "review_attempt": previous + 1,
+                "response_repair_feedback": (["Previous work for this scope was incomplete or unconsumable. "
+                    "Copy exact identity/producer, assess every requested check, and explicitly reassess applicable "
+                    "prior finding IDs in relevant assessment notes; retained findings must cover nonpassing judgments."]
+                    if previous or state["no_progress"] else [])})
+        available = remaining_seconds()
+        if available <= 30:
+            break
+        budget = min(float(plan["unit_budget_seconds"]), (available - 30) / 2)
+        _write(ledger_path, state)  # Requests survive interrupted parent processes.
+        callback = replacement_dispatch if state["waves"] else dispatch
+        try:
+            callback(handoffs, budget)
+        except WorkerAuthenticationError:
+            raise
+        except Exception as exc:
+            state["last_worker_error"] = str(exc)
+        after = content_review_schedule_result(revision_dir, parent_path,
+            [revision_dir / value for value in state["requests"]])
+        gained = after["completed"] - progress["completed"]
+        state["no_progress"] = 0 if gained > 0 else state["no_progress"] + 1
+        state["waves"].append({"assigned_sections": sum(len(s) for s, c in jobs[:plan["max_parallel_units"]]),
+            "completed_assessments": after["completed"], "gained_assessments": gained, "budget_seconds": budget})
+        _write(ledger_path, state)
+    content_review_schedule_result(revision_dir, parent_path, [revision_dir / value for value in state["requests"]])
+
+
 def run_desktop_operation(
     run_dir: Path,
     *,
@@ -5034,6 +5112,8 @@ def run_desktop_operation(
                         if not request_path.is_file():
                             continue
                         request = _read(request_path)
+                        if request.get("review_plan"):
+                            continue  # Scheduled reviews own their per-unit retries.
                         if not request.get("review_transport"):
                             continue  # Older revisions retain their original contract.
                         key = str(request["request_sha256"])
@@ -5092,11 +5172,25 @@ def run_desktop_operation(
                 authentication_failed = False
                 content_recovered_in_parallel = False
 
+                def dispatch_review_wave(items: list[Mapping[str, Any]], budget: float) -> None:
+                    scheduled, ordinary = [], []
+                    for item in items:
+                        path = run_dir / "revisions" / revision_id / str(item.get("request_path") or "")
+                        if item.get("task") == "clinical_content_verification" and path.is_file() and _read(path).get("review_plan"):
+                            scheduled.append((item, path))
+                        else:
+                            ordinary.append(item)
+                    if ordinary:
+                        handoff_runner(ordinary, budget)
+                    for item, path in scheduled:
+                        _run_content_review_schedule(path.parent.parent.parent, path, handoff_runner,
+                            fallback_handoff_runner or handoff_runner, remaining_seconds)
+
                 def run_content_wave() -> None:
                     nonlocal content_recovered_in_parallel
                     worker_authentication_failed = False
                     try:
-                        handoff_runner(non_fallback, min(remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS))
+                        dispatch_review_wave(non_fallback, min(remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS))
                     except WorkerAuthenticationError:
                         worker_authentication_failed = True
                         raise
@@ -5140,7 +5234,7 @@ def run_desktop_operation(
                         dispatch_budget = soft_timeout if supports_parent_fallback else remaining
                         if any(item.get("task") == "clinical_content_verification" for item in dispatch_handoffs):
                             dispatch_budget = min(dispatch_budget, remaining / 2, CONTENT_REVIEW_WORKER_BUDGET_SECONDS)
-                        handoff_runner(dispatch_handoffs, dispatch_budget)
+                        dispatch_review_wave(dispatch_handoffs, dispatch_budget)
                 except WorkerAuthenticationError:
                     authentication_failed = True
                     raise
@@ -5302,6 +5396,9 @@ def _production_response_is_bound(
     producer_model_id = str(producer.get("model_id") or "").strip()
     if not producer_model_id:
         return False
+    if handoff.get("review_unit_id"):
+        result = content_review_unit_result(revision_dir, request_path)
+        return bool(result and result["complete"])
     if str(handoff.get("task") or "") == "document_repair":
         if not native_repair_response_valid(request, response):
             return False
@@ -5470,10 +5567,12 @@ def _production_agent_prompt(
             "native documents and source remain read-only. After compaction read the saved checkpoint and continue. "
             "Return completed assessments even if other inspection cannot finish. Report substantive defects normally. "
         ) if transport else ""
-        if handoff.get("review_resume"):
+        if handoff.get("review_resume") and not handoff.get("review_unit_id"):
             transport_rule += " Fresh independent replacement: read outstanding scope at " + revision_path + "/" + str(handoff["review_resume_path"]) + "; " \
                               "inspect exact native evidence yourself for those judgments. Prior saved assessments are " \
                               "retained by the workflow, not approvals to invent missing judgments."
+    if handoff.get("review_unit_id"):
+        task_rule = "Act as an independent reviewer of ONLY this small scheduled scope. Read the request's readable_native_evidence and scoped approved_source first. Full native XML is a fallback for ambiguities, not a mandatory formatting-XML reread. Return complete or partial explicit judgments for the assigned sections/checks; the scheduler owns package completion."
     feedback = handoff.get("response_repair_feedback") or []
     repair_rule = (
         " Response contract corrections from the previous validation: "
@@ -9839,6 +9938,13 @@ def generate(
         if source_conflicts:
             return _repair_block(run_dir, "source_review", final_quality["findings"],
                                  candidate_outputs=_candidate_outputs(revision_dir))
+        partial_defects = [row for row in final_quality["findings"]
+                           if row.get("partial_review") and row.get("verification_source_finding")]
+        if partial_defects and all(row in partial_defects or row.get("code") == "review_coverage_incomplete"
+                                   for row in final_quality["findings"]):
+            return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
+                reference, bundle, partial_defects, operation_deadline, clock,
+                failure_stage="integrity", failure_category="integrity")
         technical_reviews = [row for row in final_quality["findings"]
                              if row.get("recovery_class") == "verifier_transient"]
         if technical_reviews:
