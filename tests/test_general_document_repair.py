@@ -10,10 +10,11 @@ from test_clean_delivery import controlled_render, ROOT, CASES
 from test_handoff_quality import acceptance_verification
 
 
-def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None, render=None, case=None, draft=None, visual_review=None):
+def lifecycle(tmp_path, monkeypatch, repair, *, retrospective=True, review=None, render=None, case=None, draft=None, visual_review=None, source=None):
     monkeypatch.setattr(workflow, 'render_assurance', render or controlled_render)
-    source = quality.branch_acceptance_source(ROOT, case or next(case for case in CASES
-        if (case['descriptor']['study_type'] == 'Retrospective') == retrospective))
+    if source is None:
+        source = quality.branch_acceptance_source(ROOT, case or next(case for case in CASES
+            if (case['descriptor']['study_type'] == 'Retrospective') == retrospective))
     reference = tmp_path / 'reference/study.reference.json'
     reference.parent.mkdir(parents=True)
     reference.write_text(json.dumps(source))

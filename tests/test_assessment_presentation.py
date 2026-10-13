@@ -154,3 +154,50 @@ def test_narrative_only_assessments_do_not_reference_a_missing_matrix(tmp_path):
     snapshot = rendering.rendered_section_snapshot(tmp_path / 'candidate/protocol.docx', 'evaluation-procedures')
     assert 'Table 15.1' not in str(snapshot)
     assert source['procedures']['assessments'] in str(snapshot)
+
+
+@pytest.mark.parametrize('branch,family', COMBINATIONS[1:])
+def test_independent_review_can_repair_a_substantive_display_error_and_deliver(tmp_path, monkeypatch, branch, family):
+    from test_general_document_repair import lifecycle, repair_response
+    source = assessment_source(branch, family)
+    source['procedures']['assessments'] = 'The questionnaire is optional.'
+    authored = []
+    def draft(request):
+        response = drafting.recorded_acceptance_response(request)
+        for section in response.get('section_results', []):
+            if section['section_id'] == 'evaluation-procedures':
+                section['assessment_presentation'] = {'notes': [{
+                    'source_text': 'The questionnaire is optional.',
+                    'display_text': 'The questionnaire is mandatory.',
+                    'rationale': 'Deliberate test defect for independent review.'}]}
+                authored.append(copy.deepcopy(section))
+        return response
+    def review(request, response, revision, number):
+        text = [p.text for p in Document(revision / 'candidate/protocol.docx').paragraphs]
+        if number == 1:
+            assert 'The questionnaire is mandatory.' in text
+            response['status'] = 'blocked'
+            response['findings'] = [{'finding_id': 'native-content', 'category': 'content',
+                'artifact': 'protocol', 'target_ids': ['evaluation-procedures'], 'check': 'source_supported',
+                'issue': 'The generated note makes an optional questionnaire mandatory.', 'material': True,
+                'source_path': 'procedures.assessments', 'source_excerpt': 'The questionnaire is optional.',
+                'affected_passage': 'The questionnaire is mandatory.'}]
+            next(row for row in response['section_assessments'] if row['section_id'] == 'evaluation-procedures')['status'] = 'blocked'
+        else:
+            assert 'The questionnaire is optional.' in text
+            assert 'The questionnaire is mandatory.' not in text
+        return response
+    def repair(request, revision):
+        path = revision / request['workspace_path'] / 'protocol.docx'
+        document = Document(path)
+        paragraph = next(p for p in document.paragraphs if p.text == 'The questionnaire is mandatory.')
+        paragraph.text = 'The questionnaire is optional.'
+        document.save(path)
+        return repair_response(request)
+    result, revision, repairs, reviews = lifecycle(tmp_path, monkeypatch, repair,
+        retrospective=False, source=source, draft=draft, review=review)
+    assert result['status'] == 'passed', result
+    assert len(authored) == 1 and len(repairs) == 1 and len(reviews) == 2
+    text = [p.text for p in Document(tmp_path / 'output/protocol.docx').paragraphs]
+    assert 'The questionnaire is optional.' in text
+    assert 'The questionnaire is mandatory.' not in text
