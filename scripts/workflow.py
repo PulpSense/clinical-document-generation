@@ -5792,7 +5792,7 @@ def _worker_capability_assurance(skill_root: Path) -> dict[str, Any]:
         identity = _worker_capability_identity(skill_root)
         evidence = skill_root.parent.parent / 'clinical-capabilities' / identity['package_manifest_sha256'] / 'assurance.json'
         return validate_assurance(evidence, identity)
-    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+    except (OSError, ValueError, ImportError, subprocess.SubprocessError) as exc:
         return {"status": "blocked", "issue": f"Cannot establish installed lifecycle capability identity: {exc}"}
 
 

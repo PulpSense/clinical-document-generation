@@ -187,3 +187,38 @@ def test_capability_evidence_invalidates_on_dependency_or_probe_change(tmp_path)
     assert validate_assurance(path, {**identity, 'hermes': 'changed'})['status'] == 'blocked'
     proof.write_text('changed')
     assert validate_assurance(path, identity)['status'] == 'blocked'
+
+
+def test_missing_native_distribution_metadata_is_an_actionable_admission_blocker(tmp_path, monkeypatch):
+    import importlib.metadata
+    import sys
+    root = tmp_path / 'profile/skills/clinical-document-generation'
+    (root / 'runtime').mkdir(parents=True)
+    (root / 'RELEASE-MANIFEST.json').write_text('{}')
+    (root / 'runtime/PDF-RENDERER.json').write_text('{}')
+    (root.parent.parent / 'config.yaml').write_text('model: {default: controlled-model}')
+    launcher = tmp_path / 'hermes/.venv/bin/hermes'
+    launcher.parent.mkdir(parents=True)
+    launcher.write_text('controlled-launcher')
+    tools = launcher.parent.parent.parent / 'tools'
+    tools.mkdir()
+    (tools / 'file_tools.py').write_text('# controlled host tool identity')
+    office, font = tmp_path / 'office', tmp_path / 'font.ttf'
+    office.write_text('controlled-office')
+    font.write_bytes(b'controlled-font')
+    monkeypatch.setattr(workflow, '_managed_hermes_pair', lambda: (launcher, Path(sys.executable)))
+    monkeypatch.setattr(workflow, 'renderer', lambda **kwargs: {'kind': 'LibreOffice', 'path': str(office)})
+    monkeypatch.setattr(workflow, '_pdfium_runtime_integrity', lambda *args, **kwargs: {
+        'status': 'passed', 'identity': {'version': 'controlled-pdfium'}})
+    def run(command, **kwargs):
+        output = str(font)+'\n' if command[0] == '/usr/bin/fc-list' else json.dumps({
+            'logged_in': True, 'provider': 'openai-codex', 'inspection_readable': True})
+        return subprocess.CompletedProcess(command, 0, output, '')
+    monkeypatch.setattr(workflow.subprocess, 'run', run)
+    def unavailable(name):
+        raise importlib.metadata.PackageNotFoundError(name)
+    monkeypatch.setattr(importlib.metadata, 'distribution', unavailable)
+    result = workflow._production_worker_readiness(root)
+    assert result['status'] == 'blocked'
+    assert 'python-docx' in result['issue']
+    assert 'metadata' in result['issue']
