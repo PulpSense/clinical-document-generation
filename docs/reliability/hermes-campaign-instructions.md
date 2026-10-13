@@ -1,5 +1,7 @@
 # Synthetic Hermes reliability campaign
 
+For the restricted Hermes TUI host, use [hermes-tui-acceptance.md](hermes-tui-acceptance.md). It supplies unpaid host checks and the fixed 20+8 campaign with local-byte acceptance; the recipient-delivery procedure below remains separate.
+
 This is a bounded development campaign, separate from release certification.
 The three `pilot: true` cases in `campaign.json` cover the three study types.
 Expansion covers the remaining two consent families and equivalent input forms.

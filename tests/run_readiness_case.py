@@ -3,8 +3,8 @@
 import argparse
 from contextlib import ExitStack
 import hashlib
-import importlib
 import json
+import os
 import platform
 from pathlib import Path
 import sys
@@ -19,7 +19,9 @@ def main():
     parser.add_argument('--planned-operation-id', required=True)
     parser.add_argument('--release-root', type=Path, required=True)
     parser.add_argument('--run-dir', type=Path, required=True)
-    parser.add_argument('--desktop-opener-command', type=Path, required=True)
+    parser.add_argument('--desktop-opener-command', type=Path)
+    parser.add_argument('--host-checks', type=Path)
+    parser.add_argument('--host-mode', choices=['isolated', 'hermes-tui'], default='isolated')
     parser.add_argument('--parent-visual-review-command', type=Path, required=True)
     parser.add_argument('--approved-by', required=True)
     parser.add_argument('--authorize-paid-operation', action='store_true')
@@ -30,20 +32,32 @@ def main():
         parser.error('Explicit owner authorization for this installed/paid operation is required')
     if platform.system() != 'Linux':
         parser.error('Run this campaign on the declared installed Linux host')
+    callback = args.parent_visual_review_command
+    if not callback.is_file() or not os.access(callback, os.X_OK):
+        parser.error('parent_visual_callback_unavailable: select a genuine executable image-review callback')
     manifest = json.loads(args.manifest.read_text())
+    if manifest.get('host_mode', 'isolated') != args.host_mode:
+        parser.error('Host mode differs from the frozen manifest')
+    if args.host_mode == 'isolated' and args.desktop_opener_command is None:
+        parser.error('Isolated campaigns require the actual recipient opener')
+    if args.host_mode == 'hermes-tui' and args.desktop_opener_command is not None:
+        parser.error('TUI campaigns use local byte retrieval only')
     unsigned = {k: v for k, v in manifest.items() if k != 'manifest_sha256'}
     digest = hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     if digest != manifest['manifest_sha256']:
         raise ValueError('Frozen campaign manifest changed')
     planned = next(p for p in manifest['baseline_operations'] + manifest['supplemental_operations']
                    if p['planned_operation_id'] == args.planned_operation_id)
+    if args.host_mode == 'hermes-tui':
+        if args.host_checks is None:
+            parser.error('TUI operations require --host-checks')
+        from tui_campaign_contract import validate_tui_host_checks
+        validate_tui_host_checks(json.loads(args.host_checks.read_text()), manifest['candidate_identity'], manifest, args.host_checks.parent)
     root, run = args.release_root.resolve(), args.run_dir.resolve()
     if run.is_relative_to(root):
         raise ValueError('Campaign work must remain outside installed code')
-    sys.path.insert(0, str(root / 'scripts'))
-    workflow = importlib.import_module('workflow')
-    if Path(workflow.__file__).resolve() != root / 'scripts/workflow.py':
-        raise ValueError('Imported a different installed candidate')
+    from tui_campaign_contract import load_installed_workflow
+    workflow = load_installed_workflow(root)
     actual = workflow._installed_release_identity(root)
     if actual['package_fingerprint'] != manifest['candidate_identity']['package_fingerprint']:
         raise ValueError('Installed bytes differ from the frozen candidate')
@@ -76,7 +90,8 @@ def main():
             (run / 'preparation-result.json').write_text(json.dumps(preparation, indent=2))
             raise ValueError('Synthetic case preparation failed; retain this planned operation')
         workflow.approve(run, approved_by=args.approved_by)
-    opener = workflow.command_desktop_opener(args.desktop_opener_command)
+    opener = (workflow.local_output_reader(run) if args.host_mode == 'hermes-tui'
+              else workflow.command_desktop_opener(args.desktop_opener_command))
     parent = workflow.command_parent_visual_reviewer(args.parent_visual_review_command)
     with ExitStack() as stack:
         if planned['cohort'] == 'supplemental':
@@ -86,7 +101,7 @@ def main():
             stack.enter_context(draft_seed_adapter(workflow, run / 'campaign-fault-evidence/draft', case['injection']))
         try:
             result = workflow.run_production_desktop_operation(run, skill_root=root, opener=opener,
-                parent_visual_reviewer=parent, operation_id=metadata['operation_id'], manual_review=True)
+                parent_visual_reviewer=parent, operation_id=metadata['operation_id'], manual_review=True, host_mode=args.host_mode)
         except ParentInterruption:
             result = {'status': 'interrupted', 'operation_id': metadata['operation_id'],
                 'instruction': 'Resume this run with --resume and the same frozen manifest; preserve original approval and deadline.'}
@@ -94,7 +109,7 @@ def main():
         else:
             (run / 'campaign-result.json').write_text(json.dumps(result, indent=2))
     print(json.dumps(result, indent=2))
-    return 0 if result['status'] in {'passed', 'review_required'} else 1
+    return 0 if result['status'] == planned['expected_status'] else 1
 
 
 if __name__ == '__main__':

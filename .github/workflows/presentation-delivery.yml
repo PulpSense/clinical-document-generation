@@ -21,6 +21,6 @@ jobs:
       - name: Check Python sources
         run: python -m compileall -q scripts
       - name: Verify Linux worker boundaries and restricted Hermes compatibility
-        run: python -m pytest tests/test_worker_boundary.py tests/test_hermes_tui.py tests/test_worker_readiness.py -q
+        run: python -m pytest tests/test_worker_boundary.py tests/test_hermes_tui.py tests/test_worker_readiness.py tests/test_tui_acceptance.py -q
       - name: Verify focused AI quality lifecycle and objective contracts
         run: python tests/offline_reliability_gate.py --timeout 1200 --report /tmp/clinical-focused-report.json

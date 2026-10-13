@@ -5298,6 +5298,12 @@ def run_desktop_operation(
                     if parent_block is not None:
                         return finish(parent_block)
             except Exception as exc:
+                if isinstance(exc, WorkerLaunchUnavailableError):
+                    return finish({
+                        "status": "blocked", "stage": "review_tooling",
+                        "findings": [{"category": "environment", "field": "worker_launch", "issue": str(exc)}],
+                        "client_outputs": [],
+                    })
                 if isinstance(exc, WorkerAuthenticationError):
                     return finish({
                         "status": "blocked", "stage": "worker_authentication",
@@ -5756,6 +5762,10 @@ def _production_authentication_path() -> Path:
     """Return the one centralized credential file required by managed Hermes."""
     account_home = Path(pwd.getpwuid(os.getuid()).pw_dir).expanduser().resolve()
     return account_home / ".hermes/auth.json"
+
+
+class WorkerLaunchUnavailableError(RuntimeError):
+    """A required worker executable cannot be launched on this host."""
 
 
 class WorkerAuthenticationError(RuntimeError):
@@ -6344,7 +6354,7 @@ def _production_dispatch_handoffs(
                 text=True,
                 start_new_session=True,
             )
-        except BaseException:
+        except BaseException as exc:
             if profile is not None:
                 if not profile.closed:
                     try:
@@ -6364,6 +6374,8 @@ def _production_dispatch_handoffs(
                     )
                 except BaseException:
                     pass
+            if isinstance(exc, FileNotFoundError):
+                raise WorkerLaunchUnavailableError(f"Required worker executable or launch input is unavailable: {exc}") from exc
             raise
         assert profile is not None and proxy is not None
         assert stdout_handle is not None and stderr_handle is not None
@@ -6581,7 +6593,10 @@ def run_production_desktop_operation(
         raise ValueError("hermes-tui is only supported for explicitly selected manual candidate generation.")
     run_dir = run_dir.expanduser().resolve()
     if host_mode == "hermes-tui":
-        opener = local_output_reader(run_dir)
+        if opener is None:
+            opener = local_output_reader(run_dir)
+        elif not getattr(opener, "local_outputs_only", False):
+            raise ValueError("hermes-tui requires a local-output reader, without recipient delivery claims.")
     untrusted_root = (skill_root or SCRIPT_DIR.parent).expanduser().absolute()
     if any(path.is_symlink() for path in (
         untrusted_root, untrusted_root.parent, untrusted_root.parent.parent,

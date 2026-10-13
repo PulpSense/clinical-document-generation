@@ -9,6 +9,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import quality
+from tui_campaign_contract import validate_tui_host_checks
 
 
 def plan():
@@ -88,7 +89,9 @@ def long_synthetic_source(source):
     return value
 
 
-def readiness_plan(candidate_identity):
+def readiness_plan(candidate_identity, host_mode="isolated", host_checks=None):
+    if host_mode not in {"isolated", "hermes-tui"}:
+        raise ValueError("Unknown campaign host mode")
     """Predeclare denominators, independent fact ledgers and every supplemental seed."""
     baseline = plan()
     operations = []
@@ -102,16 +105,19 @@ def readiness_plan(candidate_identity):
     operations.sort(key=lambda row: (0, pilot.index(row['planned_operation_id'])) if row['planned_operation_id'] in pilot else (1, 0))
     supplements = []
     for case_id, family, seeds, outcome in SUPPLEMENTS:
+        if host_mode == 'hermes-tui':
+            seeds = ([s.replace('recipient', 'local_output') for s in seeds] if case_id == 'F2'
+                     else ['unresolved_substantive_seed', 'repair_author_unavailable'] if case_id == 'F3' else seeds)
         source_case = next(c for c in baseline['cases'] if c['family'] == family and c['scenario'] == 'deliberate_prose_repair')
         supplemental_source = long_synthetic_source(source_case['source']) if case_id in {'Q3', 'Q4'} else copy.deepcopy(source_case['source'])
         source_hash = hashlib.sha256(json.dumps(supplemental_source, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
         supplements.append({'source': supplemental_source, 'native_seeds': supplemental_seed_plan(case_id, supplemental_source),
             'planned_operation_id': case_id, 'case_id': case_id, 'family': family,
             'source_case_id': source_case['case_id'], 'source_sha256': source_hash,
-            'cohort': 'supplemental', 'expected_status': outcome,
+            'cohort': 'supplemental', 'expected_status': outcome, 'host_mode': host_mode,
             'seeds': [{'seed_id': f'{case_id}.{index}', 'challenge': seed,
                        'expected': 'independent_resolution_without_needless_edit' if case_id == 'D1'
-                       else 'honest_confirmed_review_only' if case_id == 'F3' else 'detected_recovered_fresh_review_and_retrieval'}
+                       else ('honest_local_review_only' if host_mode == 'hermes-tui' else 'honest_confirmed_review_only') if case_id == 'F3' else 'detected_recovered_fresh_review_and_retrieval'}
                       for index, seed in enumerate(seeds, 1)],
             'injection_boundary': 'before_review_request_binding' if case_id == 'D1'
                 else 'run_local_construction_before_render_and_review_hashes' if case_id.startswith('Q')
@@ -121,7 +127,7 @@ def readiness_plan(candidate_identity):
         for c in baseline['cases']}
     facts.update({c['case_id']: {'source_sha256': c['source_sha256'], 'expected_source_facts': c['source'],
         'seed_ledger': c['native_seeds'], 'audit_rule': 'Audit every fixed seed and all source facts; inspect every final page independently.'} for c in supplements})
-    manifest = {'schema_version': 'hermes-readiness-campaign/v1', 'candidate_identity': candidate_identity,
+    manifest = {'schema_version': 'hermes-readiness-campaign/v1', 'candidate_identity': candidate_identity, 'host_mode': host_mode,
         'cases': baseline['cases'], 'pilot_operation_ids': pilot, 'baseline_operations': operations, 'supplemental_operations': supplements,
         'expected_fact_ledgers': facts, 'baseline_denominator': 20, 'supplemental_denominator': 8,
         'clean_denominator': 10, 'repair_denominator': 10, 'deadline_seconds': 2700,
@@ -129,8 +135,11 @@ def readiness_plan(candidate_identity):
         'live_execution': False, 'readiness': 'incomplete',
         'execution_prerequisites': ['owner_authorization', 'exact_installed_candidate',
             'reviewed_linux_injection_adapter',
-            'actual_worker_capabilities', 'independent_artifact_auditor'],
+            'tui_host_checks' if host_mode == 'hermes-tui' else 'actual_worker_capabilities', 'independent_artifact_auditor'],
         'unexecuted_cases_remain_visible': True}
+    if host_mode == 'hermes-tui' and host_checks is not None:
+        validate_tui_host_checks(host_checks, candidate_identity)
+        manifest['host_checks_sha256'] = hashlib.sha256(json.dumps(host_checks, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     manifest['manifest_sha256'] = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     return manifest
 
@@ -166,7 +175,8 @@ def summarize_readiness(manifest, operations):
         succeeded, under = 0, 0
         for p in plans:
             row = first.get(p['planned_operation_id'], {})
-            confirmed = row.get('review_delivery_confirmed') if p['expected_status'] == 'review_required' else row.get('delivery_confirmed')
+            confirmed = (row.get('local_bytes_verified') if manifest.get('host_mode') == 'hermes-tui'
+                         else row.get('review_delivery_confirmed') if p['expected_status'] == 'review_required' else row.get('delivery_confirmed'))
             ok = row.get('status') == p['expected_status'] and confirmed is True and row.get('independent_audit_passed') is True
             elapsed = row.get('elapsed_seconds')
             succeeded += bool(ok and isinstance(elapsed, (int, float)) and 0 <= elapsed <= 2700)
@@ -179,7 +189,36 @@ def summarize_readiness(manifest, operations):
         'limitations': 'Observations require exact candidate/manifest/evidence reconciliation, every seed audit and installed capability gates before a readiness verdict. Timing alone never establishes readiness.'}
 
 
-def collect_readiness_runs(manifest, runs_root):
+
+def verify_local_receipt(receipt):
+    if ((receipt.get('status') != 'locally_available' and receipt.get('delivery_status') != 'review_only_locally_available') or receipt.get('bytes_verified') is not True
+            or receipt.get('confirmed') is not False or receipt.get('recipient_delivery_verified') is not False):
+        raise ValueError('TUI outcome requires honest verified local bytes without recipient confirmation')
+
+
+def verified_local_outputs(run, result, inventory):
+    from reliability_campaign import confined_file, digest
+    verify_local_receipt(result.get('delivery', {}))
+    manifest = json.loads(confined_file(run, result['manifest']).read_text())
+    if manifest.get('status') != 'passed' or manifest.get('quality', {}).get('status') != 'passed':
+        raise ValueError('Local publication has no passing quality manifest')
+    rows = manifest['client_outputs']
+    if sorted(result['client_outputs']) != sorted(row['path'] for row in rows):
+        raise ValueError('Local result and publication manifest differ')
+    if sorted(p.name for p in (run / 'output').iterdir()) != sorted(inventory):
+        raise ValueError('Local publication contains unexpected or missing outputs')
+    if {Path(row['path']).name for row in rows} != set(inventory) or len(rows) != len(inventory):
+        raise ValueError('Local native document inventory is incomplete')
+    outputs = {}
+    for row in rows:
+        file = confined_file(run, row['path'])
+        if digest(file) != row['sha256'] or file.stat().st_size != row['bytes']:
+            raise ValueError('Local native bytes changed')
+        outputs[file.name] = row['sha256']
+    return outputs
+
+
+def collect_readiness_runs(manifest, runs_root, host_checks=None):
     """Read-only reconciliation of every retained operation and exact file inventory."""
     from reliability_campaign import confined_file, digest, verified_delivery
     validate_readiness_manifest(manifest)
@@ -208,6 +247,8 @@ def collect_readiness_runs(manifest, runs_root):
                 raise ValueError('Desktop operation identity changed')
             expected_fingerprint = manifest['candidate_identity'].get('package_fingerprint')
             release = state.get('release_identity', {})
+            if manifest.get('host_mode') == 'hermes-tui' and release.get('host_mode') != 'hermes-tui':
+                raise ValueError('Retained operation was not executed in the frozen TUI mode')
             if not expected_fingerprint or release.get('package_fingerprint') != expected_fingerprint:
                 raise ValueError('Installed candidate fingerprint differs')
             if release.get('git_commit') != manifest['candidate_identity'].get('git_commit'):
@@ -215,7 +256,15 @@ def collect_readiness_runs(manifest, runs_root):
             result = state.get('result', {})
             study_type = expected_source['meta']['study_type']
             inventory = ['protocol.docx'] if study_type == 'Retrospective' else ['protocol.docx', 'icf.docx', 'study.xml']
-            delivered = verified_delivery(run, result, inventory) if result.get('status') == 'passed' else {}
+            tui = manifest.get('host_mode') == 'hermes-tui'
+            delivered = {}
+            local_verified = False
+            if result.get('status') == 'passed':
+                if tui:
+                    delivered = verified_local_outputs(run, result, inventory)
+                    local_verified = True
+                else:
+                    delivered = verified_delivery(run, result, inventory)
             review_confirmed = False
             if result.get('status') == 'review_required':
                 rows = result.get('review_outputs', [])
@@ -230,6 +279,9 @@ def collect_readiness_runs(manifest, runs_root):
                     if digest(confined_file(run, result[field])) != result[field + '_sha256']:
                         raise ValueError('Review-only notice/findings bytes changed')
                 review_confirmed = result.get('review_delivery', {}).get('confirmed') is True
+                if tui:
+                    verify_local_receipt(result.get('review_delivery', {}))
+                    local_verified = True
 
             evidence = {str(p.relative_to(run)): {'sha256': digest(p), 'bytes': p.stat().st_size}
                 for p in sorted(run.rglob('*')) if p.is_file() and not p.is_symlink()
@@ -265,7 +317,7 @@ def collect_readiness_runs(manifest, runs_root):
             records.append({'operation_id': state['operation_id'], 'planned_operation_id': assignment['planned_operation_id'],
                 'retry_of': metadata.get('retry_of'), 'status': state['status'], 'elapsed_seconds': result.get('elapsed_seconds'),
                 'delivery_confirmed': result.get('delivery', {}).get('confirmed') is True and bool(delivered),
-                'review_delivery_confirmed': review_confirmed,
+                'review_delivery_confirmed': review_confirmed, 'local_bytes_verified': local_verified,
                 'independent_audit_passed': audit_passed, 'candidate_identity': metadata['candidate_identity'],
                 'source_sha256': assignment['source_sha256'], 'approval_identity': state.get('approval_identity'),
                 'started_at_epoch': state.get('started_at_epoch'), 'deadline_at_epoch': state.get('deadline_at_epoch'),
@@ -287,8 +339,22 @@ def collect_readiness_runs(manifest, runs_root):
         report = summarize_readiness(manifest, [])
         report.update(operation_records=records, operations=len(records), reconciliation_conflicted=True)
         errors.append({'scope': 'operation_reconciliation', 'issue': str(exc)})
+    acceptance = 'incomplete'
+    if manifest.get('host_mode') == 'hermes-tui':
+        try:
+            validate_tui_host_checks(host_checks, manifest['candidate_identity'], manifest)
+            groups = report['planned_groups']
+            complete = all(g['observed_first_operations'] == g['planned_denominator'] for g in groups.values())
+            outcomes = all(g['expected_outcomes_with_audit_and_retrieval'] == g['planned_denominator'] for g in groups.values())
+            speed = all(groups[name]['under_target'] >= 8 for name in ('clean', 'deliberate_prose_repair'))
+            acceptance = ('passed' if complete and outcomes and speed and not errors and not unmatched
+                          else 'failed' if complete else 'incomplete')
+        except (ValueError, TypeError) as exc:
+            errors.append({'scope': 'tui_host_checks', 'issue': str(exc)})
     return {**report, 'evidence_errors': errors, 'unmatched_operation_states': unmatched,
-            'readiness': 'incomplete', 'collector_scope': 'exact retained bytes and independent audit records; owner verdict still requires every gate'}
+            'readiness': 'incomplete', 'tui_local_acceptance': acceptance,
+            'recipient_delivery_verified': False if manifest.get('host_mode') == 'hermes-tui' else None,
+            'collector_scope': 'TUI local acceptance is separate from isolated certification and recipient delivery.'}
 
 
 def summarize(operations):
@@ -318,19 +384,26 @@ def summarize(operations):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--host-checks', type=Path, help='Required TUI host-check evidence for freezing and collecting')
+    parser.add_argument('--host-mode', choices=['isolated', 'hermes-tui'], default='isolated')
     parser.add_argument('--operations', type=Path, help='JSON array containing every operation, including failures and retries')
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--runs-root', type=Path, help='Read-only reconcile retained campaign operation directories')
     parser.add_argument('--candidate-identity', type=Path, help='Freeze the 20+8 readiness plan with exact candidate identity JSON; no live execution')
     parser.add_argument('--readiness-manifest', type=Path, help='Reconcile observations against a frozen 20+8 plan')
     args = parser.parse_args()
+    host_checks = json.loads(args.host_checks.read_text()) if args.host_checks else None
+    if host_checks is not None:
+        validate_tui_host_checks(host_checks, host_checks.get('candidate_identity'), evidence_root=args.host_checks.parent)
+    if args.candidate_identity and args.host_mode == 'hermes-tui' and host_checks is None:
+        parser.error('TUI plan freezing requires --host-checks')
     if args.readiness_manifest and args.runs_root:
-        result = collect_readiness_runs(json.loads(args.readiness_manifest.read_text()), args.runs_root)
+        result = collect_readiness_runs(json.loads(args.readiness_manifest.read_text()), args.runs_root, host_checks)
     elif args.readiness_manifest:
         result = summarize_readiness(json.loads(args.readiness_manifest.read_text()),
                                      json.loads(args.operations.read_text()) if args.operations else [])
     elif args.candidate_identity:
-        result = readiness_plan(json.loads(args.candidate_identity.read_text()))
+        result = readiness_plan(json.loads(args.candidate_identity.read_text()), args.host_mode, host_checks)
     else:
         result = summarize(json.loads(args.operations.read_text())) if args.operations else plan()
     args.output.parent.mkdir(parents=True, exist_ok=True)

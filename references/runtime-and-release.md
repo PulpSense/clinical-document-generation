@@ -29,6 +29,13 @@ operation rechecks those bytes and preserves the original deadline. Genuine
 independent native and page-image review is still required for clinical approval;
 missing parent visual fallback yields incomplete review, never an assumed pass.
 
+For an owner-requested TUI reliability campaign before another study, use the
+matching development checkout's `docs/reliability/hermes-tui-acceptance.md`. Its
+unpaid `tests/hermes_tui_host_checks.py` exercises installed file tools,
+checkpoint/native tools, cleanup and actual rendering before/after repair.
+Freeze its exact candidate/host report before the synthetic 20+8 campaign.
+These developer probes do not grant clinical approval or recipient assurance.
+
 ## Public interface
 
 Run commands from this skill folder. `scripts/workflow.py` is the only CLI entrypoint.

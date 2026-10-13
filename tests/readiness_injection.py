@@ -188,7 +188,8 @@ def campaign_adapter(workflow, planned, run_dir: Path, opener):
         injected_drafts = {e['request_id'] for e in events if e['event'] == 'substantive_seed_before_consumption'}
         native_seeded = any(e['event'] == 'predeclared_native_seeds_applied' for e in events)
         interrupted = any(e['event'] == 'truncate_real_final_and_interrupt_parent' for e in events)
-        retrieval_failed = any(e['event'] == 'transient_actual_recipient_transport_failure' for e in events)
+        retrieval_failed = any(e['event'] in {'transient_actual_recipient_transport_failure',
+            'transient_local_output_read_failure'} for e in events)
         denied_repair_areas = set()
         def record(event, **details):
             events.append({'event': event, **details})
@@ -265,24 +266,36 @@ def campaign_adapter(workflow, planned, run_dir: Path, opener):
             if case_id == 'F3':
                 for handoff in handoffs:
                     if handoff['task'] == 'document_repair':
+                        if planned.get('host_mode') == 'hermes-tui':
+                            import subprocess
+                            record('repair_author_unavailable')
+                            try:
+                                subprocess.run([str(run_dir / 'campaign-fault-evidence/unavailable-repair-launcher')],
+                                    check=True, timeout=10)
+                            except FileNotFoundError as exc:
+                                raise workflow.WorkerLaunchUnavailableError('Predeclared TUI repair-worker launch fault') from exc
+                            raise RuntimeError('Expected missing repair launcher unexpectedly exists')
                         request = json.loads((revision / handoff['request_path']).read_text())
                         denied_repair_areas.update(str((revision / request[k]).resolve()) for k in ('workspace_path', 'tools_path'))
                         record('repair_workspace_writes_unavailable')
             if handoffs:
                 return originals['_production_dispatch_handoffs'](handoffs, remaining, revision, configuration, **kwargs)
-        def prefix(policy):
+        def prefix(policy, **kwargs):
             if case_id == 'F3' and denied_repair_areas:
                 value = json.loads(policy.read_text())
                 value['writable'] = [p for p in value['writable'] if p not in denied_repair_areas]
                 policy.write_text(json.dumps(value))
-            return originals['_production_sandbox_prefix'](policy)
+            return originals['_production_sandbox_prefix'](policy, **kwargs)
         def retrieval(path):
             nonlocal retrieval_failed
             if case_id == 'F2' and not retrieval_failed:
                 retrieval_failed = True
-                record('transient_actual_recipient_transport_failure')
+                record('transient_local_output_read_failure' if getattr(opener, 'local_outputs_only', False)
+                       else 'transient_actual_recipient_transport_failure')
                 raise OSError('Predeclared transient recipient retrieval fault')
             return opener(path)
+        if getattr(opener, 'local_outputs_only', False):
+            retrieval.local_outputs_only = True
         if hasattr(opener, 'capability_executable'):
             retrieval.capability_executable = opener.capability_executable
         replacements = {'render_assurance': render, 'create_verification_requests': requests,
