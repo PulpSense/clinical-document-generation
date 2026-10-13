@@ -139,6 +139,10 @@ def resolve_python_runtime(
 ) -> dict[str, Any]:
     """Resolve and identify an explicit Python 3.10+ executable for Desktop use."""
     runtime_environment = os.environ if environment is None else environment
+    if candidates is None and runtime_environment.get("CLINICAL_PYTHON"):
+        # The dependency-complete clinical runtime is distinct from the
+        # managed Hermes launcher. Never silently replace an explicit binding.
+        candidates = [Path(runtime_environment["CLINICAL_PYTHON"])]
     if candidates is None:
         requested = runtime_environment.get("HERMES_PYTHON")
         discovered = [Path(requested)] if requested else []
@@ -5622,7 +5626,10 @@ def _production_agent_prompt(
             + " first. It contains the exact instructions, identities, evidence packet paths and progress path. "
             "Use bounded packets if any read truncates; concatenating text_chunks recovers all original evidence. "
             "Save each completed small group of independent assessments using write_file to the progress_path "
-            "as bound response JSON with status in_progress. This audit checkpoint is the only writable review file; "
+            "as bound response JSON with status in_progress. Before each checkpoint overwrite, read its full current contents with read_file "
+            "(every page if paginated), even when the parent pre-created an empty file; preserve completed judgments. "
+            "Then check the write_file result; a refused write is not saved progress. If refused, reload current contents "
+            "and merge your judgments before retrying within the remaining deadline. This audit checkpoint is the only writable review file; "
             "native documents and source remain read-only. After compaction read the saved checkpoint and continue. "
             "Return completed assessments even if other inspection cannot finish. Report substantive defects normally. "
         ) if transport else ""
@@ -5658,7 +5665,8 @@ def _production_agent_prompt(
             "request_id", "request_sha256", "task")}, ensure_ascii=False) + f"; revision_id={revision_dir.name}. "
            if task in {"clinical_content_verification", "rendered_page_visual_verification"} else "")
         + f"{response_write_rule}{verification_rule}{repair_rule} The validator interpreter is dependency-complete; do not search "
-        "the filesystem for Python or dependency paths. Run native Python tools with -B, "
+        "the filesystem for Python or dependency paths. Use the bound validator interpreter from CLINICAL_PYTHON: "
+        "run native Python tools as \"$CLINICAL_PYTHON\" -B, not bare python/python3 or the Hermes launcher interpreter, "
         "including when using -I, so import caches cannot modify the installed runtime. Do not modify production code or "
         "approved source material."
     )
@@ -6188,8 +6196,41 @@ def _production_dispatch_handoffs(
     runtime_identity: Mapping[str, Any],
     expected_managed_hermes_identity: Mapping[str, str] | None = None,
     host_mode: str = "isolated",
+    require_promoted_runtime: bool | None = None,
 ) -> None:
     """Run a Hermes wave with explicit host assurance and authenticated results."""
+    # Checkout-only launch fixtures have no provisioned renderer. Production
+    # supplies its bound lifecycle policy explicitly, including if runtime was
+    # removed; any present provisioned runtime is always checked strictly.
+    runtime_guard = require_promoted_runtime is not None or (
+        (skill_root / "runtime").exists() or (skill_root / "runtime").is_symlink()
+    )
+    if runtime_guard:
+        runtime_integrity = _pdfium_runtime_integrity(
+            skill_root, require_promoted_runtime=bool(require_promoted_runtime),
+        )
+        if runtime_integrity.get("status") != "passed":
+            raise RuntimeError("Provisioned renderer runtime integrity failed before worker dispatch: " + str(runtime_integrity))
+    def check_post_wave_renderer(primary_error: BaseException | None) -> None:
+        if not runtime_guard:
+            return
+        try:
+            runtime_integrity = _pdfium_runtime_integrity(
+                skill_root, require_promoted_runtime=bool(require_promoted_runtime),
+            )
+            if runtime_integrity.get("status") != "passed":
+                raise RuntimeError("Provisioned renderer runtime changed during worker dispatch; reject this worker result: " + str(runtime_integrity))
+        except BaseException as integrity_error:
+            if primary_error is None:
+                raise
+            # Failures already reject the wave. Keep launch/cleanup diagnostics
+            # primary while retaining the strict integrity finding as evidence.
+            note = str(integrity_error)
+            if hasattr(primary_error, "add_note"):
+                primary_error.add_note(note)
+            else:  # Compatible Python Runtime also includes Python 3.10.
+                primary_error.args = (str(primary_error) + "\n" + note, *primary_error.args[1:])
+
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
     worker_states: dict[int, Path] = {}
     repair_wave = any(handoff.get("task") == "document_repair" for handoff in handoffs)
@@ -6326,6 +6367,9 @@ def _production_dispatch_handoffs(
                 command.extend(("--skills", str(configuration["skill"])))
             stdout_handle, stderr_handle = _open_production_worker_logs(logs, request_id)
             worker_environment = dict(environment)
+            # Bind native tool execution to the already validated runtime;
+            # the Hermes launcher venv need not contain DOCX/XML dependencies.
+            worker_environment["CLINICAL_PYTHON"] = str(runtime_executable)
             # All mutable Hermes state belongs to this dispatch, never the
             # shared profile, earlier workers, source or installed skill.
             for name, suffix in (("HERMES_HOME", ""), ("HOME", ""), ("TMPDIR", ".tmp"),
@@ -6355,28 +6399,31 @@ def _production_dispatch_handoffs(
                 start_new_session=True,
             )
         except BaseException as exc:
-            if profile is not None:
-                if not profile.closed:
+            try:
+                if profile is not None:
+                    if not profile.closed:
+                        try:
+                            profile.close()
+                        except BaseException:
+                            pass
+                _release_production_worker_resources(
+                    stdout_handle,
+                    stderr_handle,
+                    Path(profile.name) if profile is not None else None,
+                    proxy,
+                )
+                for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
                     try:
-                        profile.close()
+                        _reap_production_worker(
+                            prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
+                        )
                     except BaseException:
                         pass
-            _release_production_worker_resources(
-                stdout_handle,
-                stderr_handle,
-                Path(profile.name) if profile is not None else None,
-                proxy,
-            )
-            for prior_process, _, prior_stdout, prior_stderr, prior_profile, _, prior_proxy in processes:
-                try:
-                    _reap_production_worker(
-                        prior_process, prior_stdout, prior_stderr, prior_profile, prior_proxy,
-                    )
-                except BaseException:
-                    pass
-            if isinstance(exc, FileNotFoundError):
-                raise WorkerLaunchUnavailableError(f"Required worker executable or launch input is unavailable: {exc}") from exc
-            raise
+                if isinstance(exc, FileNotFoundError):
+                    raise WorkerLaunchUnavailableError(f"Required worker executable or launch input is unavailable: {exc}") from exc
+                raise
+            finally:
+                check_post_wave_renderer(sys.exc_info()[1])
         assert profile is not None and proxy is not None
         assert stdout_handle is not None and stderr_handle is not None
         worker_states[process.pid] = worker_state
@@ -6469,9 +6516,12 @@ def _production_dispatch_handoffs(
             except BaseException as exc:
                 cleanup_errors.append(exc)
         if cleanup_errors:
-            raise RuntimeError(
+            cleanup_error = RuntimeError(
                 "One or more production workers could not be fully reaped."
-            ) from cleanup_errors[0]
+            )
+            check_post_wave_renderer(cleanup_error)
+            raise cleanup_error from cleanup_errors[0]
+        check_post_wave_renderer(sys.exc_info()[1])
         if integrity_guard and (
             not (skill_root / RELEASE_MANIFEST).is_file()
             or sha256_file(skill_root / RELEASE_MANIFEST) != release_manifest_hash
@@ -6708,6 +6758,7 @@ def run_production_desktop_operation(
             handoffs, remaining_seconds, revision_dir(), configuration,
             skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
             expected_managed_hermes_identity=managed_hermes_identity,
+            require_promoted_runtime=require_promoted_runtime,
             **({"host_mode": host_mode} if host_mode != "isolated" else {}),
         )
 
@@ -6722,18 +6773,50 @@ def run_production_desktop_operation(
             raise RuntimeError(
                 "Delegated Visual QA failed; a genuine Desktop-parent reviewer callback is required."
             )
-        parent_visual_reviewer(
-            handoffs, remaining_seconds, active_revision, configuration,
+        runtime_integrity = _pdfium_runtime_integrity(
+            root, require_promoted_runtime=require_promoted_runtime,
         )
-        unresolved = [
-            dict(item) for item in handoffs
-            if not _parent_visual_response_is_bound(run_dir, active_revision.name, item)
-        ]
-        if unresolved:
+        if runtime_integrity.get("status") != "passed":
             raise RuntimeError(
-                "Desktop-parent visual review returned without accepted bound responses: "
-                + ", ".join(str(item.get("response_path") or "") for item in unresolved)
+                "Provisioned renderer runtime integrity failed before parent visual review: "
+                + str(runtime_integrity)
             )
+        primary_error: BaseException | None = None
+        try:
+            parent_visual_reviewer(
+                handoffs, remaining_seconds, active_revision, configuration,
+            )
+            unresolved = [
+                dict(item) for item in handoffs
+                if not _parent_visual_response_is_bound(run_dir, active_revision.name, item)
+            ]
+            if unresolved:
+                raise RuntimeError(
+                    "Desktop-parent visual review returned without accepted bound responses: "
+                    + ", ".join(str(item.get("response_path") or "") for item in unresolved)
+                )
+        except BaseException as exc:
+            primary_error = exc
+            raise
+        finally:
+            try:
+                runtime_integrity = _pdfium_runtime_integrity(
+                    root, require_promoted_runtime=require_promoted_runtime,
+                )
+                if runtime_integrity.get("status") != "passed":
+                    raise RuntimeError(
+                        "Provisioned renderer runtime changed during parent visual review; "
+                        "reject this parent result: " + str(runtime_integrity)
+                    )
+            except BaseException as integrity_error:
+                if primary_error is None:
+                    raise
+                # Reject the fallback without hiding callback/response diagnostics.
+                note = str(integrity_error)
+                if hasattr(primary_error, "add_note"):
+                    primary_error.add_note(note)
+                else:  # Compatible Python Runtime also includes Python 3.10.
+                    primary_error.args = (str(primary_error) + "\n" + note, *primary_error.args[1:])
         parent_review_record = {
             "status": "completed",
             "revision_id": active_revision.name,
@@ -6936,6 +7019,86 @@ def _bind_available_verification_responses(revision_dir: Path) -> None:
         os.replace(temporary, response_path)
 
 
+# This supervisor is deliberately a separate, single-purpose process: setting
+# PR_SET_CHILD_SUBREAPER on the workflow host would adopt unrelated workers.
+# Linux reparents even setsid/double-fork descendants here, keeping ownership
+# until waitpid reaps them; PID scans or process-group membership cannot do that.
+_PARENT_CALLBACK_SUPERVISOR = r'''
+import ctypes
+import json
+import os
+from pathlib import Path
+import signal
+import subprocess
+import sys
+import time
+
+status_fd, status_path, command, request = sys.argv[1:]
+status_fd = int(status_fd)
+returncode = None
+errors = []
+child = None
+
+def interrupted(signum, frame):
+    raise TimeoutError("Parent callback deadline expired")
+
+try:
+    children_path = Path(f"/proc/self/task/{os.getpid()}/children")
+    children_path.read_text()  # Fail closed before launching without ownership visibility.
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
+        raise OSError(ctypes.get_errno(), "Cannot own callback descendants")
+    signal.signal(signal.SIGTERM, interrupted)
+    child = subprocess.Popen([command, request])
+    returncode = child.wait()
+except TimeoutError:
+    pass  # The host retains the original subprocess.TimeoutExpired.
+except BaseException as exc:
+    errors.append(type(exc).__name__ + ": " + str(exc))
+finally:
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    deadline = time.monotonic() + 1.0
+    try:
+        children_path = Path(f"/proc/self/task/{os.getpid()}/children")
+        while True:
+            # Reap before reading children. Unreaped children cannot have their
+            # PID reused, so every PID signalled below remains ours.
+            while True:
+                try:
+                    pid, status = os.waitpid(-1, os.WNOHANG)
+                    if child is not None and pid == child.pid:
+                        returncode = os.waitstatus_to_exitcode(status)
+                except ChildProcessError:
+                    pid = 0
+                if not pid:
+                    break
+            children = [int(pid) for pid in children_path.read_text().split()]
+            if not children:
+                break
+            for pid in children:
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            if time.monotonic() >= deadline:
+                raise RuntimeError("Owned callback descendants remain after cleanup deadline")
+            time.sleep(0.005)
+    except BaseException as exc:
+        errors.append(type(exc).__name__ + ": " + str(exc))
+    # A tiny anonymous-pipe message preserves callback status even if report
+    # creation/write fails. Popen closes this fd in the callback: only the
+    # isolated owner can report it. It is not evidence of complete cleanup.
+    status_message = (json.dumps(returncode) + "\n").encode("ascii")
+    if os.write(status_fd, status_message) != len(status_message):
+        raise RuntimeError("Incomplete callback status message")
+    os.close(status_fd)
+    descriptor = os.open(status_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w") as handle:
+        json.dump({"returncode": returncode, "errors": errors}, handle)
+sys.exit(0)
+'''
+
+
 def command_parent_visual_reviewer(
     command_path: Path,
 ) -> Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None]:
@@ -6975,31 +7138,178 @@ def command_parent_visual_reviewer(
             "handoffs": [dict(item) for item in handoffs],
             "producer_model_policy": "record_actual_nonempty_model_id",
         })
-        completed = subprocess.run(
-            [str(command), str(request_path)],
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-            check=False,
-            timeout=max(1.0, remaining_seconds),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
+        arguments = [str(command), str(request_path)]
+        process = None
+        stdout = stderr = ""
+        failure = None
+        timed_out = False
         diagnostic_dir = revision_dir.parent.parent / "logs/parent-visual-reviewer"
         diagnostic_dir.mkdir(parents=True, exist_ok=True)
         diagnostic_path = diagnostic_dir / f"{revision_dir.name}.{time.time_ns()}.json"
-        descriptor = os.open(diagnostic_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as diagnostic_file:
-            json.dump({
-                "request_path": str(request_path),
-                "returncode": completed.returncode,
-                "stdout": completed.stdout,
-                "stderr": completed.stderr,
-            }, diagnostic_file, ensure_ascii=False)
-            diagnostic_file.write("\n")
-        if completed.returncode != 0:
+        supervisor_status = diagnostic_path.with_suffix(".cleanup.json")
+        linux_supervisor = platform.system() == "Linux"
+        cleanup_errors: list[str] = []
+        callback_returncode = None
+        status_reader = status_writer = None
+        try:
+            if linux_supervisor:
+                status_reader, status_writer = os.pipe()
+                os.set_blocking(status_reader, False)
+            process = subprocess.Popen(
+                ([sys.executable, "-B", "-c", _PARENT_CALLBACK_SUPERVISOR,
+                  str(status_writer), str(supervisor_status), *arguments] if linux_supervisor else arguments),
+                env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                start_new_session=platform.system() != "Windows",
+                **({"pass_fds": (status_writer,)} if linux_supervisor else {}),
+            )
+            if status_writer is not None:
+                os.close(status_writer)
+                status_writer = None
+            stdout, stderr = process.communicate(timeout=max(0.0, remaining_seconds))
+        except BaseException as exc:
+            failure = exc
+            timed_out = isinstance(exc, subprocess.TimeoutExpired)
+        finally:
+            if process is not None:
+                try:
+                    if linux_supervisor:
+                        if process.poll() is None:
+                            # Let the isolated owner kill/reap adopted children,
+                            # rather than killing their only reliable owner first.
+                            process.terminate()
+                            stdout, stderr = process.communicate(timeout=2.0)
+                        # Never wait on this pipe: an absent/truncated status
+                        # must reject, not extend the callback deadline.
+                        message = os.read(status_reader, 64)
+                        if not message.endswith(b"\n") or len(message) == 64:
+                            raise ValueError("Missing or incomplete callback status message")
+                        reported_returncode = json.loads(message)
+                        if reported_returncode is not None and type(reported_returncode) is not int:
+                            raise ValueError("Invalid callback status message")
+                        callback_returncode = reported_returncode
+                        if process.returncode != 0:
+                            cleanup_errors.append("Callback supervisor exited abnormally")
+                        status = json.loads(supervisor_status.read_text())
+                        if status["returncode"] != callback_returncode:
+                            raise ValueError("Callback status disagrees with cleanup report")
+                        cleanup_errors.extend(status["errors"])
+                    else:
+                        try:
+                            if platform.system() != "Windows":
+                                os.killpg(process.pid, signal.SIGKILL)
+                            elif process.poll() is None:
+                                process.kill()
+                        except ProcessLookupError:
+                            pass
+                        if failure is not None:
+                            stdout, stderr = process.communicate(timeout=1.0)
+                        callback_returncode = process.returncode
+                except BaseException as exc:
+                    cleanup_errors.append(type(exc).__name__ + ": " + str(exc))
+                    # Best effort only: never claim complete ownership cleanup
+                    # if the supervisor failed to return its reaping report.
+                    try:
+                        if process.poll() is None:
+                            os.killpg(process.pid, signal.SIGKILL)
+                            process.wait(timeout=1.0)
+                    except BaseException as fallback_exc:
+                        cleanup_errors.append(type(fallback_exc).__name__ + ": " + str(fallback_exc))
+                    if isinstance(failure, subprocess.TimeoutExpired) and not (stdout or stderr):
+                        stdout = (failure.output or b"").decode(errors="replace") if isinstance(failure.output, bytes) else (failure.output or "")
+                        stderr = (failure.stderr or b"").decode(errors="replace") if isinstance(failure.stderr, bytes) else (failure.stderr or "")
+                finally:
+                    for stream in (process.stdout, process.stderr):
+                        if stream is not None:
+                            try:
+                                stream.close()
+                            except BaseException as exc:
+                                cleanup_errors.append(type(exc).__name__ + ": " + str(exc))
+            for descriptor_to_close in (status_reader, status_writer):
+                if descriptor_to_close is not None:
+                    try:
+                        os.close(descriptor_to_close)
+                    except BaseException as exc:
+                        cleanup_errors.append(type(exc).__name__ + ": " + str(exc))
+            # Establish the callback/ownership failure before attempting host
+            # evidence persistence; a full disk must never replace that error.
+            if failure is None:
+                if callback_returncode not in (None, 0):
+                    failure = RuntimeError(
+                        "Desktop-parent reviewer command exited with status "
+                        f"{callback_returncode}; inspect {diagnostic_path} for captured output."
+                    )
+                elif cleanup_errors or callback_returncode is None:
+                    failure = RuntimeError(
+                        f"Desktop-parent reviewer cleanup incomplete; inspect {diagnostic_path}."
+                    )
+            persistence_errors: list[str] = []
+            descriptor = None
+            try:
+                descriptor = os.open(diagnostic_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                diagnostic_file = os.fdopen(descriptor, "w", encoding="utf-8")
+                descriptor = None  # The file object now owns the descriptor.
+                with diagnostic_file:
+                    json.dump({
+                        "request_path": str(request_path),
+                        "returncode": callback_returncode,
+                        "stdout": stdout,
+                        "stderr": stderr,
+                        "timed_out": timed_out,
+                        "error_type": type(failure).__name__ if failure is not None else None,
+                        "cleanup_complete": not cleanup_errors,
+                        "cleanup_errors": cleanup_errors,
+                    }, diagnostic_file, ensure_ascii=False)
+                    diagnostic_file.write("\n")
+            except BaseException as exc:
+                persistence_errors.append("diagnostic creation/write: " + type(exc).__name__ + ": " + str(exc))
+            finally:
+                if descriptor is not None:
+                    try:
+                        os.close(descriptor)
+                    except BaseException as exc:
+                        persistence_errors.append("diagnostic close: " + type(exc).__name__ + ": " + str(exc))
+                try:
+                    supervisor_status.unlink(missing_ok=True)
+                except BaseException as exc:
+                    persistence_errors.append("cleanup report unlink: " + type(exc).__name__ + ": " + str(exc))
+            if persistence_errors:
+                if failure is None:
+                    failure = RuntimeError("Desktop-parent reviewer evidence persistence failed.")
+                # Filesystem-independent, bounded evidence remains on the same
+                # primary exception. Never put callback output in notes/args:
+                # ordinary traceback logging must not expose potential secrets.
+                # This explicit diagnostic attribute, like the mode-0600 file,
+                # is sensitive and should only be inspected deliberately.
+                output_limit = 4096
+                failure.desktop_parent_output_evidence = {
+                    "stdout": stdout[:output_limit],
+                    "stderr": stderr[:output_limit],
+                    "stdout_truncated": len(stdout) > output_limit,
+                    "stderr_truncated": len(stderr) > output_limit,
+                    "returncode": callback_returncode,
+                    "timed_out": timed_out,
+                }
+                note = "Desktop-parent reviewer evidence persistence failed: " + "; ".join(persistence_errors)
+                if hasattr(failure, "add_note"):
+                    failure.add_note(note)
+                else:  # Supported Python 3.10 has no exception notes.
+                    failure.args = (str(failure) + "\n" + note, *failure.args[1:])
+        if failure is not None:
+            if cleanup_errors and hasattr(failure, "add_note"):
+                failure.add_note("Desktop-parent reviewer cleanup incomplete: " + "; ".join(cleanup_errors))
+            raise failure
+        completed = subprocess.CompletedProcess(arguments, callback_returncode, stdout, stderr)
+        if completed.returncode not in (None, 0):
             raise RuntimeError(
                 "Desktop-parent reviewer command exited with status "
                 f"{completed.returncode}; inspect {diagnostic_path} for captured output."
+            )
+        if cleanup_errors or completed.returncode is None:
+            raise RuntimeError(
+                f"Desktop-parent reviewer cleanup incomplete; inspect {diagnostic_path}."
             )
         candidates = response_candidates(completed.stdout)
         for handoff in handoffs:

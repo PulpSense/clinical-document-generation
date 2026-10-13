@@ -1354,6 +1354,9 @@ def test_production_parent_review_cannot_report_completed_without_bound_response
     tmp_path,
     monkeypatch,
 ):
+    # Isolate response binding; real strict inventories have public executable
+    # coverage in test_parent_runtime_guard.py.
+    monkeypatch.setattr(workflow, "_pdfium_runtime_integrity", lambda *a, **k: {"status": "passed"})
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     skill_root.mkdir(parents=True)
     run_dir = tmp_path / "run"
@@ -1390,6 +1393,9 @@ def test_production_parent_review_record_is_cleared_when_a_later_callback_is_unb
     tmp_path,
     monkeypatch,
 ):
+    # Isolate record reset; real strict inventories have public executable
+    # coverage in test_parent_runtime_guard.py.
+    monkeypatch.setattr(workflow, "_pdfium_runtime_integrity", lambda *a, **k: {"status": "passed"})
     skill_root = tmp_path / "profile/skills/clinical-document-generation"
     skill_root.mkdir(parents=True)
     run_dir = tmp_path / "run"

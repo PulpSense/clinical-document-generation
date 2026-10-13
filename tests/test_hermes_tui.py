@@ -169,6 +169,9 @@ def test_tui_dispatch_uses_managed_worker_and_tcp_proxy_without_sandbox(tmp_path
     assert captured['start_new_session'] is True
     assert captured['env']['HERMES_HOME'].startswith(str(run / '.hermes-cache'))
     assert captured['env']['HTTPS_PROXY'].startswith('http://127.0.0.1:')
+    assert captured['env']['CLINICAL_PYTHON'] == sys.executable
+    prompt = captured['command'][captured['command'].index('-q') + 1]
+    assert '"$CLINICAL_PYTHON" -B' in prompt
     assert not list(root.parent.parent.joinpath('.tmp').glob('clinical-production-adapter-*.sock'))
 
 

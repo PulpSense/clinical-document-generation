@@ -66,9 +66,16 @@ source,checkpoint,native,nonce,runtime,code=sys.argv[2:]
 for start in range(1,2049,128):
  value=read_file_tool(source,offset=start,limit=128)
  for i in range(start-1,start+127): assert f'{i:04d} {nonce}' in value
-write_file_tool(checkpoint,json.dumps({'nonce':nonce,'completed_lines':2048}))
+# The parent pre-creates this audit file; Hermes requires a current full read
+# in the writing task before whole-file overwrite, even for an empty file.
+current=json.loads(read_file_tool(checkpoint,offset=1,limit=20))
+assert not current.get('error') and not current.get('truncated'), current
+written=json.loads(write_file_tool(checkpoint,json.dumps({'nonce':nonce,'completed_lines':2048})))
+assert not written.get('error') and written.get('verified') is True, written
 assert nonce in read_file_tool(checkpoint,offset=1,limit=20)
-tool=Path(native)/'native-probe.py'; write_file_tool(str(tool),code)
+tool=Path(native)/'native-probe.py'
+written=json.loads(write_file_tool(str(tool),code))
+assert not written.get('error') and written.get('verified') is True, written
 subprocess.run([runtime,'-B',str(tool),native],check=True)
 child=subprocess.Popen([runtime,'-B','-c','import time;time.sleep(600)',nonce])
 print(json.dumps({'status':'passed','child_pid':child.pid,'bounded_read_calls':16,'checkpoint_readback':True}),flush=True)
