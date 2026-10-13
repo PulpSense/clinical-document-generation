@@ -6145,6 +6145,24 @@ def _production_worker_usage(state: Path) -> dict[str, Any]:
         return unavailable
 
 
+def _prepare_worker_checkpoint(revision_dir: Path, relative: str) -> Path:
+    """Create a new audit file safely, preserving existing checkpoint evidence."""
+    target = revision_dir / relative
+    if Path(relative).is_absolute() or ".." in Path(relative).parts:
+        raise ValueError("Worker audit path escapes its revision.")
+    if (not target.resolve().is_relative_to(revision_dir.resolve())
+            or any(part.is_symlink() for part in (target, *target.parents))):
+        raise ValueError("Worker audit path escapes its revision or contains a symlink.")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        pass  # Existing progress must never be truncated by a replacement worker.
+    else:
+        os.close(descriptor)
+    return native_file(revision_dir, relative)
+
+
 def _production_dispatch_handoffs(
     handoffs: Sequence[Mapping[str, Any]],
     remaining_seconds: float,
@@ -6238,12 +6256,7 @@ def _production_dispatch_handoffs(
             writable_roots = [worker_state]
             for relative in [(request.get("review_transport") or {}).get("progress_path")]:
                 if relative:
-                    target = revision_dir / relative
-                    if not target.resolve().is_relative_to(revision_dir.resolve()) or target.is_symlink():
-                        raise ValueError("Worker audit path escapes its revision.")
-                    native_file(revision_dir, relative)
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    target.touch(exist_ok=True)
+                    target = _prepare_worker_checkpoint(revision_dir, relative)
                     writable_roots.append(target)
             if handoff.get("task") == "document_repair":
                 request = native_read(native_file(revision_dir, str(handoff["request_path"])))

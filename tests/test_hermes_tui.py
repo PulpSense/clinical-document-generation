@@ -127,13 +127,27 @@ def test_local_completion_retains_pending_delivery_ledger_and_reopens(tmp_path, 
     assert workflow.run_desktop_operation(tmp_path, **arguments)['status'] == 'blocked'
 
 
-def test_tui_dispatch_uses_managed_worker_and_tcp_proxy_without_sandbox(tmp_path, monkeypatch):
+@pytest.mark.parametrize("checkpoint_state", ["draft", "missing", "existing"])
+def test_tui_dispatch_uses_managed_worker_and_tcp_proxy_without_sandbox(tmp_path, monkeypatch, checkpoint_state):
     import sys
     root = tmp_path / 'profile/skills/clinical-document-generation'
     root.mkdir(parents=True)
     (root / workflow.RELEASE_MANIFEST).write_text('{}')
     run = tmp_path / 'run'
     launcher = tmp_path / 'hermes/venv/bin/hermes'
+    revision = run / 'revisions/r1'
+    progress = revision / 'hermes/review-progress/unit.json'
+    request_path = 'hermes/requests/draft.json'
+    task = 'section_drafting'
+    if checkpoint_state != 'draft':
+        task = 'clinical_content_verification'
+        request_path = 'hermes/content-review-requests/unit.json'
+        request = revision / request_path
+        request.parent.mkdir(parents=True)
+        request.write_text(json.dumps({'review_transport': {'progress_path': 'hermes/review-progress/unit.json'}}))
+        if checkpoint_state == 'existing':
+            progress.parent.mkdir(parents=True)
+            progress.write_bytes(b'authenticated checkpoint bytes')
     monkeypatch.setattr(workflow.platform, 'system', lambda: 'Linux')
     monkeypatch.setattr(workflow, '_managed_hermes_pair', lambda: (launcher, Path(sys.executable)))
     monkeypatch.setattr(workflow, '_manifest_integrity', lambda *a, **k: [])
@@ -144,9 +158,12 @@ def test_tui_dispatch_uses_managed_worker_and_tcp_proxy_without_sandbox(tmp_path
     monkeypatch.setattr(workflow.subprocess, 'Popen', stop)
     with pytest.raises(RuntimeError, match='launch observed'):
         workflow._production_dispatch_handoffs([
-            {'request_path': 'hermes/requests/draft.json', 'response_path': 'hermes/responses/draft.json', 'task': 'section_drafting'}],
+            {'request_path': request_path, 'response_path': 'hermes/responses/draft.json', 'task': task}],
             30, run / 'revisions/r1', workflow.CERTIFIED_HERMES_CONFIGURATION,
             skill_root=root, run_dir=run, runtime_identity={'executable': sys.executable}, host_mode='hermes-tui')
+    if checkpoint_state != 'draft':
+        assert progress.is_file()
+        assert progress.read_bytes() == (b'authenticated checkpoint bytes' if checkpoint_state == 'existing' else b'')
     assert captured['command'][:2] == [sys.executable, str(launcher)]
     assert '--safe-mode' in captured['command']
     assert captured['start_new_session'] is True
@@ -170,3 +187,30 @@ def test_incomplete_review_remains_review_only_and_locally_available(tmp_path, m
     assert result['recipient_delivery_verified'] is False
     assert 'NOT CLIENT READY' in (run / result['review_notice']).read_text()
     assert workflow.run_desktop_operation(run, **arguments)['review_outputs'] == result['review_outputs']
+
+
+@pytest.mark.parametrize('unsafe', ['absolute', 'traversal', 'file-symlink', 'directory-symlink', 'occupied-directory'])
+def test_checkpoint_preparation_rejects_unsafe_paths_without_changing_evidence(tmp_path, unsafe):
+    revision = tmp_path / 'revision'
+    revision.mkdir()
+    outside = tmp_path / 'outside'
+    outside.mkdir()
+    sentinel = outside / 'saved.json'
+    sentinel.write_bytes(b'original evidence')
+    relative = 'progress/saved.json'
+    if unsafe == 'absolute':
+        relative = str(sentinel)
+    elif unsafe == 'traversal':
+        relative = '../outside/saved.json'
+    elif unsafe == 'directory-symlink':
+        (revision / 'progress').symlink_to(outside, target_is_directory=True)
+    else:
+        (revision / 'progress').mkdir()
+        if unsafe == 'file-symlink':
+            (revision / relative).symlink_to(sentinel)
+        else:
+            (revision / relative).mkdir()
+    with pytest.raises((ValueError, workflow.NativeRepairIntegrityError)):
+        workflow._prepare_worker_checkpoint(revision, relative)
+    assert sentinel.read_bytes() == b'original evidence'
+    assert sorted(p.name for p in outside.iterdir()) == ['saved.json']
