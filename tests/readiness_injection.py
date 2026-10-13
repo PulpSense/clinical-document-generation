@@ -45,14 +45,35 @@ def inject_native(candidate_dir: Path, seed: dict, ledger_dir: Path):
     for node in nodes:
         attribute = seed.get('attribute')
         actual = node.get(attribute) if attribute else node.text
-        if actual != seed['before']:
-            raise ValueError('Predeclared seed original value differs; preserve this unexecuted challenge.')
+        before = seed.get('before')
+        if seed.get('check_before', True):
+            matches = isinstance(actual, str) and isinstance(before, str) and before in actual if seed.get('replace_substring') else actual == before
+            if not matches:
+                raise ValueError('Predeclared seed original value differs; preserve this unexecuted challenge.')
         if seed.get('remove_node'):
             node.getparent().remove(node)
+        elif seed.get('operation') == 'replace_paragraph':
+            namespace = seed['namespaces']['w']
+            for child in list(node):
+                if child.tag != '{' + namespace + '}pPr':
+                    node.remove(child)
+            run = ET.SubElement(node, '{' + namespace + '}r')
+            ET.SubElement(run, '{' + namespace + '}t').text = seed['after']
+        elif seed.get('operation') == 'exact_row_height':
+            namespace = seed['namespaces']['w']
+            properties = node.find('{' + namespace + '}trPr')
+            if properties is None:
+                properties = ET.SubElement(node, '{' + namespace + '}trPr')
+            for child in list(properties):
+                if child.tag == '{' + namespace + '}trHeight':
+                    properties.remove(child)
+            height = ET.SubElement(properties, '{' + namespace + '}trHeight')
+            height.set('{' + namespace + '}val', str(seed['twips']))
+            height.set('{' + namespace + '}hRule', 'exact')
         elif attribute:
             node.set(attribute, seed['after'])
         else:
-            node.text = seed['after']
+            node.text = actual.replace(before, seed['after'], 1) if seed.get('replace_substring') else seed['after']
     changed_xml = ET.tostring(root, xml_declaration=True, encoding='UTF-8')
     changed = changed_xml
     if part:
@@ -131,4 +152,128 @@ def draft_seed_adapter(workflow_module, ledger_root: Path, sentence: str):
             yield injected
         finally:
             workflow_module._production_publish_quiet_response = publish
+    return installed()
+
+
+class ParentInterruption(BaseException):
+    """Deliberate owner campaign interruption; resume the original operation."""
+
+
+def campaign_adapter(workflow, planned, run_dir: Path, opener):
+    """Install only the predeclared faults around the actual installed adapter.
+
+    No reviewer response is manufactured. F1 requires a real checkpoint and
+    interrupts the parent once; invoke the original operation again to resume.
+    """
+    from contextlib import contextmanager
+    import copy
+    @contextmanager
+    def installed():
+        case_id = planned['case_id']
+        originals = {name: getattr(workflow, name) for name in (
+            'render_assurance', 'create_verification_requests', '_production_subprocess_environment',
+            '_production_publish_quiet_response', '_production_dispatch_handoffs', '_production_sandbox_prefix')}
+        events = []
+        injected_drafts = set()
+        native_seeded = False
+        interrupted = False
+        retrieval_failed = False
+        denied_repair_areas = set()
+        def record(event, **details):
+            events.append({'event': event, **details})
+            directory = run_dir / 'campaign-fault-evidence'
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / 'events.json').write_text(json.dumps(events, indent=2))
+        def render(root, revision, *args, **kwargs):
+            nonlocal native_seeded
+            if case_id.startswith('Q') and not native_seeded:
+                for seed in planned['native_seeds']:
+                    inject_native(revision / 'candidate', seed, run_dir / 'campaign-fault-evidence/native-seeds')
+                native_seeded = True
+                record('predeclared_native_seeds_applied')
+            return originals['render_assurance'](root, revision, *args, **kwargs)
+        def requests(revision, reference, report, **kwargs):
+            if case_id == 'D1' and kwargs.get('review_set', 1) == 1:
+                context = copy.deepcopy(kwargs.get('review_context') or {})
+                context.setdefault('prior_findings', []).extend(planned['native_seeds'])
+                kwargs['review_context'] = context
+                record('test_owned_prior_hypothesis_before_binding', seeds=planned['native_seeds'])
+            return originals['create_verification_requests'](revision, reference, report, **kwargs)
+        def environment(root):
+            value = originals['_production_subprocess_environment'](root)
+            if case_id == 'F1':
+                shim = run_dir / 'campaign-fault-evidence/read-limit-shim'
+                shim.mkdir(parents=True, exist_ok=True)
+                code = "from tools import file_tools\noriginal=file_tools.read_file_tool\ndef limited(path,offset=1,limit=2000,**kwargs):\n return original(path,offset=offset,limit=min(limit,64),**kwargs)\nfile_tools.read_file_tool=limited\n"
+                (shim / 'sitecustomize.py').write_text(code)
+                value['PYTHONPATH'] = str(shim)
+                record('real_worker_read_file_limit', maximum_lines=64, shim_sha256=sha(code.encode()))
+            return value
+        def publish(revision, handoff, stdout_log):
+            nonlocal interrupted
+            accepted = originals['_production_publish_quiet_response'](revision, handoff, stdout_log)
+            if not accepted:
+                return accepted
+            request = json.loads((revision / handoff['request_path']).read_text())
+            path = revision / request['response_path']
+            response = json.loads(path.read_text())
+            if case_id == 'F3' and request['task'] == 'section_drafting' and request['request_id'] not in injected_drafts and any(
+                    row.get('section_id') == 'introduction' for row in response.get('section_results', [])):
+                changed = inject_drafting_response(request, response, 'Participants receive an unsupported experimental drug.',
+                    run_dir / 'campaign-fault-evidence' / ('draft-' + sha(request['request_id'].encode())))
+                path.write_text(json.dumps(changed, indent=2))
+                injected_drafts.add(request['request_id'])
+                record('substantive_seed_before_consumption')
+            if case_id == 'F1' and handoff.get('review_unit_id') and not interrupted:
+                checkpoint = revision / request['review_transport']['progress_path']
+                if not checkpoint.is_file():
+                    raise RuntimeError('F1 requires a real worker checkpoint; retain unexecuted fault rather than fabricate progress')
+                directory = run_dir / 'campaign-fault-evidence/truncation'
+                directory.mkdir()
+                (directory / 'real-final.bin').write_bytes(path.read_bytes())
+                (directory / 'real-checkpoint.bin').write_bytes(checkpoint.read_bytes())
+                path.write_bytes(b'{')
+                interrupted = True
+                record('truncate_real_final_and_interrupt_parent', request_id=request['request_id'])
+                raise ParentInterruption()
+            if case_id == 'F3' and request['task'] == 'document_repair':
+                record('real_repair_author_result', status=response.get('status'), producer=response.get('producer'))
+            return accepted
+        def dispatch(handoffs, remaining, revision, configuration, **kwargs):
+            if case_id == 'F2':
+                visual = [h for h in handoffs if h['task'] == 'rendered_page_visual_verification']
+                if visual:
+                    record('delegated_visual_unavailable', requests=[h['request_id'] for h in visual])
+                    handoffs = [h for h in handoffs if h not in visual]
+            if case_id == 'F3':
+                for handoff in handoffs:
+                    if handoff['task'] == 'document_repair':
+                        request = json.loads((revision / handoff['request_path']).read_text())
+                        denied_repair_areas.update(str((revision / request[k]).resolve()) for k in ('workspace_path', 'tools_path'))
+                        record('repair_workspace_writes_unavailable')
+            if handoffs:
+                return originals['_production_dispatch_handoffs'](handoffs, remaining, revision, configuration, **kwargs)
+        def prefix(policy):
+            if case_id == 'F3' and denied_repair_areas:
+                value = json.loads(policy.read_text())
+                value['writable'] = [p for p in value['writable'] if p not in denied_repair_areas]
+                policy.write_text(json.dumps(value))
+            return originals['_production_sandbox_prefix'](policy)
+        def retrieval(path):
+            nonlocal retrieval_failed
+            if case_id == 'F2' and not retrieval_failed:
+                retrieval_failed = True
+                record('transient_actual_recipient_transport_failure')
+                raise OSError('Predeclared transient recipient retrieval fault')
+            return opener(path)
+        replacements = {'render_assurance': render, 'create_verification_requests': requests,
+            '_production_subprocess_environment': environment, '_production_publish_quiet_response': publish,
+            '_production_dispatch_handoffs': dispatch, '_production_sandbox_prefix': prefix}
+        for name, value in replacements.items():
+            setattr(workflow, name, value)
+        try:
+            yield retrieval, events
+        finally:
+            for name, value in originals.items():
+                setattr(workflow, name, value)
     return installed()

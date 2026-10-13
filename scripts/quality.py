@@ -5392,6 +5392,12 @@ def _readable_native_view(revision_dir: Path, native: Mapping[str, Any]) -> dict
                                           namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}))
                 if text:
                     records.append({"location": f"{name}:{tree.getpath(node)}", "text": text})
+            for table in root.iter(qn("w:tbl")):
+                records.append({"location": f"{name}:{tree.getpath(table)}", "table": [
+                    [{"location": f"{name}:{tree.getpath(cell)}",
+                      "text": " ".join(cell.xpath(".//w:t/text()", namespaces={"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}))}
+                     for cell in row.findall(qn("w:tc"))]
+                    for row in table.findall(qn("w:tr"))]})
         elif name.endswith(".rels"):
             records.extend({"location": f"{name}:{tree.getpath(node)}", "relationship": dict(node.attrib)}
                            for node in root if node.get("TargetMode") == "External")
@@ -5399,7 +5405,7 @@ def _readable_native_view(revision_dir: Path, native: Mapping[str, Any]) -> dict
             "native_sha256": native["native_sha256"], "records": records}
 
 
-def _content_review_plan(revision_dir: Path, request: Mapping[str, Any]) -> dict[str, Any]:
+def _content_review_plan(revision_dir: Path, request: Mapping[str, Any], render_report: Mapping[str, Any]) -> dict[str, Any]:
     views = []
     for native in request["native_inspection"]:
         value = _readable_native_view(revision_dir, native)
@@ -5412,7 +5418,8 @@ def _content_review_plan(revision_dir: Path, request: Mapping[str, Any]) -> dict
                       "sha256": sha256_file(path)})
     return {"schema_version": "content-review-scheduler/v1", "max_sections": 3,
             "max_cross_checks": 2, "max_parallel_units": 3, "unit_budget_seconds": 180,
-            "max_no_progress_attempts": 2, "readable_native": views}
+            "max_no_progress_attempts": 2, "readable_native": views,
+            "page_count_by_artifact": {r["artifact"]: len(r.get("pages", [])) for r in render_report.get("artifacts", [])}}
 
 
 def _prior_concern_in_review_scope(prior: Mapping[str, Any], parent: Mapping[str, Any],
@@ -5478,13 +5485,15 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
         path = revision_dir / native["path"]
         if row["artifact"] == "study.xml" or row["section_id"].endswith(".shell"):
             view = next(v for v in plan["readable_native"] if v["artifact"] == row["artifact"])
-            passage = _json(revision_dir / view["path"])
+            passage = {"staged_path": view["path"], "sha256": view["sha256"],
+                       "reading_rule": "Read the complete native view in bounded groups; resolve all locations before judgment."}
         else:
             passage = rendered_section_snapshot(path, row["section_id"])
         passages.append({"artifact": row["artifact"], "section_id": row["section_id"],
                          "native_path": native["path"], "native_sha256": native["sha256"], "passage": passage})
     if cross_checks:
         passages = copy.deepcopy(plan["readable_native"])
+    if full_source:
         scoped_source = {"meta": copy.deepcopy(source["meta"])}
     context = copy.deepcopy(parent.get("review_context") or {})
     context["prior_findings"] = [finding for finding in context.get("prior_findings", [])
@@ -5504,13 +5513,15 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
         native_inspection_fallback=parent["native_inspection"],
         review_context=context, authorized_boilerplate=parent["authorized_boilerplate"],
         contracted_template_bundle=parent["contracted_template_bundle"],
-        review_rules=parent["instructions"], sterling_clause_contract=(parent.get("sterling_clause_contract")
-            if cross_checks or any(row["artifact"] == "icf" for row in sections) else None),
+        review_rules=parent["instructions"], sterling_clause_contract=({"parent_request_path": parent_path.relative_to(revision_dir).as_posix(),
+            "field": "sterling_clause_contract"} if parent.get("sterling_clause_contract")
+            and (cross_checks or any(row["artifact"] == "icf" for row in sections)) else None),
         response_path=f"hermes/content-review-responses/{request_id}.json",
         instructions="Complete ONLY the assigned sections and cross-document checks. Read readable_native_evidence "
           "first: inline passages or staged path/sha256 references are extracted from exact native files. "
           "Read staged references in bounded groups; do not infer a pass from the index. Full approved source "
-          "is in canonical_source_evidence.parent_request_path and its lossless bounded_views. Tables remain structured "
+          "is in canonical_source_evidence.parent_request_path and its lossless bounded index. Read any staged "
+          "sterling_clause_contract parent field before judging applicable consent language. Tables remain structured "
           "and shell/XML evidence includes native locations. Use full native inspection fallback or the canonical "
           "parent approved source if more context is necessary; missing expected content is reviewable. "
           "Do not review unrelated sections or reread all formatting XML. Return explicit independent judgments "
@@ -5526,9 +5537,14 @@ def create_content_review_unit(revision_dir: Path, parent_path: Path, sections: 
         "staged_native_bytes": sum((revision_dir / view["path"]).stat().st_size for view in passages
                                    if "path" in view),
         "assigned_sections": len(sections), "assigned_cross_checks": len(cross_checks),
+        "available_page_count": sum(count for artifact, count in plan.get("page_count_by_artifact", {}).items()
+                                    if cross_checks or any(row["artifact"] == artifact for row in sections)),
         "tokens": None, "read_calls": None,
         "measurement_note": "Bytes measure assigned evidence, not actual model consumption. Token/read counts require worker telemetry."}
     unit["review_transport"] = _review_transport(revision_dir, unit)
+    unit["request_sha256"] = "0" * 64
+    for _ in range(4):
+        unit["workload"]["serialized_request_bytes"] = len((json.dumps(unit, ensure_ascii=False, indent=2) + "\n").encode())
     unit["request_sha256"] = verification_request_sha256(unit)
     path = revision_dir / f"hermes/content-review-requests/{request_id}.json"
     ledger = revision_dir / f"hermes/content-review-ledgers/{request_id}.json"
@@ -5554,7 +5570,7 @@ def _content_assessment_consistency(sections: Sequence[Mapping[str, Any]],
             (section and (not f.get("artifact") or f["artifact"] == row.get("artifact"))
              and row["section_id"] in (f.get("target_ids") or []))
             or (not section and f.get("check") == row["check"])
-            or _notes_cite_finding(row.get("notes"), f.get("finding_id", ""))]
+            or (row["status"] != "passed" and _notes_cite_finding(row.get("notes"), f.get("finding_id", "")))]
         if row["status"] == "passed" and covering:
             errors[key] = f"Reported substantive findings contradict passing assessment {key}."
             contradictory.update(f.get("finding_id", "") for f in covering)
@@ -5945,7 +5961,7 @@ def create_verification_requests(
             )
         payload["contracted_template_bundle"] = bundle
         if payload["task"] == "clinical_content_verification":
-            payload["review_plan"] = _content_review_plan(revision_dir, payload)
+            payload["review_plan"] = _content_review_plan(revision_dir, payload, render_report)
             payload["review_transport"] = _review_transport(revision_dir, payload)
         payload["request_sha256"] = verification_request_sha256(payload)
     payloads = [_reuse_visual_request(revision_dir, payload) or payload for payload in payloads]

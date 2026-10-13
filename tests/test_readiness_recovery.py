@@ -175,3 +175,45 @@ def test_interrupted_desktop_keeps_truncated_final_checkpoint_and_original_deadl
     final = json.loads(state_path.read_text())
     assert final['deadline_at_epoch'] == original['deadline_at_epoch']
     assert final['approval_identity'] == original['approval_identity']
+
+
+@pytest.mark.parametrize('family', [FAMILIES[0], FAMILIES[1]])
+def test_long_complete_package_has_lossless_staged_native_and_source_routes(tmp_path, family):
+    parent_path, parent, source = candidate(tmp_path, family)
+    assert len(parent['sections']) >= 62
+    assert len(parent['cross_document_checks']) == 6
+    # Exercise every assigned native passage and all cross-document scope;
+    # approval is still supplied only by a controlled independent test adapter.
+    units = []
+    for artifact in dict.fromkeys(row['artifact'] for row in parent['sections']):
+        rows = [row for row in parent['sections'] if row['artifact'] == artifact]
+        for start in range(0, len(rows), 3):
+            units.append(quality.create_content_review_unit(tmp_path, parent_path, rows[start:start+3], [], 1))
+    for start in range(0, 6, 2):
+        units.append(quality.create_content_review_unit(tmp_path, parent_path, [], parent['cross_document_checks'][start:start+2], 1))
+    locations, cross_bytes = [], []
+    for path in units:
+        unit = json.loads(path.read_text())
+        assert unit['workload']['serialized_request_bytes'] == path.stat().st_size
+        for evidence in unit['readable_native_evidence']:
+            passage = evidence.get('passage', {})
+            staged = passage.get('staged_path') if isinstance(passage, dict) else evidence.get('path')
+            if staged:
+                native = json.loads((tmp_path / staged).read_text())
+                assert native['records']
+                locations.extend(row['location'] for row in native['records'])
+            elif isinstance(passage, list):
+                locations.extend(row['location'] for row in passage)
+        if unit['cross_document_checks']:
+            cross_bytes.append(path.stat().st_size)
+        response = acceptance_verification(unit)
+        destination = tmp_path / unit['response_path']
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(response))
+    result = quality.content_review_schedule_result(tmp_path, parent_path, units)
+    assert result['complete'] and result['completed'] >= 68
+    assert locations and all(':' in location for location in locations)
+    assert max(cross_bytes) < 35000
+    canonical = json.loads((tmp_path / json.loads(units[-1].read_text())['canonical_source_evidence']['parent_request_path']).read_text())
+    assert canonical['approved_source'] == source
+    assert 'UNIQUE END OF SOURCE' in canonical['approved_source']['study']['background']

@@ -4372,9 +4372,10 @@ def _run_content_review_schedule(
                     if feedback or previous or state["no_progress"] else [])})
         available = remaining_seconds()
         wave_started = time.monotonic()
-        if available <= 30:
+        reserve = max(30.0, min(180.0, available / 6))
+        if available <= reserve:
             break
-        budget = min(float(plan["unit_budget_seconds"]), (available - 30) / 2)
+        budget = min(float(plan["unit_budget_seconds"]), (available - reserve) / 2)
         _write(ledger_path, state)  # Requests survive interrupted parent processes.
         callback = replacement_dispatch if state["waves"] else dispatch
         try:
@@ -4391,6 +4392,8 @@ def _run_content_review_schedule(
             "completed_assessments": after["completed"], "gained_assessments": gained, "budget_seconds": budget,
             "elapsed_seconds": time.monotonic() - wave_started,
             "remaining_seconds_before_wave": available, "remaining_seconds_after_wave": remaining_seconds(),
+            "allocated_finalization_reserve_seconds": reserve,
+            "reserve_assurance": "allocation_only; compare with actual final review/delivery stage samples",
             "remaining_sections": len(after["remaining_sections"]),
             "remaining_cross_checks": len(after["remaining_cross_document_checks"]),
             "workloads": [_read(revision_dir / h["request_path"]).get("workload") for h in handoffs]})
@@ -4828,6 +4831,10 @@ def run_desktop_operation(
         timing = stage_timings.setdefault(stage, {"elapsed_seconds": 0.0, "invocations": 0})
         timing["elapsed_seconds"] = round(float(timing.get("elapsed_seconds") or 0.0) + max(0.0, elapsed), 3)
         timing["invocations"] = int(timing.get("invocations") or 0) + 1
+        remaining = max(0.0, deadline_at_epoch - epoch_now())
+        timing.setdefault('samples', []).append({'elapsed_seconds': max(0.0, elapsed),
+            'remaining_seconds_at_entry': remaining + max(0.0, elapsed),
+            'remaining_seconds_at_exit': remaining})
 
     def record_soft_budget_event(stage: str) -> None:
         elapsed = float(stage_timings.get(stage, {}).get("elapsed_seconds") or 0.0)
@@ -5734,34 +5741,47 @@ class WorkerAuthenticationError(RuntimeError):
     """A confirmed worker login defect cannot be repaired by redispatch."""
 
 
+def _worker_capability_identity(skill_root: Path) -> dict[str, Any]:
+    """Current installed dependency identity for capability collection and admission."""
+    launcher, _ = _managed_hermes_pair()
+    profile = skill_root.parent.parent
+    selected_renderer = renderer(environment=_production_subprocess_environment(skill_root), skill_root=skill_root)
+    if not selected_renderer:
+        raise ValueError("No installed office renderer is available.")
+    # The ordinary Linux route uses the host font inventory; changing any
+    # font bytes invalidates cached page inspection evidence.
+    font_list = subprocess.run(['/usr/bin/fc-list', '--format', '%{file}\n'],
+        capture_output=True, text=True, timeout=20, check=True)
+    fonts = sorted(set(font_list.stdout.splitlines()))
+    if not fonts:
+        raise ValueError("Installed font identity could not be established.")
+    tools_root = launcher.parent.parent.parent / 'tools'
+    tool_files = sorted(tools_root.rglob('*.py'))
+    if not tool_files:
+        raise ValueError("Installed Hermes tool identities are unavailable.")
+    pdfium = _pdfium_runtime_integrity(skill_root, require_promoted_runtime=False)
+    if pdfium.get('status') != 'passed':
+        raise ValueError('Installed PDFium runtime integrity is unproven.')
+    hermes_code = {str(p.relative_to(tools_root.parent)): sha256_file(p)
+        for p in sorted(tools_root.parent.rglob('*.py'))
+        if not set(p.relative_to(tools_root.parent).parts) & {'.venv', 'venv', '__pycache__', '.git'}}
+    identity = {"hermes_code": hermes_code, "package_manifest_sha256": sha256_file(skill_root / RELEASE_MANIFEST),
+        "hermes": _managed_hermes_identity(), "pdfium": pdfium['identity'],
+        "pdfium_metadata_sha256": sha256_file(skill_root / 'runtime/PDF-RENDERER.json'),
+        "configuration_sha256": sha256_file(profile / 'config.yaml'),
+        "runtime": {"executable": sys.executable, "sha256": sha256_file(Path(sys.executable).resolve())},
+        "renderer": {**selected_renderer, "sha256": sha256_file(Path(selected_renderer['path']))},
+        "fonts": {name: sha256_file(Path(name)) for name in fonts},
+        "tools": {str(p.relative_to(tools_root)): sha256_file(p) for p in tool_files}}
+    return identity
+
+
 def _worker_capability_assurance(skill_root: Path) -> dict[str, Any]:
     """Revalidate expensive installation probes against their actual dependencies."""
     from worker_capabilities import validate_assurance
     try:
-        launcher, _ = _managed_hermes_pair()
-        profile = skill_root.parent.parent
-        selected_renderer = renderer(environment=_production_subprocess_environment(skill_root), skill_root=skill_root)
-        if not selected_renderer:
-            raise ValueError("No installed office renderer is available.")
-        # The ordinary Linux route uses the host font inventory; changing any
-        # font bytes invalidates cached page inspection evidence.
-        font_list = subprocess.run(['/usr/bin/fc-list', '--format', '%{file}\n'],
-            capture_output=True, text=True, timeout=20, check=True)
-        fonts = sorted(set(font_list.stdout.splitlines()))
-        if not fonts:
-            raise ValueError("Installed font identity could not be established.")
-        tools_root = launcher.parent.parent.parent / 'tools'
-        tool_files = sorted(tools_root.rglob('*.py'))
-        if not tool_files:
-            raise ValueError("Installed Hermes tool identities are unavailable.")
-        identity = {"package_manifest_sha256": sha256_file(skill_root / RELEASE_MANIFEST),
-            "hermes": _managed_hermes_identity(),
-            "configuration_sha256": sha256_file(profile / 'config.yaml'),
-            "runtime": {"executable": sys.executable, "sha256": sha256_file(Path(sys.executable).resolve())},
-            "renderer": {**selected_renderer, "sha256": sha256_file(Path(selected_renderer['path']))},
-            "fonts": {name: sha256_file(Path(name)) for name in fonts},
-            "tools": {str(p.relative_to(tools_root)): sha256_file(p) for p in tool_files}}
-        evidence = profile / 'clinical-capabilities' / identity['package_manifest_sha256'] / 'assurance.json'
+        identity = _worker_capability_identity(skill_root)
+        evidence = skill_root.parent.parent / 'clinical-capabilities' / identity['package_manifest_sha256'] / 'assurance.json'
         return validate_assurance(evidence, identity)
     except (OSError, ValueError, subprocess.SubprocessError) as exc:
         return {"status": "blocked", "issue": f"Cannot establish installed lifecycle capability identity: {exc}"}
@@ -6546,6 +6566,17 @@ def run_production_desktop_operation(
     prior_state = _read(state_path) if state_path.is_file() else {}
     if prior_state.get("status") not in {"passed", "review_required", "timeout"}:
         readiness = _production_worker_readiness(root)
+        assurance = readiness.get('capability_assurance')
+        if isinstance(assurance, Mapping) and assurance.get('status') == 'passed':
+            callbacks = {'recipient_opener': opener, 'parent_visual_reviewer': parent_visual_reviewer}
+            actual = {}
+            for name, callback in callbacks.items():
+                executable = getattr(callback, 'capability_executable', None)
+                if executable is not None:
+                    actual[name] = {'path': str(executable), 'sha256': sha256_file(executable)}
+            if actual != assurance.get('transports') or len(actual) != 2:
+                readiness = {**readiness, 'status': 'blocked',
+                    'issue': 'Recipient/parent callbacks differ from installed capability evidence; requalify the actual transports.'}
         _write(run_dir / "logs/worker-readiness.json", readiness)
         if readiness["status"] != "passed":
             blocked = {
@@ -6651,6 +6682,7 @@ def command_desktop_opener(command_path: Path) -> Callable[[str], bytes]:
             stderr=subprocess.PIPE,
         ).stdout
 
+    open_attachment.capability_executable = command
     return open_attachment
 
 
@@ -6910,6 +6942,7 @@ def command_parent_visual_reviewer(
                 + ", ".join(str(item.get("response_path") or "") for item in unresolved)
             )
 
+    review.capability_executable = command
     return review
 
 

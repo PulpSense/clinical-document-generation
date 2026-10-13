@@ -26,19 +26,24 @@ def linux_prefix(policy_path: Path) -> list[str]:
     path = Path(executable)
     if not path.is_absolute() or path.is_symlink() or not path.is_file() or not os.access(path, os.X_OK):
         raise RuntimeError('The Linux Bubblewrap executable is not a trusted executable file.')
-    command = [str(path), '--die-with-parent', '--unshare-all', '--new-session',
-               '--ro-bind', '/', '/', '--proc', '/proc', '--dev', '/dev']
-    for hidden in ('/tmp', '/run', '/home', '/root'):
-        if Path(hidden).is_dir():
-            command += ['--tmpfs', hidden]
-    for area in dict.fromkeys([str(Path(__file__).resolve().parents[1]), *policy['readable']]):
+    command = [str(path), '--die-with-parent', '--unshare-all', '--new-session']
+    # An allowlisted root keeps host Unix sockets unavailable as well as direct
+    # IP networking. A read-only mount of the entire host would still expose
+    # filesystem socket endpoints outside the governed provider bridge.
+    for system in ('/usr', '/bin', '/sbin', '/lib', '/lib64', '/etc'):
+        if Path(system).exists():
+            command += ['--ro-bind', system, system]
+    command += ['--proc', '/proc', '--dev', '/dev']
+    readable = [str(Path(__file__).resolve().parents[1]),
+                str(Path(sys.executable).resolve().parent.parent), *policy['readable']]
+    for area in dict.fromkeys(readable):
         command += ['--ro-bind', area, area]
     for area in policy['writable']:
         command += ['--bind', area, area]
     # Bind exact files after runtime directories, so credentials/code stay read-only.
     for area in policy['protected']:
         command += ['--ro-bind', area, area]
-    command += ['--ro-bind', policy['proxy_socket'], policy['proxy_socket'],
+    command += ['--ro-bind', policy['proxy_socket'], policy['proxy_socket'], '--remount-ro', '/',
                 '--chdir', policy['cwd'], '--', sys.executable, str(Path(__file__).resolve()),
                 policy['proxy_socket'], str(policy['proxy_port']), '--']
     return command

@@ -221,3 +221,27 @@ access, and serialized image bytes cannot establish actual image inspection.
 The consolidated campaign and its exact host probe collector require independent
 review before execution. Missing evidence is an accurate capability blocker,
 not permission to fabricate a report or use certification-only isolation.
+
+
+The repository supplies the installation probe collector (it is not shipped as
+an ordinary generation command). After separate owner authorization, run it
+with the validated compatible Python against the exact installed Linux root:
+
+```sh
+"$CLINICAL_PYTHON" tests/installed_capability_campaign.py \
+  --release-root /absolute/installed/skills/clinical-document-generation \
+  --desktop-opener-command /absolute/recipient-opener \
+  --parent-visual-review-command /absolute/desktop-parent-reviewer \
+  --approved-by "<owner approving synthetic fixture>" --authorize-paid-probes
+```
+
+This collector executes real ordinary sandbox launches, installed bounded
+read/write tools, harmless sentinel denial/network probes, native DOCX/XML
+execution and child termination. It then runs two independent synthetic
+Retrospective Desktop lifecycles using real Hermes: delegated image review and
+genuine parent image review, both with real recipient retrieval. It preserves
+all failed attempts and raw evidence, and writes the admission cache only after
+complete coverage and unchanged dependency identity. The probes do not count
+as baseline/supplemental readiness observations or release certification. It
+never installs or activates anything. PDFium runtime integrity/metadata and
+recipient/parent executable identities also invalidate the cache on change.

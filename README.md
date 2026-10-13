@@ -112,7 +112,7 @@ it mounts the host read-only, permits writes only to the certification run and
 its isolated cache, and fails closed when Bubblewrap is unavailable.
 
 The ordinary Linux worker path also requires trusted host Bubblewrap. It uses
-private PID/network namespaces, a read-only host view, per-dispatch runtime state
+private PID/network namespaces, an allowlisted read-only filesystem, per-dispatch runtime state
 and exact checkpoint/native-work write exceptions. Its sole provider route is a
 Unix-socket CONNECT bridge restricted to the governed host; direct network access
 is isolated. Missing boundary/capability evidence rejects admission. Actual

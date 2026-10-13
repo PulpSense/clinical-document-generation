@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fixed owner-run campaign manifest and transparent operation timing summary; no live execution."""
 import argparse
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -39,6 +40,52 @@ SUPPLEMENTS = (
 )
 
 
+def supplemental_seed_plan(case_id, source):
+    w = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+    def text_seed(seed_id, artifact, before, after, xpath=None, **extra):
+        # XPath and source-owned substring are fixed before observing results.
+        return {'seed_id': seed_id, 'artifact': artifact, 'part': 'word/document.xml',
+            'namespaces': w, 'xpath': xpath or f'(//w:t[contains(., {json.dumps(before)})])[1]',
+            'before': before, 'after': after, 'replace_substring': True, **extra}
+    if case_id == 'Q1':
+        return [text_seed('Q1.1', 'protocol.docx', source['population']['sample_size'], '800 participants'),
+            text_seed('Q1.2', 'protocol.docx', 'No direct benefit', 'A direct benefit'),
+            text_seed('Q1.3', 'protocol.docx', 'Month 3', 'Baseline',
+                '(//w:tr[.//w:t[contains(., "Day 90")]]//w:t[contains(., "Month 3")])[1]')]
+    if case_id == 'Q2':
+        return [dict(seed_id='Q2.1', artifact='icf.docx', part='word/document.xml', namespaces=w,
+                     xpath='(//w:p[.//w:t[contains(translate(., "VOLUNTARY", "voluntary"), "voluntary")]])[1]',
+                     before=None, remove_node=True),
+            dict(seed_id='Q2.2', artifact='study.xml', xpath='//enrollment', before='80', after='800')]
+    if case_id == 'Q3':
+        return [text_seed('Q3.1', 'protocol.docx', 'Reminder calls support follow-up.', ''),
+            dict(seed_id='Q3.2', artifact='protocol.docx', part='word/header1.xml', namespaces=w,
+                 xpath='(//w:p)[1]', operation='replace_paragraph',
+                 after='Study title: Unsupported substituted clinical study', check_before=False,
+                 source_path='study.title', approved_value=source['study']['title'])]
+    if case_id == 'Q4':
+        return [dict(seed_id='Q4.1', artifact='icf.docx', part='word/document.xml', namespaces=w,
+                     xpath='(//w:tbl/w:tr)[1]', operation='exact_row_height', twips=1, check_before=False)]
+    if case_id == 'D1':
+        return [{'seed_id': 'D1.1', 'finding_id': 'D1-harmless-paraphrase', 'artifact': 'protocol',
+            'target_ids': ['ethics'], 'check': 'source_supported', 'material': True,
+            'issue': 'Test-owned hypothesis: question whether a harmless paraphrase of no guaranteed direct benefit changes the source meaning. Independently resolve against current native/source evidence; this is not a reviewer observation.',
+            'source_path': 'risks_benefits.benefits', 'source_excerpt': source['risks_benefits']['benefits'],
+            'affected_passage': 'Protocol ethics/benefits explanation',
+            'seed_author': 'owner-campaign-hypothesis-author', 'provenance': 'test_owned_prior_hypothesis_before_binding'}]
+    return []
+
+
+def long_synthetic_source(source):
+    value = copy.deepcopy(source)
+    value['study']['background'] += '\n' + '\n'.join(
+        f'Synthetic evidence group {i:04d}: existing follow-up records may describe the stated recovery outcome. '
+        'This qualified descriptive association is not proof of treatment benefit. No additional intervention '
+        'is assigned, and the supplied schedule relationships and consent safeguards remain applicable.'
+        for i in range(600))
+    return value
+
+
 def readiness_plan(candidate_identity):
     """Predeclare denominators, independent fact ledgers and every supplemental seed."""
     baseline = plan()
@@ -48,11 +95,16 @@ def readiness_plan(candidate_identity):
             operations.append({'planned_operation_id': f"{case['case_id']}.r{repetition}",
                 'case_id': case['case_id'], 'cohort': case['scenario'], 'repetition': repetition,
                 'expected_status': 'passed', 'source_sha256': case['source_sha256']})
+    pilot = ['retrospective-sparse-complete.r1', 'prospective-advarra-sparse-complete.r1', 'prospective-sterling-sparse-complete.r1']
+    operations.sort(key=lambda row: (0, pilot.index(row['planned_operation_id'])) if row['planned_operation_id'] in pilot else (1, 0))
     supplements = []
     for case_id, family, seeds, outcome in SUPPLEMENTS:
         source_case = next(c for c in baseline['cases'] if c['family'] == family and c['scenario'] == 'deliberate_prose_repair')
-        supplements.append({'planned_operation_id': case_id, 'case_id': case_id, 'family': family,
-            'source_case_id': source_case['case_id'], 'source_sha256': source_case['source_sha256'],
+        supplemental_source = long_synthetic_source(source_case['source']) if case_id in {'Q3', 'Q4'} else copy.deepcopy(source_case['source'])
+        source_hash = hashlib.sha256(json.dumps(supplemental_source, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+        supplements.append({'source': supplemental_source, 'native_seeds': supplemental_seed_plan(case_id, supplemental_source),
+            'planned_operation_id': case_id, 'case_id': case_id, 'family': family,
+            'source_case_id': source_case['case_id'], 'source_sha256': source_hash,
             'cohort': 'supplemental', 'expected_status': outcome,
             'seeds': [{'seed_id': f'{case_id}.{index}', 'challenge': seed,
                        'expected': 'independent_resolution_without_needless_edit' if case_id == 'D1'
@@ -64,14 +116,16 @@ def readiness_plan(candidate_identity):
     facts = {c['case_id']: {'source_sha256': c['source_sha256'], 'expected_source_facts': c['source'],
         'audit_rule': 'Compare final native/XML meaning and relationships against every approved fact; inspect every final rendered page independently of drafting and repair.'}
         for c in baseline['cases']}
+    facts.update({c['case_id']: {'source_sha256': c['source_sha256'], 'expected_source_facts': c['source'],
+        'seed_ledger': c['native_seeds'], 'audit_rule': 'Audit every fixed seed and all source facts; inspect every final page independently.'} for c in supplements})
     manifest = {'schema_version': 'hermes-readiness-campaign/v1', 'candidate_identity': candidate_identity,
-        'cases': baseline['cases'], 'baseline_operations': operations, 'supplemental_operations': supplements,
+        'cases': baseline['cases'], 'pilot_operation_ids': pilot, 'baseline_operations': operations, 'supplemental_operations': supplements,
         'expected_fact_ledgers': facts, 'baseline_denominator': 20, 'supplemental_denominator': 8,
         'clean_denominator': 10, 'repair_denominator': 10, 'deadline_seconds': 2700,
         'target_seconds_exclusive': 1500, 'minimum_under_target_per_cohort': 8,
         'live_execution': False, 'readiness': 'incomplete',
         'execution_prerequisites': ['owner_authorization', 'exact_installed_candidate',
-            'reviewed_linux_injection_adapter', 'predeclared_native_seed_locations_and_values',
+            'reviewed_linux_injection_adapter',
             'actual_worker_capabilities', 'independent_artifact_auditor'],
         'unexecuted_cases_remain_visible': True}
     manifest['manifest_sha256'] = hashlib.sha256(json.dumps(manifest, sort_keys=True, separators=(',', ':')).encode()).hexdigest()

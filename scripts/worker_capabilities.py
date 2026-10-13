@@ -31,6 +31,11 @@ def validate_assurance(path: Path, identity: Mapping[str, Any]) -> dict[str, Any
             raise ValueError('Missing worker-capabilities/v1 installation evidence.')
         if report.get('identity') != identity:
             raise ValueError('Worker capability evidence is stale for the package, Hermes, configuration, runtime, renderer, fonts or tools.')
+        transports = report.get('transports', {})
+        for transport in transports.values():
+            executable = Path(transport['path'])
+            if executable.is_symlink() or not executable.is_file() or digest(executable) != transport['sha256']:
+                raise ValueError('Recipient/parent capability transport changed.')
         capabilities = report.get('capabilities', {})
         for name in sorted(REQUIRED_CAPABILITIES):
             probe = capabilities.get(name, {})
@@ -43,6 +48,6 @@ def validate_assurance(path: Path, identity: Mapping[str, Any]) -> dict[str, Any
                         or not file.is_file() or digest(file) != row['sha256']):
                     raise ValueError(f'Changed/missing probe evidence for {name}.')
         return {'status': 'passed', 'assurance_sha256': digest(path),
-                'capabilities': sorted(REQUIRED_CAPABILITIES), 'identity': dict(identity)}
+                'capabilities': sorted(REQUIRED_CAPABILITIES), 'identity': dict(identity), 'transports': transports}
     except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
         return {'status': 'blocked', 'issue': f'{exc} Run the owner-authorized installed Linux capability campaign and retain exact evidence before admitting clinical work.'}
