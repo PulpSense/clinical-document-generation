@@ -47,6 +47,7 @@ from drafting import construction_repair_spec, construction_retry_spec, create_c
 from prs_xml import generate as generate_xml, validate_output as validate_xml_output, quality_report as xml_quality_report
 from output_recovery import (apply_xml_repairs, source_path as normalize_source_path, create_native_repair,
     adopt_native_repair, NativeRepairIntegrityError, restore_native_checkpoint, native_repair_response_valid, native_read, native_file, native_files)
+from quality import invalidate_content_review_units
 from quality import create_content_review_unit, content_review_unit_result, content_review_schedule_result, content_review_resume, retain_verification_response, ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
 from quality import VERIFY_SCHEMA, validate_verifications, retain_verification_response
@@ -4387,12 +4388,17 @@ def _run_content_review_schedule(
         budget = min(float(plan["unit_budget_seconds"]), (available - reserve) / 2)
         _write(ledger_path, state)  # Requests survive interrupted parent processes.
         callback = replacement_dispatch if state["waves"] else dispatch
+        integrity_failure = None
         try:
             callback(handoffs, budget)
         except WorkerAuthenticationError:
             raise
         except Exception as exc:
             state["last_worker_error"] = str(exc)
+            integrity_failure = getattr(exc, "worker_integrity_failure", None)
+            if integrity_failure is not None:
+                invalidate_content_review_units(revision_dir,
+                    [revision_dir / h["request_path"] for h in handoffs], integrity_failure)
         after = content_review_schedule_result(revision_dir, parent_path,
             [revision_dir / value for value in state["requests"]])
         gained = after["completed"] - progress["completed"]
@@ -4406,7 +4412,11 @@ def _run_content_review_schedule(
             "remaining_sections": len(after["remaining_sections"]),
             "remaining_cross_checks": len(after["remaining_cross_document_checks"]),
             "workloads": [_read(revision_dir / h["request_path"]).get("workload") for h in handoffs]})
+        if integrity_failure is not None:
+            state["waves"][-1]["integrity_rejection"] = integrity_failure
         _write(ledger_path, state)
+        if integrity_failure is not None:
+            break  # Do not retry workers in a known compromised runtime.
     content_review_schedule_result(revision_dir, parent_path, [revision_dir / value for value in state["requests"]])
 
 
@@ -6199,6 +6209,13 @@ def _production_dispatch_handoffs(
     require_promoted_runtime: bool | None = None,
 ) -> None:
     """Run a Hermes wave with explicit host assurance and authenticated results."""
+    def reject_integrity(error: BaseException, finding: Mapping[str, Any]) -> None:
+        # Machine-readable classification must survive a primary launch/cleanup
+        # error; notes alone are diagnostic, not a scheduler trust decision.
+        error.worker_integrity_failure = dict(finding)
+        invalidate_content_review_units(revision_dir,
+            [revision_dir / str(h["request_path"]) for h in handoffs], finding)
+
     # Checkout-only launch fixtures have no provisioned renderer. Production
     # supplies its bound lifecycle policy explicitly, including if runtime was
     # removed; any present provisioned runtime is always checked strictly.
@@ -6210,7 +6227,9 @@ def _production_dispatch_handoffs(
             skill_root, require_promoted_runtime=bool(require_promoted_runtime),
         )
         if runtime_integrity.get("status") != "passed":
-            raise RuntimeError("Provisioned renderer runtime integrity failed before worker dispatch: " + str(runtime_integrity))
+            error = RuntimeError("Provisioned renderer runtime integrity failed before worker dispatch: " + str(runtime_integrity))
+            reject_integrity(error, runtime_integrity)
+            raise error
     def check_post_wave_renderer(primary_error: BaseException | None) -> None:
         if not runtime_guard:
             return
@@ -6221,9 +6240,11 @@ def _production_dispatch_handoffs(
             if runtime_integrity.get("status") != "passed":
                 raise RuntimeError("Provisioned renderer runtime changed during worker dispatch; reject this worker result: " + str(runtime_integrity))
         except BaseException as integrity_error:
+            reject_integrity(primary_error if primary_error is not None else integrity_error,
+                {"issue": str(integrity_error), "boundary": "post_worker_renderer"})
             if primary_error is None:
                 raise
-            # Failures already reject the wave. Keep launch/cleanup diagnostics
+            # Keep launch/cleanup diagnostics
             # primary while retaining the strict integrity finding as evidence.
             note = str(integrity_error)
             if hasattr(primary_error, "add_note"):

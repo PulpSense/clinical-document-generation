@@ -5607,6 +5607,30 @@ def _retain_content_finding(findings: dict[str, Any], finding: Mapping[str, Any]
         findings[identity] = dict(finding)
 
 
+def invalidate_content_review_units(revision_dir: Path, unit_paths: Sequence[Path],
+                                    finding: Mapping[str, Any]) -> None:
+    """Persist parent-owned rejection before any saved wave evidence is consumed.
+
+    The existing authenticated unit ledger is outside the worker's writable
+    checkpoint boundary. Keep the original response bytes for diagnostics.
+    """
+    for unit_path in unit_paths:
+        if unit_path.parent != revision_dir / "hermes/content-review-requests":
+            continue  # Other worker tasks have no scheduled content evidence.
+        unit = _json(unit_path)
+        ledger_path = revision_dir / f"hermes/content-review-ledgers/{unit['request_id']}.json"
+        if not all(_revision_owned_nonsymlink_path(revision_dir, p) for p in (unit_path, ledger_path)):
+            raise ValueError("Review invalidation ledger is not revision-owned.")
+        ledger = _json(ledger_path)
+        if (unit_path.name != unit['request_id'] + '.json'
+                or not verification_request_hash_valid(unit)
+                or ledger.get("request_sha256") != unit["request_sha256"]
+                or ledger.get("request_file_sha256") != sha256_file(unit_path)):
+            raise ValueError("Review invalidation identity changed.")
+        ledger.setdefault("integrity_rejection", dict(finding))
+        _write(ledger_path, ledger)
+
+
 def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
                                _authenticated_parent: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
     """Authenticate completed or partial worker judgments, never infer a pass."""
@@ -5617,6 +5641,8 @@ def content_review_unit_result(revision_dir: Path, unit_path: Path, *,
         if unit_path != canonical or not _revision_owned_nonsymlink_path(revision_dir, unit_path):
             return None
         ledger = _json(ledger_path)
+        if "integrity_rejection" in ledger:
+            return None
         if (not verification_request_hash_valid(unit) or ledger.get("request_sha256") != unit["request_sha256"]
                 or ledger.get("request_file_sha256") != sha256_file(unit_path)):
             return None
