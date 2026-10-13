@@ -103,3 +103,9 @@ standards review found no concrete defect in the separate Linux role probes.
 
 After the final merge correction, the two affected recovery test files passed
 all 40 selected tests (125.74 seconds). No full-suite execution was performed.
+
+The first GitHub Linux run reached its 900-second developer-check timeout after
+183 completed cases with no reported test failures. CI now runs the ordinary
+Linux role-boundary tests as an explicit early step and allows 1,200 seconds for
+the selected offline gate. This is a developer test budget change; it does not
+change the production operation deadline or establish readiness timing.
