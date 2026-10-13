@@ -146,8 +146,14 @@ def draft_seed_adapter(workflow_module, ledger_root: Path, sentence: str):
             response = json.loads(response_path.read_text())
             if identity not in injected and any(r.get('section_id') == 'introduction'
                                                for r in response.get('section_results', [])):
-                changed = inject_drafting_response(request, response, sentence,
-                    ledger_root / hashlib.sha256(identity.encode()).hexdigest())
+                ledger = ledger_root / hashlib.sha256(identity.encode()).hexdigest()
+                if ledger.exists():
+                    previous = json.loads((ledger / 'after.json').read_text())
+                    if response != previous:
+                        raise ValueError('Saved draft injection bytes changed across resume.')
+                    injected.add(identity)
+                    return accepted
+                changed = inject_drafting_response(request, response, sentence, ledger)
                 response_path.write_text(json.dumps(changed, ensure_ascii=False, indent=2))
                 injected.add(identity)
             return accepted
@@ -177,11 +183,12 @@ def campaign_adapter(workflow, planned, run_dir: Path, opener):
         originals = {name: getattr(workflow, name) for name in (
             'render_assurance', 'create_verification_requests', '_production_subprocess_environment',
             '_production_publish_quiet_response', '_production_dispatch_handoffs', '_production_sandbox_prefix')}
-        events = []
-        injected_drafts = set()
-        native_seeded = False
-        interrupted = False
-        retrieval_failed = False
+        event_file = run_dir / 'campaign-fault-evidence/events.json'
+        events = json.loads(event_file.read_text()) if event_file.is_file() else []
+        injected_drafts = {e['request_id'] for e in events if e['event'] == 'substantive_seed_before_consumption'}
+        native_seeded = any(e['event'] == 'predeclared_native_seeds_applied' for e in events)
+        interrupted = any(e['event'] == 'truncate_real_final_and_interrupt_parent' for e in events)
+        retrieval_failed = any(e['event'] == 'transient_actual_recipient_transport_failure' for e in events)
         denied_repair_areas = set()
         def record(event, **details):
             events.append({'event': event, **details})
@@ -227,7 +234,7 @@ def campaign_adapter(workflow, planned, run_dir: Path, opener):
                     run_dir / 'campaign-fault-evidence' / ('draft-' + sha(request['request_id'].encode())))
                 path.write_text(json.dumps(changed, indent=2))
                 injected_drafts.add(request['request_id'])
-                record('substantive_seed_before_consumption')
+                record('substantive_seed_before_consumption', request_id=request['request_id'])
             if case_id == 'F1' and handoff.get('review_unit_id') and not interrupted:
                 checkpoint = revision / request['review_transport']['progress_path']
                 if not checkpoint.is_file():

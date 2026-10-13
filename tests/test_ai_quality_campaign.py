@@ -54,3 +54,22 @@ def test_later_success_never_replaces_failed_first_operation_in_readiness_denomi
     assert report['planned_groups']['clean']['planned_denominator'] == 10
     assert report['planned_groups']['clean']['expected_outcomes_with_audit_and_retrieval'] == 0
     assert report['operations'] == 2
+
+
+def test_collector_keeps_unmatched_operations_visible_and_missing_cases_unmeasured(tmp_path):
+    manifest = campaign.readiness_plan({'commit': 'controlled-candidate'})
+    state = tmp_path / 'unknown-run/logs/desktop-operation.json'
+    state.parent.mkdir(parents=True)
+    state.write_text('{"status":"failed","operation_id":"unmatched"}')
+    report = campaign.collect_readiness_runs(manifest, tmp_path)
+    assert report['unmatched_operation_states'] == [str(state)]
+    assert report['planned_groups']['clean']['rate'] is None
+    assert report['readiness'] == 'incomplete'
+
+
+def test_collector_rejects_changed_frozen_manifest(tmp_path):
+    import pytest
+    manifest = campaign.readiness_plan({'commit': 'controlled-candidate'})
+    manifest['baseline_operations'].pop()
+    with pytest.raises(ValueError, match='manifest'):
+        campaign.collect_readiness_runs(manifest, tmp_path)

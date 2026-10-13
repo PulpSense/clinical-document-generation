@@ -96,7 +96,8 @@ def readiness_plan(candidate_identity):
         for case in baseline['cases']:
             operations.append({'planned_operation_id': f"{case['case_id']}.r{repetition}",
                 'case_id': case['case_id'], 'cohort': case['scenario'], 'repetition': repetition,
-                'expected_status': 'passed', 'source_sha256': case['source_sha256']})
+                'expected_status': 'passed', 'source_sha256': case['source_sha256'],
+                'seed_ids': [case['case_id'] + '.unsupported-drug'] if case['injection'] else []})
     pilot = ['retrospective-sparse-complete.r1', 'prospective-advarra-sparse-complete.r1', 'prospective-sterling-sparse-complete.r1']
     operations.sort(key=lambda row: (0, pilot.index(row['planned_operation_id'])) if row['planned_operation_id'] in pilot else (1, 0))
     supplements = []
@@ -134,8 +135,19 @@ def readiness_plan(candidate_identity):
     return manifest
 
 
+def validate_readiness_manifest(manifest):
+    unsigned = {k: v for k, v in manifest.items() if k != 'manifest_sha256'}
+    actual = hashlib.sha256(json.dumps(unsigned, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    if actual != manifest.get('manifest_sha256'):
+        raise ValueError('Frozen readiness manifest bytes/identity changed')
+    planned = manifest['baseline_operations'] + manifest['supplemental_operations']
+    if len(planned) != 28 or len({p['planned_operation_id'] for p in planned}) != 28:
+        raise ValueError('Frozen readiness denominator must contain all 28 distinct operations')
+
+
 def summarize_readiness(manifest, operations):
     """Reconcile first operations separately from retries and resumes; no invented observations."""
+    validate_readiness_manifest(manifest)
     report = summarize(operations)
     planned = manifest['baseline_operations'] + manifest['supplemental_operations']
     first = {}
@@ -161,10 +173,111 @@ def summarize_readiness(manifest, operations):
             under += bool(ok and isinstance(elapsed, (int, float)) and 0 <= elapsed < 1500)
         groups[cohort] = {'planned_denominator': denominator, 'observed_first_operations': len(observed),
             'expected_outcomes_with_audit_and_retrieval': succeeded, 'under_target': under,
-            'rate': succeeded / denominator if observed else None,
+            'rate': succeeded / denominator if len(observed) == denominator else None,
             'missing': [p['planned_operation_id'] for p in plans if p['planned_operation_id'] not in first]}
     return {**report, 'planned_groups': groups, 'readiness': 'incomplete',
         'limitations': 'Observations require exact candidate/manifest/evidence reconciliation, every seed audit and installed capability gates before a readiness verdict. Timing alone never establishes readiness.'}
+
+
+def collect_readiness_runs(manifest, runs_root):
+    """Read-only reconciliation of every retained operation and exact file inventory."""
+    from reliability_campaign import confined_file, digest, verified_delivery
+    validate_readiness_manifest(manifest)
+    planned = {p['planned_operation_id']: p for p in manifest['baseline_operations'] + manifest['supplemental_operations']}
+    records, errors, matched_states = [], [], set()
+    for metadata_path in sorted(runs_root.rglob('campaign-case.json')):
+        run = metadata_path.parent
+        try:
+            metadata = json.loads(confined_file(run, metadata_path.name).read_text())
+            assignment = planned[metadata['planned_operation_id']]
+            if metadata['manifest_sha256'] != manifest['manifest_sha256'] or metadata['source_sha256'] != assignment['source_sha256']:
+                raise ValueError('Case/source/manifest binding differs from the frozen campaign')
+            if metadata['candidate_identity'] != manifest['candidate_identity']:
+                raise ValueError('Operation belongs to another candidate campaign')
+            source = json.loads(confined_file(run, 'campaign-source.json').read_text())
+            expected_source = assignment.get('source') or next(c['source'] for c in manifest['cases'] if c['case_id'] == assignment['case_id'])
+            if source != expected_source:
+                raise ValueError('Retained synthetic source differs from predeclared facts')
+            states = list((run / 'logs').glob('desktop-operation*.json'))
+            if len(states) != 1:
+                raise ValueError('Expected exactly one original Desktop operation; preserve separate retry directories')
+            state_path = states[0]
+            matched_states.add(state_path.resolve())
+            state = json.loads(confined_file(run, str(state_path.relative_to(run))).read_text())
+            if state['operation_id'] != metadata['operation_id']:
+                raise ValueError('Desktop operation identity changed')
+            expected_fingerprint = manifest['candidate_identity'].get('package_fingerprint')
+            if not expected_fingerprint or state.get('release_identity', {}).get('package_fingerprint') != expected_fingerprint:
+                raise ValueError('Installed candidate fingerprint differs')
+            result = state.get('result', {})
+            study_type = expected_source['meta']['study_type']
+            inventory = ['protocol.docx'] if study_type == 'Retrospective' else ['protocol.docx', 'icf.docx', 'study.xml']
+            delivered = verified_delivery(run, result, inventory) if result.get('status') == 'passed' else {}
+            review_confirmed = False
+            if result.get('status') == 'review_required':
+                rows = result.get('review_outputs', [])
+                if {Path(row['path']).name for row in rows} != {'REVIEW-ONLY-' + name for name in inventory}:
+                    raise ValueError('Review-only document inventory is incomplete')
+                for row in rows:
+                    file = confined_file(run, row['path'])
+                    if digest(file) != row['sha256'] or file.stat().st_size != row['bytes']:
+                        raise ValueError('Review-only native bytes changed')
+                    delivered[file.name] = row['sha256']
+                for field in ('review_findings', 'review_notice'):
+                    if digest(confined_file(run, result[field])) != result[field + '_sha256']:
+                        raise ValueError('Review-only notice/findings bytes changed')
+                review_confirmed = result.get('review_delivery', {}).get('confirmed') is True
+
+            evidence = {str(p.relative_to(run)): {'sha256': digest(p), 'bytes': p.stat().st_size}
+                for p in sorted(run.rglob('*')) if p.is_file() and not p.is_symlink()
+                and '.hermes-cache' not in p.parts and p.name not in {'auth.json', '.env'}}
+            audits = list(run.glob('independent-artifact-audit.json'))
+            authors = set()
+            for file in run.rglob('*.json'):
+                if '.hermes-cache' in file.parts or file.is_symlink():
+                    continue
+                try:
+                    payload = json.loads(file.read_text())
+                    if isinstance(payload, dict) and payload.get('task') in {'section_drafting', 'prs_narrative_drafting', 'document_repair'}:
+                        author = payload.get('producer', {}).get('reviewer_id')
+                        if author:
+                            authors.add(author)
+                except (OSError, ValueError, AttributeError):
+                    pass
+            audit = None
+            audit_passed = False
+            if audits:
+                audit = json.loads(confined_file(run, audits[0].name).read_text())
+                required_seeds = set(assignment.get('seed_ids', [])) | {s['seed_id'] for s in assignment.get('seeds', [])}
+                seed_results = audit.get('seed_results', {})
+                audit_passed = (audit.get('schema_version') == 'readiness-artifact-audit/v1'
+                    and bool(audit.get('auditor_id')) and audit['auditor_id'] not in authors
+                    and audit.get('independent_of_drafting_and_repair') is True
+                    and audit.get('all_source_facts_reviewed') is True and audit.get('all_final_pages_inspected') is True
+                    and (audit.get('material_defects_remaining') == 0 if assignment['expected_status'] == 'passed'
+                         else audit.get('all_unresolved_concerns_reported') is True and audit.get('no_unreported_material_defects') is True)
+                    and audit.get('collateral_loss') == 0
+                    and required_seeds <= set(seed_results) and all(seed_results[s].get('expected_outcome_verified') is True for s in required_seeds)
+                    and audit.get('delivered_artifact_sha256') == delivered and bool(delivered))
+            records.append({'operation_id': state['operation_id'], 'planned_operation_id': assignment['planned_operation_id'],
+                'retry_of': metadata.get('retry_of'), 'status': state['status'], 'elapsed_seconds': result.get('elapsed_seconds'),
+                'delivery_confirmed': result.get('delivery', {}).get('confirmed') is True and bool(delivered),
+                'review_delivery_confirmed': review_confirmed,
+                'independent_audit_passed': audit_passed, 'candidate_identity': metadata['candidate_identity'],
+                'source_sha256': assignment['source_sha256'], 'approval_identity': state.get('approval_identity'),
+                'started_at_epoch': state.get('started_at_epoch'), 'deadline_at_epoch': state.get('deadline_at_epoch'),
+                'stage_timings': state.get('stage_timings'), 'attempt_counters': state.get('attempt_counters'),
+                'repair_cycles': result.get('repair_cycles', 0), 'changed_native_repairs': result.get('changed_native_repairs', 0),
+                'dispute_cycles': result.get('dispute_cycles', 0), 'independent_audit': audit,
+                'worker_events': [json.loads(line) for line in (run / 'logs/hermes-agent-events.jsonl').read_text().splitlines()]
+                    if (run / 'logs/hermes-agent-events.jsonl').is_file() else [],
+                'delivered_sha256': delivered, 'evidence_inventory': evidence, 'run_directory': str(run)})
+        except (OSError, ValueError, KeyError, TypeError, StopIteration) as exc:
+            errors.append({'run_directory': str(run), 'issue': str(exc)})
+    unmatched = [str(p) for p in sorted(runs_root.rglob('desktop-operation*.json')) if p.resolve() not in matched_states]
+    report = summarize_readiness(manifest, records)
+    return {**report, 'evidence_errors': errors, 'unmatched_operation_states': unmatched,
+            'readiness': 'incomplete', 'collector_scope': 'exact retained bytes and independent audit records; owner verdict still requires every gate'}
 
 
 def summarize(operations):
@@ -196,10 +309,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--operations', type=Path, help='JSON array containing every operation, including failures and retries')
     parser.add_argument('--output', type=Path, required=True)
+    parser.add_argument('--runs-root', type=Path, help='Read-only reconcile retained campaign operation directories')
     parser.add_argument('--candidate-identity', type=Path, help='Freeze the 20+8 readiness plan with exact candidate identity JSON; no live execution')
     parser.add_argument('--readiness-manifest', type=Path, help='Reconcile observations against a frozen 20+8 plan')
     args = parser.parse_args()
-    if args.readiness_manifest:
+    if args.readiness_manifest and args.runs_root:
+        result = collect_readiness_runs(json.loads(args.readiness_manifest.read_text()), args.runs_root)
+    elif args.readiness_manifest:
         result = summarize_readiness(json.loads(args.readiness_manifest.read_text()),
                                      json.loads(args.operations.read_text()) if args.operations else [])
     elif args.candidate_identity:
