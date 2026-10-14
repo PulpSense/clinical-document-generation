@@ -218,3 +218,23 @@ def test_live_owned_worker_cwd_blocks_disposable_tree_retirement(tmp_path):
         assert not (tmp_path / 'record.json').exists()
     finally:
         process.kill(); process.wait(timeout=5)
+
+
+def test_observer_stopped_before_session_creation_is_retained_not_a_cleanup_failure(tmp_path):
+    import json
+    revision=tmp_path/'revisions/r1';worker=revision/'hermes/visual-review-observers/early'
+    worker.mkdir(parents=True);request=revision/'hermes/request.json';request.write_text('{}')
+    (worker/'diagnostic.json').write_text(json.dumps({'returncode':-9,'request_path':'hermes/request.json','observer_evidence':None,'error_type':'TimeoutExpired'}))
+    (worker/'provenance.json').write_text(json.dumps({'request_path':'hermes/request.json','request_sha256':storage.sha(request)}))
+    (worker/'launch.json').write_text('{"pid":99999999,"start_ticks":"1","request_path":"hermes/request.json"}')
+    (worker/'bin').mkdir();(worker/'bin/tirith').write_bytes(b'retain because no session state')
+    before=storage.inventory(worker)
+    result=storage.cleanup_stopped_observer_assets(revision)
+    assert result['status']=='passed' and result['retired']==[]
+    assert result['deferred'][0]['worker']==str(worker)
+    assert storage.inventory(worker)==before
+    diagnostic=json.loads((worker/'diagnostic.json').read_text())
+    diagnostic['observer_evidence']={'session_id':'previously-recorded-session'}
+    (worker/'diagnostic.json').write_text(json.dumps(diagnostic))
+    with pytest.raises(ValueError,match='session state missing'):
+        storage.cleanup_stopped_observer_assets(revision)

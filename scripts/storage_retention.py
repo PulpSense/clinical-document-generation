@@ -455,6 +455,7 @@ def cleanup_stopped_observer_assets(revision):
     records = root.parent / 'observer-storage-retention'
     records.mkdir(exist_ok=True)
     workers = []
+    deferred = []
     with directory_lock(root):
         for worker in sorted(root.iterdir()):
             if worker.is_symlink() or not worker.is_dir():
@@ -478,7 +479,12 @@ def cleanup_stopped_observer_assets(revision):
             require(request.is_relative_to(revision) and launch['request_path'] == data['request_path']
                 and provenance['request_path'] == data['request_path'] and sha(request) == provenance['request_sha256'],
                 'Observer request/provenance changed')
-            require((worker / 'state.db').is_file(), 'Required observer session state missing')
+            if not (worker / 'state.db').is_file():
+                require(data.get('error_type') == 'TimeoutExpired' and data.get('observer_evidence') is None,
+                    'Required observer session state missing')
+                stopped_references(worker)
+                deferred.append({'worker':str(worker),'reason':'Timed-out observer has no session proof; retain ALL assets and evidence, reclaim zero bytes'})
+                continue
             stopped_references(worker)
             workers.append(worker)
         results = []
@@ -531,7 +537,7 @@ def cleanup_stopped_observer_assets(revision):
                     proof = duplicate_tree_index(path, source)
                     save(records / (token+'-source.json'), proof)
                     results.append(retire_tree(path, records / (token+'-deletion.json'), proof['inventory'], protected=[source]))
-        return {'status':'passed','retired':results}
+        return {'status':'passed','retired':results,'deferred':deferred}
 
 
 def archive_duplicate_index(archive, retained, *, generated_index_path=None, strip_prefix=None):
