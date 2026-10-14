@@ -427,9 +427,11 @@ def run_visual_review(revision: Path, parent_path: Path, dispatch, remaining_sec
         groups = []
         image_capacity = min(2, plan['max_images']) if no_progress else plan['max_images']
         for target in pending:
-            if (groups and target['kind'] != 'document'
-                    and len({p['path'] for t in [*groups[-1], target] for p in t['pages']}) <= image_capacity):
-                groups[-1].append(target)
+            compatible = next((group for group in groups
+                if target['kind'] != 'document' and group[0]['kind'] != 'document'
+                and len({p['path'] for t in [*group, target] for p in t['pages']}) <= image_capacity), None)
+            if compatible is not None:
+                compatible.append(target)
             else:
                 groups.append([target])
         paths = []
@@ -445,8 +447,13 @@ def run_visual_review(revision: Path, parent_path: Path, dispatch, remaining_sec
             handoffs.append({'task': unit['task'], 'request_path': path.relative_to(revision).as_posix(),
                 'response_path': unit['response_path'], 'request_id': unit['request_id'],
                 'request_sha256': unit['request_sha256'], 'visual_unit': True})
-        # Leave allocation for subsequent scopes, final response publication and cleanup.
-        budget = min(float(plan['unit_budget_seconds']), (available - reserve) / 2)
+        # Reserve a follow-up wave only when unassigned groups remain.
+        # Halving the final scope's allocation starves document review even
+        # though there is no later scope to fund.
+        waves_left = (len(groups) + plan['max_parallel_units'] - 1) // plan['max_parallel_units']
+        if ordinary and any(t['kind'] == 'document' for t in missing):
+            waves_left += 1  # document evidence depends on completed local scopes
+        budget = min(float(plan['unit_budget_seconds']), (available - reserve) / max(1, waves_left))
         try:
             dispatch(handoffs, budget)
         except Exception as exc:

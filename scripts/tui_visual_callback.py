@@ -424,8 +424,11 @@ def main() -> int:
                 failure = RuntimeError('Observer storage retention could not safely complete before another wave')
                 failure.storage_retention_failure = True
                 raise failure from exc
+            observer_budget = min(budget, deadline - time.monotonic())
+            if observer_budget <= 15.0:
+                raise TimeoutError('Callback observer allocation cannot cover response and cleanup reserve')
             with ThreadPoolExecutor(max_workers=3) as pool:
-                futures = [pool.submit(observe_unit, revision, dict(h), min(budget, deadline - time.monotonic()), envelope)
+                futures = [pool.submit(observe_unit, revision, dict(h), observer_budget, envelope)
                     for h in handoffs]
                 failures = []
                 for future in futures:
