@@ -75,7 +75,7 @@ def test_conflicting_results_for_one_image_call_are_not_access_proof(tmp_path):
     assert metadata_fixture(tmp_path, [], duplicate_result=json.dumps({'success': False, 'error': 'image unavailable'}))['inspected_paths'] == []
 
 
-@pytest.mark.parametrize('fault', ['candidate-relabel', 'last-line-request', 'last-line-native', 'wrong-tool-result', 'error-envelope'])
+@pytest.mark.parametrize('fault', ['candidate-relabel', 'last-line-request', 'last-line-native', 'wrong-tool-result', 'error-envelope', 'missing-cleanup', 'unresolved-cleanup', 'foreign-cleanup'])
 def test_persisted_evidence_cannot_be_relabelled_or_self_attested(tmp_path, fault):
     from test_visual_units import parent_fixture, response_for
     from tui_visual_callback import _authenticate_observer_response
@@ -108,6 +108,16 @@ def test_persisted_evidence_cannot_be_relabelled_or_self_attested(tmp_path, faul
         db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,?)', (f'synthetic-{i}', 'tool', None, 'image', 'vision_analyze', json.dumps({'success': True, 'analysis': 'synthetic image fixture'}), 2))
         db.commit()
         db.close()
+        # Explicit validator fixture, never actual-host descendant assurance.
+        import tui_visual_callback as callback
+        command_hash = 'unpaid-fixture-command'
+        launch = {'pid': 99999999, 'start_ticks': '1', 'owned_command_sha256': command_hash,
+            'supervisor_sha256': quality.sha256_file(Path(callback.__file__).with_name('owned_observer_process.py'))}
+        (state / 'launch.json').write_text(json.dumps(launch))
+        (state / 'provenance.json').write_text(json.dumps({'command_sha256': command_hash}))
+        proof = {'fixture_only': True, 'descendants_reaped': True, 'errors': [],
+            'owner_pid': launch['pid'], 'owner_start_ticks': launch['start_ticks'], 'command_sha256': command_hash}
+        (state / 'owned-descendant-cleanup.json').write_text(json.dumps(proof))
         metadata = observer_metadata(state, revision, unit)
         response = revision / unit['response_path']
         response.parent.mkdir(parents=True, exist_ok=True)
@@ -120,6 +130,23 @@ def test_persisted_evidence_cannot_be_relabelled_or_self_attested(tmp_path, faul
     timed_out.mkdir()
     (timed_out / 'diagnostic.json').write_text(json.dumps({'error_type': 'TimeoutExpired'}))
     assert visual_review_result(revision, parent_path)['complete']
+    if fault.endswith('cleanup'):
+        certificate = states[-1] / 'owned-descendant-cleanup.json'
+        original_certificate = certificate.read_text()
+        if fault == 'missing-cleanup':
+            certificate.unlink()
+        else:
+            changed = json.loads(original_certificate)
+            if fault == 'unresolved-cleanup': changed['descendants_reaped'] = False
+            else: changed['command_sha256'] = 'foreign'
+            certificate.write_text(json.dumps(changed))
+        rejected = visual_review_result(revision, parent_path, publish=False)
+        assert not rejected['complete']
+        assert len(rejected['assessments']) == len(states) - 1
+        certificate.write_text(original_certificate)
+        # Restoring a certificate cannot erase the recorded integrity rejection.
+        assert not visual_review_result(revision, parent_path, publish=False)['complete']
+        return
     if fault != 'candidate-relabel':
         state = states[-1]  # Document target requires full native/evidence access.
         diagnostic = json.loads((state / 'diagnostic.json').read_text())

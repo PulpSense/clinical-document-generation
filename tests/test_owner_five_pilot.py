@@ -42,6 +42,14 @@ def test_owner_five_pilot_freezes_existing_ids_without_weakening_full_criteria()
 
 @pytest.mark.parametrize('phase,expected_calls', [('pilot', 1), ('remaining', 0)])
 def test_owner_scope_launches_exactly_five_or_refuses_before_spending(tmp_path, monkeypatch, phase, expected_calls):
+    # Selection/debit unit fixture uses the historical authorization clock;
+    # production still reads real UTC and the exact owner authority.
+    import datetime as dates
+    real_datetime = dates.datetime
+    class Fixed(real_datetime):
+        @classmethod
+        def now(cls,tz=None):return real_datetime(2026,10,14,8,0,tzinfo=dates.timezone.utc)
+    monkeypatch.setattr(dates,'datetime',Fixed)
     identity = {'git_commit': 'synthetic-unit-test'}
     host = host_report(identity)
     retained = tmp_path / 'retained.txt'
@@ -68,7 +76,15 @@ def test_owner_scope_launches_exactly_five_or_refuses_before_spending(tmp_path, 
     # This test isolates selection/spending. Real storage validation has separate
     # positive and negative public-seam tests with actual allocated inventories.
     monkeypatch.setattr(runner, 'admit_storage', lambda *a: {'admitted': True, 'fixture_only': True})
-    monkeypatch.setattr(runner.subprocess, 'run', lambda command, **kwargs: calls.append(command) or subprocess.CompletedProcess(command, 0))
+    def selection_only_owned_launch(command, **kwargs):
+        calls.append(command)
+        state = kwargs['state']
+        state.mkdir()
+        (state / 'stdout.log').write_text('unpaid selection-only fixture')
+        (state / 'stderr.log').write_text('')
+        assert kwargs['deadline_utc'] == '2026-10-14T09:12:25.124854+00:00'
+        return {'returncode': 0, 'fixture_only': True}
+    monkeypatch.setattr(runner, 'run_owner_case', selection_only_owned_launch)
     ledger = tmp_path / 'attempts.json'
     ledger.write_text(json.dumps({'deadline_utc':'2026-10-14T09:12:25.124854+00:00',
         'limits':{'study_operations':10,'capability_probes':3},'study_operations':[], 'capability_probes':[], 'counters':{}}))

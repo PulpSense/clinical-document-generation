@@ -123,7 +123,7 @@ def test_acceptance_cannot_use_file_presence_or_claimed_probe_success_as_image_p
         validate_callback_probe(command, evidence, {'package_fingerprint': 'fixture'})
 
 
-@pytest.mark.parametrize('fault', ['none', 'live', 'poisoned', 'foreign'])
+@pytest.mark.parametrize('fault', ['none', 'live', 'poisoned', 'foreign', 'missing-cleanup', 'unresolved-descendants', 'foreign-cleanup'])
 def test_interrupted_callback_recovers_only_stopped_authentic_observers(tmp_path, monkeypatch, fault):
     import tui_visual_callback as callback
     import quality
@@ -137,10 +137,24 @@ def test_interrupted_callback_recovers_only_stopped_authentic_observers(tmp_path
     state.mkdir(parents=True)
     (state / 'stdout.log').write_text(json.dumps(response_for(unit)))
     (state / 'diagnostic.json').write_text(json.dumps({'request_path': path.relative_to(revision).as_posix(), 'returncode': -9}))
+    # Explicit unpaid stopped-observer certificate fixture. Real detached-child
+    # reaping is exercised separately in test_owned_observer_runtime.py.
+    command_hash = 'unpaid-fixture-command'
+    launch = {'pid': 99999999, 'start_ticks': '1',
+        'request_path': path.relative_to(revision).as_posix(),
+        'owned_command_sha256': command_hash,
+        'supervisor_sha256': quality.sha256_file(Path(callback.__file__).with_name('owned_observer_process.py'))}
     if fault == 'live':
         stat = Path(f'/proc/{os.getpid()}/stat').read_text().rsplit(')', 1)[1].split()
-        (state / 'launch.json').write_text(json.dumps({'pid': os.getpid(), 'start_ticks': stat[19],
-            'request_path': path.relative_to(revision).as_posix()}))
+        launch.update(pid=os.getpid(), start_ticks=stat[19])
+    (state / 'launch.json').write_text(json.dumps(launch))
+    (state / 'provenance.json').write_text(json.dumps({'command_sha256': command_hash}))
+    proof = {'fixture_only': True, 'descendants_reaped': fault != 'unresolved-descendants',
+        'errors': [] if fault != 'unresolved-descendants' else ['unresolved fixture child'],
+        'owner_pid': launch['pid'], 'owner_start_ticks': launch['start_ticks'],
+        'command_sha256': command_hash if fault != 'foreign-cleanup' else 'foreign'}
+    if fault != 'missing-cleanup':
+        (state / 'owned-descendant-cleanup.json').write_text(json.dumps(proof))
     if fault == 'poisoned':
         ledger_path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
         ledger = json.loads(ledger_path.read_text())

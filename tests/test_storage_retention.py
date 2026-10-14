@@ -4,6 +4,33 @@ import pytest
 import storage_retention as storage
 
 
+def _fixture_owned_observer_cleanup(worker):
+    """Explicit unpaid certificate fixture, never production/audit evidence."""
+    import json
+    launch=json.loads((worker/'launch.json').read_text())
+    launch.update(owned_command_sha256='unpaid-fixture-command',supervisor_sha256=storage.sha(Path(storage.__file__).with_name('owned_observer_process.py')))
+    (worker/'launch.json').write_text(json.dumps(launch))
+    proof={'fixture_only':True,'descendants_reaped':True,'errors':[], 'owner_pid':launch['pid'],
+        'owner_start_ticks':launch['start_ticks'],'command_sha256':'unpaid-fixture-command'}
+    path=worker/'owned-descendant-cleanup.json';path.write_text(json.dumps(proof))
+    diagnostic=json.loads((worker/'diagnostic.json').read_text())
+    diagnostic.update(descendants_reaped=True,owned_cleanup_path=path.name,owned_cleanup_sha256=storage.sha(path))
+    (worker/'diagnostic.json').write_text(json.dumps(diagnostic))
+
+
+def test_launched_observer_without_terminal_diagnostic_blocks_reclamation(tmp_path):
+    import json
+    revision = tmp_path / 'revisions/r1'
+    worker = revision / 'hermes/visual-review-observers/interrupted'
+    worker.mkdir(parents=True)
+    (worker / 'launch.json').write_text(json.dumps({'pid': 99999999, 'start_ticks': '1'}))
+    (worker / 'bin').mkdir()
+    (worker / 'bin/keep').write_bytes(b'owned lifetime not established')
+    with pytest.raises(storage.OwnedProcessProofUnavailable):
+        storage.cleanup_stopped_observer_assets(revision)
+    assert (worker / 'bin/keep').read_bytes() == b'owned lifetime not established'
+
+
 def test_sequential_peak_counts_retained_growth_and_one_worker_wave(tmp_path):
     cases = [dict(case_id='retrospective', retained_bytes=20, worker_peak_bytes=50, scratch_peak_bytes=10),
              dict(case_id='prospective', retained_bytes=40, worker_peak_bytes=50, scratch_peak_bytes=10)]
@@ -169,13 +196,14 @@ def test_stopped_observer_assets_are_deduped_before_next_wave_without_touching_a
         (worker / 'diagnostic.json').write_text(json.dumps({'returncode':0, 'request_path':'hermes/request.json'}))
         (worker / 'provenance.json').write_text(json.dumps({'request_path':'hermes/request.json', 'request_sha256':storage.sha(request)}))
         (worker / 'launch.json').write_text('{"pid":99999999,"start_ticks":"1","request_path":"hermes/request.json","fixture_only":true}')
+        _fixture_owned_observer_cleanup(worker)
     storage.cleanup_stopped_observer_assets(revision)
     assert (observers / 'one/bin/tirith').read_bytes() == b'exact verified security binary'
     assert not (observers / 'two/bin').exists()
     assert (observers / 'two/state.db').read_bytes() == b'actual session tool evidence'
     # A later wave must not remove the canonical source of earlier records.
     earlier = observers / 'aaa'; (earlier / 'bin').mkdir(parents=True)
-    for name in ('diagnostic.json','provenance.json','launch.json','state.db'):
+    for name in ('diagnostic.json','provenance.json','launch.json','state.db','owned-descendant-cleanup.json'):
         (earlier / name).write_bytes((observers / 'one' / name).read_bytes())
     (earlier / 'bin/tirith').write_bytes(b'exact verified security binary')
     storage.cleanup_stopped_observer_assets(revision)
@@ -228,6 +256,7 @@ def test_observer_stopped_before_session_creation_is_retained_not_a_cleanup_fail
     (worker/'provenance.json').write_text(json.dumps({'request_path':'hermes/request.json','request_sha256':storage.sha(request)}))
     (worker/'launch.json').write_text('{"pid":99999999,"start_ticks":"1","request_path":"hermes/request.json"}')
     (worker/'bin').mkdir();(worker/'bin/tirith').write_bytes(b'retain because no session state')
+    _fixture_owned_observer_cleanup(worker)
     before=storage.inventory(worker)
     result=storage.cleanup_stopped_observer_assets(revision)
     assert result['status']=='passed' and result['retired']==[]

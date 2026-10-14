@@ -2,7 +2,27 @@
 
 ## Current owner-authorized scope
 
-For the TUI visual correction campaign, execute exactly the independently audited
+The latest takeover authorization reduces final acceptance to **three fresh
+cases**, using `--pilot-scope owner-three-only`: Retrospective,
+Prospective–Sterling, and Ambispective–Advarra. The prospective slot uses the
+real `SYNOPSIS_PureSee Odyssey_23Jun2026-2.txt` and its unchanged, byte-verified
+client-approved source; it replaces the synthetic prospective slot, never adds
+a fourth study. The fixed synthetic manifest is only a branch-selection fixture:
+do not run its prospective synthetic case or count it as the real study. Execute
+the real study in a fresh ordinary workflow run, supervised by `run_owner_case`
+with the same original mission deadline and cumulative debit. Preserve supplied
+input and approved source bytes inside that run; no old drafts/reviews are reused.
+Exercise actual TUI tools,
+rendering, image review, forced fallback and owned cleanup first. Independent
+final native/every-page review and exact-candidate binding remain mandatory.
+This three-case result is not five-family or full-corpus acceptance. Original
+cumulative attempt limits and UTC deadline remain unchanged. The five-case
+procedure below is retained as the superseded campaign scope, not authorization
+to launch the two excluded combinations.
+
+## Historical five-case scope — superseded, not current authorization
+
+For the prior TUI visual correction campaign, the authorization was to execute
 five-case pilot below, fast focused regressions, unpaid host/render checks and
 the mandatory bounded genuine callback/fallback admission probe on the matching
 candidate. **Do not execute any other fixed cases, even if the pilot passes.**

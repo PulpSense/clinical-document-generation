@@ -116,6 +116,27 @@ def inventory_from_record(journal):
     return json.loads(Path(journal).read_text())['inventory']
 
 
+class OwnedProcessProofUnavailable(ValueError):
+    """Unavailable inspection is a reclamation deferral, never deletion proof."""
+    storage_reclamation_deferred = True
+
+    def __init__(self, diagnostics):
+        self.diagnostics = diagnostics
+        super().__init__('Owned process proof unavailable: ' + str(diagnostics['pid']))
+
+
+def public_process_identity(proc):
+    """Kernel public identity only; never log argv, credentials or environment."""
+    values = {}
+    for line in (proc / 'status').read_text().splitlines():
+        key, _, value = line.partition(':')
+        if key in {'Uid', 'State', 'PPid'}:
+            values[key] = value.strip()
+    fields = (proc / 'stat').read_text().rsplit(')', 1)[1].split()
+    return {'pid': int(proc.name), 'uids': [int(v) for v in values['Uid'].split()],
+        'state': fields[0], 'start_ticks': int(fields[19]), 'ppid': int(values['PPid'])}
+
+
 def stopped_references(root):
     """Inspect actual argv, cwd, environment and FDs for owned live workers.
 
@@ -125,11 +146,20 @@ def stopped_references(root):
     require(Path('/proc').is_dir(), 'Process proof unavailable')
     root = safe_path(root)
     checked = []
+    kernel_ended = []
     for proc in Path('/proc').iterdir():
         if not proc.name.isdigit() or int(proc.name) == os.getpid():
             continue
         try:
-            if proc.stat().st_uid != os.getuid():
+            identity = public_process_identity(proc)
+            if identity['state'] == 'Z' and public_process_identity(proc) == identity:
+                # exit_files/exit_fs precede zombie publication. A stable
+                # kernel zombie cannot execute or retain cwd/open-file users.
+                # This is not a substitute for the target worker's separate
+                # required owned-descendant reaping/terminal-state proof.
+                kernel_ended.append(identity)
+                continue
+            if os.getuid() not in identity['uids']:
                 continue
             def inside(value):
                 return value.startswith('/') and Path(value).is_relative_to(root)
@@ -147,8 +177,14 @@ def stopped_references(root):
         except (FileNotFoundError, ProcessLookupError):
             continue
         except PermissionError as exc:
-            raise ValueError('Owned process proof unavailable: ' + proc.name) from exc
-    return {'owned_pids_checked': checked, 'foreign_processes': 'excluded; not claimed inspected'}
+            diagnostic = {'pid': int(proc.name), 'uids': [], 'state': 'unknown', 'errno': exc.errno}
+            try:
+                diagnostic.update(public_process_identity(proc))
+            except (OSError, ValueError, KeyError):
+                pass
+            raise OwnedProcessProofUnavailable(diagnostic) from exc
+    return {'owned_pids_checked': checked, 'kernel_ended_pids': kernel_ended,
+        'foreign_processes': 'excluded; not claimed inspected'}
 
 
 def retire_tree(root, journal, expected, *, protected, hook=lambda phase: None):
@@ -441,6 +477,34 @@ def completed_operation_cleanup(run, state_path):
     return result
 
 
+def await_observer_reclamation(revision, deadline, *, cleanup=None, clock=None, sleep=None):
+    """Bounded, logged retry of unavailable inspection; never waive proof.
+
+    This runs before a new wave, not after completed judgments. Integrity,
+    identity/catalog and file errors still fail immediately. No allocation
+    occurs while a same-user process cannot be safely inspected.
+    """
+    cleanup = cleanup or cleanup_stopped_observer_assets
+    clock = clock or time.monotonic
+    sleep = sleep or time.sleep
+    log = Path(revision) / 'hermes/observer-reclamation-wait.jsonl'
+    log.parent.mkdir(parents=True, exist_ok=True)
+    while True:
+        try:
+            return cleanup(revision)
+        except OwnedProcessProofUnavailable as exc:
+            remaining = deadline - clock()
+            with log.open('a') as stream:
+                stream.write(json.dumps({'at_epoch': time.time(), 'event': 'inspection_unavailable_reclamation_deferred',
+                    'diagnostics': exc.diagnostics, 'remaining_seconds': max(0.0, remaining),
+                    'no_new_observer_allocated': True, 'no_deletion_proof_waiver': True}) + '\n')
+                stream.flush()
+                os.fsync(stream.fileno())
+            if remaining <= 0:
+                raise
+            sleep(min(1.0, remaining))
+
+
 def cleanup_stopped_observer_assets(revision):
     """End-of-wave duplicate cleanup, before another observer wave allocates.
 
@@ -462,11 +526,36 @@ def cleanup_stopped_observer_assets(revision):
                 continue
             diagnostic = worker / 'diagnostic.json'
             if not diagnostic.is_file() or diagnostic.is_symlink():
+                if (worker / 'launch.json').exists():
+                    raise OwnedProcessProofUnavailable({'pid': None, 'uids': [],
+                        'state': 'launched_observer_without_terminal_diagnostic',
+                        'worker': str(worker), 'no_deletion_proof_waiver': True})
                 continue
             data = json.loads(diagnostic.read_text())
+            if data.get('descendants_reaped') is False:
+                raise OwnedProcessProofUnavailable({'pid': None, 'uids': [], 'state': 'unresolved_owned_descendants',
+                    'worker': str(worker), 'no_deletion_proof_waiver': True})
             if type(data.get('returncode')) is not int:
+                if (worker / 'launch.json').exists():
+                    raise OwnedProcessProofUnavailable({'pid': None, 'uids': [],
+                        'state': 'launched_observer_without_terminal_returncode',
+                        'worker': str(worker), 'no_deletion_proof_waiver': True})
                 continue
             launch = json.loads((worker / 'launch.json').read_text())
+            if data.get('descendants_reaped') is not True:
+                raise OwnedProcessProofUnavailable({'pid': launch.get('pid'), 'uids': [], 'state': 'unresolved_owned_descendants',
+                    'worker': str(worker), 'no_deletion_proof_waiver': True})
+            cleanup_path = safe_path(worker / data.get('owned_cleanup_path', ''))
+            require(cleanup_path.parent == worker and cleanup_path.name == 'owned-descendant-cleanup.json'
+                and cleanup_path.is_file() and not cleanup_path.is_symlink()
+                and sha(cleanup_path) == data.get('owned_cleanup_sha256'), 'Observer cleanup certificate changed')
+            cleanup = json.loads(cleanup_path.read_text())
+            require(cleanup.get('descendants_reaped') is True and cleanup.get('errors') == []
+                and cleanup.get('owner_pid') == launch.get('pid')
+                and cleanup.get('owner_start_ticks') == launch.get('start_ticks')
+                and cleanup.get('command_sha256') == launch.get('owned_command_sha256')
+                and launch.get('supervisor_sha256') == sha(Path(__file__).with_name('owned_observer_process.py')),
+                'Observer descendant cleanup identity binding failed')
             require(type(launch['pid']) is int and launch['pid'] > 0 and str(launch['start_ticks']).isdigit(), 'Invalid observer launch identity')
             proc = Path('/proc') / str(launch['pid']) / 'stat'
             try:
@@ -715,6 +804,56 @@ def validate_storage_forecast(forecast):
     require(type(quantum) is int and quantum > 0 and len(margin.get('rationale', '').strip()) >= 40, 'Missing defensible margin basis')
     require(raw > 0 and forecast['margin_bytes'] == ((raw + quantum - 1) // quantum) * quantum, 'Unsupported margin estimate')
     return observations
+
+
+OWNER_LIMITS_AUTHORITY = Path('/opt/data/clinical-reliability-campaigns/overnight-continuation-20261014/limits.json')
+OWNER_LEDGER_ROOT = Path('/opt/data/clinical-reliability-campaigns')
+
+
+def owner_limits(data):
+    """Validate the original authority or exact owner-approved supersession."""
+    declared = data['limits']
+    binding = data.get('limits_authority')
+    if binding is None:
+        require(declared == {'study_operations': 10, 'capability_probes': 3}, 'Original owner limits required without authority')
+        require(data['deadline_utc'] == '2026-10-14T09:12:25.124854+00:00', 'Original owner deadline required without authority')
+    else:
+        path = safe_path(binding['path'])
+        require(path == OWNER_LIMITS_AUTHORITY.absolute(), 'Foreign owner limits authority')
+        require(sha(path) == binding['sha256'], 'Owner limits authority changed')
+        authority = json.loads(path.read_text())
+        expected = {'deadline_utc': '2026-10-14T13:12:25.124854+00:00',
+            'original_started_at_utc': '2026-10-14T01:12:25.124854+00:00',
+            'study_operation_limit': 20, 'additional_probe_limit': 6,
+            'counts_are_cumulative_across_all_coordinators': True,
+            'operation_deadline_seconds': 2700, 'delegated_visual_cap_seconds': 240,
+            'parent_visual_cap_seconds': 480}
+        require(all(authority.get(k) == v and type(authority.get(k)) is type(v) for k, v in expected.items()), 'Unsupported owner limits authority')
+        require(declared == {'study_operations': 20, 'capability_probes': 6}
+            and data['deadline_utc'] == authority['deadline_utc'], 'Ledger contradicts owner limits authority')
+    require(all(type(v) is int for v in declared.values()), 'Invalid owner limits')
+    return {**declared, 'deadline_utc': data['deadline_utc']}
+
+
+def owner_cumulative_counts(ledger_path, data):
+    """Charge every historical record; counters cannot erase record history."""
+    ledger_path = safe_path(ledger_path)
+    names = data.get('cumulative_ledger_paths', [str(ledger_path), *data.get('prior_ledgers', [])])
+    require(isinstance(names, list) and bool(names), 'Missing cumulative owner ledgers')
+    paths = [safe_path(p) for p in names]
+    require(len(paths) == len(set(paths)), 'Duplicate cumulative owner ledger')
+    require(ledger_path in paths, 'Current owner ledger omitted')
+    if data.get('limits_authority'):
+        discovered = {safe_path(p) for p in OWNER_LEDGER_ROOT.rglob('attempts.json')}
+        require(discovered == set(paths), 'Cumulative owner ledger inventory changed')
+    studies = probes = 0
+    for path in paths:
+        value = data if path == ledger_path else json.loads(path.read_text())
+        require(isinstance(value.get('study_operations'), list)
+            and isinstance(value.get('capability_probes'), list), 'Malformed cumulative owner ledger')
+        studies += len(value['study_operations'])
+        probes += len(value['capability_probes'])
+    return {'study_operations_launched': studies, 'additional_capability_probes_launched': probes}
 
 
 def sequential_admission(path, cases, *, margin_bytes, available_bytes=None):

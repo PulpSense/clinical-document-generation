@@ -238,6 +238,13 @@ def recover_completed_observers(revision: Path, parent_path: Path) -> None:
             existing = visual_review_unit_result(revision, path)
             if existing and existing['complete']:
                 continue
+            from owned_observer_runtime import validate_owned_observer_cleanup, OwnedObserverLifetimeUnresolved
+            try:
+                validate_owned_observer_cleanup(state)
+            except (OwnedObserverLifetimeUnresolved, OSError, ValueError, KeyError, TypeError) as exc:
+                ledger['integrity_rejection'] = {'reason': 'Stopped observer cleanup proof invalid', 'error': str(exc)}
+                _write(revision, revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json", ledger)
+                continue  # Reject this unit; preserve recovery of independently valid siblings.
             metadata = observer_metadata(state, revision, unit)
             known = {r['target_id']: r['proof']['request_path'] for r in
                 visual_review_result(revision, parent_path, publish=False)['assessments']}
@@ -253,10 +260,14 @@ def recover_completed_observers(revision: Path, parent_path: Path) -> None:
                 _authenticate_observer_response(revision, target, unit, metadata)
             progress = revision / unit['review_transport']['progress_path']
             if progress.is_file() and progress.stat().st_size:
-                raw = _read(progress)
-                if not (state / 'raw-progress.json').exists():
-                    _write(revision, state / 'raw-progress.json', raw)
-                recover_response(progress, raw)
+                try:
+                    raw = _read(progress)
+                    if not (state / 'raw-progress.json').exists():
+                        _write(revision, state / 'raw-progress.json', raw)
+                    recover_response(progress, raw)
+                except (OSError, ValueError, KeyError, TypeError):
+                    # Preserve the checkpoint; authenticate final stdout independently.
+                    pass
             output = (state / 'stdout.log').read_text()
             decoder = json.JSONDecoder()
             for index, character in enumerate(output):
@@ -324,34 +335,39 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
     _write(revision, state / 'provenance.json', provenance)
     stdout_path, stderr_path = state / 'stdout.log', state / 'stderr.log'
     process = None
+    owned = None
     failure = None
     started = time.monotonic()
-    with stdout_path.open('x') as stdout, stderr_path.open('x') as stderr:
-        try:
-            process = subprocess.Popen(command, cwd=revision, env=environment,
-                stdout=stdout, stderr=stderr, text=True, start_new_session=True)
-            if sys.platform == 'linux':
-                stat = Path(f'/proc/{process.pid}/stat').read_text().rsplit(')', 1)[1].split()
-                _write(revision, state / 'launch.json', {'pid': process.pid, 'start_ticks': stat[19],
-                    'request_path': handoff['request_path'], 'callback_owner_pid': os.getpid()})
-            process.wait(timeout=max(0.01, budget - 2.0))
-        except Exception as exc:
-            failure = exc
-        finally:
-            if process is not None:
-                try: os.killpg(process.pid, signal.SIGKILL)
-                except ProcessLookupError: pass
-                process.wait(timeout=1.0)
-    # Outer command adapter's subreaper owns detached/double-fork descendants.
-    # This local record attests only to the direct observer's process group.
+    from owned_observer_runtime import run_owned_observer, OwnedObserverLifetimeUnresolved
+    try:
+        owned = run_owned_observer(command, cwd=revision, env=environment, state=state, budget=budget,
+            write_launch=lambda fields: _write(revision, state / 'launch.json', {**fields,
+                'request_path': handoff['request_path'], 'callback_owner_pid': os.getpid()}))
+        failure = owned['failure']
+    except OwnedObserverLifetimeUnresolved as exc:
+        failure = exc
+        # Unresolved owned lifetime permanently poisons this unit, including
+        # any partial checkpoints. Recovery cannot grant it credit.
+        ledger_path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
+        ledger = _read(ledger_path)
+        ledger['integrity_rejection'] = {'reason': 'Owned observer descendant lifetime unresolved', 'error': str(exc)}
+        _write(revision, ledger_path, ledger)
+        _write(revision, state / 'diagnostic.json', {'request_path': handoff['request_path'],
+            'returncode': None, 'descendants_reaped': False, 'error_type': type(exc).__name__,
+            'elapsed_seconds': time.monotonic() - started})
+        raise
     metadata = None
     try:
         metadata = observer_metadata(state, revision, unit)
         # Preserve raw checkpoint before attaching host-observed identity.
         if checkpoint.is_file() and checkpoint.stat().st_size:
-            raw = _read(checkpoint)
-            _write(revision, state / 'raw-progress.json', raw)
-            _authenticate_observer_response(revision, checkpoint, unit, metadata)
+            try:
+                raw = _read(checkpoint)
+                _write(revision, state / 'raw-progress.json', raw)
+                _authenticate_observer_response(revision, checkpoint, unit, metadata)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                # Keep invalid checkpoint evidence; validate final independently.
+                if failure is None: failure = exc
         decoder = json.JSONDecoder()
         output = stdout_path.read_text()
         for index, char in enumerate(output):
@@ -370,9 +386,11 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
         if failure is None: failure = exc
     _write(revision, state / 'diagnostic.json', {'request_path': handoff['request_path'],
         'allocated_seconds': budget, 'elapsed_seconds': time.monotonic() - started,
-        'returncode': process.returncode if process else None, 'observer_evidence': metadata,
+        'returncode': owned['returncode'], 'observer_evidence': metadata,
         'error_type': type(failure).__name__ if failure else None,
-        'cleanup_scope': 'direct observer process group; outer callback subreaper owns all descendants'})
+        'descendants_reaped': owned['cleanup']['descendants_reaped'],
+        'owned_cleanup_path': 'owned-descendant-cleanup.json', 'owned_cleanup_sha256': owned['cleanup_sha256'],
+        'cleanup_scope': 'dedicated per-observer Linux subreaper; all owned descendants terminated and reaped'})
     result = visual_review_unit_result(revision, unit_path)
     if not result or not result['complete']:
         raise RuntimeError('Configured callback observer returned incomplete authenticated visual scope') from failure
@@ -394,6 +412,18 @@ def main() -> int:
             raise ValueError('Bundled callback requires authenticated bounded visual coverage plan')
         recover_completed_observers(revision, parent_path)
         def dispatch(handoffs, budget):
+            # Reclaim a previous closed wave before allocating the next one.
+            # A final complete wave need not discard or lose its judgments
+            # merely because unrelated process inspection is unavailable.
+            try:
+                from storage_retention import await_observer_reclamation
+                await_observer_reclamation(revision, deadline - min(15.0, max(2.0, budget / 10)))
+            except Exception as exc:
+                if getattr(exc, 'storage_reclamation_deferred', False):
+                    raise
+                failure = RuntimeError('Observer storage retention could not safely complete before another wave')
+                failure.storage_retention_failure = True
+                raise failure from exc
             with ThreadPoolExecutor(max_workers=3) as pool:
                 futures = [pool.submit(observe_unit, revision, dict(h), min(budget, deadline - time.monotonic()), envelope)
                     for h in handoffs]
@@ -401,16 +431,6 @@ def main() -> int:
                 for future in futures:
                     try: future.result()
                     except Exception as exc: failures.append(exc)
-                # A complete stopped wave must retire only exact disposable
-                # copies before another wave can allocate private bootstrap
-                # assets. Raw judgments/session/tool/usage evidence remain.
-                try:
-                    from storage_retention import cleanup_stopped_observer_assets
-                    cleanup_stopped_observer_assets(revision)
-                except (OSError, ValueError, KeyError, TypeError) as exc:
-                    failure = RuntimeError('Observer storage retention could not safely complete before another wave')
-                    failure.storage_retention_failure = True
-                    raise failure from exc
                 if failures: raise failures[0]
         result = run_visual_review(revision, parent_path, dispatch, max(0.0, deadline - time.monotonic()),
             observer_evidence_required=True)

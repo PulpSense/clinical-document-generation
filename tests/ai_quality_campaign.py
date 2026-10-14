@@ -92,10 +92,13 @@ def long_synthetic_source(source):
 OWNER_FIVE_PILOT_IDS = ['retrospective-sparse-complete.r1', 'prospective-advarra-sparse-complete.r1',
     'prospective-sterling-sparse-complete.r1', 'ambispective-sterling-sparse-complete.r1',
     'ambispective-advarra-sparse-complete.r1']
+OWNER_THREE_PILOT_IDS = [OWNER_FIVE_PILOT_IDS[i] for i in (0, 2, 4)]
+OWNER_PILOT_SCOPES = {'owner-five-pilot-only': OWNER_FIVE_PILOT_IDS,
+    'owner-three-pilot-only': OWNER_THREE_PILOT_IDS}
 
 
 def readiness_plan(candidate_identity, host_mode="isolated", host_checks=None, *, pilot_scope='default-three'):
-    if pilot_scope not in {'default-three', 'owner-five-only'} or (pilot_scope == 'owner-five-only' and host_mode != 'hermes-tui'):
+    if pilot_scope not in {'default-three', 'owner-five-only', 'owner-three-only'} or (pilot_scope != 'default-three' and host_mode != 'hermes-tui'):
         raise ValueError('Owner five-case pilot requires explicit TUI scope')
     if host_mode not in {"isolated", "hermes-tui"}:
         raise ValueError("Unknown campaign host mode")
@@ -108,7 +111,8 @@ def readiness_plan(candidate_identity, host_mode="isolated", host_checks=None, *
                 'case_id': case['case_id'], 'cohort': case['scenario'], 'repetition': repetition,
                 'expected_status': 'passed', 'source_sha256': case['source_sha256'],
                 'seed_ids': [case['case_id'] + '.unsupported-drug'] if case['injection'] else []})
-    pilot = list(OWNER_FIVE_PILOT_IDS if pilot_scope == 'owner-five-only' else OWNER_FIVE_PILOT_IDS[:3])
+    pilot = list(OWNER_THREE_PILOT_IDS if pilot_scope == 'owner-three-only' else
+        OWNER_FIVE_PILOT_IDS if pilot_scope == 'owner-five-only' else OWNER_FIVE_PILOT_IDS[:3])
     operations.sort(key=lambda row: (0, pilot.index(row['planned_operation_id'])) if row['planned_operation_id'] in pilot else (1, 0))
     supplements = []
     for case_id, family, seeds, outcome in SUPPLEMENTS:
@@ -146,6 +150,8 @@ def readiness_plan(candidate_identity, host_mode="isolated", host_checks=None, *
         'unexecuted_cases_remain_visible': True}
     if pilot_scope == 'owner-five-only':
         manifest['execution_scope'] = 'owner-five-pilot-only'
+    elif pilot_scope == 'owner-three-only':
+        manifest['execution_scope'] = 'owner-three-pilot-only'
     if host_mode == 'hermes-tui' and host_checks is not None:
         validate_tui_host_checks(host_checks, candidate_identity)
         manifest['host_checks_sha256'] = hashlib.sha256(json.dumps(host_checks, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
@@ -162,19 +168,20 @@ def validate_readiness_manifest(manifest):
     if len(planned) != 28 or len({p['planned_operation_id'] for p in planned}) != 28:
         raise ValueError('Frozen readiness denominator must contain all 28 distinct operations')
     if 'execution_scope' in manifest:
-        if (manifest['execution_scope'] != 'owner-five-pilot-only' or manifest.get('host_mode') != 'hermes-tui'
-                or manifest.get('pilot_operation_ids') != OWNER_FIVE_PILOT_IDS):
-            raise ValueError('Frozen owner-five pilot scope/IDs differ from authorization')
-        selected = [p for p in manifest['baseline_operations'] if p['planned_operation_id'] in OWNER_FIVE_PILOT_IDS]
+        scope = manifest['execution_scope']
+        ids = OWNER_PILOT_SCOPES.get(scope)
+        if (ids is None or manifest.get('host_mode') != 'hermes-tui'
+                or manifest.get('pilot_operation_ids') != ids):
+            raise ValueError('Frozen ' + scope + ' scope/IDs differ from authorization')
+        selected = [p for p in manifest['baseline_operations'] if p['planned_operation_id'] in ids]
         fixed = {c['case_id']: c for c in plan()['cases']}
-        if (len(selected) != 5 or any(p.get('case_id') not in fixed for p in selected)
-                or {fixed[p['case_id']]['family'] for p in selected} != {
-                    'Retrospective/none', 'Prospective/Advarra', 'Prospective/Sterling',
-                    'Ambispective/Advarra', 'Ambispective/Sterling'}
+        families = {fixed[key.rsplit('.r', 1)[0]]['family'] for key in ids}
+        if (len(selected) != len(ids) or any(p.get('case_id') not in fixed for p in selected)
+                or {fixed[p['case_id']]['family'] for p in selected} != families
                 or any(p['planned_operation_id'] != p['case_id'] + '.r1'
                     or p.get('source_sha256') != fixed[p['case_id']]['source_sha256']
                     or p.get('repetition') != 1 or p.get('cohort') != 'clean' for p in selected)):
-            raise ValueError('Owner-five pilot must use one fixed clean baseline case per family')
+            raise ValueError(scope + ' must use the exact fixed clean baseline cases')
 
 
 def summarize_readiness(manifest, operations):
@@ -407,7 +414,7 @@ def summarize(operations):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--pilot-scope', choices=['default-three', 'owner-five-only'], default='default-three',
+    parser.add_argument('--pilot-scope', choices=['default-three', 'owner-five-only', 'owner-three-only'], default='default-three',
         help='Explicit owner five-family pilot-only scope; full 28-case criteria remain unchanged')
     parser.add_argument('--host-checks', type=Path, help='Required TUI host-check evidence for freezing and collecting')
     parser.add_argument('--host-mode', choices=['isolated', 'hermes-tui'], default='isolated')

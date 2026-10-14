@@ -213,6 +213,15 @@ def visual_review_unit_result(revision: Path, path: Path) -> dict | None:
                     if (not _owned(revision, state) or state.parent != revision / 'hermes/visual-review-observers'
                             or retained.get('database_sha256') != quality.sha256_file(state / 'state.db')):
                         continue
+                    from owned_observer_runtime import validate_owned_observer_cleanup, OwnedObserverLifetimeUnresolved
+                    try:
+                        validate_owned_observer_cleanup(state)
+                    except (OwnedObserverLifetimeUnresolved, OSError, ValueError, KeyError, TypeError):
+                        ledger['integrity_rejection'] = {
+                            'reason': 'Owned observer descendant cleanup proof missing or invalid',
+                            'observer_state_path': state.relative_to(revision).as_posix()}
+                        _write(revision, ledger_path, ledger)
+                        return None  # Revoke this unit, including any earlier checkpoint credit.
                     observed = observer_metadata(state, revision, unit)
                     if (not observed['request_inspection_complete']
                             or not isinstance(response.get('producer'), dict)
@@ -435,6 +444,12 @@ def run_visual_review(revision: Path, parent_path: Path, dispatch, remaining_sec
         try:
             dispatch(handoffs, budget)
         except Exception as exc:
+            if getattr(exc, 'storage_reclamation_deferred', False):
+                # Completed authenticated scope remains partial unless all
+                # required judgments really completed. Allocate no new wave.
+                updated = visual_review_result(revision, parent_path)
+                return {**updated, 'dispatch_errors': [*errors, type(exc).__name__ + ': ' + str(exc)],
+                    'resource_deferred': getattr(exc, 'diagnostics', {})}
             if getattr(exc, 'storage_retention_failure', False):
                 # Storage eligibility failure is not renderer poisoning or a
                 # visual judgment. Preserve authenticated completed work, but
@@ -456,7 +471,8 @@ def callback_release_binding(root: Path) -> dict:
     root = root.absolute()
     identity = workflow._installed_release_identity(root)
     paths = ['scripts/tui_visual_callback', 'scripts/tui_visual_callback.py',
-             'scripts/visual_review.py', 'scripts/workflow.py', 'scripts/quality.py']
+             'scripts/visual_review.py', 'scripts/workflow.py', 'scripts/quality.py', 'scripts/storage_retention.py',
+             'scripts/owned_observer_process.py', 'scripts/owned_observer_runtime.py']
     return {'release_root': str(root), 'release_identity': identity,
         'manifest_sha256': quality.sha256_file(root / workflow.RELEASE_MANIFEST),
         'source_sha256': {p: quality.sha256_file(root / p) for p in paths}}

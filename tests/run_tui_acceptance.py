@@ -15,8 +15,8 @@ def select_phase_operations(manifest, phase):
     validate_readiness_manifest(manifest)
     if phase not in {'pilot', 'remaining'}:
         raise ValueError('Unknown TUI campaign phase')
-    if manifest.get('execution_scope') == 'owner-five-pilot-only' and phase != 'pilot':
-        raise ValueError('owner-five-pilot-only: other fixed cases are not authorized')
+    if manifest.get('execution_scope') in {'owner-five-pilot-only', 'owner-three-pilot-only'} and phase != 'pilot':
+        raise ValueError(manifest['execution_scope'] + ': other fixed cases are not authorized')
     pilot = manifest['pilot_operation_ids']
     planned = manifest['baseline_operations'] + manifest['supplemental_operations']
     if phase == 'pilot':
@@ -57,19 +57,43 @@ def debit_owner_operation(ledger_path, planned, run, identity):
     from datetime import datetime, timezone
     import storage_retention as storage
     ledger_path = storage.safe_path(ledger_path)
-    with storage.directory_lock(ledger_path.parent):
+    initial = json.loads(ledger_path.read_text())
+    lock_root = storage.OWNER_LIMITS_AUTHORITY.parent if initial.get('limits_authority') else ledger_path.parent
+    with storage.directory_lock(lock_root):
         data = json.loads(ledger_path.read_text())
-        storage.require(data['limits'] == {'study_operations': 10, 'capability_probes': 3}, 'Original owner limits required')
-        deadline = datetime.fromisoformat(data['deadline_utc'])
-        storage.require(deadline.isoformat() == '2026-10-14T09:12:25.124854+00:00', 'Original owner deadline required')
-        storage.require((deadline - datetime.now(timezone.utc)).total_seconds() >= 180, 'Original deadline exhausted for new study')
-        storage.require(len(data['study_operations']) < 10, 'Additional study-operation ceiling exhausted')
+        limits = storage.owner_limits(data)
+        counts = storage.owner_cumulative_counts(ledger_path, data)
+        deadline = datetime.fromisoformat(limits['deadline_utc'])
+        storage.require((deadline - datetime.now(timezone.utc)).total_seconds() >= 180, 'Owner deadline exhausted for new study')
+        storage.require(counts['study_operations_launched'] < limits['study_operations'], 'Additional study-operation ceiling exhausted')
         data['study_operations'].append({'attempt_number': len(data['study_operations']) + 1,
             'planned_operation_id': planned['planned_operation_id'], 'run_dir': str(run),
             'candidate_identity': identity, 'started_at_utc': datetime.now(timezone.utc).isoformat(),
             'status': 'debited_before_launch'})
-        data['counters']['study_operations_launched'] = len(data['study_operations'])
+        data['counters'].update(storage.owner_cumulative_counts(ledger_path, data))
         storage.save(ledger_path, data)
+
+
+def run_owner_case(command, *, deadline_utc, state, cwd, env):
+    """Enforce mission/study minimum around real execution, with owned cleanup."""
+    from datetime import datetime, timezone
+    from owned_observer_runtime import run_owned_observer
+    deadline = datetime.fromisoformat(deadline_utc)
+    if deadline.tzinfo is None:
+        raise ValueError('Owner deadline must include UTC timezone')
+    remaining = (deadline - datetime.now(timezone.utc)).total_seconds()
+    if remaining <= 8:
+        raise ValueError('Owner deadline exhausted before launch and owned cleanup')
+    state = Path(state)
+    state.mkdir(parents=True, exist_ok=False)
+    def write_launch(value):
+        (state / 'launch.json').write_text(json.dumps(value, indent=2))
+    result = run_owned_observer(command, cwd=cwd, env=env, state=state,
+        budget=min(2700.0, remaining), write_launch=write_launch)
+    outcome = {**result, 'deadline_utc': deadline_utc,
+        'failure': str(result['failure']) if result['failure'] else None}
+    (state / 'outcome.json').write_text(json.dumps(outcome, indent=2))
+    return outcome
 
 
 def genuine_owner_audit(run, assignment, row):
@@ -138,12 +162,12 @@ def main():
                     and first[key].get('local_bytes_verified') is True
                     and first[key].get('independent_audit_passed') is True for key in pilot)):
             parser.error('Audit all three passing pilot outputs independently before running remaining cases')
-    if manifest.get('execution_scope') == 'owner-five-pilot-only':
+    if manifest.get('execution_scope') in {'owner-five-pilot-only', 'owner-three-pilot-only'}:
         if args.storage_forecast is None or args.attempt_ledger is None:
             parser.error('Evidence-bound sequential forecast and original owner attempt ledger required')
     failures = []
     launch_selection = selected
-    if manifest.get('execution_scope') == 'owner-five-pilot-only':
+    if manifest.get('execution_scope') in {'owner-five-pilot-only', 'owner-three-pilot-only'}:
         collected = collect_readiness_runs(manifest, runs, host)
         first = {r['planned_operation_id']: r for r in collected['operation_records'] if not r.get('retry_of')}
         def audited(key):
@@ -183,18 +207,29 @@ def main():
             '--parent-visual-review-command', str(args.parent_visual_review_command.absolute()),
             '--approved-by', args.approved_by, '--authorize-paid-operation']
         resume = run.exists()
-        if manifest.get('execution_scope') == 'owner-five-pilot-only':
+        if manifest.get('execution_scope') in {'owner-five-pilot-only', 'owner-three-pilot-only'}:
             debit_owner_operation(args.attempt_ledger, planned, run, manifest['candidate_identity'])
         log = runs / (planned['planned_operation_id'] + '.launcher.log')
+        owner_scope = manifest.get('execution_scope') in {'owner-five-pilot-only', 'owner-three-pilot-only'}
+        def execute_case(extra, suffix):
+            if owner_scope:
+                from storage_retention import owner_limits
+                limits = owner_limits(json.loads(args.attempt_ledger.read_text()))
+                outcome = run_owner_case(command + extra, deadline_utc=limits['deadline_utc'],
+                    state=runs / (planned['planned_operation_id'] + suffix), cwd=Path.cwd(), env=dict(os.environ))
+                output.write((runs / (planned['planned_operation_id'] + suffix) / 'stdout.log').read_text())
+                output.write((runs / (planned['planned_operation_id'] + suffix) / 'stderr.log').read_text())
+                return subprocess.CompletedProcess(command + extra, outcome['returncode'] if outcome['returncode'] is not None else 1)
+            return subprocess.run(command + extra, stdout=output, stderr=subprocess.STDOUT)
         with log.open('a' if resume else 'x') as output:
-            completed = subprocess.run(command + (['--resume'] if resume else []), stdout=output, stderr=subprocess.STDOUT)
+            completed = execute_case(['--resume'] if resume else [], '.owned-launch')
             if not resume and planned['case_id'] == 'F1' and interrupted.is_file() and not (run / 'campaign-result.json').exists():
-                completed = subprocess.run(command + ['--resume'], stdout=output, stderr=subprocess.STDOUT)
+                completed = execute_case(['--resume'], '.owned-resume')
         if completed.returncode:
             failures.append(planned['planned_operation_id'])
             break
     report = collect_readiness_runs(manifest, runs, host)
-    if manifest.get('execution_scope') == 'owner-five-pilot-only':
+    if manifest.get('execution_scope') in {'owner-five-pilot-only', 'owner-three-pilot-only'}:
         report['execution_scope'] = manifest['execution_scope']
         report['owner_pilot_operation_ids'] = list(manifest['pilot_operation_ids'])
         report['other_fixed_cases_excluded_by_owner_direction'] = [p['planned_operation_id']
