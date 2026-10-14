@@ -94,7 +94,7 @@ PDF_PAGE_RENDERER = {
 }
 PRODUCTION_MODULES = {
     "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
-    "worker_boundary.py", "worker_capabilities.py", "visual_review.py", "tui_visual_callback.py",
+    "worker_boundary.py", "worker_capabilities.py", "visual_review.py", "tui_visual_callback.py", "storage_retention.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
@@ -6936,8 +6936,26 @@ def run_production_desktop_operation(
         },
         require_promoted_runtime=require_promoted_runtime,
     )
+    # Retention runs only after the operation's terminal state is durable. It
+    # never changes clinical status, source, review evidence or delivery bytes.
+    # A storage fault is deferred separately, not relabeled as activation or
+    # clinical failure, and existing unique worker state remains audit evidence.
+    storage_cleanup = {"status": "not_applicable"}
+    if host_mode == "hermes-tui" and result.get("status") in {"passed", "blocked", "timeout", "review_required"}:
+        from storage_retention import completed_operation_cleanup, save as save_retention
+        try:
+            storage_cleanup = completed_operation_cleanup(run_dir, desktop_operation_state_path(run_dir, operation_id))
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            storage_cleanup = {"status": "deferred", "error": type(exc).__name__ + ": " + str(exc)}
+        try:
+            (run_dir / "storage-retention").mkdir(exist_ok=True)
+            save_retention(run_dir / "storage-retention/completion.json", storage_cleanup)
+        except OSError:
+            pass  # Per-entry retirement intent remains the durable recovery authority.
     return {
         **result,
+        "storage_retention": {"status": storage_cleanup["status"],
+            "record": str(run_dir / "storage-retention/completion.json") if storage_cleanup["status"] != "not_applicable" else None},
         "parent_visual_review": parent_review_record,
         "parent_visual_callback": {
             "configured": parent_visual_reviewer is not None,

@@ -84,6 +84,11 @@ def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypa
         {'status': 'passed', 'stage': 'delivery', 'revision_id': 'r1', 'client_outputs': ['output/protocol.docx'], 'manifest': 'revisions/r1/delivery-manifest.json'}])
     monkeypatch.setattr(workflow, 'generate', lambda *a, **k: next(results))
     dispatched = []
+    for worker in ('one', 'two'):
+        cache = run / '.hermes-cache' / worker
+        (cache / 'bin').mkdir(parents=True)
+        (cache / 'bin/tool').write_bytes(b'exact disposable tool copy')
+        (cache / 'state.db').write_bytes(b'unique tool session audit')
     monkeypatch.setattr(workflow, '_production_dispatch_handoffs', lambda *a, **k: dispatched.append(k['host_mode']))
     result = workflow.run_production_desktop_operation(run, skill_root=root, manual_review=True, host_mode='hermes-tui')
     assert dispatched == ['hermes-tui'], result
@@ -91,6 +96,10 @@ def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypa
     assert result['stage'] == 'local_output_availability'
     assert result['delivery']['confirmed'] is False
     assert result['delivery_status'] == 'locally_available'
+    assert not (run / '.hermes-cache/two/bin').exists()
+    assert (run / '.hermes-cache/one/bin/tool').is_file()
+    assert (run / '.hermes-cache/two/state.db').read_bytes() == b'unique tool session audit'
+    assert json.loads((run / 'storage-retention/completion.json').read_text())['status'] == 'passed'
     saved = json.loads((run / 'logs/desktop-operation.json').read_text())
     assert saved['result']['recipient_delivery_verified'] is False
     assert saved['release_identity']['host_mode'] == 'hermes-tui'

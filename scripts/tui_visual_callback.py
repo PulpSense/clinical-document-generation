@@ -401,6 +401,16 @@ def main() -> int:
                 for future in futures:
                     try: future.result()
                     except Exception as exc: failures.append(exc)
+                # A complete stopped wave must retire only exact disposable
+                # copies before another wave can allocate private bootstrap
+                # assets. Raw judgments/session/tool/usage evidence remain.
+                try:
+                    from storage_retention import cleanup_stopped_observer_assets
+                    cleanup_stopped_observer_assets(revision)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    failure = RuntimeError('Observer storage retention could not safely complete before another wave')
+                    failure.storage_retention_failure = True
+                    raise failure from exc
                 if failures: raise failures[0]
         result = run_visual_review(revision, parent_path, dispatch, max(0.0, deadline - time.monotonic()),
             observer_evidence_required=True)

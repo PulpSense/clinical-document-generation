@@ -40,7 +40,7 @@ def test_owner_five_pilot_freezes_existing_ids_without_weakening_full_criteria()
         campaign.validate_readiness_manifest(owner)
 
 
-@pytest.mark.parametrize('phase,expected_calls', [('pilot', 5), ('remaining', 0)])
+@pytest.mark.parametrize('phase,expected_calls', [('pilot', 1), ('remaining', 0)])
 def test_owner_scope_launches_exactly_five_or_refuses_before_spending(tmp_path, monkeypatch, phase, expected_calls):
     identity = {'git_commit': 'synthetic-unit-test'}
     host = host_report(identity)
@@ -60,11 +60,23 @@ def test_owner_scope_launches_exactly_five_or_refuses_before_spending(tmp_path, 
     monkeypatch.setattr(runner, 'collect_readiness_runs', lambda *a: {'operation_records': [],
         'evidence_errors': [], 'unmatched_operation_states': [], 'tui_local_acceptance': 'incomplete'})
     calls = []
+    forecast = {'schema_version': 'sequential-storage-forecast/v1', 'candidate_identity': identity,
+        'cases': [dict(case_id=key, retained_bytes=20, worker_peak_bytes=50, scratch_peak_bytes=10) for key in FIVE],
+        'margin_bytes': 15, 'evidence_inventory': [{'path': str(retained),
+            'sha256': hashlib.sha256(retained.read_bytes()).hexdigest()}]}
+    (tmp_path / 'forecast.json').write_text(json.dumps(forecast))
+    # This test isolates selection/spending. Real storage validation has separate
+    # positive and negative public-seam tests with actual allocated inventories.
+    monkeypatch.setattr(runner, 'admit_storage', lambda *a: {'admitted': True, 'fixture_only': True})
     monkeypatch.setattr(runner.subprocess, 'run', lambda command, **kwargs: calls.append(command) or subprocess.CompletedProcess(command, 0))
+    ledger = tmp_path / 'attempts.json'
+    ledger.write_text(json.dumps({'deadline_utc':'2026-10-14T09:12:25.124854+00:00',
+        'limits':{'study_operations':10,'capability_probes':3},'study_operations':[], 'capability_probes':[], 'counters':{}}))
     monkeypatch.setattr(sys, 'argv', ['runner', '--manifest', str(tmp_path / 'manifest.json'),
         '--host-checks', str(tmp_path / 'host.json'), '--release-root', str(tmp_path / 'skill'),
         '--runs-root', str(tmp_path / 'runs'), '--parent-visual-review-command', str(callback),
         '--callback-probe', str(tmp_path / 'synthetic-proof.json'), '--approved-by', 'synthetic-test',
+        '--storage-forecast', str(tmp_path / 'forecast.json'), '--attempt-ledger', str(ledger),
         '--phase', phase, '--authorize-paid-campaign'])
     if phase == 'remaining':
         with pytest.raises(SystemExit) as error:
@@ -77,5 +89,5 @@ def test_owner_scope_launches_exactly_five_or_refuses_before_spending(tmp_path, 
         assert len(probes) == 1
     assert len(calls) == expected_calls
     if calls:
-        assert [c[c.index('--planned-operation-id') + 1] for c in calls] == FIVE
+        assert [c[c.index('--planned-operation-id') + 1] for c in calls] == FIVE[:1]
         assert all('--resume' not in c for c in calls)

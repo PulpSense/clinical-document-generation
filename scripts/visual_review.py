@@ -435,6 +435,11 @@ def run_visual_review(revision: Path, parent_path: Path, dispatch, remaining_sec
         try:
             dispatch(handoffs, budget)
         except Exception as exc:
+            if getattr(exc, 'storage_retention_failure', False):
+                # Storage eligibility failure is not renderer poisoning or a
+                # visual judgment. Preserve authenticated completed work, but
+                # do not allocate another observer wave on a failed budget premise.
+                raise
             integrity = getattr(exc, 'worker_integrity_failure', None)
             if integrity:
                 invalidate_visual_review_units(revision, paths, integrity)
