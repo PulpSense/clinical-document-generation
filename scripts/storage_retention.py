@@ -828,6 +828,13 @@ def owner_limits(data):
             'counts_are_cumulative_across_all_coordinators': True,
             'operation_deadline_seconds': 2700, 'delegated_visual_cap_seconds': 240,
             'parent_visual_cap_seconds': 480}
+        if authority.get('deadline_utc') == '2026-10-14T16:12:25.124854+00:00':
+            require(authority.get('deadline_extension_authority') == {
+                'owner_decision': 'Extend the campaign cutoff to 16:12 UTC',
+                'prior_deadline_utc': '2026-10-14T13:12:25.124854+00:00',
+                'study_seconds': 2700, 'cumulative_caps_unchanged': True,
+                'sequential_studies_only': True}, 'Missing explicit owner cutoff extension')
+            expected['deadline_utc'] = authority['deadline_utc']
         require(all(authority.get(k) == v and type(authority.get(k)) is type(v) for k, v in expected.items()), 'Unsupported owner limits authority')
         require(declared == {'study_operations': 20, 'capability_probes': 6}
             and data['deadline_utc'] == authority['deadline_utc'], 'Ledger contradicts owner limits authority')
