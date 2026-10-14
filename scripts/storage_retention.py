@@ -851,6 +851,15 @@ def owner_limits(data):
                 'Missing explicit owner continuation cutoff extension')
             require(expected['additional_probe_limit'] == 50, 'Continuation cutoff requires approved probe authority')
             expected['deadline_utc'] = authority['deadline_utc']
+        if authority.get('deadline_utc') == '2026-10-15T18:12:25.124854+00:00':
+            require(canonical(authority.get('deadline_extension_authority')) == canonical({
+                'owner_decision': "yes go ahead, don't stop until the three test pass, if you need expand the limit hour to tomorrow, finish this",
+                'prior_deadline_utc': '2026-10-14T18:12:25.124854+00:00',
+                'study_seconds': 2700, 'study_operation_limit': 20,
+                'additional_probe_limit': 50, 'sequential_studies_only': True}),
+                'Missing explicit owner tomorrow cutoff extension')
+            require(expected['additional_probe_limit'] == 50, 'Tomorrow cutoff requires approved probe authority')
+            expected['deadline_utc'] = authority['deadline_utc']
         require(all(authority.get(k) == v and type(authority.get(k)) is type(v) for k, v in expected.items()), 'Unsupported owner limits authority')
         require(declared == {'study_operations': 20, 'capability_probes': expected['additional_probe_limit']}
             and data['deadline_utc'] == authority['deadline_utc'], 'Ledger contradicts owner limits authority')
