@@ -137,7 +137,7 @@ def main():
     response = json.loads(response_path.read_text()) if response_path.is_file() else None
     record = {'schema_version': 'tui-visual-callback-probe/v1', 'scope': 'synthetic callback transport; no clinical approval',
         'candidate_identity': identity, 'parent_request_path': path.relative_to(revision).as_posix(),
-        'delegated_timeout_observed': any(d.get('cause_type') == 'TimeoutExpired' for d in delegate_failures),
+        'delegated_timeout_observed': any(d.get('error_type') in {'TimeoutExpired', 'TimeoutError'} for d in delegate_failures),
         'fallback_callback_completed': failure is None and fallback_calls[0] == 1,
         'started_at_utc': datetime.now(timezone.utc).isoformat(), 'elapsed_seconds': time.monotonic() - started,
         'callback_path': str(REPO / 'scripts/tui_visual_callback'), 'callback_sha256': quality.sha256_file(REPO / 'scripts/tui_visual_callback'),
