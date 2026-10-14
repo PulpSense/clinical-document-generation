@@ -6994,11 +6994,17 @@ def validate_verifications(
                     "code": "review_coverage_incomplete" if message == "Visual scope incomplete; authenticated substantive findings are ready for repair." else "visual_unit_evidence_invalid",
                     "issue": message}, "verifier_transient"))
             expected_pages = {(a["artifact"], p["page"], p["sha256"]) for a in request.get("artifacts", []) for p in a.get("pages", [])}
+            expected_page_checks = set(VISUAL_CHECKS)
+            if request.get("visual_review_plan"):
+                # Authenticated recombination above retains mandatory document TOC review.
+                # Page rows must remain the observer's actual local judgments, not invented global checks.
+                from visual_review import PAGE_CHECKS
+                expected_page_checks = set(PAGE_CHECKS)
             valid_page_rows = [
                 p for p in response.get("page_assessments", [])
                 if isinstance(p, Mapping)
                 and p.get("status") in {"passed", "blocked", "failed"}
-                and set(p.get("checks", [])) == set(VISUAL_CHECKS)
+                and set(p.get("checks", [])) == expected_page_checks
             ]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
             if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "code": "review_coverage_incomplete", "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))

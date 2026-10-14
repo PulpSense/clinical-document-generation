@@ -835,8 +835,24 @@ def owner_limits(data):
                 'study_seconds': 2700, 'cumulative_caps_unchanged': True,
                 'sequential_studies_only': True}, 'Missing explicit owner cutoff extension')
             expected['deadline_utc'] = authority['deadline_utc']
+        if authority.get('additional_probe_limit') == 50:
+            require(canonical(authority.get('probe_extension_authority')) == canonical({
+                'owner_decision': "do as many tests as yo need for this to work, extend the limit to 50 if you ned, i don' care",
+                'prior_probe_limit': 6, 'additional_probe_limit': 50,
+                'study_operation_limit': 20, 'operation_deadline_seconds': 2700,
+                'sequential_studies_only': True}), 'Missing explicit owner probe extension')
+            expected['additional_probe_limit'] = 50
+        if authority.get('deadline_utc') == '2026-10-14T18:12:25.124854+00:00':
+            require(canonical(authority.get('deadline_extension_authority')) == canonical({
+                'owner_decision': 'Extend the cutoff to 18:12 UTC',
+                'prior_deadline_utc': '2026-10-14T16:12:25.124854+00:00',
+                'study_seconds': 2700, 'study_operation_limit': 20,
+                'additional_probe_limit': 50, 'sequential_studies_only': True}),
+                'Missing explicit owner continuation cutoff extension')
+            require(expected['additional_probe_limit'] == 50, 'Continuation cutoff requires approved probe authority')
+            expected['deadline_utc'] = authority['deadline_utc']
         require(all(authority.get(k) == v and type(authority.get(k)) is type(v) for k, v in expected.items()), 'Unsupported owner limits authority')
-        require(declared == {'study_operations': 20, 'capability_probes': 6}
+        require(declared == {'study_operations': 20, 'capability_probes': expected['additional_probe_limit']}
             and data['deadline_utc'] == authority['deadline_utc'], 'Ledger contradicts owner limits authority')
     require(all(type(v) is int for v in declared.values()), 'Invalid owner limits')
     return {**declared, 'deadline_utc': data['deadline_utc']}

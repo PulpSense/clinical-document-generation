@@ -16,7 +16,8 @@ import quality
 from drafting import sha256_value
 
 BOUNDARY_CHECKS = ['table_flow', 'heading_continuity', 'header_footer_continuity']
-DOCUMENT_CHECKS = ['toc_destinations', 'document_continuity', 'template_preservation']
+DOCUMENT_CHECKS = ['toc_destinations', 'toc_mismatch', 'document_continuity', 'template_preservation']
+PAGE_CHECKS = [check for check in quality.VISUAL_CHECKS if check != 'toc_mismatch']
 
 
 def _read(path: Path) -> dict:
@@ -47,7 +48,7 @@ def visual_review_plan(parent: Mapping) -> dict:
         name, pages = artifact['artifact'], artifact.get('pages', [])
         for page in pages:
             targets.append({'target_id': f"{name}:page:{page['page']}", 'kind': 'page',
-                'artifact': name, 'pages': [copy.deepcopy(page)], 'checks': list(quality.VISUAL_CHECKS)})
+                'artifact': name, 'pages': [copy.deepcopy(page)], 'checks': list(PAGE_CHECKS)})
         for left, right in zip(pages, pages[1:]):
             targets.append({'target_id': f"{name}:boundary:{left['page']}-{right['page']}",
                 'kind': 'boundary', 'artifact': name, 'pages': [copy.deepcopy(left), copy.deepcopy(right)],
@@ -103,7 +104,8 @@ def create_visual_review_unit(revision: Path, parent_path: Path,
     request_id = parent['request_id'] + '.visual-unit-' + sha256_value(scope)[:16] + ('.callback' if observer_evidence_required else '') + f'.a{attempt}'
     prefix = f'hermes/visual-review'
     unit = {k: copy.deepcopy(parent[k]) for k in (
-        'schema_version', 'task', 'revision_id', 'review_set', 'checks', 'artifacts')}
+        'schema_version', 'task', 'revision_id', 'review_set', 'artifacts')}
+    unit['checks'] = list(dict.fromkeys(check for target in scope for check in target['checks']))
     for key in ('source_identity_sha256', 'generation_authority_sha256', 'renderer',
                 'page_renderer', 'review_context', 'template_preservation', 'contracted_template_bundle',
                 'callback_release_binding'):
@@ -128,7 +130,11 @@ def create_visual_review_unit(revision: Path, parent_path: Path,
         'Return bound response JSON, genuine producer identity and status passed/blocked/in_progress. Save completed '
         'judgments immediately to review_transport.progress_path using write_file; read before overwrite and preserve '
         'all completed judgments. Response finalization and cleanup are part of your allocation. '
-        + str(parent.get('instructions', '')))
+        + str(parent.get('instructions', ''))
+        + ' For this unit, the exact visual_scope and unit checks govern applicability over package-wide instructions. '
+        'Page scope judges visible local layout, including TOC legibility where present, not destinations on unassigned pages. '
+        'Whole-document TOC destinations and toc_mismatch remain mandatory for the later document observer, '
+        'using completed bound page/boundary evidence and native headings; do not invent or waive those judgments.')
     if any(t['kind'] == 'document' for t in targets):
         snapshot = visual_review_result(revision, parent_path, publish=False)
         non_document = [t for t in expected if t['kind'] != 'document']
