@@ -213,7 +213,7 @@ def test_candidate_loader_in_fresh_process_rejects_checkout_dependency_cache(tmp
     root = tmp_path / 'installed'
     shutil.copytree(Path(workflow.__file__).parent, root / 'scripts')
     tests = Path(__file__).parent
-    script = "import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from tui_campaign_contract import load_installed_workflow;w=load_installed_workflow(Path(sys.argv[2]));print(json.dumps({n:sys.modules[Path(n).stem].__file__ for n in w.PRODUCTION_MODULES}))"
+    script = "import sys,json;from pathlib import Path;sys.path.insert(0,sys.argv[1]);from tui_campaign_contract import load_installed_workflow;w=load_installed_workflow(Path(sys.argv[2]));print(json.dumps({n:sys.modules[Path(n).stem].__file__ for n in w.PRODUCTION_MODULES if n != 'owned_observer_process.py'}))"
     result = subprocess.run([sys.executable, '-B', '-c', script, str(tests), str(root)],
         text=True, capture_output=True, check=True)
     assert all(Path(p).is_relative_to(root) for p in json.loads(result.stdout).values())

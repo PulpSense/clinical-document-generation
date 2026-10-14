@@ -43,6 +43,14 @@ def load_installed_workflow(root):
     sys.path.insert(0, str(root / 'scripts'))
     workflow = importlib.import_module('workflow')
     for name in workflow.PRODUCTION_MODULES:
+        if name == 'owned_observer_process.py':
+            # This CLI-only subreaper is executed by its bound absolute path,
+            # never imported into a parent process (which would adopt children).
+            if Path(name).stem in sys.modules:
+                raise ValueError('Standalone owned supervisor must not be imported')
+            if not (root / 'scripts' / name).is_file() or (root / 'scripts' / name).is_symlink():
+                raise ValueError('Installed owned supervisor is unavailable')
+            continue
         module = importlib.import_module(Path(name).stem)
         if Path(module.__file__).resolve() != root / 'scripts' / name:
             raise ValueError(f'Imported a different installed candidate module: {name}')

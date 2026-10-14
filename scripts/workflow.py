@@ -95,6 +95,7 @@ PDF_PAGE_RENDERER = {
 PRODUCTION_MODULES = {
     "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
     "worker_boundary.py", "worker_capabilities.py", "visual_review.py", "tui_visual_callback.py", "storage_retention.py",
+    "owned_observer_process.py", "owned_observer_runtime.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
