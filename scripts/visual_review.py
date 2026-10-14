@@ -175,30 +175,37 @@ def invalidate_visual_review_units(revision: Path, paths: Sequence[Path], findin
         _write(revision, ledger, value)
 
 
+def validate_visual_review_unit_request(revision: Path, path: Path) -> tuple[dict, dict, dict]:
+    """Validate canonical assignment independently of absent reviewer judgments."""
+    unit = _read(path)
+    if path != revision / f"hermes/visual-review-requests/{unit['request_id']}.json" or not _owned(revision, path):
+        raise ValueError('Visual unit request escapes canonical identity')
+    ledger_path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
+    if not _owned(revision, ledger_path):
+        raise ValueError('Visual unit ledger escapes revision')
+    ledger = _read(ledger_path)
+    if ('integrity_rejection' in ledger or not quality.verification_request_hash_valid(unit)
+            or ledger.get('request_sha256') != unit['request_sha256']
+            or ledger.get('request_file_sha256') != quality.sha256_file(path)):
+        raise ValueError('Visual unit identity rejected')
+    parent = _parent(revision, revision / unit['parent_request_path'])
+    if (unit['parent_request_id'] != parent['request_id']
+            or unit['parent_request_sha256'] != parent['request_sha256']
+            or any(t not in parent['visual_review_plan']['targets'] for t in unit['visual_scope'])):
+        raise ValueError('Visual unit parent or scope changed')
+    if unit.get('document_evidence'):
+        bound = unit['document_evidence']
+        evidence_path = revision / bound['path']
+        if not _owned(revision, evidence_path) or quality.sha256_file(evidence_path) != bound['sha256']:
+            raise ValueError('Visual unit document evidence changed')
+    return unit, parent, ledger
+
+
 def visual_review_unit_result(revision: Path, path: Path) -> dict | None:
     """Credit authentic completed targets independently from malformed sibling files."""
     try:
-        unit = _read(path)
-        if path != revision / f"hermes/visual-review-requests/{unit['request_id']}.json" or not _owned(revision, path):
-            return None
+        unit, parent, ledger = validate_visual_review_unit_request(revision, path)
         ledger_path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
-        if not _owned(revision, ledger_path):
-            return None
-        ledger = _read(ledger_path)
-        if ('integrity_rejection' in ledger or not quality.verification_request_hash_valid(unit)
-                or ledger.get('request_sha256') != unit['request_sha256']
-                or ledger.get('request_file_sha256') != quality.sha256_file(path)):
-            return None
-        parent = _parent(revision, revision / unit['parent_request_path'])
-        if (unit['parent_request_id'] != parent['request_id']
-                or unit['parent_request_sha256'] != parent['request_sha256']
-                or any(t not in parent['visual_review_plan']['targets'] for t in unit['visual_scope'])):
-            return None
-        if unit.get('document_evidence'):
-            bound = unit['document_evidence']
-            evidence_path = revision / bound['path']
-            if not _owned(revision, evidence_path) or quality.sha256_file(evidence_path) != bound['sha256']:
-                return None
         accepted, findings, proofs = {}, [], []
         expected = {t['target_id']: t for t in unit['visual_scope']}
         for relative in (unit['review_transport']['progress_path'], unit['response_path']):

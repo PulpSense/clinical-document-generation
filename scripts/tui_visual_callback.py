@@ -287,6 +287,7 @@ def recover_completed_observers(revision: Path, parent_path: Path) -> None:
 
 def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -> None:
     unit_path = revision / handoff['request_path']
+    original_request_sha256 = quality.sha256_file(unit_path)
     unit = _read(unit_path)
     state = revision / 'hermes/visual-review-observers' / (unit['request_id'] + '.' + uuid.uuid4().hex)
     state.mkdir(parents=True)
@@ -393,6 +394,27 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
         'cleanup_scope': 'dedicated per-observer Linux subreaper; all owned descendants terminated and reaped'})
     result = visual_review_unit_result(revision, unit_path)
     if not result or not result['complete']:
+        if isinstance(failure, (TimeoutError, subprocess.TimeoutExpired)):
+            # Preserve a verified owned timeout at the public fallback seam.
+            # Generic execution/integrity errors must not be relabeled timeout.
+            from owned_observer_runtime import validate_owned_observer_cleanup
+            proof = validate_owned_observer_cleanup(state)
+            if quality.sha256_file(state / 'owned-descendant-cleanup.json') != owned['cleanup_sha256']:
+                raise OwnedObserverLifetimeUnresolved('Owned cleanup proof changed before timeout transport')
+            # Missing judgments and rejected identity share None at aggregation;
+            # validate assignment separately before admitting ordinary recovery.
+            from visual_review import validate_visual_review_unit_request
+            validate_visual_review_unit_request(revision, unit_path)
+            if (quality.sha256_file(unit_path) != original_request_sha256
+                    or provenance['request_sha256'] != original_request_sha256
+                    or json.dumps(_read(state / 'provenance.json'), sort_keys=True)
+                        != json.dumps(provenance, sort_keys=True)
+                    or _read(state / 'launch.json').get('request_path') != handoff['request_path']
+                    or type(proof.get('returncode')) is not int
+                    or type(owned.get('returncode')) is not int
+                    or proof['returncode'] != owned['returncode']):
+                raise OwnedObserverLifetimeUnresolved('Rejected observer request, provenance or terminal status before timeout transport')
+            raise failure
         raise RuntimeError('Configured callback observer returned incomplete authenticated visual scope') from failure
 
 
