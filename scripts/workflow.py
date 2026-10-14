@@ -5172,6 +5172,13 @@ def run_desktop_operation(
                                     parent_budget,
                                 )
                         except Exception as parent_exc:
+                            if not isinstance(parent_exc, (TimeoutError, subprocess.TimeoutExpired)):
+                                return {
+                                    "status": "blocked", "stage": "parent_visual_integrity",
+                                    "findings": [{"category": "integrity", "field": "parent_visual_review",
+                                                  "issue": str(parent_exc)}],
+                                    "client_outputs": [],
+                                }
                             errors.append(str(parent_exc))
                         pending = unresolved_parent_handoffs(pending)
                     if not pending:
@@ -5258,6 +5265,18 @@ def run_desktop_operation(
                                 # its final response is missing or incomplete.
                                 pass
 
+                def content_repair_preempts_visual_block(block: Mapping[str, Any]) -> bool:
+                    if block.get("stage") != "parent_visual_review" or not revision_id:
+                        return False
+                    revision = run_dir / "revisions" / revision_id
+                    if not _accepted_partial_repair_findings(revision):
+                        return False
+                    stage_history.append({"stage": "parent_visual_review",
+                                          "status": "incomplete_before_native_repair",
+                                          "findings": block.get("findings", [])})
+                    save("running")
+                    return True
+
                 bounded_parent_review_runner = run_bounded_parent_review
                 handoff_started = clock()
                 save("running")
@@ -5305,9 +5324,17 @@ def run_desktop_operation(
                                     handoff_runner(delegated, timeout)
                                 except WorkerAuthenticationError:
                                     raise
-                                except Exception:
-                                    pass
-                            parent_block = run_bounded_parent_review(fallback_owned)
+                                except Exception as visual_exc:
+                                    if not isinstance(visual_exc, (TimeoutError, subprocess.TimeoutExpired)):
+                                        parent_block = {
+                                            "status": "blocked", "stage": "parent_visual_integrity",
+                                            "findings": [{"category": "integrity", "field": "delegated_visual_review",
+                                                          "issue": str(visual_exc)}],
+                                            "client_outputs": [],
+                                        }
+                                        break
+                            if parent_block is None:
+                                parent_block = run_bounded_parent_review(fallback_owned)
                             hard_future.result()
                     elif supports_parent_fallback and fallback_owned:
                         for delegated, timeout in (
@@ -5319,8 +5346,15 @@ def run_desktop_operation(
                                 handoff_runner(delegated, timeout)
                             except WorkerAuthenticationError:
                                 raise
-                            except Exception:
-                                pass
+                            except Exception as visual_exc:
+                                if not isinstance(visual_exc, (TimeoutError, subprocess.TimeoutExpired)):
+                                    parent_block = {
+                                        "status": "blocked", "stage": "parent_visual_integrity",
+                                        "findings": [{"category": "integrity", "field": "delegated_visual_review",
+                                                      "issue": str(visual_exc)}],
+                                        "client_outputs": [],
+                                    }
+                                    break
                     else:
                         dispatch_budget = soft_timeout if supports_parent_fallback else remaining
                         if any(item.get("task") == "clinical_content_verification" for item in dispatch_handoffs):
@@ -5338,10 +5372,14 @@ def run_desktop_operation(
                 # Complete wave accounting before saving/archiving any terminal
                 # outcome. A return inside the try runs this finally afterwards.
                 if parent_block is not None:
+                    if content_repair_preempts_visual_block(parent_block):
+                        continue
                     return finish(parent_block)
                 if supports_parent_fallback:
                     parent_block = run_bounded_parent_review(fallback_owned)
                     if parent_block is not None:
+                        if content_repair_preempts_visual_block(parent_block):
+                            continue
                         return finish(parent_block)
             except Exception as exc:
                 if isinstance(exc, WorkerLaunchUnavailableError):
@@ -5370,6 +5408,8 @@ def run_desktop_operation(
                 ):
                     parent_block = bounded_parent_review_runner(fallback_handoffs)
                     if parent_block is not None:
+                        if content_repair_preempts_visual_block(parent_block):
+                            continue
                         return finish(parent_block)
                     continue
                 remaining = remaining_seconds()
@@ -10168,6 +10208,27 @@ def _begin_independent_review(
     return paths, []
 
 
+def _accepted_partial_repair_findings(revision_dir: Path) -> list[dict[str, Any]]:
+    """Repair authenticated native concerns despite independent missing scope.
+
+    Only ordinary coverage gaps may coexist; integrity, source clarification,
+    malformed response and other validation failures remain stop conditions.
+    """
+    findings, _ = validate_verifications(revision_dir)
+    defects = [row for row in findings
+               if row.get("partial_review") and row.get("verification_source_finding")
+               and not row.get("source_clarification_required")
+               and not row["verification_source_finding"].get("source_clarification_required")
+               and row.get("disposition") != "source_clarification"
+               and row["verification_source_finding"].get("disposition") != "source_clarification"
+               and not internal_presentation_note(row)]
+    if defects and all(row in defects or row.get("code") in {
+            "review_coverage_incomplete", "verification_response_missing"}
+                       for row in findings):
+        return defects
+    return []
+
+
 def _schedule_native_repair(run_dir: Path, revision_dir: Path, reference_path: Path,
                             working_reference: dict[str, Any], reference: Mapping[str, Any],
                             bundle: Mapping[str, Any], findings: list[dict[str, Any]],
@@ -10671,6 +10732,11 @@ def generate(
         )
     _bind_available_verification_responses(revision_dir)
     pending_checks = pending_verifications(revision_dir)
+    partial_defects = _accepted_partial_repair_findings(revision_dir)
+    if partial_defects:
+        return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
+            reference, bundle, partial_defects, operation_deadline, clock,
+            failure_stage="integrity", failure_category="integrity")
     if pending_checks: return _awaiting(revision_dir, stage="independent_verification", paths=pending_checks)
     final_quality = quality_report(revision_dir, reference, render_report, xml_report)
     final_quality["render_assurance"] = assurance_report
