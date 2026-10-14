@@ -31,7 +31,10 @@ def run_owned_observer(command, *, cwd, env, state, budget, write_launch):
    os.close(write_fd);write_fd=None
    start_ticks=Path(f'/proc/{process.pid}/stat').read_text().rsplit(')',1)[1].split()[19]
    write_launch({'pid':process.pid,'start_ticks':start_ticks,'owned_command_sha256':expected_command,'owned_cleanup_path':status.name,'supervisor_sha256':hashlib.sha256(supervisor.read_bytes()).hexdigest()})
-   ready,_,_=select.select([read_fd],[],[],min(3.0,max(0.01,budget-8.0)))
+   # Readiness establishes signal handlers and descendant ownership. Reserve
+   # cleanup time from worker execution, not from the startup handshake: the
+   # synthetic 0.3s timeout must not kill Python before its supervisor is ready.
+   ready,_,_=select.select([read_fd],[],[],min(3.0,max(0.01,budget)))
    if not ready or os.read(read_fd,6)!=b'ready\n':raise TimeoutError('Observer supervisor readiness failed')
    process.wait(timeout=max(0.01,budget-(time.monotonic()-started)-7.0))
  except BaseException as exc:failure=exc
