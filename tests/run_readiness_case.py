@@ -92,7 +92,7 @@ def main():
         workflow.approve(run, approved_by=args.approved_by)
     opener = (workflow.local_output_reader(run) if args.host_mode == 'hermes-tui'
               else workflow.command_desktop_opener(args.desktop_opener_command))
-    parent = workflow.command_parent_visual_reviewer(args.parent_visual_review_command)
+    parent = workflow.command_parent_visual_reviewer(args.parent_visual_review_command, skill_root=root)
     with ExitStack() as stack:
         if planned['cohort'] == 'supplemental':
             opener, _events = stack.enter_context(campaign_adapter(workflow, planned, run, opener))

@@ -1,5 +1,29 @@
 # Hermes TUI host checks and acceptance
 
+## Current owner-authorized scope
+
+For the TUI visual correction campaign, execute exactly the independently audited
+five-case pilot below, fast focused regressions, unpaid host/render checks and
+the mandatory bounded genuine callback/fallback admission probe on the matching
+candidate. **Do not execute any other fixed cases, even if the pilot passes.**
+Freeze the manifest with `--pilot-scope owner-five-only`; the runner rejects
+`--phase remaining` for that hash-bound scope before admission or spending.
+Retain all first outcomes and failed evidence. Report five-case pilot-only
+acceptance and other fixed cases as not run by owner direction, never full
+28-case acceptance. The default full-campaign criteria and remaining-case
+reference below are unchanged, but they are not execution authorization.
+No client-study restart is authorized.
+
+Exact owner pilot IDs, in execution order:
+
+1. `retrospective-sparse-complete.r1`
+2. `prospective-advarra-sparse-complete.r1`
+3. `prospective-sterling-sparse-complete.r1`
+4. `ambispective-sterling-sparse-complete.r1`
+5. `ambispective-advarra-sparse-complete.r1`
+
+These are existing fixed clean baseline cases, not additional or duplicated runs.
+
 Run this procedure on the actual Linux Hermes host before another client study.
 Use a development checkout at the same commit as the freshly replaced installed
 candidate. Helpers under `tests/` are developer commands, not additional skill
@@ -12,10 +36,11 @@ Use the existing validated `CLINICAL_PYTHON`, absolute installed `RELEASE_ROOT`,
 matching development `CHECKOUT`, fresh `CAMPAIGN_ROOT` outside installed code,
 and a genuine executable `PARENT_VISUAL_REVIEW_COMMAND`. The parent command must
 follow the existing `--parent-visual-review-command` contract: inspect actual
-images and produce authenticated visual responses. Discover and validate the
-existing callback; do not invent a path or implement a callback that returns
-constant passes. If no genuine callback exists, run the unpaid checks and stop
-with `parent_visual_callback_unavailable` before paid acceptance cases.
+images and produce authenticated visual responses. The bundled executable is
+`$RELEASE_ROOT/scripts/tui_visual_callback`; production TUI selects it by default
+unless an explicit callback override is supplied. File presence is not image
+capability. Never return constant passes or impersonate a parent observer.
+If it is unavailable, stop with `parent_visual_callback_unavailable`.
 
 ## Unpaid host checks
 
@@ -42,8 +67,33 @@ replace/provision the candidate cleanly and rerun under a new evidence root.
 
 ## Freeze and run the pilot
 
+Before any pilot, run one explicitly authorized synthetic callback probe on
+this exact installed candidate. It injects a short delegated timeout (not a
+change to the production 240-second ceiling), then exercises one genuine
+callback with the remaining budget. The fixture is not a clinical generation
+entrypoint or a rendering certificate. Retain first failures; do not loop paid
+probes on an unchanged implementation. The report binds actual session/model,
+image tool evidence, authenticated responses and implementation hashes.
+
+```bash
+"$CLINICAL_PYTHON" -B tests/run_tui_visual_probe.py \
+  --release-root "$RELEASE_ROOT" \
+  --candidate-identity "$CAMPAIGN_ROOT/host/candidate-identity.json" \
+  --run-dir "$CAMPAIGN_ROOT/callback-probe" --authorize-paid-probe
+```
+
+Require complete accepted image judgments and successful fallback. The runner
+revalidates actual returned read-line coverage and correlated successful image
+results from retained session databases, not EOF/full-read claims. It binds the
+intact installed manifest, source hashes and command at launch into the parent
+request, persisted operation, invocation snapshot and observer provenance;
+accepted response/ledger hashes bind that provenance. Mutable report labels or
+flags cannot establish matching-candidate admission. Development evidence and
+older probes lacking those durable installed bindings must not be relabelled.
+
 ```bash
 "$CLINICAL_PYTHON" -B tests/ai_quality_campaign.py --host-mode hermes-tui \
+  --pilot-scope owner-five-only \
   --candidate-identity "$CAMPAIGN_ROOT/host/candidate-identity.json" \
   --host-checks "$CAMPAIGN_ROOT/host/host-checks.json" \
   --output "$CAMPAIGN_ROOT/manifest.json"
@@ -52,15 +102,18 @@ replace/provision the candidate cleanly and rerun under a new evidence root.
   --host-checks "$CAMPAIGN_ROOT/host/host-checks.json" \
   --release-root "$RELEASE_ROOT" --runs-root "$CAMPAIGN_ROOT/runs" \
   --parent-visual-review-command "$PARENT_VISUAL_REVIEW_COMMAND" \
+  --callback-probe "$CAMPAIGN_ROOT/callback-probe/probe-result.json" \
   --approved-by 'owner-authorized synthetic acceptance' --authorize-paid-campaign
 ```
 
 The manifest freezes 20 baseline first operations (10 clean, 10 deliberate prose
 repair) across retrospective, prospective/Advarra, prospective/Sterling,
 ambispective/Advarra and ambispective/Sterling, plus eight supplemental cases.
-The three pilot operations cover retrospective and both prospective consent
-families. No client source is used. Owner authorization for this synthetic
-campaign permits fixture approval only; it does not approve any new client facts.
+The default full-campaign pilot has three operations (retrospective and both
+prospective consent families). The explicit owner-five-only pilot adds the
+fixed ambispective/Sterling and ambispective/Advarra IDs listed above, covering
+all five families. No client source is used. Owner authorization for this
+synthetic pilot permits fixture approval only, not any new client facts.
 
 ## Independent audit
 
@@ -98,7 +151,10 @@ remain an honestly labeled complete Review-only Document Set. Other cases
 require passing clinical status and no material defects. Missing/failed audits
 remain failures or incomplete evidence, never inferred successes.
 
-## Remaining cases and decision
+## Remaining cases and decision (reference only; not authorized)
+
+**Do not run this phase under the current owner scope.** The following retained
+procedure defines unchanged full-campaign criteria, not a pilot-only pass.
 
 Run the same runner with `--phase remaining` after pilot audits. It refuses
 expansion unless all three pilot outcomes have passing independent audits and

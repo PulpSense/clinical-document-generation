@@ -1,0 +1,4 @@
+#!/bin/sh
+# Single-purpose callback; not a clinical generation entrypoint.
+: "${CLINICAL_PYTHON:?CLINICAL_PYTHON must name the validated compatible runtime}"
+exec "$CLINICAL_PYTHON" -B "$(dirname "$0")/tui_visual_callback.py" "$@"

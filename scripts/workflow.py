@@ -31,7 +31,7 @@ import uuid
 from xml.etree import ElementTree
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable, Iterable, Mapping, Sequence
 
@@ -94,7 +94,7 @@ PDF_PAGE_RENDERER = {
 }
 PRODUCTION_MODULES = {
     "contracts.py", "drafting.py", "prs_xml.py", "quality.py", "rendering.py", "workflow.py", "output_recovery.py",
-    "worker_boundary.py", "worker_capabilities.py",
+    "worker_boundary.py", "worker_capabilities.py", "visual_review.py", "tui_visual_callback.py",
 }
 CERTIFIED_HERMES_CONFIGURATION = {
     "source": "clinical-release-certification",
@@ -439,7 +439,7 @@ def _package_release_tree(
             "Release packaging requires the declared production Python modules: "
             + ", ".join(sorted(PRODUCTION_MODULES))
         )
-    exact_files = {"SKILL.md", "README.md", "CONTEXT.md", "requirements.txt", "agents/openai.yaml"}
+    exact_files = {"SKILL.md", "README.md", "CONTEXT.md", "requirements.txt", "agents/openai.yaml", "scripts/tui_visual_callback"}
     files = [
         path for path in sorted(repo_root.rglob("*"))
         if path.is_file()
@@ -507,7 +507,7 @@ def _package_release_tree(
             "The pinned pypdfium2 wheel is missing or does not match its governed hash."
         )
     pdf_renderer["runtime_inventory"] = _pdfium_wheel_inventory(pdf_renderer_wheel)
-    implementation_files = sorted(f"scripts/{name}" for name in PRODUCTION_MODULES)
+    implementation_files = sorted([*(f"scripts/{name}" for name in PRODUCTION_MODULES), "scripts/tui_visual_callback"])
     manifest = {
         "schema_version": "hermes-release-manifest/v2",
         "git_commit": git_commit,
@@ -523,6 +523,7 @@ def _package_release_tree(
         },
         "inventory": {
             "implementation": implementation_files,
+            "executable_callbacks": ["scripts/tui_visual_callback"],
             "contracted_template_bundles": bundles,
             "governed_resources": governed_resources,
             "font_identities": font_inventory,
@@ -546,6 +547,7 @@ def _package_release_tree(
                 relative = path.relative_to(repo_root).as_posix()
                 info = zipfile.ZipInfo(f"clinical-document-generation/{relative}", date_time=(1980, 1, 1, 0, 0, 0))
                 info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = (0o100755 if relative == "scripts/tui_visual_callback" else 0o100644) << 16
                 archive.writestr(info, file_bytes[path])
             info = zipfile.ZipInfo(f"clinical-document-generation/{RELEASE_MANIFEST}", date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
@@ -1360,6 +1362,14 @@ def provision_render_assurance(skill_root: Path) -> dict[str, Any]:
             "renderer": None,
             "page_renderer": None,
         }
+    # zipfile extraction does not restore POSIX modes. Installation owns this
+    # one explicit, hash-verified permission restoration; generation is read-only.
+    declared_callbacks = (_read(skill_root / RELEASE_MANIFEST).get("inventory") or {}).get("executable_callbacks", [])
+    if declared_callbacks not in ([], ["scripts/tui_visual_callback"]):
+        return {"status": "blocked", "findings": [{"category": "installation", "issue": "Unknown executable callback inventory."}]}
+    for relative in declared_callbacks:
+        callback = skill_root / relative
+        callback.chmod(0o755)
     office_renderers = [
         item for item in renderers(skill_root=skill_root)
         if item.get("kind") in {"Microsoft Word", "LibreOffice"}
@@ -4962,6 +4972,7 @@ def run_desktop_operation(
                 clock=clock,
                 stage_observer=observe_generate_stage,
                 require_promoted_runtime=require_promoted_runtime,
+                **({"bounded_visual_review": True} if (release_identity or {}).get("host_mode") == "hermes-tui" else {}),
             )
         finally:
             generate_elapsed = clock() - generate_started
@@ -5137,7 +5148,9 @@ def run_desktop_operation(
                         if not eligible:
                             break
                         parent_remaining = remaining_seconds()
-                        if parent_remaining <= 0:
+                        reserve = 65.0 if (release_identity or {}).get("host_mode") == "hermes-tui" else 0.0
+                        parent_budget = min(max(0.0, parent_remaining - reserve), PARENT_VISUAL_WORKER_BUDGET_SECONDS)
+                        if parent_budget <= 0:
                             break
                         for item in eligible:
                             key = str(
@@ -5149,7 +5162,6 @@ def run_desktop_operation(
                                     attempt_counters["parent_visual_callbacks"].get(key) or 0
                                 ) + 1
                         save("running")
-                        parent_budget = min(parent_remaining, PARENT_VISUAL_WORKER_BUDGET_SECONDS)
                         try:
                             if fallback_handoff_runner is not None:
                                 fallback_handoff_runner(eligible, parent_budget)
@@ -5488,6 +5500,10 @@ def _production_response_is_bound(
     producer_model_id = str(producer.get("model_id") or "").strip()
     if not producer_model_id:
         return False
+    if handoff.get("visual_unit"):
+        from visual_review import visual_review_unit_result
+        result = visual_review_unit_result(revision_dir, request_path)
+        return bool(result and result["complete"])
     if handoff.get("review_unit_id"):
         result = content_review_unit_result(revision_dir, request_path)
         return bool(result and result["complete"])
@@ -5647,7 +5663,7 @@ def _production_agent_prompt(
         else " The next generate invocation is the authoritative response validator."
     )
     transport_rule = ""
-    if task == "clinical_content_verification":
+    if task == "clinical_content_verification" or handoff.get("visual_unit"):
         request = _read(revision_dir / str(handoff["request_path"]))
         transport = request.get("review_transport") or {}
         transport_rule = (
@@ -5661,7 +5677,10 @@ def _production_agent_prompt(
             "and merge your judgments before retrying within the remaining deadline. This audit checkpoint is the only writable review file; "
             "native documents and source remain read-only. After compaction read the saved checkpoint and continue. "
             "Return completed assessments even if other inspection cannot finish. Report substantive defects normally. "
-        ) if transport else ""
+        ) if transport and transport.get("index_path") else ""
+        if handoff.get("visual_unit"):
+            transport_rule = " Read the bounded visual request directly. Its progress_path is the only writable checkpoint; save each completed target immediately as authenticated response JSON with status in_progress, after reading current checkpoint. Preserve prior judgments; finalize within your allocation. "
+            task_rule = "Act as an independent visual reviewer of ONLY visual_scope. Inspect each assigned image with vision_analyze; explicitly judge assigned pages, cross-page boundaries or document-level checks. Use visual_assessments, not section_assessments. Document scope must read document_evidence plus exact native DOCX and title/TOC/end images. Never infer missing judgments."
         if handoff.get("review_resume") and not handoff.get("review_unit_id"):
             transport_rule += " Fresh independent replacement: read outstanding scope at " + revision_path + "/" + str(handoff["review_resume_path"]) + "; " \
                               "inspect exact native evidence yourself for those judgments. Prior saved assessments are " \
@@ -6234,6 +6253,9 @@ def _production_dispatch_handoffs(
         error.worker_integrity_failure = dict(finding)
         invalidate_content_review_units(revision_dir,
             [revision_dir / str(h["request_path"]) for h in handoffs], finding)
+        from visual_review import invalidate_visual_review_units
+        invalidate_visual_review_units(revision_dir,
+            [revision_dir / str(h["request_path"]) for h in handoffs], finding)
 
     # Checkout-only launch fixtures have no provisioned renderer. Production
     # supplies its bound lifecycle policy explicitly, including if runtime was
@@ -6729,6 +6751,8 @@ def run_production_desktop_operation(
             )
         require_promoted_runtime = False
     configuration = dict(hermes_configuration)
+    if host_mode == "hermes-tui" and parent_visual_reviewer is None:
+        parent_visual_reviewer = command_parent_visual_reviewer(root / "scripts/tui_visual_callback", skill_root=root)
     allowed_configuration_fields = set(CERTIFIED_HERMES_CONFIGURATION) | {
         "layout_preservation_notes",
     }
@@ -6755,6 +6779,9 @@ def run_production_desktop_operation(
     runtime_identity = resolve_python_runtime(environment=os.environ)
     managed_hermes_identity = _managed_hermes_identity()
     identity = {**identity, "managed_hermes_identity": managed_hermes_identity}
+    callback_command = getattr(parent_visual_reviewer, "capability_executable", None)
+    if callback_command is not None:
+        identity["parent_visual_callback"] = {"path": str(callback_command), "sha256": sha256_file(callback_command)}
     state_path = desktop_operation_state_path(run_dir, operation_id)
     prior_state = _read(state_path) if state_path.is_file() else {}
     if prior_state.get("status") not in {"passed", "review_required", "timeout"}:
@@ -6794,13 +6821,28 @@ def run_production_desktop_operation(
         return run_dir / "revisions" / revision_id
 
     def route(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
-        _production_dispatch_handoffs(
-            handoffs, remaining_seconds, revision_dir(), configuration,
-            skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
-            expected_managed_hermes_identity=managed_hermes_identity,
-            require_promoted_runtime=require_promoted_runtime,
-            **({"host_mode": host_mode} if host_mode != "isolated" else {}),
-        )
+        def dispatch(items, budget):
+            _production_dispatch_handoffs(
+                items, budget, revision_dir(), configuration,
+                skill_root=root, run_dir=run_dir, runtime_identity=runtime_identity,
+                expected_managed_hermes_identity=managed_hermes_identity,
+                require_promoted_runtime=require_promoted_runtime,
+                **({"host_mode": host_mode} if host_mode != "isolated" else {}),
+            )
+        deadline = time.monotonic() + remaining_seconds
+        ordinary = []
+        for handoff in handoffs:
+            path = revision_dir() / str(handoff["request_path"])
+            request = _read(path) if handoff.get("task") == "rendered_page_visual_verification" and path.is_file() else {}
+            if request.get("visual_review_plan") and not handoff.get("visual_unit"):
+                from visual_review import run_visual_review
+                reviewed = run_visual_review(revision_dir(), path, dispatch, max(0.0, deadline - time.monotonic()))
+                if not reviewed["complete"] and not reviewed["findings"]:
+                    raise RuntimeError("Delegated bounded visual review incomplete; retain authenticated partial progress for callback")
+            else:
+                ordinary.append(handoff)
+        if ordinary:
+            dispatch(ordinary, max(0.0, deadline - time.monotonic()))
 
     def fallback(handoffs: list[Mapping[str, Any]], remaining_seconds: float) -> None:
         nonlocal parent_review_record
@@ -6822,6 +6864,10 @@ def run_production_desktop_operation(
                 + str(runtime_integrity)
             )
         primary_error: BaseException | None = None
+        prior_visual_units = set((active_revision / "hermes/visual-review-requests").glob("*.json"))
+        callback_manifest_hash = sha256_file(root / RELEASE_MANIFEST) if host_mode == "hermes-tui" and (root / RELEASE_MANIFEST).is_file() else None
+        if callback_manifest_hash and _manifest_integrity(root):
+            raise RuntimeError("Installed skill integrity failed before parent visual callback")
         try:
             parent_visual_reviewer(
                 handoffs, remaining_seconds, active_revision, configuration,
@@ -6848,7 +6894,13 @@ def run_production_desktop_operation(
                         "Provisioned renderer runtime changed during parent visual review; "
                         "reject this parent result: " + str(runtime_integrity)
                     )
+                if callback_manifest_hash and (sha256_file(root / RELEASE_MANIFEST) != callback_manifest_hash or _manifest_integrity(root)):
+                    raise RuntimeError("Installed skill changed during parent visual callback")
             except BaseException as integrity_error:
+                from visual_review import invalidate_visual_review_units
+                launched_units = set((active_revision / "hermes/visual-review-requests").glob("*.json")) - prior_visual_units
+                invalidate_visual_review_units(active_revision, sorted(launched_units),
+                    {"issue": str(integrity_error), "boundary": "post_parent_callback_renderer_or_package"})
                 if primary_error is None:
                     raise
                 # Reject the fallback without hiding callback/response diagnostics.
@@ -6864,6 +6916,9 @@ def run_production_desktop_operation(
             "response_paths": [str(item.get("response_path") or "") for item in handoffs],
             "completion_requirement": "Desktop parent must inspect every bound page image.",
             "producer_model_policy": "record_actual_nonempty_model_id",
+            "observer_evidence": [proof.get("observer_evidence") for item in handoffs
+                for proof in (_read(active_revision / str(item["response_path"])).get("unit_proofs") or [])
+                if proof.get("observer_evidence")],
         }
 
     result = run_desktop_operation(
@@ -6886,7 +6941,8 @@ def run_production_desktop_operation(
         "parent_visual_review": parent_review_record,
         "parent_visual_callback": {
             "configured": parent_visual_reviewer is not None,
-            "image_capability_validation": "not_attested" if parent_visual_reviewer is not None else "unavailable",
+            "image_capability_validation": "actual_bound_image_tools_observed" if (parent_review_record or {}).get("observer_evidence") else ("not_attested" if parent_visual_reviewer is not None else "unavailable"),
+            **({"executable": str(callback_command)} if callback_command else {}),
         },
         "review_mode": "manual_pre_release" if manual_review else "governed_delivery",
         "host_mode": host_mode,
@@ -7146,6 +7202,7 @@ sys.exit(0)
 
 def command_parent_visual_reviewer(
     command_path: Path,
+    *, skill_root: Path | None = None,
 ) -> Callable[[Sequence[Mapping[str, Any]], float, Path, Mapping[str, Any]], None]:
     """Build the external Desktop-parent callback used by the public CLI."""
     expanded = command_path.expanduser()
@@ -7154,6 +7211,7 @@ def command_parent_visual_reviewer(
     command = expanded.absolute()
     if command.is_symlink() or not command.is_file() or not os.access(command, os.X_OK):
         raise ValueError("The Desktop-parent reviewer command must be an absolute executable file.")
+    expected_command_sha256 = sha256_file(command)
 
     def response_candidates(output: str) -> list[dict[str, Any]]:
         decoder = json.JSONDecoder()
@@ -7175,6 +7233,8 @@ def command_parent_visual_reviewer(
         revision_dir: Path,
         configuration: Mapping[str, Any],
     ) -> None:
+        if command.is_symlink() or sha256_file(command) != expected_command_sha256:
+            raise RuntimeError("Desktop-parent callback executable changed after binding")
         request_path = revision_dir / "hermes/desktop-parent-visual-review-request.json"
         _write(request_path, {
             "schema_version": "desktop-parent-visual-review-request/v1",
@@ -7182,7 +7242,25 @@ def command_parent_visual_reviewer(
             "revision_id": revision_dir.name,
             "handoffs": [dict(item) for item in handoffs],
             "producer_model_policy": "record_actual_nonempty_model_id",
+            "revision_path": str(revision_dir.absolute()),
+            "remaining_seconds": min(480.0, max(0.0, remaining_seconds - 2.0)),
+            "callback_deadline_utc": (datetime.now(timezone.utc) + timedelta(seconds=min(480.0, max(0.0, remaining_seconds - 2.0)))).isoformat(),
+            "configuration": dict(configuration),
+            "managed_hermes_identity": _managed_hermes_identity(),
+            "profile_path": str(skill_root.parent.parent.absolute()) if skill_root else os.environ.get("HERMES_HOME", ""),
         })
+        # The canonical latest envelope remains discoverable, but each actual
+        # invocation receives its own immutable deadline/identity snapshot.
+        canonical_request_path = request_path
+        if skill_root is not None:
+            from visual_review import callback_release_binding
+            envelope = _read(request_path)
+            envelope['callback_release_binding'] = callback_release_binding(skill_root)
+            envelope['callback_command'] = {'path': str(command), 'sha256': expected_command_sha256}
+            _write(request_path, envelope)
+        request_path = revision_dir / f"hermes/parent-visual-invocations/{time.time_ns()}.json"
+        _write(request_path, _read(canonical_request_path))
+        invocation_request_sha256 = sha256_file(request_path)
         arguments = [str(command), str(request_path)]
         process = None
         stdout = stderr = ""
@@ -7213,7 +7291,7 @@ def command_parent_visual_reviewer(
             if status_writer is not None:
                 os.close(status_writer)
                 status_writer = None
-            stdout, stderr = process.communicate(timeout=max(0.0, remaining_seconds))
+            stdout, stderr = process.communicate(timeout=min(480.0, max(0.0, remaining_seconds)))
         except BaseException as exc:
             failure = exc
             timed_out = isinstance(exc, subprocess.TimeoutExpired)
@@ -7299,6 +7377,7 @@ def command_parent_visual_reviewer(
                 with diagnostic_file:
                     json.dump({
                         "request_path": str(request_path),
+                        "request_sha256": invocation_request_sha256,
                         "returncode": callback_returncode,
                         "stdout": stdout,
                         "stderr": stderr,
@@ -7346,6 +7425,8 @@ def command_parent_visual_reviewer(
             if cleanup_errors and hasattr(failure, "add_note"):
                 failure.add_note("Desktop-parent reviewer cleanup incomplete: " + "; ".join(cleanup_errors))
             raise failure
+        if sha256_file(request_path) != invocation_request_sha256:
+            raise RuntimeError("Desktop-parent callback invocation envelope changed")
         completed = subprocess.CompletedProcess(arguments, callback_returncode, stdout, stderr)
         if completed.returncode not in (None, 0):
             raise RuntimeError(
@@ -10054,12 +10135,14 @@ def _begin_independent_review(
     revision_dir: Path, reference: Mapping[str, Any],
     render_report: Mapping[str, Any], bundle: Mapping[str, Any], review_set: int,
     review_context: Mapping[str, Any] | None = None,
+    *, bounded_visual_review: bool = False,
 ) -> tuple[list[Path], list[dict[str, Any]]]:
     """Send usable candidates directly to independent AI review."""
     try:
         paths = create_verification_requests(
             revision_dir, reference, render_report,
             contracted_bundle=bundle, review_set=review_set, review_context=review_context,
+            bounded_visual_review=bounded_visual_review,
         )
     except ReviewEvidenceError as exc:
         return [], [exc.finding]
@@ -10093,6 +10176,7 @@ def generate(
     clock: Callable[[], float] = time.monotonic,
     stage_observer: Callable[[str, float], Any] | None = None,
     require_promoted_runtime: bool = True,
+    bounded_visual_review: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
     """Advance one approved revision until it needs Hermes work or passes."""
@@ -10151,6 +10235,11 @@ def generate(
         _write(reference_path, working_reference)
         _complete_generation_authority_rebind(revision_dir)
     state = working_reference.setdefault("generation", {})
+    # Keep the stronger TUI coverage contract through recursive repair and resume.
+    bounded_visual_review = bounded_visual_review or state.get("visual_review_policy") == "bounded_authenticated_units/v1"
+    if bounded_visual_review and state.get("visual_review_policy") != "bounded_authenticated_units/v1":
+        state["visual_review_policy"] = "bounded_authenticated_units/v1"
+        _write(reference_path, working_reference)
     resumed_requests = _apply_pending_recovery_plan(
         revision_dir,
         reference_path,
@@ -10552,6 +10641,7 @@ def generate(
     _, early_findings = _begin_independent_review(
         revision_dir, reference, render_report, bundle, review_set,
         review_context=state.get("native_review_context"),
+        bounded_visual_review=bounded_visual_review,
     )
     if early_findings:
         return _quality_retry(
@@ -11049,7 +11139,7 @@ def main(argv: list[str] | None = None) -> int:
             operation_id=args.operation_id,
             opener=command_desktop_opener(Path(args.desktop_opener_command)) if args.desktop_opener_command else None,
             parent_visual_reviewer=command_parent_visual_reviewer(
-                Path(args.parent_visual_review_command)
+                Path(args.parent_visual_review_command), skill_root=SCRIPT_DIR.parent,
             ) if args.parent_visual_review_command else None,
             manual_review=args.manual_review,
             host_mode=args.host_mode,

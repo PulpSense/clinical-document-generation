@@ -10,6 +10,21 @@ import sys
 from ai_quality_campaign import collect_readiness_runs, validate_readiness_manifest, validate_tui_host_checks
 
 
+def select_phase_operations(manifest, phase):
+    """Return only frozen IDs; owner five-case scope cannot expand to other cases."""
+    validate_readiness_manifest(manifest)
+    if phase not in {'pilot', 'remaining'}:
+        raise ValueError('Unknown TUI campaign phase')
+    if manifest.get('execution_scope') == 'owner-five-pilot-only' and phase != 'pilot':
+        raise ValueError('owner-five-pilot-only: other fixed cases are not authorized')
+    pilot = manifest['pilot_operation_ids']
+    planned = manifest['baseline_operations'] + manifest['supplemental_operations']
+    if phase == 'pilot':
+        by_id = {p['planned_operation_id']: p for p in planned}
+        return [by_id[key] for key in pilot]
+    return [p for p in planned if p['planned_operation_id'] not in set(pilot)]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--manifest', type=Path, required=True)
@@ -17,6 +32,7 @@ def main():
     parser.add_argument('--release-root', type=Path, required=True)
     parser.add_argument('--runs-root', type=Path, required=True)
     parser.add_argument('--parent-visual-review-command', type=Path, required=True)
+    parser.add_argument('--callback-probe', type=Path)
     parser.add_argument('--approved-by', required=True)
     parser.add_argument('--phase', choices=['pilot', 'remaining'], required=True)
     parser.add_argument('--authorize-paid-campaign', action='store_true')
@@ -32,6 +48,18 @@ def main():
     validate_tui_host_checks(host, manifest['candidate_identity'], manifest, args.host_checks.parent)
     if manifest.get('host_mode') != 'hermes-tui':
         parser.error('This runner only accepts an explicit TUI manifest')
+    try:
+        selected = select_phase_operations(manifest, args.phase)
+    except ValueError as exc:
+        parser.error(str(exc))
+    sys.path.insert(0, str(args.release_root / 'scripts'))
+    from visual_review import validate_callback_probe
+    try:
+        if args.callback_probe is None:
+            raise ValueError('callback_image_capability_unproven: --callback-probe is required before paid cases')
+        validate_callback_probe(callback, args.callback_probe, manifest['candidate_identity'])
+    except ValueError as exc:
+        parser.error(str(exc))
     runs = args.runs_root.absolute()
     if runs.resolve().is_relative_to(args.release_root.resolve()):
         parser.error('Campaign runs must remain outside installed code')
@@ -45,8 +73,6 @@ def main():
                     and first[key].get('local_bytes_verified') is True
                     and first[key].get('independent_audit_passed') is True for key in pilot)):
             parser.error('Audit all three passing pilot outputs independently before running remaining cases')
-    selected = [p for p in manifest['baseline_operations'] + manifest['supplemental_operations']
-        if (p['planned_operation_id'] in pilot) == (args.phase == 'pilot')]
     failures = []
     for planned in selected:
         run = runs / planned['planned_operation_id']
@@ -72,6 +98,12 @@ def main():
             failures.append(planned['planned_operation_id'])
             break
     report = collect_readiness_runs(manifest, runs, host)
+    if manifest.get('execution_scope') == 'owner-five-pilot-only':
+        report['execution_scope'] = manifest['execution_scope']
+        report['owner_pilot_operation_ids'] = list(manifest['pilot_operation_ids'])
+        report['other_fixed_cases_excluded_by_owner_direction'] = [p['planned_operation_id']
+            for p in manifest['baseline_operations'] + manifest['supplemental_operations']
+            if p['planned_operation_id'] not in pilot]
     (runs / ('phase-' + args.phase + '-report.json')).write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({'phase': args.phase, 'unexpected_outcomes': failures,
         'tui_local_acceptance': report['tui_local_acceptance'],

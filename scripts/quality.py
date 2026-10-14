@@ -5288,7 +5288,7 @@ def _reuse_visual_request(revision_dir: Path, proposed: Mapping[str, Any]) -> di
     if _has_visual_concern(proposed.get("review_context") or {}, artifact):
         return None
     bindings = ("task", "revision_id", "source_identity_sha256", "generation_authority_sha256",
-                "artifacts", "renderer", "page_renderer", "checks", "contracted_template_bundle")
+                "artifacts", "renderer", "page_renderer", "checks", "contracted_template_bundle", "visual_review_plan")
     for path in sorted((revision_dir / "hermes/verification-requests").glob("*.json")):
         if path.is_symlink():
             continue
@@ -5811,6 +5811,7 @@ def create_verification_requests(
     contracted_bundle: Mapping[str, Any] | None = None,
     review_set: int = 1,
     review_context: Mapping[str, Any] | None = None,
+    bounded_visual_review: bool = False,
 ) -> list[Path]:
     requests = revision_dir / "hermes/verification-requests"; responses = revision_dir / "hermes/verification-responses"
     content_files = []
@@ -5989,6 +5990,9 @@ def create_verification_requests(
         payload["template_preservation"] = template_preservation
         payload["instructions"] += " " + template_preservation
         if payload["task"] == "rendered_page_visual_verification":
+            if bounded_visual_review:
+                from visual_review import visual_review_plan
+                payload["visual_review_plan"] = visual_review_plan(payload)
             payload["instructions"] += " Judge layout from these bound page images and renderer; a different local renderer's pagination alone does not establish a defect."
         if review_context:
             payload["review_context"] = dict(review_context)
@@ -6484,6 +6488,10 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
         )
         if not evidence:
             return False
+        if request.get("visual_review_plan") and response.get("visual_scheduler_partial") is True:
+            return bool(any(f.get("partial_review") and f.get("verification_source_finding") for f in validation_findings)) and not any(
+                f.get("recovery_class") in {"verifier_transient", "document_structure_defect"}
+                and f.get("code") != "review_coverage_incomplete" for f in validation_findings)
         return not any(
             item.get("recovery_class") in {
                 "verifier_transient", "document_structure_defect",
@@ -6668,7 +6676,28 @@ def validate_verifications(
             }, "document_structure_defect"))
             continue
         if not response_path.is_file():
-            findings.append(recovery_finding({"category": "verification", "field": request["task"], "code": "verification_response_missing", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "Independent Hermes verification response is missing."}, "verifier_transient")); continue
+            partial_visual = None
+            if request.get("visual_review_plan"):
+                from visual_review import visual_review_result
+                try:
+                    partial_visual = visual_review_result(revision_dir, request_path, publish=False)
+                    for source in partial_visual["findings"]:
+                        findings.append(recovery_finding({
+                            **{k: source[k] for k in ("artifact", "page", "check", "element", "issue", "finding_id", "recommended_action") if k in source},
+                            "partial_review": True, "category": "visual", "field": request["task"],
+                            "target_ids": [f"layout:{source['artifact']}"],
+                            "verification_request_id": request["request_id"],
+                            "verification_source_finding": dict(source),
+                        }, "visual_defect"))
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    findings.append(recovery_finding({"category": "verification", "field": request["task"],
+                        "target_ids": [verification_target], "verification_request_id": request["request_id"],
+                        "issue": "Partial visual evidence cannot be authenticated: " + str(exc)}, "verifier_transient"))
+            findings.append(recovery_finding({"category": "verification", "field": request["task"],
+                "code": "review_coverage_incomplete" if partial_visual else "verification_response_missing",
+                "target_ids": [verification_target], "verification_request_id": request["request_id"],
+                "issue": "Independent Hermes verification response is missing or visual scope remains incomplete."}, "verifier_transient"))
+            continue
         try: response = _json(response_path)
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Invalid verification response: {exc}"}, "verifier_transient")); continue
@@ -6791,7 +6820,8 @@ def validate_verifications(
                 source = item if isinstance(item, Mapping) else {"issue": item}
                 category = "visual" if request["task"] == "rendered_page_visual_verification" else "verification"
                 finding = {
-                    "partial_review": bool(response.get("scheduler_partial") and response.get("review_unit_evidence")),
+                    "partial_review": bool((response.get("scheduler_partial") and response.get("review_unit_evidence"))
+                                           or (response.get("visual_scheduler_partial") and response.get("unit_proofs"))),
                     "category": category,
                     "field": request["task"],
                     "verification_request_id": request["request_id"],
@@ -6957,6 +6987,12 @@ def validate_verifications(
             ):
                 findings.append(recovery_finding({"category": "verification", "field": request["task"], "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": "A passing content response contains a non-passing section or cross-document assessment."}, "verifier_transient"))
         if request["task"] == "rendered_page_visual_verification":
+            from visual_review import visual_response_coverage_errors
+            for message in visual_response_coverage_errors(revision_dir, request, response):
+                findings.append(recovery_finding({"category": "verification", "field": "visual_assessments",
+                    "target_ids": [verification_target], "verification_request_id": request["request_id"],
+                    "code": "review_coverage_incomplete" if message == "Visual scope incomplete; authenticated substantive findings are ready for repair." else "visual_unit_evidence_invalid",
+                    "issue": message}, "verifier_transient"))
             expected_pages = {(a["artifact"], p["page"], p["sha256"]) for a in request.get("artifacts", []) for p in a.get("pages", [])}
             valid_page_rows = [
                 p for p in response.get("page_assessments", [])
@@ -6965,7 +7001,7 @@ def validate_verifications(
                 and set(p.get("checks", [])) == set(VISUAL_CHECKS)
             ]
             assessed = {(p.get("artifact"), p.get("page"), p.get("sha256")) for p in valid_page_rows}
-            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))
+            if expected_pages != assessed or len(valid_page_rows) != len(expected_pages): findings.append(recovery_finding({"category": "verification", "field": "page_assessments", "target_ids": [verification_target], "verification_request_id": request["request_id"], "code": "review_coverage_incomplete", "issue": f"Every rendered page and every visual check must be explicitly assessed; expected {len(expected_pages)}, accepted {len(assessed)}."}, "verifier_transient"))
             if response.get("status") == "passed" and any(
                 page.get("status") != "passed" for page in valid_page_rows
             ):

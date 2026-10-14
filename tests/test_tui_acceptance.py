@@ -269,6 +269,8 @@ def test_remaining_campaign_stops_spending_after_first_unexpected_outcome(tmp_pa
         'local_bytes_verified': True, 'independent_audit_passed': True} for p in manifest['pilot_operation_ids']],
         'evidence_errors': [], 'unmatched_operation_states': [], 'tui_local_acceptance': 'incomplete'}
     monkeypatch.setattr(runner, 'collect_readiness_runs', lambda *a: collector)
+    import visual_review
+    monkeypatch.setattr(visual_review, 'validate_callback_probe', lambda *a: {})
     calls = []
     def launch(command, **kwargs):
         calls.append(command)
@@ -277,6 +279,7 @@ def test_remaining_campaign_stops_spending_after_first_unexpected_outcome(tmp_pa
     monkeypatch.setattr(sys, 'argv', ['runner', '--manifest', str(tmp_path / 'manifest.json'),
         '--host-checks', str(tmp_path / 'host.json'), '--release-root', str(tmp_path / 'skill'),
         '--runs-root', str(tmp_path / 'runs'), '--parent-visual-review-command', str(callback),
+        '--callback-probe', str(tmp_path / 'controlled-proof.json'),
         '--approved-by', 'owner', '--phase', 'remaining', '--authorize-paid-campaign'])
     assert runner.main() == 1
     assert len(calls) == 1

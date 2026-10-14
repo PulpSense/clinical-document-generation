@@ -56,6 +56,12 @@ def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypa
     import sys
     root = tmp_path / 'profile/skills/clinical-document-generation'
     root.mkdir(parents=True)
+    # The public TUI now requires the shipped executable callback contract.
+    # Retain actual package bytes/mode rather than a fake passing executable.
+    import shutil
+    (root / 'scripts').mkdir()
+    for name in ('tui_visual_callback', 'tui_visual_callback.py', 'visual_review.py'):
+        shutil.copy2(workflow.SCRIPT_DIR / name, root / 'scripts' / name)
     run = tmp_path / 'run'
     manifest_path = run / 'revisions/r1/delivery-manifest.json'
     manifest_path.parent.mkdir(parents=True)
@@ -74,13 +80,13 @@ def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypa
     monkeypatch.setattr(workflow, 'resolve_python_runtime', lambda **k: {'executable': sys.executable, 'version_info': list(sys.version_info[:3])})
     monkeypatch.setattr(workflow, '_production_worker_readiness', lambda r, **k: {'status': 'passed', 'host_mode': k['host_mode']})
     results = iter([
-        {'status': 'awaiting_hermes', 'stage': 'drafting', 'revision_id': 'r1', 'handoffs': [{'task': 'section_drafting'}]},
+        {'status': 'awaiting_hermes', 'stage': 'drafting', 'revision_id': 'r1', 'handoffs': [{'task': 'section_drafting', 'request_path': 'hermes/draft-requests/test.json'}]},
         {'status': 'passed', 'stage': 'delivery', 'revision_id': 'r1', 'client_outputs': ['output/protocol.docx'], 'manifest': 'revisions/r1/delivery-manifest.json'}])
     monkeypatch.setattr(workflow, 'generate', lambda *a, **k: next(results))
     dispatched = []
     monkeypatch.setattr(workflow, '_production_dispatch_handoffs', lambda *a, **k: dispatched.append(k['host_mode']))
     result = workflow.run_production_desktop_operation(run, skill_root=root, manual_review=True, host_mode='hermes-tui')
-    assert dispatched == ['hermes-tui']
+    assert dispatched == ['hermes-tui'], result
     assert result['status'] == 'passed'
     assert result['stage'] == 'local_output_availability'
     assert result['delivery']['confirmed'] is False
