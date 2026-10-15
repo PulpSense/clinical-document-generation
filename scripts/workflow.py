@@ -50,6 +50,7 @@ from output_recovery import (apply_xml_repairs, source_path as normalize_source_
 from quality import invalidate_content_review_units
 from quality import create_content_review_unit, content_review_unit_result, content_review_schedule_result, content_review_resume, retain_verification_response, ReviewEvidenceError, CERTIFICATION_CASE_ORDER, CERTIFICATION_EVIDENCE_MAX_FILES, CERTIFICATION_EVIDENCE_MAX_ITEM_BYTES, CERTIFICATION_EVIDENCE_MAX_TOTAL_BYTES, CERTIFICATION_RUNTIME_CEILING_SECONDS, CERTIFICATION_VISUAL_CHECKS, CONTENT_CHECKS, DETERMINISTIC_BRANCH_ACCEPTANCE_CASES, FORMAT_CONFORMANCE_BASELINE_CASES, GOVERNED_GATE_SEQUENCE, RELEASE_CERTIFICATION_PUBLIC_KEY, RELEASE_CERTIFICATION_SIGNATURE_ALGORITHM, RELEASE_CERTIFICATION_TRUSTED_KEY_ID, RESPONSE_SCHEMA, VISUAL_CHECKS, _approved_packaged_font_fallback, _certification_evidence_findings, _manifest_package_fingerprint, _pdfium_runtime_integrity, _template_fonts, _validated_certification_evidence, advance_gate_ledger, audit_format_conformance_outputs, branch_acceptance_inventory, branch_acceptance_source, build_gate_ledger, canonical_evidence_sha256, certification_runtime_classification, create_verification_requests, final_exact_artifact_review_findings, load_format_conformance_matrix, page_renderers, pending_verifications, quality_report, release_certification_attestation_findings, release_certification_key_id, release_certification_payload, render_assurance, renderer, renderers, run_pdfium_worker, sha256_file as quality_sha256, validate_gate_ledger, verification_recovery_request_findings, verification_response_is_complete, verification_response_is_terminal
 from rendering import rendered_section_snapshot, render_documents
+from visual_review import IncompleteVisualReview
 from quality import VERIFY_SCHEMA, validate_verifications, retain_verification_response
 from contracts import document_table_reference, protocol_table_contracts, applicable_required_inputs, required_input_value
 from contracts import canonical_review_surface, finding_requires_repair, internal_presentation_note, review_concern, reviewed_presentation_only
@@ -5325,7 +5326,8 @@ def run_desktop_operation(
                                 except WorkerAuthenticationError:
                                     raise
                                 except Exception as visual_exc:
-                                    if not isinstance(visual_exc, (TimeoutError, subprocess.TimeoutExpired)):
+                                    if (getattr(visual_exc, 'worker_integrity_failure', None)
+                                            or not isinstance(visual_exc, (IncompleteVisualReview, TimeoutError, subprocess.TimeoutExpired))):
                                         parent_block = {
                                             "status": "blocked", "stage": "parent_visual_integrity",
                                             "findings": [{"category": "integrity", "field": "delegated_visual_review",
@@ -5347,7 +5349,8 @@ def run_desktop_operation(
                             except WorkerAuthenticationError:
                                 raise
                             except Exception as visual_exc:
-                                if not isinstance(visual_exc, (TimeoutError, subprocess.TimeoutExpired)):
+                                if (getattr(visual_exc, 'worker_integrity_failure', None)
+                                            or not isinstance(visual_exc, (IncompleteVisualReview, TimeoutError, subprocess.TimeoutExpired))):
                                     parent_block = {
                                         "status": "blocked", "stage": "parent_visual_integrity",
                                         "findings": [{"category": "integrity", "field": "delegated_visual_review",
@@ -5576,7 +5579,19 @@ def _production_publish_quiet_response(
     stdout_log: Path,
 ) -> bool:
     """Publish one validated JSON final answer from Hermes quiet-mode stdout."""
-    if _production_response_is_bound(
+    if handoff.get('visual_unit'):
+        final_path = revision_dir / str(handoff['response_path'])
+        if final_path.exists() and final_path.stat().st_size:
+            request = _read(native_file(revision_dir, str(handoff['request_path'])))
+            final = _read(native_file(revision_dir, str(handoff['response_path'])))
+            if not isinstance(final, Mapping) or not all(key in final for key in (
+                    'schema_version', 'request_id', 'request_sha256', 'task', 'producer')):
+                raise ValueError('Saved visual final response lacks mandatory binding fields')
+            if _bind_verification_response_payload(request, final) is None:
+                raise ValueError('Saved visual final response binding rejected')
+    # Complete saved progress does not authenticate a separate attempted final
+    # on stdout. Inspect both channels for visual units even after scope is full.
+    if not handoff.get('visual_unit') and _production_response_is_bound(
         revision_dir, handoff,
     ):
         return True
@@ -5586,20 +5601,56 @@ def _production_publish_quiet_response(
         return False
     decoder = json.JSONDecoder()
     candidates: list[Mapping[str, Any]] = []
+    decoded_end = 0
     for match in re.finditer(r"\{", payload):
+        if handoff.get('visual_unit') and match.start() < decoded_end:
+            continue
         try:
             candidate, _end = decoder.raw_decode(payload, match.start())
         except json.JSONDecodeError:
+            if handoff.get('visual_unit'):
+                line_prefix = payload[payload.rfind('\n', 0, match.start()) + 1:match.start()]
+                # Ordinary prefixed log prose (including {cache miss}) is not
+                # a final. A standalone object or quoted-key JSON fragment is.
+                if not line_prefix.strip() or re.match(r'''\{\s*["']''', payload[match.start():]):
+                    raise ValueError('Malformed visual final response is not absent review coverage')
             continue
-        if isinstance(candidate, Mapping):
+        if handoff.get('visual_unit'):
+            decoded_end = _end
+            # Traverse decoded objects, not braces inside JSON string values.
+            # Retain support for a valid envelope around the actual response.
+            pending = [candidate]
+            while pending:
+                item = pending.pop()
+                if isinstance(item, Mapping):
+                    candidates.append(item)
+                    pending.extend(item.values())
+                elif isinstance(item, list):
+                    pending.extend(item)
+        elif isinstance(candidate, Mapping):
             candidates.append(candidate)
     if not candidates:
+        if handoff.get('visual_unit') and payload.lstrip().startswith('{'):
+            raise ValueError('Malformed visual final response is not absent review coverage')
         return False
     response_path = revision_dir / str(handoff.get("response_path") or "")
     verification_task = str(handoff.get("task") or "") in {
         "clinical_content_verification", "rendered_page_visual_verification",
     }
     request = _read(revision_dir / str(handoff.get("request_path") or "")) if verification_task else None
+    if handoff.get('visual_unit') and request is not None:
+        # Validate every attempted response before choosing one to publish.
+        # A later valid final cannot erase a rejected earlier final.
+        for candidate in candidates:
+            if not any(key in candidate for key in (
+                    'schema_version', 'request_id', 'request_sha256', 'task',
+                    'producer', 'visual_assessments', 'findings')):
+                continue
+            if not all(key in candidate for key in (
+                    'schema_version', 'request_id', 'request_sha256', 'task', 'producer')):
+                raise ValueError('Structured visual final response lacks mandatory binding fields')
+            if _bind_verification_response_payload(request, candidate) is None:
+                raise ValueError('Visual final response binding rejected; not ordinary missing coverage')
     for candidate in reversed(candidates):
         if request is not None:
             # Hermes can finish a complete visual judgment while omitting the
@@ -5608,9 +5659,15 @@ def _production_publish_quiet_response(
             if not all(key in candidate for key in (
                 "schema_version", "request_id", "request_sha256", "task", "producer",
             )):
+                if handoff.get('visual_unit') and any(key in candidate for key in (
+                        'schema_version', 'request_id', 'request_sha256', 'task',
+                        'producer', 'visual_assessments', 'findings')):
+                    raise ValueError('Structured visual final response lacks mandatory binding fields')
                 continue
             bound = _bind_verification_response_payload(request, candidate)
             if bound is None:
+                if handoff.get('visual_unit'):
+                    raise ValueError('Visual final response binding rejected; not ordinary missing coverage')
                 continue
             candidate = bound
         _write(response_path, candidate)
@@ -6177,6 +6234,7 @@ def _reap_production_worker(
         if process.poll() is None:
             try:
                 os.killpg(process.pid, signal.SIGTERM)
+                process._clinical_parent_signals = {*getattr(process, '_clinical_parent_signals', ()), signal.SIGTERM}
             except ProcessLookupError:
                 pass
             except BaseException as exc:
@@ -6187,6 +6245,7 @@ def _reap_production_worker(
                 if process.poll() is None:
                     try:
                         os.killpg(process.pid, signal.SIGKILL)
+                        process._clinical_parent_signals = {*getattr(process, '_clinical_parent_signals', ()), signal.SIGKILL}
                     except ProcessLookupError:
                         pass
                     except BaseException as exc:
@@ -6200,6 +6259,7 @@ def _reap_production_worker(
                 if process.poll() is None:
                     try:
                         os.killpg(process.pid, signal.SIGKILL)
+                        process._clinical_parent_signals = {*getattr(process, '_clinical_parent_signals', ()), signal.SIGKILL}
                     except ProcessLookupError:
                         pass
                     except BaseException as kill_exc:
@@ -6336,6 +6396,7 @@ def _production_dispatch_handoffs(
 
     processes: list[tuple[subprocess.Popen[str], Mapping[str, Any], Any, Any, Path, float, _ProductionConnectProxy]] = []
     worker_states: dict[int, Path] = {}
+    parent_terminated: set[int] = set()
     repair_wave = any(handoff.get("task") == "document_repair" for handoff in handoffs)
     release_manifest_hash = None
     integrity_guard = repair_wave or host_mode == "hermes-tui"
@@ -6542,6 +6603,7 @@ def _production_dispatch_handoffs(
                     if process.poll() is None:
                         try:
                             os.killpg(process.pid, signal.SIGTERM)
+                            parent_terminated.add(process.pid)
                         except ProcessLookupError:
                             pass
                     process.wait(timeout=5)
@@ -6585,9 +6647,20 @@ def _production_dispatch_handoffs(
                     "The selected provider rejected the isolated Hermes worker login. "
                     "Authenticate the worker profile before starting a fresh operation."
                 )
-            raise RuntimeError(
+            visual_only = all(h.get('visual_unit') for h in handoffs)
+            if visual_only and any(process.returncode not in (None, 0)
+                                   and not (process.pid in parent_terminated and process.returncode in (-signal.SIGTERM, 130))
+                                   for process, _, _, _, _, _, _ in processes):
+                raise RuntimeError('Visual worker execution failed before complete bound responses')
+            error_type = IncompleteVisualReview if visual_only else RuntimeError
+            raise error_type(
                 "Hermes workers did not produce complete bound responses: " + ", ".join(missing)
             )
+        if all(h.get('visual_unit') for h in handoffs) and any(
+                process.returncode not in (None, 0)
+                and not (process.pid in parent_terminated and process.returncode in (-signal.SIGTERM, 130))
+                for process, _, _, _, _, _, _ in processes):
+            raise RuntimeError('Visual worker execution failed despite saved complete judgments')
     finally:
         cleanup_errors: list[BaseException] = []
         for process, _, stdout_handle, stderr_handle, profile, _, proxy in processes:
@@ -6631,6 +6704,23 @@ def _production_dispatch_handoffs(
             or _manifest_integrity(skill_root)
         ):
             raise RuntimeError("Installed skill files changed during worker dispatch; reject this worker result.")
+        primary_error = sys.exc_info()[1]
+        if all(h.get('visual_unit') for h in handoffs) and (
+                primary_error is None or isinstance(primary_error, IncompleteVisualReview)):
+            for process, _, _, _, _, _, _ in processes:
+                code = process.returncode
+                sent = getattr(process, '_clinical_parent_signals', set())
+                parent_stop = (process.pid in parent_terminated and code in (-signal.SIGTERM, 130)) or (
+                    type(code) is int and (-code in sent or code == 130 and signal.SIGTERM in sent))
+                if type(code) is not int or code != 0 and not parent_stop:
+                    raise RuntimeError('Visual worker terminal execution failed after reaping') from primary_error
+            # A TERM handler may write or replace finals while being reaped.
+            # Only the now-quiescent disk/stdout bytes can authorize recovery
+            # or evidence credit; pre-reap validation is not a final gate.
+            for _, handoff, stdout_handle, _, _, _, _ in processes:
+                _production_publish_quiet_response(
+                    revision_dir, handoff, Path(stdout_handle.name),
+                )
 
 
 def _installed_release_identity(skill_root: Path) -> dict[str, Any]:
@@ -6878,8 +6968,10 @@ def run_production_desktop_operation(
             if request.get("visual_review_plan") and not handoff.get("visual_unit"):
                 from visual_review import run_visual_review
                 reviewed = run_visual_review(revision_dir(), path, dispatch, max(0.0, deadline - time.monotonic()))
+                if reviewed.get('resource_deferred'):
+                    raise RuntimeError('Visual review resource reclamation deferred; preserve scope without new allocation')
                 if not reviewed["complete"] and not reviewed["findings"]:
-                    raise RuntimeError("Delegated bounded visual review incomplete; retain authenticated partial progress for callback")
+                    raise IncompleteVisualReview("Delegated bounded visual review incomplete; retain authenticated partial progress for callback")
             else:
                 ordinary.append(handoff)
         if ordinary:

@@ -15,6 +15,10 @@ from typing import Any, Mapping, Sequence
 import quality
 from drafting import sha256_value
 
+class IncompleteVisualReview(RuntimeError):
+    """A reaped, postchecked production wave lacks complete bound judgments."""
+
+
 BOUNDARY_CHECKS = ['table_flow', 'heading_continuity', 'header_footer_continuity']
 DOCUMENT_CHECKS = ['toc_destinations', 'toc_mismatch', 'document_continuity', 'template_preservation']
 PAGE_CHECKS = [check for check in quality.VISUAL_CHECKS if check != 'toc_mismatch']
@@ -479,8 +483,11 @@ def run_visual_review(revision: Path, parent_path: Path, dispatch, remaining_sec
             if integrity:
                 invalidate_visual_review_units(revision, paths, integrity)
             errors.append(type(exc).__name__ + ': ' + str(exc))
-            if integrity:
-                raise  # Do not retry a poisoned renderer in the same wave.
+            import subprocess
+            if integrity or not isinstance(exc, (IncompleteVisualReview, TimeoutError, subprocess.TimeoutExpired)):
+                raise  # Unknown execution failures cannot become missing coverage.
+        for path in paths:
+            validate_visual_review_unit_request(revision, path)
         updated = visual_review_result(revision, parent_path)
         no_progress = no_progress + 1 if len(updated['assessments']) <= len(result['assessments']) else 0
 
