@@ -6649,7 +6649,7 @@ def _production_dispatch_handoffs(
                 )
             visual_only = all(h.get('visual_unit') for h in handoffs)
             if visual_only and any(process.returncode not in (None, 0)
-                                   and not (process.pid in parent_terminated and process.returncode in (-signal.SIGTERM, 130))
+                                   and not (process.pid in parent_terminated and process.returncode in (-signal.SIGTERM, -signal.SIGINT, 130))
                                    for process, _, _, _, _, _, _ in processes):
                 raise RuntimeError('Visual worker execution failed before complete bound responses')
             error_type = IncompleteVisualReview if visual_only else RuntimeError
@@ -6658,7 +6658,7 @@ def _production_dispatch_handoffs(
             )
         if all(h.get('visual_unit') for h in handoffs) and any(
                 process.returncode not in (None, 0)
-                and not (process.pid in parent_terminated and process.returncode in (-signal.SIGTERM, 130))
+                and not (process.pid in parent_terminated and process.returncode in (-signal.SIGTERM, -signal.SIGINT, 130))
                 for process, _, _, _, _, _, _ in processes):
             raise RuntimeError('Visual worker execution failed despite saved complete judgments')
     finally:
@@ -6710,8 +6710,12 @@ def _production_dispatch_handoffs(
             for process, _, _, _, _, _, _ in processes:
                 code = process.returncode
                 sent = getattr(process, '_clinical_parent_signals', set())
-                parent_stop = (process.pid in parent_terminated and code in (-signal.SIGTERM, 130)) or (
-                    type(code) is int and (-code in sent or code == 130 and signal.SIGTERM in sent))
+                # Hermes raises KeyboardInterrupt from its TERM handler. During
+                # startup Python reports that uncaught interruption as -SIGINT;
+                # after CLI setup it normally returns 130. Neither is ordinary
+                # unless this parent actually sent TERM to this exact child.
+                parent_stop = (process.pid in parent_terminated and code in (-signal.SIGTERM, -signal.SIGINT, 130)) or (
+                    type(code) is int and (-code in sent or code in (-signal.SIGINT, 130) and signal.SIGTERM in sent))
                 if type(code) is not int or code != 0 and not parent_stop:
                     raise RuntimeError('Visual worker terminal execution failed after reaping') from primary_error
             # A TERM handler may write or replace finals while being reaped.

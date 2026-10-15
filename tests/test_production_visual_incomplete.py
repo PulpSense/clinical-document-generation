@@ -11,7 +11,7 @@ from test_visual_units import parent_fixture, response_for
 
 
 @pytest.mark.parametrize('parallel', [False, True])
-@pytest.mark.parametrize('fault', ['ordinary', 'persistent', 'launch', 'cleanup', 'authentication', 'renderer', 'ledger', 'bad_final_hash', 'malformed_final', 'unknown_exit', 'bad_final_file', 'bad_final_file_complete_progress', 'self_term', 'own_budget', 'own_budget_exit2', 'bound_parent_term', 'unknown_exit_complete', 'missing_binding_key', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'bad_final_hash_complete_progress', 'missing_binding_complete_progress', 'malformed_complete_progress', 'bad_then_good_stdout', 'good_then_bad_stdout', 'valid_stdout', 'malformed_nested_complete_progress', 'malformed_then_good_stdout', 'good_then_malformed_stdout', 'log_prefixed_malformed', 'disk_missing_binding_complete_progress', 'ordinary_log_valid_stdout', 'json_envelope_valid_stdout', 'quoted_brace_valid_stdout'])
+@pytest.mark.parametrize('fault', ['ordinary', 'persistent', 'launch', 'cleanup', 'authentication', 'renderer', 'ledger', 'bad_final_hash', 'malformed_final', 'unknown_exit', 'bad_final_file', 'bad_final_file_complete_progress', 'self_term', 'own_budget', 'own_budget_exit2', 'bound_parent_term', 'unknown_exit_complete', 'missing_binding_key', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'bad_final_hash_complete_progress', 'missing_binding_complete_progress', 'malformed_complete_progress', 'bad_then_good_stdout', 'good_then_bad_stdout', 'valid_stdout', 'malformed_nested_complete_progress', 'malformed_then_good_stdout', 'good_then_malformed_stdout', 'log_prefixed_malformed', 'disk_missing_binding_complete_progress', 'ordinary_log_valid_stdout', 'json_envelope_valid_stdout', 'quoted_brace_valid_stdout', 'own_budget_keyboardinterrupt', 'self_int', 'bound_parent_keyboardinterrupt'])
 def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, monkeypatch, parallel, fault):
     run = tmp_path / 'run'
     revision, parent_path, parent = parent_fixture(run, 'retrospective')
@@ -118,6 +118,14 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
             action = ('print(' + repr(json.dumps(bad)) + ',flush=True)' if fault.endswith('stdout')
                       else 'Path(' + repr(str(final)) + ').write_text(' + repr(json.dumps(bad)) + ')')
             code += '; import time,signal,sys; signal.signal(signal.SIGTERM,lambda *_: (' + action + ',sys.exit(0))); time.sleep(60)'
+        if fault == 'self_int':
+            code += '; import os,signal; signal.signal(signal.SIGINT,signal.default_int_handler); os.kill(os.getpid(),signal.SIGINT)'
+        if fault in {'own_budget_keyboardinterrupt', 'bound_parent_keyboardinterrupt'}:
+            if fault == 'bound_parent_keyboardinterrupt':
+                final = revision / unit['response_path']; final.parent.mkdir(parents=True, exist_ok=True)
+                code += '; Path(' + repr(str(final)) + ').write_text(' + repr(json.dumps(response_for(unit))) + ')'
+            ready = target.with_name(target.name + '.handler-ready')
+            code += '; import signal,time; signal.signal(signal.SIGTERM,lambda *_: (_ for _ in ()).throw(KeyboardInterrupt())); Path(' + repr(str(ready)) + ').write_text("ready"); time.sleep(60)'
         if fault == 'self_term':
             code += '; import os,signal; os.kill(os.getpid(),signal.SIGTERM)'
         if fault == 'bound_parent_term':
@@ -130,11 +138,14 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
             code += '; import sys; print("authentication required", file=sys.stderr); sys.exit(1)'
         child = real_popen([sys.executable, '-B', '-c', code], **options)
         launched.append(child)
-        if fault not in {'own_budget', 'own_budget_exit2', 'bound_parent_term', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final'}:
-            assert child.wait(timeout=5) == (1 if fault == 'authentication' else -15 if fault == 'self_term' else 2 if fault in {'unknown_exit', 'unknown_exit_complete'} else 0)
+        if fault not in {'own_budget', 'own_budget_exit2', 'bound_parent_term', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'own_budget_keyboardinterrupt', 'bound_parent_keyboardinterrupt'}:
+            assert child.wait(timeout=5) == (1 if fault == 'authentication' else -2 if fault == 'self_int' else -15 if fault == 'self_term' else 2 if fault in {'unknown_exit', 'unknown_exit_complete'} else 0)
         else:
             import time
             until=time.monotonic()+3
+            if fault in {'own_budget_keyboardinterrupt', 'bound_parent_keyboardinterrupt'}:
+                while not ready.exists() and time.monotonic() < until: time.sleep(.01)
+                assert ready.exists(), 'TERM handler not installed before dispatch starts'
             while launched == [child] and (not target.exists() or target.stat().st_size == 0) and time.monotonic()<until: time.sleep(.01)
         if fault == 'bad_request_hash':
             request_path = revision / h['request_path']
@@ -162,7 +173,7 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
     original_dispatch = workflow._production_dispatch_handoffs
     def dispatch(items, *args, **kwargs):
         if items[0].get('task') == 'ordinary-fixture': return
-        if fault in {'own_budget', 'own_budget_exit2', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final'}:
+        if fault in {'own_budget', 'own_budget_exit2', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'own_budget_keyboardinterrupt', 'bound_parent_keyboardinterrupt'}:
             args=list(args); args[0]=5.15; args=tuple(args)
         return original_dispatch(items, *args, **kwargs)
     monkeypatch.setattr(workflow, '_production_dispatch_handoffs', dispatch)
@@ -196,12 +207,16 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
         'returncodes': [p.poll() for p in launched], 'client_outputs': result.get('client_outputs'), 'result': result}
     (tmp_path / 'observation.json').write_text(json.dumps(observation) + '\n')
     assert all(p.poll() is not None for p in launched)
+    if fault == 'self_int':
+        # Assert outside the adapter: it deliberately catches launch errors,
+        # including fixture assertions, and could otherwise mask a bad probe.
+        assert launched and all(p.returncode == -2 for p in launched)
     assert not result.get('client_outputs')
-    if fault in {'launch', 'cleanup', 'authentication', 'renderer', 'ledger', 'bad_final_hash', 'bad_request_hash', 'malformed_final', 'manifest', 'postcheck_raise', 'unknown_exit', 'bad_final_file', 'bad_final_file_complete_progress', 'self_term', 'own_budget_exit2', 'unknown_exit_complete', 'missing_binding_key', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'bad_final_hash_complete_progress', 'missing_binding_complete_progress', 'malformed_complete_progress', 'bad_then_good_stdout', 'good_then_bad_stdout', 'malformed_nested_complete_progress', 'malformed_then_good_stdout', 'good_then_malformed_stdout', 'log_prefixed_malformed', 'disk_missing_binding_complete_progress'}:
+    if fault in {'launch', 'cleanup', 'authentication', 'renderer', 'ledger', 'bad_final_hash', 'bad_request_hash', 'malformed_final', 'manifest', 'postcheck_raise', 'unknown_exit', 'bad_final_file', 'bad_final_file_complete_progress', 'self_term', 'own_budget_exit2', 'unknown_exit_complete', 'missing_binding_key', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'bad_final_hash_complete_progress', 'missing_binding_complete_progress', 'malformed_complete_progress', 'bad_then_good_stdout', 'good_then_bad_stdout', 'malformed_nested_complete_progress', 'malformed_then_good_stdout', 'good_then_malformed_stdout', 'log_prefixed_malformed', 'disk_missing_binding_complete_progress', 'self_int'}:
         assert callbacks == []
         assert result['stage'] == ('worker_authentication' if fault == 'authentication' else 'parent_visual_integrity')
     else:
-        if fault in {'bound_parent_term', 'valid_stdout', 'ordinary_log_valid_stdout', 'json_envelope_valid_stdout', 'quoted_brace_valid_stdout'}:
+        if fault in {'bound_parent_term', 'valid_stdout', 'ordinary_log_valid_stdout', 'json_envelope_valid_stdout', 'quoted_brace_valid_stdout', 'bound_parent_keyboardinterrupt'}:
             assert not callbacks
             assert result['stage']=='synthetic_probe_done'
             return
