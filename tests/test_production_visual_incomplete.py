@@ -50,6 +50,13 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
         response['visual_assessments'] = response['visual_assessments'][:1]
         response['status'] = 'in_progress'
         target = revision / unit['review_transport']['progress_path']
+        if fault.startswith('finding_'):
+            row = response['visual_assessments'][0]
+            row['status'] = 'blocked'
+            response['findings'] = [{'target_id': row['target_id'], 'artifact': row['artifact'],
+                'page': row['pages'][0]['page'], 'check': row['checks'][0],
+                'element': 'Controlled paragraph', 'recommended_action': 'Repair controlled defect',
+                'issue': 'Retained checkpoint concern', 'finding_id': 'retained-concern'}]
         code = (f'from pathlib import Path; p=Path({str(target)!r}); p.write_text({json.dumps(response)!r})'
                 if not launched else 'from pathlib import Path')
         if fault in {'bad_final_hash', 'bad_final_hash_complete_progress'}:
@@ -134,6 +141,18 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
             code += '; import time,signal,sys'
             if fault == 'own_budget_exit2': code += '; signal.signal(signal.SIGTERM,lambda *args: sys.exit(2))'
             code += '; time.sleep(60)'
+        transport = fault.removeprefix('finding_').removesuffix('_valid_stdout')
+        if transport in {'truncated_disk', 'encoding_disk', 'nonobject_disk',
+                         'truncated_stdout', 'encoding_stdout', 'nonobject_stdout'}:
+            malformed = (b'{"schema_version":' if transport.startswith('truncated') else
+                         b'\xff\xfe' if transport.startswith('encoding') else b'[1, null, "not a response"]')
+            if transport.endswith('disk'):
+                final = revision / unit['response_path']
+                code += '; q=Path(' + repr(str(final)) + '); q.parent.mkdir(parents=True,exist_ok=True); q.write_bytes(' + repr(malformed) + ')'
+            else:
+                code += '; import sys; sys.stdout.buffer.write(' + repr(malformed) + '); sys.stdout.flush()'
+        if fault == 'finding_later_pass' or fault.endswith('_disk_valid_stdout'):
+            code += '; print(' + repr(json.dumps(response_for(unit))) + ')'
         if fault == 'authentication':
             code += '; import sys; print("authentication required", file=sys.stderr); sys.exit(1)'
         child = real_popen([sys.executable, '-B', '-c', code], **options)
@@ -212,11 +231,23 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
         # including fixture assertions, and could otherwise mask a bad probe.
         assert launched and all(p.returncode == -2 for p in launched)
     assert not result.get('client_outputs')
-    if fault in {'launch', 'cleanup', 'authentication', 'renderer', 'ledger', 'bad_final_hash', 'bad_request_hash', 'malformed_final', 'manifest', 'postcheck_raise', 'unknown_exit', 'bad_final_file', 'bad_final_file_complete_progress', 'self_term', 'own_budget_exit2', 'unknown_exit_complete', 'missing_binding_key', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'bad_final_hash_complete_progress', 'missing_binding_complete_progress', 'malformed_complete_progress', 'bad_then_good_stdout', 'good_then_bad_stdout', 'malformed_nested_complete_progress', 'malformed_then_good_stdout', 'good_then_malformed_stdout', 'log_prefixed_malformed', 'disk_missing_binding_complete_progress', 'self_int'}:
+    if fault.endswith('_disk_valid_stdout'):
+        assert not callbacks
+        assert result['stage'] == 'synthetic_probe_done'
+        return
+    if fault.startswith('finding_'):
+        retained = visual_review_result(revision, parent_path, publish=False)
+        assert any(f['finding_id'] == 'retained-concern' for f in retained['findings'])
+        assert retained['assessments'][0]['status'] == 'blocked'
+        assert not callbacks, 'Substantive findings must return to generation/repair, not missing-scope fallback'
+        assert result['stage'] == 'synthetic_probe_done'
+        assert any(f['finding_id'] == 'retained-concern' for f in json.loads((revision / parent['response_path']).read_text())['findings'])
+        return
+    if fault in {'launch', 'cleanup', 'authentication', 'renderer', 'ledger', 'bad_final_hash', 'bad_request_hash', 'manifest', 'postcheck_raise', 'unknown_exit', 'bad_final_file', 'bad_final_file_complete_progress', 'self_term', 'own_budget_exit2', 'unknown_exit_complete', 'missing_binding_key', 'own_budget_bad_final_file', 'own_budget_bad_stdout', 'cleanup_replace_final', 'bad_final_hash_complete_progress', 'missing_binding_complete_progress', 'bad_then_good_stdout', 'good_then_bad_stdout', 'disk_missing_binding_complete_progress', 'self_int'}:
         assert callbacks == []
         assert result['stage'] == ('worker_authentication' if fault == 'authentication' else 'parent_visual_integrity')
     else:
-        if fault in {'bound_parent_term', 'valid_stdout', 'ordinary_log_valid_stdout', 'json_envelope_valid_stdout', 'quoted_brace_valid_stdout', 'bound_parent_keyboardinterrupt'}:
+        if fault in {'malformed_complete_progress', 'malformed_nested_complete_progress', 'bound_parent_term', 'valid_stdout', 'ordinary_log_valid_stdout', 'json_envelope_valid_stdout', 'quoted_brace_valid_stdout', 'bound_parent_keyboardinterrupt'}:
             assert not callbacks
             assert result['stage']=='synthetic_probe_done'
             return

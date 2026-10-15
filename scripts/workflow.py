@@ -5579,27 +5579,55 @@ def _production_publish_quiet_response(
     handoff: Mapping[str, Any],
     stdout_log: Path,
 ) -> bool:
-    """Publish one validated JSON final answer from Hermes quiet-mode stdout."""
+    """Publish an authenticated final without conflating transport and identity."""
+    def retain_transport(path: Path, channel: str) -> None:
+        # Preserve exact rejected bytes before another channel can publish over
+        # the final path. This is diagnostic evidence, never review credit.
+        raw = path.read_bytes()
+        digest = __import__('hashlib').sha256(raw).hexdigest()
+        retained = revision_dir / 'hermes/visual-final-transport' / (
+            str(handoff['request_id']) + '.' + channel + '.' + digest + '.bin')
+        if not retained.exists():
+            retained.parent.mkdir(parents=True, exist_ok=True)
+            retained.write_bytes(raw)
+
     if handoff.get('visual_unit'):
         final_path = revision_dir / str(handoff['response_path'])
         if final_path.exists() and final_path.stat().st_size:
             request = _read(native_file(revision_dir, str(handoff['request_path'])))
-            final = _read(native_file(revision_dir, str(handoff['response_path'])))
-            if not isinstance(final, Mapping) or not all(key in final for key in (
-                    'schema_version', 'request_id', 'request_sha256', 'task', 'producer')):
-                raise ValueError('Saved visual final response lacks mandatory binding fields')
-            if _bind_verification_response_payload(request, final) is None:
-                raise ValueError('Saved visual final response binding rejected')
+            final_path = native_file(revision_dir, str(handoff['response_path']))
+            try:
+                final = json.loads(final_path.read_text(encoding='utf-8'))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                final = None
+            if not isinstance(final, Mapping):
+                retain_transport(final_path, 'disk')
+            else:
+                if not all(key in final for key in (
+                        'schema_version', 'request_id', 'request_sha256', 'task', 'producer')):
+                    raise ValueError('Saved visual final response lacks mandatory binding fields')
+                if _bind_verification_response_payload(request, final) is None:
+                    raise ValueError('Saved visual final response binding rejected')
     # Complete saved progress does not authenticate a separate attempted final
     # on stdout. Inspect both channels for visual units even after scope is full.
     if not handoff.get('visual_unit') and _production_response_is_bound(
         revision_dir, handoff,
     ):
         return True
+    malformed_transport = False
     try:
         payload = stdout_log.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        if not handoff.get('visual_unit'):
+            raise
+        # Replacement decoding is for detecting parseable foreign bindings,
+        # not for publishing a repaired or invented response.
+        payload = stdout_log.read_bytes().decode('utf-8', errors='replace')
+        malformed_transport = True
     except OSError:
         return False
+    if handoff.get('visual_unit') and payload.lstrip().startswith('['):
+        malformed_transport = True
     decoder = json.JSONDecoder()
     candidates: list[Mapping[str, Any]] = []
     decoded_end = 0
@@ -5614,7 +5642,7 @@ def _production_publish_quiet_response(
                 # Ordinary prefixed log prose (including {cache miss}) is not
                 # a final. A standalone object or quoted-key JSON fragment is.
                 if not line_prefix.strip() or re.match(r'''\{\s*["']''', payload[match.start():]):
-                    raise ValueError('Malformed visual final response is not absent review coverage')
+                    malformed_transport = True
             continue
         if handoff.get('visual_unit'):
             decoded_end = _end
@@ -5631,8 +5659,8 @@ def _production_publish_quiet_response(
         elif isinstance(candidate, Mapping):
             candidates.append(candidate)
     if not candidates:
-        if handoff.get('visual_unit') and payload.lstrip().startswith('{'):
-            raise ValueError('Malformed visual final response is not absent review coverage')
+        if handoff.get('visual_unit') and payload.strip():
+            retain_transport(stdout_log, 'stdout')
         return False
     response_path = revision_dir / str(handoff.get("response_path") or "")
     verification_task = str(handoff.get("task") or "") in {
@@ -5652,6 +5680,9 @@ def _production_publish_quiet_response(
                 raise ValueError('Structured visual final response lacks mandatory binding fields')
             if _bind_verification_response_payload(request, candidate) is None:
                 raise ValueError('Visual final response binding rejected; not ordinary missing coverage')
+    if handoff.get('visual_unit') and malformed_transport:
+        retain_transport(stdout_log, 'stdout')
+        return False  # Independent checkpoints remain available to aggregation.
     for candidate in reversed(candidates):
         if request is not None:
             # Hermes can finish a complete visual judgment while omitting the
