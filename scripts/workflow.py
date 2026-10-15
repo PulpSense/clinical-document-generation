@@ -5662,7 +5662,14 @@ def _production_publish_quiet_response(
                 item = pending.pop()
                 if isinstance(item, Mapping):
                     candidates.append(item)
-                    pending.extend(item.values())
+                    # Response bodies own their assessments, findings and
+                    # metadata. Those descendants are not independent finals.
+                    # Keep traversing envelopes so separate response siblings
+                    # (including foreign ones) are still authenticated below.
+                    if not any(key in item for key in (
+                            'schema_version', 'request_id', 'request_sha256', 'task',
+                            'producer', 'visual_assessments', 'findings')):
+                        pending.extend(item.values())
                 elif isinstance(item, list):
                     pending.extend(item)
         elif isinstance(candidate, Mapping):

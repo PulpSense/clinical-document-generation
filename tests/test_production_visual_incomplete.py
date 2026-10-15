@@ -151,6 +151,20 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
                 code += '; q=Path(' + repr(str(final)) + '); q.parent.mkdir(parents=True,exist_ok=True); q.write_bytes(' + repr(malformed) + ')'
             else:
                 code += '; import sys; sys.stdout.buffer.write(' + repr(malformed) + '); sys.stdout.flush()'
+        if 'nested_producer' in fault:
+            good = response_for(unit)
+            good['visual_assessments'][0]['producer'] = dict(good['producer'])
+            bad = dict(good, request_sha256='0' * 64)
+            if fault == 'nested_producer_foreign_envelope':
+                finals = [{'response': good, 'other_response': bad}]
+            elif fault == 'nested_producer_foreign_first':
+                finals = [bad, good]
+            elif fault == 'nested_producer_foreign_last':
+                finals = [good, bad]
+            else:
+                finals = [{'response': good}] if fault == 'nested_producer_envelope_stdout' else [good]
+            for final in finals:
+                code += '; print(' + repr(json.dumps(final)) + ')'
         if fault == 'finding_later_pass' or fault.endswith('_disk_valid_stdout'):
             code += '; print(' + repr(json.dumps(response_for(unit))) + ')'
         if fault == 'authentication':
@@ -231,6 +245,14 @@ def test_production_missing_visual_scope_reaches_only_safe_fallback(tmp_path, mo
         # including fixture assertions, and could otherwise mask a bad probe.
         assert launched and all(p.returncode == -2 for p in launched)
     assert not result.get('client_outputs')
+    if fault in {'nested_producer_foreign_first', 'nested_producer_foreign_last', 'nested_producer_foreign_envelope'}:
+        assert not callbacks
+        assert result['stage'] == 'parent_visual_integrity'
+        return
+    if fault in {'nested_producer_stdout', 'nested_producer_envelope_stdout'}:
+        assert not callbacks
+        assert result['stage'] == 'synthetic_probe_done'
+        return
     if fault.endswith('_disk_valid_stdout'):
         assert not callbacks
         assert result['stage'] == 'synthetic_probe_done'
