@@ -2,6 +2,7 @@
 import json
 import pytest
 import quality
+from visual_review import IncompleteVisualReview
 from test_content_review_recovery import operation, candidate, FAMILIES
 
 
@@ -188,13 +189,30 @@ def test_scheduler_finishes_concurrently_with_slow_visual_fallback(tmp_path, mon
         return response
     def visual(request, response, revision, fallback):
         if not fallback:
-            raise RuntimeError('Delegated visual worker did not respond')
+            raise IncompleteVisualReview('Delegated visual worker did not respond')
         assert last_cross_started.wait(30), 'Content scheduler was blocked behind parent visual fallback'
         now[0] = 179.0
         return response
     result, revision, _ = operation(tmp_path, monkeypatch, FAMILIES[0], worker, worker,
         clock=lambda: now[0], visual_review=visual)
     assert result['status'] == 'passed', result
+
+
+def test_generic_visual_execution_failure_remains_fatal(tmp_path, monkeypatch):
+    calls = []
+    def visual(request, response, revision, fallback):
+        calls.append(fallback)
+        raise RuntimeError('Controlled generic visual execution failure')
+    result, _, _ = operation(tmp_path, monkeypatch, FAMILIES[-1],
+        lambda request, response, revision: response,
+        lambda request, response, revision, handoff: response,
+        visual_review=visual)
+    assert calls == [False], 'Generic execution failure must not invoke recovery fallback'
+    assert result['status'] == 'review_required', result
+    assert result['stage'] == 'parent_visual_integrity', result
+    assert not result.get('client_outputs')
+    assert any(row['issue'] == 'Controlled generic visual execution failure'
+               for row in result['findings'])
 
 
 def test_interrupted_parent_resumes_units_without_resetting_approval_or_deadline(tmp_path, monkeypatch):

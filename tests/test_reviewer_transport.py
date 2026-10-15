@@ -10,6 +10,18 @@ import workflow
 from test_desktop_delivery import _visual_handoff_fixture
 
 
+@pytest.fixture(autouse=True)
+def synthetic_managed_hermes_identity(monkeypatch):
+    # These tests execute a shell callback, not a managed Hermes installation.
+    identity = {'kind': 'synthetic-managed-hermes-identity',
+                'fixture': 'reviewer-transport-shell-callback/v1'}
+    def reject_installed_launcher_lookup():
+        pytest.fail('Controlled shell callbacks must not discover installed Hermes')
+    monkeypatch.setattr(workflow, '_managed_hermes_pair', reject_installed_launcher_lookup)
+    monkeypatch.setattr(workflow, '_managed_hermes_identity', lambda: dict(identity))
+    return identity
+
+
 def reviewer_command(tmp_path, payload):
     output = tmp_path / 'review.json'
     output.write_text(json.dumps(payload))
@@ -19,7 +31,7 @@ def reviewer_command(tmp_path, payload):
     return workflow.command_parent_visual_reviewer(command)
 
 
-def test_request_schema_label_is_normalized_without_changing_visual_judgment(tmp_path):
+def test_request_schema_label_is_normalized_without_changing_visual_judgment(tmp_path, synthetic_managed_hermes_identity):
     handoff, request, response = _visual_handoff_fixture(tmp_path, 'protocol')
     revision = tmp_path / 'revisions/r1'
     request_path = revision / handoff['request_path']
@@ -37,6 +49,7 @@ def test_request_schema_label_is_normalized_without_changing_visual_judgment(tmp
     assert json.loads(json.loads(diagnostics[0].read_text())['stdout']) == response
     parent_request = json.loads((revision / 'hermes/desktop-parent-visual-review-request.json').read_text())
     assert parent_request['response_schema_version'] == quality.RESPONSE_SCHEMA
+    assert parent_request['managed_hermes_identity'] == synthetic_managed_hermes_identity
 
 
 @pytest.mark.parametrize('defect', [
