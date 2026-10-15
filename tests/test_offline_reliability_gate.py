@@ -8,6 +8,19 @@ import pytest
 import offline_reliability_gate as gate
 
 
+def test_collected_parameterized_cases_are_partitioned_exactly_once():
+    ids = ['tests/test_example.py::test_case[second]',
+           'tests/test_example.py::test_case[first]',
+           'tests/test_example.py::test_other']
+    shards = [gate.shard_ids(ids, index, 5) for index in range(5)]
+    assert sorted(node for shard in shards for node in shard) == sorted(ids)
+    assert shards == [sorted(ids)[index::5] for index in range(5)]
+    with pytest.raises(ValueError):
+        gate.shard_ids(ids, 5, 5)
+    with pytest.raises(ValueError):
+        gate.shard_ids(ids + ids[:1], 0, 5)
+
+
 
 
 def test_release_check_is_explicit_and_excludes_live_suites():
@@ -40,6 +53,154 @@ def test_release_check_is_explicit_and_excludes_live_suites():
 
 
 
+
+
+def test_ci_uses_five_disjoint_shards_with_always_uploaded_evidence():
+    workflow = (gate.ROOT / '.github/workflows/presentation-delivery.yml').read_text()
+    assert 'shard: [0, 1, 2, 3, 4]' in workflow
+    assert 'fail-fast: false' in workflow
+    assert '--timeout 1200 --shard-index ${{ matrix.shard }} --shard-count 5' in workflow
+    assert 'timeout-minutes: 30' in workflow
+    assert '--verify-shards' in workflow and 'needs: delivery-policy' in workflow
+    assert workflow.count('uses: actions/upload-artifact@v4') == 2
+    assert workflow.count('if: always()') >= 4
+    assert 'python -m pytest tests/test_worker_boundary.py' not in workflow
+
+
+def test_shard_artifact_coverage_rejects_missing_duplicate_and_incomplete_cases(tmp_path):
+    ids = ['tests/probe.py::test_case[a]', 'tests/probe.py::test_case[b]',
+           'tests/probe.py::test_case[c]']
+    paths = []
+    for index in range(2):
+        selected = gate.shard_ids(ids, index, 2)
+        path = tmp_path / f'shard-{index}.cases.json'
+        path.write_text(json.dumps({'index': index, 'count': 2, 'all': ids,
+                                    'selected': selected, 'completed': selected}))
+        paths.append(path)
+    assert gate.verify_coverage(tmp_path, 2) == 3
+    original = paths[0].read_text()
+    manifest = json.loads(original)
+    for field, value in [('completed', []), ('selected', ids), ('all', ids[:-1]),
+                         ('completed', manifest['completed'] * 2), ('index', 1)]:
+        changed = dict(manifest, **{field: value})
+        paths[0].write_text(json.dumps(changed))
+        with pytest.raises(ValueError):
+            gate.verify_coverage(tmp_path, 2)
+    paths[0].write_text(original)
+    paths[1].unlink()
+    with pytest.raises(ValueError):
+        gate.verify_coverage(tmp_path, 2)
+
+
+def test_gate_retains_early_failure_and_partial_junit_on_timeout(tmp_path, monkeypatch, capsys):
+    import xml.etree.ElementTree as ET
+    (tmp_path / 'tests').mkdir()
+    (tmp_path / 'tests/test_probe.py').write_text(
+        'import time\n'
+        'def test_a_failure():\n    assert False, "EARLY_FAILURE_VISIBLE"\n'
+        'def test_b_hang():\n    time.sleep(60)\n')
+    report = tmp_path / 'report.json'
+    monkeypatch.setattr(gate, 'ROOT', tmp_path)
+    monkeypatch.setattr(gate, 'TEST_FILES', ('test_probe.py',))
+    monkeypatch.setattr(gate, 'test_environment', lambda _: (os.environ.copy(), None))
+    monkeypatch.setattr(sys, 'argv', ['gate', '--timeout', '2', '--report', str(report)])
+    import threading
+    import time
+    codes = []
+    worker = threading.Thread(target=lambda: codes.append(gate.main()))
+    worker.start()
+    log = report.with_suffix('.log')
+    until = time.monotonic() + 5
+    try:
+        while worker.is_alive() and time.monotonic() < until:
+            if log.exists() and 'EARLY_FAILURE_VISIBLE' in log.read_text():
+                break
+            time.sleep(0.01)
+        # Evidence must be available while the later test is still hung, not
+        # merely reconstructed by the parent after its timeout.
+        assert worker.is_alive()
+        assert json.loads(report.read_text())['status'] == 'running'
+        assert ET.parse(report.with_suffix('.xml')).find('.//failure') is not None
+    finally:
+        worker.join(timeout=10)
+    assert not worker.is_alive() and codes == [1]
+    output = capsys.readouterr().out
+    assert 'EARLY_FAILURE_VISIBLE' in output
+    assert 'EARLY_FAILURE_VISIBLE' in report.with_suffix('.log').read_text()
+    result = json.loads(report.read_text())
+    assert result['timed_out'] is True
+    cases = json.loads(report.with_suffix('.cases.json').read_text())
+    assert len(cases['all']) == 2
+    assert cases['completed'] == ['tests/test_probe.py::test_a_failure']
+    junit = ET.parse(report.with_suffix('.xml'))
+    assert junit.find('.//failure') is not None
+    assert junit.find('.//error[@type="timeout"]') is not None
+    assert junit.find('.//testcase[@name="tests/test_probe.py::test_b_hang"]/error[@type="incomplete"]') is not None
+
+
+@pytest.mark.skipif(os.name == 'nt', reason='POSIX detached process probe')
+def test_timeout_does_not_wait_for_detached_descendant_output_pipe(tmp_path, monkeypatch):
+    import signal
+    import time
+    (tmp_path / 'tests').mkdir()
+    pid_file = tmp_path / 'descendant.pid'
+    (tmp_path / 'tests/test_probe.py').write_text(
+        'import subprocess, sys, time\nfrom pathlib import Path\n'
+        'def test_hang():\n'
+        '    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(8)"], start_new_session=True)\n'
+        f'    Path({str(pid_file)!r}).write_text(str(child.pid))\n'
+        '    time.sleep(60)\n')
+    monkeypatch.setattr(gate, 'ROOT', tmp_path)
+    monkeypatch.setattr(gate, 'TEST_FILES', ('test_probe.py',))
+    monkeypatch.setattr(gate, 'test_environment', lambda _: (os.environ.copy(), None))
+    monkeypatch.setattr(sys, 'argv', ['gate', '--timeout', '2', '--report', str(tmp_path / 'report.json')])
+    original_command = gate.test_command
+    monkeypatch.setattr(gate, 'test_command', lambda: original_command() + ['-s'])
+    started = time.monotonic()
+    try:
+        assert gate.main() == 1
+        assert time.monotonic() - started < 5
+    finally:
+        if pid_file.exists():
+            try:
+                os.kill(int(pid_file.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+def test_gate_preserves_collection_errors_as_junit(tmp_path, monkeypatch):
+    import xml.etree.ElementTree as ET
+    (tmp_path / 'tests').mkdir()
+    (tmp_path / 'tests/test_probe.py').write_text('raise RuntimeError("COLLECTION_FAILURE")\n')
+    report = tmp_path / 'report.json'
+    monkeypatch.setattr(gate, 'ROOT', tmp_path)
+    monkeypatch.setattr(gate, 'TEST_FILES', ('test_probe.py',))
+    monkeypatch.setattr(gate, 'test_environment', lambda _: (os.environ.copy(), None))
+    monkeypatch.setattr(sys, 'argv', ['gate', '--timeout', '10', '--report', str(report)])
+    assert gate.main() == 1
+    junit = ET.parse(report.with_suffix('.xml'))
+    assert 'COLLECTION_FAILURE' in junit.find('.//error').text
+    assert 'INTERNALERROR' not in report.with_suffix('.log').read_text()
+
+
+def test_real_collected_parameterized_shards_have_exact_once_coverage(tmp_path, monkeypatch):
+    (tmp_path / 'tests').mkdir()
+    (tmp_path / 'tests/test_probe.py').write_text(
+        'import pytest\n@pytest.mark.parametrize("value", range(7))\n'
+        'def test_case(value):\n    assert value >= 0\n')
+    monkeypatch.setattr(gate, 'ROOT', tmp_path)
+    monkeypatch.setattr(gate, 'TEST_FILES', ('test_probe.py',))
+    monkeypatch.setattr(gate, 'test_environment', lambda _: (os.environ.copy(), None))
+    reports = tmp_path / 'evidence'
+    for index in range(5):
+        report = reports / f'shard-{index}.json'
+        monkeypatch.setattr(sys, 'argv', ['gate', '--timeout', '10', '--shard-count', '5',
+                                        '--shard-index', str(index), '--report', str(report)])
+        assert gate.main() == 0
+        assert json.loads(report.read_text())['status'] == 'passed'
+    assert gate.verify_coverage(reports, 5) == 7
+    monkeypatch.setattr(sys, 'argv', ['gate', '--verify-shards', str(reports), '--shard-count', '5'])
+    assert gate.main() == 0
 
 
 @pytest.mark.skipif(sys.platform != 'linux', reason='Hermes Linux profile office runtime')

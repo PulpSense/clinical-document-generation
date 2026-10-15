@@ -7,8 +7,13 @@ permissions:
 
 jobs:
   delivery-policy:
+    name: Focused delivery shard ${{ matrix.shard }}
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,7 +25,47 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - name: Check Python sources
         run: python -m compileall -q scripts
-      - name: Verify Linux worker boundaries and restricted Hermes compatibility
-        run: python -m pytest tests/test_worker_boundary.py tests/test_hermes_tui.py tests/test_worker_readiness.py tests/test_tui_acceptance.py -q
+      # Worker boundary/readiness and Hermes compatibility cases remain in TEST_FILES;
+      # do not execute those cases a second time outside the disjoint gate.
       - name: Verify focused AI quality lifecycle and objective contracts
-        run: python tests/offline_reliability_gate.py --timeout 1200 --report /tmp/clinical-focused-report.json
+        run: python tests/offline_reliability_gate.py --timeout 1200 --shard-index ${{ matrix.shard }} --shard-count 5 --report ${{ runner.temp }}/clinical-focused/shard-${{ matrix.shard }}.json
+      - name: Retain reports, partial JUnit, case manifests and live logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clinical-focused-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/clinical-focused/
+          if-no-files-found: error
+
+  delivery-policy-coverage:
+    needs: delivery-policy
+    if: always()
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: clinical-focused-shard-*
+          path: ${{ runner.temp }}/clinical-focused
+          merge-multiple: true
+      - name: Verify exact-once coverage of collected parameterized cases
+        if: always()
+        shell: bash
+        run: |
+          python tests/offline_reliability_gate.py --verify-shards "${{ runner.temp }}/clinical-focused" --shard-count 5 2>&1 | tee "${{ runner.temp }}/clinical-focused-coverage.log"
+      - name: Require every shard to pass as well as complete coverage
+        if: always()
+        env:
+          SHARD_RESULT: ${{ needs.delivery-policy.result }}
+        run: test "$SHARD_RESULT" = success
+      - name: Retain aggregate coverage diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clinical-focused-coverage
+          path: ${{ runner.temp }}/clinical-focused-coverage.log
+          if-no-files-found: error

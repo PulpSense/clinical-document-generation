@@ -50,6 +50,12 @@ def test_public_production_fallback_preserves_post_guard_as_machine_stop(tmp_pat
     reference.write_text(json.dumps({'approval': {'revision_id': 'r1'}}))
     root = tmp_path / 'skill'
     root.mkdir()
+    def reject_installed_launcher_lookup():
+        pytest.fail('Synthetic fallback fixture must not discover installed Hermes')
+    monkeypatch.setattr(workflow, '_managed_hermes_pair', reject_installed_launcher_lookup)
+    identity = {'kind': 'synthetic-managed-hermes-identity',
+                'fixture': 'production-fallback-post-guard/v1'}
+    monkeypatch.setattr(workflow, '_managed_hermes_identity', lambda: dict(identity))
     intact = [True]
     monkeypatch.setattr(workflow, '_pdfium_runtime_integrity', lambda *a, **k:
         {'status': 'passed' if intact[0] else 'blocked'})
