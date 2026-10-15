@@ -52,7 +52,8 @@ def test_local_reader_refuses_outside_run(tmp_path):
         workflow.local_output_reader(run)(str(outside))
 
 
-def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypatch):
+@pytest.mark.parametrize('process_inspectable', [True, False], ids=['cleanup-proven', 'cleanup-deferred'])
+def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypatch, process_inspectable):
     import sys
     root = tmp_path / 'profile/skills/clinical-document-generation'
     root.mkdir(parents=True)
@@ -89,17 +90,57 @@ def test_public_tui_adapter_routes_and_persists_local_outcome(tmp_path, monkeypa
         (cache / 'bin').mkdir(parents=True)
         (cache / 'bin/tool').write_bytes(b'exact disposable tool copy')
         (cache / 'state.db').write_bytes(b'unique tool session audit')
+    unique = run / '.hermes-cache/three/bin/tool'
+    unique.parent.mkdir(parents=True)
+    unique.write_bytes(b'nonduplicate tool evidence')
+    # Inspect a controlled Linux process namespace through the real checker.
+    # Unrelated CI runner processes may legitimately be non-inspectable; they
+    # cannot be treated as deletion proof or an unconditional test success.
+    import storage_retention as storage
+    checker = storage.stopped_references
+    observed = []
+    code = ('import ctypes,time; assert ctypes.CDLL(None).prctl(4,'
+        + ('1' if process_inspectable else '0')
+        + ",0,0,0)==0; print('ready',flush=True); time.sleep(30)")
+    child = subprocess.Popen([sys.executable, '-B', '-c', code], stdout=subprocess.PIPE, text=True)
+    class ControlledProc:
+        def is_dir(self): return True
+        def iterdir(self): return iter([Path('/proc') / str(child.pid)])
+    def controlled_path(value, *parts):
+        return ControlledProc() if value == '/proc' and not parts else Path(value, *parts)
+    def inspect_controlled_namespace(target):
+        observed.append(str(target))
+        with monkeypatch.context() as scope:
+            scope.setattr(storage, 'Path', controlled_path)
+            return checker(target)
+    monkeypatch.setattr(storage, 'stopped_references', inspect_controlled_namespace)
     monkeypatch.setattr(workflow, '_production_dispatch_handoffs', lambda *a, **k: dispatched.append(k['host_mode']))
-    result = workflow.run_production_desktop_operation(run, skill_root=root, manual_review=True, host_mode='hermes-tui')
+    try:
+        assert child.stdout.readline().strip() == 'ready'
+        result = workflow.run_production_desktop_operation(run, skill_root=root, manual_review=True, host_mode='hermes-tui')
+    finally:
+        child.terminate()
+        child.wait(timeout=5)
+    assert observed and child.returncode is not None
     assert dispatched == ['hermes-tui'], result
     assert result['status'] == 'passed'
     assert result['stage'] == 'local_output_availability'
     assert result['delivery']['confirmed'] is False
     assert result['delivery_status'] == 'locally_available'
-    assert not (run / '.hermes-cache/two/bin').exists()
-    assert (run / '.hermes-cache/one/bin/tool').is_file()
+    completion = json.loads((run / 'storage-retention/completion.json').read_text())
+    if process_inspectable:
+        assert not (run / '.hermes-cache/two/bin').exists()
+        assert completion['status'] == 'passed'
+        assert completion['retired']
+        assert all(r['process_proof']['owned_pids_checked'] == [child.pid] for r in completion['retired'])
+    else:
+        assert (run / '.hermes-cache/two/bin/tool').read_bytes() == b'exact disposable tool copy'
+        assert completion['status'] == 'deferred'
+        assert completion['error'] == 'OwnedProcessProofUnavailable: Owned process proof unavailable: ' + str(child.pid)
+    assert result['storage_retention']['status'] == completion['status']
+    assert unique.read_bytes() == b'nonduplicate tool evidence'
+    assert (run / '.hermes-cache/one/bin/tool').read_bytes() == b'exact disposable tool copy'
     assert (run / '.hermes-cache/two/state.db').read_bytes() == b'unique tool session audit'
-    assert json.loads((run / 'storage-retention/completion.json').read_text())['status'] == 'passed'
     saved = json.loads((run / 'logs/desktop-operation.json').read_text())
     assert saved['result']['recipient_delivery_verified'] is False
     assert saved['release_identity']['host_mode'] == 'hermes-tui'
