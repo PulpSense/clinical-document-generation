@@ -4111,25 +4111,105 @@ def _confirm_review_delivery(run_dir: Path, result: Mapping[str, Any], opener: C
 
 
 def _terminal_diagnostic_archive(run_dir: Path) -> dict[str, Any]:
-    """Keep a blocked run's evidence together without labeling it a deliverable."""
+    """Export run evidence, not private worker homes; never reclaim local evidence."""
+    from storage_retention import sequential_admission
+
     output = run_dir / "output"
+    if output.is_symlink():
+        raise ValueError("Diagnostic output directory must not be a symlink.")
     output.mkdir(parents=True, exist_ok=True)
     destination = output / "BLOCKED-RUN-DIAGNOSTICS.zip"
+    # Worker homes contain copied profiles/skills and private session databases.
+    # Only the explicit operation diagnostics are exportable from these homes;
+    # unknown state stays local, including credentials copied as regular files.
+    worker_diagnostics = {
+        "diagnostic.json", "provenance.json", "launch.json", "stdout.log", "stderr.log",
+        "raw-final.json", "raw-progress.json", "owned-descendant-cleanup.json",
+        "owned-descendant-cleanup.jsonl", "observer-reclamation.jsonl",
+    }
+    private_names = {"auth.json", "config.yaml", ".env", "credentials.json"}
+    cache_names = {".cache", ".tmp", ".config", ".local", "__pycache__", ".pytest_cache", ".hermes"}
+    inventory, excluded = [], []
+    for directory, directories, filenames in os.walk(run_dir, followlinks=False):
+        parent = Path(directory)
+        parts = parent.relative_to(run_dir).parts
+        worker_root_depth = (2 if len(parts) >= 2 and parts[0] == ".hermes-cache"
+            else parts.index("visual-review-observers") + 2 if "visual-review-observers" in parts
+                and len(parts) > parts.index("visual-review-observers") + 1 else None)
+        worker_relative = parts[worker_root_depth:] if worker_root_depth is not None else None
+        for name in sorted(directories):
+            path = parent / name
+            private_worker_directory = worker_relative is not None and not (worker_relative == () and name == "logs")
+            if path.is_symlink() or private_worker_directory or name in cache_names or (not parts and name == "output"):
+                directories.remove(name)
+                excluded.append({"path": path.relative_to(run_dir).as_posix(),
+                                 "reason": "symlink" if path.is_symlink() else "private_state_or_export"})
+        for name in sorted(filenames):
+            path = parent / name
+            relative = path.relative_to(run_dir).as_posix()
+            worker_file_allowed = (worker_relative is None
+                or (worker_relative == () and name in worker_diagnostics)
+                or (worker_relative == ("logs",) and name in {"agent.log", "errors.log"}))
+            if (path.is_symlink() or name in private_names or name.startswith(".env.")
+                    or not worker_file_allowed
+                    or relative == "diagnostic-inventory.json"):
+                excluded.append({"path": relative, "reason": "private_state_or_link"})
+                continue
+            if not path.is_file():
+                continue
+            inventory.append({"path": relative, "bytes": path.stat().st_size, "sha256": sha256_file(path)})
+    inventory.sort(key=lambda row: row["path"])
+    metadata = json.dumps({"files": inventory, "excluded": excluded,
+        "exclusion_policy": "Private worker state is not exported; all original local evidence is unchanged."},
+        indent=2).encode("utf-8")
+    # Conservative DEFLATE + ZIP64/name/header allowance, including the inventory.
+    # Reserve independently of campaign admission; never delete evidence to fit.
+    sizes = [(row["bytes"], len(row["path"].encode("utf-8"))) for row in inventory]
+    sizes.append((len(metadata), len("diagnostic-inventory.json")))
+    bound = sum(size + size // 1000 + 1024 + 2 * name_bytes for size, name_bytes in sizes) + 1024
+    capacity = sequential_admission(output, [{"case_id": "terminal-diagnostic-export",
+        "retained_bytes": 0, "worker_peak_bytes": 0, "scratch_peak_bytes": bound}],
+        margin_bytes=16 * 1024 * 1024)
+    if not capacity["admitted"]:
+        raise OSError(28, "Insufficient diagnostic export capacity; original evidence retained locally.")
     with tempfile.NamedTemporaryFile(prefix=".diagnostics-", suffix=".zip", dir=output, delete=False) as pending:
         temporary = Path(pending.name)
     try:
-        inventory = []
-        files = sorted(
-            path for path in run_dir.rglob("*")
-            if path.is_file() and not path.is_symlink()
-            and path.relative_to(run_dir).parts[0] != "output"
-        )
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1) as archive:
-            for path in files:
-                relative = path.relative_to(run_dir).as_posix()
-                archive.write(path, relative)
-                inventory.append({"path": relative, "bytes": path.stat().st_size, "sha256": sha256_file(path)})
-            archive.writestr("diagnostic-inventory.json", json.dumps({"files": inventory}, indent=2))
+            for row in inventory:
+                path = run_dir / row["path"]
+                if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+                    raise ValueError("Diagnostic evidence became a symlink.")
+                digest = hashlib.sha256()
+                with path.open("rb") as source, archive.open(row["path"], "w", force_zip64=True) as target:
+                    remaining = row["bytes"]
+                    while remaining:
+                        chunk = source.read(min(1024 * 1024, remaining))
+                        if not chunk:
+                            raise ValueError("Diagnostic evidence shrank during export.")
+                        target.write(chunk)
+                        digest.update(chunk)
+                        remaining -= len(chunk)
+                    if source.read(1) or digest.hexdigest() != row["sha256"]:
+                        raise ValueError("Diagnostic evidence changed during export.")
+            archive.writestr("diagnostic-inventory.json", metadata)
+        if temporary.stat().st_size > bound:
+            raise ValueError("Diagnostic export exceeded its admitted size bound.")
+        # Read back exact member bytes before replacing any previous good export.
+        with zipfile.ZipFile(temporary) as archive:
+            if set(archive.namelist()) != {row["path"] for row in inventory} | {"diagnostic-inventory.json"}:
+                raise ValueError("Diagnostic export inventory differs.")
+            for row in inventory:
+                digest = hashlib.sha256()
+                size = 0
+                with archive.open(row["path"]) as member:
+                    for chunk in iter(lambda: member.read(1024 * 1024), b""):
+                        size += len(chunk)
+                        digest.update(chunk)
+                if size != row["bytes"] or digest.hexdigest() != row["sha256"]:
+                    raise ValueError("Diagnostic export member integrity differs.")
+            if archive.read("diagnostic-inventory.json") != metadata:
+                raise ValueError("Diagnostic export metadata differs.")
         os.replace(temporary, destination)
     finally:
         temporary.unlink(missing_ok=True)
@@ -5125,6 +5205,7 @@ def run_desktop_operation(
                 def run_bounded_parent_review(
                     candidates: Sequence[Mapping[str, Any]],
                 ) -> dict[str, Any] | None:
+                    from visual_review import IncompleteVisualReview
                     pending = unresolved_parent_handoffs(candidates)
                     if pending and not parent_visual_callback_available:
                         return {
@@ -5174,7 +5255,8 @@ def run_desktop_operation(
                                     parent_budget,
                                 )
                         except Exception as parent_exc:
-                            if not isinstance(parent_exc, (TimeoutError, subprocess.TimeoutExpired)):
+                            if (getattr(parent_exc, 'worker_integrity_failure', None)
+                                    or not isinstance(parent_exc, (IncompleteVisualReview, TimeoutError, subprocess.TimeoutExpired))):
                                 return {
                                     "status": "blocked", "stage": "parent_visual_integrity",
                                     "findings": [{"category": "integrity", "field": "parent_visual_review",
@@ -5183,6 +5265,15 @@ def run_desktop_operation(
                                 }
                             errors.append(str(parent_exc))
                         pending = unresolved_parent_handoffs(pending)
+                        if pending and revision_id and _accepted_partial_repair_findings(
+                            run_dir / "revisions" / revision_id,
+                        ):
+                            # A clean partial/missing response or an explicitly
+                            # recoverable exception may leave unrelated scope.
+                            # Return accepted concerns to native repair before
+                            # spending another parent allocation on that scope.
+                            # Fatal execution/integrity exits returned above.
+                            break
                     if not pending:
                         return None
                     issue = (
@@ -5572,6 +5663,66 @@ def _production_response_is_bound(
         response.get("task") == request.get("task"),
         response.get("batch_id") == request.get("batch_id"),
     ))
+
+
+def _framed_json_values(payload: str) -> tuple[list[Any], list[str]]:
+    """Decode complete outer frames, never salvage objects inside broken JSON.
+
+    Logs/code fences may surround independently framed objects. Quoted JSON is
+    text, not another response. A broken/unclosed container consumes the rest
+    of that channel; accepted independent checkpoints are unaffected.
+    """
+    decoder = json.JSONDecoder()
+    values, errors = [], []
+    index = 0
+    while index < len(payload):
+        start = index
+        if payload[index] == '"':
+            try:
+                _, index = decoder.raw_decode(payload, index)
+            except ValueError:
+                # Do not scan braces embedded in a quoted text fragment.
+                index += 1
+                escaped = False
+                while index < len(payload):
+                    character = payload[index]
+                    index += 1
+                    if character == '"' and not escaped:
+                        break
+                    escaped = character == '\\' and not escaped
+            continue
+        if payload[index] not in '{[':
+            index += 1
+            continue
+        stack, quoted, escaped = [], False, False
+        while index < len(payload):
+            character = payload[index]
+            index += 1
+            if quoted:
+                if character == '"' and not escaped:
+                    quoted = False
+                escaped = character == '\\' and not escaped
+                continue
+            if character == '"':
+                quoted = True
+            elif character in '{[':
+                stack.append(character)
+            elif character in '}]':
+                if not stack or stack.pop() != {'}': '{', ']': '['}[character]:
+                    errors.append('Malformed outer JSON container: mismatched delimiter')
+                    return values, errors
+                if not stack:
+                    break
+        if stack or quoted:
+            errors.append('Malformed outer JSON container: unterminated frame')
+            break
+        try:
+            values.append(json.loads(payload[start:index]))
+        except ValueError:
+            prefix = payload[payload.rfind('\n', 0, start) + 1:start]
+            if not prefix.strip() or re.match(r'''[\{\[]\s*["']''', payload[start:index]):
+                errors.append('Malformed outer JSON container: invalid JSON')
+    return values, errors
 
 
 def _production_publish_quiet_response(
@@ -7088,7 +7239,13 @@ def run_production_desktop_operation(
                     {"issue": str(integrity_error), "boundary": "post_parent_callback_renderer_or_package"})
                 if primary_error is None:
                     raise
-                # Reject the fallback without hiding callback/response diagnostics.
+                # Preserve the primary transport exception and its diagnostics,
+                # but carry the post-execution stop as machine-readable state.
+                # Exception prose/notes cannot authorize ordinary recovery.
+                primary_error.worker_integrity_failure = {
+                    'issue': str(integrity_error),
+                    'boundary': 'post_parent_callback_renderer_or_package',
+                }
                 note = str(integrity_error)
                 if hasattr(primary_error, "add_note"):
                     primary_error.add_note(note)
@@ -7417,17 +7574,25 @@ def command_parent_visual_reviewer(
     expected_command_sha256 = sha256_file(command)
 
     def response_candidates(output: str) -> list[dict[str, Any]]:
-        decoder = json.JSONDecoder()
         candidates: list[dict[str, Any]] = []
-        for index, character in enumerate(output):
-            if character != "{":
-                continue
-            try:
-                value, _ = decoder.raw_decode(output, index)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(value, dict):
-                candidates.append(value)
+        values, _ = _framed_json_values(output)
+        for value in values:
+            pending = [value]
+            while pending:
+                item = pending.pop()
+                if isinstance(item, dict):
+                    if item.get('schema_version') == 'tui-visual-callback-recovery/v1':
+                        continue  # The report owns its metadata/handoffs, not review finals.
+                    if any(key in item for key in (
+                            'schema_version', 'request_id', 'request_sha256', 'task',
+                            'producer', 'visual_assessments', 'page_assessments', 'findings')):
+                        candidates.append(item)
+                        # Assessments, concerns and reviewer metadata belong to
+                        # their response; they are not independent sibling finals.
+                        continue
+                    pending.extend(item.values())
+                elif isinstance(item, list):
+                    pending.extend(item)
         return candidates
 
     def review(
@@ -7464,6 +7629,15 @@ def command_parent_visual_reviewer(
         request_path = revision_dir / f"hermes/parent-visual-invocations/{time.time_ns()}.json"
         _write(request_path, _read(canonical_request_path))
         invocation_request_sha256 = sha256_file(request_path)
+        invocation_envelope = _read(request_path)
+        protected_inputs = {
+            native_file(revision_dir, str(item['request_path'])): sha256_file(
+                native_file(revision_dir, str(item['request_path']))) for item in handoffs
+        }
+        approved_reference = revision_dir / 'approved-reference.json'
+        if approved_reference.is_file():
+            approved_reference = native_file(revision_dir, 'approved-reference.json')
+            protected_inputs[approved_reference] = sha256_file(approved_reference)
         arguments = [str(command), str(request_path)]
         process = None
         stdout = stderr = ""
@@ -7562,7 +7736,7 @@ def command_parent_visual_reviewer(
             # Establish the callback/ownership failure before attempting host
             # evidence persistence; a full disk must never replace that error.
             if failure is None:
-                if callback_returncode not in (None, 0):
+                if callback_returncode not in (None, 0, 75):
                     failure = RuntimeError(
                         "Desktop-parent reviewer command exited with status "
                         f"{callback_returncode}; inspect {diagnostic_path} for captured output."
@@ -7630,6 +7804,81 @@ def command_parent_visual_reviewer(
             raise failure
         if sha256_file(request_path) != invocation_request_sha256:
             raise RuntimeError("Desktop-parent callback invocation envelope changed")
+        candidates = response_candidates(stdout)
+        # Authenticate every actual sibling response before either publication
+        # or safely incomplete transport. A later pass/report cannot erase a
+        # rejected attempted final; nested reviewer metadata is not a final.
+        bound_requests = [_read(path) for path in protected_inputs if path != approved_reference]
+        for candidate in candidates:
+            if (not all(key in candidate for key in _VERIFICATION_IDENTITY_FIELDS)
+                    or not isinstance(candidate.get('producer'), Mapping)
+                    or not any(bound is not None and _semantic_response_matches_request(request, bound)
+                        for request in bound_requests
+                        for bound in [_bind_verification_response_payload(request, candidate)])):
+                raise RuntimeError('Desktop-parent visual reviewer did not produce one bound terminal response: rejected sibling identity')
+        if callback_returncode == 75:
+            # This dedicated status is transport, never approval. Require its
+            # immutable invocation-bound report only after successful reaping,
+            # diagnostic persistence and the ordinary execution checks above.
+            import quality
+            from visual_review import IncompleteVisualReview
+            report_path = request_path.with_suffix('.recovery.json')
+            if not quality._revision_owned_nonsymlink_path(revision_dir, report_path):
+                raise ValueError('Parent recovery report must be revision-owned and nonsymlinked')
+            try:
+                report = _read(report_path)
+            except (OSError, ValueError, UnicodeError) as exc:
+                raise ValueError('Missing or malformed parent incomplete-recovery report') from exc
+            expected = {
+                'schema_version': 'tui-visual-callback-recovery/v1',
+                'outcome': 'incomplete_authenticated_visual_scope', 'exit_code': 75,
+                'invocation_path': str(request_path), 'invocation_sha256': invocation_request_sha256,
+                'revision_id': revision_dir.name, 'revision_path': str(revision_dir),
+                'managed_hermes_identity': invocation_envelope['managed_hermes_identity'],
+                'callback_release_binding': invocation_envelope.get('callback_release_binding'),
+                'callback_command': invocation_envelope.get('callback_command'),
+                'handoffs': invocation_envelope['handoffs'],
+            }
+            if (not isinstance(report, dict) or type(report.get('exit_code')) is not int
+                    or any(json.dumps(report.get(key), sort_keys=True) != json.dumps(value, sort_keys=True)
+                           for key, value in expected.items())
+                    or not isinstance(report.get('missing_target_ids'), list)
+                    or not all(isinstance(item, str) and item for item in report['missing_target_ids'])
+                    or not isinstance(report.get('validation_feedback'), list)
+                    or not isinstance(report.get('dispatch_errors'), list)
+                    or not all(isinstance(item, str) for item in report['dispatch_errors'])):
+                raise ValueError('Parent incomplete-recovery report binding or shape rejected')
+            if (command.is_symlink() or sha256_file(command) != expected_command_sha256
+                    or _managed_hermes_identity() != invocation_envelope['managed_hermes_identity']
+                    or any(not path.is_file() or path.is_symlink() or sha256_file(path) != digest
+                           for path, digest in protected_inputs.items())):
+                raise ValueError('Parent callback command, runtime, source or request changed')
+            if skill_root is not None:
+                from visual_review import callback_release_binding
+                if callback_release_binding(skill_root) != invocation_envelope.get('callback_release_binding'):
+                    raise ValueError('Parent callback installed implementation changed')
+            for item in handoffs:
+                bound_path = native_file(revision_dir, str(item['request_path']))
+                parent = _read(bound_path)
+                if parent.get('visual_review_plan'):
+                    from visual_review import validate_visual_review_unit_request, visual_review_result
+                    for unit_path in (revision_dir / 'hermes/visual-review-requests').glob(
+                            parent['request_id'] + '.visual-unit-*.json'):
+                        validate_visual_review_unit_request(revision_dir, unit_path)
+                    visual_review_result(revision_dir, bound_path, publish=False)
+                    # Aggregation can revoke previously attested cleanup. Recheck
+                    # durable rejection before transporting ordinary incompleteness.
+                    for unit_path in (revision_dir / 'hermes/visual-review-requests').glob(
+                            parent['request_id'] + '.visual-unit-*.json'):
+                        validate_visual_review_unit_request(revision_dir, unit_path)
+            detail = '; '.join(str(item.get('issue', item)) if isinstance(item, dict) else str(item)
+                               for item in report['validation_feedback'])
+            incomplete = IncompleteVisualReview('Desktop-parent safely incomplete authenticated scope' +
+                                                (': ' + detail if detail else ''))
+            incomplete.validation_feedback = report['validation_feedback']
+            incomplete.missing_target_ids = report['missing_target_ids']
+            incomplete.recovery_report_path = str(report_path)
+            raise incomplete
         completed = subprocess.CompletedProcess(arguments, callback_returncode, stdout, stderr)
         if completed.returncode not in (None, 0):
             raise RuntimeError(
@@ -7640,7 +7889,6 @@ def command_parent_visual_reviewer(
             raise RuntimeError(
                 f"Desktop-parent reviewer cleanup incomplete; inspect {diagnostic_path}."
             )
-        candidates = response_candidates(completed.stdout)
         for handoff in handoffs:
             bound_request_path = (revision_dir / str(handoff.get("request_path") or "")).resolve()
             try:

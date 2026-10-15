@@ -21,6 +21,13 @@ TEST_FILES = (
     'test_observer_clean_partial.py', 'test_production_visual_transport.py',
     'test_visual_transport_retention.py', 'test_production_visual_metadata.py',
     'test_production_visual_incomplete.py',
+    'test_document_review_ownership.py', 'test_visual_evidence_followup.py',
+    'test_observer_review_recovery.py', 'test_shared_review_to_repair.py',
+    'test_parent_review_recovery_report.py', 'test_parent_partial_integrity.py',
+    'test_review_outer_framing.py', 'test_observer_concern_channels.py',
+    'test_visual_retry_feedback.py', 'test_attested_channel_integrity.py',
+    'test_review_repair_priority.py', 'test_bounded_diagnostic_export.py',
+    'test_repair_with_incomplete_visual.py', 'test_repair_visual_stop_conditions.py',
     'test_content_review_recovery.py', 'test_review_scheduler.py', 'test_readiness_recovery.py', 'test_worker_boundary.py', 'test_readiness_campaign.py',
 )
 

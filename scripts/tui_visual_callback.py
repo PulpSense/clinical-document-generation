@@ -176,28 +176,187 @@ def observer_metadata(state: Path, revision: Path, unit: dict) -> dict:
         connection.close()
 
 
-def _authenticate_observer_response(revision: Path, path: Path, unit: dict, metadata: dict) -> None:
+def _retain_observer_bytes(revision: Path, target: Path, raw: bytes) -> None:
+    """Retain exact transport bytes with the existing revision mutation guards."""
+    if not quality._revision_owned_nonsymlink_path(revision, target):
+        raise ValueError('Observer diagnostic must be revision-owned and nonsymlinked')
+    quality._assert_safe_mutation_path(target.parent, directory=True)
+    quality._assert_safe_mutation_path(target, directory=False)
+    if target.exists():
+        if target.read_bytes() != raw:
+            raise ValueError('Retained observer transport bytes changed')
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    quality._assert_safe_mutation_path(target, directory=False)
+    target.write_bytes(raw)
+
+
+def _observer_feedback(revision: Path, unit: dict, channel: str, issue: str) -> None:
+    path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
+    ledger = _read(path)
+    feedback = {'category': 'transport', 'issue': issue,
+        'target_ids': [t['target_id'] for t in unit['visual_scope']], 'channel': channel}
+    rows = ledger.setdefault('observer_transport_feedback', [])
+    if feedback not in rows:
+        rows.append(feedback)
+    validation = ledger.setdefault('validation_feedback', [])
+    if feedback not in validation:
+        validation.append(feedback)
+    _write(revision, path, ledger)
+
+
+def _observer_binding(unit: dict, response: dict) -> None:
+    """Authenticate raw outer identity before host attestation or filtering."""
+    if (response.get('schema_version') != quality.RESPONSE_SCHEMA
+            or any(response.get(k) != unit[k] for k in ('request_id', 'request_sha256', 'task', 'revision_id'))
+            or not isinstance(response.get('producer'), dict)
+            or any(not isinstance(response['producer'].get(k), str) or not response['producer'][k].strip()
+                for k in ('model_id', 'reviewer_id'))):
+        raise ValueError('Observer raw response mandatory identity/binding rejected')
+
+
+def _observer_stdout_frames(text: str) -> list[tuple[object, bytes]]:
+    """Locate original byte slices; only the shared strict framer grants values.
+
+    This lexical walk does not decode or salvage JSON. In particular, a broken
+    outer container owns its nested bytes, including after mismatched brackets.
+    """
+    frames = []
+    stack = []
+    quoted = escaped = False
+    start = None
+    for index, character in enumerate(text):
+        if quoted:
+            if character == '"' and not escaped:
+                quoted = False
+            escaped = character == '\\' and not escaped
+            continue
+        if character == '"':
+            quoted = True
+        elif character in '{[':
+            if not stack:
+                start = index
+            stack.append(character)
+        elif character in '}]' and stack:
+            if stack.pop() != {'}': '{', ']': '['}[character]:
+                break
+            if not stack:
+                frame = text[start:index + 1]
+                values, _ = workflow._framed_json_values(frame)
+                if len(values) == 1:
+                    frames.append((values[0], frame.encode('utf-8')))
+    return frames
+
+
+def _observer_channels(revision: Path, state: Path, unit: dict, metadata: dict) -> None:
+    """Parse independent file channels and all semantic outer stdout candidates."""
+    checkpoint = revision / unit['review_transport']['progress_path']
+    final = revision / unit['response_path']
+    for channel, path in (('checkpoint', checkpoint), ('final_file', final)):
+        if not quality._revision_owned_nonsymlink_path(revision, path):
+            raise ValueError('Observer response channel is not revision-owned')
+        if not path.is_file() or not path.stat().st_size:
+            _observer_feedback(revision, unit, channel, 'Missing response channel')
+            continue
+        raw = path.read_bytes()
+        retained = state / ('raw-progress.json' if channel == 'checkpoint' else 'raw-disk-final.json')
+        if retained.exists() and retained.read_bytes() != raw:
+            ledger = _read(revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json")
+            attestation = ledger.get('observer_attestations', {}).get(path.relative_to(revision).as_posix(), {})
+            if attestation.get('response_sha256') != quality.sha256_file(path):
+                raise ValueError('Observer response changed after authentication')
+            raw = retained.read_bytes()
+        else:
+            _retain_observer_bytes(revision, retained, raw)
+        try:
+            response = json.loads(raw)
+        except (ValueError, UnicodeDecodeError):
+            _observer_feedback(revision, unit, channel, 'Malformed response JSON')
+            continue
+        if not isinstance(response, dict):
+            _observer_feedback(revision, unit, channel, 'Response is not an object')
+            continue
+        _observer_binding(unit, response)
+        _authenticate_observer_response(revision, path, unit, metadata, response)
+    output = (state / 'stdout.log').read_bytes()
+    _retain_observer_bytes(revision, state / 'raw-final.json', output)
+    try:
+        text = output.decode('utf-8')
+        valid_encoding = True
+    except UnicodeDecodeError:
+        # Replacement text may expose an attempted foreign identity, but may
+        # never be published or earn review credit from repaired bytes.
+        text = output.decode('utf-8', errors='replace')
+        valid_encoding = False
+        _observer_feedback(revision, unit, 'stdout', 'Malformed UTF-8 final response channel')
+    values, malformed = workflow._framed_json_values(text)
+    for issue in malformed:
+        _observer_feedback(revision, unit, 'stdout', issue)
+    candidates = []
+    semantic = {'schema_version', 'request_id', 'request_sha256', 'task', 'revision_id',
+        'visual_assessments', 'findings', 'producer', 'status'}
+    for value, raw in _observer_stdout_frames(text):
+        if isinstance(value, dict) and value in values and semantic.intersection(value):
+            _observer_binding(unit, value)
+            if valid_encoding:
+                candidates.append((value, raw))
+    if not candidates:
+        _observer_feedback(revision, unit, 'stdout', 'Missing or malformed final response JSON')
+    for candidate, raw in candidates:
+        # Hash and retain the exact original frame, before host attestation.
+        name = __import__('hashlib').sha256(raw).hexdigest() + '.json'
+        path = state / 'authenticated-finals' / name
+        _retain_observer_bytes(revision, state / 'raw-finals' / name, raw)
+        ledger_path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
+        relative = path.relative_to(revision).as_posix()
+        if not path.exists():
+            _retain_observer_bytes(revision, path, raw)
+        elif path.read_bytes() != raw:
+            attestation = _read(ledger_path).get('observer_attestations', {}).get(relative, {})
+            if attestation.get('response_sha256') != quality.sha256_file(path):
+                raise ValueError('Observer stdout response changed after authentication')
+        _authenticate_observer_response(revision, path, unit, metadata, candidate)
+        ledger = _read(ledger_path)
+        if relative in ledger.get('observer_attestations', {}):
+            channels = ledger.setdefault('observer_final_channels', [])
+            if relative not in channels:
+                channels.append(relative)
+            _write(revision, ledger_path, ledger)
+    # Retain the declared final for legacy readers, without replacing any disk
+    # judgment. Aggregation uses every separately authenticated candidate above.
+    if candidates and not final.exists():
+        _retain_observer_bytes(revision, state / 'raw-disk-final.json', candidates[0][1])
+        _write(revision, final, candidates[0][0])
+        _authenticate_observer_response(revision, final, unit, metadata)
+
+
+def _authenticate_observer_response(revision: Path, path: Path, unit: dict, metadata: dict,
+                                    raw_response: dict | None = None) -> None:
     """Attach observed runtime identity, retaining original model response bytes."""
     if not path.is_file() or not metadata.get('request_inspection_complete'):
         return
-    response = _read(path)
+    response = dict(raw_response) if raw_response is not None else _read(path)
     if (response.get('schema_version') != quality.RESPONSE_SCHEMA
             or any(response.get(k) != unit[k] for k in ('request_id', 'request_sha256', 'task', 'revision_id'))):
         return
     rows = response.get('visual_assessments')
-    if not isinstance(rows, list):
-        return
     inspected = set(metadata['inspected_paths'])
     expected = {t['target_id']: t for t in unit['visual_scope']}
     # Filter incomplete tool access, not visual conclusions. Never derive a pass.
     observed_targets = {t['target_id'] for t in unit['visual_scope']
         if all(p['path'] in inspected for p in t['pages'])
         and (t['kind'] != 'document' or metadata['native_inspection_complete'])}
-    rows = [r for r in rows if isinstance(r, dict) and r.get('target_id') in observed_targets]
-    if isinstance(response.get('findings'), list):
-        response['findings'] = [f for f in response['findings'] if isinstance(f, dict)
-            and f.get('target_id') in observed_targets]
-    response['visual_assessments'] = rows
+    if isinstance(rows, list):
+        # Leave malformed/foreign rows visible to the row validator for precise
+        # feedback; only filter valid assigned rows lacking inspected evidence.
+        response['visual_assessments'] = [r for r in rows if not isinstance(r, dict)
+            or not isinstance(r.get('target_id'), str) or r['target_id'] not in expected
+            or r['target_id'] in observed_targets]
+    # Keep malformed assessment shape for precise feedback. Independently
+    # authenticated findings must still reach downstream concern validation.
+    # Concerns carry their own bound location/provenance. Missing pixels may
+    # withhold assessment credit, but must not destroy native concerns or
+    # pixel concerns that downstream aggregation routes to targeted follow-up.
     response['model_reported_producer'] = response.get('producer')
     response['producer'] = {'model_id': metadata['model_id'], 'reviewer_id': metadata['session_id'],
         'role': 'independent configured TUI callback observer; not the invoking conversational parent'}
@@ -243,9 +402,6 @@ def recover_completed_observers(revision: Path, parent_path: Path) -> None:
                     or ledger.get('request_file_sha256') != quality.sha256_file(path)
                     or not quality.verification_request_hash_valid(unit)):
                 continue
-            existing = visual_review_unit_result(revision, path)
-            if existing and existing['complete']:
-                continue
             from owned_observer_runtime import validate_owned_observer_cleanup, OwnedObserverLifetimeUnresolved
             try:
                 validate_owned_observer_cleanup(state)
@@ -253,42 +409,32 @@ def recover_completed_observers(revision: Path, parent_path: Path) -> None:
                 ledger['integrity_rejection'] = {'reason': 'Stopped observer cleanup proof invalid', 'error': str(exc)}
                 _write(revision, revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json", ledger)
                 continue  # Reject this unit; preserve recovery of independently valid siblings.
-            metadata = observer_metadata(state, revision, unit)
-            known = {r['target_id']: r['proof']['request_path'] for r in
-                visual_review_result(revision, parent_path, publish=False)['assessments']}
-            relative = path.relative_to(revision).as_posix()
-            def recover_response(target, payload):
-                if not isinstance(payload, dict) or not isinstance(payload.get('visual_assessments'), list):
-                    return
-                payload['visual_assessments'] = [r for r in payload['visual_assessments'] if isinstance(r, dict)
-                    and (r.get('target_id') not in known or known[r['target_id']] == relative or r.get('status') != 'passed')]
-                if not payload['visual_assessments'] and not payload.get('findings'):
-                    return
-                _write(revision, target, payload)
-                _authenticate_observer_response(revision, target, unit, metadata)
-            progress = revision / unit['review_transport']['progress_path']
-            if progress.is_file() and progress.stat().st_size:
-                try:
-                    raw = _read(progress)
-                    if not (state / 'raw-progress.json').exists():
-                        _write(revision, state / 'raw-progress.json', raw)
-                    recover_response(progress, raw)
-                except (OSError, ValueError, KeyError, TypeError):
-                    # Preserve the checkpoint; authenticate final stdout independently.
-                    pass
-            output = (state / 'stdout.log').read_text()
-            decoder = json.JSONDecoder()
-            for index, character in enumerate(output):
-                if character != '{':
-                    continue
-                try: candidate, _ = decoder.raw_decode(output, index)
-                except ValueError: continue
-                if (isinstance(candidate, dict) and all(candidate.get(k) == unit[k]
-                        for k in ('request_id', 'request_sha256', 'task', 'revision_id'))):
-                    if not (state / 'raw-final.json').exists():
-                        _write(revision, state / 'raw-final.json', candidate)
-                    recover_response(revision / unit['response_path'], candidate)
-                    break
+            try:
+                provenance = _read(state / 'provenance.json')
+                proof = validate_owned_observer_cleanup(state)
+                if 'returncode' in proof:
+                    # Production proofs bind terminal status. Legacy synthetic
+                    # fixture certificates have no status and grant no crash evidence.
+                    host_timeout = diagnostic.get('owned_timeout') is True
+                    if type(proof['returncode']) is not int or (proof['returncode'] != 0 and not host_timeout):
+                        raise ValueError('Stopped observer uncontrolled terminal exit')
+                    if (provenance.get('request_sha256') != quality.sha256_file(path)
+                            or provenance.get('request_path') != path.relative_to(revision).as_posix()
+                            or provenance.get('managed_hermes_identity') != workflow._managed_hermes_identity()):
+                        raise ValueError('Stopped observer request/runtime identity changed')
+                    if provenance.get('invocation_path') and quality.sha256_file(Path(provenance['invocation_path'])) != provenance.get('invocation_sha256'):
+                        raise ValueError('Stopped observer invocation identity changed')
+                    if provenance.get('callback_release_binding'):
+                        from visual_review import callback_release_binding
+                        if callback_release_binding(Path(__file__).parent.parent) != provenance['callback_release_binding']:
+                            raise ValueError('Stopped observer callback source changed')
+                metadata = observer_metadata(state, revision, unit)
+                _observer_channels(revision, state, unit, metadata)
+            except (OSError, ValueError, KeyError, TypeError, sqlite3.DatabaseError) as exc:
+                ledger = _read(revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json")
+                ledger['integrity_rejection'] = {'reason': 'Stopped observer authentication/execution rejected',
+                    'error': str(exc)}
+                _write(revision, revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json", ledger)
         except (OSError, ValueError, KeyError, TypeError, sqlite3.DatabaseError):
             continue  # Valid sibling observers remain independently recoverable.
 
@@ -370,32 +516,13 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
     metadata = None
     try:
         metadata = observer_metadata(state, revision, unit)
-        # Preserve raw checkpoint before attaching host-observed identity.
-        if checkpoint.is_file() and checkpoint.stat().st_size:
-            try:
-                raw = _read(checkpoint)
-                _write(revision, state / 'raw-progress.json', raw)
-                _authenticate_observer_response(revision, checkpoint, unit, metadata)
-            except (OSError, ValueError, KeyError, TypeError) as exc:
-                # Keep invalid checkpoint evidence; validate final independently.
-                if failure is None: failure = exc
-        decoder = json.JSONDecoder()
-        output = stdout_path.read_text()
-        for index, char in enumerate(output):
-            if char != '{': continue
-            try: candidate, _ = decoder.raw_decode(output, index)
-            except ValueError: continue
-            if (not isinstance(candidate, dict) or any(candidate.get(k) != unit[k]
-                    for k in ('request_id', 'request_sha256', 'task', 'revision_id'))):
-                continue
-            _write(revision, state / 'raw-final.json', candidate)
-            final_path = revision / unit['response_path']
-            _write(revision, final_path, candidate)
-            _authenticate_observer_response(revision, final_path, unit, metadata)
-            break
+        _observer_channels(revision, state, unit, metadata)
     except Exception as exc:
-        if failure is None: failure = exc
+        failure = exc  # Authentication failure always outranks a host timeout.
+    owned_timeout = (failure is owned.get('failure')
+        and isinstance(failure, (TimeoutError, subprocess.TimeoutExpired)))
     _write(revision, state / 'diagnostic.json', {'request_path': handoff['request_path'],
+        'owned_timeout': owned_timeout,
         'allocated_seconds': budget, 'elapsed_seconds': time.monotonic() - started,
         'returncode': owned['returncode'], 'observer_evidence': metadata,
         'error_type': type(failure).__name__ if failure else None,
@@ -403,34 +530,54 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
         'owned_cleanup_path': 'owned-descendant-cleanup.json', 'owned_cleanup_sha256': owned['cleanup_sha256'],
         'cleanup_scope': 'dedicated per-observer Linux subreaper; all owned descendants terminated and reaped'})
     result = visual_review_unit_result(revision, unit_path)
-    if not result or not result['complete']:
-        clean_partial = (result is not None and failure is None
-            and type(owned.get('returncode')) is int and owned['returncode'] == 0)
-        if clean_partial or isinstance(failure, (TimeoutError, subprocess.TimeoutExpired)):
-            # Partial scope and owned timeouts are recoverable only after the
-            # same cleanup and assignment checks. Unknown failures stay fatal.
-            from owned_observer_runtime import validate_owned_observer_cleanup
-            proof = validate_owned_observer_cleanup(state)
-            if quality.sha256_file(state / 'owned-descendant-cleanup.json') != owned['cleanup_sha256']:
-                raise OwnedObserverLifetimeUnresolved('Owned cleanup proof changed before timeout transport')
-            # Missing judgments and rejected identity share None at aggregation;
-            # validate assignment separately before admitting ordinary recovery.
-            from visual_review import validate_visual_review_unit_request
-            validate_visual_review_unit_request(revision, unit_path)
-            if (quality.sha256_file(unit_path) != original_request_sha256
-                    or provenance['request_sha256'] != original_request_sha256
-                    or json.dumps(_read(state / 'provenance.json'), sort_keys=True)
-                        != json.dumps(provenance, sort_keys=True)
-                    or _read(state / 'launch.json').get('request_path') != handoff['request_path']
-                    or type(proof.get('returncode')) is not int
-                    or type(owned.get('returncode')) is not int
-                    or proof['returncode'] != owned['returncode']):
-                raise OwnedObserverLifetimeUnresolved('Rejected observer request, provenance or terminal status before timeout transport')
-            if clean_partial:
-                from visual_review import IncompleteVisualReview
-                raise IncompleteVisualReview('Configured callback observer returned incomplete authenticated visual scope')
-            raise failure
-        raise RuntimeError('Configured callback observer returned incomplete authenticated visual scope') from failure
+    ledger_path = revision / f"hermes/visual-review-ledgers/{unit['request_id']}.json"
+    feedback = list((result or {}).get('validation_feedback', []))
+    for item in _read(ledger_path).get('observer_transport_feedback', []):
+        if item not in feedback:
+            feedback.append(item)
+    diagnostic = _read(state / 'diagnostic.json')
+    diagnostic['validation_feedback'] = feedback
+    _write(revision, state / 'diagnostic.json', diagnostic)
+    try:
+        from owned_observer_runtime import validate_owned_observer_cleanup
+        from visual_review import validate_visual_review_unit_request
+        proof = validate_owned_observer_cleanup(state)
+        validate_visual_review_unit_request(revision, unit_path)
+        if (quality.sha256_file(state / 'owned-descendant-cleanup.json') != owned['cleanup_sha256']
+                or quality.sha256_file(unit_path) != original_request_sha256
+                or _read(state / 'provenance.json') != provenance
+                or workflow._managed_hermes_identity() != provenance['managed_hermes_identity']
+                or _read(state / 'launch.json').get('request_path') != handoff['request_path']
+                or type(proof.get('returncode')) is not int
+                or type(owned.get('returncode')) is not int
+                or proof['returncode'] != owned['returncode']):
+            raise ValueError('Observer request, runtime, provenance or cleanup changed')
+        if envelope.get('_invocation_path') and quality.sha256_file(Path(envelope['_invocation_path'])) != envelope['_invocation_sha256']:
+            raise ValueError('Observer invocation request changed')
+        if envelope.get('callback_release_binding'):
+            from visual_review import callback_release_binding
+            if callback_release_binding(Path(__file__).parent.parent) != envelope['callback_release_binding']:
+                raise ValueError('Observer callback source changed')
+        if failure is not None and not owned_timeout:
+            raise RuntimeError('Configured callback observer authentication/execution failed') from failure
+        if failure is None and owned['returncode'] != 0:
+            raise RuntimeError('Configured callback observer exited without a controlled timeout')
+        if _read(ledger_path).get('integrity_rejection'):
+            raise ValueError('Observer unit integrity was rejected')
+    except Exception as exc:
+        ledger = _read(ledger_path)
+        ledger['integrity_rejection'] = {'reason': 'Observer terminal authentication/execution rejected',
+            'error_type': type(exc).__name__, 'error': str(exc)}
+        _write(revision, ledger_path, ledger)
+        raise
+    if result and result['complete']:
+        return
+    if failure is not None:
+        raise failure
+    from visual_review import IncompleteVisualReview
+    incomplete = IncompleteVisualReview('Configured callback observer returned incomplete authenticated visual scope')
+    incomplete.validation_feedback = feedback
+    raise incomplete
 
 
 def main() -> int:
@@ -442,6 +589,8 @@ def main() -> int:
         return 2
     deadline = time.monotonic() + allocation - 2.0
     errors = []
+    missing_target_ids = set()
+    validation_feedback = []
     for handoff in envelope['handoffs']:
         parent_path = revision / handoff['request_path']
         parent = _read(parent_path)
@@ -471,14 +620,48 @@ def main() -> int:
                 for future in futures:
                     try: future.result()
                     except Exception as exc: failures.append(exc)
-                if failures: raise failures[0]
+                if failures:
+                    from visual_review import IncompleteVisualReview
+                    recoverable = (IncompleteVisualReview, TimeoutError, subprocess.TimeoutExpired)
+                    # A safely incomplete sibling must never hide another
+                    # observer's fatal identity, cleanup or execution fault.
+                    raise next((exc for exc in failures if not isinstance(exc, recoverable)), failures[0])
         result = run_visual_review(revision, parent_path, dispatch, max(0.0, deadline - time.monotonic()),
             observer_evidence_required=True)
-        if not result['complete'] and not result['findings']:
+        if result['findings']:
+            return 0  # Productive native findings preempt unrelated later review.
+        if not result['complete']:
             errors.extend(result['dispatch_errors'] or ['Incomplete visual targets'])
+            for target in result.get('followup_missing') or result.get('missing', []):
+                missing_target_ids.add(target['target_id'] if isinstance(target, dict) else target)
+            validation_feedback.extend(result.get('validation_feedback', []))
     if errors:
-        print('Configured visual callback incomplete; retained diagnostics: ' + '; '.join(errors), file=sys.stderr)
-        return 1
+        # Dedicated exit code + immutable invocation identity. Exit 1 and
+        # arbitrary exceptions remain fatal; the parent must authenticate this
+        # report and its own cleanup proof before granting bounded retry.
+        invocation = Path(envelope['_invocation_path'])
+        if quality.sha256_file(invocation) != envelope['_invocation_sha256']:
+            raise ValueError('Callback invocation changed before recoverable report')
+        if workflow._managed_hermes_identity() != envelope['managed_hermes_identity']:
+            raise ValueError('Callback runtime changed before recoverable report')
+        if envelope.get('callback_release_binding'):
+            from visual_review import callback_release_binding
+            if callback_release_binding(Path(__file__).parent.parent) != envelope['callback_release_binding']:
+                raise ValueError('Callback source changed before recoverable report')
+        report = {'schema_version': 'tui-visual-callback-recovery/v1',
+            'outcome': 'incomplete_authenticated_visual_scope', 'exit_code': 75,
+            'invocation_path': str(invocation), 'invocation_sha256': envelope['_invocation_sha256'],
+            'revision_id': revision.name, 'revision_path': str(revision),
+            'managed_hermes_identity': envelope.get('managed_hermes_identity'),
+            'callback_release_binding': envelope.get('callback_release_binding'),
+            'callback_command': envelope.get('callback_command'),
+            'handoffs': envelope['handoffs'], 'missing_target_ids': sorted(missing_target_ids),
+            'validation_feedback': validation_feedback, 'dispatch_errors': errors}
+        report_path = invocation.with_suffix('.recovery.json')
+        _write(revision, report_path, report)
+        print(json.dumps(report, sort_keys=True))
+        print('Configured visual callback safely incomplete; retained authenticated diagnostics', file=sys.stderr)
+        return 75
     return 0
 
 
