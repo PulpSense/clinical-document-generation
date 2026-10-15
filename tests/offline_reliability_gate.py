@@ -19,6 +19,7 @@ TEST_FILES = (
     'test_reviewer_transport.py', 'test_worker_readiness.py', 'test_hermes_tui.py', 'test_tui_acceptance.py',
     'test_offline_reliability_gate.py', 'test_ai_quality_campaign.py',
     'test_observer_clean_partial.py', 'test_production_visual_transport.py',
+    'test_visual_transport_retention.py',
     'test_production_visual_incomplete.py',
     'test_content_review_recovery.py', 'test_review_scheduler.py', 'test_readiness_recovery.py', 'test_worker_boundary.py', 'test_readiness_campaign.py',
 )

@@ -19,7 +19,7 @@ def test_release_check_is_explicit_and_excludes_live_suites():
             'test_general_document_repair.py', 'test_ai_delivery_outcomes.py'} <= set(gate.TEST_FILES)
     assert {'test_content_review_recovery.py', 'test_review_scheduler.py'} <= set(gate.TEST_FILES)
     assert {'test_observer_clean_partial.py', 'test_production_visual_transport.py',
-            'test_production_visual_incomplete.py'} <= set(gate.TEST_FILES)
+            'test_visual_transport_retention.py', 'test_production_visual_incomplete.py'} <= set(gate.TEST_FILES)
     assert 'test_review_resolutions.py' not in gate.TEST_FILES
     assert 'test_hypothesis_fidelity.py' not in gate.TEST_FILES
     assert not any('e2e' in node or 'certification' in node or 'corpus' in node for node in command)

@@ -5581,15 +5581,24 @@ def _production_publish_quiet_response(
 ) -> bool:
     """Publish an authenticated final without conflating transport and identity."""
     def retain_transport(path: Path, channel: str) -> None:
+        import quality
         # Preserve exact rejected bytes before another channel can publish over
         # the final path. This is diagnostic evidence, never review credit.
         raw = path.read_bytes()
         digest = __import__('hashlib').sha256(raw).hexdigest()
         retained = revision_dir / 'hermes/visual-final-transport' / (
             str(handoff['request_id']) + '.' + channel + '.' + digest + '.bin')
-        if not retained.exists():
-            retained.parent.mkdir(parents=True, exist_ok=True)
-            retained.write_bytes(raw)
+        if not quality._revision_owned_nonsymlink_path(revision_dir, retained):
+            raise ValueError('Visual transport diagnostic must be revision-owned and nonsymlinked')
+        quality._assert_safe_mutation_path(retained.parent, directory=True)
+        quality._assert_safe_mutation_path(retained, directory=False)
+        if retained.exists():
+            if retained.read_bytes() != raw:
+                raise ValueError('Visual transport diagnostic bytes changed')
+            return
+        retained.parent.mkdir(parents=True, exist_ok=True)
+        quality._assert_safe_mutation_path(retained, directory=False)
+        retained.write_bytes(raw)
 
     if handoff.get('visual_unit'):
         final_path = revision_dir / str(handoff['response_path'])
