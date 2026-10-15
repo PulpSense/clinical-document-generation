@@ -404,9 +404,11 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
         'cleanup_scope': 'dedicated per-observer Linux subreaper; all owned descendants terminated and reaped'})
     result = visual_review_unit_result(revision, unit_path)
     if not result or not result['complete']:
-        if isinstance(failure, (TimeoutError, subprocess.TimeoutExpired)):
-            # Preserve a verified owned timeout at the public fallback seam.
-            # Generic execution/integrity errors must not be relabeled timeout.
+        clean_partial = (result is not None and failure is None
+            and type(owned.get('returncode')) is int and owned['returncode'] == 0)
+        if clean_partial or isinstance(failure, (TimeoutError, subprocess.TimeoutExpired)):
+            # Partial scope and owned timeouts are recoverable only after the
+            # same cleanup and assignment checks. Unknown failures stay fatal.
             from owned_observer_runtime import validate_owned_observer_cleanup
             proof = validate_owned_observer_cleanup(state)
             if quality.sha256_file(state / 'owned-descendant-cleanup.json') != owned['cleanup_sha256']:
@@ -424,6 +426,9 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
                     or type(owned.get('returncode')) is not int
                     or proof['returncode'] != owned['returncode']):
                 raise OwnedObserverLifetimeUnresolved('Rejected observer request, provenance or terminal status before timeout transport')
+            if clean_partial:
+                from visual_review import IncompleteVisualReview
+                raise IncompleteVisualReview('Configured callback observer returned incomplete authenticated visual scope')
             raise failure
         raise RuntimeError('Configured callback observer returned incomplete authenticated visual scope') from failure
 
