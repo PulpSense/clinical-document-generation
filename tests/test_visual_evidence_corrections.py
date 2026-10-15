@@ -8,7 +8,8 @@ import quality
 from tui_visual_callback import observer_metadata
 
 
-def metadata_fixture(tmp_path, reads, image_result=None, tool_name='vision_analyze', duplicate_result=None):
+def metadata_fixture(tmp_path, reads, image_result=None, tool_name='vision_analyze', duplicate_result=None,
+                     *, require_baseline=False, baseline_reads=()):
     revision = tmp_path / 'revisions/r1'
     revision.mkdir(parents=True)
     image = revision / 'page.png'
@@ -30,8 +31,15 @@ def metadata_fixture(tmp_path, reads, image_result=None, tool_name='vision_analy
         'CREATE TABLE messages(session_id TEXT,role TEXT,tool_calls TEXT,tool_call_id TEXT,tool_name TEXT,content TEXT,timestamp REAL);')
     db.execute('INSERT INTO sessions VALUES(?,?,0,0)', ('synthetic-session', 'synthetic-model'))
     calls = []
-    for n, path in enumerate([request, native, evidence]):
-        for i, (args, result) in enumerate(reads):
+    declared_reads = [(request, reads), (native, reads), (evidence, reads)]
+    if require_baseline:
+        baseline = revision / 'baseline.docx'
+        baseline.write_bytes(b'synthetic baseline')
+        unit['template_baseline_evidence'] = [{'path': 'baseline.docx', 'sha256': quality.sha256_file(baseline)}]
+        unit['visual_scope'][0]['kind'] = 'document'
+        declared_reads.append((baseline, baseline_reads))
+    for n, (path, actual_reads) in enumerate(declared_reads):
+        for i, (args, result) in enumerate(actual_reads):
             cid = f'read-{n}-{i}'
             calls.append({'id': cid, 'function': {'name': 'read_file', 'arguments': json.dumps({'path': str(path), **args})}})
             db.execute('INSERT INTO messages VALUES(?,?,?,?,?,?,?)', ('synthetic-session','tool',None,cid,'read_file',json.dumps(result),2))
@@ -60,6 +68,19 @@ def test_complete_inspection_requires_union_of_actual_returned_lines(tmp_path, r
     evidence = metadata_fixture(tmp_path, reads)
     assert evidence['request_inspection_complete'] is complete
     assert evidence['native_inspection_complete'] is complete
+
+
+@pytest.mark.parametrize('baseline_reads,complete', [
+    ([], False),
+    ([({}, {'content': '1|baseline beginning', 'total_lines': 2})], False),
+    ([({}, {'error': 'File not found', 'content': '1|baseline', 'total_lines': 1})], False),
+    ([({}, {'content': '1|baseline', 'total_lines': 1})], True),
+])
+def test_document_inspection_requires_actual_complete_baseline_read(tmp_path, baseline_reads, complete):
+    full = [({}, {'content': '1|complete', 'total_lines': 1})]
+    metadata = metadata_fixture(tmp_path, full, require_baseline=True, baseline_reads=baseline_reads)
+    assert metadata['request_inspection_complete']
+    assert metadata['native_inspection_complete'] is complete
 
 
 @pytest.mark.parametrize('tool,result', [

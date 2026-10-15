@@ -5803,6 +5803,34 @@ def content_review_schedule_result(revision_dir: Path, parent_path: Path,
             "completed": len(rows) + len(cross), "complete": complete, "findings": list(findings.values())}
 
 
+def _stage_visual_template_baselines(revision_dir: Path, repo_root: Path,
+                                      bundle: Mapping[str, Any], artifacts: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Expose only selected exact contract bytes in the revision evidence namespace."""
+    rows = []
+    selected = bundle["layout_preservation_baseline"]["artifacts"]
+    for artifact in artifacts:
+        name = artifact["artifact"]
+        for role in ("contracted_template", "client_template_authority"):
+            binding = selected[name][role]
+            source = repo_root / binding["path"]
+            if (not _revision_owned_nonsymlink_path(repo_root, source)
+                    or sha256_file(source) != binding["sha256"]):
+                raise ValueError("Contracted template baseline source changed")
+            relative = f"hermes/template-baselines/{binding['sha256']}/{source.name}"
+            target = revision_dir / relative
+            _assert_safe_mutation_path(target, directory=False)
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with target.open("xb") as stream:
+                    stream.write(source.read_bytes())
+            if (not _revision_owned_nonsymlink_path(revision_dir, target)
+                    or sha256_file(target) != binding["sha256"]):
+                raise ValueError("Revision template baseline changed")
+            rows.append({"artifact": name, "role": role, "package_path": binding["path"],
+                         "path": relative, "sha256": binding["sha256"]})
+    return rows
+
+
 def create_verification_requests(
     revision_dir: Path,
     reference: Mapping[str, Any],
@@ -6003,6 +6031,14 @@ def create_verification_requests(
                 "pass or the repair author's claim alone does not resolve an explicit concern."
             )
         payload["contracted_template_bundle"] = bundle
+        if payload["task"] == "rendered_page_visual_verification":
+            payload["template_baseline_evidence"] = _stage_visual_template_baselines(
+                revision_dir, repo_root, bundle, payload["artifacts"])
+            payload["instructions"] += (
+                " Contract identity paths in contracted_template_bundle are package-relative, not evidence paths. "
+                "Read the exact revision-relative template_baseline_evidence paths read-only for template comparison; "
+                "the document observer must fully read both selected baselines. Missing comparison evidence is "
+                "incomplete verification, never an observed layout defect or a passing template comparison.")
         if payload["task"] == "clinical_content_verification":
             payload["review_plan"] = _content_review_plan(revision_dir, payload, render_report)
             payload["review_transport"] = _review_transport(revision_dir, payload)
@@ -6488,7 +6524,10 @@ def verification_response_is_terminal(revision_dir: Path, request_path: Path) ->
         )
         if not evidence:
             return False
-        if request.get("visual_review_plan") and response.get("visual_scheduler_partial") is True:
+        if ((request.get("visual_review_plan") and response.get("visual_scheduler_partial") is True)
+                or (request.get("review_plan") and response.get("scheduler_partial") is True)):
+            # Consuming an authenticated substantive partial review enables native
+            # repair, not approval: the independent complete-coverage gate remains.
             return bool(any(f.get("partial_review") and f.get("verification_source_finding") for f in validation_findings)) and not any(
                 f.get("recovery_class") in {"verifier_transient", "document_structure_defect"}
                 and f.get("code") != "review_coverage_incomplete" for f in validation_findings)

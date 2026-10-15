@@ -84,6 +84,22 @@ def _parent(revision: Path, path: Path) -> dict:
             evidence = revision / relative
             if not _owned(revision, evidence) or quality.sha256_file(evidence) != digest:
                 raise ValueError('Visual native/PDF/page evidence is stale or foreign')
+    baseline = parent.get('contracted_template_bundle', {}).get('layout_preservation_baseline', {}).get('artifacts')
+    rows = parent.get('template_baseline_evidence', [])
+    expected_baselines = []
+    if baseline:
+        for artifact in parent.get('artifacts', []):
+            for role in ('contracted_template', 'client_template_authority'):
+                binding = baseline[artifact['artifact']][role]
+                expected_baselines.append({'artifact': artifact['artifact'], 'role': role,
+                    'package_path': binding['path'], 'sha256': binding['sha256'],
+                    'path': f"hermes/template-baselines/{binding['sha256']}/{Path(binding['path']).name}"})
+    if rows != expected_baselines:
+        raise ValueError('Visual template baseline bindings are incomplete or changed')
+    for row in rows:
+        evidence = revision / row['path']
+        if not _owned(revision, evidence) or quality.sha256_file(evidence) != row['sha256']:
+            raise ValueError('Visual template baseline evidence changed or unavailable')
     if parent.get('visual_review_plan') != visual_review_plan(parent):
         raise ValueError('Visual coverage plan is incomplete or changed')
     if not parent['visual_review_plan']['targets']:
@@ -112,7 +128,7 @@ def create_visual_review_unit(revision: Path, parent_path: Path,
     unit['checks'] = list(dict.fromkeys(check for target in scope for check in target['checks']))
     for key in ('source_identity_sha256', 'generation_authority_sha256', 'renderer',
                 'page_renderer', 'review_context', 'template_preservation', 'contracted_template_bundle',
-                'callback_release_binding'):
+                'template_baseline_evidence', 'callback_release_binding'):
         if key in parent:
             unit[key] = copy.deepcopy(parent[key])
     # Keep full native/PDF binding but restrict images to exactly assigned access.
@@ -197,6 +213,8 @@ def validate_visual_review_unit_request(revision: Path, path: Path) -> tuple[dic
             or unit['parent_request_sha256'] != parent['request_sha256']
             or any(t not in parent['visual_review_plan']['targets'] for t in unit['visual_scope'])):
         raise ValueError('Visual unit parent or scope changed')
+    if unit.get('template_baseline_evidence') != parent.get('template_baseline_evidence'):
+        raise ValueError('Visual unit template baseline assignment changed')
     if unit.get('document_evidence'):
         bound = unit['document_evidence']
         evidence_path = revision / bound['path']

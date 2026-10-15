@@ -153,12 +153,20 @@ def observer_metadata(state: Path, revision: Path, unit: dict) -> dict:
         required_native = {str((revision / a['docx']).resolve()) for a in unit['artifacts']}
         if unit.get('document_evidence'):
             required_native.add(str((revision / unit['document_evidence']['path']).resolve()))
+        baseline_bindings_valid = True
+        if any(t.get('kind') == 'document' for t in unit['visual_scope']):
+            for baseline in unit.get('template_baseline_evidence', []):
+                path = revision / baseline['path']
+                required_native.add(str(path.resolve()))
+                if (not quality._revision_owned_nonsymlink_path(revision, path)
+                        or not path.is_file() or quality.sha256_file(path) != baseline['sha256']):
+                    baseline_bindings_valid = False
         complete_reads = {p for p, c in read_coverage.items()
             if not c['contradictory'] and len(c['lines']) == c['total_lines']}
         return {'session_id': session_id, 'model_id': model_id, 'image_tool_results': tools,
             'native_read_results': native_reads,
             'request_inspection_complete': bool(unit.get('request_id')) and str((revision / f"hermes/visual-review-requests/{unit['request_id']}.json").resolve()) in complete_reads,
-            'native_inspection_complete': required_native <= complete_reads,
+            'native_inspection_complete': baseline_bindings_valid and required_native <= complete_reads,
             'inspected_paths': sorted(inspected), 'state_path': str(state),
             'database_sha256': quality.sha256_file(database),
             'provenance_sha256': quality.sha256_file(state / 'provenance.json') if (state / 'provenance.json').is_file() else None,
@@ -312,8 +320,10 @@ def observe_unit(revision: Path, handoff: dict, budget: float, envelope: dict) -
         'checkpoint. Native artifacts, source, requests, installed files and sibling judgments are READ-ONLY. '
         'Do not load unrelated skills or search the host. Read the bounded request at ' + str(unit_path) + '. '
         'Inspect assigned PNGs with vision_analyze, batch independent images together. '
-        'The request instructions and visual_scope define your complete assignment. Paths are relative to ' + str(revision) + '. '
-        'Read document_evidence and exact native DOCX when document scope is assigned. '
+        'The request instructions and visual_scope define your complete assignment. Evidence paths are relative to ' + str(revision) + '. '
+        'Package paths in contracted_template_bundle are identities, not revision-readable locations. '
+        'Read document_evidence, exact native DOCX, and every template_baseline_evidence file completely when document scope is assigned. '
+        'Only the declared staged baseline paths authorize template comparison; do not search installed assets. '
         'Immediately save completed target judgments to ' + str(checkpoint) + ' as bound response JSON, status in_progress; '
         'read current checkpoint before overwriting, preserve completed work. '
         'Return complete or partial response JSON only, with schema_version ' + quality.RESPONSE_SCHEMA + ', '

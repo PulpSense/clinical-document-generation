@@ -4637,7 +4637,13 @@ def test_generation_authority_rebind_archives_complete_recovery_state(tmp_path):
     (revision / "gate-attempt-journal.json").write_text('{"entries": []}', encoding="utf-8")
     (revision / "recovery-archive-transaction.json").write_text("{}", encoding="utf-8")
     (revision / "recovery-finalization-transaction.json").write_text("{}", encoding="utf-8")
-    working = {"generation": {"governing_sha256": "a" * 64, "gate_attempts": []}}
+    repairs = revision / "repairs/pass-001"
+    repairs.mkdir(parents=True)
+    (repairs / "request.json").write_text('{"old_repair": true}', encoding="utf-8")
+    (repairs / "accepted.docx").write_bytes(b"prior accepted native evidence")
+    working = {"generation": {"governing_sha256": "a" * 64, "gate_attempts": [],
+        "native_repair_history": [{"request_id": "old-repair"}],
+        "native_checkpoint": {"path": "repairs/pass-001/accepted.docx"}}}
 
     assert workflow._rebind_generation_authority(revision, working, "b" * 64) is True
     workflow._complete_generation_authority_rebind(revision)
@@ -4649,10 +4655,26 @@ def test_generation_authority_rebind_archives_complete_recovery_state(tmp_path):
         "gate-attempt-journal.json",
         "recovery-archive-transaction.json",
         "recovery-finalization-transaction.json",
+        "repairs/pass-001/request.json",
+        "repairs/pass-001/accepted.docx",
     ):
         assert (archive / relative).is_file()
         assert not (revision / relative).exists()
     workflow._validate_generation_authority_attempts(revision, working["generation"])
+    archived_request = (archive / "repairs/pass-001/request.json").read_bytes()
+    archived_state = json.loads((archive / "generation-state.json").read_text())
+    assert archived_state['native_repair_history'] == [{'request_id': 'old-repair'}]
+    assert 'native_checkpoint' not in working['generation']
+    (revision / 'candidate').mkdir()
+    Document().save(revision / 'candidate/protocol.docx')
+    (revision / 'approved-reference.json').write_text('{}')
+    (revision / 'approved-source.md').write_text('Unchanged approved source')
+    from output_recovery import create_native_repair
+    request_path = create_native_repair(revision, working['generation'],
+        {'meta': {'study_type': 'Retrospective'}}, {}, [{'issue': 'Fresh legitimate native concern'}])
+    assert request_path == revision / 'repairs/pass-001/request.json'
+    assert (archive / 'repairs/pass-001/request.json').read_bytes() == archived_request
+    workflow._validate_generation_authority_attempts(revision, working['generation'])
 
 
 def test_generation_authority_inventory_includes_nested_manifest_named_files(tmp_path):

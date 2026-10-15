@@ -3210,6 +3210,7 @@ _GENERATION_AUTHORITY_PATHS = (
     "rendered",
     "hermes",
     "request-ledger",
+    "repairs",
     "attempts",
     "candidate-build.json",
     "candidate-structure.json",
@@ -10304,23 +10305,37 @@ def _begin_independent_review(
     return paths, []
 
 
-def _accepted_partial_repair_findings(revision_dir: Path) -> list[dict[str, Any]]:
+def _verification_requires_source_clarification(finding: Mapping[str, Any]) -> bool:
+    source = finding.get("verification_source_finding")
+    return any(row.get("source_clarification_required")
+               or row.get("disposition") == "source_clarification"
+               for row in (finding, source if isinstance(source, Mapping) else {}))
+
+
+def _accepted_partial_repair_findings(revision_dir: Path, *,
+                                      findings: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Repair authenticated native concerns despite independent missing scope.
 
     Only ordinary coverage gaps may coexist; integrity, source clarification,
     malformed response and other validation failures remain stop conditions.
     """
-    findings, _ = validate_verifications(revision_dir)
+    if findings is None:
+        findings, _ = validate_verifications(revision_dir)
     defects = [row for row in findings
-               if row.get("partial_review") and row.get("verification_source_finding")
-               and not row.get("source_clarification_required")
-               and not row["verification_source_finding"].get("source_clarification_required")
-               and row.get("disposition") != "source_clarification"
-               and row["verification_source_finding"].get("disposition") != "source_clarification"
+               if row.get("verification_source_finding")
+               and row.get("recovery_class") in {"drafting_defect", "visual_defect"}
+               and not _verification_requires_source_clarification(row)
                and not internal_presentation_note(row)]
-    if defects and all(row in defects or row.get("code") in {
-            "review_coverage_incomplete", "verification_response_missing"}
-                       for row in findings):
+    def ordinary_gap(row: dict[str, Any]) -> bool:
+        # Reviewer-controlled codes cannot turn a rejected source finding into
+        # a system coverage notice or hide a source-clarification stop.
+        return (row.get("code") in {"review_coverage_incomplete", "verification_response_missing"}
+                and row.get("recovery_class") == "verifier_transient"
+                and "verification_source_finding" not in row
+                and not row.get("source_clarification_required")
+                and row.get("disposition") != "source_clarification")
+    if any(row.get("partial_review") for row in defects) and all(
+            row in defects or ordinary_gap(row) for row in findings):
         return defects
     return []
 
@@ -10827,8 +10842,12 @@ def generate(
             stage_observer=stage_observer, require_promoted_runtime=require_promoted_runtime,
         )
     _bind_available_verification_responses(revision_dir)
+    verification_findings, _ = validate_verifications(revision_dir)
+    if any(_verification_requires_source_clarification(row) for row in verification_findings):
+        return _repair_block(run_dir, "source_review", verification_findings,
+                             candidate_outputs=_candidate_outputs(revision_dir))
     pending_checks = pending_verifications(revision_dir)
-    partial_defects = _accepted_partial_repair_findings(revision_dir)
+    partial_defects = _accepted_partial_repair_findings(revision_dir, findings=verification_findings)
     if partial_defects:
         return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
             reference, bundle, partial_defects, operation_deadline, clock,
@@ -10838,15 +10857,13 @@ def generate(
     final_quality["render_assurance"] = assurance_report
     if final_quality["status"] != "passed":
         source_conflicts = [finding for finding in final_quality["findings"]
-                            if finding.get("source_clarification_required")]
+                            if _verification_requires_source_clarification(finding)]
         if source_conflicts:
             return _repair_block(run_dir, "source_review", final_quality["findings"],
                                  candidate_outputs=_candidate_outputs(revision_dir))
-        partial_defects = [row for row in final_quality["findings"]
-                           if row.get("partial_review") and row.get("verification_source_finding")
-                           and not internal_presentation_note(row)]
-        if partial_defects and all(row in partial_defects or row.get("code") == "review_coverage_incomplete"
-                                   for row in final_quality["findings"]):
+        partial_defects = _accepted_partial_repair_findings(
+            revision_dir, findings=final_quality["findings"])
+        if partial_defects:
             return _schedule_native_repair(run_dir, revision_dir, reference_path, working_reference,
                 reference, bundle, partial_defects, operation_deadline, clock,
                 failure_stage="integrity", failure_category="integrity")
