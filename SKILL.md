@@ -17,6 +17,8 @@ templates own fixed language and formatting. Stop at the unreviewed DOCX/XML
 outputs; the owner and Codex inspect them after generation. This experimental
 route supersedes the review, repair, renderer-provisioning and delivery-gate
 instructions below for these runs. Preserve Linux runtime dependencies.
+Deliver only “Here are the documents:” with clickable file links, using the clean
+filenames and delivery instructions in generation-only.md.
 
 Generate source-grounded clinical documents through one approval, independent AI review, general-tool repair and complete file delivery. AI owns meaning and visual usability. Code owns input/schema presence, approval and source identity, native-file integrity, required inventory, supported XML structure, rendering and exact-byte delivery.
 

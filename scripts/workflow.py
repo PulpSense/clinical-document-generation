@@ -10736,10 +10736,10 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
     output.mkdir(parents=True, exist_ok=False)
     entries = []
     for name in names:
-        path = output / f"UNREVIEWED-{name}"
+        path = output / name
         shutil.copy2(workspace / "candidate" / name, path)
         entries.append({"absolute_path": str(path), "path": path.relative_to(run_dir).as_posix(),
-                        "sha256": sha256_file(path)})
+                        "sha256": sha256_file(path), "link": f"[{name}](<{path.as_posix()}>)"})
     notice = output / "README.txt"
     notice.write_text(
         "UNREVIEWED EXPERIMENT — not client-ready.\n"
@@ -10751,6 +10751,8 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
     started = datetime.fromisoformat(_read(marker)["started_at"])
     result = {**base, "status": "unreviewed", "stage": "generation_only_complete",
               "experimental_outputs": entries, "notice": str(notice),
+              "delivery_message": "Here are the documents:\n\n" + "\n".join(
+                  f"- {entry['link']}" for entry in entries),
               "manifest": str(manifest_path), "governing_sha256": identity,
               "elapsed_seconds": (datetime.now(timezone.utc) - started).total_seconds(),
               "assessments": {"content": "not_run", "visual": "not_run"}}

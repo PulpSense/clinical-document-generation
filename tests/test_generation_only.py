@@ -58,10 +58,13 @@ def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch
     result = complete(tmp_path)
     assert result["status"] == "unreviewed", result
     assert not result["client_outputs"]
-    expected = {"UNREVIEWED-protocol.docx"}
+    expected = {"protocol.docx"}
     if branch != "Retrospective":
-        expected |= {"UNREVIEWED-icf.docx", "UNREVIEWED-study.xml"}
+        expected |= {"icf.docx", "study.xml"}
     assert {Path(item["absolute_path"]).name for item in result["experimental_outputs"]} == expected
+    assert result["delivery_message"] == "Here are the documents:\n\n" + "\n".join(
+        f"- [{Path(item['absolute_path']).name}](<{item['absolute_path']}>)"
+        for item in result["experimental_outputs"])
     for entry in result["experimental_outputs"]:
         file = Path(entry["absolute_path"])
         assert file.is_file()
