@@ -732,6 +732,68 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
                 paragraph.paragraph_format.keep_with_next = True
 
 
+def _visible_table_borders(table: Table) -> None:
+    """Cell overrides must not hide the Protocol's visible table grid."""
+    for properties, tag, sides in [
+        (table._tbl.tblPr, "tblBorders", ("top", "left", "bottom", "right", "insideH", "insideV")),
+        *[(cell._tc.get_or_add_tcPr(), "tcBorders", ("top", "left", "bottom", "right"))
+          for row in table.rows for cell in row.cells],
+    ]:
+        borders = properties.find(qn(f"w:{tag}"))
+        if borders is None:
+            borders = OxmlElement(f"w:{tag}")
+            properties.append(borders)
+        for side in sides:
+            edge = borders.find(qn(f"w:{side}"))
+            if edge is None:
+                edge = OxmlElement(f"w:{side}")
+                borders.append(edge)
+            for key, value in {"val": "single", "color": "000000", "sz": "8", "space": "0"}.items():
+                edge.set(qn(f"w:{key}"), value)
+            for key in ("themeColor", "themeTint", "themeShade"):
+                edge.attrib.pop(qn(f"w:{key}"), None)
+
+
+def _insert_retrospective_site_directory(document: Document, reference: Mapping[str, Any]) -> None:
+    contract = protocol_table_contracts(reference)["study-sites"]
+    rows = contract["rows"]
+    if len(rows) < 2:
+        return
+    sections = list(protocol_contract("Retrospective"))
+    owner_index = next(i for i, section in enumerate(sections)
+                       if section.section_id == contract["section_id"])
+    boundary = sections[owner_index + 1]
+    boundary_key = _protocol_heading_key(f"{boundary.number} {boundary.title}")
+    anchor = next((p for p in document.paragraphs
+                   if _protocol_heading_key(p.text) == boundary_key), None)
+    if anchor is None:
+        return
+    caption = document.add_paragraph(contract["caption"])
+    caption.paragraph_format.keep_with_next = True
+    caption.runs[0].bold = True
+    anchor._p.addprevious(caption._p)
+    table = document.add_table(rows=len(rows), cols=3)
+    table.autofit = False
+    section = document.sections[0]
+    width = section.page_width - section.left_margin - section.right_margin
+    for column, proportion in zip(table.columns, (0.36, 0.28, 0.36)):
+        column.width = int(width * proportion)
+    for row, values in zip(table.rows, rows):
+        for index, (cell, value) in enumerate(zip(row.cells, values)):
+            cell.width = table.columns[index].width
+            cell.text = value
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.space_after = Pt(4)
+                for run in paragraph.runs:
+                    run.font.size = Pt(10)
+    for cell in table.rows[0].cells:
+        for run in cell.paragraphs[0].runs:
+            run.bold = True
+    _set_repeat_header(table.rows[0])
+    _visible_table_borders(table)
+    anchor._p.addprevious(table._tbl)
+
+
 def _normalize_protocol_title_controls(document: Document, reference: Mapping[str, Any]) -> None:
     """Expose approved Protocol controls without conflating version and amendment."""
     protocol_date = _document_control_date(reference)
@@ -766,6 +828,7 @@ def _normalize_protocol_title_controls(document: Document, reference: Mapping[st
         anchor = set_control("Protocol Version", protocol_version, anchor)
     if protocol_date:
         set_control("Protocol Date", protocol_date, anchor)
+    _visible_table_borders(table)
 
 
 def _protocol_heading_key(value: str) -> str:
@@ -1011,6 +1074,7 @@ def _retrospective_eligibility_blocks(
                     blocks.append((f"Minimum eligible age: {lower}.", True))
                 else:
                     blocks.append((f"Maximum eligible age: {upper}.", True))
+    blocks.extend((note, False) for note in _list(get_path(reference, "population.eligibility_notes", [])))
     return blocks
 
 
@@ -1156,7 +1220,7 @@ def _replace_protocol_leaf_bodies(
             introduction = ("The scheduled visits and study activities are shown in Table 15.1."
                             if assessment_table["rows"] else "Study assessments are described below.")
             blocks = [(introduction, False)]
-        if branch == "Retrospective" and section.section_id == "subjects.eligibility":
+        if branch == "Retrospective" and section.section_id == "subjects.eligibility" and not blocks:
             blocks = _retrospective_eligibility_blocks(reference)
         if branch == "Retrospective" and section.section_id == "study-procedure.enrollment":
             withdrawal = str(get_path(reference, "procedures.discontinuation", "") or "").strip()
@@ -3853,6 +3917,8 @@ def _template_document(
         _normalize_protocol_container_introductions(document, branch, boilerplate)
         _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
         _sample_size_evidence_table(document, reference, authority_path)
+        if branch == "Retrospective":
+            _insert_retrospective_site_directory(document, reference)
         _normalize_protocol_title_controls(document, reference)
         _normalize_protocol_summary_table(document, reference)
         _ensure_protocol_references(document, authority, reference)

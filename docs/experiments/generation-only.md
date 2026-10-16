@@ -1,5 +1,8 @@
 # Generation-only experiment
 
+For the agreed retrospective, repeat-run and template-switch sequence, continue
+from the current step in [the validation plan](validation-plan.md).
+
 ## Settled scope
 
 The owner requested an isolated worktree to inspect the initial generated

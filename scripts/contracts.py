@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.48-specimen-results-ownership"
+CONTRACT_VERSION = "clinical-documents-v2.49-retrospective-coverage"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -456,6 +456,14 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
         "icf.withdrawal": "Assembly inserts the authorized voluntary-participation paragraph once. Draft only additional supplied withdrawal instructions, optional follow-up, investigator discontinuation and earned-payment conditions in participant-facing language. If no additional facts exist, return the exact fixed paragraph as fixed_boilerplate; assembly retains it once.",
     }
+    eligibility = (
+        "Preserve the approved unit of eligibility and each criterion's scope, conditions and exceptions. "
+        "Use supplied population context and eligibility_notes for cross-criterion rules. State how "
+        "exclusion of a subunit (such as an eye, specimen or record) affects the person and remaining "
+        "eligible subunits only when supplied. Retain related notes in paragraphs beside distinct "
+        "inclusion/exclusion lists. Missing measurements may limit an analysis without excluding the "
+        "cohort member when the approved source makes that distinction. Add no new eligibility rule."
+    ) if section_id in {"subjects.inclusion", "subjects.exclusion", "subjects.eligibility"} else ""
     policy = (
         "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, "
         "transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute "
@@ -470,6 +478,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         specific.get(section_id, f"Explain {title.lower()} using all material approved facts supplied for this section."),
         "Do not replace supplied detail with generic clinical prose.",
         *((policy,) if policy else ()),
+        *((eligibility,) if eligibility else ()),
     )
 
 
@@ -588,7 +597,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary"), owned_concepts=("study-objectives",), brief_reference_concepts=("clinical-rationale", "primary-endpoint", "endpoint-inventory"), do_not_restate_concepts=("clinical-rationale", "endpoint-inventory")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size", "population.inclusion_criteria")),
-    _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation", "population.eligibility_notes", "population.study_population")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.treatment_assignment", "design.intervention_description", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("study-design", "intervention-assignment", "endpoint-inventory")),
@@ -643,9 +652,9 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("objectives", "5.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary", "study.hypothesis", "endpoints.primary", "endpoints.secondary"), owned_concepts=("study-objectives", "endpoint-inventory"), brief_reference_concepts=("clinical-rationale", "primary-endpoint"), do_not_restate_concepts=("clinical-rationale",)),
     _section_spec("subjects", "6.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "6.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size", "population.inclusion_criteria")),
-    _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("subjects.eligibility", "6.2.", "Inclusion/Exclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation", "population.eligibility_notes", "population.study_population")),
     _section_spec("study-design", "7.", "STUDY DESIGN", role="container"),
-    _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.arms", "design.masking")),
+    _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.arms", "design.masking"), table_evidence=("sites",)),
     _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "retrospective-bias"),
     _section_spec("study-procedure", "8.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent", "procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline", "procedures.retention", "procedures.discontinuation", "procedures.replacement", "procedures.specimens", "procedures.return_of_results"), "retrospective-consent"),
@@ -676,7 +685,7 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
         boilerplate_keys=("icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"),
     ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-purpose", "study-hypothesis", "primary-endpoint"), do_not_restate_concepts=("clinical-background", "comparative-evidence", "study-rationale")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.retention", "procedures.adverse_events", "procedures.specimens", "procedures.return_of_results", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.retention", "procedures.adverse_events", "procedures.specimens", "procedures.return_of_results", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation", "population.eligibility_notes", "population.study_population")),
     _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.participation_duration", "procedures.visit_schedule", "procedures.visit_schedule_table", "population.sample_size", "study.timeline")),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
@@ -1934,6 +1943,48 @@ def document_table_reference(reference: Mapping[str, Any], model: Mapping[str, A
     return reference
 
 
+def protocol_site_directory(reference: Mapping[str, Any]) -> list[list[str]]:
+    """Project supplied site identities and staff details without clinical prose."""
+    def people(site: Mapping[str, Any], keys: tuple[str, ...]) -> str:
+        records = []
+        for key in keys:
+            value = site.get(key)
+            records.extend(value if isinstance(value, list) else [value])
+        lines = []
+        for person in records:
+            if not isinstance(person, Mapping):
+                continue
+            name = str(person.get("name") or " ".join(str(person.get(k) or "") for k in
+                       ("first_name", "middle_name", "last_name"))).strip()
+            if not name and not any(meaningful(person.get(k)) for k in ("phone", "business_phone", "office_phone", "email")):
+                continue
+            parts = [name, str(person.get("degrees") or person.get("degree") or ""),
+                     str(person.get("role") or person.get("title") or "")]
+            for key, label in (("business_phone", "Business"), ("office_phone", "Office"),
+                               ("email", "Email")):
+                value = person.get(key) or (person.get("phone") if key == "business_phone" else None)
+                if meaningful(value):
+                    parts.append(f"{label}: {value}")
+            line = "; ".join(part for part in parts if part)
+            if line not in lines:
+                lines.append(line)
+        return "\n".join(lines)
+
+    rows = [["Study site", "Investigator(s)", "Study contact(s)"]]
+    sites = reference.get("sites") or []
+    for site in sites:
+        if not isinstance(site, Mapping):
+            continue
+        facility = site.get("facility")
+        fields = facility_projection(facility if isinstance(facility, Mapping) else {})
+        identity = "\n".join(str(fields[key]) for key in ("name", "address") if fields[key])
+        row = [identity, people(site, ("investigator", "investigators")),
+               people(site, ("contact", "contacts"))]
+        if any(row):
+            rows.append(row)
+    return rows
+
+
 def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentation: Any = None) -> dict[str, dict[str, Any]]:
     """Return typed, source-derived Protocol table matrices for rendering and QA."""
     visits = normalized_visit_records(reference)
@@ -2221,6 +2272,9 @@ def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentati
             [labels.get(row[0], row[0]), *row[1:]]
             for row in assessment_rows[header_rows:] if row[0] not in qualifiers]
     return {
+        "study-sites": {"section_id": "study-design.design",
+                        "caption": "Participating sites and study contacts",
+                        "header_rows": 1, "rows": protocol_site_directory(reference)},
         "schedule-of-assessments": {
             "section_id": "evaluation-procedures",
             "caption": "Table 15.1. Proposed Visits and Study Assessments",

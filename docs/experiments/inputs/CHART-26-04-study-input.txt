@@ -1,0 +1,284 @@
+CHART-26-04 — STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT
+Version 1.0 | 16 October 2026
+
+DOCUMENT REQUEST AND REVIEW STATUS
+Requested document: retrospective protocol DOCX, using the current retrospective
+Protocol template. No informed consent document or study XML is requested in
+this run. This is a new study input for the usual Source of Truth approval
+process. The ethics application has not been submitted. No IRB approval,
+consent waiver, privacy-authorization waiver, approval identifier or approval
+date has been issued. Source of Truth approval does not constitute IRB approval.
+
+IDENTIFICATION AND DESIGN
+Protocol number: CHART-26-04.
+Full title: Recorded Intraocular Pressure After Routine Cataract Surgery:
+A Retrospective Multisite Medical Record Review.
+Short title: Eye Pressure After Cataract Surgery.
+Study type: Retrospective. Study classification: Observational cohort.
+Time perspective: Retrospective. Number of sites: 2, both in the United States.
+Condition: Pseudophakia following cataract surgery.
+One records-based cohort. Routine cataract surgery and subsequent clinical
+care were selected and performed independently of this research. There are no
+assigned treatments, comparison products, randomization, masking, placebo or
+investigational products. This study neither evaluates an investigational
+product nor assigns changes to care.
+
+BACKGROUND AND UNMET NEED
+Routine postoperative records contain pressure measurements and prescribing
+decisions, but measurement availability and recording times vary. Combining
+these existing records may describe pressure change and documented early
+pressure elevations without assuming a uniform clinical follow-up schedule.
+Unmet need: The participating clinics lack a combined description of recorded
+postoperative pressure change, early pressure elevations and pressure-lowering
+medication initiation, with missing records and paired eyes accounted for.
+No published effect estimate or bibliographic references are supplied.
+Primary objective: Describe recorded change in intraocular pressure from the
+preoperative baseline to the historical Day 30 assessment window.
+Secondary objectives: Describe early recorded pressure elevations and new
+pressure-lowering medication prescriptions after surgery.
+Exploratory objective: Describe the association between a pre-existing diabetes
+diagnosis and recorded pressure change, accounting for baseline pressure and site.
+Hypothesis: Eyes of patients with documented pre-existing diabetes will have a
+larger mean recorded pressure increase at Day 30 than eyes of patients with an
+explicitly documented absence of diabetes. This is an exploratory association
+hypothesis, not an established result or a causal effect of surgery or diabetes.
+
+HISTORICAL WINDOWS AND DATE ANCHORS
+Eligible routine-care cataract operations: 1 January 2024 through 15 August 2026,
+inclusive. Historical record window: 3 October 2023 through 30 September 2026,
+inclusive. This includes the preoperative baseline window for the earliest
+eligible operation and all postoperative windows for the latest operation.
+Historical Day 0 means the operation date for each eye, not research enrollment.
+Baseline: Last documented intraocular pressure for that eye within 90 calendar
+days before its operation, excluding measurements on the operation date.
+Early postoperative window: Days 1 through 7 after that eye's operation.
+Day 30 outcome window: Days 21 through 45 after that eye's operation.
+These are historical record-selection windows, not scheduled research visits.
+All relevant clinical care predates research record abstraction. No additional
+follow-up is requested to obtain a missing measurement.
+
+POPULATION, SAMPLE AND ELIGIBILITY
+Planned sample: All eligible records, anticipated to represent 240 unique
+people and approximately 360 eligible operated eyes across the two sites.
+Anticipated site contributions: 140 people at Site 1 and 100 at Site 2.
+The eye count is an estimate, not an additional participant target. Actual
+counts and reasons for exclusions will be reported. No prospective recruitment,
+participant enrollment appointments or direct participant contact are planned.
+Age: 18 through 89 years, inclusive, at the first eligible eye operation.
+All sexes eligible. Healthy volunteers: No.
+Sampling: Consecutive eligible routine-care records within the fixed surgical
+window. Each person appears once in the participant count; both eligible eyes
+may contribute to eye-level analyses. Link duplicate records across clinics
+using a restricted site-to-site matching process before coding the dataset.
+Assign a person's site to the clinic of the first eligible operation. The eye's
+operating site remains recorded separately. A repeated record is not a new eye.
+Inclusion criteria:
+- Age 18 through 89 at the person's first eligible operation.
+- At least one routine cataract operation from 1 January 2024 through
+  15 August 2026 at a participating clinic.
+- A source operative record identifying the eye and operation date.
+- Records accessible under site authorization and the ethics/privacy decisions
+  required before research access.
+Exclusion criteria, applied to individual operated eyes:
+- Cataract surgery combined at the same operation with glaucoma filtering
+  surgery, a glaucoma drainage implant or a retinal operation.
+- A source operative record that does not permit reliable identification of
+  the operated eye or operation date after source verification.
+If both eyes are ineligible, exclude the person from the study cohort. If only
+one eye is ineligible, retain the other eligible eye. A missing baseline or
+postoperative pressure measurement does not exclude an otherwise eligible eye
+from the cohort; it affects only the relevant outcome's analysis denominator.
+Prior glaucoma, use of pressure-lowering medication and diabetes are recorded
+characteristics, not exclusion criteria. Do not infer a diagnosis from a single
+prescription. Pregnancy status is not collected and creates no eligibility
+restriction. There is no screening washout or restriction on participation in
+another study, because this is a records-only review with no research screening.
+Sample justification: Include all eligible records from the fixed period. The
+anticipated 240 people/360 eyes is a feasibility estimate; no treatment effect,
+prospective loss-to-follow-up allowance or formal power calculation is assumed.
+
+RECORD ABSTRACTION AND MEASUREMENT RULES
+Research staff will access records only after required ethics/privacy decisions
+and written site permissions. Staff will verify eligibility, link duplicate
+records, assign study IDs and abstract the following existing information:
+age at operation, sex, eye laterality, operation date, operating site, documented
+diabetes status, documented glaucoma diagnosis, pressure-lowering medication
+use at baseline, pressure measurements and their dates/methods, and new
+pressure-lowering medication prescriptions within 45 days after surgery.
+Use the recorded pressure value in mmHg and retain the recorded method.
+No research pressure test, vision test, questionnaire, telephone call, clinic
+visit, specimen collection or other new participant procedure is performed.
+No specimens are accessed, transferred or stored. No genetic information or
+laboratory testing is included. No imaging re-reading is planned.
+For the baseline, choose the latest measurement strictly before surgery within
+the specified 90-day window. In the Day 30 window, choose the measurement closest
+to postoperative Day 30; if equally distant, choose the earlier date. For the
+early window, use all recorded pressure measurements to determine whether any
+value reaches the specified threshold; one eye is counted only once even if
+several measurements meet that threshold. For baseline and Day 30 selection, if two pressure values on the selected
+date have different times, use the later recorded time. If time cannot resolve
+multiple values, retain the source ambiguity as missing for that outcome
+rather than choosing a value without a documented rule.
+Retain measurements recorded before or after treatment as documented; these
+observational summaries do not represent untreated pressure trajectories.
+The research abstraction schedule is staff work: eligibility/query review in
+November 2026, abstraction through January 2027, and verification/query closure
+in February 2027. Do not turn these work phases into participant visits.
+
+OUTCOMES
+Primary outcome: Mean eye-level change in intraocular pressure, mmHg, from the
+selected preoperative baseline to the selected historical Day 30 value
+(postoperative Days 21–45). Change is Day 30 minus baseline; positive change
+means a higher recorded pressure, not clinical improvement. Use eyes with both
+selected measurements. Report the number of contributing eyes and unique people.
+Secondary outcome 1: Proportion of eyes with at least one recorded intraocular
+pressure of 25 mmHg or higher on postoperative Days 1–7. Denominator: eligible
+eyes with at least one pressure measurement in that window. Multiple qualifying
+measurements in one eye count as one eye meeting the outcome.
+Secondary outcome 2: Proportion of eyes with a newly prescribed pressure-lowering
+medication during postoperative Days 0–45. Denominator: eligible eyes with
+medication documentation sufficient to assess initiation in that window.
+A new medication means a drug not listed for that eye at baseline; changing the
+dose of an existing drug does not count. A prescription does not establish
+adherence. Record eye-specific prescribing; an unresolved laterality is missing
+for this outcome rather than assigned to both eyes.
+Exploratory outcome: Association of documented diabetes status with eye-level
+pressure change over the primary outcome interval. Diabetes is classified as
+documented present, explicitly documented absent, or unknown. Unknown status
+is reported separately and is not recoded as absence.
+No other outcomes or treatment comparisons are specified.
+
+STATISTICAL ANALYSIS PLAN
+Describe cohort flow, exclusions, people and eyes contributed by each site,
+baseline characteristics, measurement availability and measurement methods.
+For the primary outcome, summarize paired observed pressure change by mean,
+standard deviation, median and range. Report a 95% confidence interval for the
+mean change using a participant-cluster bootstrap with 2,000 resamples,
+resampling people with all their included eyes together.
+For secondary proportions, report numerator, available-case denominator and
+percentage. Report missingness explicitly. Do not treat absent pressure
+measurements as no pressure elevation or an absent medication entry as proof
+that no medication was prescribed.
+For the exploratory association, fit a linear mixed-effects model of pressure
+change with documented diabetes status, baseline pressure, age at first eligible
+operation and operating site as fixed effects and person as a random intercept.
+Use eyes with complete required model variables and diabetes explicitly present
+or absent. Report the association estimate and 95% confidence interval; report
+unknown diabetes status separately. No confirmatory hypothesis test, p-value
+threshold, superiority conclusion or causal interpretation is specified.
+No missing-value imputation. Report outcome-specific available-case eye and
+person counts. Report measurement-method distributions; do not invent a
+conversion between methods or assume that all routine measurements used the
+same device. Report data inconsistencies and the records omitted from each
+analysis. Selection bias, incomplete records, care-related measurement timing
+and residual confounding limit interpretation.
+Software: R, version recorded when analysis is performed; no specific version
+is prescribed in this input. No additional sensitivity analysis is specified.
+
+CONSENT, ETHICS AND PRIVACY
+Reviewing body: Meridian Independent Research Review Board, independent of the
+sponsor and clinics. A waiver of informed consent and a waiver of individual
+privacy authorization will be requested for this records-only review. Neither
+waiver is granted yet. Research record access and abstraction cannot start
+until the required decisions and site permissions are documented. Do not
+represent a requested waiver as an approval or invent approval details.
+No participant contact or re-consent is authorized by this study plan. If the
+reviewing body does not permit the requested records-only approach, revise the
+study plan through its normal review process before proceeding; do not add
+participant visits or generate an ICF as an automatic substitute.
+The principal research risk is loss of confidentiality, not complications from
+historical surgery or new research procedures. Routine clinical events are
+historical data, not prospective research adverse events. The study introduces
+no participant safety monitoring visits, clinical treatment or new SAE collection
+program. Research staff refer suspected unauthorized access or disclosure to
+the site's privacy officer and PI on the day discovered; they document the
+incident and follow institutional notification and IRB reporting requirements.
+No specific external reporting deadline is supplied.
+At each site, direct identifiers remain in the clinic's secure environment.
+Authorized site investigators and abstractors access identifying records only
+for eligibility, linkage, verification and correction. Restricted matching uses
+name, date of birth and operation details solely to resolve duplicate records;
+linkage material is kept separately with access limited to the two site PIs
+and their designated data managers. The central study dataset contains study
+IDs, age, sex, operating site, laterality, relative postoperative days, recorded
+measurements, medication variables and diagnosis flags. Exact dates, names,
+contact details and linkage keys are not sent to the sponsor or statistician.
+Sites retain exact clinical dates for verification and derive relative days
+before central transfer. The sponsor and statistician receive coded data only.
+Authorized monitors, the reviewing IRB and legally authorized oversight bodies
+may inspect relevant source records under applicable permissions. No public
+individual-data sharing, sale, genetic analysis, specimen banking or unrelated
+future research is planned. Publications contain aggregate results only.
+Study linkage files and the coded research dataset are retained securely for
+five years after administrative closeout on 31 March 2027, then securely
+destroyed unless a binding requirement requires longer retention. Original
+clinical records remain under each clinic's usual retention policy; research
+closeout does not authorize their destruction.
+There is no individual research-result return or clinical alert service. This
+review generates no validated clinical report or new clinical test. Historical
+findings do not trigger new participant contact under this protocol. Aggregate
+results may be made available through clinic notices after analysis; obtaining
+a summary is not an additional research assessment or follow-up requirement.
+
+COSTS, COMPENSATION AND STUDY DISPOSITION
+Participant compensation and reimbursement: None. No participant visits, travel
+or additional treatment are requested. The sponsor pays research abstraction,
+secure data management and statistical-analysis costs. Historical clinical care
+remains ordinary care; this research creates no participant or insurer charges.
+No research intervention or specimen collection creates a physical injury risk;
+no free-treatment fund or additional injury compensation is established. The
+privacy-incident procedure above applies to research confidentiality incidents.
+An individual contributes eligible historical records; there is no prospective
+completion visit or withdrawal appointment. If access to a record is restricted
+before abstraction, omit that record and document why. If an authorization or
+ethics decision later requires removal of identifiable research data, follow
+that decision and document the effect on analysis populations. This plan does
+not promise that already aggregated results can be withdrawn or contact people
+to obtain retrospective withdrawal instructions. No replacement recruitment.
+
+TIMELINE AND COMPLETION
+Historical care dates: as specified above; record cutoff 30 September 2026.
+Planned first research record access: 2 November 2026, subject to the required
+ethics/privacy decisions and site permissions. These are research-work dates,
+not dates of patient treatment or recruitment appointments.
+Primary-outcome abstraction expected complete: 29 January 2027.
+All record abstraction and source-query verification expected complete:
+26 February 2027. This defines completion of research data collection.
+Analysis and administrative closeout planned by 31 March 2027. Closeout includes
+query resolution, duplicate-record reconciliation, disposition/count review,
+final coded dataset lock, analysis and archival access review. Administrative
+closeout does not extend historical clinical follow-up.
+Current study status: Research abstraction not started. No ethics approval or
+waiver identifier, approval date or public registration identifier is supplied.
+No actual study approval is represented by this synopsis.
+
+SPONSOR, STUDY STAFF AND TWO SITES
+Sponsor: Meridian Ophthalmic Outcomes Research, 410 Research Avenue, Suite 210,
+Baltimore, MD 21202, United States.
+Sponsor contact: Morgan Lane, Research Director, +1 202-555-0180,
+morgan.lane@example.org.
+Overall principal investigator: Dr. Avery Brooks, MD, Principal Investigator.
+Overall study coordinator: Casey Reed, CCRC, Research Data Coordinator.
+Business phone: +1 202-555-0181. Office phone: +1 202-555-0182.
+Email: casey.reed@example.org. Mailing address: Site 1 below.
+
+Site 1 facility: Meridian Eye Clinic, 520 Charles Street, Suite 110,
+Baltimore, MD 21201, United States.
+Site 1 investigator: Dr. Avery Brooks, MD, Principal Investigator.
+Site 1 contact: Casey Reed, CCRC, Research Data Coordinator; business
++1 202-555-0181, office +1 202-555-0182, casey.reed@example.org.
+
+Site 2 facility: Severn Ophthalmology Center, 630 Severn Avenue, Suite 220,
+Annapolis, MD 21401, United States.
+Site 2 investigator: Dr. Riley Chen, MD, Site Investigator.
+Site 2 contact: Jordan Blake, CCRC, Site Data Coordinator; business
++1 202-555-0183, office +1 202-555-0184, jordan.blake@example.org.
+These are staff research contacts available Monday–Friday, 9 a.m.–5 p.m. local
+time, not participant scheduling or emergency lines.
+
+IRB CONTACT
+Meridian Independent Research Review Board.
+Affiliation: Independent IRB, unaffiliated with the sponsor and clinics.
+Address: 740 Review Road, Suite 310, Baltimore, MD 21203, United States.
+Phone: +1 202-555-0185. Email: research.rights@example.org.
+This contact handles research-rights questions and study oversight concerns.

@@ -51,7 +51,8 @@ this file.
   unambiguous US mailing string may supply those components. Clarify a supplied
   multi-part address that cannot be separated safely before approval.
 - `population`: study population, planned sample size, sample justification,
-  age/sex eligibility, inclusion criteria, exclusion criteria, and supporting
+  age/sex eligibility, inclusion criteria, exclusion criteria, optional
+  `eligibility_notes` for supplied cross-criterion unit/scope/exception rules, and supporting
   sample-size evidence.
 - `design`: design description, site count, masking, arms/groups,
   interventions/test articles, controls, and data sources. Use

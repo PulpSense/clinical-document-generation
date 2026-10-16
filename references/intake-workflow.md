@@ -116,6 +116,12 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   timing, exceptions and negation, and choose one consistent placement before
   approval. Do not copy a negative eligibility requirement unchanged under an
   Exclusion Criteria heading or duplicate it under both headings.
+- Preserve the unit of eligibility and criterion-specific conditions/exceptions
+  inside the relevant inclusion/exclusion entries. Retain cross-criterion rules
+  in `population.eligibility_notes`, including supplied rules distinguishing
+  a person from eligible eyes, records or other subunits. Preserve separately
+  whether missing data limits an analysis rather than cohort membership.
+  These notes are optional; add no rule absent from the input.
 - Populate format-specific structured fields from facts explicitly stated in
   the intake, not just from identically named form questions. Keep coded
   type/status values separate from narrative descriptions: observational design
