@@ -656,5 +656,16 @@
     "study-procedure.unscheduled": [
       "Use 'unscheduled visit' when describing an in-person visit, and 'contact' only when the source actually permits other contact modes. Preserve the approved scope; a wording correction never authorizes additional visits or assessments."
     ]
-  }
+  },
+  "consent_template_comments": [
+    "Use the approved Advarra or Sterling family. Their layouts and retained legal language differ; do not combine families or switch selection to imitate an uploaded example.",
+    "Template annotations are drafting guidance, not clinical facts. Keep instructional brackets, alternative OR choices, comments, highlighting and unfilled authoring instructions out of patient-facing text, except Sterling IRB-owned merge fields, which remain for the IRB to complete.",
+    "Sterling retains KEY INFORMATION and its five concise concepts. Its IRB comment particularly identifies FDA-regulated and HHS-supported research; absence of a supplied regulatory flag is not permission to delete the selected family's mandatory section.",
+    "Investigational-product terminology, random assignment probabilities, blinding and treatment-disclosure statements apply only when supported by the approved design and source policies. A study involving a marketed device or observational follow-up is not automatically an investigational or blinded trial.",
+    "Use the approved policy for returning individual results or aggregate study results. For blinded studies, preserve any participant preference and sponsor-availability conditions supplied by the source. Do not choose a will/will-not-return alternative or promise disclosure from the template alone.",
+    "Include source-supplied pregnancy testing in PROCEDURES, and reproductive risks, contraception and egg/sperm donation requirements in RISKS. Include only applicable, approved requirements; a device or drug label alone does not authorize pregnancy restrictions or additional tests.",
+    "Retain supplied withdrawal and discontinuation follow-up instructions. Preserve the template's option to discuss safe follow-up; do not convert it into compulsory additional procedures without approved support.",
+    "Include only approved payment, reimbursement, costs, injury-payment and privacy/authorization terms. Preserve their conditions and recipients; no fictional payment schedule, payer, expiry date or data-storage plan comes from template examples.",
+    "Sterling ClinicalTrials.gov wording is the exact template statement only when the approved participant_registry_disclosure flag authorizes it. GINA is conditional on approved genetic-information collection. Do not infer these triggers merely because XML is generated."
+  ]
 }

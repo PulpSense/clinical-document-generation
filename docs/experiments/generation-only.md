@@ -157,3 +157,32 @@ in the original checkout and was excluded from that passing selection. The full
 suite was not run. The original TOC fix remains included: earlier downloaded
 files require regeneration to acquire the visible linked entries, with page
 numbers populated when Word updates its fields.
+
+## Consent-template follow-up — 16 October 2026
+
+The supplied Sterling consent template matches the retained reference exactly.
+Its 14 comments include 12 resolved comments and two open IRB comments: leave
+IRB-owned merge fields for the IRB, and retain the exact registry statement when
+applicable. Historical comments guide drafting but do not supply study facts.
+The approved family selection remains authoritative: Advarra front metadata is
+populated; Sterling IRB-owned front merge fields remain reserved.
+
+Advarra metadata labels and values now have explicit left alignment, avoiding
+inherited body justification. Cosmetic trailing empty cell paragraphs are
+removed while native fields and multiline labels remain intact. Other tables,
+body formatting and family layouts are unchanged. A copy of the uploaded ICF
+was rendered with bundled LibreOffice and all six pages inspected; metadata
+values remained unchanged. The desktop LibreOffice window could not be opened,
+so comments were inspected from their anchored DOCX XML instead.
+
+Generation-only prompt guidance now covers the selected family's key information,
+conditional pregnancy testing and reproductive risks, results disclosure and
+blinding, withdrawal follow-up, privacy terms and registry/GINA applicability.
+Supplied conditional evidence is routed to the relevant existing ICF section;
+absent details do not create new requirements or invented study content. Original
+n8n messages remain unchanged, and no new generation gate is introduced.
+
+Focused front-matter, template-comment, generation-only and Brad-feedback checks
+passed: 43 tests. One existing reviewer-instruction literal-string test fails
+unchanged in the original checkout and was excluded. The full suite was not run.
+Prompt behavior still needs a fresh Hermes generation for manual comparison.

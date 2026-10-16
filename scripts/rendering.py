@@ -2515,6 +2515,9 @@ def _preserve_sterling_registry_statement(
 def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]) -> None:
     if document.tables:
         front = document.tables[0]
+        labels = {row.cells[0].text.strip().casefold() for row in front.rows}
+        if not labels.intersection({"sponsor / study title:", "protocol number:", "principal investigator:\n(study doctor)"}):
+            return
         site = _first_site(reference)
         facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
         coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
@@ -2524,11 +2527,20 @@ def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]
         }
         for row in front.rows:
             label = row.cells[0].text.strip()
-            if label not in replacements:
-                continue
-            new_label, value = replacements[label]
-            _set_paragraph_text(row.cells[0].paragraphs[0], new_label)
-            _set_paragraph_text(row.cells[1].paragraphs[0], value)
+            if label in replacements:
+                new_label, value = replacements[label]
+                _set_paragraph_text(row.cells[0].paragraphs[0], new_label)
+                _set_paragraph_text(row.cells[1].paragraphs[0], value)
+            for cell in row.cells:
+                # Metadata labels/values must not inherit body justification.
+                # Remove cosmetic trailing spacers, preserving native fields
+                # and intentional multiline labels such as Study Doctor.
+                while (len(cell.paragraphs) > 1 and _plain_blank(cell.paragraphs[-1])
+                       and not cell.paragraphs[-1]._p.xpath('.//w:fldChar | .//w:fldSimple | .//w:instrText | .//w:drawing | .//w:object')):
+                    paragraph = cell.paragraphs[-1]
+                    paragraph._p.getparent().remove(paragraph._p)
+                for paragraph in cell.paragraphs:
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
 
 def _normalize_sterling_generated_section_spacing(document: Document) -> None:

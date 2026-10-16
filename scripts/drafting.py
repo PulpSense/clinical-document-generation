@@ -452,12 +452,17 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
             for section in sections
             if str(section["section_id"]) in library.get("editorial_corrections", {})
         },
+        "consent_template_comments": (
+            library.get("consent_template_comments", [])
+            if any(str(section["section_id"]).startswith("icf.") for section in sections) else []
+        ),
         "adapter_instructions": [
             "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
             "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
             "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
             "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
             "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
+            "For ICF requests also follow consent_template_comments. Assess applicability from the approved source and selected family, preserving supplied conditions and existing family-owned sections. Template comments do not establish new study facts or authorization.",
             "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
             "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
             "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses.",
@@ -619,11 +624,24 @@ def _section_payload(
     # Structured table rows are governed by the same section contract, but
     # their exact values are inserted and verified outside the prose draft.
     minimum_evidence = [path for path in minimum_evidence if path not in section.table_evidence]
+    conditional_paths = {
+        "icf.procedures": ("procedures.pregnancy_testing", "procedures.return_of_results", "procedures.blinding_disclosure"),
+        "icf.risks": ("risks_benefits.pregnancy", "risks_benefits.unknown_risks"),
+        "icf.privacy": ("risks_benefits.authorization_duration", "confidentiality.authorization_duration"),
+    }.get(section.section_id, ())
+    conditional_evidence = [path for path in conditional_paths if meaningful(get_path(reference, path))]
+    minimum_evidence.extend(path for path in conditional_evidence if path not in minimum_evidence)
     semantic_evidence = [
         obligation for path in minimum_evidence
         if (obligation := semantic_evidence_contract(path, get_path(reference, path)))
     ]
     content_expectations = list(section.content_expectations)
+    if conditional_evidence:
+        content_expectations.append(
+            "Preserve the supplied conditional template facts in " + ", ".join(conditional_evidence)
+            + ". Retain their applicability, participant preferences, availability conditions and timing. "
+            "Use participant-facing language within this section; do not choose unsupplied template alternatives or add new requirements."
+        )
     for obligation in semantic_evidence:
         content_expectations.extend(obligation["requirements"])
     maximum_draft_words = 0
