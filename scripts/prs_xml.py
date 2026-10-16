@@ -707,7 +707,7 @@ def _fill_repeated(study: ET.Element, reference: Mapping[str, Any]) -> None:
             _set(node, f"contact_backup/{field}", value)
         for field in ("first_name", "middle_name", "last_name", "degrees"):
             _set(node, f"investigator/{field}", investigator_fields[field])
-        _set(node, "investigator/role", investigator.get("role"))
+        _set(node, "investigator/role", investigator.get("role") or investigator.get("title"))
 
 
 def expected_counts(reference: Mapping[str, Any]) -> dict[str, int]:

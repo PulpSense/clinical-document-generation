@@ -2482,12 +2482,15 @@ def _insert_sterling_conditional_clauses(
         _set_paragraph_text(heading, heading_text)
         for run in heading.runs:
             _copy_run_design(run, _first_visible_run(anchor))
+        heading.paragraph_format.keep_with_next = True
+        heading.paragraph_format.keep_together = True
         anchor._p.addprevious(heading._p)
         exemplar = next((
             paragraph for paragraph in document.paragraphs
             if paragraph.text.strip().startswith("You are being asked to participate in a medical research study.")
         ), None)
-        for text in clause.get("authorized_texts", []):
+        texts = clause.get("authorized_texts", [])
+        for index, text in enumerate(texts):
             paragraph = document.add_paragraph()
             if exemplar is not None:
                 _copy_paragraph_design(paragraph, exemplar)
@@ -2496,6 +2499,8 @@ def _insert_sterling_conditional_clauses(
             if exemplar is not None:
                 for run in paragraph.runs:
                     _copy_run_design(run, _first_visible_run(exemplar))
+            paragraph.paragraph_format.keep_together = True
+            paragraph.paragraph_format.keep_with_next = index < len(texts) - 1
             anchor._p.addprevious(paragraph._p)
 
 
@@ -2508,13 +2513,21 @@ def _normalize_sterling_generated_typography(document: Document, model: Mapping[
     source_run = _first_visible_run(exemplar)
     generated = {
         text for section_id in model.get("icf", {})
-        for text, is_list in _icf_blocks(model, section_id) if not is_list
+        for text, _is_list in _icf_blocks(model, section_id)
     }
     for paragraph in document.paragraphs:
         if paragraph.text.strip() not in generated or _is_icf_heading(paragraph):
             continue
         for run in paragraph.runs:
             _copy_run_design(run, source_run)
+        # Paragraph-mark formatting also paints native list markers. Keep
+        # numbering/indents, but replace annotation emphasis with body type.
+        properties = paragraph._p.get_or_add_pPr()
+        marker_type = properties.find(qn("w:rPr"))
+        if marker_type is not None:
+            properties.remove(marker_type)
+        if source_run is not None and source_run._r.rPr is not None:
+            properties.append(copy.deepcopy(source_run._r.rPr))
 
 
 def _preserve_sterling_registry_statement(

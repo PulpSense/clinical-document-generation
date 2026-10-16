@@ -1,0 +1,41 @@
+{
+  "provenance": "Accepted icf.risks from COMFORT-26-03-2fe14bb-entire-run.zip; source matches comfort-hermes-v25.json. Development replay, not a new model trial.",
+  "section": {
+    "section_id": "icf.risks",
+    "outcome": "drafted",
+    "paragraphs": [
+      {
+        "text": "Your prior cataract operations were ordinary medical care. They are not new procedures or new surgical risks introduced by joining this study. Research participation has the following possible risks and burdens.",
+        "evidence_refs": [
+          "source:risks_benefits.risks"
+        ]
+      },
+      {
+        "text": "You may ask to pause or stop testing. Contact the study doctor if symptoms persist. Genetic information could reveal information about you or your biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and it does not sequence your whole genome, meaning all of your genetic material.",
+        "evidence_refs": [
+          "source:risks_benefits.risks"
+        ]
+      },
+      {
+        "text": "Pregnancy is not a reason for exclusion. There are no study pregnancy tests, contraception requirements, radiation, drugs or reproductive interventions.",
+        "evidence_refs": [
+          "source:risks_benefits.pregnancy"
+        ]
+      }
+    ],
+    "lists": [
+      {
+        "items": [
+          "Temporary tired eyes or headache from vision testing.",
+          "Dry mouth, mild nausea or embarrassment when giving saliva.",
+          "Discomfort answering questions about symptoms.",
+          "Time, inconvenience and travel for study participation.",
+          "Loss of privacy involving medical or genetic information."
+        ],
+        "evidence_refs": [
+          "source:risks_benefits.risks"
+        ]
+      }
+    ]
+  }
+}

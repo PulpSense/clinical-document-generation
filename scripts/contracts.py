@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.47-stable-source-projections"
+CONTRACT_VERSION = "clinical-documents-v2.48-specimen-results-ownership"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -456,9 +456,20 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
         "icf.withdrawal": "Assembly inserts the authorized voluntary-participation paragraph once. Draft only additional supplied withdrawal instructions, optional follow-up, investigator discontinuation and earned-payment conditions in participant-facing language. If no additional facts exist, return the exact fixed paragraph as fixed_boilerplate; assembly retains it once.",
     }
+    policy = (
+        "This section owns supplied specimen handling and results-return policies. Preserve collection/coding, "
+        "transfer recipients and access limits, testing purpose, specimen destruction timing and any absolute "
+        "deadline, future-use/sharing/sale/commercial restrictions, and the distinction between specimen "
+        "retention and derived-data retention. Distinguish individual clinical results, research/genetic "
+        "results, incidental findings and aggregate summaries, including any limits, preferences, recipients "
+        "and timing. Keep routine-care referral arrangements when supplied. Preserve uncertainty; absent "
+        "optional policies remain absent. For records-only research, describe only the approved existing "
+        "records/specimens and results policies without adding collection or participant contact."
+    ) if section_id in {"study-procedure.measurements", "study-procedure.enrollment", "icf.procedures"} else ""
     return (
         specific.get(section_id, f"Explain {title.lower()} using all material approved facts supplied for this section."),
         "Do not replace supplied detail with generic clinical prose.",
+        *((policy,) if policy else ()),
     )
 
 
@@ -593,7 +604,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("study-procedure", "9.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.consent", "9.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent",), "consent"),
     _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.assessment_details", "procedures.intervention_management", "procedures.retention"), owned_concepts=("complete-visit-schedule",)),
-    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessment_details", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("endpoint-measurement-methods",), brief_reference_concepts=("complete-visit-schedule", "endpoint-inventory"), do_not_restate_concepts=("complete-visit-schedule", "endpoint-inventory")),
+    _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessment_details", "procedures.specimens", "procedures.return_of_results", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("endpoint-measurement-methods", "specimen-handling", "return-of-results"), brief_reference_concepts=("complete-visit-schedule", "endpoint-inventory"), do_not_restate_concepts=("complete-visit-schedule", "endpoint-inventory")),
     _section_spec("study-procedure.unscheduled", "9.4.", "Unscheduled Visits", "protocol-operations", ("procedures.unscheduled_visits",), "unscheduled"),
     _section_spec("study-procedure.discontinued", "9.5.", "Discontinued Subjects", "protocol-operations", ("procedures.discontinued_subjects",), "discontinued-subjects"),
     _section_spec("analysis-plan", "10.", "ANALYSIS PLAN", role="container"),
@@ -637,7 +648,7 @@ RETROSPECTIVE_1_TO_13: tuple[SectionSpec, ...] = (
     _section_spec("study-design.design", "7.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.arms", "design.masking")),
     _section_spec("study-design.bias", "7.2.", "Methods Used to Minimize Bias", "protocol-foundations", ("design.study_design", "statistics.bias_minimization"), "retrospective-bias"),
     _section_spec("study-procedure", "8.", "STUDY PROCEDURE", role="container"),
-    _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent", "procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline", "procedures.retention", "procedures.discontinuation", "procedures.replacement"), "retrospective-consent"),
+    _section_spec("study-procedure.enrollment", "8.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent", "procedures.assessments", "procedures.visit_schedule_table", "procedures.visit_schedule", "study.timeline", "procedures.retention", "procedures.discontinuation", "procedures.replacement", "procedures.specimens", "procedures.return_of_results"), "retrospective-consent"),
     _section_spec("analysis-plan", "9.", "ANALYSIS PLAN", role="container"),
     _section_spec("analysis-plan.datasets", "9.1.", "Analysis Data Sets", "protocol-analysis-and-oversight", ("statistics.analysis_plan",)),
     _section_spec("analysis-plan.methodology", "9.2.", "Statistical Methodology", "protocol-analysis-and-oversight", ("statistics.methodology", "statistics.analysis_plan"), owned_concepts=("statistical-methods",)),
@@ -665,7 +676,7 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
         boilerplate_keys=("icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"),
     ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-purpose", "study-hypothesis", "primary-endpoint"), do_not_restate_concepts=("clinical-background", "comparative-evidence", "study-rationale")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.retention", "procedures.adverse_events", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.retention", "procedures.adverse_events", "procedures.specimens", "procedures.return_of_results", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.participation_duration", "procedures.visit_schedule", "procedures.visit_schedule_table", "population.sample_size", "study.timeline")),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
