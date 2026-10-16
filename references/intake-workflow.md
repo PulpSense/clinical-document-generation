@@ -29,6 +29,14 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   name/type may be derived from explicit facts or left not applicable. Show these
   normalizations for approval. Do not invent a treatment assignment. Ask about real
   contradictions, such as a payment trigger inconsistent with the schedule.
+  Compare the declared study type with source descriptions of treatment assignment.
+  If one says observational while another explicitly says the study randomly assigns
+  treatments, quote both statements and ask which design is correct in the consolidated
+  source question, before requesting Source-of-Truth approval. Masking alone does not
+  establish treatment assignment. Record the clarified study type and consistent design
+  wording in the editable Source-of-Truth, preserving the original evidence. Generation
+  uses that approved classification; Brad's XML supplies structure, not a default study
+  type for other studies. This is AI intake guidance, not a post-generation check.
 - Represent supplied visits as rows with `visit`, supplied `timing`, and
   `procedures` assigned to that visit. Convert explicit narrative relationships
   into rows: “Screening: history. Week 8: questionnaire” already supplies those
