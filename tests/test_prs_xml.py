@@ -262,6 +262,8 @@ def _screening_criterion(tmp_path, value, *, qualifier=None):
     )
     study = next(ET.parse(output).getroot().iter("clinical_study"))
     criteria = study.findtext("eligibility/criteria/textblock") or ""
+    if qualifier:
+        return next(line.strip("• ") for line in criteria.splitlines() if f"Participation in {qualifier}" in line)
     return next(line.strip("• ") for line in criteria.splitlines() if "without participation" in line)
 
 
@@ -281,7 +283,7 @@ def test_screening_washout_preserves_approved_study_qualifier(tmp_path):
         qualifier="another interventional study",
     )
     assert criterion == (
-        "At least 90 days without participation in another interventional study before screening"
+        "Participation in another interventional study within 90 days before screening."
     )
     assert criterion.count("another interventional study") == 1
     assert criterion.count("before screening") == 1
@@ -306,38 +308,19 @@ def test_screening_washout_preserves_approved_interventional_study_qualifier(tmp
     assert "90 days without participation in another interventional study before screening" in criteria
 
 
-def test_validation_semantically_rejects_mutated_screening_interval(tmp_path):
+def test_scoped_exclusion_is_not_duplicated_as_an_inclusion_requirement(tmp_path):
     reference = fixture()
-    reference["procedures"]["minimum_days_before_screening_without_participation"] = (
-        "At least 90 days before screening"
-    )
-    reference["population"]["exclusion_criteria"].append(
-        "Participation in another interventional study within 90 days before screening."
-    )
+    reference["procedures"]["minimum_days_before_screening_without_participation"] = "At least 90 days before screening"
+    approved = "Participation in another interventional study within 90 days before screening."
+    reference["population"]["exclusion_criteria"].append(approved)
     output = tmp_path / "study.xml"
-    generate(
-        TEMPLATE,
-        output,
-        reference,
-        {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}},
-    )
-    tree = ET.parse(output)
-    study = next(tree.getroot().iter("clinical_study"))
-    criteria = study.find("eligibility/criteria/textblock")
-    assert criteria is not None
-    criteria.text = (criteria.text or "").replace(
-        "At least 90 days without participation in another interventional study before screening",
-        "At least 30 days without participation in another study before screening",
-    )
-    tree.write(output, encoding="utf-8", xml_declaration=True)
-
-    findings = validate_output(output, reference, MANUAL_REFERENCE, generation_template=TEMPLATE)
-
-    assert any(
-        item.get("code") == "screening_interval_semantic_mismatch"
-        and item.get("field") == "eligibility/criteria"
-        for item in findings
-    )
+    generate(TEMPLATE, output, reference,
+             {"brief_summary": {"text": "Summary."}, "detailed_description": {"text": "Description."}})
+    study = next(ET.parse(output).getroot().iter("clinical_study"))
+    criteria = study.findtext("eligibility/criteria/textblock") or ""
+    assert criteria.count(approved) == 1
+    assert "without participation" not in criteria
+    assert approved in criteria.split("Exclusion Criteria:")[1]
 
 
 def test_validation_rejects_mutated_approved_inclusion_criterion(tmp_path):

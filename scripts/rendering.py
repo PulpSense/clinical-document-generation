@@ -30,7 +30,7 @@ from lxml import etree as ET
 from pypdf import PdfReader
 from pypdf.errors import PyPdfError
 
-from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
+from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, explicitly_true, participant_visit_count, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
 from output_recovery import DOCX_SOURCE_FIELDS
 from contracts import bibliographic_citation_spans, protocol_bibliography
@@ -417,7 +417,7 @@ def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dic
         "sampleSizeJustification": _draft_text(model, "sample-size") or _text(get_path(reference, "population.sample_justification")),
         "interventionName": _text(get_path(reference, "design.intervention_name")),
         "daysBeforeScreening": screening_interval.days if screening_interval else "",
-        "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(len(visits)) if visits else "",
+        "inclusionCriteria": "\n".join(f"• {item}" for item in inclusion), "totalVisits": str(participant_visit_count(visits)) if visits else "",
         "AI_duration": _protocol_followup_summary(reference), "AI_populationShort": _text(get_path(reference, "population.study_population")) or "; ".join(inclusion),
         "AI_populationLong": _draft_text(model, "subjects.population"), "AI_introduction": _draft_text(model, "introduction"),
         "AI_inclusionCriteria": _draft_text(model, "subjects.inclusion", bullets=True) or "\n".join(f"• {item}" for item in inclusion),
@@ -723,6 +723,13 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
                 cell_paragraph.paragraph_format.right_indent = None
                 cell_paragraph.paragraph_format.first_line_indent = None
                 cell_paragraph.paragraph_format.keep_together = True
+
+    # Keep the final compact duration row attached to the preceding synopsis
+    # row instead of stranding it alone on an otherwise empty page.
+    if len(table.rows) > 1:
+        for cell in table.rows[-2].cells:
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.keep_with_next = True
 
 
 def _normalize_protocol_title_controls(document: Document, reference: Mapping[str, Any]) -> None:
@@ -2457,7 +2464,7 @@ def _insert_sterling_conditional_clauses(
             continue
         trigger = clause.get("trigger") or {}
         paths = [str(path) for path in trigger.get("paths", [])]
-        if trigger.get("rule") != "truthy" or not any(get_path(reference, path) is True for path in paths):
+        if trigger.get("rule") != "truthy" or not any(explicitly_true(get_path(reference, path)) for path in paths):
             continue
         heading_text = str(clause["section"])
         if any(_icf_heading_key(item.text) == _icf_heading_key(heading_text) for item in document.paragraphs):
@@ -2900,7 +2907,7 @@ def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
             table._tbl.append(copy.deepcopy(template))
             record = item if isinstance(item, Mapping) else {"visitName": item}
             values = (
-                _text(record.get("visitNumber")),
+                _text(record.get("display_visit_number", record.get("visitNumber"))),
                 _text(record.get("visitName") or record.get("visit")),
                 _text(record.get("visitWindow") or record.get("timing")),
                 _text(record.get("CRFnumber")),

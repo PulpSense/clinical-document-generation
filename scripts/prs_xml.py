@@ -238,9 +238,16 @@ def _site_backup_contact(site: Mapping[str, Any]) -> dict[str, Any]:
 
 def _site_investigator(site: Mapping[str, Any]) -> Mapping[str, Any]:
     investigators = site.get("investigators")
-    if isinstance(investigators, list) and investigators and isinstance(investigators[0], Mapping):
-        return investigators[0]
+    investigators = investigators if isinstance(investigators, list) else []
     investigator = site.get("investigator")
+    # The designated first investigator retains precedence. An empty primary
+    # placeholder must not hide the named singular investigator behind it.
+    candidates = [*investigators[:1], investigator, *investigators[1:]]
+    for candidate in candidates:
+        if isinstance(candidate, Mapping) and any(
+            meaningful(candidate.get(key)) for key in ("name", "first_name", "last_name")
+        ):
+            return candidate
     return investigator if isinstance(investigator, Mapping) else {}
 
 
@@ -283,6 +290,7 @@ def _enrollment_count(value: Any) -> str:
 
 def _normalize_participation_scope(value: str) -> str:
     normalized = re.sub(r"\s+", " ", value).strip().casefold()
+    normalized = re.sub(r"^(?:an?|the)\s+", "another ", normalized)
     return re.sub(r"\bstudies\b$", "study", normalized)
 
 
@@ -293,6 +301,7 @@ def _equivalent_screening_criterion(value: str, requirement: ScreeningIntervalRe
     criterion with a different anchor. Different intervals/scopes remain distinct.
     """
     text = re.sub(r"\s+", " ", value).strip().casefold()
+    text = re.sub(r"\b(?:an?|the)(?=(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b)", "another", text)
     days = re.escape(requirement.days)
     scope = re.escape(requirement.participation_scope.casefold())
     anchor = r"(?:screening|day\s*0|enrollment|enrolment)\b"
@@ -323,7 +332,7 @@ def screening_interval_requirement(
     exclusion = get_path(reference, "population.exclusion_criteria", []) or []
     for criterion in (*inclusion, *exclusion):
         scope_match = re.search(
-            r"\banother(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b",
+            r"\b(?:another|an?|the)(?:\s+[a-z][a-z-]*){0,5}\s+stud(?:y|ies)\b",
             _text(criterion),
             re.I,
         )

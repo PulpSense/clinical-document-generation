@@ -1,0 +1,2086 @@
+{
+  "provenance": {
+    "archive": "COMFORT-26-03-entire-run.zip",
+    "prompt_version": "section-drafting-v25-live-run-reliability",
+    "note": "Approved source and accepted drafts, with request metadata omitted; development replay only."
+  },
+  "source": {
+    "meta": {
+      "document_set": [
+        "protocol_docx",
+        "icf_docx",
+        "xml"
+      ],
+      "study_type": "Ambispective",
+      "protocol_number": "COMFORT-26-03",
+      "version": "1.0",
+      "date": "16 October 2026",
+      "icf_template": "Sterling"
+    },
+    "source": {
+      "source_of_truth_file": "reference/source-of-truth.md",
+      "input_files": [
+        "input/COMFORT-26-03-study-input.txt"
+      ],
+      "field_candidates": {
+        "study.title": [
+          {
+            "value": "Historical Ocular Care, Current Symptoms and Prospective Comfort After Routine Bilateral Cataract Surgery: An Ambispective Observational Study With Research Saliva Genotyping.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "study.background": [
+          {
+            "value": "Current comfort after cataract surgery may vary between people with different documented ocular-care histories. This study links historical clinic records with newly collected symptoms and vision assessments. Research genotyping is included to explore possible associations with symptom variation. No prior effect estimates or bibliographic references are supplied.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "objectives.primary": [
+          {
+            "value": [
+              "Describe change in patient-reported ocular comfort from enrollment to Day 90 after enrollment."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "study.hypothesis": [
+          {
+            "value": "Greater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This is an exploratory association hypothesis, not a claim of a treatment effect.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.study_design": [
+          {
+            "value": "Study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other \u2014 ambispective, combining retrospective record abstraction and prospective follow-up in the same consenting participants. Condition: Pseudophakia following bilateral cataract surgery. Number of sites: 3, all in the United States. One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.intervention_name": [
+          {
+            "value": "Prior routine bilateral cataract surgery and its documented ocular-care history",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.intervention_type": [
+          {
+            "value": "Procedure/Surgery",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "design.number_of_sites": [
+          {
+            "value": 3,
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "endpoints.primary": [
+          {
+            "value": [
+              {
+                "label": "Change in ocular comfort score",
+                "description": "0 to 10; positive change means improved reported comfort.",
+                "time_frame": "Day 0 to Day 90 (Day 90 +/- 10 days after enrollment)"
+              }
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "procedures.visit_schedule": [
+          {
+            "value": [
+              {
+                "visit": "Historical record abstraction \u2014 staff task, not a participant visit",
+                "timing": "Records dated 1 January 2025 through 30 September 2026; abstracted after Day 0 consent",
+                "procedures": [
+                  "Abstract existing surgery dates",
+                  "Abstract implanted lens categories",
+                  "Abstract documented ocular diagnoses",
+                  "Abstract clinician-recorded ocular surface treatments",
+                  "Abstract recorded best-corrected distance visual acuity",
+                  "Abstract documented unscheduled ocular visits"
+                ]
+              },
+              {
+                "visit": "Visit 1 \u2014 Day 0 / Enrollment",
+                "timing": "Day 0 after enrollment; screening and enrollment at same visit",
+                "duration": "Approximately 70 minutes",
+                "mode": "In person",
+                "procedures": [
+                  "Written informed consent before research activities",
+                  "Eligibility confirmation",
+                  "Authorization for historical records",
+                  "Demographics and current ocular-care update",
+                  "Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and the participant's current correction",
+                  "Study-specific ocular comfort rating for preceding 7 days: 0 (extremely uncomfortable) to 10 (fully comfortable); same wording at Day 0, Day 30 and Day 90; not presented as a validated instrument",
+                  "One approximately 2 mL saliva collection by passive drool into a labeled tube",
+                  "Assessment-related symptom enquiry"
+                ]
+              },
+              {
+                "visit": "Visit 2 \u2014 Day 30",
+                "timing": "Day 30 +/- 5 days after enrollment",
+                "duration": "Approximately 15 minutes",
+                "mode": "Telephone",
+                "procedures": [
+                  "Study-specific ocular comfort rating for preceding 7 days: 0 (extremely uncomfortable) to 10 (fully comfortable); same wording at Day 0, Day 30 and Day 90; not presented as a validated instrument",
+                  "Interval ocular-care update",
+                  "Enquiry about unscheduled ocular visits since enrollment",
+                  "Assessment-related symptom enquiry"
+                ]
+              },
+              {
+                "visit": "Visit 3 \u2014 Day 90 / Final Visit",
+                "timing": "Day 90 +/- 10 days after enrollment",
+                "duration": "Approximately 40 minutes",
+                "mode": "In person",
+                "procedures": [
+                  "Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and the participant's current correction",
+                  "Study-specific ocular comfort rating for preceding 7 days: 0 (extremely uncomfortable) to 10 (fully comfortable); same wording at Day 0, Day 30 and Day 90; not presented as a validated instrument",
+                  "Interval ocular-care update",
+                  "Unscheduled ocular-visit enquiry",
+                  "Assessment-related symptom enquiry",
+                  "Confirmation of research completion"
+                ]
+              }
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.inclusion_criteria": [
+          {
+            "value": [
+              "Age 55 to 85 at written consent.",
+              "Bilateral cataract surgery completed before enrollment; second-eye surgery occurred between 3 and 18 months before Day 0.",
+              "Both surgeries occurred between 1 January 2025 and 30 September 2026, with records accessible at the enrolling clinic.",
+              "Able to consent, complete English-language questionnaires, provide a saliva sample and attend the specified future visits.",
+              "Willing to authorize access to the historical records described below."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.exclusion_criteria": [
+          {
+            "value": [
+              "Participation in an interventional research study in the 60 days before screening, or planned interventional research participation during follow-up.",
+              "Planned ocular surgery during the 90-day prospective period.",
+              "An ocular condition that prevents reliable completion of the specified visual acuity assessments, as determined by the site investigator.",
+              "Inability to consent personally or need for a proxy questionnaire respondent."
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "procedures.minimum_days_before_screening_without_participation": [
+          {
+            "value": 60,
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.sample_size": [
+          {
+            "value": 90,
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "population.sample_justification": [
+          {
+            "value": "Ninety participants is a practical exploratory sample, with up to 15% loss to prospective follow-up anticipated. The study has no formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "risks_benefits.compensation_or_reimbursement": [
+          {
+            "value": "Compensation: $40 for attended Day 0, $15 for completed Day 30 telephone visit and $40 for attended Day 90, maximum $95. No completion bonus. Earned payments remain payable after withdrawal. Payment is by check within 30 days of each completed contact. No parking, mileage, transit or other travel reimbursement.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "statistics.analysis_plan": [
+          {
+            "value": "Summarize participant flow, historical-record availability, completion and baseline characteristics overall and by site. For the primary outcome, report the observed paired mean change, standard deviation and 95% confidence interval among participants with Day 0 and Day 90 ratings; also report median and range. Describe Day 30 comfort and unscheduled visits using counts and appropriate continuous summaries. Report historical-treatment proportions with an explicit denominator of people with relevant records. Summarize visual acuity by eye; any pooled-eye exploratory model uses a participant-level random intercept to account for paired eyes. Explore the association of historical treatment documentation with Day 90 comfort using linear regression adjusted for Day 0 comfort, age and site. Exploratory genetic associations are reported descriptively; no causal or clinically actionable interpretation and no confirmatory significance claims. Report missing values and reasons separately for historical and prospective data. Do not impute unrecorded historical care or missing questionnaire values.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "study.timeline": [
+          {
+            "value": "Historical data window: 1 January 2025 through 30 September 2026. Prospective recruitment: 1 November 2026 through 31 January 2027. Last prospective participant assessment expected by 11 May 2027, allowing the final visit window. Anticipated primary completion and study completion: 11 May 2027. Analysis and administrative closeout: by 30 June 2027. Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.irb.name": [
+          {
+            "value": "Harbor Independent Research Review Board",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.irb.affiliation": [
+          {
+            "value": "Independent IRB, unaffiliated with the sponsor and study clinics.",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.irb.phone": [
+          {
+            "value": "+1 202-555-0168",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.irb.email": [
+          {
+            "value": "participant.rights@example.org",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.irb.address": [
+          {
+            "value": "950 Review Avenue, Suite 450, Baltimore, MD 21204, United States",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.sponsor.name": [
+          {
+            "value": "Harbor Patient Outcomes Research",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.sponsor.address": [
+          {
+            "value": "510 Research Lane, Suite 400, Baltimore, MD 21202, United States",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.principal_investigator.name": [
+          {
+            "value": "Dr. Cameron Ellis",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.principal_investigator.title": [
+          {
+            "value": "Principal Investigator",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.name": [
+          {
+            "value": "Alex Rivera",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.title": [
+          {
+            "value": "Lead Study Coordinator",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.business_phone": [
+          {
+            "value": "+1 202-555-0161",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.office_phone": [
+          {
+            "value": "+1 202-555-0162",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "parties.study_coordinator.email": [
+          {
+            "value": "alex.rivera@example.org",
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "sites.facilities": [
+          {
+            "value": [
+              {
+                "name": "Harbor Eye Research Clinic",
+                "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States",
+                "city": "Baltimore",
+                "state": "MD",
+                "postal_code": "21203",
+                "country": "United States"
+              },
+              {
+                "name": "Capitol Vision Research Clinic",
+                "address": "730 Capitol Avenue, Suite 230, Washington, DC 20004, United States",
+                "city": "Washington",
+                "state": "DC",
+                "postal_code": "20004",
+                "country": "United States"
+              },
+              {
+                "name": "Bayview Ophthalmology Research Center",
+                "address": "840 Bayview Road, Suite 340, Annapolis, MD 21401, United States",
+                "city": "Annapolis",
+                "state": "MD",
+                "postal_code": "21401",
+                "country": "United States"
+              }
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "sites.contacts": [
+          {
+            "value": [
+              {
+                "name": "Alex Rivera",
+                "first_name": "Alex",
+                "last_name": "Rivera",
+                "degrees": "CCRC",
+                "title": "Lead Study Coordinator",
+                "business_phone": "+1 202-555-0161",
+                "office_phone": "+1 202-555-0162",
+                "email": "alex.rivera@example.org",
+                "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States"
+              },
+              {
+                "name": "Sam Carter",
+                "first_name": "Sam",
+                "last_name": "Carter",
+                "degrees": "CCRC",
+                "title": "Site Study Coordinator",
+                "business_phone": "+1 202-555-0164",
+                "office_phone": "+1 202-555-0165",
+                "email": "sam.carter@example.org",
+                "address": "730 Capitol Avenue, Suite 230, Washington, DC 20004, United States"
+              },
+              {
+                "name": "Robin Hayes",
+                "first_name": "Robin",
+                "last_name": "Hayes",
+                "degrees": "CCRC",
+                "title": "Site Study Coordinator",
+                "business_phone": "+1 202-555-0166",
+                "office_phone": "+1 202-555-0167",
+                "email": "robin.hayes@example.org",
+                "address": "840 Bayview Road, Suite 340, Annapolis, MD 21401, United States"
+              }
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ],
+        "sites.investigators": [
+          {
+            "value": [
+              [
+                {
+                  "name": "Dr. Cameron Ellis",
+                  "first_name": "Cameron",
+                  "last_name": "Ellis",
+                  "degrees": "MD",
+                  "title": "Principal Investigator"
+                },
+                {
+                  "name": "Dr. Jamie Parker",
+                  "first_name": "Jamie",
+                  "last_name": "Parker",
+                  "degrees": "MD",
+                  "title": "Sub-Investigator",
+                  "phone": "+1 202-555-0163",
+                  "email": "jamie.parker@example.org"
+                }
+              ],
+              {
+                "name": "Dr. Drew Bennett",
+                "first_name": "Drew",
+                "last_name": "Bennett",
+                "degrees": "MD",
+                "title": "Site Investigator"
+              },
+              {
+                "name": "Dr. Quinn Foster",
+                "first_name": "Quinn",
+                "last_name": "Foster",
+                "degrees": "MD",
+                "title": "Site Investigator"
+              }
+            ],
+            "source": "COMFORT-26-03-study-input.txt"
+          }
+        ]
+      },
+      "provenance": "Fresh extraction solely from COMFORT-26-03-study-input.txt. Procedure/Surgery is the normalized exposure category, not assigned or performed research surgery. Historical abstraction is a staff task after consent, never Visit 0. ISO dates normalize explicitly supplied calendar dates. Sterling layout selection does not replace the supplied reviewing IRB or imply approval. No previous-study facts or approval reused."
+    },
+    "approval": {
+      "status": "approved",
+      "approved_by": "client",
+      "approved_at": "2026-10-16T18:32:51.168075+00:00",
+      "review_file": "reference/source-of-truth.md",
+      "source_sha256": "071924aa0062695b3f6a5c72607b9e883147010b8de72219d7bf84f98d944fb3",
+      "revision_id": "r-e6f9db43d1ec",
+      "source_approval_identity": "e6f9db43d1ec024cb0c8b5c305b14093aa7bdf23f2358b99c7c15c434af34e17",
+      "generation_authority_sha256": "eab1f01661bf81c0aea5ff6f4d6b16402d7cb77ad9bb3e3ed10a21f05ffeb43c",
+      "governing_sha256": "eab1f01661bf81c0aea5ff6f4d6b16402d7cb77ad9bb3e3ed10a21f05ffeb43c"
+    },
+    "study": {
+      "title": "Historical Ocular Care, Current Symptoms and Prospective Comfort After Routine Bilateral Cataract Surgery: An Ambispective Observational Study With Research Saliva Genotyping.",
+      "short_title": "Comfort After Cataract Surgery.",
+      "condition": "Pseudophakia following bilateral cataract surgery",
+      "background": "Current comfort after cataract surgery may vary between people with different documented ocular-care histories. This study links historical clinic records with newly collected symptoms and vision assessments. Research genotyping is included to explore possible associations with symptom variation. No prior effect estimates or bibliographic references are supplied.",
+      "hypothesis": "Greater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This is an exploratory association hypothesis, not a claim of a treatment effect.",
+      "participation_duration": "90 days after enrollment; two in-person visits and one telephone visit; days measured from enrollment, not surgery.",
+      "timeline": "Historical data window: 1 January 2025 through 30 September 2026. Prospective recruitment: 1 November 2026 through 31 January 2027. Last prospective participant assessment expected by 11 May 2027, allowing the final visit window. Anticipated primary completion and study completion: 11 May 2027. Analysis and administrative closeout: by 30 June 2027. Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation.",
+      "completion": "11 May 2027. Analysis and administrative closeout: by 30 June 2027. Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation. At closeout, reconcile disposition and payments, resolve data queries, confirm specimen destruction, lock/analyze coded data and archive retained records.",
+      "references": null
+    },
+    "parties": {
+      "sponsor": {
+        "name": "Harbor Patient Outcomes Research",
+        "address": "510 Research Lane, Suite 400, Baltimore, MD 21202, United States",
+        "contact": {
+          "name": "Taylor Morgan",
+          "first_name": "Taylor",
+          "last_name": "Morgan",
+          "degrees": null,
+          "title": "Research Director",
+          "phone": "+1 202-555-0160",
+          "email": "taylor.morgan@example.org"
+        }
+      },
+      "principal_investigator": {
+        "name": "Dr. Cameron Ellis",
+        "first_name": "Cameron",
+        "last_name": "Ellis",
+        "degrees": "MD",
+        "title": "Principal Investigator"
+      },
+      "study_coordinator": {
+        "name": "Alex Rivera",
+        "first_name": "Alex",
+        "last_name": "Rivera",
+        "degrees": "CCRC",
+        "title": "Lead Study Coordinator",
+        "business_phone": "+1 202-555-0161",
+        "office_phone": "+1 202-555-0162",
+        "email": "alex.rivera@example.org",
+        "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States"
+      },
+      "sub_investigators": [
+        {
+          "degrees": "MD",
+          "email": "jamie.parker@example.org",
+          "first_name": "Jamie",
+          "last_name": "Parker",
+          "name": "Dr. Jamie Parker",
+          "phone": "+1 202-555-0163",
+          "title": "Sub-Investigator"
+        }
+      ],
+      "irb": {
+        "name": "Harbor Independent Research Review Board",
+        "affiliation": "Independent IRB, unaffiliated with the sponsor and study clinics.",
+        "address": "950 Review Avenue, Suite 450, Baltimore, MD 21204, United States",
+        "phone": "+1 202-555-0168",
+        "email": "participant.rights@example.org"
+      }
+    },
+    "sites": [
+      {
+        "contact": {
+          "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States",
+          "business_phone": "+1 202-555-0161",
+          "degrees": "CCRC",
+          "email": "alex.rivera@example.org",
+          "first_name": "Alex",
+          "last_name": "Rivera",
+          "name": "Alex Rivera",
+          "office_phone": "+1 202-555-0162",
+          "title": "Lead Study Coordinator"
+        },
+        "facility": {
+          "address": "620 Harbor Street, Suite 120, Baltimore, MD 21203, United States",
+          "city": "Baltimore",
+          "country": "United States",
+          "name": "Harbor Eye Research Clinic",
+          "postal_code": "21203",
+          "state": "MD"
+        },
+        "investigator": {
+          "degrees": "",
+          "first_name": "",
+          "last_name": "",
+          "name": "",
+          "title": ""
+        },
+        "investigators": [
+          {
+            "degrees": "MD",
+            "first_name": "Cameron",
+            "last_name": "Ellis",
+            "name": "Dr. Cameron Ellis",
+            "title": "Principal Investigator"
+          },
+          {
+            "degrees": "MD",
+            "email": "jamie.parker@example.org",
+            "first_name": "Jamie",
+            "last_name": "Parker",
+            "name": "Dr. Jamie Parker",
+            "phone": "+1 202-555-0163",
+            "title": "Sub-Investigator"
+          }
+        ]
+      },
+      {
+        "contact": {
+          "address": "730 Capitol Avenue, Suite 230, Washington, DC 20004, United States",
+          "business_phone": "+1 202-555-0164",
+          "degrees": "CCRC",
+          "email": "sam.carter@example.org",
+          "first_name": "Sam",
+          "last_name": "Carter",
+          "name": "Sam Carter",
+          "office_phone": "+1 202-555-0165",
+          "title": "Site Study Coordinator"
+        },
+        "facility": {
+          "address": "730 Capitol Avenue, Suite 230, Washington, DC 20004, United States",
+          "city": "Washington",
+          "country": "United States",
+          "name": "Capitol Vision Research Clinic",
+          "postal_code": "20004",
+          "state": "DC"
+        },
+        "investigator": {
+          "degrees": "MD",
+          "first_name": "Drew",
+          "last_name": "Bennett",
+          "name": "Dr. Drew Bennett",
+          "title": "Site Investigator"
+        },
+        "investigators": [
+          {
+            "degrees": "",
+            "first_name": "",
+            "last_name": "",
+            "name": "",
+            "title": ""
+          },
+          {
+            "degrees": "",
+            "email": "",
+            "first_name": "",
+            "last_name": "",
+            "name": "",
+            "phone": "",
+            "title": ""
+          }
+        ]
+      },
+      {
+        "contact": {
+          "address": "840 Bayview Road, Suite 340, Annapolis, MD 21401, United States",
+          "business_phone": "+1 202-555-0166",
+          "degrees": "CCRC",
+          "email": "robin.hayes@example.org",
+          "first_name": "Robin",
+          "last_name": "Hayes",
+          "name": "Robin Hayes",
+          "office_phone": "+1 202-555-0167",
+          "title": "Site Study Coordinator"
+        },
+        "facility": {
+          "address": "840 Bayview Road, Suite 340, Annapolis, MD 21401, United States",
+          "city": "Annapolis",
+          "country": "United States",
+          "name": "Bayview Ophthalmology Research Center",
+          "postal_code": "21401",
+          "state": "MD"
+        },
+        "investigator": {
+          "degrees": "MD",
+          "first_name": "Quinn",
+          "last_name": "Foster",
+          "name": "Dr. Quinn Foster",
+          "title": "Site Investigator"
+        },
+        "investigators": [
+          {
+            "degrees": "",
+            "first_name": "",
+            "last_name": "",
+            "name": "",
+            "title": ""
+          },
+          {
+            "degrees": "",
+            "email": "",
+            "first_name": "",
+            "last_name": "",
+            "name": "",
+            "phone": "",
+            "title": ""
+          }
+        ]
+      }
+    ],
+    "population": {
+      "study_population": "Planned enrollment: 90 participants, targeting 30 per site. Age: 55 through 85 years, inclusive. All sexes eligible. Healthy volunteers: No. Sampling: Non-probability, consecutive eligible clinic patients invited during routine contact. Only patients who give written consent enter this study; there is no separate records-only cohort or waiver-of-consent population.",
+      "sample_size": "90",
+      "sample_justification": "Ninety participants is a practical exploratory sample, with up to 15% loss to prospective follow-up anticipated. The study has no formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person.",
+      "minimum_age": "55 Years",
+      "maximum_age": "85 Years",
+      "sex": "All",
+      "healthy_volunteers": "No",
+      "inclusion_criteria": [
+        "Age 55 to 85 at written consent.",
+        "Bilateral cataract surgery completed before enrollment; second-eye surgery occurred between 3 and 18 months before Day 0.",
+        "Both surgeries occurred between 1 January 2025 and 30 September 2026, with records accessible at the enrolling clinic.",
+        "Able to consent, complete English-language questionnaires, provide a saliva sample and attend the specified future visits.",
+        "Willing to authorize access to the historical records described below."
+      ],
+      "exclusion_criteria": [
+        "Participation in an interventional research study in the 60 days before screening, or planned interventional research participation during follow-up.",
+        "Planned ocular surgery during the 90-day prospective period.",
+        "An ocular condition that prevents reliable completion of the specified visual acuity assessments, as determined by the site investigator.",
+        "Inability to consent personally or need for a proxy questionnaire respondent."
+      ]
+    },
+    "design": {
+      "study_design": "Study type: Ambispective. Registry classification: Observational. Observational model: Cohort. Time perspective: Other \u2014 ambispective, combining retrospective record abstraction and prospective follow-up in the same consenting participants. Condition: Pseudophakia following bilateral cataract surgery. Number of sites: 3, all in the United States. One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.",
+      "study_design_summary": "One ambispective observational cohort combining historical record abstraction with prospective assessments of the same consenting participants. No assigned treatment, comparator product, randomization, masking, placebo or investigational product.",
+      "number_of_sites": "3",
+      "masking": "None",
+      "randomization": "None",
+      "intervention_name": "Prior routine bilateral cataract surgery and its documented ocular-care history",
+      "intervention_type": "Procedure/Surgery",
+      "intervention_description": "One observational cohort; no treatment arms or comparator product. Intervention/exposure name: Prior routine bilateral cataract surgery and its documented ocular-care history. Exposure category: Procedure/Surgery, observed retrospectively, not assigned or performed by this study. Research activities: medical-record abstraction, noninvasive vision testing, symptom questionnaires and one saliva collection for research genotyping. The study does not assign surgery, an IOL type, medication or other treatment. It has no randomization, masking, placebo or investigational product.",
+      "arms": [
+        {
+          "description": "90 participants, targeting 30 per site, with historical care-record abstraction and prospective follow-up in the same people; no treatment arms or comparator product, no separate records-only cohort or waiver population.",
+          "name": "Consenting ambispective observational cohort"
+        }
+      ],
+      "data_sources": "Historical record period: 1 January 2025 through 30 September 2026, inclusive. After consent, staff abstract relevant existing records within that fixed period: surgery dates, implanted lens categories, documented ocular diagnoses, clinician-recorded ocular surface treatments, best-corrected distance visual acuity, and documented unscheduled ocular visits. Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+      "sampling_method": "Non-Probability Sample"
+    },
+    "objectives": {
+      "primary": [
+        "Describe change in patient-reported ocular comfort from enrollment to Day 90 after enrollment."
+      ],
+      "secondary": [
+        "Describe historical ocular-care patterns, current and follow-up visual acuity, symptom-related unscheduled visits and associations between historical care characteristics and prospective comfort."
+      ],
+      "exploratory": [
+        "Examine associations between selected research genetic variants and Day 90 comfort; these analyses do not establish clinical utility."
+      ]
+    },
+    "endpoints": {
+      "primary": [
+        {
+          "analysis_method": "",
+          "description": "0 to 10; positive change means improved reported comfort.",
+          "label": "Change in ocular comfort score",
+          "time_frame": "Day 0 to Day 90 (Day 90 +/- 10 days after enrollment)"
+        }
+      ],
+      "secondary": [
+        {
+          "analysis_method": "",
+          "description": "0 to 10",
+          "label": "Ocular comfort score",
+          "time_frame": "Day 30 +/- 5 days after enrollment"
+        },
+        {
+          "analysis_method": "",
+          "description": "logMAR; lower values indicate better acuity.",
+          "label": "Best-corrected distance visual acuity for each eye",
+          "time_frame": "Day 90 +/- 10 days after enrollment"
+        },
+        {
+          "analysis_method": "",
+          "description": "Collected at Day 30 and Day 90; a visit reported at both contacts is counted once.",
+          "label": "Number of participant-reported unscheduled ocular-care visits",
+          "time_frame": "Between Day 0 and Day 90 after enrollment"
+        },
+        {
+          "analysis_method": "",
+          "description": "In available historical records; denominator is people with relevant records.",
+          "label": "Proportion with clinician-documented ocular surface treatment",
+          "time_frame": "1 January 2025 through 30 September 2026"
+        }
+      ],
+      "other": [
+        {
+          "analysis_method": "",
+          "description": "Variant selection specified in a laboratory analysis plan before coded outcome dataset release; no clinical risk score and no claim of clinical utility.",
+          "label": "Association of coded research genotype groups with Day 90 comfort score",
+          "time_frame": "Day 90 +/- 10 days after enrollment"
+        }
+      ]
+    },
+    "procedures": {
+      "minimum_days_before_screening_without_participation": "60",
+      "consent": "Written consent before research activities, including authorization for historical records. Only consenting participants enter the study; no records-only cohort or waiver. Screening and enrollment at the same Day 0 visit. No representative or witness signature required.",
+      "historical_record_review": "Historical record period: 1 January 2025 through 30 September 2026, inclusive. After consent, staff abstract relevant existing records within that fixed period: surgery dates, implanted lens categories, documented ocular diagnoses, clinician-recorded ocular surface treatments, best-corrected distance visual acuity, and documented unscheduled ocular visits. Historical data are whatever was recorded in routine care. There is no assumed historical questionnaire, saliva collection, consent visit or standardized research assessment. An absent historical value is recorded as missing. The record-abstraction task is performed by staff after Day 0; it is not an extra participant visit. No pre-consent research procedures were performed. Source surgical and care records remain at the clinic.",
+      "visit_schedule": [
+        {
+          "duration": "",
+          "mode": "",
+          "procedures": "Abstract existing surgery dates; Abstract implanted lens categories; Abstract documented ocular diagnoses; Abstract clinician-recorded ocular surface treatments; Abstract recorded best-corrected distance visual acuity; Abstract documented unscheduled ocular visits",
+          "timing": "Records dated 1 January 2025 through 30 September 2026; abstracted after Day 0 consent",
+          "visit": "Historical record abstraction \u2014 staff task, not a participant visit"
+        },
+        {
+          "duration": "Approximately 70 minutes",
+          "mode": "In person",
+          "procedures": "Written informed consent before research activities; Eligibility confirmation; Authorization for historical records; Demographics and current ocular-care update; Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and the participant's current correction; Study-specific ocular comfort rating for preceding 7 days: 0 (extremely uncomfortable) to 10 (fully comfortable); same wording at Day 0, Day 30 and Day 90; not presented as a validated instrument; One approximately 2 mL saliva collection by passive drool into a labeled tube; Assessment-related symptom enquiry",
+          "timing": "Day 0 after enrollment; screening and enrollment at same visit",
+          "visit": "Visit 1 \u2014 Day 0 / Enrollment"
+        },
+        {
+          "duration": "Approximately 15 minutes",
+          "mode": "Telephone",
+          "procedures": "Study-specific ocular comfort rating for preceding 7 days: 0 (extremely uncomfortable) to 10 (fully comfortable); same wording at Day 0, Day 30 and Day 90; not presented as a validated instrument; Interval ocular-care update; Enquiry about unscheduled ocular visits since enrollment; Assessment-related symptom enquiry",
+          "timing": "Day 30 +/- 5 days after enrollment",
+          "visit": "Visit 2 \u2014 Day 30"
+        },
+        {
+          "duration": "Approximately 40 minutes",
+          "mode": "In person",
+          "procedures": "Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and the participant's current correction; Study-specific ocular comfort rating for preceding 7 days: 0 (extremely uncomfortable) to 10 (fully comfortable); same wording at Day 0, Day 30 and Day 90; not presented as a validated instrument; Interval ocular-care update; Unscheduled ocular-visit enquiry; Assessment-related symptom enquiry; Confirmation of research completion",
+          "timing": "Day 90 +/- 10 days after enrollment",
+          "visit": "Visit 3 \u2014 Day 90 / Final Visit"
+        }
+      ],
+      "assessments": [
+        "Historical period is a record-review column, not Visit 0. Staff abstraction occurs after consent, without an extra participant visit. No pre-consent research procedures.",
+        "Historical data are whatever was recorded in routine care. No assumed historical questionnaire, saliva collection, consent visit or standardized research assessment; absent values are missing. Source surgical/care records remain at clinic.",
+        "No acuity testing or saliva collection by telephone. Saliva occurs only at Day 0; acuity only at the two in-person visits.",
+        "No exit form, fourth visit or second saliva sample. No substituted home vision testing.",
+        "No blood draws, pupil dilation, imaging, study medication or research surgery. The saliva specimen is mandatory for this study's eligibility; there is no optional genetic substudy or separate future-use opt-in."
+      ],
+      "methods": "Best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and the participant's current correction. Questionnaire: A study-specific ocular comfort rating for the preceding 7 days, 0 to 10, where 0 means extremely uncomfortable and 10 means fully comfortable. This is not presented as a validated instrument. The same wording is used at Day 0, Day 30 and Day 90.",
+      "evaluation": "Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+      "retention": "If a telephone visit is missed, staff may make up to two further scheduling attempts within its existing window. No substituted home vision testing.",
+      "discontinuation": "Participants may leave at any time without penalty or loss of usual benefits. They can tell or write to the site coordinator. A final discussion of symptoms and ordinary-care needs is offered but optional; no mandatory final research visit, saliva collection or examination is required after withdrawal. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure. Record the reason when available. Leaving research does not stop routine care.",
+      "completion": "Each participant finishes after Day 90, or earlier withdrawal/discontinuation; historical-record years and administrative closeout do not extend participation.",
+      "return_of_results": "Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings are not returned. The study does not search for clinically actionable incidental findings. Consent must clearly distinguish this policy from the return of routine vision-test results. Individual visual acuity results are offered at each in-person visit. Clinical concerns observed during testing are explained and referred to ordinary care. An aggregate plain-language study summary is available on request after study analysis is complete. There is no treatment assignment to disclose or unmask.",
+      "pregnancy_testing": "Pregnancy is not an exclusion criterion. There are no study pregnancy tests, contraception requirements, radiation, drugs or reproductive interventions. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan.",
+      "specimens": "Each saliva tube carries only a study ID. The clinic ships coded tubes to the sponsor's contracted research laboratory. The laboratory performs targeted genotyping and returns coded research data to the study statistician. The lab receives no participant names, contacts or clinic ID key. The original saliva and extracted DNA are destroyed within 90 days after completion of laboratory testing, and no later than 30 June 2027. Specimens are not banked for future research, shared for other studies or sold. No commercial development or participant share of commercial proceeds is planned. The coded genetic data remain part of the retained study dataset. Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings are not returned. The study does not search for clinically actionable incidental findings. Consent must clearly distinguish this policy from the return of routine vision-test results.",
+      "adverse_events": "Enquiry about assessment-related symptoms at all three contacts. Testing may be paused or stopped on request. Contact the study doctor for persistent symptoms.",
+      "unscheduled_visits": null,
+      "termination": null,
+      "study_termination": null
+    },
+    "statistics": {
+      "analysis_plan": "Summarize participant flow, historical-record availability, completion and baseline characteristics overall and by site. For the primary outcome, report the observed paired mean change, standard deviation and 95% confidence interval among participants with Day 0 and Day 90 ratings; also report median and range. Describe Day 30 comfort and unscheduled visits using counts and appropriate continuous summaries. Report historical-treatment proportions with an explicit denominator of people with relevant records. Summarize visual acuity by eye; any pooled-eye exploratory model uses a participant-level random intercept to account for paired eyes. Explore the association of historical treatment documentation with Day 90 comfort using linear regression adjusted for Day 0 comfort, age and site. Exploratory genetic associations are reported descriptively; no causal or clinically actionable interpretation and no confirmatory significance claims. Report missing values and reasons separately for historical and prospective data. Do not impute unrecorded historical care or missing questionnaire values.",
+      "sample_size_justification": "Ninety participants is a practical exploratory sample, with up to 15% loss to prospective follow-up anticipated. The study has no formal power calculation or assumed treatment effect. The target is 90 people, not 90 eyes or 90 historical records. Both eyes may contribute descriptive vision data, but participant-reported endpoints use one record per person.",
+      "analysis_populations": "Primary paired analysis among participants with Day 0 and Day 90 comfort ratings. Participant-reported endpoints use one record per person. Both eyes may contribute descriptive vision data; pooled-eye exploratory models use a participant-level random intercept.",
+      "missing_data_handling": "Report missing values and reasons separately for historical and prospective data. Do not impute unrecorded historical care or missing questionnaire values.",
+      "methodology": null
+    },
+    "safety": {
+      "adverse_events": "Potential research risks: temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment while providing saliva; discomfort answering symptom questions; inconvenience and travel; and loss of privacy involving medical or genetic information. Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks. Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed.",
+      "roles": "For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+      "pregnancy": "Pregnancy is not an exclusion criterion. There are no study pregnancy tests, contraception requirements, radiation, drugs or reproductive interventions. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan.",
+      "contact_hours": "Site contacts handle scheduling, research questions and referral to the site doctor for possible research injury, Monday\u2013Friday, 9 a.m.\u20135 p.m. local time. These numbers are not emergency or 24-hour contact lines.",
+      "general_information": null,
+      "monitoring": null,
+      "follow_up": null
+    },
+    "ethics": {
+      "approval_status": "Not yet submitted. No IRB approval obtained; no approval identifier or date issued.",
+      "consent": "This is a new study input for the normal Source of Truth approval process. No IRB approval has been obtained. Contacts and procedures below belong only to this study. Sterling's IRB-managed merge fields remain under its normal template process; study-specific contacts are supplied separately below. Sampling: Non-probability, consecutive eligible clinic patients invited during routine contact. Only patients who give written consent enter this study; there is no separate records-only cohort or waiver-of-consent population. Children and adults unable to consent are not enrolled. No representative or witness signature is required under this study plan.",
+      "participant_rights_contact": "Reviewing IRB: Harbor Independent Research Review Board. Affiliation: Independent IRB, unaffiliated with the sponsor and study clinics. Address: 950 Review Avenue, Suite 450, Baltimore, MD 21204, United States. Phone: +1 202-555-0168. Email: participant.rights@example.org. This contact handles participant-rights questions and research concerns. Selected consent layout: Sterling. The study-specific reviewing IRB is the one named above; template-family selection does not replace it with an IRB or contacts from another study. No actual study approval is represented here.",
+      "withdrawal": "Participants may leave at any time without penalty or loss of usual benefits. They can tell or write to the site coordinator. A final discussion of symptoms and ordinary-care needs is offered but optional; no mandatory final research visit, saliva collection or examination is required after withdrawal. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure. Record the reason when available. Leaving research does not stop routine care."
+    },
+    "confidentiality": {
+      "data_handling": "Collected identifiers: name, contact information, date of birth and signed consent, used for scheduling, eligibility, records linkage and payment. Coded study data: age, sex, surgery dates, lens categories, ocular history, care history, acuity, questionnaire responses, unscheduled visits and genotype. Each clinic keeps its ID key separately on an encrypted access-controlled drive; paper consent forms are in locked cabinets. Only authorized site investigators and coordinators access identifying records for their duties. The sponsor, laboratory and statistician receive coded information only. Authorized study monitors, the IRB and legally authorized oversight bodies may review relevant original records for oversight. No public individual-data sharing, sale, unrelated future research or identifiable publication is planned.",
+      "retention": "Identifying records, keys and coded datasets are retained securely for seven years after administrative closeout on 30 June 2027, then securely destroyed, unless a binding retention requirement requires longer storage.",
+      "authorization_duration": "Permission to collect new research health information ends after the participant's final Day 90 assessment, or earlier upon written withdrawal. Already collected data may be retained and used for study integrity and required oversight under the retention policy above. This is a finite authorization; it does not expire only when all retained records are destroyed. To withdraw authorization, write to the enrolling site's coordinator at the site mailing address below. New research collection stops upon withdrawal. If a specimen has not been analyzed, the site requests its destruction; data already generated or incorporated into analyses may continue to be used.",
+      "publication": "No public individual-data sharing, sale, unrelated future research or identifiable publication. Aggregate plain-language summary available on request after analysis.",
+      "genetic_information": "Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed. Each saliva tube carries only a study ID. The clinic ships coded tubes to the sponsor's contracted research laboratory. The laboratory performs targeted genotyping and returns coded research data to the study statistician. The lab receives no participant names, contacts or clinic ID key. The original saliva and extracted DNA are destroyed within 90 days after completion of laboratory testing, and no later than 30 June 2027. Specimens are not banked for future research, shared for other studies or sold. No commercial development or participant share of commercial proceeds is planned. The coded genetic data remain part of the retained study dataset. Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings are not returned. The study does not search for clinically actionable incidental findings. Consent must clearly distinguish this policy from the return of routine vision-test results."
+    },
+    "risks_benefits": {
+      "risks": "Potential research risks: temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment while providing saliva; discomfort answering symptom questions; inconvenience and travel; and loss of privacy involving medical or genetic information. Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks. Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed.",
+      "benefits": "No direct benefit is promised. The research may improve understanding of reported comfort and documented care patterns.",
+      "alternatives": "Ordinary eye care without joining the study. Care and benefits are unaffected by refusal.",
+      "compensation_or_reimbursement": "Compensation: $40 for attended Day 0, $15 for completed Day 30 telephone visit and $40 for attended Day 90, maximum $95. No completion bonus. Earned payments remain payable after withdrawal. Payment is by check within 30 days of each completed contact. No parking, mileage, transit or other travel reimbursement.",
+      "costs": "The sponsor pays for all research testing, saliva collection, research laboratory work and questionnaires. Routine clinical care remains payable by the participant or insurer under ordinary arrangements. No research charges are billed to insurance; the study does not pay for ordinary future treatment.",
+      "injury_handling": "For possible research injury or persistent discomfort, contact the enrolling site's study doctor via the coordinator; the clinic arranges evaluation. Emergency care uses ordinary emergency services. No fund for free injury treatment or additional injury compensation is established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+      "privacy": "Collected identifiers: name, contact information, date of birth and signed consent, used for scheduling, eligibility, records linkage and payment. Coded study data: age, sex, surgery dates, lens categories, ocular history, care history, acuity, questionnaire responses, unscheduled visits and genotype. Each clinic keeps its ID key separately on an encrypted access-controlled drive; paper consent forms are in locked cabinets. Only authorized site investigators and coordinators access identifying records for their duties. The sponsor, laboratory and statistician receive coded information only. Authorized study monitors, the IRB and legally authorized oversight bodies may review relevant original records for oversight. No public individual-data sharing, sale, unrelated future research or identifiable publication is planned. Identifying records, keys and coded datasets are retained securely for seven years after administrative closeout on 30 June 2027, then securely destroyed, unless a binding retention requirement requires longer storage. Permission to collect new research health information ends after the participant's final Day 90 assessment, or earlier upon written withdrawal. Already collected data may be retained and used for study integrity and required oversight under the retention policy above. This is a finite authorization; it does not expire only when all retained records are destroyed. To withdraw authorization, write to the enrolling site's coordinator at the site mailing address below. New research collection stops upon withdrawal. If a specimen has not been analyzed, the site requests its destruction; data already generated or incorporated into analyses may continue to be used.",
+      "authorization_duration": "Permission to collect new research health information ends after the participant's final Day 90 assessment, or earlier upon written withdrawal. Already collected data may be retained and used for study integrity and required oversight under the retention policy above. This is a finite authorization; it does not expire only when all retained records are destroyed. To withdraw authorization, write to the enrolling site's coordinator at the site mailing address below. New research collection stops upon withdrawal. If a specimen has not been analyzed, the site requests its destruction; data already generated or incorporated into analyses may continue to be used.",
+      "genetic_information": "Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed. Each saliva tube carries only a study ID. The clinic ships coded tubes to the sponsor's contracted research laboratory. The laboratory performs targeted genotyping and returns coded research data to the study statistician. The lab receives no participant names, contacts or clinic ID key. The original saliva and extracted DNA are destroyed within 90 days after completion of laboratory testing, and no later than 30 June 2027. Specimens are not banked for future research, shared for other studies or sold. No commercial development or participant share of commercial proceeds is planned. The coded genetic data remain part of the retained study dataset. Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings are not returned. The study does not search for clinically actionable incidental findings. Consent must clearly distinguish this policy from the return of routine vision-test results.",
+      "pregnancy": "Pregnancy is not an exclusion criterion. There are no study pregnancy tests, contraception requirements, radiation, drugs or reproductive interventions.",
+      "risk_mitigation": null
+    },
+    "regulatory": {
+      "prs": {
+        "provider_study_id": "COMFORT-26-03",
+        "study_type": "Observational",
+        "observational_study_design": "Cohort",
+        "time_perspective": "Other",
+        "sampling_method": "Non-Probability Sample",
+        "overall_status": "Not yet recruiting",
+        "enrollment": "90",
+        "enrollment_type": "Anticipated",
+        "start_date": "2026-11-01",
+        "start_date_type": "Anticipated",
+        "primary_completion_date": "2027-05-11",
+        "primary_completion_date_type": "Anticipated",
+        "study_completion_date": "2027-05-11",
+        "study_completion_date_type": "Anticipated",
+        "verification_date": "2026-10",
+        "healthy_volunteers": "No",
+        "fda_regulated_drug": "No",
+        "fda_regulated_device": "No",
+        "ipd_sharing": "No",
+        "biospecimen_retention": "Samples With DNA",
+        "biospecimen_description": "Mandatory approximately 2 mL saliva at Day 0 for targeted research genotyping. Saliva and extracted DNA destroyed within 90 days after laboratory testing completes, no later than 30 June 2027; no future-use banking, sale or other-study sharing.",
+        "patient_registry": null,
+        "target_duration_quantity": null,
+        "target_duration_units": null
+      },
+      "genetic_information_collected": "True",
+      "future_specimen_use": "False",
+      "sponsor_receives_identifiable_information": "False",
+      "clinicaltrials_gov_disclosure_required": "False",
+      "source_conditions": "Recruitment status: Not yet recruiting. Enrollment type: Anticipated, 90. Registry verification month: October 2026. IRB status: Not yet submitted. No IRB approval identifier/date or public registration number has been issued. Under the supplied study plan, mandatory ClinicalTrials.gov consent disclosure does not apply; generating study XML does not itself create that requirement. No FDA-regulated investigational drug or device study. No investigational product, randomization, masking, radiation or pregnancy testing. Genetic information collected: Yes. Future specimen use: No. Public individual participant data sharing: No. Sponsor receives identifiable information: No.",
+      "consent_template_process": "Sterling IRB-managed merge fields remain under normal template process. Study-specific reviewing IRB and contacts are Harbor Independent Research Review Board; layout selection does not replace them."
+    }
+  },
+  "drafts": {
+    "protocol": [
+      {
+        "section_id": "title-page",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "investigator-agreement",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "general-information",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "table-of-contents",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "introduction",
+        "paragraphs": [
+          {
+            "text": "Ocular comfort following routine bilateral cataract surgery may differ among people with different documented ocular-care histories. The relationship between historical care, current symptoms and subsequent comfort remains uncertain. Linking existing clinic records with newly collected symptom ratings and vision assessments provides a basis for describing these relationships, while research genotyping permits exploratory assessment of possible genetic associations with symptom variation.",
+            "evidence_refs": [
+              "study.background"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "objectives",
+        "paragraphs": [
+          {
+            "text": "The primary objective is to describe the change in patient-reported ocular comfort from enrollment to Day 90 after enrollment.",
+            "evidence_refs": [
+              "objectives.primary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Secondary objectives are to describe historical ocular-care patterns, current and follow-up visual acuity, symptom-related unscheduled visits, and associations between historical care characteristics and prospective comfort.",
+            "evidence_refs": [
+              "objectives.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "The exploratory objective is to examine associations between selected research genetic variants and Day 90 comfort. These analyses do not establish clinical utility.",
+            "evidence_refs": [
+              "objectives.exploratory"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "subjects",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "subjects.population",
+        "paragraphs": [
+          {
+            "text": "The study population comprises clinic patients aged 55 through 85 years, inclusive, with pseudophakia following completed bilateral cataract surgery. Both surgeries must have occurred between 1 January 2025 and 30 September 2026, with records accessible at the enrolling clinic; second-eye surgery must have occurred 3 to 18 months before Day 0. Participants must be able to consent personally, complete English-language questionnaires, provide a saliva sample and attend the specified future visits, and must authorize access to their historical records.",
+            "evidence_refs": [
+              "population.study_population",
+              "population.inclusion_criteria"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "All sexes are eligible; healthy volunteers are not enrolled. Consecutive eligible clinic patients will be invited during routine contact using non-probability sampling. Only patients providing written consent enter the cohort, and each contributes both historical-record data and prospective follow-up; there is no separate records-only cohort or waiver-of-consent population. Planned enrollment is 90 participants, targeting 30 at each of three sites.",
+            "evidence_refs": [
+              "population.study_population",
+              "population.sample_size",
+              "design.number_of_sites"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "subjects.inclusion",
+        "paragraphs": [],
+        "lists": [
+          {
+            "items": [
+              "Age 55 through 85 years, inclusive, at written consent.",
+              "Bilateral cataract surgery completed before enrollment, with second-eye surgery 3 to 18 months before Day 0.",
+              "Both cataract surgeries performed between 1 January 2025 and 30 September 2026, with records accessible at the enrolling clinic.",
+              "Able to consent, complete English-language questionnaires, provide a saliva sample and attend the specified future visits.",
+              "Willing to authorize access to historical records for the period 1 January 2025 through 30 September 2026.",
+              "No participation in an interventional research study during the 60 days before screening."
+            ],
+            "evidence_refs": [
+              "population.inclusion_criteria",
+              "population.minimum_age",
+              "population.maximum_age",
+              "procedures.minimum_days_before_screening_without_participation",
+              "procedures.historical_record_review"
+            ],
+            "boilerplate_refs": []
+          }
+        ]
+      },
+      {
+        "section_id": "subjects.exclusion",
+        "paragraphs": [],
+        "lists": [
+          {
+            "items": [
+              "Participation in an interventional research study in the 60 days before screening, or planned interventional research participation during follow-up.",
+              "Planned ocular surgery during the 90-day prospective period.",
+              "An ocular condition that prevents reliable completion of the specified visual acuity assessments, as determined by the site investigator.",
+              "Inability to consent personally or need for a proxy questionnaire respondent."
+            ],
+            "evidence_refs": [
+              "population.exclusion_criteria"
+            ],
+            "boilerplate_refs": []
+          }
+        ]
+      },
+      {
+        "section_id": "study-design",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "study-design.design",
+        "paragraphs": [
+          {
+            "text": "This ambispective observational cohort study at three United States sites combines retrospective review of routine-care records with prospective follow-up of the same consenting participants. Prior routine bilateral cataract surgery and its documented ocular-care history are observed exposures, not procedures assigned or performed by this study. There are no treatment arms, comparator product, randomization, masking, placebo or investigational product. Enrollment assigns no surgery, intraocular lens type, medication or other treatment.",
+            "evidence_refs": [
+              "design.study_design",
+              "design.intervention_description"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "After Day 0 consent, staff abstract existing records dated 1 January 2025 through 30 September 2026, including surgery dates, implanted lens categories, documented ocular diagnoses, clinician-recorded ocular surface treatments, recorded best-corrected distance visual acuity and documented unscheduled ocular visits. This is a staff task, not a participant visit. Historical information reflects routine-care documentation only: no historical research visit, questionnaire, saliva collection or standardized research assessment is assumed, and absent values remain missing. No research procedures occurred before consent; source surgical and care records remain at the clinic.",
+            "evidence_refs": [
+              "design.data_sources"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Prospective follow-up lasts 90 days from enrollment, not from surgery. Day 0 and Day 90 (\u00b110 days) are in-person visits with noninvasive visual acuity testing and symptom assessment; Day 30 (\u00b15 days) is a telephone symptom and ocular-care follow-up without acuity testing. A single saliva sample for research genotyping is collected at Day 0 only.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments",
+              "study.participation_duration"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "The exploratory association hypothesis is that greater historical use of clinician-documented ocular surface treatment will be associated with lower Day 90 comfort scores. This does not hypothesize or demonstrate a treatment effect.",
+            "evidence_refs": [
+              "study.hypothesis"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "The primary endpoint is change in ocular comfort score from Day 0 to Day 90 (\u00b110 days). Scores range from 0 to 10; a positive change indicates improved reported comfort.",
+            "evidence_refs": [
+              "endpoints.primary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "The exploratory endpoint is the association of coded research genotype groups with Day 90 (\u00b110 days) comfort score. Variant selection will be specified in a laboratory analysis plan before release of the coded outcome dataset. These analyses produce no clinical risk score and do not establish clinical utility.",
+            "evidence_refs": [
+              "endpoints.other"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": [
+          {
+            "items": [
+              "Secondary: ocular comfort score (0 to 10) at Day 30 (\u00b15 days) after enrollment.",
+              "Secondary: best-corrected distance visual acuity for each eye at Day 90 (\u00b110 days), expressed in logMAR; lower values indicate better acuity.",
+              "Secondary: number of participant-reported unscheduled ocular-care visits between Day 0 and Day 90, collected at both follow-up contacts; a visit reported at both contacts is counted once.",
+              "Secondary: proportion with clinician-documented ocular surface treatment in available records dated 1 January 2025 through 30 September 2026, using people with relevant records as the denominator."
+            ],
+            "evidence_refs": [
+              "endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          }
+        ]
+      },
+      {
+        "section_id": "study-design.bias",
+        "paragraphs": [
+          {
+            "text": "Consecutive eligible clinic patients will be invited during routine contact, using consistent eligibility requirements. Historical abstraction is restricted to the predefined record period and specified data fields. Unrecorded historical care is not treated as absence of care: missing values and reasons are reported separately for historical and prospective data, without imputing unrecorded care or missing questionnaire values. Selection and documentation limitations remain relevant to interpretation.",
+            "evidence_refs": [
+              "population.study_population",
+              "population.inclusion_criteria",
+              "design.data_sources",
+              "statistics.missing_data_handling"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Measurement consistency is supported by the same study-specific comfort-rating wording and preceding-7-day recall period at each contact, and by visual acuity testing at 4 m with a logMAR chart and the participant\u2019s current correction at the two in-person visits. Outcomes and follow-up windows are predefined. The primary analysis uses paired Day 0 and Day 90 ratings; historical-treatment associations with Day 90 comfort are adjusted for Day 0 comfort, age and site. Any pooled-eye exploratory model accounts for paired eyes with a participant-level random intercept. These controls do not remove residual confounding; associations must not be interpreted as causal treatment effects or clinically actionable genetic findings.",
+            "evidence_refs": [
+              "procedures.methods",
+              "procedures.visit_schedule",
+              "endpoints.primary",
+              "statistics.analysis_plan"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-design.assignment",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.consent",
+        "paragraphs": [
+          {
+            "text": "Written informed consent, including authorization to access the specified historical records, will be obtained before any research activity. The consent discussion and signed form will be documented in study records. Screening and enrollment occur during the same Day 0 visit. Only personally consenting participants enter this cohort; there is no separate records-only cohort or waiver-of-consent population. No representative or witness signature is required.",
+            "evidence_refs": [
+              "procedures.consent"
+            ],
+            "boilerplate_refs": [
+              "consent"
+            ]
+          },
+          {
+            "text": "The consent discussion will distinguish research-only genotyping from routine vision-test results and explain the specimen and result-return policies described in Section 9.3. Authorization to collect new research health information ends after the final Day 90 assessment or earlier written withdrawal; retention of previously collected information does not extend that authorization.",
+            "evidence_refs": [
+              "procedures.consent"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.visits",
+        "paragraphs": [
+          {
+            "text": "The same consenting participants contribute historical clinic records and attend three prospective contacts: two in-person visits and one telephone visit over approximately 90 days. All prospective day numbers and windows are measured from enrollment, not surgery. Historical abstraction is a staff task after Day 0, not Visit 0 or an additional participant visit; no research procedures occurred before consent.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Historical record abstraction: Staff review available routine-care records dated 1 January 2025 through 30 September 2026, inclusive, for surgery dates, implanted lens categories, ocular diagnoses, clinician-recorded ocular surface treatments, recorded best-corrected distance visual acuity and documented unscheduled ocular visits. Historical values reflect only what was recorded in ordinary care; absent values remain missing. No historical questionnaire, saliva collection, consent visit or standardized research assessment is presumed. Original surgical and care records remain at the clinic.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Visit 1 \u2014 Day 0 / Enrollment: This in-person visit lasts approximately 70 minutes. Written consent and historical-record authorization precede research activities, with eligibility confirmation and enrollment at this same visit. Staff collect demographics and a current ocular-care update, assess best-corrected distance visual acuity for each eye at 4 m with a logMAR chart and the participant\u2019s current correction, obtain the study-specific comfort rating for the preceding 7 days, collect approximately 2 mL of saliva by passive drool into a labeled tube and enquire about assessment-related symptoms.",
+            "evidence_refs": [
+              "procedures.visit_schedule"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Visit 2 \u2014 Day 30: At Day 30 +/- 5 days after enrollment, the approximately 15-minute telephone visit obtains the same comfort rating, an interval ocular-care update, unscheduled ocular visits since enrollment and assessment-related symptoms. There is no telephone acuity test or saliva collection. If missed, staff may make up to two further scheduling attempts within the existing window; home vision testing is not substituted.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Visit 3 \u2014 Day 90 / Final Visit: At Day 90 +/- 10 days after enrollment, the approximately 40-minute in-person visit repeats best-corrected distance visual acuity for each eye at 4 m using a logMAR chart and current correction, and the same comfort rating. Staff update interval ocular care, enquire about unscheduled ocular visits and assessment-related symptoms, and confirm research completion. There is no exit form, fourth visit or second saliva sample.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "At all three contacts, the study-specific comfort rating covers the preceding 7 days, from 0 (extremely uncomfortable) to 10 (fully comfortable), using identical wording; it is not presented as a validated instrument. Saliva collection is confined to Day 0 and is mandatory for eligibility, not an optional genetic substudy or future-use opt-in. Acuity testing is confined to the two in-person visits. There are no blood draws, pupil dilation, imaging, study medication or research surgery.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.measurements",
+        "paragraphs": [
+          {
+            "text": "Ocular comfort will be recorded once per participant using the same study-specific question at Day 0, Day 30 +/- 5 days and Day 90 +/- 10 days after enrollment. Participants rate comfort over the preceding 7 days from 0 (extremely uncomfortable) to 10 (fully comfortable). The rating is not presented as validated. Subtracting the Day 0 score from the Day 90 score gives the primary change measure; a positive change denotes improved reported comfort.",
+            "evidence_refs": [
+              "procedures.methods",
+              "endpoints.primary",
+              "endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Best-corrected distance visual acuity will be measured separately for each eye at the in-person assessments using a logMAR chart at 4 m and the participant\u2019s current correction. Record eye-specific logMAR values; lower values indicate better acuity. The Day 90 assessment supplies the secondary acuity measure. Individual acuity results are offered at each in-person visit; clinical concerns observed during testing are explained and referred to ordinary care.",
+            "evidence_refs": [
+              "procedures.methods",
+              "endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "At the Day 30 and Day 90 enquiries, staff collect participant-reported unscheduled ocular-care visits between enrollment and Day 90. A visit reported at both contacts is counted only once. Historical ocular surface treatment is obtained separately by abstracting clinician documentation in available records from 1 January 2025 through 30 September 2026; the denominator for the historical treatment proportion is participants with relevant records, not all enrolled participants or eyes.",
+            "evidence_refs": [
+              "endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Research genotyping uses the single approximately 2 mL Day 0 passive-drool saliva specimen. Tubes carry only a study ID and are shipped by the clinic to the sponsor\u2019s contracted research laboratory for targeted genotyping. The laboratory receives no participant names, contacts or clinic ID key, and returns coded research data to the study statistician. Variant selection will be specified in a laboratory analysis plan before release of the coded outcome dataset for exploration of genotype-group associations with Day 90 comfort. No clinical risk score or claim of clinical utility is made; testing does not determine family relationships, ancestry or clinical disease risk and does not include whole genome sequencing.",
+            "evidence_refs": [
+              "endpoints.other"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Original saliva and extracted DNA will be destroyed within 90 days after laboratory testing is completed and no later than 30 June 2027. Specimens are not banked, shared for other studies or sold; no commercial development or participant share of commercial proceeds is planned. Coded genetic data remain in the retained study dataset. Research genotyping is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings will not be returned, and the study will not search for clinically actionable incidental findings. This differs from offering routine visual acuity results. An aggregate plain-language study summary is available on request after analysis. There is no treatment assignment to disclose or unmask.",
+            "evidence_refs": [
+              "endpoints.other",
+              "procedures.methods"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.unscheduled",
+        "paragraphs": [
+          {
+            "text": "An unscheduled visit does not authorize additional research assessments beyond this protocol. The reason for the visit and any protocol-permitted activities performed will be documented in study records.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "unscheduled"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "study-procedure.discontinued",
+        "paragraphs": [
+          {
+            "text": "For a participant who stops taking part, record the reason when available and offer, but do not require, a final discussion of symptoms and ordinary-care needs. No final research visit, examination or saliva collection is mandatory after withdrawal, and routine care continues. Discontinuation criteria are described in Section 18.2.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "discontinued-subjects"
+            ]
+          },
+          {
+            "text": "Previously collected information may be retained and used for study integrity and required oversight under the consent and retention policy. Written withdrawal of authorization to the enrolling site coordinator stops new research collection; if a specimen has not been analyzed, the site requests its destruction. Data already generated or incorporated into analyses may continue to be used. Permission for new collection otherwise ends after the final Day 90 assessment, not when retained records are destroyed.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "discontinued-subjects"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "analysis-plan",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "analysis-plan.datasets",
+        "paragraphs": [
+          {
+            "text": "Historical records and prospective observations will be linked within the same consenting participant cohort, not analyzed as separately recruited populations. Historical summaries use the relevant available records; participant-reported endpoints contribute one record per person. The primary paired analysis includes participants with both Day 0 and Day 90 comfort ratings. Both eyes may contribute descriptive visual acuity observations, with a participant-level random intercept in any pooled-eye exploratory model.",
+            "evidence_refs": [
+              "source:statistics.analysis_populations",
+              "source:statistics.analysis_plan"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Participant flow, historical-record availability, baseline characteristics and completion will be summarized overall and by site. Missing values and available reasons will be reported separately for historical and prospective data. Unrecorded historical care and missing questionnaire values will not be imputed.",
+            "evidence_refs": [
+              "source:statistics.analysis_plan"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "analysis-plan.methodology",
+        "paragraphs": [
+          {
+            "text": "For the primary comfort outcome, Day 90 minus Day 0 change will be summarized by the observed paired mean change, standard deviation and 95% confidence interval, together with the median and range. Positive change on the 0-to-10 scale indicates improved reported comfort. Day 30 comfort and unscheduled ocular-care visits will be described using counts and appropriate continuous summaries; a visit reported at both follow-up contacts will be counted once.",
+            "evidence_refs": [
+              "source:statistics.analysis_plan",
+              "source:endpoints.primary",
+              "source:endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Historical ocular surface treatment will be reported as a proportion with an explicit denominator of people with relevant records. Visual acuity will be summarized by eye; a participant-level random intercept will account for paired eyes in any pooled-eye exploratory model. Linear regression will explore the association between historical treatment documentation and Day 90 comfort, adjusting for Day 0 comfort, age and site.",
+            "evidence_refs": [
+              "source:statistics.analysis_plan",
+              "source:endpoints.secondary"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Associations between coded research genotype groups and Day 90 comfort will be described. Variant selection will be specified in a laboratory analysis plan before release of the coded outcome dataset.",
+            "evidence_refs": [
+              "source:statistics.analysis_plan",
+              "source:endpoints.other"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "analysis-plan.considerations",
+        "paragraphs": [
+          {
+            "text": "These observational analyses describe change and explore associations, not treatment effects. Genetic associations are descriptive and will not support causal or clinically actionable interpretations, a clinical risk score, claims of clinical utility or confirmatory significance claims.",
+            "evidence_refs": [
+              "source:statistics.analysis_plan",
+              "source:endpoints.other"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "sample-size",
+        "paragraphs": [
+          {
+            "text": "The planned sample is 90 participants, a practical exploratory target with up to 15% loss to prospective follow-up anticipated. There is no formal power calculation or assumed treatment effect. Enrollment is counted in people, not eyes or historical records. Both eyes may contribute descriptive vision data, while participant-reported endpoints use one record per person.",
+            "evidence_refs": [
+              "source:population.sample_size",
+              "source:population.sample_justification"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "confidentiality-publication",
+        "paragraphs": [
+          {
+            "text": "Study results may be presented or published only in a form that protects participant confidentiality and follows the approved publication and data-governance requirements.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "publication"
+            ]
+          },
+          {
+            "text": "No public individual-data sharing, sale, unrelated future research or identifiable publication is planned. An aggregate plain-language summary will be available on request after analysis. Identifying records, linkage keys and coded datasets will be retained securely for seven years after administrative closeout on 30 June 2027, then securely destroyed unless a binding retention requirement requires longer storage. This records-retention period does not extend participant involvement or authorization for new research collection.",
+            "evidence_refs": [
+              "source:confidentiality.publication",
+              "source:confidentiality.retention"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "quality-safety",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "quality-safety.general",
+        "paragraphs": [
+          {
+            "text": "An adverse event is an unfavorable medical occurrence reported during study participation, regardless of its possible relationship to a study activity. A serious adverse event results in death, is life-threatening, requires or prolongs inpatient hospitalization, causes persistent or significant disability, or is an important medical event. There is no study device or investigational product.",
+            "evidence_refs": [
+              "source:regulatory.source_conditions"
+            ],
+            "boilerplate_refs": [
+              "safety-general"
+            ]
+          },
+          {
+            "text": "Potential research risks include temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment during saliva collection; discomfort answering symptom questions; inconvenience and travel; and loss of medical or genetic privacy. A confidentiality breach involving genetic information may reveal information about participants or biological relatives. Testing may be paused or stopped on request, and persistent symptoms warrant contact with the study doctor. Prior cataract operations were ordinary care, not new research risks. Targeted research genotyping does not determine family relationships, ancestry or clinical disease risk and does not involve whole genome sequencing.",
+            "evidence_refs": [
+              "source:risks_benefits.risks"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "quality-safety.monitoring",
+        "paragraphs": [
+          {
+            "text": "Safety information will be collected during the scheduled study contacts. Assessment-related symptoms will be enquired about at Day 0, the Day 30 telephone contact and the Day 90 final assessment. Testing may be paused or stopped at the participant\u2019s request. The monitoring activities do not add visits, repeat saliva collection or telephone vision testing.",
+            "evidence_refs": [
+              "source:procedures.adverse_events",
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments"
+            ],
+            "boilerplate_refs": [
+              "safety-monitoring"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "quality-safety.reporting",
+        "paragraphs": [
+          {
+            "text": "The investigator will review reported events for seriousness and possible relationship to study activities. Serious events will be communicated to the sponsor and reviewing ethics committee within the timelines required by applicable approved procedures and governing requirements.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "safety-reporting"
+            ]
+          },
+          {
+            "text": "Symptoms arising during vision testing, saliva collection or symptom questioning should be distinguished from the participant\u2019s prior ordinary-care cataract operations. Testing can be paused or stopped on request. Persistent symptoms or possible research injury are referred through the enrolling site coordinator to the site study doctor for clinic-arranged evaluation; emergencies use ordinary emergency services. Site contacts operate Monday\u2013Friday, 9 a.m.\u20135 p.m. local time and are not emergency or 24-hour lines.",
+            "evidence_refs": [
+              "source:safety.adverse_events",
+              "source:safety.roles",
+              "source:safety.contact_hours"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "quality-safety.follow-up",
+        "paragraphs": [
+          {
+            "text": "Safety-event follow-up is confined to the study procedures and collection period described in this protocol. Persistent symptoms or possible research injury will be directed to the enrolling site\u2019s study doctor through the coordinator for clinic-arranged evaluation, with emergency care obtained through ordinary emergency services. Clinical concerns observed during testing will be explained and referred to ordinary care.",
+            "evidence_refs": [
+              "source:safety.roles",
+              "source:procedures.return_of_results"
+            ],
+            "boilerplate_refs": [
+              "safety-followup"
+            ]
+          },
+          {
+            "text": "Scheduled participation finishes after the final Day 90 assessment; earlier withdrawal or discontinuation is recorded separately from completion. A final discussion of symptoms and ordinary-care needs is optional after withdrawal, with no mandatory final research visit, examination or saliva collection. Routine care continues independently of research participation. Administrative closeout does not extend research follow-up.",
+            "evidence_refs": [
+              "source:procedures.discontinuation",
+              "source:procedures.completion",
+              "source:study.timeline"
+            ],
+            "boilerplate_refs": [
+              "safety-followup"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "quality-safety.analysis",
+        "paragraphs": [
+          {
+            "text": "Safety information available in the study data will be summarized descriptively. Assessment-related symptoms will be considered in the context of the vision tests, saliva collection and symptom questions, without treating the previously completed ordinary-care cataract operations as research procedures.",
+            "evidence_refs": [
+              "source:safety.adverse_events"
+            ],
+            "boilerplate_refs": [
+              "safety-analysis"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "ethics",
+        "paragraphs": [
+          {
+            "text": "COMFORT-26-03 has not yet been submitted to the IRB. No IRB approval has been obtained and no approval identifier or date has been issued. The designated reviewing body is Harbor Independent Research Review Board, an independent IRB unaffiliated with the sponsor and study clinics. Applicable ethics review requirements and ethical and privacy protections govern study conduct. The Sterling consent layout does not change the identity of the reviewing IRB or establish approval.",
+            "evidence_refs": [
+              "source:ethics",
+              "source:parties.irb"
+            ],
+            "boilerplate_refs": [
+              "ethics"
+            ]
+          },
+          {
+            "text": "Consecutive eligible clinic patients will be invited during routine contact. Written informed consent, including authorization to review historical records, precedes research activities. Historical abstraction and prospective follow-up involve the same consenting participants; there is no separate records-only cohort or waiver-of-consent population. Children and adults unable to consent personally are not enrolled, and no representative or witness signature is required under this study plan.",
+            "evidence_refs": [
+              "source:ethics"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation for participant request, inability to complete assessments, additional ocular surgery or study closure; the reason will be recorded when available. Any final discussion of symptoms and ordinary-care needs is optional. Withdrawal requires no mandatory final research visit, examination or saliva collection and does not stop routine care.",
+            "evidence_refs": [
+              "source:ethics"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Participant-rights questions and research concerns may be directed to Harbor Independent Research Review Board, 950 Review Avenue, Suite 450, Baltimore, MD 21204, United States, telephone +1 202-555-0168, email participant.rights@example.org. No direct benefit is promised. Compensation, research costs and injury-handling arrangements are described in Section 17; payment is not a clinical benefit.",
+            "evidence_refs": [
+              "source:ethics",
+              "source:parties.irb",
+              "source:risks_benefits.benefits"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "ethics.confidentiality",
+        "paragraphs": [
+          {
+            "text": "Confidentiality protections for study records and participant information are described in Section 16.",
+            "evidence_refs": [],
+            "boilerplate_refs": [
+              "confidentiality-cross-reference"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "evaluation-procedures",
+        "paragraphs": [
+          {
+            "text": "The Schedule of Assessments presents the historical record-review component and the three prospective participant contacts. The accompanying notes clarify the scope and conditions of the assessments.",
+            "evidence_refs": [
+              "procedures.visit_schedule",
+              "procedures.assessments"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": [],
+        "assessment_presentation": {
+          "notes": [
+            {
+              "source_text": "No acuity testing or saliva collection by telephone. Saliva occurs only at Day 0; acuity only at the two in-person visits.",
+              "display_text": "",
+              "rationale": "The table assigns acuity only to the two in-person visits and saliva only to Day 0; neither is assigned to the telephone contact."
+            },
+            {
+              "source_text": "Assessment-matrix clarification: The historical period is a record-review column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity occurs only at the two in-person visits.",
+              "display_text": "",
+              "rationale": "The historical column is labeled a staff task rather than a participant visit, and the retained first note explicitly excludes Visit 0. The table and retained notes already specify the saliva and acuity restrictions."
+            },
+            {
+              "source_text": "Potential research risks: temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment while providing saliva; discomfort answering symptom questions; inconvenience and travel; and loss of privacy involving medical or genetic information. Testing can be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care and are not new research risks. Genetic information may reveal information about a participant or biological relatives if confidentiality is lost. This research does not determine family relationships, ancestry or clinical disease risk, and does not perform whole genome sequencing. Genetic information is collected: Yes. The applicable Sterling genetic-information/GINA section is needed.",
+              "display_text": "Potential research risks include temporary eye fatigue or headache during vision testing; dry mouth, mild nausea or embarrassment during saliva collection; discomfort answering symptom questions; inconvenience and travel; and loss of privacy involving medical or genetic information. Testing may be paused or stopped on request. Contact the study doctor for persistent symptoms. Prior cataract operations were ordinary care, not new research risks. If confidentiality is lost, genetic information may reveal information about a participant or biological relatives. The study collects genetic information but does not determine family relationships, ancestry or clinical disease risk, or perform whole genome sequencing.",
+              "rationale": "Retains every clinical risk, mitigation instruction and genetic limitation; removes only the internal instruction identifying which Sterling template section to include."
+            }
+          ]
+        }
+      },
+      {
+        "section_id": "confidentiality",
+        "paragraphs": [
+          {
+            "text": "Names, contact information, dates of birth and signed consent records will be collected for scheduling, eligibility, records linkage and payment. Coded study data comprise age, sex, surgery dates, lens categories, ocular and care histories, acuity, questionnaire responses, unscheduled visits and genotype. Each clinic will retain its ID key separately on an encrypted, access-controlled drive and paper consent forms in locked cabinets. Source surgical and care records remain at the clinic. Only authorized site investigators and coordinators will access identifying records for their duties.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling",
+              "source:risks_benefits.privacy"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "The sponsor, laboratory and statistician will receive coded information only. Authorized study monitors, the IRB and legally authorized oversight bodies may review relevant original records. No public individual-data sharing, sale, unrelated future research or identifiable publication is planned. Identifying records, keys and coded datasets will be retained securely for seven years after administrative closeout on 30 June 2027, followed by secure destruction unless a binding retention requirement requires longer storage.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling",
+              "source:risks_benefits.privacy"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Authorization to collect new research health information ends after the participant\u2019s final Day 90 assessment or earlier upon written withdrawal to the enrolling site coordinator at the site mailing address. New research collection stops upon withdrawal. Already collected data may be retained and used for study integrity and required oversight; authorization is finite and does not continue until retained records are destroyed. For an unanalyzed specimen, the site will request destruction. Data already generated or incorporated into analyses may continue to be used.",
+            "evidence_refs": [
+              "source:risks_benefits.privacy"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Saliva tubes bear only the study ID and are shipped by the clinic to the sponsor\u2019s contracted research laboratory for targeted genotyping. The laboratory receives no participant names, contact information or clinic ID key and returns coded research data to the statistician. Original saliva and extracted DNA will be destroyed within 90 days after laboratory testing is complete and no later than 30 June 2027. Specimens will not be banked for future research, shared for other studies or sold. No commercial development or participant share of commercial proceeds is planned. Coded genetic data remain in the retained study dataset.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling",
+              "source:confidentiality.genetic_information",
+              "source:procedures.specimens"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Genetic testing is research-only, is not validated for individual clinical decisions and produces no clinical report. Individual genetic results and incidental genetic findings will not be returned, and clinically actionable incidental findings will not be sought. This differs from individual visual acuity results, which are offered at each in-person visit. Clinical concerns observed during testing will be explained and referred to ordinary care.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling",
+              "source:confidentiality.genetic_information",
+              "source:procedures.return_of_results"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "financial-injury",
+        "paragraphs": [
+          {
+            "text": "Compensation is $40 for attended Day 0, $15 for a completed Day 30 telephone visit and $40 for attended Day 90, to a maximum of $95. There is no completion bonus. Earned payments remain payable after withdrawal and are issued by check within 30 days of each completed contact. Parking, mileage, transit and other travel expenses are not reimbursed.",
+            "evidence_refs": [
+              "source:risks_benefits.compensation_or_reimbursement"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "The sponsor pays for research testing, saliva collection, research laboratory work and questionnaires. Research charges are not billed to insurance. Routine clinical care remains payable by the participant or insurer under ordinary arrangements, and the study does not pay for ordinary future treatment.",
+            "evidence_refs": [
+              "source:risks_benefits.costs"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "For possible research injury or persistent discomfort, the enrolling site\u2019s study doctor is contacted through the coordinator and the clinic arranges evaluation. Emergencies use ordinary emergency services. No fund for free injury treatment or additional injury compensation has been established; ordinary treatment may be billed to the participant or insurer. Legal rights are not waived.",
+            "evidence_refs": [
+              "source:risks_benefits.injury_handling"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.completion",
+        "paragraphs": [
+          {
+            "text": "A participant completes the study after the Day 90 final assessment. Earlier withdrawal or investigator discontinuation ends participation but is recorded as discontinuation, not completion. Historical record years and subsequent administrative closeout do not extend an individual\u2019s participation.",
+            "evidence_refs": [
+              "procedures.completion"
+            ],
+            "boilerplate_refs": [
+              "completion"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.discontinuation",
+        "paragraphs": [
+          {
+            "text": "Participants may leave at any time without penalty or loss of usual benefits by telling or writing to the site coordinator. The investigator may discontinue participation at the participant\u2019s request, for inability to complete assessments, additional ocular surgery or study closure. Record the reason when available. Leaving research does not stop routine care.",
+            "evidence_refs": [
+              "procedures.discontinuation"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "A final discussion of symptoms and ordinary-care needs will be offered but remains optional. Withdrawal does not require a final research visit, saliva sample or examination. Information already collected may continue to be used as permitted by the consent and applicable requirements.",
+            "evidence_refs": [
+              "procedures.discontinuation"
+            ],
+            "boilerplate_refs": [
+              "discontinuation"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.termination",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.study-termination",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "endpoint-criteria.study-completion",
+        "paragraphs": [
+          {
+            "text": "The historical data window is 1 January 2025 through 30 September 2026, and prospective recruitment is planned for 1 November 2026 through 31 January 2027. The last prospective assessment, allowing the final visit window, and anticipated primary completion and study completion are 11 May 2027. Analysis and administrative closeout are planned by 30 June 2027. These administrative activities do not extend participant involvement.",
+            "evidence_refs": [
+              "study.timeline",
+              "study.completion"
+            ],
+            "boilerplate_refs": []
+          },
+          {
+            "text": "Closeout will reconcile participant disposition and earned payments, resolve data queries, confirm specimen destruction, lock and analyze coded data, and archive retained records. Participant completion and discontinuation remain distinct dispositions in the study records.",
+            "evidence_refs": [
+              "study.completion"
+            ],
+            "boilerplate_refs": [
+              "study-completion"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "risks-benefits",
+        "paragraphs": [],
+        "lists": []
+      },
+      {
+        "section_id": "risks-benefits.risks",
+        "paragraphs": [
+          {
+            "text": "Research participation may cause temporary eye fatigue or headache with vision testing, dry mouth, mild nausea or embarrassment with saliva collection, discomfort with symptom questions, inconvenience and travel, and loss of medical or genetic privacy. Genetic disclosure may reveal information about participants or biological relatives. Targeted genotyping does not determine family relationships, ancestry or clinical disease risk and does not involve whole genome sequencing. Testing can be paused or stopped on request, and persistent symptoms warrant contact with the study doctor. Prior cataract surgery was ordinary care, not a new research risk; retrospective record collection introduces no additional surgical risk.",
+            "evidence_refs": [
+              "source:risks_benefits.risks"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      },
+      {
+        "section_id": "risks-benefits.benefits",
+        "paragraphs": [
+          {
+            "text": "No direct benefit is promised. The study may improve understanding of reported ocular comfort and documented care patterns after routine bilateral cataract surgery. Research genotyping explores possible associations with symptom variation without establishing clinical utility or changing participants\u2019 treatment.",
+            "evidence_refs": [
+              "source:risks_benefits.benefits",
+              "source:study.background"
+            ],
+            "boilerplate_refs": []
+          }
+        ],
+        "lists": []
+      }
+    ],
+    "icf": {
+      "icf.key-information-summary": {
+        "section_id": "icf.key-information-summary",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Purpose: This observational study links past eye-care records with new assessments after cataract surgery in both eyes. Researchers will describe comfort changes and explore links with care history and selected genetic differences. Their hypothesis is that more documented eye-surface treatment is linked with lower Day 90 comfort, not that treatment causes it. No treatment is assigned or compared.",
+            "evidence_refs": [
+              "source:objectives.primary",
+              "source:study.background",
+              "source:study.hypothesis",
+              "source:design.intervention_description"
+            ]
+          },
+          {
+            "text": "Participation: About 90 people will join. You take part for 90 days from enrollment, with two clinic visits and one telephone contact. Research includes vision tests, comfort questions, review of existing records after consent, and one required saliva sample for genetic research. Your earlier surgery is not study treatment. There is no optional genetic substudy.",
+            "evidence_refs": [
+              "source:population.sample_size",
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments",
+              "source:study.timeline",
+              "source:design.intervention_description"
+            ]
+          },
+          {
+            "text": "Main risks: Vision testing may cause eye fatigue or headache. Saliva collection may cause dry mouth, mild nausea or embarrassment. Questions may be uncomfortable, and visits involve time and travel. Medical or genetic information could be disclosed, potentially revealing information about you or biological relatives. You can ask to pause or stop testing; contact the study doctor for persistent symptoms.",
+            "evidence_refs": [
+              "source:risks_benefits.risks"
+            ]
+          },
+          {
+            "text": "Possible benefit: Taking part is not expected to guarantee any personal improvement. What researchers learn may help them understand differences in eye comfort and patterns of earlier eye care.",
+            "evidence_refs": [
+              "source:risks_benefits.benefits"
+            ]
+          },
+          {
+            "text": "Your choices: You can continue ordinary eye care without joining; your care and usual benefits will not change. Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled.",
+            "evidence_refs": [
+              "source:risks_benefits.alternatives"
+            ],
+            "boilerplate_refs": [
+              "icf-voluntary"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.background": {
+        "section_id": "icf.background",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "People may feel different levels of eye comfort after cataract surgery, and their past eye care may differ. Connecting information already in clinic records with newly collected symptom reports and vision tests may help researchers understand these differences. Testing selected genetic differences from saliva is also part of this research, to explore possible links with symptoms.",
+            "evidence_refs": [
+              "source:study.background"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.study-purpose": {
+        "section_id": "icf.study-purpose",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "The study aims to describe how your reported eye comfort changes from enrollment to Day 90. The researchers\u2019 hypothesis is that people with more clinician-documented treatment of the eye surface in their past records will report lower comfort at Day 90. This is an idea being explored, not an established result or a claim that treatment causes discomfort. The main outcome is the change in your comfort score, rated from 0 to 10, between Day 0 and Day 90, with the final assessment allowed within 10 days before or after Day 90. A higher score means greater reported comfort.",
+            "evidence_refs": [
+              "source:objectives.primary",
+              "source:study.hypothesis",
+              "source:endpoints.primary"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.procedures": {
+        "section_id": "icf.procedures",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "If you meet the inclusion and exclusion criteria and are enrolled in the study, staff will review existing eye-care records after your consent, and you will have two in-person research visits at your enrolling clinic and one telephone research visit. You may leave early. Your previous cataract surgery and ordinary eye care are separate from these research activities. Details are indicated below:",
+            "evidence_refs": [
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments",
+              "source:design.intervention_description"
+            ]
+          },
+          {
+            "text": "To join, you must be 55 through 85 years old when you sign consent. You must already have had cataract surgery in both eyes, with your second-eye surgery 3 to 18 months before Day 0. Both operations must have occurred between 1 January 2025 and 30 September 2026, with records available at your enrolling clinic. You must be able to give your own consent, complete English-language questionnaires, provide saliva and attend the planned future visits. You must agree to access to the historical records described below. The saliva sample is required to join this study; it is not an optional genetic substudy.",
+            "evidence_refs": [
+              "source:population.inclusion_criteria",
+              "source:population.minimum_age",
+              "source:population.maximum_age",
+              "source:procedures.assessments"
+            ]
+          },
+          {
+            "text": "You cannot join if you took part in interventional research, a study that assigns treatment or another intervention, during the 60 days before screening, or plan to do so during follow-up. You also cannot join if you plan eye surgery during the 90-day follow-up, have an eye condition that the site investigator determines prevents reliable vision testing, cannot consent personally, or need someone else to answer the questionnaires for you. Pregnancy does not prevent participation. There are no study pregnancy tests or contraception requirements. Children and adults unable to consent are not enrolled. No representative or witness signature is required.",
+            "evidence_refs": [
+              "source:population.exclusion_criteria",
+              "source:procedures.minimum_days_before_screening_without_participation",
+              "source:procedures.pregnancy_testing"
+            ]
+          },
+          {
+            "text": "Historical record review, a staff task rather than a visit: After Day 0 consent, staff collect information from your existing records dated 1 January 2025 through 30 September 2026, inclusive. This includes surgery dates, implanted lens categories, recorded eye diagnoses, clinician-recorded eye-surface treatments, recorded distance vision with correction, and documented unplanned eye-care visits. Staff use only what ordinary care recorded and mark absent information as missing. There were no research procedures before consent; this review does not mean you previously had study questionnaires, saliva collection or standardized research tests. Your original surgical and care records stay at the clinic.",
+            "evidence_refs": [
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments"
+            ]
+          },
+          {
+            "text": "1. Visit 1, Day 0 / Enrollment, in person, approximately 70 minutes: Screening and enrollment take place at this same visit. Before any research activity, you review and sign consent, including permission to use your historical records. Staff confirm eligibility and collect demographic information and an update on your current eye care. They measure distance vision in each eye using your current correction and a logMAR letter chart at 4 meters. You rate eye comfort over the preceding 7 days from 0, extremely uncomfortable, to 10, fully comfortable. You provide approximately 2 mL of saliva by letting it drool into a labeled tube. Staff ask about symptoms related to the assessments.",
+            "evidence_refs": [
+              "source:procedures.visit_schedule"
+            ]
+          },
+          {
+            "text": "2. Visit 2, Day 30, telephone, approximately 15 minutes: This contact occurs 30 days after enrollment, within 5 days before or after that day. You give the same comfort rating for the preceding 7 days, update staff about your eye care, and report unplanned eye-care visits since enrollment. Staff ask about assessment-related symptoms. There is no vision test or saliva collection by telephone.",
+            "evidence_refs": [
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments"
+            ]
+          },
+          {
+            "text": "3. Visit 3, Day 90 / Final Visit, in person, approximately 40 minutes: This visit occurs 90 days after enrollment, within 10 days before or after that day. Staff repeat the distance vision test for each eye at 4 meters using the logMAR chart and your current correction. You give the same comfort rating for the preceding 7 days, update your eye-care history, and report unplanned eye-care visits. Staff ask about assessment-related symptoms and confirm completion of your research participation. There is no second saliva sample or additional exit form.",
+            "evidence_refs": [
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments"
+            ]
+          },
+          {
+            "text": "The comfort question uses the same wording at all three contacts. It was developed for this study and is not presented as a validated questionnaire. These tests measure research outcomes; they do not assign treatment. There is no research surgery, study medication, blood draw, pupil dilation or imaging. The study does not assign your implanted lens type or any other treatment, and there is no random assignment, masking, placebo or investigational product. Vision testing is limited to the two clinic visits and is not replaced by home vision testing. You may ask to pause or stop testing. Contact the study doctor if symptoms persist.",
+            "evidence_refs": [
+              "source:procedures.visit_schedule",
+              "source:procedures.assessments",
+              "source:procedures.adverse_events",
+              "source:design.intervention_description"
+            ]
+          },
+          {
+            "text": "Your coded saliva sample goes to the sponsor\u2019s contracted research laboratory for targeted genotyping, which examines selected genetic differences. It is not whole genome sequencing and does not determine ancestry, family relationships or clinical disease risk. The tube carries only your study ID. The laboratory receives no name, contact details or clinic ID key and sends coded genetic research data to the study statistician. Your original saliva and extracted DNA will be destroyed within 90 days after laboratory testing is completed, and no later than 30 June 2027. Samples will not be stored for future research, shared for other studies or sold. No commercial development or share of commercial proceeds for participants is planned. Coded genetic data remain in the retained study dataset.",
+            "evidence_refs": [
+              "source:procedures.assessments",
+              "source:procedures.return_of_results"
+            ]
+          },
+          {
+            "text": "Genetic testing is for research only, is not validated for individual medical decisions and produces no clinical report. You will not receive individual genetic results or incidental genetic findings. The study does not look for incidental genetic findings that could guide medical care. In contrast, your individual vision-test results are offered at each in-person visit. Staff will explain clinical concerns noticed during testing and refer you for ordinary care. You may request a plain-language summary of overall findings after analysis is complete. There is no treatment assignment to reveal or unmask.",
+            "evidence_refs": [
+              "source:procedures.return_of_results"
+            ]
+          },
+          {
+            "text": "You may tell or write to your site coordinator if you want to stop participating. Leaving does not stop your ordinary care or cause a penalty or loss of usual benefits. An optional final discussion of symptoms and ordinary-care needs is offered, but you do not have to return for a research visit, saliva collection or examination after withdrawal. The investigator may end participation at your request, if you cannot complete assessments, if you have additional eye surgery, or if the study closes.",
+            "evidence_refs": [
+              "source:procedures.assessments",
+              "source:procedures.visit_schedule"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.duration": {
+        "section_id": "icf.duration",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "The study plans to enroll 90 participants across three United States clinics, targeting 30 at each clinic. It is for eligible adults aged 55 through 85 who previously had cataract surgery in both eyes. Your participation lasts about 90 days after enrollment, not after surgery, and ends after the Day 90 assessment, allowed within 10 days before or after Day 90, or sooner if you leave or participation is discontinued. Review of older records and later study analysis or administrative closeout do not extend your participation.",
+            "evidence_refs": [
+              "source:study.timeline"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.risks": {
+        "section_id": "icf.risks",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Your cataract operations were ordinary care that happened before enrollment; they are not new research procedures or new surgical risks from joining this study. You may experience the following research risks.",
+            "evidence_refs": [
+              "source:risks_benefits.risks"
+            ]
+          },
+          {
+            "text": "Vision testing can cause temporary eye fatigue or headache. Giving saliva may cause dry mouth, mild nausea or embarrassment. Answering symptom questions may feel uncomfortable. Participation also involves inconvenience, time and travel. You can ask to pause or stop testing. Contact your study doctor for symptoms that persist.",
+            "evidence_refs": [
+              "source:risks_benefits.risks"
+            ]
+          },
+          {
+            "text": "There is a risk that private medical or genetic information could be disclosed. If confidentiality is lost, genetic information may reveal information about you or biological relatives. The study collects genetic information, but it does not determine family relationships, ancestry or clinical disease risk and does not sequence your whole genome. Privacy protections and the limits of genetic nondiscrimination protections are described below.",
+            "evidence_refs": [
+              "source:risks_benefits.risks"
+            ]
+          },
+          {
+            "text": "Pregnancy is not an exclusion. This study requires no pregnancy testing or contraception and includes no radiation, drugs or reproductive interventions.",
+            "evidence_refs": [
+              "source:risks_benefits.pregnancy"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.benefits": {
+        "section_id": "icf.benefits",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "No direct benefit to you is promised from taking part. The study may help researchers better understand reported eye comfort and patterns of documented eye care. Joining does not mean that your comfort or vision will improve.",
+            "evidence_refs": [
+              "source:risks_benefits.benefits"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.payment": {
+        "section_id": "icf.payment",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "You will receive $40 for attending Day 0, $15 for completing the Day 30 telephone visit and $40 for attending Day 90, up to $95 in all. There is no completion bonus. Payment is by check within 30 days of each completed contact. If you withdraw, you will still receive payments you have earned. There is no reimbursement for parking, mileage, transit or other travel costs.",
+            "evidence_refs": [
+              "source:risks_benefits.compensation_or_reimbursement"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.costs": {
+        "section_id": "icf.costs",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Harbor Patient Outcomes Research, the sponsor, pays for all research testing, saliva collection, research laboratory work and questionnaires. No research charges will be billed to your insurance. You or your insurer remain responsible for routine clinical care under your usual arrangements. The study does not pay for ordinary future treatment.",
+            "evidence_refs": [
+              "source:risks_benefits.costs"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.alternatives": {
+        "section_id": "icf.alternatives",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "Instead of joining, you can continue your ordinary eye care. Choosing not to take part will not affect your care or benefits. You may discuss your care options with your treating clinician.",
+            "evidence_refs": [
+              "source:risks_benefits.alternatives"
+            ],
+            "boilerplate_refs": [
+              "alternatives"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.privacy": {
+        "section_id": "icf.privacy",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "By signing this form, you give the study team permission to collect, use and share the medical and study information described here for this research. The clinic collects your name, contact details, date of birth and signed consent to schedule contacts, confirm eligibility, link records and arrange payment. Coded study information includes age, sex, surgery dates, implanted lens categories, eye and care histories, vision-test results, questionnaire answers, unplanned visits and genotype, the selected genetic differences measured in this study.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling"
+            ],
+            "boilerplate_refs": [
+              "icf-privacy-authorization"
+            ]
+          },
+          {
+            "text": "Your clinic keeps the key linking your identity with your study ID separately on an encrypted, access-controlled drive. Paper consent forms are kept in locked cabinets. Only authorized site investigators and coordinators may access identifying records for their duties. The sponsor, laboratory and statistician receive coded information only. Authorized monitors, the reviewing IRB and legally authorized oversight bodies may review relevant original records for oversight. These safeguards cannot eliminate all risk of disclosure. Reports and publications will not identify you. There is no planned public sharing of individual data, sale, unrelated future research or identifiable publication.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling",
+              "source:risks_benefits.privacy"
+            ]
+          },
+          {
+            "text": "Your permission to collect new research health information ends after your final Day 90 assessment, or earlier if you withdraw that permission in writing. To withdraw authorization, write to your enrolling site\u2019s coordinator at the mailing address listed below. New research collection stops upon withdrawal. If your sample has not been analyzed, the site will request its destruction. Data already generated or included in analyses may still be used for study integrity and required oversight. Identifying records, ID keys and coded datasets are kept securely for seven years after administrative closeout on 30 June 2027, then securely destroyed unless a binding requirement calls for longer retention. That storage period does not extend permission to collect new information or your active participation.",
+            "evidence_refs": [
+              "source:risks_benefits.privacy",
+              "source:confidentiality.authorization_duration",
+              "source:risks_benefits.authorization_duration"
+            ]
+          },
+          {
+            "text": "Genetic Information Nondiscrimination Act: A federal law called GINA generally makes it illegal for health insurance companies, group health plans and most employers to discriminate against you based on genetic information. Health insurers and group health plans may not request genetic information from this research or use it to decide eligibility or premiums. Employers with 15 or more employees may not use research genetic information in employment decisions or to set employment terms. GINA does not protect against genetic discrimination by sellers of life insurance, disability insurance or long-term care insurance.",
+            "evidence_refs": [
+              "source:risks_benefits.privacy"
+            ]
+          },
+          {
+            "text": "For questions, scheduling, withdrawal of authorization or referral to your site doctor, use the contact for your enrolling clinic. Site contacts are available Monday\u2013Friday, 9 a.m.\u20135 p.m. local time. These are not emergency or 24-hour lines.",
+            "evidence_refs": [
+              "source:confidentiality.authorization_duration"
+            ]
+          },
+          {
+            "text": "Harbor Eye Research Clinic: Alex Rivera, CCRC, Lead Study Coordinator; business +1 202-555-0161; office +1 202-555-0162; alex.rivera@example.org. Mailing address: 620 Harbor Street, Suite 120, Baltimore, MD 21203, United States. Study doctors: Dr. Cameron Ellis, MD, Principal Investigator, and Dr. Jamie Parker, MD, Sub-Investigator.",
+            "evidence_refs": [
+              "source:confidentiality.authorization_duration"
+            ]
+          },
+          {
+            "text": "Capitol Vision Research Clinic: Sam Carter, CCRC, Site Study Coordinator; business +1 202-555-0164; office +1 202-555-0165; sam.carter@example.org. Mailing address: 730 Capitol Avenue, Suite 230, Washington, DC 20004, United States. Site study doctor: Dr. Drew Bennett, MD.",
+            "evidence_refs": [
+              "source:confidentiality.authorization_duration"
+            ]
+          },
+          {
+            "text": "Bayview Ophthalmology Research Center: Robin Hayes, CCRC, Site Study Coordinator; business +1 202-555-0166; office +1 202-555-0167; robin.hayes@example.org. Mailing address: 840 Bayview Road, Suite 340, Annapolis, MD 21401, United States. Site study doctor: Dr. Quinn Foster, MD.",
+            "evidence_refs": [
+              "source:confidentiality.authorization_duration"
+            ]
+          },
+          {
+            "text": "For questions about your rights as a research participant, contact Harbor Independent Research Review Board, an independent IRB unaffiliated with the sponsor and study clinics, at +1 202-555-0168 or participant.rights@example.org; 950 Review Avenue, Suite 450, Baltimore, MD 21204, United States. This is the study-specific reviewing IRB.",
+            "evidence_refs": [
+              "source:confidentiality.data_handling"
+            ]
+          }
+        ],
+        "lists": []
+      },
+      "icf.injury": {
+        "section_id": "icf.injury",
+        "outcome": "drafted",
+        "paragraphs": [
+          {
+            "text": "If you think a research activity caused an injury or you have persistent discomfort, contact your enrolling site\u2019s study doctor through the coordinator using the clinic contacts in this form. The clinic will arrange evaluation. In an emergency, use ordinary emergency services rather than waiting for a study contact. No fund has been established for free injury treatment or additional injury compensation. Ordinary treatment may be billed to you or your insurer. Signing this form does not waive your legal rights.",
+            "evidence_refs": [
+              "source:risks_benefits.injury_handling"
+            ]
+          }
+        ],
+        "lists": []
+      }
+    },
+    "prs": {
+      "brief_summary": {
+        "text": "COMFORT-26-03 is an ambispective observational cohort study of historical ocular care and prospective comfort after routine bilateral cataract surgery. Approximately 90 consenting adults aged 55 to 85 years will be enrolled across three United States clinics. Existing care records and new assessments come from the same participants; the study does not assign surgery, lens type, medication or other treatment and has no comparator product, randomization, masking, placebo or investigational product.\n\nThe primary objective is to describe change in patient-reported ocular comfort, measured on a study-specific 0-to-10 scale, from enrollment (Day 0) to Day 90, with a final visit window of plus or minus 10 days. Positive change indicates improved reported comfort. The exploratory hypothesis is that greater historical use of clinician-documented ocular surface treatment is associated with lower Day 90 comfort, rather than a treatment effect. After written consent, staff abstract records dated 1 January 2025 through 30 September 2026. Prospective activities comprise two in-person visits, one telephone visit, noninvasive vision testing, symptom questionnaires and one mandatory saliva collection for research genotyping. Genetic analyses explore associations and do not establish clinical utility.",
+        "evidence_refs": [
+          "study.title",
+          "study.hypothesis",
+          "objectives.primary",
+          "endpoints.primary",
+          "design.study_design"
+        ]
+      },
+      "detailed_description": {
+        "text": "Reported comfort following cataract surgery may differ among people with different documented ocular-care histories. This cohort links historical clinic records with newly collected comfort ratings and vision measurements in the same consenting participants. Research genotyping explores possible associations with symptom variation. The primary objective concerns change in comfort over follow-up, whereas the exploratory hypothesis concerns an association between greater historical use of clinician-documented ocular surface treatment and lower Day 90 comfort. Neither the observational design nor the exploratory genetic analysis establishes a causal treatment effect or clinical utility.\n\nThe cohort includes 90 people with pseudophakia following bilateral cataract surgery, targeting 30 participants per site at three United States clinics. All sexes are eligible; healthy volunteers are not enrolled. Consecutive eligible clinic patients aged 55 through 85 years are invited during routine contact using non-probability sampling. Both cataract operations must have occurred between 1 January 2025 and 30 September 2026, and the second-eye operation must have occurred 3 to 18 months before Day 0. Accessible records, personal consent, English-language questionnaire completion, saliva provision and attendance at future visits are required. There is no separate records-only cohort or waiver-of-consent population. Prior routine bilateral cataract surgery and its documented ocular-care history constitute the observed exposure, categorized as Procedure/Surgery, not research-assigned treatment. The study has no treatment arms, comparator product, randomization, masking, placebo or investigational product.\n\nAfter consent, staff abstract available records from 1 January 2025 through 30 September 2026, inclusive, covering surgery dates, implanted lens categories, documented ocular diagnoses, clinician-recorded ocular surface treatments, best-corrected distance visual acuity and documented unscheduled ocular visits. This is a staff task, not an additional participant visit or Visit 0. No historical research questionnaire, saliva sample, consent visit or standardized research assessment is assumed. Unrecorded historical values remain missing, and original care records remain at the clinic. No pre-consent research procedures are performed.\n\nProspective participation lasts 90 days after enrollment, not after surgery. At Visit 1, Day 0, an approximately 70-minute in-person visit includes written consent before research activities, eligibility confirmation, authorization for historical records, demographics and current ocular-care update, best-corrected distance visual acuity for each eye at 4 metres using a logMAR chart and current correction, the comfort questionnaire, one approximately 2 mL saliva collection by passive drool into a labeled tube, and enquiry about assessment-related symptoms. At Visit 2, Day 30 plus or minus 5 days, an approximately 15-minute telephone contact includes the questionnaire, interval ocular-care update, unscheduled-visit enquiry and assessment-related symptom enquiry. No visual acuity test or saliva collection occurs by telephone. At Visit 3, Day 90 plus or minus 10 days, an approximately 40-minute in-person visit includes repeat acuity for each eye, questionnaire, interval ocular-care update, unscheduled-visit and assessment-related symptom enquiries, then confirmation of completion. There is no required exit form, fourth visit, second saliva sample or substituted home vision testing. Following a missed telephone visit, up to two further scheduling attempts may occur within its existing window.\n\nThe questionnaire uses the same study-specific wording at each prospective contact and asks about comfort during the preceding 7 days on a scale from 0, extremely uncomfortable, to 10, fully comfortable. It is not presented as a validated instrument. There are no blood draws, pupil dilation, imaging, study medication or research surgery. Saliva provision is mandatory for eligibility, not an optional genetic substudy or future-use choice.\n\nThe primary outcome is change in comfort score from Day 0 to Day 90, with positive change indicating improvement. The four secondary outcomes are comfort score at Day 30; best-corrected distance visual acuity in logMAR for each eye at Day 90, with lower values indicating better acuity; the number of participant-reported unscheduled ocular-care visits between Day 0 and Day 90, collected at both follow-up contacts and counted once if reported twice; and the proportion with clinician-documented ocular surface treatment in available historical records, using people with relevant records as the denominator. The exploratory outcome is the association between coded research genotype groups and Day 90 comfort. Variant selection is specified in a laboratory analysis plan before release of the coded outcome dataset; no clinical risk score is produced.\n\nThe primary analysis reports observed paired mean change, standard deviation, 95% confidence interval, median and range among people with Day 0 and Day 90 ratings. Participant-reported endpoints use one record per person. Both eyes may contribute descriptive vision data; any pooled-eye exploratory model includes a participant-level random intercept. Historical-treatment associations with Day 90 comfort are explored using linear regression adjusted for Day 0 comfort, age and site. Genetic associations are descriptive, with no confirmatory significance claim or clinically actionable interpretation. Missing historical and prospective data and reasons are reported separately without imputing unrecorded care or missing questionnaire values. This is a practical exploratory sample without a formal power calculation or assumed treatment effect.\n\nSaliva tubes carry only study IDs and go to a contracted research laboratory for targeted genotyping, with coded data returned to the statistician. Neither names nor the clinic ID key are supplied to the laboratory. Original saliva and extracted DNA are destroyed within 90 days after laboratory testing is completed, and no later than 30 June 2027; they are not banked for future research, sold or shared with other studies. Coded genetic data remain in the retained study dataset. Genetic testing is research-only and does not produce an individual clinical report; individual genetic results and incidental genetic findings are not returned, and clinically actionable incidental findings are not sought. Individual visual acuity results are offered at each in-person visit, with clinical concerns explained and referred to ordinary care. An aggregate plain-language summary is available on request after analysis. There is no treatment assignment to disclose or unmask.",
+        "evidence_refs": [
+          "study.background",
+          "study.hypothesis",
+          "objectives.primary",
+          "design.study_design",
+          "endpoints.primary",
+          "endpoints.secondary",
+          "population.study_population",
+          "procedures.assessments"
+        ]
+      }
+    },
+    "construction_repairs": []
+  }
+}

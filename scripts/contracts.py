@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.46-single-owner-presentation"
+CONTRACT_VERSION = "clinical-documents-v2.47-stable-source-projections"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -914,6 +914,11 @@ def meaningful(value: Any) -> bool:
     return True
 
 
+def explicitly_true(value: Any) -> bool:
+    """Accept explicit JSON or text booleans without treating 'False' as true."""
+    return value is True or isinstance(value, str) and value.strip().casefold() in {"true", "yes"}
+
+
 def contextual_clinical_boilerplate(
     sections: Mapping[str, str], reference: Mapping[str, Any],
 ) -> dict[str, str]:
@@ -1591,6 +1596,20 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
         ):
             visits = narrative_order
         table_count = len(visits)
+    participant_number = 0
+    for record in visits:
+        nonparticipant = record.get("participant_visit") is False or bool(re.search(
+            r"\b(?:not (?:a )?(?:participant |research )?visit|staff task)\b", record["visit"], re.I))
+        if nonparticipant:
+            record["display_visit_number"] = ""
+        else:
+            participant_number += 1
+            named_number = re.match(r"^visit\s+(\d+)\b", record["visit"], re.I)
+            record["display_visit_number"] = (
+                named_number.group(1) if named_number else
+                str(record.get("visitNumber") or participant_number))
+    # Internal row IDs still identify every source row for interpretation;
+    # participant-facing numbering excludes explicitly identified staff tasks.
     used_numbers = {str(row["visitNumber"]) for row in visits if meaningful(row.get("visitNumber"))}
     for index, record in enumerate(visits, 1):
         if not meaningful(record.get("visitNumber")):
@@ -1672,6 +1691,11 @@ def participant_followup_summary(reference: Mapping[str, Any]) -> str:
     return ""
 
 
+def participant_visit_count(visits: Iterable[Mapping[str, Any]]) -> int:
+    """Count participant contacts in normalized rows, excluding staff tasks."""
+    return sum(bool(visit["display_visit_number"]) for visit in visits)
+
+
 def computed_study_fields(reference: Mapping[str, Any]) -> dict[str, Any]:
     """Preview source-derived synopsis and table fields before model drafting.
 
@@ -1681,7 +1705,7 @@ def computed_study_fields(reference: Mapping[str, Any]) -> dict[str, Any]:
     visits = normalized_visit_records(reference)
     return {
         "participant_followup": participant_followup_summary(reference),
-        "visit_count": len(visits) if visits else None,
+        "visit_count": participant_visit_count(visits) if visits else None,
         "assessment_table": protocol_table_contracts(reference)["schedule-of-assessments"],
     }
 
@@ -1919,7 +1943,9 @@ def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentati
 
             assessment_rows = [
                 ["Activity", *[header_label(visit) for visit in normalized_visits]],
-                ["Activity", *[f"Visit {visit['visitNumber']}" for visit in normalized_visits]],
+                ["Activity", *[f"Visit {visit['display_visit_number']}" if visit['display_visit_number'] else
+                               ("Record review" if "record" in visit["visit"].casefold() else "Staff task")
+                               for visit in normalized_visits]],
                 *[
                     [activity, *["X" if activity in visit["procedures"] else "" for visit in normalized_visits]]
                     for activity in activities
@@ -2176,11 +2202,13 @@ def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentati
         if row and row[0]:
             row[0] = row[0][0].upper() + row[0][1:]
     if assessment_presentation is not None:
-        labels, supplemental_notes = _assessment_display_edits(
+        labels, supplemental_notes, qualifiers = _assessment_display_edits(
             assessment_presentation, [str(row[0]) for row in assessment_rows[2 if matrix else 1:]],
             supplemental_notes)
-        for row in assessment_rows[2 if matrix else 1:]:
-            row[0] = labels.get(row[0], row[0])
+        header_rows = 2 if matrix else 1
+        assessment_rows = assessment_rows[:header_rows] + [
+            [labels.get(row[0], row[0]), *row[1:]]
+            for row in assessment_rows[header_rows:] if row[0] not in qualifiers]
     return {
         "schedule-of-assessments": {
             "section_id": "evaluation-procedures",
@@ -2202,12 +2230,12 @@ def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentati
     }
 
 
-def _assessment_display_edits(presentation: Any, labels: list[str], notes: list[str]) -> tuple[dict[str, str], list[str]]:
+def _assessment_display_edits(presentation: Any, labels: list[str], notes: list[str]) -> tuple[dict[str, str], list[str], dict[str, str]]:
     """Bind model-authored display edits to existing facts; AI review owns meaning."""
     if not isinstance(presentation, Mapping):
         raise ValueError("Assessment presentation must be an object.")
     edits = {}
-    for key, originals in (("activity_labels", labels), ("notes", notes)):
+    for key, originals in (("activity_labels", labels), ("notes", notes), ("qualifiers", labels)):
         records = presentation.get(key, [])
         if not isinstance(records, list):
             raise ValueError("Assessment display edits must be lists.")
@@ -2217,13 +2245,16 @@ def _assessment_display_edits(presentation: Any, labels: list[str], notes: list[
                     or record.get("source_text") not in originals
                     or record["source_text"] in selected
                     or not isinstance(record.get("display_text"), str)
-                    or key == "activity_labels" and not record["display_text"].strip()
+                    or key in {"activity_labels", "qualifiers"} and not record["display_text"].strip()
                     or not isinstance(record.get("rationale"), str) or not record["rationale"].strip()):
                 raise ValueError("Assessment display edits require one exact existing label/note, display text and rationale.")
             selected[record["source_text"]] = record["display_text"].strip()
         edits[key] = selected
-    return edits["activity_labels"], list(dict.fromkeys(
-        display for note in notes if (display := edits["notes"].get(note, note))))
+    if edits["activity_labels"].keys() & edits["qualifiers"].keys():
+        raise ValueError("An activity cannot be both renamed and moved to a qualifier note.")
+    return edits["activity_labels"], list(dict.fromkeys([
+        *[display for note in notes if (display := edits["notes"].get(note, note))],
+        *edits["qualifiers"].values()])), edits["qualifiers"]
 
 
 def assessment_presentation_contract(reference: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -2240,8 +2271,11 @@ def assessment_presentation_contract(reference: Mapping[str, Any]) -> dict[str, 
             "risks_section": get_path(reference, "risks_benefits.risks"),
         },
         "instructions": (
-            "Optionally return assessment_presentation with activity_labels and notes edit lists. "
+            "Optionally return assessment_presentation with activity_labels, notes and qualifiers edit lists. "
             "Each edit has source_text (exact existing table label or note), display_text, and rationale. "
+            "Use qualifiers only to move a non-activity instruction or qualification from a checked row "
+            "into a nonempty note beneath the matrix. Name its assessment and preserve all timing/conditions; "
+            "never move an actual assessment or staff task, delete a fact or change visit assignments. "
             "Use standalone clinical wording, preserving clinical facts, units, qualifications and visit associations. "
             "Remove internal synopsis/source references from display labels and notes. Omit a note with empty "
             "display_text only when all its material information is already represented. Keep unique safety, "

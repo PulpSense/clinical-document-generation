@@ -44,7 +44,11 @@ for every returned `requests` and `handoffs` path. For each request:
    A list group may include `label`, rendered as an unbulleted paragraph before
    its items. Use separate labeled groups for secondary and exploratory endpoints.
    In `evaluation-procedures`, compare each supplied assessment note with the
-   structured table. Use `assessment_presentation.notes` edits to omit a wholly
+   structured table. Move non-activity qualifications into nonempty adjacent
+   notes using `assessment_presentation.qualifiers` (exact `source_text`,
+   participant-readable `display_text`, and factual `rationale`). Retain the
+   assessment name, conditions and timing. Keep actual assessments and staff
+   tasks in their assigned columns. Use `assessment_presentation.notes` edits to omit a wholly
    redundant note (`display_text: ""`) or shorten it to its unique instructions.
    Each edit cites exact `source_text` and explains its `rationale`. Preserve
    every additional condition, measurement, timing rule and safety fact.
