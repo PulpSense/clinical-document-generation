@@ -2971,8 +2971,11 @@ def _set_repeat_header(row) -> None:
 
 def _prevent_row_split(row) -> None:
     properties = row._tr.get_or_add_trPr()
-    if properties.find(qn("w:cantSplit")) is None:
-        properties.append(OxmlElement("w:cantSplit"))
+    rule = properties.find(qn("w:cantSplit"))
+    if rule is None:
+        rule = OxmlElement("w:cantSplit")
+        properties.append(rule)
+    rule.set(qn("w:val"), "true")
 
 
 def _normalize_protocol_table_pagination(document: Document) -> None:
@@ -2990,13 +2993,13 @@ def _normalize_protocol_table_pagination(document: Document) -> None:
         if not table.rows or table.rows[0].cells[0].text.strip() != "Study Staff":
             continue
         _set_repeat_header(table.rows[0])
-        for row in table.rows:
+        for row_index, row in enumerate(table.rows):
             for cell in row.cells:
                 for paragraph in cell.paragraphs:
                     paragraph.paragraph_format.keep_together = True
-        for cell in table.rows[0].cells:
-            for paragraph in cell.paragraphs:
-                paragraph.paragraph_format.keep_with_next = True
+                    # Keep this compact contact block together, ending the
+                    # chain on its last row so it does not pull the next section.
+                    paragraph.paragraph_format.keep_with_next = row_index < len(table.rows) - 1
         for row in table.rows[1:]:
             properties = row._tr.get_or_add_trPr()
             header = properties.find(qn("w:tblHeader"))

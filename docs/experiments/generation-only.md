@@ -267,3 +267,22 @@ files. Renderer identity and byte hashes remain in internal run records; deliver
 continues to show only document links and recorded total generation time.
 The 49 focused office-refresh, generation, native-TOC, repetition and existing
 TOC-cache checks passed. The full suite was not run.
+
+## Contact-table pagination follow-up — 16 October 2026
+
+The next Hermes rerun retained all 44 correct TOC numbers and removed the
+duplicate timing and assessment prose. Its contact data row split between pages
+9 and 10. The DOCX contained an inherited `w:cantSplit w:val="0"`: the helper
+previously treated presence of that property as protection, without enabling it.
+
+The existing row-protection helper now explicitly sets cantSplit true, including
+when the template supplies a false value. Contact-table paragraphs keep with the
+next row through the penultimate row; the last row ends the chain. Existing
+caption/header cohesion is retained. Word can move a compact contact table as
+one block without a visual reviewer or an extra rendering stage. A table taller
+than a page still requires natural pagination; no page number or break is guessed.
+
+Four regression cases reproduced the inherited-disabled setting and passed after
+the fix. The complete focused native-table, TOC, editorial and office-refresh
+selection passed (14 tests). No visual renderer was invoked for this correction.
+Clinical values, the dependency list and the six-script inventory are unchanged.
