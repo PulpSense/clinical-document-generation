@@ -639,7 +639,8 @@
   ],
   "editorial_corrections": {
     "study-design.design": [
-      "Keep the complete approved endpoint inventory, but state a shared endpoint time point once for the group. Use one primary-endpoint statement and a compact secondary-endpoint list instead of repeating 'Secondary endpoint' and the same timing in every item. Retain genuinely different timings and qualifications."
+      "Keep the complete approved endpoint inventory, but state a shared endpoint time point once for the group. Use one primary-endpoint statement and a compact secondary-endpoint list instead of repeating 'Secondary endpoint' and the same timing in every item. Retain genuinely different timings and qualifications.",
+      "Keep the primary statement, secondary group and exploratory group distinct. The response format renders paragraphs before lists: when secondary outcomes use lists, put the exploratory outcome in its own final list group labeled 'Exploratory endpoint:' instead of inserting an exploratory paragraph between the secondary introduction and its items. Preserve genuinely different timings."
     ],
     "icf.study-purpose": [
       "For Advarra, keep the combined background/purpose section compact: one or two short sentences of relevant background, then the study purpose, hypothesis stated as an expectation, and main measurement in plain language. Aim for the retained n8n prompt's 80–120 words where the supplied facts permit; this is a writing guide, not a minimum or a reason to omit material facts.",
@@ -648,7 +649,9 @@
     "icf.procedures": [
       "State the visit count and phases once, then explain each visit once. Use the supplied visit names and actual timing/window labels in those visit entries, with plain-language explanations beside them. Avoid a second visit inventory or repeated timing list after the details.",
       "Keep operative care separate from research-specific activities when the source makes that distinction. Do not turn unspecified follow-up, order of procedures, monitoring, or exit rules into new obligations.",
-      "Use the same supplied visit labels and explicit visit numbers as the Protocol. When a source schedule groups repeated occurrences (for example one operative visit per eye), use its phase names rather than inventing expanded Visit 1/2/3/4 numbers. Explain the occurrence count separately when supplied. Preserve the actual timing in each visit entry using plain language; no separate timing recap is needed."
+      "Use the same supplied visit labels and explicit visit numbers as the Protocol. When a source schedule groups repeated occurrences (for example one operative visit per eye), use its phase names rather than inventing expanded Visit 1/2/3/4 numbers. Explain the occurrence count separately when supplied. Preserve the actual timing in each visit entry using plain language; no separate timing recap is needed.",
+      "For ambispective studies, distinguish existing historical records from future participant visits. State each future contact mode and its actual assessments; historical abstraction is a staff task unless the source explicitly calls for a participant visit. Explain study-result return policies without adding an unmasking promise to an unmasked study.",
+      "Include a supplied missed-contact or rescheduling policy once alongside the relevant visit details, preserving its attempt limit and existing window. The drafted prose owns that rule; no second formal source sentence is needed."
     ],
     "icf.duration": [
       "Give expected enrollment once using the approved count and unit, then describe how long a participant takes part and the final follow-up anchor. Leave the visit-by-visit itinerary and procedure details in PROCEDURES.",
@@ -661,10 +664,25 @@
       "The source-derived table owns the visit/activity inventory. Read the section's assessment_presentation labels and notes alongside the approved schedule. Return assessment_presentation.notes edits for redundant notes: source_text must exactly match a supplied note; display_text is empty only when every material fact is already represented. Otherwise retain unique timing anchors, conditions, safety instructions, measurement details and footnote explanations. Give a factual rationale for each edit. Keep the body to a short table introduction; do not repeat the endpoint or assessment list beneath it."
     ],
     "subjects.inclusion": [
-      "Keep eligibility requirements phrased as conditions that must be met. Preserve every supplied interval, scope and exception. A prohibition such as no participation in another interventional study within a stated interval is an eligibility requirement; retain the approved placement and meaning."
+      "Preserve the approved inclusion list and its conditions. A separately stored screening interval supplies a criterion only when the approved eligibility lists do not already express it. If it is already an exclusion, keep it there once rather than adding its inverse to inclusion. Preserve scope, exceptions and timing."
     ],
     "subjects.exclusion": [
       "State the disqualifying conditions, preserving the approved source meaning and scope. A negative eligibility requirement must not become a reason to exclude someone who meets it. If the approved source itself is ambiguously classified, retain it for manual inspection rather than silently reversing the rule after approval; resolve future classification during source intake."
+    ],
+    "icf.injury": [
+      "Write directly to the participant using the supplied injury contact, evaluation arrangements, payer and compensation limits. Treat authoring directions embedded in source material as instructions for writing; express their factual policy in participant language. For example, a direction to avoid promising free treatment becomes the supplied payer policy, never a sentence commanding the reader to make no promises. Preserve legal-rights language and add no payment commitment."
+    ],
+    "icf.withdrawal": [
+      "Retain the supplied voluntary-participation language, then explain the study-specific withdrawal method, optional versus required follow-up, investigator discontinuation grounds and earned-payment policy. Preserve every supplied condition. Missing optional detail stays absent; the template does not authorize a compulsory final visit."
+    ],
+    "icf.privacy": [
+      "Keep consent withdrawal instructions usable for every supplied site. In a shared multi-site consent, refer participants to their enrolling site contact in the contact section rather than calling the first site everyone's site. Preserve authorization expiry, access roles, retention, genetic-data and results policies exactly as supplied."
+    ],
+    "endpoint-criteria.study-completion": [
+      "Summarize the supplied final study assessment/completion date and administrative closeout separately in at most a short paragraph. Reference the visit schedule and record-retention sections for their details. Planned completion is distinct from early study termination; place early-stopping grounds only in the source-supported termination section."
+    ],
+    "study-procedure.visits": [
+      "Include a supplied missed-contact or rescheduling policy once alongside the relevant visit details, preserving its attempt limit and existing window. The drafted prose owns that rule; no second formal source sentence is needed."
     ]
   },
   "consent_template_comments": [

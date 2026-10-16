@@ -1,0 +1,161 @@
+{
+  "case": "comfort",
+  "producer": "Codex in this conversation; manually drafted from the saved prompt-only request, not Hermes or a separate API call",
+  "section_results": [
+    {
+      "section_id": "subjects.inclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Age 55–85 at consent.",
+            "Routine bilateral cataract surgery before enrollment, with second-eye surgery 3–18 months before Day 0.",
+            "Both surgeries occurred during 1 January 2025–30 September 2026, with clinic records available.",
+            "Able to consent personally, answer English questionnaires, provide saliva and attend future visits.",
+            "Authorize access to the specified historical records."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "subjects.exclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Interventional research participation in the 60 days before screening or planned during follow-up.",
+            "Planned ocular surgery in the next 90 days.",
+            "An ocular condition preventing reliable visual assessment.",
+            "Inability to consent personally or need for a proxy."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.design",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This three-site ambispective observational study follows one cohort after routine bilateral cataract surgery. After consent, staff abstract existing records from 1 January 2025 through 30 September 2026 and collect prospective data through Day 90. Historical abstraction is not a participant visit. Surgery and treatment are not assigned; there is no randomization or masking."
+        },
+        {
+          "text": "The primary endpoint is change in comfort score, 0–10, from Day 0 to Day 90 +/- 10 days, where a positive change indicates improvement. Secondary endpoints are:"
+        }
+      ],
+      "lists": [
+        {
+          "items": [
+            "Comfort score at Day 30 +/- 5 days.",
+            "Best-corrected distance visual acuity per eye at Day 90 +/- 10 days.",
+            "Unscheduled ocular visits from Day 0 through Day 90.",
+            "Proportion with documented ocular surface treatment in historical records dated 1 January 2025 through 30 September 2026."
+          ]
+        },
+        {
+          "items": [
+            "Exploratory endpoint: Research genotype-group associations with Day 90 comfort; results are not clinically actionable."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "evaluation-procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The schedule shows future participant contacts. Staff review of the specified historical records occurs after consent and is described separately."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "endpoint-criteria.study-completion",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Final participant assessments are expected by 11 May 2027. Analysis and administrative closeout are planned by 30 June 2027. Individual participation ends after the Day 90 assessments or earlier withdrawal or discontinuation."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "You may join if you are 55 to 85, had ordinary cataract surgery in both eyes during 1 January 2025 through 30 September 2026, and your second-eye surgery was 3 to 18 months before Day 0. Clinic records must be available. You must consent personally, authorize the records review, answer English questionnaires, provide saliva and attend future visits. You cannot join if you need someone to answer for you, an eye condition prevents reliable testing, you plan eye surgery in the next 90 days, or you took part in interventional research during the previous 60 days or plan to during follow-up."
+        },
+        {
+          "text": "Your prior surgery was ordinary care. This research assigns no treatment. After you consent, staff review existing surgery, lens, diagnosis, eye-care, vision and unscheduled-visit records from the specified historical period. Missing information stays missing. This staff review is not another visit, and it does not mean you had research visits in the past. If you meet the inclusion and exclusion criteria and are enrolled in the study, you will have two in-person visits and one telephone visit. Details are indicated below:"
+        },
+        {
+          "text": "Visit 1, Day 0 / Enrollment, in person. This visit takes about 70 minutes. You sign consent before research. Staff check eligibility, obtain record authorization, and collect demographic and current eye-care information. You read a distance chart at 4 meters using your current glasses, one eye at a time, with results recorded in logMAR. You rate comfort during the past 7 days from 0 (extremely uncomfortable) to 10 (fully comfortable). You provide about 2 milliliters of saliva by letting it drip into a tube. Staff ask about symptoms during the assessments. This is the only saliva collection."
+        },
+        {
+          "text": "Visit 2, Day 30, by telephone within 5 days before or after. This contact takes about 15 minutes. You repeat the comfort question and report eye-care updates, unscheduled eye visits since enrollment and assessment-related symptoms. There is no vision test or saliva collection by telephone. Staff may make up to two more scheduling attempts for a missed call within its original window; home vision testing is not substituted."
+        },
+        {
+          "text": "Visit 3, Day 90 / Final Visit, in person within 10 days before or after. This visit takes about 40 minutes. You repeat the vision test and comfort question, give the eye-care and unscheduled-visit updates, and answer the symptom questions. You then finish participation without an exit form, fourth visit or second saliva sample."
+        },
+        {
+          "text": "Vision results are offered at in-person visits. The saliva tests are research-only and are not validated for individual clinical decisions. You will not receive individual genetic results, incidental genetic findings or a clinical genetic report. After analysis, you may request a plain-language summary of combined study results. There is no treatment assignment to reveal."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.duration",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The study expects to enroll 90 participants. Your prospective participation lasts 90 days after enrollment, through the final Day 90 visit unless you leave earlier. Staff also review the specified existing records; the historical record period and later administrative work do not extend your research visits."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.injury",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "If you think a research activity injured you or discomfort continues, contact your enrolling site’s doctor through its coordinator listed in this form. The clinic arranges evaluation. Use ordinary emergency services when needed. No fund for free injury treatment or additional injury compensation has been established; ordinary treatment may be billed to you or your insurer. You do not waive legal rights by signing."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.withdrawal",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements."
+        },
+        {
+          "text": "Tell or write to your enrolling site coordinator if you wish to leave. A final discussion of symptoms and ordinary care is optional. You do not have to attend another research visit, have an examination or provide saliva after withdrawal. The investigator may stop participation at your request, if assessments cannot be completed, if you have additional eye surgery or if the study closes. Staff record the reason when available. Payments already earned remain due."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.privacy",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you."
+        },
+        {
+          "text": "Each clinic keeps identifying records and its study-ID key securely and separately from coded information. The sponsor, laboratory and statistician receive coded information only. Authorized monitors, the IRB and oversight bodies may inspect original records. Individual data are not shared publicly."
+        },
+        {
+          "text": "Your saliva tube carries only your study ID. The laboratory receives no name or ID key and performs targeted research genotyping, not whole genome sequencing. Saliva and DNA are destroyed within 90 days after testing and no later than 30 June 2027. They are not banked, sold or used for unrelated future research. Coded genetic data stay in the study dataset."
+        },
+        {
+          "text": "Identifying records, keys and coded data are retained for seven years after 30 June 2027, then securely destroyed unless binding retention requirements require longer. Permission for new collection ends at the final Day 90 assessment or earlier written withdrawal. Write to your enrolling site’s coordinator, using that site’s address in the contact section, to withdraw permission. New collection stops and the site requests destruction of samples not yet analyzed. Data already generated or included in analyses may continue to be used."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

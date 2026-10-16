@@ -206,12 +206,12 @@ def test_parallel_drafting_topology_and_prs_dependency():
     assert plan["prs-narrative"].prerequisites == ("protocol-foundations",)
 
 
-def test_icf_contract_is_template_and_branch_specific_for_research_injury():
+def test_icf_contract_drafts_research_injury_for_both_families_and_branches():
     prospective_advarra = {section.section_id for section in icf_contract("Prospective", "Advarra")}
     prospective_sterling = {section.section_id for section in icf_contract("Prospective", "Sterling")}
     ambispective_advarra = {section.section_id for section in icf_contract("Ambispective", "Advarra")}
 
-    assert "icf.injury" not in prospective_advarra
+    assert "icf.injury" in prospective_advarra
     assert "icf.injury" in prospective_sterling
     assert "icf.injury" in ambispective_advarra
 

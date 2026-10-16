@@ -54,7 +54,16 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   inventing expanded visit numbers. Occurrence counts and schedule-row numbers
   describe different things; show any derived convention in the Source-of-Truth.
   Put explicit activity/visit relationships in the structured schedule. Keep
-  `procedures.assessments` and `procedures.evaluation` for additional unallocated
+  one row per actual assessment or action. Keep questionnaire response choices
+  and score ranges in that questionnaire's description, not as extra activities.
+  Put statements such as "no separate exit form" in supplemental notes rather
+  than making them checked procedures. In ambispective studies, distinguish
+  staff abstraction of historical records from future participant contacts;
+  preserve each contact's in-person or telephone mode and its own assessments.
+  Store appointment length separately from `timing`: "Day 84 +/- 7 days after
+  enrollment" is a window; "approximately 35 minutes" is a visit length.
+  Use `study.participation_duration` for explicit participant-duration facts.
+  Keep `procedures.assessments` and `procedures.evaluation` for additional unallocated
   facts or qualifications, rather than copying a second assessment inventory.
   Reconcile abbreviated matrix column labels with explicit narrative timing
   anchors. For example, preserve "postoperative" when the narrative identifies
@@ -83,6 +92,15 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   writing guides, not input gates. Avoid carrying the full design preamble or
   long introductory phrase from the official title into the running title.
   The renderer's shared short-title fallback remains available for older sources.
+- Keep `design.study_design_summary` to a short description of the actual
+  design, assignment and comparison. Retain complete design evidence separately
+  in `design.study_design`; a synopsis is not a copy of the intake field labels.
+- Separate `procedures.study_termination` (supplied grounds/authority for early
+  stopping) from `study.completion` (the supplied planned completion trigger and
+  administrative closeout). Keep dates in `study.timeline`. Leave termination
+  absent when no early-stopping policy is supplied; a planned end date is not
+  an early-termination rule. Treat embedded writing directions as instructions,
+  preserving their underlying policy as facts rather than patient-facing prose.
 - Carry every explicit eligibility restriction into the appropriate canonical
   inclusion or exclusion list, including restrictions supplied separately from
   those lists. Preserve any dedicated structured field as well. For example, a

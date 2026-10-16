@@ -1,0 +1,157 @@
+{
+  "case": "near",
+  "producer": "Codex in this conversation; manually drafted from the saved prompt-only request, not Hermes or a separate API call",
+  "section_results": [
+    {
+      "section_id": "subjects.inclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "At least 50 years old at consent.",
+            "Routine bilateral cataract surgery completed with enhanced monofocal IOLs in both eyes or standard monofocal IOLs in both eyes.",
+            "Second-eye surgery occurred 28 to 42 days before Day 0.",
+            "Able to consent and complete English questionnaires without a proxy.",
+            "Able to attend Day 0, Week 6 and Week 12."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "subjects.exclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Multifocal, trifocal or extended-depth-of-focus IOL in either eye.",
+            "Planned ocular surgery during participation.",
+            "An ocular condition preventing reliable assessments.",
+            "Participation in an interventional study within 30 days before Day 0, or planned participation during follow-up."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.design",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This prospective observational study compares two cohorts at two US clinics, defined by enhanced or standard monofocal IOLs already implanted in both eyes. Lens selection and surgery precede enrollment; research assigns no treatment and involves no randomization or masking."
+        },
+        {
+          "text": "The primary endpoint is binocular uncorrected near visual acuity in logMAR at Week 12 (Day 84 +/- 7 days); lower values indicate better acuity. Secondary endpoints at Week 12 are:"
+        }
+      ],
+      "lists": [
+        {
+          "items": [
+            "Percentage reporting never using reading glasses during the preceding 7 days.",
+            "Near-task satisfaction, scored 0–10.",
+            "Binocular uncorrected distance visual acuity in logMAR."
+          ]
+        },
+        {
+          "items": [
+            "Exploratory endpoint: Change in near visual acuity from Day 0 to Week 6."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "evaluation-procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The schedule of assessments shows the research activities at each visit."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "endpoint-criteria.study-completion",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Final participant assessments are expected by 30 November 2027. Analysis and administrative closeout end on 31 January 2028; these activities do not extend individual participation."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "You may join if you are at least 50 years old, have enhanced monofocal artificial lenses in both eyes or standard monofocal lenses in both eyes, and had second-eye surgery 28 to 42 days before enrollment. You must be able to consent, answer English questionnaires yourself and attend the scheduled visits. You cannot join if either eye has a multifocal, trifocal or extended-depth-of-focus lens, you plan eye surgery during participation, an eye condition prevents reliable testing, or you took part in an interventional research study in the previous 30 days or plan to during follow-up."
+        },
+        {
+          "text": "Your lens choice and surgery occurred as ordinary care before this research. The study assigns no treatment. If you meet the inclusion and exclusion criteria and are enrolled in the study, you will attend three research visits. Both lens groups follow the same schedule. Details are indicated below:"
+        },
+        {
+          "text": "Visit 1, Day 0 / Enrollment. You consent before research activities. Staff check eligibility, review surgery records, and record demographic information and lens type. At this visit and both follow-ups, you read near and distance charts at 40 centimeters and 4 meters, using both eyes without glasses. Results use logMAR scoring. You report reading-glasses use over the past 7 days as never, sometimes, often or always, rate satisfaction with near tasks from 0 (not satisfied) to 10 (fully satisfied), and answer questions about symptoms during testing. These assessments measure your experience; they are not treatment."
+        },
+        {
+          "text": "Visit 2, Week 6. On Day 42, within 7 days before or after, you repeat those assessments and update staff about eye care since your previous visit."
+        },
+        {
+          "text": "Visit 3, Week 12 / Final Visit. On Day 84, within 7 days before or after, you repeat the assessments and eye-care update, then finish participation. No separate exit form or extra closeout visit is required. Staff may contact you once within 7 days after a missed visit solely to reschedule within its existing window."
+        },
+        {
+          "text": "Your individual vision results are offered at attended visits. After analysis, you may request a plain-language summary of the combined results."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.duration",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The study expects to enroll 80 participants. You take part for 12 weeks after Day 0, ending with the Week 12 assessments unless you stop earlier."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.injury",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "If a research activity injures you or discomfort continues, contact the study doctor through your site coordinator listed in the contact section. The site will arrange an evaluation. Obtain emergency care through ordinary emergency services when needed. There is no sponsor fund for free injury treatment or additional injury compensation. Ordinary treatment may be billed to you or your insurer. Signing this form does not waive your legal rights."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.withdrawal",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements."
+        },
+        {
+          "text": "You can tell or write to your site coordinator to leave. A discussion of symptoms and ordinary-care needs is optional; you do not have to attend a final research examination, have extra testing or provide new research information after withdrawal. The investigator may stop your participation at your request, if you cannot complete assessments, if you have additional eye surgery or if the study closes. Staff record the reason when available. You keep payments already earned and reimbursement for eligible travel expenses already incurred."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.privacy",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you."
+        },
+        {
+          "text": "Each clinic keeps its own study-ID key separately on an encrypted drive with controlled access; signed paper consent forms are in locked cabinets. The sponsor and statistician receive coded assessments without your name, contact details or ID key. Authorized monitors, the IRB and oversight bodies may inspect relevant originals. Publications use combined results; individual data are not shared publicly."
+        },
+        {
+          "text": "Records and separate keys are retained for 7 years after closeout on 31 January 2028, then securely destroyed unless binding requirements require longer storage. Permission to collect new information ends at your final research visit or earlier written withdrawal. To withdraw permission, write to your enrolling site coordinator using that site’s contact details in this form. New collection stops; existing data may remain for study integrity and oversight."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

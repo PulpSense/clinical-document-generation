@@ -1,0 +1,117 @@
+{
+  "case": "sparse",
+  "producer": "Codex in this conversation; manually drafted from the saved prompt-only request, not Hermes or a separate API call",
+  "section_results": [
+    {
+      "section_id": "subjects.inclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Adults able to consent and answer the questionnaire.",
+            "No interventional research participation during the previous 14 days."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "subjects.exclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Unable to answer the questionnaire personally."
+          ]
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.design",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This prospective observational questionnaire study at one site assigns no treatment. Participants consent at enrollment and answer a care-experience questionnaire by telephone four weeks later. The primary endpoint is the 0–10 care-experience score at four weeks."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "evaluation-procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The schedule shows enrollment and the telephone questionnaire."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "endpoint-criteria.study-completion",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Enrollment is planned during February 2027, with the final survey in March 2027."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "You may join if you are an adult who can consent and answer the questionnaire personally, and you have not taken part in interventional research during the previous 14 days. You cannot join if you cannot answer for yourself. The study assigns no treatment. If you meet the inclusion and exclusion criteria and are enrolled in the study, there are two research contacts. Details are indicated below:"
+        },
+        {
+          "text": "Enrollment, Day 0. You give consent."
+        },
+        {
+          "text": "Telephone follow-up, four weeks after enrollment. You answer the care-experience questionnaire, scored from 0 to 10. No additional procedures are planned."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.duration",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The study expects to enroll 20 participants. You take part for four weeks from enrollment through the telephone questionnaire."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.injury",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. The study team will explain available care and any responsibility for related costs. Signing this form does not waive your legal rights."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.withdrawal",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements."
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.privacy",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you."
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

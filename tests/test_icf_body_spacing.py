@@ -66,3 +66,16 @@ def test_assembled_icf_cleans_body_after_authority_layout_is_applied(family, tmp
     rendering._normalize_icf_body_spacing(document, sterling=family == "Sterling")
     assert document._element.xml == before
     assert any("Signature of Participant" in p.text for p in document.paragraphs)
+
+
+def test_signature_compaction_retains_lines_labels_and_preference_wording():
+    document = Document(ROOT / "assets/client-templates/reference/advarra-icf-reference.docx")
+    rendering._normalize_icf_preferences(document)
+    before = [p.text for p in document.paragraphs if p.text.strip()]
+    lines = sum(bool(p._p.xpath('.//w:tab')) for p in document.paragraphs)
+    rendering._compact_icf_signature_end(document)
+    assert [p.text for p in document.paragraphs if p.text.strip()] == before
+    assert sum(bool(p._p.xpath('.//w:tab')) for p in document.paragraphs) == lines
+    final = next(p for p in document.paragraphs if p.text.strip().casefold() ==
+                 "you will be given a signed and dated copy of this informed consent document to keep.")
+    assert final.paragraph_format.keep_with_next

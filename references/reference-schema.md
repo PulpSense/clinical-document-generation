@@ -40,8 +40,9 @@ this file.
 - `source`: preserved intake provenance and `field_candidates`. Put competing
   values for an obligatory field in `field_candidates`; conflicting values
   block approval until the reviewer selects one.
-- `study`: title, short title, background/rationale, unmet need, hypothesis, and
-  timeline.
+- `study`: title, short title, background/rationale, unmet need, hypothesis,
+  `participation_duration` (participant follow-up with its anchor), timeline,
+  and supplied study-completion/closeout facts in `completion`.
 - `parties`: sponsor, principal investigator, sub-investigators, coordinator,
   IRB/ethics committee, funding source, and their contact details.
 - `sites`: one row per site with facility, contact, backup contact, and
@@ -53,7 +54,9 @@ this file.
   age/sex eligibility, inclusion criteria, exclusion criteria, and supporting
   sample-size evidence.
 - `design`: design description, site count, masking, arms/groups,
-  interventions/test articles, controls, and data sources.
+  interventions/test articles, controls, and data sources. Use
+  `study_design_summary` for the concise synopsis and `study_design` for the
+  complete source description.
 - `objectives`: primary and secondary objectives.
 - `endpoints`: structured `primary`, `secondary`, and optional `other`
   outcome rows. Every row requires a measure (`label`, `measure`, or

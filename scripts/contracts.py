@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.44-applicable-intake-and-native-review"
+CONTRACT_VERSION = "clinical-documents-v2.45-source-owned-drafting"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -412,7 +412,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "introduction": "Write one concise clinical-background paragraph: identify the setting, summarize relevant prior evidence with its stated uncertainty, then name the evidence gap that motivates this study. Do not repeat a speculative comparison claiming the untested study combination will outperform alternative treatment patterns. Leave the study title, hypothesis, and endpoint definitions to their owning sections.",
         "objectives": "State the approved study purpose and each supplied objective concisely. Study Design owns the hypothesis and endpoint definitions; this section describes what the study aims to learn.",
         "subjects.population": "Describe who or which records make up the approved population, using the supplied population and inclusion criteria, then give the planned sample size. A count alone is not a population description. Add no eligibility facts.",
-        "subjects.inclusion": "Preserve every approved inclusion criterion and the approved minimum interval without participation in another study before screening as distinct, usable criteria.",
+        "subjects.inclusion": "Preserve every approved inclusion criterion. Include the supplied screening interval only if neither approved eligibility list already states it; keep an interval supplied as an exclusion there once.",
         "subjects.exclusion": "Preserve every approved exclusion criterion as a distinct, usable criterion.",
         "subjects.eligibility": "Preserve every approved inclusion and exclusion criterion and the supplied numerical age limits; keep the groups distinct.",
         "study-design.design": "Explain the approved design, setting, arms, intervention, and masking details that are supplied. When supplied, identify who selected treatment before enrollment and state whether enrollment changes treatment. Identify every approved primary, secondary, and exploratory endpoint once in a grouped, readable account of what the design evaluates.",
@@ -454,6 +454,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
         "icf.payment": "State the approved payment or reimbursement terms exactly enough for participant use.",
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
+        "icf.withdrawal": "Preserve the authorized voluntary-participation wording and incorporate all supplied withdrawal, optional follow-up, investigator discontinuation and earned-payment conditions in participant-facing language.",
     }
     return (
         specific.get(section_id, f"Explain {title.lower()} using all material approved facts supplied for this section."),
@@ -576,7 +577,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     _section_spec("objectives", "6.", "OBJECTIVE(S)", "protocol-foundations", ("objectives.primary", "objectives.secondary"), owned_concepts=("study-objectives",), brief_reference_concepts=("clinical-rationale", "primary-endpoint", "endpoint-inventory"), do_not_restate_concepts=("clinical-rationale", "endpoint-inventory")),
     _section_spec("subjects", "7.", "SUBJECTS", role="container"),
     _section_spec("subjects.population", "7.1.", "Subject Population", "protocol-foundations", ("population.study_population", "population.sample_size", "population.inclusion_criteria")),
-    _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("subjects.inclusion", "7.2.", "Inclusion Criteria", "protocol-foundations", ("population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
     _section_spec("subjects.exclusion", "7.3.", "Exclusion Criteria", "protocol-foundations", ("population.exclusion_criteria",)),
     _section_spec("study-design", "8.", "STUDY DESIGN", role="container"),
     _section_spec("study-design.design", "8.1.", "Study Design", "protocol-foundations", ("design.study_design", "design.treatment_assignment", "design.intervention_description", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("study-design", "intervention-assignment", "endpoint-inventory")),
@@ -591,7 +592,7 @@ PROTOCOL_1_TO_19: tuple[SectionSpec, ...] = (
     ),
     _section_spec("study-procedure", "9.", "STUDY PROCEDURE", role="container"),
     _section_spec("study-procedure.consent", "9.1.", "Informed Consent / Subject Enrollment", "protocol-operations", ("procedures.consent",), "consent"),
-    _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.assessment_details", "procedures.intervention_management"), owned_concepts=("complete-visit-schedule",)),
+    _section_spec("study-procedure.visits", "9.2.", "Visits and Examinations", "protocol-operations", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.assessment_details", "procedures.intervention_management", "procedures.retention"), owned_concepts=("complete-visit-schedule",)),
     _section_spec("study-procedure.measurements", "9.3.", "Study Methods and Measurements", "protocol-operations", ("procedures.methods", "procedures.assessment_details", "endpoints.primary", "endpoints.secondary", "endpoints.other"), owned_concepts=("endpoint-measurement-methods",), brief_reference_concepts=("complete-visit-schedule", "endpoint-inventory"), do_not_restate_concepts=("complete-visit-schedule", "endpoint-inventory")),
     _section_spec("study-procedure.unscheduled", "9.4.", "Unscheduled Visits", "protocol-operations", ("procedures.unscheduled_visits",), "unscheduled"),
     _section_spec("study-procedure.discontinued", "9.5.", "Discontinued Subjects", "protocol-operations", ("procedures.discontinued_subjects",), "discontinued-subjects"),
@@ -664,8 +665,8 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
         boilerplate_keys=("icf-sparse-risks", "icf-sparse-benefits", "alternatives", "icf-voluntary"),
     ),
     _section_spec("icf.study-purpose", "", "Study purpose", "icf-narrative", ("objectives.primary", "study.hypothesis", "endpoints.primary"), owned_concepts=("study-purpose", "study-hypothesis", "primary-endpoint"), do_not_restate_concepts=("clinical-background", "comparative-evidence", "study-rationale")),
-    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.adverse_events", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
-    _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.timeline",)),
+    _section_spec("icf.procedures", "", "What will happen", "icf-narrative", ("procedures.assessments", "procedures.visit_schedule", "procedures.visit_schedule_table", "procedures.retention", "procedures.adverse_events", "design.intervention_description", "population.inclusion_criteria", "population.exclusion_criteria", "population.minimum_age", "population.maximum_age", "procedures.minimum_days_before_screening_without_participation")),
+    _section_spec("icf.duration", "", "Length and participation", "icf-narrative", ("study.participation_duration", "procedures.visit_schedule", "procedures.visit_schedule_table", "population.sample_size", "study.timeline")),
     _section_spec("icf.risks", "", "Risks and discomforts", "icf-narrative", ("risks_benefits.risks", "risks_benefits.risk_mitigation"), "icf-sparse-risks"),
     _section_spec("icf.benefits", "", "Potential benefits", "icf-narrative", ("risks_benefits.benefits",), "icf-sparse-benefits"),
     _section_spec("icf.payment", "", "Payment", "icf-narrative", ("risks_benefits.compensation_or_reimbursement",)),
@@ -673,6 +674,7 @@ ICF_STUDY_SECTIONS: tuple[SectionSpec, ...] = (
     _section_spec("icf.alternatives", "", "Alternatives", "icf-narrative", ("risks_benefits.alternatives",), "alternatives"),
     _section_spec("icf.privacy", "", "Privacy", "icf-narrative", ("risks_benefits.privacy", "confidentiality.data_handling"), "icf-privacy-authorization"),
     _section_spec("icf.injury", "", "Research injury", "icf-narrative", ("risks_benefits.injury_handling",), "injury"),
+    _section_spec("icf.withdrawal", "", "Leaving the study", "icf-narrative", ("procedures.discontinuation", "procedures.discontinued_subjects", "procedures.termination", "risks_benefits.compensation_or_reimbursement"), "icf-withdrawal"),
 )
 
 STERLING_BACKGROUND_SECTION = _section_spec(
@@ -811,8 +813,6 @@ def icf_contract(study_type: str, icf_template: str = "Advarra") -> tuple[Sectio
             for section in sections
             if section.section_id != "icf.key-information-summary"
         )
-    if branch == "Prospective" and not sterling:
-        sections = tuple(section for section in sections if section.section_id != "icf.injury")
     return sections
 
 
@@ -1637,6 +1637,9 @@ def participant_followup_summary(reference: Mapping[str, Any]) -> str:
     activity rows never stand in for visits; enrollment/analysis cannot supply
     a participant follow-up value.
     """
+    explicit = str(get_path(reference, "study.participation_duration") or "").strip()
+    if explicit:
+        return explicit
     timeline = str(get_path(reference, "study.timeline") or "").strip()
     followup = re.search(
         r"\bfollow[ -]?up\s*[:=]\s*(.+?)(?=[;,\n.]\s*(?:enrollment|recruitment|(?:data\s+)?analysis)\s*[:=]|$)", timeline, re.I | re.S,
@@ -1653,7 +1656,10 @@ def participant_followup_summary(reference: Mapping[str, Any]) -> str:
     if visits:
         final = visits[-1]
         name = str(final.get("visit") or "").strip()
-        timing = str(final.get("timing") or "").strip()
+        timing = re.sub(
+            r"(?:;\s*|,\s*)(?:(?:approximately|about)\s+)?\d+(?:[–-]\d+)?\s*(?:minutes?|hours?)\.?\s*$",
+            "", str(final.get("timing") or "").strip(), flags=re.I,
+        )
         if re.search(r"\b(?:after|following|from|postoperativ(?:e|ely)|post[- ]surgery)\b", timing, re.I):
             return timing
         if "postoperative" in f"{name} {timing}".casefold() and name and not re.fullmatch(r"Visit\s+\w+", name, re.I):

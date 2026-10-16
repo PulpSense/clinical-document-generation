@@ -1,0 +1,147 @@
+PROMPT-ONLY SECTION TRIALS
+16 October 2026
+
+Thirty targeted section drafts written and manually reviewed by Codex in this conversation.
+These are scoped development trials, not full study documents or Hermes runs.
+
+NEAR — Prospective / Advarra
+
+subjects.inclusion
+- At least 50 years old at consent.
+- Routine bilateral cataract surgery completed with enhanced monofocal IOLs in both eyes or standard monofocal IOLs in both eyes.
+- Second-eye surgery occurred 28 to 42 days before Day 0.
+- Able to consent and complete English questionnaires without a proxy.
+- Able to attend Day 0, Week 6 and Week 12.
+
+subjects.exclusion
+- Multifocal, trifocal or extended-depth-of-focus IOL in either eye.
+- Planned ocular surgery during participation.
+- An ocular condition preventing reliable assessments.
+- Participation in an interventional study within 30 days before Day 0, or planned participation during follow-up.
+
+study-design.design
+This prospective observational study compares two cohorts at two US clinics, defined by enhanced or standard monofocal IOLs already implanted in both eyes. Lens selection and surgery precede enrollment; research assigns no treatment and involves no randomization or masking.
+The primary endpoint is binocular uncorrected near visual acuity in logMAR at Week 12 (Day 84 +/- 7 days); lower values indicate better acuity. Secondary endpoints at Week 12 are:
+- Percentage reporting never using reading glasses during the preceding 7 days.
+- Near-task satisfaction, scored 0–10.
+- Binocular uncorrected distance visual acuity in logMAR.
+- Exploratory endpoint: Change in near visual acuity from Day 0 to Week 6.
+
+evaluation-procedures
+The schedule of assessments shows the research activities at each visit.
+
+endpoint-criteria.study-completion
+Final participant assessments are expected by 30 November 2027. Analysis and administrative closeout end on 31 January 2028; these activities do not extend individual participation.
+
+icf.procedures
+You may join if you are at least 50 years old, have enhanced monofocal artificial lenses in both eyes or standard monofocal lenses in both eyes, and had second-eye surgery 28 to 42 days before enrollment. You must be able to consent, answer English questionnaires yourself and attend the scheduled visits. You cannot join if either eye has a multifocal, trifocal or extended-depth-of-focus lens, you plan eye surgery during participation, an eye condition prevents reliable testing, or you took part in an interventional research study in the previous 30 days or plan to during follow-up.
+Your lens choice and surgery occurred as ordinary care before this research. The study assigns no treatment. If you meet the inclusion and exclusion criteria and are enrolled in the study, you will attend three research visits. Both lens groups follow the same schedule. Details are indicated below:
+Visit 1, Day 0 / Enrollment. You consent before research activities. Staff check eligibility, review surgery records, and record demographic information and lens type. At this visit and both follow-ups, you read near and distance charts at 40 centimeters and 4 meters, using both eyes without glasses. Results use logMAR scoring. You report reading-glasses use over the past 7 days as never, sometimes, often or always, rate satisfaction with near tasks from 0 (not satisfied) to 10 (fully satisfied), and answer questions about symptoms during testing. These assessments measure your experience; they are not treatment.
+Visit 2, Week 6. On Day 42, within 7 days before or after, you repeat those assessments and update staff about eye care since your previous visit.
+Visit 3, Week 12 / Final Visit. On Day 84, within 7 days before or after, you repeat the assessments and eye-care update, then finish participation. No separate exit form or extra closeout visit is required. Staff may contact you once within 7 days after a missed visit solely to reschedule within its existing window.
+Your individual vision results are offered at attended visits. After analysis, you may request a plain-language summary of the combined results.
+
+icf.duration
+The study expects to enroll 80 participants. You take part for 12 weeks after Day 0, ending with the Week 12 assessments unless you stop earlier.
+
+icf.injury
+If a research activity injures you or discomfort continues, contact the study doctor through your site coordinator listed in the contact section. The site will arrange an evaluation. Obtain emergency care through ordinary emergency services when needed. There is no sponsor fund for free injury treatment or additional injury compensation. Ordinary treatment may be billed to you or your insurer. Signing this form does not waive your legal rights.
+
+icf.withdrawal
+Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.
+You can tell or write to your site coordinator to leave. A discussion of symptoms and ordinary-care needs is optional; you do not have to attend a final research examination, have extra testing or provide new research information after withdrawal. The investigator may stop your participation at your request, if you cannot complete assessments, if you have additional eye surgery or if the study closes. Staff record the reason when available. You keep payments already earned and reimbursement for eligible travel expenses already incurred.
+
+icf.privacy
+By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you.
+Each clinic keeps its own study-ID key separately on an encrypted drive with controlled access; signed paper consent forms are in locked cabinets. The sponsor and statistician receive coded assessments without your name, contact details or ID key. Authorized monitors, the IRB and oversight bodies may inspect relevant originals. Publications use combined results; individual data are not shared publicly.
+Records and separate keys are retained for 7 years after closeout on 31 January 2028, then securely destroyed unless binding requirements require longer storage. Permission to collect new information ends at your final research visit or earlier written withdrawal. To withdraw permission, write to your enrolling site coordinator using that site’s contact details in this form. New collection stops; existing data may remain for study integrity and oversight.
+
+COMFORT — Ambispective / Sterling
+
+subjects.inclusion
+- Age 55–85 at consent.
+- Routine bilateral cataract surgery before enrollment, with second-eye surgery 3–18 months before Day 0.
+- Both surgeries occurred during 1 January 2025–30 September 2026, with clinic records available.
+- Able to consent personally, answer English questionnaires, provide saliva and attend future visits.
+- Authorize access to the specified historical records.
+
+subjects.exclusion
+- Interventional research participation in the 60 days before screening or planned during follow-up.
+- Planned ocular surgery in the next 90 days.
+- An ocular condition preventing reliable visual assessment.
+- Inability to consent personally or need for a proxy.
+
+study-design.design
+This three-site ambispective observational study follows one cohort after routine bilateral cataract surgery. After consent, staff abstract existing records from 1 January 2025 through 30 September 2026 and collect prospective data through Day 90. Historical abstraction is not a participant visit. Surgery and treatment are not assigned; there is no randomization or masking.
+The primary endpoint is change in comfort score, 0–10, from Day 0 to Day 90 +/- 10 days, where a positive change indicates improvement. Secondary endpoints are:
+- Comfort score at Day 30 +/- 5 days.
+- Best-corrected distance visual acuity per eye at Day 90 +/- 10 days.
+- Unscheduled ocular visits from Day 0 through Day 90.
+- Proportion with documented ocular surface treatment in historical records dated 1 January 2025 through 30 September 2026.
+- Exploratory endpoint: Research genotype-group associations with Day 90 comfort; results are not clinically actionable.
+
+evaluation-procedures
+The schedule shows future participant contacts. Staff review of the specified historical records occurs after consent and is described separately.
+
+endpoint-criteria.study-completion
+Final participant assessments are expected by 11 May 2027. Analysis and administrative closeout are planned by 30 June 2027. Individual participation ends after the Day 90 assessments or earlier withdrawal or discontinuation.
+
+icf.procedures
+You may join if you are 55 to 85, had ordinary cataract surgery in both eyes during 1 January 2025 through 30 September 2026, and your second-eye surgery was 3 to 18 months before Day 0. Clinic records must be available. You must consent personally, authorize the records review, answer English questionnaires, provide saliva and attend future visits. You cannot join if you need someone to answer for you, an eye condition prevents reliable testing, you plan eye surgery in the next 90 days, or you took part in interventional research during the previous 60 days or plan to during follow-up.
+Your prior surgery was ordinary care. This research assigns no treatment. After you consent, staff review existing surgery, lens, diagnosis, eye-care, vision and unscheduled-visit records from the specified historical period. Missing information stays missing. This staff review is not another visit, and it does not mean you had research visits in the past. If you meet the inclusion and exclusion criteria and are enrolled in the study, you will have two in-person visits and one telephone visit. Details are indicated below:
+Visit 1, Day 0 / Enrollment, in person. This visit takes about 70 minutes. You sign consent before research. Staff check eligibility, obtain record authorization, and collect demographic and current eye-care information. You read a distance chart at 4 meters using your current glasses, one eye at a time, with results recorded in logMAR. You rate comfort during the past 7 days from 0 (extremely uncomfortable) to 10 (fully comfortable). You provide about 2 milliliters of saliva by letting it drip into a tube. Staff ask about symptoms during the assessments. This is the only saliva collection.
+Visit 2, Day 30, by telephone within 5 days before or after. This contact takes about 15 minutes. You repeat the comfort question and report eye-care updates, unscheduled eye visits since enrollment and assessment-related symptoms. There is no vision test or saliva collection by telephone. Staff may make up to two more scheduling attempts for a missed call within its original window; home vision testing is not substituted.
+Visit 3, Day 90 / Final Visit, in person within 10 days before or after. This visit takes about 40 minutes. You repeat the vision test and comfort question, give the eye-care and unscheduled-visit updates, and answer the symptom questions. You then finish participation without an exit form, fourth visit or second saliva sample.
+Vision results are offered at in-person visits. The saliva tests are research-only and are not validated for individual clinical decisions. You will not receive individual genetic results, incidental genetic findings or a clinical genetic report. After analysis, you may request a plain-language summary of combined study results. There is no treatment assignment to reveal.
+
+icf.duration
+The study expects to enroll 90 participants. Your prospective participation lasts 90 days after enrollment, through the final Day 90 visit unless you leave earlier. Staff also review the specified existing records; the historical record period and later administrative work do not extend your research visits.
+
+icf.injury
+If you think a research activity injured you or discomfort continues, contact your enrolling site’s doctor through its coordinator listed in this form. The clinic arranges evaluation. Use ordinary emergency services when needed. No fund for free injury treatment or additional injury compensation has been established; ordinary treatment may be billed to you or your insurer. You do not waive legal rights by signing.
+
+icf.withdrawal
+Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.
+Tell or write to your enrolling site coordinator if you wish to leave. A final discussion of symptoms and ordinary care is optional. You do not have to attend another research visit, have an examination or provide saliva after withdrawal. The investigator may stop participation at your request, if assessments cannot be completed, if you have additional eye surgery or if the study closes. Staff record the reason when available. Payments already earned remain due.
+
+icf.privacy
+By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you.
+Each clinic keeps identifying records and its study-ID key securely and separately from coded information. The sponsor, laboratory and statistician receive coded information only. Authorized monitors, the IRB and oversight bodies may inspect original records. Individual data are not shared publicly.
+Your saliva tube carries only your study ID. The laboratory receives no name or ID key and performs targeted research genotyping, not whole genome sequencing. Saliva and DNA are destroyed within 90 days after testing and no later than 30 June 2027. They are not banked, sold or used for unrelated future research. Coded genetic data stay in the study dataset.
+Identifying records, keys and coded data are retained for seven years after 30 June 2027, then securely destroyed unless binding retention requirements require longer. Permission for new collection ends at the final Day 90 assessment or earlier written withdrawal. Write to your enrolling site’s coordinator, using that site’s address in the contact section, to withdraw permission. New collection stops and the site requests destruction of samples not yet analyzed. Data already generated or included in analyses may continue to be used.
+
+SPARSE — Prospective / Sterling
+
+subjects.inclusion
+- Adults able to consent and answer the questionnaire.
+- No interventional research participation during the previous 14 days.
+
+subjects.exclusion
+- Unable to answer the questionnaire personally.
+
+study-design.design
+This prospective observational questionnaire study at one site assigns no treatment. Participants consent at enrollment and answer a care-experience questionnaire by telephone four weeks later. The primary endpoint is the 0–10 care-experience score at four weeks.
+
+evaluation-procedures
+The schedule shows enrollment and the telephone questionnaire.
+
+endpoint-criteria.study-completion
+Enrollment is planned during February 2027, with the final survey in March 2027.
+
+icf.procedures
+You may join if you are an adult who can consent and answer the questionnaire personally, and you have not taken part in interventional research during the previous 14 days. You cannot join if you cannot answer for yourself. The study assigns no treatment. If you meet the inclusion and exclusion criteria and are enrolled in the study, there are two research contacts. Details are indicated below:
+Enrollment, Day 0. You give consent.
+Telephone follow-up, four weeks after enrollment. You answer the care-experience questionnaire, scored from 0 to 10. No additional procedures are planned.
+
+icf.duration
+The study expects to enroll 20 participants. You take part for four weeks from enrollment through the telephone questionnaire.
+
+icf.injury
+If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. The study team will explain available care and any responsibility for related costs. Signing this form does not waive your legal rights.
+
+icf.withdrawal
+Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.
+
+icf.privacy
+By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you.
+

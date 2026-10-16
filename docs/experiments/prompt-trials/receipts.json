@@ -1,0 +1,23 @@
+{
+  "original_n8n_nodes_unchanged": 22,
+  "cases": [
+    {
+      "case": "near",
+      "request_sha256": "711a40e14e44a0cfa7e007b69c22f2af3813047926748eb0ae5b2c7f6057d0ae",
+      "response_sha256": "6baccbfc894e07479696759e4641015c8667e3b80310262223330a46ff9bfc3a",
+      "manual_review": "Reviewed by the same Codex agent for the targeted criteria listed in README.md; final Hermes run remains pending."
+    },
+    {
+      "case": "comfort",
+      "request_sha256": "2cf71a01562640cec7757eddbb36fa63a803b2c80e1e4232d6e42fcea558fe9a",
+      "response_sha256": "5f64c1f8153f56a0228f83a642f4e59e5463acb16fedf781cd6e5fd38419ef7a",
+      "manual_review": "Reviewed by the same Codex agent for the targeted criteria listed in README.md; final Hermes run remains pending."
+    },
+    {
+      "case": "sparse",
+      "request_sha256": "c41763f3e7d33cb4377bcbe15f8c8b98c067454521888911ca1b4ea4550ba6ee",
+      "response_sha256": "ecc7d1c3a8e838abeb883d57728d7ff315ebb7ea10e8cf3737b49f9cab7dd62c",
+      "manual_review": "Reviewed by the same Codex agent for the targeted criteria listed in README.md; final Hermes run remains pending."
+    }
+  ]
+}

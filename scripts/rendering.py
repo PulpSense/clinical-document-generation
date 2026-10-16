@@ -1155,34 +1155,8 @@ def _replace_protocol_leaf_bodies(
                 text.casefold() for text, _is_list in blocks
             ):
                 blocks.append((withdrawal, False))
-        if section.section_id == "study-procedure.visits":
-            retention = str(get_path(reference, "procedures.retention", "") or "").strip()
-            if retention and retention.casefold().rstrip(".") not in " ".join(
-                text.casefold() for text, _is_list in blocks
-            ):
-                blocks.append((retention, False))
-        if section.section_id == "endpoint-criteria.study-completion":
-            completion = str(get_path(reference, "study.completion", "") or "").strip()
-            timeline = str(get_path(reference, "study.timeline", "") or "").strip().rstrip(".")
-            # An accepted timeline-only repair owns this body. Preserve it rather
-            # than copying visit detail back out of the raw timeline. The source
-            # still supplies the fallback for an absent draft or an unsupplied
-            # completion/closeout assertion.
-            completion_text = re.sub(
-                r"\bno(?: separate)? study[\s-]+(?:completion|closeout|closure)"
-                r"(?: (?:criterion|criteria|date|trigger))? is (?:specified|supplied|provided|defined)\b",
-                "", " ".join(text for text, _ in blocks), flags=re.I,
-            )
-            completion_language = re.search(
-                r"\bstudy[\s-]+(?:completion|closeout|closure)\b"
-                r"|\b(?:completion|closeout|closure)\s+of\s+(?:the\s+)?study\b"
-                r"|\b(?:complete|close|conclude|finish|end)(?:s|d)?\s+(?:the\s+)?study\b"
-                r"|\bstudy\s+(?:(?:is|was|will|shall|be|considered|deemed|declared|has|been|to)\s+)*"
-                r"(?:complete(?:d)?|closed|concluded|finished|ends?|ended)\b",
-                completion_text, re.I,
-            )
-            if not completion and timeline and (not blocks or completion_language):
-                blocks = [(f"The planned study timeline is {timeline}.", False)]
+        # Accepted study-completion prose owns its source-grounded summary;
+        # copying the entire raw timeline here discarded that drafting work.
         if not blocks:
             continue
         expected = _protocol_heading_key(f"{section.number} {section.title}")
@@ -2036,19 +2010,13 @@ def _populate_icf_sections(
     # Their accepted source-bound drafts are the body; the heading design is retained.
     source_bound_sections = (
         *(("icf.background",) if sterling else ()),
-        "icf.procedures", "icf.costs", "icf.alternatives", "icf.risks",
+        "icf.study-purpose", "icf.procedures", "icf.costs", "icf.alternatives", "icf.risks",
     )
     for section_id in source_bound_sections:
         heading = heading_by_id.get(section_id)
         blocks = _icf_blocks(model, section_id)
-        if section_id == "icf.procedures":
-            retention = str(get_path(reference, "procedures.retention", "") or "").strip()
-            if retention and retention.casefold().rstrip(".") not in " ".join(
-                text.casefold() for text, _is_list in blocks
-            ):
-                blocks.append((retention, False))
-            # The source-bound draft owns visit timing. An exact-string test
-            # cannot distinguish an omission from a plain-language paraphrase.
+        # Accepted procedure drafts own the visit and missed-contact prose.
+        # Exact-string comparisons cannot recognize a faithful paraphrase.
         if heading is None:
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)
@@ -2094,11 +2062,11 @@ def _restore_advarra_injury_section(
     document: Document,
     authority: Document,
     reference: Mapping[str, Any],
+    model: Mapping[str, Any],
+    boilerplate: Mapping[str, str],
 ) -> None:
     """Restore the authority-derived injury section before Legal Rights."""
-    injury_handling = _text(get_path(reference, "risks_benefits.injury_handling"))
-    if not injury_handling:
-        return
+    blocks = _icf_blocks(model, "icf.injury") or [(boilerplate["injury"], False)]
     legal_heading = next((
         paragraph for paragraph in document.paragraphs
         if _icf_heading_key(paragraph.text) == _icf_heading_key("LEGAL RIGHTS")
@@ -2155,7 +2123,7 @@ def _restore_advarra_injury_section(
     _insert_icf_blocks(
         document,
         injury_heading._p,
-        [(injury_handling, False)],
+        blocks,
         authority_body or authority_exemplar,
     )
 
@@ -2317,7 +2285,46 @@ def _study_doctor_contact(reference: Mapping[str, Any]) -> str:
     return f"For medical concerns, contact {doctor} at {phone}."
 
 
-def _normalize_advarra_contact_sections(document: Document, reference: Mapping[str, Any], boilerplate: Mapping[str, str]) -> None:
+def _icf_withdrawal_blocks(model: Mapping[str, Any], boilerplate: Mapping[str, str]) -> list[tuple[str, bool]]:
+    blocks = _icf_blocks(model, "icf.withdrawal")
+    fixed = boilerplate["icf-withdrawal"]
+    if fixed not in " ".join(text for text, _ in blocks):
+        blocks.insert(0, (fixed, False))
+    return blocks
+
+
+def _shared_site_contact_blocks(reference: Mapping[str, Any]) -> list[tuple[str, bool]]:
+    sites = [site for site in reference.get("sites", []) if isinstance(site, Mapping)]
+    if len(sites) < 2:
+        return []
+    blocks = []
+    for site in sites:
+        facility = site.get("facility") or {}
+        name = _text(facility.get("name"))
+        contacts = site.get("contacts") or site.get("contact") or []
+        if isinstance(contacts, Mapping):
+            contacts = [contacts]
+        details = []
+        for person in contacts:
+            if not isinstance(person, Mapping):
+                continue
+            parts = [_text(person.get("name")), _text(person.get("title"))]
+            for key, label in (("business_phone", "business phone"), ("office_phone", "office phone"),
+                               ("email", "email")):
+                value = _text(person.get(key) or (person.get("phone") if key == "business_phone" else ""))
+                if value:
+                    parts.append(f"{label}: {value}")
+            details.append(", ".join(part for part in parts if part))
+        address = _facility_address(facility)
+        contact = "; ".join(part for part in details if part)
+        text = f"For participants enrolled at {name}: {contact}." if contact else f"Study site: {name}."
+        if address:
+            text += f" Mailing address: {address}."
+        blocks.append((text, False))
+    return blocks
+
+
+def _normalize_advarra_contact_sections(document: Document, reference: Mapping[str, Any], boilerplate: Mapping[str, str], model: Mapping[str, Any]) -> None:
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     irb = get_path(reference, "parties.irb", {}) or {}
     coordinator_phone = _text(coordinator.get("business_phone") or coordinator.get("phone"))
@@ -2336,13 +2343,14 @@ def _normalize_advarra_contact_sections(document: Document, reference: Mapping[s
     _replace_icf_section_body(
         document,
         "WHOM TO CONTACT ABOUT THIS STUDY",
-        [(text, False) for text in (contact, doctor_contact, rights) if text],
+        [(text, False) for text in (contact, doctor_contact) if text]
+        + _shared_site_contact_blocks(reference) + [(rights, False)],
         sterling=False,
     )
     _replace_icf_section_body(
         document,
         "LEAVING THE STUDY",
-        [(boilerplate["icf-withdrawal"], False)],
+        _icf_withdrawal_blocks(model, boilerplate),
         sterling=False,
     )
 
@@ -2392,26 +2400,17 @@ def _normalize_sterling_retained_sections(
     document: Document,
     reference: Mapping[str, Any],
     boilerplate: Mapping[str, str],
+    model: Mapping[str, Any],
 ) -> None:
     _replace_sterling_section_body(
         document,
         "INFORMATION",
         [(sterling_clause_text("sterling.information.new-findings"), False)],
     )
-    withdrawal_blocks = [(boilerplate["icf-withdrawal"], False)]
-    discontinuation = _text(
-        get_path(reference, "procedures.discontinuation")
-        or get_path(reference, "procedures.discontinued_subjects")
-    )
-    if discontinuation:
-        withdrawal_blocks.append((discontinuation, False))
-    termination = _text(get_path(reference, "procedures.termination"))
-    if termination:
-        withdrawal_blocks.append((termination, False))
     _replace_sterling_section_body(
         document,
         "VOLUNTARY PARTICIPATION/WITHDRAWAL",
-        withdrawal_blocks,
+        _icf_withdrawal_blocks(model, boilerplate),
     )
     coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
     investigator = get_path(reference, "parties.principal_investigator", {}) or {}
@@ -2437,7 +2436,8 @@ def _normalize_sterling_retained_sections(
     _replace_sterling_section_body(
         document,
         "QUESTIONS",
-        [(text, False) for text in (research_contact, doctor_contact, irb_contact) if text],
+        [(text, False) for text in (research_contact, doctor_contact) if text]
+        + _shared_site_contact_blocks(reference) + [(irb_contact, False)],
     )
 
 
@@ -2468,17 +2468,41 @@ def _insert_sterling_conditional_clauses(
         heading = document.add_paragraph()
         _copy_paragraph_design(heading, anchor)
         _set_paragraph_text(heading, heading_text)
+        for run in heading.runs:
+            _copy_run_design(run, _first_visible_run(anchor))
         anchor._p.addprevious(heading._p)
         exemplar = next((
             paragraph for paragraph in document.paragraphs
-            if paragraph.text.strip() and not _is_icf_heading(paragraph)
+            if paragraph.text.strip().startswith("You are being asked to participate in a medical research study.")
         ), None)
         for text in clause.get("authorized_texts", []):
             paragraph = document.add_paragraph()
             if exemplar is not None:
                 _copy_paragraph_design(paragraph, exemplar)
             _set_paragraph_text(paragraph, str(text))
+            _normalize_icf_plain_body_paragraph(paragraph)
+            if exemplar is not None:
+                for run in paragraph.runs:
+                    _copy_run_design(run, _first_visible_run(exemplar))
             anchor._p.addprevious(paragraph._p)
+
+
+def _normalize_sterling_generated_typography(document: Document, model: Mapping[str, Any]) -> None:
+    """Generated prose uses the family's body font, not annotation typography."""
+    exemplar = next((p for p in document.paragraphs if p.text.strip().startswith(
+        "You are being asked to participate in a medical research study.")), None)
+    if exemplar is None:
+        return
+    source_run = _first_visible_run(exemplar)
+    generated = {
+        text for section_id in model.get("icf", {})
+        for text, is_list in _icf_blocks(model, section_id) if not is_list
+    }
+    for paragraph in document.paragraphs:
+        if paragraph.text.strip() not in generated or _is_icf_heading(paragraph):
+            continue
+        for run in paragraph.runs:
+            _copy_run_design(run, source_run)
 
 
 def _preserve_sterling_registry_statement(
@@ -2515,9 +2539,16 @@ def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]
         site = _first_site(reference)
         facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
         coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
+        sites = [item for item in reference.get("sites", []) if isinstance(item, Mapping)]
+        site_address = _facility_address(facility)
+        if len(sites) > 1:
+            site_address = "\n".join(
+                f"{_text(item.get('facility', {}).get('name'))}: {_facility_address(item.get('facility', {}))}"
+                for item in sites
+            )
         replacements = {
             "Telephone:": ("Study Coordinator Telephone:", _text(coordinator.get("business_phone") or coordinator.get("phone"))),
-            "Address:": ("Study Site Address:", _facility_address(facility)),
+            "Address:": ("Study Site Addresses:" if len(sites) > 1 else "Study Site Address:", site_address),
         }
         for row in front.rows:
             label = row.cells[0].text.strip()
@@ -2708,6 +2739,23 @@ def _compact_icf_signature_end(document: Document) -> None:
     ), None)
     if final is None:
         return
+    # Advarra's inherited default paragraph spacing expands each blank/line
+    # in the signing area. Keep all writing lines and one 12pt spacer between
+    # entries while removing the extra inherited before/after padding.
+    if agreement is not None and _icf_heading_key(agreement.text) == _icf_heading_key("AGREEMENT TO BE IN THE STUDY"):
+        signing = False
+        for paragraph in document.paragraphs:
+            if paragraph._p is agreement._p:
+                signing = True
+            if signing and (paragraph._p.xpath('.//w:tab') or not paragraph.text.strip()):
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.space_after = Pt(0)
+                paragraph.paragraph_format.line_spacing = Pt(12) if _plain_blank(paragraph) else 1.0
+            if signing and paragraph.text.strip().startswith(("Printed Name of", "Signature of")):
+                paragraph.paragraph_format.space_before = Pt(0)
+                paragraph.paragraph_format.space_after = Pt(0)
+            if paragraph._p is final._p:
+                break
     final.paragraph_format.space_before = Pt(0)
     final.paragraph_format.space_after = Pt(0)
     no_sign = next((
@@ -2759,6 +2807,20 @@ def _normalize_icf_preferences(document: Document) -> None:
     ), None)
     paragraphs = list(document.paragraphs)
     if heading is not None and preference_paragraphs:
+        previous = heading._p.getprevious()
+        while previous is not None and previous.tag == qn("w:p"):
+            spacer = Paragraph(previous, document)
+            if not _plain_blank(spacer) or spacer._p.xpath('.//w:fldChar | .//w:fldSimple | .//w:drawing | .//w:u'):
+                break
+            preceding = previous.getprevious()
+            previous.getparent().remove(previous)
+            previous = preceding
+        if previous is not None and previous.tag == qn("w:p"):
+            preceding_text = Paragraph(previous, document)
+            if preceding_text.text.strip().casefold() == "you will be given a signed and dated copy of this informed consent document to keep.":
+                # Keep the fixed-size signature/choice area as one native
+                # block so choices cannot become an otherwise empty last page.
+                preceding_text.paragraph_format.keep_with_next = True
         start = next(index for index, paragraph in enumerate(paragraphs) if paragraph._p is heading._p)
         end = next(index for index, paragraph in enumerate(paragraphs) if paragraph._p is preference_paragraphs[-1]._p)
         block = paragraphs[start:end + 1]
@@ -2775,6 +2837,8 @@ def _normalize_icf_preferences(document: Document) -> None:
             block.remove(paragraph)
     for paragraph in block:
         paragraph.paragraph_format.keep_together = True
+        paragraph.paragraph_format.space_before = Pt(0)
+        paragraph.paragraph_format.space_after = Pt(4)
     for paragraph in block[:-1]:
         paragraph.paragraph_format.keep_with_next = True
 
@@ -3713,17 +3777,17 @@ def _template_document(
         if not sterling:
             _remove_advarra_example_study_prose(document)
         if sterling:
-            _normalize_sterling_retained_sections(document, reference, boilerplate)
+            _normalize_sterling_retained_sections(document, reference, boilerplate, model)
             _insert_sterling_conditional_clauses(document, reference)
             repair_sterling_clause_placement(document, reference)
         else:
             _normalize_icf_withdrawal(document, boilerplate)
-            _normalize_advarra_contact_sections(document, reference, boilerplate)
+            _normalize_advarra_contact_sections(document, reference, boilerplate, model)
         _normalize_icf_front_matter(document, reference)
         # Sterling's front-matter telephone fields belong to the IRB merge.
         _normalize_source_bound_shell(document, reference, icf=True)
         if not sterling:
-            _restore_advarra_injury_section(document, authority, reference)
+            _restore_advarra_injury_section(document, authority, reference, model, boilerplate)
         _apply_icf_authority_layout(document, authority, model, sterling=sterling)
         if sterling:
             _normalize_sterling_generated_section_spacing(document)
@@ -3734,6 +3798,7 @@ def _template_document(
         _normalize_generated_icf_privacy_prose(document, model, sterling=sterling)
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
         if sterling:
+            _normalize_sterling_generated_typography(document, model)
             _preserve_sterling_registry_statement(document, authority, reference)
         _normalize_icf_body_spacing(document, sterling=sterling)
 

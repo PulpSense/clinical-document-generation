@@ -314,3 +314,36 @@ Advarra, supplies all required operational contacts and analysis details, and
 states conditional clauses that do not apply. It is source input for a new
 normal approval/generation run, not an already approved Source of Truth or a
 claim that the study has IRB approval.
+
+## Prompt-first trials and source-owned sections — 16 October 2026
+
+Saved 30 section drafts across the NEAR prospective/Advarra case, a new
+COMFORT ambispective/Sterling case and a sparse source case before changing
+document construction. Exact effective prompts, scoped source projections,
+responses and provenance are in `prompt-trials/`. Codex authored and reviewed
+these drafts directly; they are not an independent Hermes or API benchmark.
+All 22 original n8n prompts are unchanged. Editorial corrections clarify
+participant wording, withdrawal detail, shared-site privacy, results policies,
+eligibility placement and section ownership without adding unsupported facts.
+
+Construction now preserves accepted injury, withdrawal and completion drafts,
+avoids appending duplicate rescheduling policies, lists all shared-consent site
+contacts and separates participant duration from appointment length. Intake
+guidance separates activity rows from response choices, historical records from
+future visits and administrative closeout from participant completion. Existing
+approved source snapshots are not silently rewritten by generation.
+
+Sterling generated prose and conditional genetic clauses use the retained body
+typography. Advarra signature spacing keeps signature lines and PCP choices
+together. Final local family fixtures were visually inspected at six Advarra
+pages and five Sterling pages. A formatting-only copy of the uploaded ICF went
+from seven pages to six with nonblank text unchanged. These are development
+fixtures, not new study deliverables or added production review stages.
+
+The focused generation, contracts, TOC, spacing, contact-table, office-refresh
+and source-owned drafting selection passed 50 tests. After the last signature
+pagination adjustment, the 17 affected checks passed again. Skill validation
+and whitespace checks passed. The full suite was not run; retired test modules
+importing the removed quality module remain outside this focused selection.
+The complete Hermes generation remains the final integration test. Linux
+dependencies and the six production scripts are unchanged.

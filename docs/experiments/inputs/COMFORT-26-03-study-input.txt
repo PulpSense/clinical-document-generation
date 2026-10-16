@@ -1,0 +1,305 @@
+COMFORT-26-03 — STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT
+Version 1.0 | 16 October 2026
+
+DOCUMENTS AND TEMPLATE
+Requested documents: protocol DOCX, informed consent DOCX and study XML.
+Selected consent family: Sterling.
+This is a new study input for the normal Source of Truth approval process.
+No IRB approval has been obtained. Contacts and procedures below belong only
+to this study. Sterling's IRB-managed merge fields remain under its normal
+template process; study-specific contacts are supplied separately below.
+
+IDENTIFICATION AND STUDY DESIGN
+Protocol number: COMFORT-26-03.
+Full title: Historical Ocular Care, Current Symptoms and Prospective Comfort
+After Routine Bilateral Cataract Surgery: An Ambispective Observational Study
+With Research Saliva Genotyping.
+Short title: Comfort After Cataract Surgery.
+Study type: Ambispective.
+Registry classification: Observational. Observational model: Cohort.
+Time perspective: Other — ambispective, combining retrospective record
+abstraction and prospective follow-up in the same consenting participants.
+Condition: Pseudophakia following bilateral cataract surgery.
+Number of sites: 3, all in the United States.
+One observational cohort; no treatment arms or comparator product.
+Intervention/exposure name: Prior routine bilateral cataract surgery and its
+documented ocular-care history. Exposure category: Procedure/Surgery,
+observed retrospectively, not assigned or performed by this study.
+Research activities: medical-record abstraction, noninvasive vision testing,
+symptom questionnaires and one saliva collection for research genotyping.
+The study does not assign surgery, an IOL type, medication or other treatment.
+It has no randomization, masking, placebo or investigational product.
+
+BACKGROUND, OBJECTIVES AND HYPOTHESIS
+Current comfort after cataract surgery may vary between people with different
+documented ocular-care histories. This study links historical clinic records
+with newly collected symptoms and vision assessments. Research genotyping is
+included to explore possible associations with symptom variation. No prior
+effect estimates or bibliographic references are supplied.
+Primary objective: Describe change in patient-reported ocular comfort from
+enrollment to Day 90 after enrollment.
+Secondary objectives: Describe historical ocular-care patterns, current and
+follow-up visual acuity, symptom-related unscheduled visits and associations
+between historical care characteristics and prospective comfort.
+Exploratory objective: Examine associations between selected research genetic
+variants and Day 90 comfort; these analyses do not establish clinical utility.
+Hypothesis: Greater historical use of clinician-documented ocular surface
+treatment will be associated with lower Day 90 comfort scores. This is an
+exploratory association hypothesis, not a claim of a treatment effect.
+
+POPULATION AND SAMPLE
+Planned enrollment: 90 participants, targeting 30 per site.
+Age: 55 through 85 years, inclusive. All sexes eligible. Healthy volunteers: No.
+Sampling: Non-probability, consecutive eligible clinic patients invited during
+routine contact. Only patients who give written consent enter this study;
+there is no separate records-only cohort or waiver-of-consent population.
+Inclusion criteria:
+- Age 55 to 85 at written consent.
+- Bilateral cataract surgery completed before enrollment; second-eye surgery
+  occurred between 3 and 18 months before Day 0.
+- Both surgeries occurred between 1 January 2025 and 30 September 2026, with
+  records accessible at the enrolling clinic.
+- Able to consent, complete English-language questionnaires, provide a saliva
+  sample and attend the specified future visits.
+- Willing to authorize access to the historical records described below.
+Exclusion criteria:
+- Participation in an interventional research study in the 60 days before
+  screening, or planned interventional research participation during follow-up.
+- Planned ocular surgery during the 90-day prospective period.
+- An ocular condition that prevents reliable completion of the specified
+  visual acuity assessments, as determined by the site investigator.
+- Inability to consent personally or need for a proxy questionnaire respondent.
+Minimum period without interventional-study participation before screening:
+60 days. Screening and enrollment occur at the same Day 0 visit.
+Pregnancy is not an exclusion criterion. There are no study pregnancy tests,
+contraception requirements, radiation, drugs or reproductive interventions.
+Children and adults unable to consent are not enrolled. No representative or
+witness signature is required under this study plan.
+Sample justification: Ninety participants is a practical exploratory sample,
+with up to 15% loss to prospective follow-up anticipated. The study has no
+formal power calculation or assumed treatment effect. The target is 90 people,
+not 90 eyes or 90 historical records. Both eyes may contribute descriptive
+vision data, but participant-reported endpoints use one record per person.
+
+RETROSPECTIVE COMPONENT — NO HISTORICAL RESEARCH VISITS
+Historical record period: 1 January 2025 through 30 September 2026, inclusive.
+After consent, staff abstract relevant existing records within that fixed
+period: surgery dates, implanted lens categories, documented ocular diagnoses,
+clinician-recorded ocular surface treatments, best-corrected distance visual
+acuity, and documented unscheduled ocular visits.
+Historical data are whatever was recorded in routine care. There is no assumed
+historical questionnaire, saliva collection, consent visit or standardized
+research assessment. An absent historical value is recorded as missing.
+The record-abstraction task is performed by staff after Day 0; it is not an
+extra participant visit. No pre-consent research procedures were performed.
+Source surgical and care records remain at the clinic.
+
+PROSPECTIVE VISITS AND PROCEDURES
+Prospective participation lasts 90 days after enrollment, with two in-person
+visits and one telephone visit. Day counts are measured from enrollment,
+not from cataract surgery.
+Visit 1 — Day 0 / Enrollment, in person, approximately 70 minutes:
+written informed consent before research activities; eligibility confirmation;
+authorization for historical records; demographics and current ocular-care
+update; best-corrected distance visual acuity for each eye at 4 m using a logMAR
+chart and the participant's current correction; comfort questionnaire; one
+approximately 2 mL saliva collection by passive drool into a labeled tube;
+and enquiry about symptoms during the research assessments.
+Visit 2 — Day 30 +/- 5 days, telephone, approximately 15 minutes:
+comfort questionnaire, interval ocular-care update, enquiry about unscheduled
+ocular visits since enrollment and assessment-related symptoms. No visual
+acuity test or saliva collection takes place by telephone.
+Visit 3 — Day 90 +/- 10 days / Final Visit, in person, approximately 40 minutes:
+repeat visual acuity for each eye, comfort questionnaire, interval ocular-care
+update, unscheduled-visit enquiry and assessment-related symptom enquiry.
+Confirm completion after these activities. No exit form, fourth visit or
+second saliva sample is required.
+If a telephone visit is missed, staff may make up to two further scheduling
+attempts within its existing window. No substituted home vision testing.
+Questionnaire: A study-specific ocular comfort rating for the preceding 7 days,
+0 to 10, where 0 means extremely uncomfortable and 10 means fully comfortable.
+This is not presented as a validated instrument. The same wording is used at
+Day 0, Day 30 and Day 90.
+No blood draws, pupil dilation, imaging, study medication or research surgery.
+The saliva specimen is mandatory for this study's eligibility; there is no
+optional genetic substudy or separate future-use opt-in.
+Assessment-matrix clarification: The historical period is a record-review
+column, not Visit 0. Saliva collection occurs only at Day 0; visual acuity
+occurs only at the two in-person visits.
+
+ENDPOINTS AND ANALYSIS PLAN
+Primary outcome: Change in ocular comfort score, 0–10, from Day 0 to Day 90
+(Day 90 +/- 10 days). Positive change means improved reported comfort.
+Secondary outcome 1: Ocular comfort score, 0–10, at Day 30 +/- 5 days.
+Secondary outcome 2: Best-corrected distance visual acuity in logMAR for each
+eye at Day 90 +/- 10 days; lower logMAR means better visual acuity.
+Secondary outcome 3: Number of participant-reported unscheduled ocular-care
+visits between Day 0 and Day 90, collected at Day 30 and Day 90. A visit reported
+at both contacts is counted once.
+Secondary outcome 4: Proportion with clinician-documented ocular surface
+treatment in available records from 1 January 2025 to 30 September 2026.
+Exploratory outcome: Association of coded research genotype groups with Day 90
+comfort score. Variant selection is specified in a laboratory analysis plan
+before the coded outcome dataset is released; no clinical risk score is made.
+No additional outcomes are specified.
+Analysis plan: Summarize participant flow, historical-record availability,
+completion and baseline characteristics overall and by site. For the primary
+outcome, report the observed paired mean change, standard deviation and 95%
+confidence interval among participants with Day 0 and Day 90 ratings; also
+report median and range. Describe Day 30 comfort and unscheduled visits using
+counts and appropriate continuous summaries. Report historical-treatment
+proportions with an explicit denominator of people with relevant records.
+Summarize visual acuity by eye; any pooled-eye exploratory model uses a
+participant-level random intercept to account for paired eyes. Explore the
+association of historical treatment documentation with Day 90 comfort using
+linear regression adjusted for Day 0 comfort, age and site. Exploratory genetic
+associations are reported descriptively; no causal or clinically actionable
+interpretation and no confirmatory significance claims. Report missing values
+and reasons separately for historical and prospective data. Do not impute
+unrecorded historical care or missing questionnaire values.
+
+RESEARCH RISKS, BENEFITS AND ALTERNATIVES
+Potential research risks: temporary eye fatigue or headache during vision
+testing; dry mouth, mild nausea or embarrassment while providing saliva;
+discomfort answering symptom questions; inconvenience and travel; and loss of
+privacy involving medical or genetic information. Testing can be paused or
+stopped on request. Contact the study doctor for persistent symptoms.
+Prior cataract operations were ordinary care and are not new research risks.
+Genetic information may reveal information about a participant or biological
+relatives if confidentiality is lost. This research does not determine family
+relationships, ancestry or clinical disease risk, and does not perform whole
+genome sequencing. Genetic information is collected: Yes. The applicable
+Sterling genetic-information/GINA section is needed.
+No direct benefit is promised. The research may improve understanding of
+reported comfort and documented care patterns. The alternative is ordinary
+eye care without joining the study. Care and benefits are unaffected by refusal.
+
+GENETIC SPECIMENS, PRIVACY AND RETURN OF RESULTS
+Each saliva tube carries only a study ID. The clinic ships coded tubes to the
+sponsor's contracted research laboratory. The laboratory performs targeted
+genotyping and returns coded research data to the study statistician. The lab
+receives no participant names, contacts or clinic ID key.
+The original saliva and extracted DNA are destroyed within 90 days after
+completion of laboratory testing, and no later than 30 June 2027. Specimens
+are not banked for future research, shared for other studies or sold. No
+commercial development or participant share of commercial proceeds is planned.
+The coded genetic data remain part of the retained study dataset.
+Genetic testing is research-only, is not validated for individual clinical
+decisions and produces no clinical report. Individual genetic results and
+incidental genetic findings are not returned. The study does not search for
+clinically actionable incidental findings. Consent must clearly distinguish
+this policy from the return of routine vision-test results.
+Individual visual acuity results are offered at each in-person visit. Clinical
+concerns observed during testing are explained and referred to ordinary care.
+An aggregate plain-language study summary is available on request after study
+analysis is complete. There is no treatment assignment to disclose or unmask.
+
+CONFIDENTIALITY AND AUTHORIZATION
+Collected identifiers: name, contact information, date of birth and signed
+consent, used for scheduling, eligibility, records linkage and payment.
+Coded study data: age, sex, surgery dates, lens categories, ocular history,
+care history, acuity, questionnaire responses, unscheduled visits and genotype.
+Each clinic keeps its ID key separately on an encrypted access-controlled
+drive; paper consent forms are in locked cabinets. Only authorized site
+investigators and coordinators access identifying records for their duties.
+The sponsor, laboratory and statistician receive coded information only.
+Authorized study monitors, the IRB and legally authorized oversight bodies may
+review relevant original records for oversight. No public individual-data
+sharing, sale, unrelated future research or identifiable publication is planned.
+Identifying records, keys and coded datasets are retained securely for seven
+years after administrative closeout on 30 June 2027, then securely destroyed,
+unless a binding retention requirement requires longer storage.
+Authorization duration: Permission to collect new research health information
+ends after the participant's final Day 90 assessment, or earlier upon written
+withdrawal. Already collected data may be retained and used for study integrity
+and required oversight under the retention policy above. This is a finite
+authorization; it does not expire only when all retained records are destroyed.
+To withdraw authorization, write to the enrolling site's coordinator at the
+site mailing address below. New research collection stops upon withdrawal.
+If a specimen has not been analyzed, the site requests its destruction; data
+already generated or incorporated into analyses may continue to be used.
+
+COMPENSATION, COSTS, INJURY AND WITHDRAWAL
+Compensation: $40 for attended Day 0, $15 for completed Day 30 telephone visit
+and $40 for attended Day 90, maximum $95. No completion bonus. Earned payments
+remain payable after withdrawal. Payment is by check within 30 days of each
+completed contact. No parking, mileage, transit or other travel reimbursement.
+The sponsor pays for all research testing, saliva collection, research
+laboratory work and questionnaires. Routine clinical care remains payable by
+the participant or insurer under ordinary arrangements. No research charges
+are billed to insurance; the study does not pay for ordinary future treatment.
+For possible research injury or persistent discomfort, contact the enrolling
+site's study doctor via the coordinator; the clinic arranges evaluation.
+Emergency care uses ordinary emergency services. No fund for free injury
+treatment or additional injury compensation is established; ordinary treatment
+may be billed to the participant or insurer. Legal rights are not waived.
+Participants may leave at any time without penalty or loss of usual benefits.
+They can tell or write to the site coordinator. A final discussion of symptoms
+and ordinary-care needs is offered but optional; no mandatory final research
+visit, saliva collection or examination is required after withdrawal.
+The investigator may discontinue participation for participant request,
+inability to complete assessments, additional ocular surgery or study closure.
+Record the reason when available. Leaving research does not stop routine care.
+
+TIMELINE, COMPLETION AND REGISTRY
+Historical data window: 1 January 2025 through 30 September 2026.
+Prospective recruitment: 1 November 2026 through 31 January 2027.
+Last prospective participant assessment expected by 11 May 2027, allowing
+the final visit window. Anticipated primary completion and study completion:
+11 May 2027. Analysis and administrative closeout: by 30 June 2027.
+Each participant finishes after Day 90, or earlier withdrawal/discontinuation;
+historical-record years and administrative closeout do not extend participation.
+At closeout, reconcile disposition and payments, resolve data queries, confirm
+specimen destruction, lock/analyze coded data and archive retained records.
+Recruitment status: Not yet recruiting. Enrollment type: Anticipated, 90.
+Registry verification month: October 2026. IRB status: Not yet submitted.
+No IRB approval identifier/date or public registration number has been issued.
+Under the supplied study plan, mandatory ClinicalTrials.gov consent disclosure
+does not apply; generating study XML does not itself create that requirement.
+No FDA-regulated investigational drug or device study. No investigational
+product, randomization, masking, radiation or pregnancy testing.
+Genetic information collected: Yes. Future specimen use: No. Public individual
+participant data sharing: No. Sponsor receives identifiable information: No.
+
+SPONSOR, OVERALL STAFF AND THREE SITES
+Sponsor: Harbor Patient Outcomes Research, 510 Research Lane, Suite 400,
+Baltimore, MD 21202, United States.
+Sponsor contact: Taylor Morgan, Research Director, +1 202-555-0160,
+taylor.morgan@example.org.
+Overall principal investigator: Dr. Cameron Ellis, MD, Principal Investigator.
+Overall coordinator: Alex Rivera, CCRC, Lead Study Coordinator.
+Business phone: +1 202-555-0161. Office phone: +1 202-555-0162.
+Email: alex.rivera@example.org. Mailing address: Site 1 below.
+
+Site 1 facility: Harbor Eye Research Clinic, 620 Harbor Street, Suite 120,
+Baltimore, MD 21203, United States.
+Site 1 investigator: Dr. Cameron Ellis, MD, Principal Investigator.
+Site 1 contact: Alex Rivera, CCRC, Lead Study Coordinator, business
++1 202-555-0161, office +1 202-555-0162, alex.rivera@example.org.
+Site 1 additional investigator: Dr. Jamie Parker, MD, Sub-Investigator,
++1 202-555-0163, jamie.parker@example.org.
+
+Site 2 facility: Capitol Vision Research Clinic, 730 Capitol Avenue, Suite 230,
+Washington, DC 20004, United States.
+Site 2 investigator: Dr. Drew Bennett, MD, Site Investigator.
+Site 2 contact: Sam Carter, CCRC, Site Study Coordinator, business
++1 202-555-0164, office +1 202-555-0165, sam.carter@example.org.
+
+Site 3 facility: Bayview Ophthalmology Research Center, 840 Bayview Road,
+Suite 340, Annapolis, MD 21401, United States.
+Site 3 investigator: Dr. Quinn Foster, MD, Site Investigator.
+Site 3 contact: Robin Hayes, CCRC, Site Study Coordinator, business
++1 202-555-0166, office +1 202-555-0167, robin.hayes@example.org.
+Site contacts handle scheduling, research questions and referral to the site
+doctor for possible research injury, Monday–Friday, 9 a.m.–5 p.m. local time.
+These numbers are not emergency or 24-hour contact lines.
+
+IRB CONTACT AND CONSENT FAMILY
+Reviewing IRB: Harbor Independent Research Review Board.
+Affiliation: Independent IRB, unaffiliated with the sponsor and study clinics.
+Address: 950 Review Avenue, Suite 450, Baltimore, MD 21204, United States.
+Phone: +1 202-555-0168. Email: participant.rights@example.org.
+This contact handles participant-rights questions and research concerns.
+Selected consent layout: Sterling. The study-specific reviewing IRB is the
+one named above; template-family selection does not replace it with an IRB
+or contacts from another study. No actual study approval is represented here.
