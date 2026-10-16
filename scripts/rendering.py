@@ -4002,6 +4002,7 @@ def render_documents(
     font_substitutions: Mapping[str, str] | None = None,
     artifact_names: Iterable[str] | None = None,
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
+    audit_output: bool = True,
 ) -> dict[str, Any]:
     output = revision_dir / "candidate"; output.mkdir(parents=True, exist_ok=True)
     fields = render_fields(reference, model)
@@ -4071,7 +4072,7 @@ def render_documents(
             _clear_icf_review_highlighting(document)
         font_replacements = _apply_font_substitutions(document, substitutions)
         path = output / f"{kind}.docx"; document.save(path); _strip_review_metadata(path)
-        findings = audit_docx(path)
+        findings = audit_docx(path) if audit_output else []
         blocking_findings = [finding for finding in findings if finding.get("publication_disposition") != "warning"]
         results.append({"artifact": kind, "path": path.relative_to(revision_dir).as_posix(), "template": template.relative_to(repo_root).as_posix(), "template_sha256": _sha256_file(template), "client_template_authority": authority.relative_to(repo_root).as_posix(), "client_template_authority_sha256": _sha256_file(authority), "font_replacements": font_replacements, "status": "passed" if not blocking_findings else "blocked", "findings": blocking_findings, "warnings": [finding for finding in findings if finding.get("publication_disposition") == "warning"], "construction_passages": construction_passages, "construction_fields": construction_fields})
     return {

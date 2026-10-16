@@ -10655,6 +10655,106 @@ def _schedule_native_repair(run_dir: Path, revision_dir: Path, reference_path: P
     return _awaiting(revision_dir, stage="document_repair", paths=[repair_path], findings=findings)
 
 
+def generate_only(run_dir: Path) -> dict[str, Any]:
+    """Experimental drafting and first native assembly, without review or repair."""
+    run_dir = run_dir.expanduser().resolve()
+    _, working = _reference(run_dir)
+    approved, issue = _approval_valid(run_dir, working)
+    if not approved:
+        return {"status": "blocked", "stage": "approval_gate", "findings": [{"issue": issue}], "client_outputs": []}
+    revision = run_dir / "revisions" / working["approval"]["revision_id"]
+    reference = _read(revision / "approved-reference.json")
+    bundle = contracted_template_bundle(SCRIPT_DIR.parent, reference)
+    governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
+    identity = sha256_value(governing)
+    workspace = revision / "generation-only" / identity[:16]
+    workspace.mkdir(parents=True, exist_ok=True)
+    marker = workspace / "generation-only.json"
+    if not marker.exists():
+        _write(marker, {"profile": "n8n-with-brad-corrections/v1", "governing_sha256": identity,
+                        "started_at": datetime.now(timezone.utc).isoformat()})
+    base = {"mode": "generation_only", "workspace": str(workspace),
+            "revision_id": working["approval"]["revision_id"], "client_outputs": []}
+    manifest_path = workspace / "experiment-manifest.json"
+    if manifest_path.is_file():
+        saved = _read(manifest_path)
+        for entry in saved["experimental_outputs"]:
+            path = Path(entry["absolute_path"])
+            if not path.is_file() or sha256_file(path) != entry["sha256"]:
+                return {**base, "status": "blocked", "stage": "file_integrity",
+                        "findings": [{"issue": f"Saved experimental output changed or is missing: {path}"}]}
+        return saved
+    # Invalid response JSON can be corrected manually without invoking any
+    # content reviewer or automatic drafting/repair loop.
+    for rejected in (workspace / "hermes/rejected").glob("*.json"):
+        (workspace / "hermes/accepted-requests" / rejected.name).unlink(missing_ok=True)
+        rejected.unlink()
+    findings = ingest_responses(workspace, governing)
+    if findings:
+        return {**base, "status": "blocked", "stage": "drafting_response",
+                "findings": findings, "experimental_outputs": []}
+    schedule_requests(repo_root=SCRIPT_DIR.parent, revision_dir=workspace,
+                      revision_id=working["approval"]["revision_id"], reference=reference,
+                      wave="generation-only", contracted_bundle=bundle)
+    pending = pending_requests(workspace, governing)
+    if pending:
+        result = _awaiting(workspace, stage="drafting", paths=pending)
+        return {**result, **base}
+    missing = missing_drafts(workspace, reference, SCRIPT_DIR.parent, contracted_bundle=bundle)
+    if missing:
+        return {**base, "status": "blocked", "stage": "drafting_response",
+                "findings": [{"issue": f"Missing draft: {target}"} for target in missing]}
+    model = merged_drafts(workspace, reference, governing)
+    _write(workspace / "merged-drafts.json", model)
+    report = render_documents(SCRIPT_DIR.parent, workspace, reference, model,
+                              contracted_bundle=bundle, audit_output=False)
+    _write(workspace / "assembly-report.json", report)
+    if report["status"] != "passed":
+        return {**base, "status": "blocked", "stage": "assembly", "findings": report["artifacts"]}
+    if bundle.get("prs_authority"):
+        prs = bundle["prs_authority"]
+        generate_xml(SCRIPT_DIR.parent / prs["generation_template"]["path"],
+                     workspace / "candidate/study.xml", reference, model["prs"],
+                     structural_template=SCRIPT_DIR.parent / prs["structural_reference"]["path"],
+                     check_output=False)
+    names = document_set(get_path(reference, "meta.study_type"))
+    try:
+        # Availability checks only: native files exist and can be opened. No
+        # quality, content, visual, XML contract or publication gate runs here.
+        for name in names:
+            path = workspace / "candidate" / name
+            if path.suffix == ".docx":
+                Document(path)
+            else:
+                ElementTree.parse(path)
+    except (OSError, ValueError, zipfile.BadZipFile, PackageNotFoundError, ElementTree.ParseError) as exc:
+        return {**base, "status": "blocked", "stage": "file_integrity", "findings": [{"issue": str(exc)}]}
+    output = run_dir / "generation-only-output" / base["revision_id"] / identity[:16]
+    output.mkdir(parents=True, exist_ok=False)
+    entries = []
+    for name in names:
+        path = output / f"UNREVIEWED-{name}"
+        shutil.copy2(workspace / "candidate" / name, path)
+        entries.append({"absolute_path": str(path), "path": path.relative_to(run_dir).as_posix(),
+                        "sha256": sha256_file(path)})
+    notice = output / "README.txt"
+    notice.write_text(
+        "UNREVIEWED EXPERIMENT — not client-ready.\n"
+        "Generated using n8n prompts with approved-source and Brad editorial corrections, "
+        "plus current instructions for additional sections and the current DOCX/XML builders.\n"
+        "No content review, visual review, PDF conversion, post-generation quality gates or automatic repairs ran.\n"
+        "Inspect these files against the approved source and references/brad-review-coverage.md.\n",
+        encoding="utf-8")
+    started = datetime.fromisoformat(_read(marker)["started_at"])
+    result = {**base, "status": "unreviewed", "stage": "generation_only_complete",
+              "experimental_outputs": entries, "notice": str(notice),
+              "manifest": str(manifest_path), "governing_sha256": identity,
+              "elapsed_seconds": (datetime.now(timezone.utc) - started).total_seconds(),
+              "assessments": {"content": "not_run", "visual": "not_run"}}
+    _write(manifest_path, result)
+    return result
+
+
 def generate(
     run_dir: Path,
     *,
@@ -11552,6 +11652,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage", choices=("prepare", "approve", "validate", "generate"))
     parser.add_argument("--approved-by", default="client")
     parser.add_argument("--source-md")
+    parser.add_argument("--generation-only", action="store_true", help="experimental n8n drafting and DOCX/XML assembly without post-generation review or repair")
     parser.add_argument("--desktop-operation", action="store_true", help="run the shipped real-Hermes Desktop adapter")
     parser.add_argument("--manual-review", action="store_true", help="generate local pre-release review outputs from a provisioned candidate without requiring promotion")
     parser.add_argument("--host-mode", choices=("isolated", "hermes-tui"), default="isolated", help="explicit host-managed TUI mode generates local files without namespace or recipient-delivery claims")
@@ -11579,6 +11680,13 @@ def main(argv: list[str] | None = None) -> int:
         help=argparse.SUPPRESS,
     )
     args = parser.parse_args(argv)
+    if args.generation_only and (
+        args.stage != "generate" or not args.run_dir or args.desktop_operation or args.manual_review
+        or args.release_gate or args.format_conformance or args.package_release or args.provision_candidate
+        or args.bind_certification or args.verify_installation or args.install_release or args.rollback_release
+        or args.delivery_metrics or args.internal_pdfium_worker
+    ):
+        parser.error("--generation-only requires --run-dir and --stage generate, without Desktop or release operations")
     if args.manual_review and not (
         args.desktop_operation or (args.stage == "generate" and args.run_dir)
     ):
@@ -11587,7 +11695,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--host-mode hermes-tui requires --desktop-operation --manual-review")
     if args.internal_pending_activation_smoke and not args.verify_installation:
         parser.error("internal pending activation smoke requires --verify-installation")
-    if args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
+    if args.generation_only: result = generate_only(Path(args.run_dir))
+    elif args.internal_pdfium_worker: result = run_pdfium_worker(Path(args.internal_pdfium_worker))
     elif args.delivery_metrics:
         records = _read(Path(args.delivery_metrics))
         result = delivery_reliability_metrics(records["operations"], evidence_kind=records["evidence_kind"])
@@ -11649,7 +11758,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.stage == "generate" and args.manual_review:
             stage_options["require_promoted_runtime"] = False
         result = {"prepare": prepare, "approve": approve, "validate": validate, "generate": generate}[args.stage](run_dir, **stage_options)
-    print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes"} else 1
+    print(json.dumps(result, indent=2, ensure_ascii=False)); return 0 if result.get("status") in {"passed", "structural_passed", "awaiting_approval", "awaiting_hermes", "unreviewed"} else 1
 
 
 __all__ = ["approve", "bind_release_certification", "command_desktop_opener", "command_parent_visual_reviewer", "confirm_desktop_delivery", "delivery_reliability_metrics", "desktop_attachment_reply", "desktop_operation_state_path", "generate", "install_release", "package_release", "performance_classification", "prepare", "provision_render_assurance", "resolve_python_runtime", "rollback_release", "run_desktop_operation", "run_format_conformance", "run_production_desktop_operation", "run_release_gate", "validate", "verify_installation"]

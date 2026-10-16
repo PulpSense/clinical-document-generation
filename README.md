@@ -2,6 +2,15 @@
 
 Hermes skill for generating reviewed clinical Protocol DOCX, ICF DOCX, and ClinicalTrials.gov PRS XML packages.
 
+This branch contains a **generation-only experiment**: retained n8n writing
+prompts with Brad's later corrections, current templates/formatting, and
+source-grounded drafting for additional sections. After source approval, use
+`scripts/workflow.py --run-dir <run-dir> --stage generate --generation-only`.
+Hermes fills the returned drafting requests; the command stops at unreviewed
+DOCX/XML without post-generation review or repair. Follow
+[the Hermes instructions](references/generation-only.md). The reviewed workflow
+below remains available separately.
+
 The repository root is the skill root. Install the whole repository—not only `SKILL.md`—because the skill requires its templates, contracts, boilerplate, and Python modules.
 
 ## Architecture

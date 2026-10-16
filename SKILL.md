@@ -5,6 +5,19 @@ description: Generate reviewed clinical Protocol DOCX, ICF DOCX, and ClinicalTri
 
 # Clinical Document Generation
 
+## Generation-only experiment in this checkout
+
+This checkout implements the owner's n8n-prompt experiment. For generation
+here, use [generation-only.md](references/generation-only.md). Complete the
+ordinary source intake and explicit approval steps, then use
+`--stage generate --generation-only` instead of the Desktop operation below.
+Use the retained n8n prompts for matching sections, Brad's later corrections,
+and source-grounded drafting for additional study-specific sections. The current
+templates own fixed language and formatting. Stop at the unreviewed DOCX/XML
+outputs; the owner and Codex inspect them after generation. This experimental
+route supersedes the review, repair, renderer-provisioning and delivery-gate
+instructions below for these runs. Preserve Linux runtime dependencies.
+
 Generate source-grounded clinical documents through one approval, independent AI review, general-tool repair and complete file delivery. AI owns meaning and visual usability. Code owns input/schema presence, approval and source identity, native-file integrity, required inventory, supported XML structure, rendering and exact-byte delivery.
 
 ## Before generation

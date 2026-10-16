@@ -850,6 +850,7 @@ def generate(
     narrative: Mapping[str, Any],
     *,
     structural_template: Path | None = None,
+    check_output: bool = True,
 ) -> dict[str, Any]:
     tree = ET.parse(template_path); root = tree.getroot(); study = _study(root)
     study_type = _text(get_path(reference, "regulatory.prs.study_type")).casefold()
@@ -868,6 +869,8 @@ def generate(
         if element.tail: element.tail = TOKEN.sub(lambda match: fields.get(match.group(1), ""), element.tail)
     ET.indent(tree, space="  "); output_path.parent.mkdir(parents=True, exist_ok=True)
     tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    if not check_output:
+        return {"artifact": "xml", "path": output_path.name, "status": "unreviewed", "findings": []}
     findings = validate_output(
         output_path,
         reference,

@@ -265,6 +265,10 @@ def _request_matches_approved_reference(
             request.get("approved_input") == _draft_source_items(scoped, expected_contracts),
             contracts == expected_contracts,
             request.get("constraints") == _request_constraints(),
+            request.get("generation_only_prompts") == (
+                generation_only_prompt_payload(repo_root, reference, expected_contracts)
+                if (revision_dir / "generation-only.json").is_file() else None
+            ),
             request.get("response_path") == f"hermes/responses/{request_id}.json",
             set(targets) <= set(batch.section_ids),
             all(attempt >= 1 for attempt in normalized_attempts.values()),
@@ -326,6 +330,131 @@ def governing_resources(
         "topology_version": TOPOLOGY_VERSION,
         "prompt_version": PROMPT_VERSION,
         "producer_policy": "nonempty-model-id",
+        "generation_only_prompts_sha256": (
+            sha256_file(repo_root / "references/generation-only-n8n-prompts.json")
+            if (repo_root / "references/generation-only-n8n-prompts.json").is_file() else None
+        ),
+    }
+
+
+def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any],
+                                   sections: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    """Adapt retained n8n writing prompts to approved inputs and native sections.
+
+    n8n expressions are substituted as data; no expression or workflow code is
+    executed. Original messages remain available beside the adapted messages.
+    """
+    library = _read_json(repo_root / "references/generation-only-n8n-prompts.json")
+    branch = canonical_study_type(get_path(reference, "meta.study_type"))
+    suffix = {"Prospective": "", "Ambispective": "1", "Retrospective": "2"}[branch]
+    source_paths = {
+        "whatIsTheFullTitleOfTheStudy": "study.title",
+        "describeTheStudyDesign": "design.study_design",
+        "describeTheUnmetMedicalNeedAddressedByThisStudy": "study.unmet_need",
+        "provideTheBackgroundAndSignificanceOfTheStudy": "study.background",
+        "provideTheStudyTimeline": "study.timeline",
+        "stateTheStudyHypothesis": "study.hypothesis",
+        "specifySampleSize": "population.sample_size",
+        "specifySampleJustification": "population.sample_justification",
+        "listInclusionCriteria": "population.inclusion_criteria",
+        "listExclusionCriteria": "population.exclusion_criteria",
+        "howManyInvestigationalSitesWillParticipateInTheStudy": "design.number_of_sites",
+        "howManyInvestigationalSitesParticipatedInTheStudy": "design.number_of_sites",
+        "whatAreThePrimaryObjectivesOfTheStudy": "objectives.primary",
+        "whatAreTheKeyObjectivesOfTheStudy": "objectives.primary",
+        "outlineTheStatisticalAnalysisPlan": "statistics.analysis_plan",
+        "willParticipantsReceiveCompensationOrTravelReimbursement": "risks_benefits.compensation_or_reimbursement",
+        "interventionName": "design.intervention_name",
+        "interventionType": "design.intervention_type",
+        "areThereAnyTestArticles": "design.test_articles",
+        "areThereAnyControlArticles": "design.control_articles",
+        "uSFDAregulatedDevice": "regulatory.prs.fda_regulated_device",
+        "uSFDAregulatedDrug": "regulatory.prs.fda_regulated_drug",
+        "whatIsTheNameOfThePrincipalInvestigator": "parties.principal_investigator.name",
+        "whatIsTheNameOfTheStudyCoordinator": "parties.study_coordinator.name",
+    }
+    bindings = {key: get_path(reference, path) for key, path in source_paths.items()}
+    # Preserve the same canonical aliases accepted by the native builders.
+    bindings["describeTheUnmetMedicalNeedAddressedByThisStudy"] = (
+        bindings["describeTheUnmetMedicalNeedAddressedByThisStudy"] or get_path(reference, "study.unmet_medical_need"))
+    bindings["specifySampleJustification"] = (
+        bindings["specifySampleJustification"] or get_path(reference, "statistics.sample_size_justification"))
+    interventions = get_path(reference, "design.interventions", []) or []
+    bindings["areThereAnyTestArticles"] = (
+        bindings["areThereAnyTestArticles"] or get_path(reference, "design.intervention_name")
+        or (interventions[0] if interventions else None))
+    bindings["areThereAnyControlArticles"] = (
+        bindings["areThereAnyControlArticles"] or get_path(reference, "design.control")
+        or (interventions[1] if len(interventions) > 1 else None))
+    for key, field in (("uSFDAregulatedDevice", "fda_regulated_device"),
+                       ("uSFDAregulatedDrug", "fda_regulated_drug")):
+        if bindings[key] is None:
+            bindings[key] = get_path(reference, f"regulatory.{field}")
+    sites = reference.get("sites") or []
+    bindings["whatIsTheNameOfTheFacility"] = get_path(sites[0], "facility.name") if sites else None
+    for key in ("listTheKeyEndpoints", "listThePrimaryAndSecondaryEndpoints"):
+        bindings[key] = reference.get("endpoints", {})
+    schedule = {key: get_path(reference, f"procedures.{key}") for key in
+                ("assessments", "visit_schedule", "visit_schedule_table")}
+    for key in ("listAllPlannedAssessmentsAndTheirSchedule", "listAllAssessmentsConductedAndTheirSchedules"):
+        bindings[key] = schedule
+
+    def substitute(match: re.Match[str]) -> str:
+        expression = match.group(1).strip()
+        if "Set Questions" in expression or expression.startswith("$json."):
+            key = expression.rsplit(".", 1)[-1]
+            if key not in bindings:
+                raise ValueError(f"Unsupported n8n input binding: {expression}")
+            value = bindings[key]
+        elif "Procedures & Assessments" in expression:
+            # The native request uses the approved schedule directly rather than
+            # treating earlier model prose as a new source of study facts.
+            value = schedule
+        elif "Population Variables2" in expression:
+            value = get_path(reference, "population.inclusion_criteria")
+        else:
+            raise ValueError(f"Unsupported n8n input binding: {expression}")
+        return "Not supplied in the approved source" if value is None else (
+            value if isinstance(value, str) else json.dumps(value, ensure_ascii=False))
+
+    grouped: dict[str, dict[str, Any]] = {}
+    fallback = []
+    overrides = library["branch_overrides"].get(branch, {})
+    for section in sections:
+        target = str(section["section_id"])
+        mapping = overrides.get(target) or library["section_sources"].get(target)
+        if not mapping:
+            fallback.append(target)
+            continue
+        base, field = mapping
+        node = base if target in overrides else base + suffix
+        if node not in library["nodes"]:
+            fallback.append(target)
+            continue
+        if node not in grouped:
+            original = library["nodes"][node]["messages"]
+            grouped[node] = {
+                "node": node, "targets": [], "original_messages": original,
+                "messages": [{"role": item.get("role", "user"),
+                              "content": re.sub(r"\{\{(.*?)\}\}", substitute,
+                                                item["content"].removeprefix("="), flags=re.S)}
+                             for item in original],
+            }
+        grouped[node]["targets"].append({"section_id": target, "legacy_fields": field})
+    return {
+        "profile": "n8n-with-brad-corrections/v1",
+        "source": library["source"],
+        "prompts": list(grouped.values()),
+        "current_instruction_targets": fallback,
+        "adapter_instructions": [
+            "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
+            "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+            "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
+            "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+            "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
+            "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
+            "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses.",
+        ],
     }
 
 
@@ -898,6 +1027,11 @@ def create_drafting_request(
         "constraints": _request_constraints(),
         "response_path": response_path.relative_to(revision_dir).as_posix(),
     }
+    if (revision_dir / "generation-only.json").is_file():
+        payload["generation_only_prompts"] = generation_only_prompt_payload(repo_root, reference, sections)
+        # The original n8n demonstrations are the baseline for mapped sections.
+        payload["writing_examples"] = [example for example in payload["writing_examples"]
+                                       if example["section_id"] in payload["generation_only_prompts"]["current_instruction_targets"]]
     payload["request_sha256"] = request_sha256(payload)
     request_path = revision_dir / "hermes/requests" / f"{request_id}.json"
     ledger_path = _request_ledger_path(revision_dir, request_id)
@@ -2378,6 +2512,52 @@ def _source_interpretation_findings(
             for error in errors]
 
 
+def _generation_only_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> dict[str, Any]:
+    """Accept native drafting structure without making a content judgment."""
+    common = {key: copy.deepcopy(request.get(key)) for key in
+              ("governing_resources", "request_id", "request_sha256")}
+    common["producer"] = dict(response["producer"])
+    contracts = {item["section_id"]: item for item in request["section_contracts"]}
+    if request["task"] == "prs_narrative_drafting":
+        keys = {"prs.brief-summary": "brief_summary", "prs.detailed-description": "detailed_description"}
+        narrative = response.get("narrative")
+        if not isinstance(narrative, Mapping) or set(narrative) != {keys[target] for target in contracts}:
+            raise ValueError("Return exactly the requested PRS narrative keys.")
+        clean = {}
+        for key, item in narrative.items():
+            if not isinstance(item, Mapping) or not isinstance(item.get("text"), str) or not item["text"].strip():
+                raise ValueError(f"PRS narrative {key} needs nonempty text.")
+            clean[key] = {**copy.deepcopy(item), **common}
+        return {"kind": "prs", "narrative": clean, **common}
+    results = response.get("section_results")
+    if not isinstance(results, list) or any(not isinstance(item, Mapping) for item in results):
+        raise ValueError("Return a section_results list of objects.")
+    ids = [item.get("section_id") for item in results]
+    if len(ids) != len(contracts) or set(ids) != set(contracts):
+        raise ValueError("Return each requested section exactly once.")
+    drafts = []
+    for item in results:
+        target = item["section_id"]
+        if item.get("outcome") not in {"drafted", "fixed_boilerplate"}:
+            raise ValueError(f"Section {target} requires drafted or fixed_boilerplate outcome.")
+        paragraphs, lists = item.get("paragraphs", []), item.get("lists", [])
+        if not isinstance(paragraphs, list) or not isinstance(lists, list):
+            raise ValueError(f"Section {target} requires paragraph and list arrays.")
+        for paragraph in paragraphs:
+            if not isinstance(paragraph, Mapping) or not isinstance(paragraph.get("text"), str) or not paragraph["text"].strip():
+                raise ValueError(f"Section {target} has a malformed or empty paragraph.")
+        for group in lists:
+            if (not isinstance(group, Mapping) or not isinstance(group.get("items"), list)
+                    or not group["items"] or any(not isinstance(text, str) or not text.strip() for text in group["items"])):
+                raise ValueError(f"Section {target} has a malformed or empty list.")
+        if not paragraphs and not lists:
+            raise ValueError(f"Section {target} has no content.")
+        drafts.append({**copy.deepcopy(item), **common, "paragraphs": paragraphs, "lists": lists,
+                       "artifact": request["artifact"], "batch_id": request["batch_id"],
+                       "attempt": request["attempts"][target], "warnings": []})
+    return {"kind": "sections", "drafts": drafts, **common}
+
+
 def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -> tuple[dict[str, Any] | None, list[dict[str, Any]]]:
     findings: list[dict[str, Any]] = []
     for field in ("schema_version", "request_id", "request_sha256", "revision_id", "task", "batch_id"):
@@ -2389,6 +2569,11 @@ def validate_response(request: Mapping[str, Any], response: Mapping[str, Any]) -
         findings.append({"category": "drafting", "field": "producer.model_id", "issue": "Response does not identify the producing model.", "next_action": "Record the actual model identity."})
     if findings:
         return None, findings
+    if request.get("generation_only_prompts"):
+        try:
+            return _generation_only_response(request, response), []
+        except (ValueError, TypeError, KeyError) as exc:
+            return None, [{"category": "drafting", "field": request["batch_id"], "issue": str(exc)}]
     if request.get('construction_repair'):
         return _validate_construction_response(request, response)
     if request.get("task") == "prs_narrative_drafting":
