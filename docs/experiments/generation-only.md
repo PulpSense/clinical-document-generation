@@ -186,3 +186,26 @@ Focused front-matter, template-comment, generation-only and Brad-feedback checks
 passed: 43 tests. One existing reviewer-instruction literal-string test fails
 unchanged in the original checkout and was excluded. The full suite was not run.
 Prompt behavior still needs a fresh Hermes generation for manual comparison.
+
+## Experimental script cleanup — 16 October 2026
+
+The owner requested removal of scripts outside the active generation path.
+This checkout now retains six Python files: workflow, contracts, drafting,
+rendering, PRS XML and output_recovery. The last still supplies field mappings
+and compatibility helpers imported by drafting/rendering; it is not an active
+post-generation repair stage. Nine review, worker, callback and storage files
+were removed. The workflow retains source preparation, approval, source-readiness
+validation and generation-only assembly; obsolete Desktop, release and review
+operations were removed rather than left calling deleted modules.
+
+Plain `--stage generate` now uses the same experimental lifecycle as the retained
+`--generation-only` compatibility flag. Skill instructions and README describe
+only the supported lifecycle. Existing Linux dependency declarations are unchanged.
+Historical reviewed-workflow tests/references remain as repository history and
+are outside this checkout's supported execution path. The original reviewed
+implementation remains in the primary checkout and Git history.
+
+Delivery includes clean document links followed by generation time from recorded
+elapsed seconds. Focused native-generation, obligatory-intake, TOC and front-table
+checks passed (45 tests), plus two fresh-process CLI cases for generation with
+and without the compatibility flag. The full suite was not run.

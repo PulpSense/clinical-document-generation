@@ -15,12 +15,10 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-import quality
-
-
 @pytest.fixture
 def governed_pdfium(tmp_path, monkeypatch):
     """Provide the exact shape of a release-owned PDFium test runtime."""
+    import quality  # Only historical reviewed-workflow tests use this fixture.
     source_wheel = Path()
     platform_tag = ""
     machine = platform.machine().casefold()

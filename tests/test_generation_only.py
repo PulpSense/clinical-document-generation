@@ -1,6 +1,8 @@
 """Controlled construction tests; no live model or clinical-quality claims."""
 import copy
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -13,6 +15,20 @@ import rendering
 import workflow
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("extra_args", [[], ["--generation-only"]])
+def test_public_generate_command_uses_experimental_drafting(tmp_path, extra_args):
+    approved_run(tmp_path)
+    process = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/workflow.py"), "--run-dir", str(tmp_path),
+         "--stage", "generate", *extra_args], capture_output=True, text=True, check=True)
+    result = json.loads(process.stdout)
+    assert result["mode"] == "generation_only"
+    assert result["status"] == "awaiting_hermes"
+    assert result["handoffs"]
+    assert all(item["task"] in {"section_drafting", "prs_narrative_drafting"}
+               for item in result["handoffs"])
 
 
 def approved_run(path, branch="Prospective", family="Sterling"):
@@ -51,7 +67,7 @@ def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch
 
     for name in ("render_assurance", "create_verification_requests", "quality_report", "_quality_retry",
                  "_schedule_native_repair", "_publish"):
-        monkeypatch.setattr(workflow, name, unexpected)
+        assert not hasattr(workflow, name)
     monkeypatch.setattr(rendering, "audit_docx", unexpected)
     monkeypatch.setattr(prs_xml, "validate_output", unexpected)
     monkeypatch.setattr(prs_xml, "quality_report", unexpected)
@@ -62,9 +78,10 @@ def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch
     if branch != "Retrospective":
         expected |= {"icf.docx", "study.xml"}
     assert {Path(item["absolute_path"]).name for item in result["experimental_outputs"]} == expected
+    minutes, seconds = divmod(round(result['elapsed_seconds'], 2), 60)
     assert result["delivery_message"] == "Here are the documents:\n\n" + "\n".join(
         f"- [{Path(item['absolute_path']).name}](<{item['absolute_path']}>)"
-        for item in result["experimental_outputs"])
+        for item in result["experimental_outputs"]) + f"\n\nGeneration time: {int(minutes)} minutes {seconds:.2f} seconds."
     for entry in result["experimental_outputs"]:
         file = Path(entry["absolute_path"])
         assert file.is_file()

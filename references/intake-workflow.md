@@ -11,8 +11,9 @@
 6. Run `workflow.py --stage generate`. Do not ask new source questions after
    approval. Missing optional detail stays blank or uses authorized standard
    clinical boilerplate where the section contract permits it.
-7. Satisfy Hermes drafting and verification requests until the workflow returns
-   `status: passed`; then return only `client_outputs`.
+7. Satisfy Hermes drafting requests until `status: unreviewed`; then deliver the
+   complete `experimental_outputs` using the links and recorded generation time
+   in `delivery_message`. Follow [generation-only.md](generation-only.md).
 
 The canonical approved reference never stores model prose or a legacy flat
 placeholder layer. Rendering maps canonical facts and accepted section drafts

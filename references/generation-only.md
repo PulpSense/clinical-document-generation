@@ -59,11 +59,11 @@ The terminal result is `status: unreviewed`, with exact paths in
 `client_outputs` stays empty. Local host paths establish saved files only;
 use the channel's actual transfer mechanism when available.
 
-Deliver with only “Here are the documents:” and a clickable link for each generated
-file. Use `delivery_message` when its links are accessible to the user; otherwise
+Deliver with “Here are the documents:”, a clickable link for each generated
+file, and the recorded generation time in minutes and seconds. Use `delivery_message` when its links are accessible to the user; otherwise
 upload/attach the files through the channel's supported transfer mechanism and use
 the resulting links in that same short message. Keep filenames free of the
-`UNREVIEWED-` prefix. Keep run paths, revision IDs, timing, hashes, drafting records,
+`UNREVIEWED-` prefix. Keep run paths, revision IDs, hashes, drafting records,
 assessment status and experiment notices in the run records rather than the delivery
 message. Internal `status: unreviewed` records the workflow's actual assessment state.
 
