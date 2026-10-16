@@ -1537,15 +1537,7 @@ def _normalize_icf_heading_styles(document: Document, *, sterling: bool = False)
 
 
 def _icf_blocks(model: Mapping[str, Any], section_id: str) -> list[tuple[str, bool]]:
-    draft = model.get("icf", {}).get(section_id, {})
-    blocks: list[tuple[str, bool]] = []
-    for paragraph in draft.get("paragraphs", []):
-        if isinstance(paragraph, Mapping):
-            blocks.extend((part.strip(), False) for part in str(paragraph.get("text") or "").split("\n\n") if part.strip())
-    for group in draft.get("lists", []):
-        if isinstance(group, Mapping):
-            blocks.extend((item, True) for item in _list(group.get("items")))
-    return blocks
+    return _draft_blocks(model.get("icf", {}).get(section_id, {}))
 
 
 def _copy_paragraph_design(paragraph: Paragraph, exemplar: Paragraph | None) -> None:
@@ -3814,6 +3806,18 @@ def _template_document(
             _normalize_sterling_generated_typography(document, model)
             _preserve_sterling_registry_statement(document, authority, reference)
         _normalize_icf_body_spacing(document, sterling=sterling)
+        # Apply group cohesion after the authority layout has copied its
+        # paragraph properties, so a visit label stays with its first activity.
+        list_labels = {
+            str(group.get("label") or "").strip()
+            for section in model.get("icf", {}).values()
+            for group in section.get("lists", []) if isinstance(group, Mapping)
+            if str(group.get("label") or "").strip()
+        }
+        for paragraph in document.paragraphs:
+            if paragraph.text.strip() in list_labels:
+                paragraph.paragraph_format.keep_with_next = True
+                paragraph.paragraph_format.keep_together = True
 
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""

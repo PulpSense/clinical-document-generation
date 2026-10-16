@@ -400,3 +400,27 @@ handoff behavior were tested separately. Historical prompt-trial requests and
 receipts retain their original instructions rather than being rewritten to
 claim they used these corrections. Hermes must now rerun NEAR with the same
 previously approved Source of Truth to confirm its new drafting response.
+
+## Preserve ICF list labels — 16 October 2026
+
+The next NEAR rerun confirmed all four preceding corrections but exposed that
+the separate ICF block projection discarded list-group labels supported by the
+drafting response. Visit activities consequently lost their names, timing and
+appointment lengths. ICF assembly now uses the same paragraph/list projection
+as Protocol assembly. Exact drafted labels precede their own bullet items once;
+unlabeled lists and ordinary paragraphs retain their existing behavior. Final
+ICF layout keeps each explicit group label with its first activity, after the
+authority layout has copied paragraph properties. Prompts, clinical source
+facts, runtime dependencies and the six-script inventory are unchanged.
+
+The generated-DOCX regression failed before the fix for Advarra and Sterling in
+both Prospective and Ambispective branches, then passed for all four cases.
+It checks order, exact timing/duration text, single occurrences and native
+bullet/group cohesion. The focused generation/editorial/source-owned/spacing
+selection passed 54 tests. After the last label pagination adjustment, the 41
+affected checks passed again. Python compilation and whitespace checks passed;
+no static type checker is configured. The full suite was not run under the
+repository's focused-test constraint. Standards and Spec reviews against
+fc7c04f reported zero findings, including the final pagination change. Local
+construction fixtures for all four combinations were rendered for layout
+inspection; they are development material, not new clinical study deliverables.

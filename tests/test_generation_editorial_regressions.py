@@ -191,3 +191,47 @@ def test_current_prompts_assign_endpoint_note_and_withdrawal_ownership():
     assert "label 'Exploratory endpoint'" in ' '.join(corrections['study-design.design'])
     assert 'related_source' in ' '.join(corrections['evaluation-procedures'])
     assert 'Assembly supplies the exact authorized' in ' '.join(corrections['icf.withdrawal'])
+
+
+@pytest.mark.parametrize('family', ['Advarra', 'Sterling'])
+@pytest.mark.parametrize('branch', ['Prospective', 'Ambispective'])
+def test_icf_visit_groups_keep_labels_timing_and_activities(family, branch, tmp_path):
+    source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['meta'].update(icf_template=family, study_type=branch)
+    procedures = {
+        'paragraphs': [{'text': 'You will attend three in-person research visits.'}],
+        'lists': [
+            {'label': 'Visit 1 — Day 0 / Enrollment; no visit window; approximately 60 minutes',
+             'items': ['You will give written consent before research assessments.',
+                       'Staff will check eligibility and test your vision.']},
+            {'label': 'Visit 2 — Week 6; Day 42 +/- 7 days; approximately 35 minutes',
+             'items': ['You will repeat the vision tests and questionnaires.']},
+            {'label': 'Visit 3 — Week 12 / Final Visit; Day 84 +/- 7 days; approximately 35 minutes',
+             'items': ['You will repeat the assessments and complete participation.']},
+        ],
+    }
+    rendering.render_documents(ROOT, tmp_path, source,
+        {'protocol': [], 'icf': {'icf.procedures': procedures}, 'prs': {}},
+        artifact_names={'icf'}, audit_output=False)
+    document = Document(tmp_path / 'candidate/icf.docx')
+    paragraphs = document.paragraphs
+    texts = [p.text for p in paragraphs]
+    first = texts.index('You will attend three in-person research visits.')
+    assert texts[first:first+8] == [
+        'You will attend three in-person research visits.',
+        'Visit 1 — Day 0 / Enrollment; no visit window; approximately 60 minutes',
+        'You will give written consent before research assessments.',
+        'Staff will check eligibility and test your vision.',
+        'Visit 2 — Week 6; Day 42 +/- 7 days; approximately 35 minutes',
+        'You will repeat the vision tests and questionnaires.',
+        'Visit 3 — Week 12 / Final Visit; Day 84 +/- 7 days; approximately 35 minutes',
+        'You will repeat the assessments and complete participation.',
+    ]
+    for group in procedures['lists']:
+        label = group['label']
+        assert texts.count(label) == 1
+        assert not paragraphs[texts.index(label)]._p.xpath('./w:pPr/w:numPr')
+        assert paragraphs[texts.index(label)].paragraph_format.keep_with_next
+        for item in group['items']:
+            assert texts.count(item) == 1
+            assert paragraphs[texts.index(item)]._p.xpath('./w:pPr/w:numPr')
