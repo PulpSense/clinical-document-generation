@@ -9,7 +9,9 @@ Install the entire folder with its existing compatible Python runtime and
 
 The workflow prepares an editable Source-of-Truth, records explicit approval,
 requests section drafts from Hermes and builds the complete native document set.
-It performs no PDF conversion, independent review or automatic repair.
+One office pagination pass fills Protocol TOC page numbers using the existing
+host LibreOffice (`CLINICAL_SOFFICE` can specify its absolute path). Its temporary
+PDF stays internal and is deleted. There is no independent review or automatic repair.
 
 Six Python scripts are retained:
 

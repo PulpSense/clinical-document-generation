@@ -241,3 +241,29 @@ source preparation for manual verification. TOC page-number caches still require
 office pagination; adding a field-refresh step awaits the owner's choice.
 Focused generation, repetition, metadata and obligatory-intake checks passed:
 73 tests. No full suite or new live Hermes study generation was run.
+
+## Approved TOC field refresh — 16 October 2026
+
+The owner approved one office field-refresh step after native assembly, without
+content/visual reviews or repair loops. The workflow now runs the existing host
+LibreOffice once to paginate a private Protocol copy. It reads exact heading
+destinations from that PDF's outline, fills the native DOCX's TOC/PAGEREF caches,
+and discards the PDF and private office profile. The native clinical body and
+tables are not exported back from LibreOffice. A reserved page-number column is
+present before pagination, so inserting cached digits preserves the label layout.
+
+The supplied 12-page Protocol was replayed through this step. Non-TOC paragraphs
+and table text remained unchanged; all 44 cached TOC numbers matched a separate
+development verification render, and its two TOC pages were inspected visually.
+Prospective, Ambispective and Retrospective fixture replays also matched final
+pagination: 44, 44 and 21 TOC entries respectively. These additional verification
+renders are development checks, not extra stages in the production lifecycle.
+
+The executable is resolved from CLINICAL_SOFFICE or the existing Linux PATH.
+Dependency declarations and the six-script inventory are unchanged. A construction
+failure leaves original candidate bytes intact and returns office_field_refresh
+feedback without automatic retry or publication. Completed results reuse saved
+files. Renderer identity and byte hashes remain in internal run records; delivery
+continues to show only document links and recorded total generation time.
+The 49 focused office-refresh, generation, native-TOC, repetition and existing
+TOC-cache checks passed. The full suite was not run.

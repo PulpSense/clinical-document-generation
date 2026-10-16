@@ -17,6 +17,17 @@ import workflow
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def office_refresh(monkeypatch):
+    """Workflow tests isolate office processing; real pagination has separate coverage."""
+    calls = []
+    def refresh(path):
+        calls.append(path)
+        return {"status": "passed", "renderer": "controlled-test-double"}
+    monkeypatch.setattr(workflow, "refresh_protocol_fields", refresh)
+    return calls
+
+
 @pytest.mark.parametrize("extra_args", [[], ["--generation-only"]])
 def test_public_generate_command_uses_experimental_drafting(tmp_path, extra_args):
     approved_run(tmp_path)
@@ -59,7 +70,7 @@ def complete(path):
 @pytest.mark.parametrize("branch,family", [("Prospective", "Advarra"), ("Prospective", "Sterling"),
                                            ("Ambispective", "Advarra"), ("Ambispective", "Sterling"),
                                            ("Retrospective", None)])
-def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch, branch, family):
+def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch, branch, family, office_refresh):
     approved_run(tmp_path, branch, family)
 
     def unexpected(*_args, **_kwargs):
@@ -91,9 +102,24 @@ def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch
     assert not (workspace / "verification").exists()
     assert not (tmp_path / "output").exists()
     assert workflow.generate_only(tmp_path) == result
+    assert office_refresh == [workspace / "candidate/protocol.docx"]
     file = Path(result["experimental_outputs"][0]["absolute_path"])
     file.write_bytes(b"changed")
     assert workflow.generate_only(tmp_path)["stage"] == "file_integrity"
+
+
+def test_office_failure_returns_construction_feedback_without_publishing(tmp_path, monkeypatch):
+    approved_run(tmp_path)
+    calls = []
+    def unavailable(path):
+        calls.append(path)
+        raise RuntimeError("Office field-refresh executable is unavailable.")
+    monkeypatch.setattr(workflow, "refresh_protocol_fields", unavailable)
+    result = complete(tmp_path)
+    assert result["status"] == "blocked"
+    assert result["stage"] == "office_field_refresh"
+    assert len(calls) == 1
+    assert not list(tmp_path.glob("generation-only-output/**/*"))
 
 
 def test_n8n_prompts_keep_original_messages_and_resolve_inputs(tmp_path):

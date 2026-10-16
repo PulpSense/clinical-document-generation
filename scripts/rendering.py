@@ -5,7 +5,11 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 import re
+import shutil
+import signal
+import subprocess
 import tempfile
 import zipfile
 from datetime import datetime
@@ -24,6 +28,7 @@ from docx.table import Table
 from docx.text.paragraph import Paragraph
 from lxml import etree as ET
 from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
 from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participant_followup_summary, BOILERPLATE_VERSION, LAYOUT_REPAIR_RULES, canonical_study_type, contracted_template_bundle, contextual_clinical_boilerplate, facility_projection, get_path, meaningful, normalized_visit_records, protocol_contract, protocol_table_contracts, recovery_finding, section_applies, sterling_clause_contract, sterling_clause_text
 from prs_xml import screening_interval_requirement
@@ -3879,6 +3884,9 @@ def _populate_protocol_toc_cache(document: Document, page_map: Mapping[str, int]
             source._p.append(end)
         paragraph = document.add_paragraph(style="toc 2" if style == "Heading 2" else "toc 1")
         paragraph.paragraph_format.left_indent = paragraph.style.paragraph_format.left_indent
+        # Reserve a page-number column before office pagination. Inserting the
+        # cached digits later must not reflow a long TOC label into another line.
+        paragraph.paragraph_format.right_indent = Inches(0.6)
         paragraph.paragraph_format.tab_stops.add_tab_stop(
             Inches(5.75), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS
         )
@@ -3912,11 +3920,36 @@ def _populate_protocol_toc_cache(document: Document, page_map: Mapping[str, int]
     return True
 
 
-def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
+def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path, *, require_outline: bool = False) -> bool:
     """Populate the Word TOC cache from current rendered-page evidence."""
     document = Document(docx_path)
+    reader = PdfReader(pdf_path)
+    if require_outline:
+        destinations: dict[str, set[int]] = {}
+        def collect(items) -> None:
+            for item in items:
+                if isinstance(item, list):
+                    collect(item)
+                else:
+                    page = reader.get_destination_page_number(item)
+                    if page is not None and page >= 0:
+                        key = re.sub(r"\s+", " ", item.title).strip().casefold()
+                        destinations.setdefault(key, set()).add(page + 1)
+        collect(reader.outline)
+        page_map = {}
+        for paragraph in document.paragraphs:
+            if paragraph.text.strip() and paragraph.style.name in {"Heading 1", "Heading 2"}:
+                key = re.sub(r"\s+", " ", paragraph.text).strip().casefold()
+                candidates = destinations.get(key, set())
+                if len(candidates) != 1:
+                    raise ValueError(f"Office pagination did not identify one page for heading: {paragraph.text.strip()}")
+                page_map[paragraph.text.strip()] = next(iter(candidates))
+        if not _populate_protocol_toc_cache(document, page_map):
+            raise ValueError("Protocol has no native table of contents to refresh.")
+        document.save(docx_path)
+        return True
     pages = []
-    for page in PdfReader(pdf_path).pages:
+    for page in reader.pages:
         try:
             extracted = page.extract_text(extraction_mode="layout")
         except TypeError:  # Compatibility with older pypdf releases.
@@ -3944,6 +3977,53 @@ def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
         return False
     document.save(docx_path)
     return True
+
+
+def refresh_protocol_fields(docx_path: Path, *, timeout_seconds: float = 120) -> dict[str, Any]:
+    """One office pagination pass; update only native TOC caches, without reviews."""
+    docx_path = docx_path.expanduser().resolve()
+    configured = os.environ.get("CLINICAL_SOFFICE")
+    command = (shutil.which(os.path.expanduser(configured)) if configured else
+               shutil.which("libreoffice") or shutil.which("soffice"))
+    if not command:
+        raise RuntimeError("TOC field refresh needs the existing LibreOffice executable. Set CLINICAL_SOFFICE to its absolute path.")
+    original_hash = hashlib.sha256(docx_path.read_bytes()).hexdigest()
+    with tempfile.TemporaryDirectory(prefix=".office-fields-", dir=docx_path.parent) as temporary:
+        folder = Path(temporary)
+        working = folder / docx_path.name
+        document = Document(docx_path)
+        if not _populate_protocol_toc_cache(document, {}):
+            raise ValueError("Protocol has no native table of contents to refresh.")
+        document.save(working)
+        output = folder / "pagination"
+        output.mkdir()
+        args = [str(Path(command).resolve()), f"-env:UserInstallation={(folder / 'profile').as_uri()}",
+                "--headless", "--convert-to", "pdf:writer_pdf_Export", "--outdir", str(output), str(working)]
+        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   text=True, start_new_session=True)
+        try:
+            stdout, stderr = process.communicate(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired as exc:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate()
+            raise RuntimeError("The single office TOC field-refresh pass timed out.") from exc
+        pdf = output / working.with_suffix(".pdf").name
+        if process.returncode != 0 or not pdf.is_file():
+            raise RuntimeError(f"Office TOC field refresh failed: {(stderr or stdout).strip()[-1500:]}")
+        try:
+            refresh_toc_from_pdf(working, pdf, require_outline=True)
+            page_count = len(PdfReader(pdf).pages)
+        except PyPdfError as exc:
+            raise RuntimeError("Office TOC field refresh produced an unreadable pagination PDF.") from exc
+        result = {"status": "passed", "renderer": str(Path(command).resolve()),
+                  "page_count": page_count, "source_sha256": original_hash,
+                  "pagination_pdf_sha256": hashlib.sha256(pdf.read_bytes()).hexdigest(),
+                  "output_sha256": hashlib.sha256(working.read_bytes()).hexdigest()}
+        os.replace(working, docx_path)
+    return result
 
 
 def audit_docx(path: Path, *, required_phrases: Iterable[str] = ()) -> list[dict[str, Any]]:
@@ -4102,4 +4182,4 @@ def render_documents(
     }
 
 
-__all__ = ["audit_docx", "refresh_toc_from_pdf", "render_documents", "render_fields", "protocol_section_snapshot", "rendered_section_snapshot", "template_paths"]
+__all__ = ["audit_docx", "refresh_toc_from_pdf", "refresh_protocol_fields", "render_documents", "render_fields", "protocol_section_snapshot", "rendered_section_snapshot", "template_paths"]

@@ -23,7 +23,7 @@ if str(SCRIPT_DIR) not in sys.path:
 from contracts import contracted_template_bundle, document_set, get_path, parse_source_truth, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import governing_resources, ingest_responses, merged_drafts, missing_drafts, pending_requests, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
-from rendering import render_documents
+from rendering import render_documents, refresh_protocol_fields
 from contracts import applicable_required_inputs, required_input_value
 
 
@@ -414,6 +414,12 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
     _write(workspace / "assembly-report.json", report)
     if report["status"] != "passed":
         return {**base, "status": "blocked", "stage": "assembly", "findings": report["artifacts"]}
+    try:
+        field_refresh = refresh_protocol_fields(workspace / "candidate/protocol.docx")
+    except (OSError, RuntimeError, ValueError) as exc:
+        return {**base, "status": "blocked", "stage": "office_field_refresh",
+                "findings": [{"issue": str(exc)}], "experimental_outputs": []}
+    _write(workspace / "office-field-refresh.json", field_refresh)
     if bundle.get("prs_authority"):
         prs = bundle["prs_authority"]
         generate_xml(SCRIPT_DIR.parent / prs["generation_template"]["path"],
@@ -445,7 +451,8 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
         "UNREVIEWED EXPERIMENT — not client-ready.\n"
         "Generated using n8n prompts with approved-source and Brad editorial corrections, "
         "plus current instructions for additional sections and the current DOCX/XML builders.\n"
-        "No content review, visual review, PDF conversion, post-generation quality gates or automatic repairs ran.\n"
+        "One office pagination pass populated TOC fields; its internal PDF was discarded.\n"
+        "No content review, visual review, post-generation quality gates or automatic repairs ran.\n"
         "Inspect these files against the approved source and references/brad-review-coverage.md.\n",
         encoding="utf-8")
     started = datetime.fromisoformat(_read(marker)["started_at"])
@@ -459,6 +466,7 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
               "manifest": str(manifest_path), "governing_sha256": identity,
               "elapsed_seconds": elapsed_seconds,
               "assessments": {"content": "not_run", "visual": "not_run"}}
+    result["office_field_refresh"] = field_refresh
     _write(manifest_path, result)
     return result
 

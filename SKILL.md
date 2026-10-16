@@ -10,7 +10,8 @@ explicit source approval, obtains Hermes section drafts and assembles native
 DOCX/XML. The owner and Codex inspect outputs afterward. Follow
 [generation-only.md](references/generation-only.md) for drafting and delivery.
 The reviewed workflow remains in Git history and the original checkout; this
-checkout has no review workers, PDF conversion, quality gates or repair lifecycle.
+checkout has no review workers, quality gates or repair lifecycle. One office
+pagination pass populates Protocol TOC page numbers after native assembly.
 
 ## Runtime and source preparation
 
@@ -18,6 +19,10 @@ Use an existing absolute Python 3.10+ interpreter in `CLINICAL_PYTHON` with
 `requirements.txt` installed. Preserve Linux runtime dependencies. Keep the
 installed skill read-only during generation; write run data in its run folder.
 Install this entire skill folder, including assets and references.
+Use the existing host LibreOffice executable for TOC pagination. Set
+`CLINICAL_SOFFICE` to its absolute path if `libreoffice` or `soffice` is not on
+PATH. This formatting step creates a temporary internal PDF and discards it;
+the native DOCX body is not round-tripped through the office application.
 
 Preserve supplied files in `input/`. Read
 [intake-workflow.md](references/intake-workflow.md) when interpreting them and

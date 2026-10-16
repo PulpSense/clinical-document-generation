@@ -2,9 +2,11 @@
 
 Use this checkout as a complete skill folder on the Hermes host, with its
 existing compatible Python 3.10+ runtime and requirements. Keep the installed
-reviewed skill separate. This path uses native DOCX/XML builders and requires no
-office renderer, PDF conversion, page-image runtime provisioning, independent
-review workers, parent visual callback or promoted release.
+reviewed skill separate. This path uses native DOCX/XML builders and the existing
+host LibreOffice for one Protocol TOC pagination pass. It requires no page-image
+runtime provisioning, independent review workers, parent visual callback or
+promoted release. Set `CLINICAL_SOFFICE` to the existing executable's absolute
+path if `libreoffice` or `soffice` is not on PATH; preserve Linux dependencies.
 
 ## Generate with Hermes
 
@@ -47,7 +49,8 @@ for every returned `requests` and `handoffs` path. For each request:
    For PRS return `narrative.brief_summary` and `narrative.detailed_description`,
    each as an object with `text`. Return only the requested targets.
 5. Run the same command again. It schedules remaining drafting prerequisites,
-   then builds the complete native files once all drafts exist. A malformed
+   then builds the complete native files and refreshes Protocol TOC fields once
+   all drafts exist. A malformed
    response returns `drafting_response` with specific format feedback; correct
    the same response file and rerun. There is no automatic repair loop.
 
@@ -74,7 +77,16 @@ message. Internal `status: unreviewed` records the workflow's actual assessment 
 
 Source approval, request/response identity, section presence and basic native
 readability are checked. Content judgments, XML contract validation, DOCX audits,
-visual QA, PDF conversion, publication gates and repair loops are skipped.
+visual QA, publication gates and repair loops are skipped. The approved office
+field-refresh step runs once after Protocol assembly, reads exact heading page
+positions from an internal PDF outline, and inserts their caches into native
+Word fields. It discards the PDF and does not round-trip the clinical DOCX body
+through LibreOffice. A reserved page-number column keeps TOC labels from
+reflowing when numbers are inserted. No content or visual judgment runs.
+An office failure returns `stage: office_field_refresh` with construction feedback,
+without starting a retry loop or publishing files with invented page numbers.
+The recorded renderer, before/after hashes and pagination-PDF hash stay internal
+in `office-field-refresh.json`. Completed results reuse their saved files.
 The current source-driven table and XML builders still preserve their structure;
 legacy workflow constants and external Google Docs/Gmail actions are excluded.
 Prompts, responses, merged drafts and assembly records remain in `workspace`.
