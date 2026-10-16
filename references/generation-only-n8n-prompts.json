@@ -636,5 +636,25 @@
     "Only prompt messages are retained from the supplied workflow. No credentials, pinned executions, external document IDs or executable workflow nodes are imported.",
     "Legacy Visits Table and Outcomes prompts are preserved for provenance but are not used to replace approved table rows or endpoints. Current source-driven table and PRS builders remain authoritative.",
     "Native paragraph/list response transport replaces the legacy Google Docs alias JSON transport. Fixed client template language remains template-owned."
-  ]
+  ],
+  "editorial_corrections": {
+    "study-design.design": [
+      "Keep the complete approved endpoint inventory, but state a shared endpoint time point once for the group. Use one primary-endpoint statement and a compact secondary-endpoint list instead of repeating 'Secondary endpoint' and the same timing in every item. Retain genuinely different timings and qualifications."
+    ],
+    "icf.study-purpose": [
+      "For Advarra, keep the combined background/purpose section compact: one or two short sentences of relevant background, then the study purpose, hypothesis stated as an expectation, and main measurement in plain language. Aim for the retained n8n prompt's 80–120 words where the supplied facts permit; this is a writing guide, not a minimum or a reason to omit material facts.",
+      "Purpose explains what the study aims to learn. Detailed visit activities belong in PROCEDURES. Do not add a separate methodological critique or repeat the full literature summary and endpoint inventory here."
+    ],
+    "icf.procedures": [
+      "State the visit count and phases once, then explain each visit once. Use the supplied visit names and actual timing/window labels in those visit entries, with plain-language explanations beside them. Avoid a second visit inventory or repeated timing list after the details.",
+      "Keep operative care separate from research-specific activities when the source makes that distinction. Do not turn unspecified follow-up, order of procedures, monitoring, or exit rules into new obligations."
+    ],
+    "icf.duration": [
+      "Give expected enrollment once using the approved count and unit, then describe how long a participant takes part and the final follow-up anchor. Leave the visit-by-visit itinerary and procedure details in PROCEDURES.",
+      "Keep sponsor enrollment and data-analysis periods out of the participant duration paragraph unless needed to resolve an explicit source ambiguity. Never imply those study-wide phases extend the participant's follow-up, and do not add extra safety visits absent from the source."
+    ],
+    "study-procedure.unscheduled": [
+      "Use 'unscheduled visit' when describing an in-person visit, and 'contact' only when the source actually permits other contact modes. Preserve the approved scope; a wording correction never authorizes additional visits or assessments."
+    ]
+  }
 }

@@ -344,6 +344,7 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
     n8n expressions are substituted as data; no expression or workflow code is
     executed. Original messages remain available beside the adapted messages.
     """
+    sections = tuple(sections)
     library = _read_json(repo_root / "references/generation-only-n8n-prompts.json")
     branch = canonical_study_type(get_path(reference, "meta.study_type"))
     suffix = {"Prospective": "", "Ambispective": "1", "Retrospective": "2"}[branch]
@@ -446,11 +447,17 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
         "source": library["source"],
         "prompts": list(grouped.values()),
         "current_instruction_targets": fallback,
+        "editorial_corrections": {
+            str(section["section_id"]): library["editorial_corrections"][str(section["section_id"])]
+            for section in sections
+            if str(section["section_id"]) in library.get("editorial_corrections", {})
+        },
         "adapter_instructions": [
             "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
             "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
             "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
             "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
+            "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
             "Use only the approved comparator, endpoints, visits, risks, benefits, statistical methods and regulatory facts. Omit legacy defaults that invent placebo, standard-of-care comparators, extra outcomes, inferred side-effect lists, dates or significance levels.",
             "For current_instruction_targets, draft study-specific content from the approved source and current section instructions, retaining applicable fixed client language.",
             "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses.",

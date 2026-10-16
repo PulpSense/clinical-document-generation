@@ -2765,6 +2765,7 @@ def _replace_static_toc(document: Document) -> None:
             preserve_from = index
     for paragraph in paragraphs[start:preserve_from]:
         paragraph._element.getparent().remove(paragraph._element)
+    _populate_protocol_toc_cache(document, {})
 
 
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
@@ -3829,34 +3830,17 @@ def _boilerplate(repo_root: Path, bundle: Mapping[str, Any], reference: Mapping[
         {str(key): str(value) for key, value in payload["sections"].items()}, reference)
 
 
-def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
-    """Populate the Word TOC cache from current rendered-page evidence."""
-    document = Document(docx_path)
-    pages = []
-    for page in PdfReader(pdf_path).pages:
-        try:
-            extracted = page.extract_text(extraction_mode="layout")
-        except TypeError:  # Compatibility with older pypdf releases.
-            try:
-                extracted = page.extract_text()
-            except KeyError:  # A valid blank page may have no /Contents object.
-                extracted = ""
-        except KeyError:  # A valid blank page may have no /Contents object.
-            extracted = ""
-        pages.append(re.sub(r"\s+", " ", extracted or "").casefold())
-    headings = [(paragraph.text.strip(), paragraph.style.name) for paragraph in document.paragraphs if paragraph.text.strip() and paragraph.style.name in {"Heading 1", "Heading 2"}]
+def _populate_protocol_toc_cache(document: Document, page_map: Mapping[str, int]) -> bool:
+    """Cache linked native headings even before page numbers can be calculated.
+
+    The first assembly has no pagination authority. Empty PAGEREF caches avoid
+    invented numbers while giving Word a complete, live TOC to update on open.
+    """
+    headings = [(paragraph.text.strip(), paragraph.style.name) for paragraph in document.paragraphs
+                if paragraph.text.strip() and paragraph.style.name in {"Heading 1", "Heading 2"}]
     toc_heading = next((heading for heading, _style in headings if "TABLE OF CONTENTS" in heading.upper()), "")
     if not toc_heading:
         return False
-    toc_matches = [index for index, page in enumerate(pages, 1) if re.sub(r"\s+", " ", toc_heading).casefold() in page]
-    toc_page = toc_matches[0] if toc_matches else 0
-    page_map = {}
-    for heading, _style in headings:
-        normalized = re.sub(r"\s+", " ", heading).casefold()
-        matches = [index for index, page in enumerate(pages, 1) if normalized in page]
-        if matches:
-            body_matches = [page for page in matches if page > toc_page]
-            page_map[heading] = body_matches[-1] if body_matches else matches[0]
     toc_title = next((paragraph for paragraph in document.paragraphs if paragraph.text.strip() == toc_heading), None)
     if toc_title is None:
         return False
@@ -3924,6 +3908,39 @@ def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
         first.insert(insertion + offset, run)
     created[-1]._p.append(field[-1])
     _set_update_fields(document)
+    return True
+
+
+def refresh_toc_from_pdf(docx_path: Path, pdf_path: Path) -> bool:
+    """Populate the Word TOC cache from current rendered-page evidence."""
+    document = Document(docx_path)
+    pages = []
+    for page in PdfReader(pdf_path).pages:
+        try:
+            extracted = page.extract_text(extraction_mode="layout")
+        except TypeError:  # Compatibility with older pypdf releases.
+            try:
+                extracted = page.extract_text()
+            except KeyError:  # A valid blank page may have no /Contents object.
+                extracted = ""
+        except KeyError:  # A valid blank page may have no /Contents object.
+            extracted = ""
+        pages.append(re.sub(r"\s+", " ", extracted or "").casefold())
+    headings = [(paragraph.text.strip(), paragraph.style.name) for paragraph in document.paragraphs if paragraph.text.strip() and paragraph.style.name in {"Heading 1", "Heading 2"}]
+    toc_heading = next((heading for heading, _style in headings if "TABLE OF CONTENTS" in heading.upper()), "")
+    if not toc_heading:
+        return False
+    toc_matches = [index for index, page in enumerate(pages, 1) if re.sub(r"\s+", " ", toc_heading).casefold() in page]
+    toc_page = toc_matches[0] if toc_matches else 0
+    page_map = {}
+    for heading, _style in headings:
+        normalized = re.sub(r"\s+", " ", heading).casefold()
+        matches = [index for index, page in enumerate(pages, 1) if normalized in page]
+        if matches:
+            body_matches = [page for page in matches if page > toc_page]
+            page_map[heading] = body_matches[-1] if body_matches else matches[0]
+    if not _populate_protocol_toc_cache(document, page_map):
+        return False
     document.save(docx_path)
     return True
 

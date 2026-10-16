@@ -36,6 +36,13 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   negations, and historical versus prospective phases with their activities.
   Keep genuinely unassigned requirements as separate assessment notes. A missing
   optional window stays blank; a visit label is not a reason to invent one.
+  Keep occurrence counts (such as one operative visit per eye) in the visit
+  description rather than repeating them as a timing window. A name such as
+  "Screening" alone supplies no screening window.
+  Reconcile abbreviated matrix column labels with explicit narrative timing
+  anchors. For example, preserve "postoperative" when the narrative identifies
+  the Month 3 assessment as 3 months after surgery; a shorter matrix label must
+  not erase that relationship.
 - Preserve the approved population, cohorts, and comparisons separately from
   prose labels. Populate `design.arms` when the source identifies groups,
   including a single observational cohort when explicitly supported. A missing
@@ -54,7 +61,24 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   corresponding site record rather than only naming the overall investigator.
 - Preserve an explicit `study.short_title`. When absent, derive a concise phrase
   from the full title and show it for approval. Retain the unchanged full title.
+  Aim for a short running-header label, often 6–10 words and around 60 characters
+  or fewer, naming the distinguishing intervention/topic and outcome. These are
+  writing guides, not input gates. Avoid carrying the full design preamble or
+  long introductory phrase from the official title into the running title.
   The renderer's shared short-title fallback remains available for older sources.
+- Carry every explicit eligibility restriction into the appropriate canonical
+  inclusion or exclusion list, including restrictions supplied separately from
+  those lists. Preserve any dedicated structured field as well. For example, a
+  supplied interval without participation in another interventional study belongs
+  in the eligibility criteria as well as the screening-interval field, so the
+  same approved restriction reaches Protocol, ICF and XML. Show the placement
+  for source approval; never derive a new restriction from an example.
+- Populate format-specific structured fields from facts explicitly stated in
+  the intake, not just from identically named form questions. Keep coded
+  type/status values separate from narrative descriptions: observational design
+  belongs in the study-design fields, rather than in an intervention-type value.
+  Preserve an explicitly supplied condition and IRB submission status in their
+  supported fields; leave genuinely absent regulatory facts absent.
 - Preserve supplied privacy, costs, injury, and closeout procedures in their
   own fields. Missing optional procedures remain absent and use only authorized
   Fixed Clinical Boilerplate where permitted; they are not additional obligatory

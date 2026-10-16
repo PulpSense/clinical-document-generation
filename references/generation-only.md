@@ -20,7 +20,8 @@ When the result is `awaiting_hermes`, `workspace` is the absolute base directory
 for every returned `requests` and `handoffs` path. For each request:
 
 1. Read the complete JSON. In `generation_only_prompts`, follow
-   `adapter_instructions`, then the `messages` for each mapped target. These
+   `adapter_instructions` and target-specific `editorial_corrections`, then the
+   `messages` for each mapped target. These
    preserve the original n8n system prompts, task instructions and examples,
    substituting approved values for n8n expressions. `original_messages`
    retains the unmodified source for comparison.
