@@ -96,7 +96,7 @@ def test_existing_screening_interval_is_not_repeated_in_prs_eligibility(tmp_path
     study = next(ET.parse(output).getroot().iter("clinical_study"))
     criteria = study.findtext("eligibility/criteria/textblock") or ""
     assert criteria.count("60 days") == 1
-    assert "At least 60 days without participation in another study before screening" in criteria
+    assert "No participation in another study during the 60 days before screening." in criteria
     assert validate_output(output, reference, TEMPLATE) == []
 
 

@@ -41,11 +41,17 @@ for every returned `requests` and `handoffs` path. For each request:
    and `lists: [{"items": ["..."]}]`. Use empty arrays where appropriate, with
    at least one paragraph or list per section. Retain evidence/boilerplate refs
    when useful for manual inspection. Interpretation bookkeeping is optional.
+   A list group may include `label`, rendered as an unbulleted paragraph before
+   its items. Use separate labeled groups for secondary and exploratory endpoints.
    In `evaluation-procedures`, compare each supplied assessment note with the
    structured table. Use `assessment_presentation.notes` edits to omit a wholly
    redundant note (`display_text: ""`) or shorten it to its unique instructions.
    Each edit cites exact `source_text` and explains its `rationale`. Preserve
    every additional condition, measurement, timing rule and safety fact.
+   Compare safety notes with the supplied `related_source` context too: general
+   risks belong in the safety/risks sections; retain unique assessment instructions.
+   For `icf.withdrawal`, draft additional study-specific policies; assembly owns
+   the fixed voluntary-participation paragraph and retains it once.
    For PRS return `narrative.brief_summary` and `narrative.detailed_description`,
    each as an object with `text`. Return only the requested targets.
 5. Run the same command again. It schedules remaining drafting prerequisites,

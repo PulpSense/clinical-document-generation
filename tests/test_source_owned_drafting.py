@@ -21,11 +21,13 @@ def trial(name):
 
 
 @pytest.mark.parametrize("name", ["near", "comfort", "sparse"])
-def test_trial_response_uses_the_production_transport_and_current_prompts(name):
+def test_historical_trial_response_uses_the_production_transport(name):
     request, response = trial(name)
     reference = request["source"]
-    assert request["generation_only_prompts"] == drafting.generation_only_prompt_payload(
-        ROOT, reference, request["section_contracts"])
+    # Historical receipts retain their original instructions. Later corrections
+    # must not rewrite the record of what produced these manual drafts.
+    current = drafting.generation_only_prompt_payload(ROOT, reference, request["section_contracts"])
+    assert request["generation_only_prompts"]["prompts"] == current["prompts"]
     count = 0
     for batch in contracts.batch_plan(reference["meta"]["study_type"], reference["meta"]["icf_template"]):
         sections = [s for s in request["section_contracts"] if s["section_id"] in batch.section_ids]

@@ -970,6 +970,8 @@ def _draft_blocks(section: Mapping[str, Any]) -> list[tuple[str, bool]]:
     for group in section.get("lists", []):
         if not isinstance(group, Mapping):
             continue
+        if label := str(group.get("label") or "").strip():
+            blocks.append((label, False))
         blocks.extend((item, True) for item in _list(group.get("items")))
     return blocks
 
@@ -1458,6 +1460,7 @@ def _normalize_retained_icf_agreement_prose(
             break
         if text and not _paragraph_has_numbering(paragraph):
             _normalize_icf_plain_body_paragraph(paragraph)
+            paragraph.paragraph_format.keep_together = True
         element = element.getnext()
 
 
@@ -2286,10 +2289,20 @@ def _study_doctor_contact(reference: Mapping[str, Any]) -> str:
 
 
 def _icf_withdrawal_blocks(model: Mapping[str, Any], boilerplate: Mapping[str, str]) -> list[tuple[str, bool]]:
-    blocks = _icf_blocks(model, "icf.withdrawal")
     fixed = boilerplate["icf-withdrawal"]
-    if fixed not in " ".join(text for text, _ in blocks):
-        blocks.insert(0, (fixed, False))
+    # Assembly owns the fixed paragraph. Drafting supplies additional policies.
+    # Remove exact fixed sentences even when a response combines them with new
+    # details; never discard the remaining study-specific conditions.
+    def sentences(text: str) -> list[str]:
+        return re.split(r"(?<=[.!?])\s+", text.strip())
+    def key(text: str) -> str:
+        return re.sub(r"\s+", " ", text).strip().casefold()
+    fixed_sentences = {key(text) for text in sentences(fixed)}
+    blocks = [(fixed, False)]
+    for text, is_list in _icf_blocks(model, "icf.withdrawal"):
+        remaining = " ".join(part for part in sentences(text) if key(part) not in fixed_sentences)
+        if remaining:
+            blocks.append((remaining, is_list))
     return blocks
 
 

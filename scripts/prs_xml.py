@@ -286,14 +286,21 @@ def _normalize_participation_scope(value: str) -> str:
     return re.sub(r"\bstudies\b$", "study", normalized)
 
 
-def _equivalent_screening_criterion(value: str, requirement: ScreeningIntervalRequirement) -> bool:
-    """Recognize an already supplied interval before adding its PRS wording."""
+def _equivalent_screening_criterion(value: str, requirement: ScreeningIntervalRequirement, *, exclusion: bool = False) -> bool:
+    """Recognize source ownership of the same participation scope and interval.
+
+    Preserve the source's anchor and exceptions rather than adding an inverse
+    criterion with a different anchor. Different intervals/scopes remain distinct.
+    """
     text = re.sub(r"\s+", " ", value).strip().casefold()
     days = re.escape(requirement.days)
     scope = re.escape(requirement.participation_scope.casefold())
+    anchor = r"(?:screening|day\s*0|enrollment|enrolment)\b"
     return bool(
-        re.search(rf"\b(?:no|without) participation in {scope} (?:during|within|in) (?:the )?{days} days? before screening\b", text)
-        or re.search(rf"\bat least {days} days? without participation in {scope} before screening\b", text)
+        re.search(rf"\b(?:no|without) participation in {scope} (?:during|within|in) (?:the )?{days} days? (?:before|prior to) {anchor}", text)
+        or re.search(rf"\bat least {days} days? without participation in {scope} (?:before|prior to) {anchor}", text)
+        or exclusion and re.search(
+            rf"\bparticipation in {scope} (?:during|within|in) (?:the )?{days} days? (?:before|prior to) {anchor}", text)
     )
 
 
@@ -443,8 +450,10 @@ def _fields(reference: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[
     inclusion = [_text(item) for item in get_path(reference, "population.inclusion_criteria", []) or []]
     exclusion = [_text(item) for item in get_path(reference, "population.exclusion_criteria", []) or []]
     screening_interval = screening_interval_requirement(reference)
-    if screening_interval:
-        inclusion = [item for item in inclusion if not _equivalent_screening_criterion(item, screening_interval)]
+    if screening_interval and not (
+        any(_equivalent_screening_criterion(item, screening_interval) for item in inclusion)
+        or any(_equivalent_screening_criterion(item, screening_interval, exclusion=True) for item in exclusion)
+    ):
         inclusion.append(
             f"At least {screening_interval.days} days without participation in "
             f"{screening_interval.participation_scope} before screening"

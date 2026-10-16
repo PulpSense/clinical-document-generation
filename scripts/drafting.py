@@ -61,7 +61,7 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v26-source-owned-sections"
+PROMPT_VERSION = "section-drafting-v27-single-owner-presentation"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
 IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py")
 
@@ -459,6 +459,7 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
         "adapter_instructions": [
             "For each mapped target, use its retained n8n messages as the base writing prompt. Produce only the named legacy field's content for that native section.",
             "Return the current request's section_results or narrative schema, identifiers and evidence references. The old JSON aliases and section numbers are transport examples; the current template owns headings, numbering, tables and formatting.",
+            "A list group may contain a nonempty label alongside items. That label renders as an unbulleted paragraph immediately before the group's items; use it to separate endpoint categories without turning introductions into bullets.",
             "This experiment checks response bindings, section inventory and text/list shape only. Evidence references may be retained for manual inspection; schedule_interpretation, benefit_interpretation and assessment_presentation bookkeeping is optional. The source-derived table is built directly from approved source rows.",
             "Approved source facts and current section content_expectations (including Brad's corrections) override conflicting legacy instructions and demonstrations. Demonstration studies are examples, never evidence for this study.",
             "Apply editorial_corrections only to their named target sections. They refine the retained n8n writing prompts; supplied study facts and applicable client consent language remain authoritative. Missing optional source detail is not a reason to expand or invent clinical content.",
@@ -2576,6 +2577,8 @@ def _generation_only_response(request: Mapping[str, Any], response: Mapping[str,
             if (not isinstance(group, Mapping) or not isinstance(group.get("items"), list)
                     or not group["items"] or any(not isinstance(text, str) or not text.strip() for text in group["items"])):
                 raise ValueError(f"Section {target} has a malformed or empty list.")
+            if "label" in group and (not isinstance(group["label"], str) or not group["label"].strip()):
+                raise ValueError(f"Section {target} requires a nonempty list label when supplied.")
         if not paragraphs and not lists:
             raise ValueError(f"Section {target} has no content.")
         drafts.append({**copy.deepcopy(item), **common, "paragraphs": paragraphs, "lists": lists,

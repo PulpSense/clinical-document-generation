@@ -363,3 +363,40 @@ Focused workflow coverage checks the exact branch file set, one retained copy
 of each native file, internal notice placement, replay/integrity behavior,
 office failure and preservation of an occupied output folder. All 13 focused
 workflow tests and the skill validator passed. The full suite was not run.
+
+## NEAR rerun corrections — 16 October 2026
+
+The latest Hermes NEAR outputs confirmed four remaining defects. ICF withdrawal
+assembly now owns the fixed voluntary-participation paragraph and removes exact
+fixed sentences echoed inside longer drafts while preserving their added study
+policies. Both families use this rule; a fixed-only fallback remains once.
+Drafting instructions request additional study policies rather than another
+voluntary-participation introduction. Retained Advarra agreement paragraphs keep
+together so shorter withdrawal prose cannot strand an opening line across pages.
+
+PRS generation preserves an explicitly supplied participation restriction in
+its approved inclusion or exclusion location, including its scope, timing anchor
+and conditions. It adds the standalone interval only if the same scope and
+duration are absent. Screening, Day 0 and enrollment wording stay as supplied;
+the builder does not translate one anchor into another. Different intervals
+remain distinct. The approved Source of Truth is unchanged.
+
+Draft list groups may now carry a plain-text `label`, rendered immediately
+before their bullets. Updated guidance uses distinct secondary and exploratory
+groups. Assessment-note guidance explicitly compares general safety/risk notes
+with their supplied source context, omitting wholly covered prose and retaining
+unique timing, conditions and safety instructions through the existing exact
+source-text display-edit mechanism. This is part of initial drafting, with no
+new review gate or repair loop. All 22 original n8n messages remain unchanged.
+
+The focused generation, source-owned drafting, editorial and selected PRS checks
+passed 40 tests, followed by two additional fallback/prompt checks. After the
+last agreement pagination adjustment, all 19 affected editorial/spacing checks
+passed. Skill validation and whitespace checks passed. The full suite was not
+run. Local copies of the uploaded NEAR documents were used only to preview the
+targeted text/layout changes; changed pages were inspected, with unchanged
+pages verified against the already reviewed renders. Production assembly and
+handoff behavior were tested separately. Historical prompt-trial requests and
+receipts retain their original instructions rather than being rewritten to
+claim they used these corrections. Hermes must now rerun NEAR with the same
+previously approved Source of Truth to confirm its new drafting response.

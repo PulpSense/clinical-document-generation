@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.45-source-owned-drafting"
+CONTRACT_VERSION = "clinical-documents-v2.46-single-owner-presentation"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -454,7 +454,7 @@ def _content_expectations(section_id: str, title: str) -> tuple[str, ...]:
         "icf.benefits": "State the approved potential benefits and explicitly preserve any no-direct-benefit statement.",
         "icf.payment": "State the approved payment or reimbursement terms exactly enough for participant use.",
         "icf.privacy": "Explain the approved privacy and confidentiality handling in participant-facing language.",
-        "icf.withdrawal": "Preserve the authorized voluntary-participation wording and incorporate all supplied withdrawal, optional follow-up, investigator discontinuation and earned-payment conditions in participant-facing language.",
+        "icf.withdrawal": "Assembly inserts the authorized voluntary-participation paragraph once. Draft only additional supplied withdrawal instructions, optional follow-up, investigator discontinuation and earned-payment conditions in participant-facing language. If no additional facts exist, return the exact fixed paragraph as fixed_boilerplate; assembly retains it once.",
     }
     return (
         specific.get(section_id, f"Explain {title.lower()} using all material approved facts supplied for this section."),
@@ -2234,6 +2234,11 @@ def assessment_presentation_contract(reference: Mapping[str, Any]) -> dict[str, 
     return {
         "activity_labels": [row[0] for row in table["rows"][table["header_rows"]:]],
         "notes": table["supplemental_notes"],
+        "related_source": {
+            "safety_sections": {path: get_path(reference, path) for path in
+                                ("safety.monitoring", "safety.adverse_events")},
+            "risks_section": get_path(reference, "risks_benefits.risks"),
+        },
         "instructions": (
             "Optionally return assessment_presentation with activity_labels and notes edit lists. "
             "Each edit has source_text (exact existing table label or note), display_text, and rationale. "
