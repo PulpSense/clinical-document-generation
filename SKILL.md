@@ -95,6 +95,16 @@ that same generate command until native assembly is complete. Both plain
 
 ## Delivery
 
+### Owner-required output presentation
+
+- Present the documents as normal outputs, not as “generation-only” or experimental documents. Use the normal filenames `protocol.docx`, `icf.docx`, and, when applicable, `study.xml`.
+- The user-facing `output/` folder must contain only the branch-appropriate DOCX/XML documents. Keep README files, notices, commit identifiers, hashes, prompt provenance, and other technical metadata in internal run records, outside this folder.
+- If the workflow saves its immutable result elsewhere, export byte-identical copies into the run's `output/` folder and record their source/destination hashes internally. Do not rewrite the original result or misrepresent its actual assessment status.
+- At startup, simply say that document generation has started. Do not narrate internal prompt sources or mention Brad's corrections in progress or delivery messages; continue following them internally.
+- Finish with a short, neatly formatted message headed **Here are the documents**, one individually clickable link per document, and **Generation time: X minutes Y seconds**. Do not include commit IDs, revision IDs, experiment labels, audit details, or long technical explanations in that delivery message.
+- Use genuine accessible file links or actual channel uploads when supported. Never invent upload links or claim recipient transfer from a host-local path alone. If the channel cannot deliver accessible files, state that limitation plainly.
+- This presentation preference does not establish independent review or certification. Preserve the true assessment status internally and disclose it accurately if asked.
+
 Use `delivery_message`: “Here are the documents:”, clickable links for the
 complete branch set, then generation time in minutes and seconds. Transfer files
 through the channel's actual attachment/upload mechanism when host-local paths
