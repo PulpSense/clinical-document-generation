@@ -2042,19 +2042,8 @@ def _populate_icf_sections(
                 text.casefold() for text, _is_list in blocks
             ):
                 blocks.append((retention, False))
-            visible = " ".join(text.casefold() for text, _is_list in blocks)
-            missing_windows = [
-                (str(visit.get("visit") or "").strip(), str(visit.get("timing") or "").strip())
-                for visit in normalized_visit_records(reference)
-                if str(visit.get("timing") or "").strip()
-                and str(visit.get("timing") or "").strip().casefold() not in visible
-            ]
-            if missing_windows:
-                windows = "; ".join(
-                    f"{name} ({timing})" if name else timing
-                    for name, timing in missing_windows
-                )
-                blocks.append((f"Scheduled visit windows: {windows}.", False))
+            # The source-bound draft owns visit timing. An exact-string test
+            # cannot distinguish an omission from a plain-language paraphrase.
         if heading is None:
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)

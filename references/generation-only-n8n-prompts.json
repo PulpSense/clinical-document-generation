@@ -647,7 +647,8 @@
     ],
     "icf.procedures": [
       "State the visit count and phases once, then explain each visit once. Use the supplied visit names and actual timing/window labels in those visit entries, with plain-language explanations beside them. Avoid a second visit inventory or repeated timing list after the details.",
-      "Keep operative care separate from research-specific activities when the source makes that distinction. Do not turn unspecified follow-up, order of procedures, monitoring, or exit rules into new obligations."
+      "Keep operative care separate from research-specific activities when the source makes that distinction. Do not turn unspecified follow-up, order of procedures, monitoring, or exit rules into new obligations.",
+      "Use the same supplied visit labels and explicit visit numbers as the Protocol. When a source schedule groups repeated occurrences (for example one operative visit per eye), use its phase names rather than inventing expanded Visit 1/2/3/4 numbers. Explain the occurrence count separately when supplied. Preserve the actual timing in each visit entry using plain language; no separate timing recap is needed."
     ],
     "icf.duration": [
       "Give expected enrollment once using the approved count and unit, then describe how long a participant takes part and the final follow-up anchor. Leave the visit-by-visit itinerary and procedure details in PROCEDURES.",
@@ -655,6 +656,15 @@
     ],
     "study-procedure.unscheduled": [
       "Use 'unscheduled visit' when describing an in-person visit, and 'contact' only when the source actually permits other contact modes. Preserve the approved scope; a wording correction never authorizes additional visits or assessments."
+    ],
+    "evaluation-procedures": [
+      "The source-derived table owns the visit/activity inventory. Read the section's assessment_presentation labels and notes alongside the approved schedule. Return assessment_presentation.notes edits for redundant notes: source_text must exactly match a supplied note; display_text is empty only when every material fact is already represented. Otherwise retain unique timing anchors, conditions, safety instructions, measurement details and footnote explanations. Give a factual rationale for each edit. Keep the body to a short table introduction; do not repeat the endpoint or assessment list beneath it."
+    ],
+    "subjects.inclusion": [
+      "Keep eligibility requirements phrased as conditions that must be met. Preserve every supplied interval, scope and exception. A prohibition such as no participation in another interventional study within a stated interval is an eligibility requirement; retain the approved placement and meaning."
+    ],
+    "subjects.exclusion": [
+      "State the disqualifying conditions, preserving the approved source meaning and scope. A negative eligibility requirement must not become a reason to exclude someone who meets it. If the approved source itself is ambiguously classified, retain it for manual inspection rather than silently reversing the rule after approval; resolve future classification during source intake."
     ]
   },
   "consent_template_comments": [

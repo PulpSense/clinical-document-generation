@@ -209,3 +209,35 @@ Delivery includes clean document links followed by generation time from recorded
 elapsed seconds. Focused native-generation, obligatory-intake, TOC and front-table
 checks passed (45 tests), plus two fresh-process CLI cases for generation with
 and without the compatibility flag. The full suite was not run.
+
+## Latest output follow-up — 16 October 2026
+
+Manual inspection covered all 12 Protocol pages and all six Advarra ICF pages
+from the latest uploaded output, plus the XML. The short header, visible linked
+TOC, left-aligned populated Advarra metadata, complete endpoint inventory and
+Brad's XML structure were present. Remaining findings included duplicate timing
+prose inserted by the ICF assembler, a redundant source assessment note below
+the Protocol matrix, inconsistent derived visit numbering, and negative
+eligibility wording under the XML Exclusion Criteria heading.
+
+The ICF assembler no longer appends a timing inventory based on exact-string
+matching; accepted source-bound drafts own the wording. Regression tests cover
+plain-language timing in both families. Prompt guidance now uses the existing
+assessment_presentation edits to omit wholly redundant notes while retaining
+unique conditions, timing and safety details. A handoff-to-native-output test
+checks that a redundant-note edit survives and a unique instruction stays visible.
+
+Intake guidance now keeps phase labels distinct from occurrence counts and asks
+for consistent source-approved numbering. It also places eligibility requirements
+and disqualifying conditions with the correct polarity before source approval.
+Approved facts are not silently reclassified during XML assembly. Narrative IRB
+submission status is distinct from an explicitly supplied PRS approval status;
+"not submitted" does not authorize an inferred "Pending" value. Missing optional
+PRS values remain blank.
+
+Original n8n node messages remain unchanged. These changes add no review or
+repair stage and retain six scripts. Prompt effects need a fresh Hermes run with
+source preparation for manual verification. TOC page-number caches still require
+office pagination; adding a field-refresh step awaits the owner's choice.
+Focused generation, repetition, metadata and obligatory-intake checks passed:
+73 tests. No full suite or new live Hermes study generation was run.

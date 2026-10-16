@@ -48,6 +48,14 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   Keep occurrence counts (such as one operative visit per eye) in the visit
   description rather than repeating them as a timing window. A name such as
   "Screening" alone supplies no screening window.
+  Use one visit-label convention across all documents. Preserve explicit source
+  visit numbers. When the source lists phases with repeated occurrences, such as
+  one operative visit per eye, retain those phase names in the ICF rather than
+  inventing expanded visit numbers. Occurrence counts and schedule-row numbers
+  describe different things; show any derived convention in the Source-of-Truth.
+  Put explicit activity/visit relationships in the structured schedule. Keep
+  `procedures.assessments` and `procedures.evaluation` for additional unallocated
+  facts or qualifications, rather than copying a second assessment inventory.
   Reconcile abbreviated matrix column labels with explicit narrative timing
   anchors. For example, preserve "postoperative" when the narrative identifies
   the Month 3 assessment as 3 months after surgery; a shorter matrix label must
@@ -82,12 +90,26 @@ raw evidence and show the resulting facts in the editable Source-of-Truth.
   in the eligibility criteria as well as the screening-interval field, so the
   same approved restriction reaches Protocol, ICF and XML. Show the placement
   for source approval; never derive a new restriction from an example.
+  Phrase inclusion criteria as requirements for eligibility and exclusion
+  criteria as disqualifying conditions. For example, "must not have participated
+  in another interventional study during the previous 30 days" is an inclusion
+  requirement; its equivalent exclusion is "Participation in another
+  interventional study during the 30 days before screening." Preserve scope,
+  timing, exceptions and negation, and choose one consistent placement before
+  approval. Do not copy a negative eligibility requirement unchanged under an
+  Exclusion Criteria heading or duplicate it under both headings.
 - Populate format-specific structured fields from facts explicitly stated in
   the intake, not just from identically named form questions. Keep coded
   type/status values separate from narrative descriptions: observational design
   belongs in the study-design fields, rather than in an intervention-type value.
   Preserve an explicitly supplied condition and IRB submission status in their
   supported fields; leave genuinely absent regulatory facts absent.
+  Keep narrative IRB submission/review status distinct from a PRS approval-status
+  value. Store an explicitly supplied PRS value in `parties.irb.approval_status`;
+  keep the source's submission statement in `ethics.approval_status`. "Not
+  submitted" alone does not authorize assigning "Pending" or "Approved" in XML.
+  Show the distinction for source approval; a missing optional PRS value remains
+  blank rather than triggering an extra question.
 - Preserve supplied privacy, costs, injury, and closeout procedures in their
   own fields. Missing optional procedures remain absent and use only authorized
   Fixed Clinical Boilerplate where permitted; they are not additional obligatory
