@@ -21,6 +21,20 @@ directly into the client templates.
 
 ## Represent facts before approval
 
+For participant registry disclosures, interpret the supplied consent instructions
+and record the explicit decision as a boolean at
+`regulatory.prs.participant_registry_disclosure`. A request for the standard
+ClinicalTrials.gov consent disclosure means Yes; an explicit decision to omit it
+means No. Leave an unspecified decision blank. Registration plans, interventional
+classification and requests for XML do not establish consent-disclosure
+applicability. Reconcile conflicting narrative and structured decisions with the
+owner before approval. Preserve the distinction between a sponsor's request and
+a statement about legal necessity; do not invent an NCT identifier or approval.
+The structured aliases `regulatory.clinicaltrials_consent_disclosure_applies`
+and `regulatory.clinicaltrials_gov_disclosure_required` are supported for existing
+sources. Their values must agree with the canonical field; when correcting the
+decision, update all supplied declarations before regenerating the review file.
+
 Apply these rules to every study branch during the Extraction Pass. Preserve the
 raw evidence and show the resulting facts in the editable Source-of-Truth.
 

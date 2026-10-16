@@ -159,6 +159,7 @@ _OPTIONAL_REVIEW_FIELDS = (
 )
 
 _OPTIONAL_PRS_REVIEW_FIELDS = (
+    "regulatory.prs.participant_registry_disclosure",
     "regulatory.prs.observational_study_design",
     "regulatory.prs.time_perspective",
     "regulatory.prs.verification_date",
@@ -200,6 +201,10 @@ def _intake_review_guidance(reference: Mapping[str, Any]) -> dict[str, Any]:
             "Apply references/intake-workflow.md's study-design clarification guidance: compare declared "
             "study type with explicit treatment-assignment descriptions, resolve actual disagreement "
             "with the user before requesting approval, and record the clarified facts in the editable source. "
+            "For explicit participant registry-disclosure instructions, record Yes/No in "
+            "regulatory.prs.participant_registry_disclosure; reconcile narrative instructions with "
+            "structured aliases before approval. Keep an unknown decision blank and do not infer it "
+            "from trial classification, registration plans or XML requests. "
             "For observational studies, an assigned test article is not required. AI may derive a descriptive "
             "activity name or classification from explicit source facts, or record not applicable; show "
             "these normalizations in the Source-of-Truth for approval. Preserve routine product use without "

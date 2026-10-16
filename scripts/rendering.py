@@ -34,7 +34,7 @@ from contracts import study_short_title, ICF_RETAINED_SHELL_SECTIONS, participan
 from prs_xml import screening_interval_requirement
 from output_recovery import DOCX_SOURCE_FIELDS
 from contracts import bibliographic_citation_spans, protocol_bibliography
-from contracts import document_table_reference
+from contracts import document_table_reference, participant_registry_disclosure
 
 
 TOKEN = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
@@ -2609,14 +2609,20 @@ def _preserve_sterling_registry_statement(
             "a description of this research study will be available on http://www.clinicaltrials.gov",
         )):
             paragraph._p.getparent().remove(paragraph._p)
-    if get_path(reference, "regulatory.prs.participant_registry_disclosure") is not True:
+    if participant_registry_disclosure(reference) is not True:
         return
     exact = sterling_clause_text("sterling.privacy.registry-disclosure")
     source_paragraph = next((p for p in authority.paragraphs if p.text == exact), None)
     questions = next((p for p in document.paragraphs if _icf_heading_key(p.text) == _icf_heading_key("QUESTIONS")), None)
     if source_paragraph is None or questions is None:
         raise LayoutRepairTargetError("Sterling registry statement has no template paragraph or placement anchor.")
-    questions._p.addprevious(copy.deepcopy(source_paragraph._p))
+    statement = copy.deepcopy(source_paragraph._p)
+    # The authority carries an empty SEQ CHAPTER field that office refresh
+    # displays as a stray "1". Preserve the wording and visible run formatting.
+    for run in statement.xpath("./w:r[w:fldChar or w:instrText]"):
+        if not run.xpath("./w:t"):
+            statement.remove(run)
+    questions._p.addprevious(statement)
 
 
 def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]) -> None:
@@ -4312,6 +4318,7 @@ def render_documents(
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
     audit_output: bool = True,
 ) -> dict[str, Any]:
+    participant_registry_disclosure(reference)  # Reject conflicting declarations before writing files.
     output = revision_dir / "candidate"; output.mkdir(parents=True, exist_ok=True)
     fields = render_fields(reference, model)
     bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))

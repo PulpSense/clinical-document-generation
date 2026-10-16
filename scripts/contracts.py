@@ -19,7 +19,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.49-retrospective-coverage"
+CONTRACT_VERSION = "clinical-documents-v2.50-registry-disclosure-mapping"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -937,6 +937,35 @@ def meaningful(value: Any) -> bool:
 def explicitly_true(value: Any) -> bool:
     """Accept explicit JSON or text booleans without treating 'False' as true."""
     return value is True or isinstance(value, str) and value.strip().casefold() in {"true", "yes"}
+
+
+REGISTRY_DISCLOSURE_FIELD = "regulatory.prs.participant_registry_disclosure"
+REGISTRY_DISCLOSURE_ALIASES = (
+    "regulatory.clinicaltrials_consent_disclosure_applies",
+    "regulatory.clinicaltrials_gov_disclosure_required",
+)
+
+
+def participant_registry_disclosure(reference: Mapping[str, Any]) -> bool | None:
+    """Resolve explicit structured decisions; narrative applicability belongs to intake AI."""
+    decisions: dict[str, bool] = {}
+    for path in (REGISTRY_DISCLOSURE_FIELD, *REGISTRY_DISCLOSURE_ALIASES):
+        value = get_path(reference, path)
+        if value is None or isinstance(value, str) and not value.strip():
+            continue
+        if isinstance(value, bool):
+            decisions[path] = value
+        elif isinstance(value, str) and (match := re.match(
+            r"^(yes|no|true|false)(?=$|[\s;:,.])", value.strip(), re.I
+        )):
+            decisions[path] = match.group(1).casefold() in {"yes", "true"}
+        else:
+            raise ValueError(f"{path} must declare Yes/No or a boolean; clarify the disclosure decision before approval.")
+    if len(set(decisions.values())) > 1:
+        raise ValueError("Conflicting participant registry disclosure decisions: " + ", ".join(
+            f"{path}={value}" for path, value in decisions.items()
+        ))
+    return next(iter(decisions.values()), None)
 
 
 def contextual_clinical_boilerplate(
@@ -2680,6 +2709,17 @@ def source_contract(
     for legacy_key in ("template_fields", "generated", "needs_review"):
         normalized.pop(legacy_key, None)
     alias_findings = _canonicalize_declared_aliases(normalized)
+    disclosure_findings = []
+    try:
+        disclosure = participant_registry_disclosure(normalized)
+        if disclosure is not None:
+            set_path(normalized, REGISTRY_DISCLOSURE_FIELD, disclosure)
+    except ValueError as error:
+        disclosure_findings.append({
+            "category": "source-evidence", "field": REGISTRY_DISCLOSURE_FIELD,
+            "issue": str(error),
+            "required": "Resolve the explicit disclosure decision before Source-of-Truth approval.",
+        })
     branch = canonical_study_type(get_path(normalized, "meta.study_type"))
     if branch:
         normalized.setdefault("meta", {})["study_type"] = branch
@@ -2691,7 +2731,7 @@ def source_contract(
         if prs_study_type := _prs_study_type_from_design(normalized):
             set_path(normalized, "regulatory.prs.study_type", prs_study_type)
     # AI resolves semantic alias/candidate conflicts before the single approval.
-    findings = input_findings(normalized)
+    findings = input_findings(normalized) + disclosure_findings
     if require_approval:
         if str(get_path(normalized, "approval.status", "")).casefold() != "approved":
             findings.append({"category": "approval", "field": "approval.status", "issue": "The current Source-of-Truth Markdown has not been explicitly approved.", "required": "Explicit approval of the current file."})
@@ -2709,6 +2749,7 @@ def source_contract(
         if finding.get("category") != "approval"
         and (
             finding.get("issue") in source_gap_issues
+            or finding.get("field") == REGISTRY_DISCLOSURE_FIELD
             or finding.get("field") == "meta.icf_template"
             and "unresolved" in str(finding.get("issue", "")).casefold()
         )

@@ -1,0 +1,299 @@
+BREAK-27-05 STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT
+Version 1.0 | 16 October 2026
+
+DOCUMENT REQUEST
+Prepare a protocol, informed consent form and study XML using the Sterling
+consent template. This is a new study. Use only the facts in this input; do not
+reuse NEAR, COMFORT or CHART contacts, procedures, eligibility or approvals.
+Prepare a fresh Source of Truth for owner approval before generating documents.
+
+IDENTIFICATION AND DESIGN
+Protocol number: BREAK-27-05.
+Full title: Scheduled Screen Breaks and Eye Discomfort in Adults With Frequent
+Digital Screen Use: A Randomized Prospective Behavioral Study.
+Short title: Screen Breaks and Eye Discomfort.
+Study type for protocol selection: Prospective.
+Registry study classification: Interventional. Primary purpose: Supportive Care.
+Allocation: Randomized. Intervention model: Parallel Assignment. Two groups.
+Masking: Single, Outcomes Assessor. Participants and the training coordinator
+know assignment. The clinic vision assessor is masked. This is not a
+double-masked study; participant-reported symptoms cannot be masked.
+Number of sites: 2, both in the United States.
+Condition: Eye discomfort associated with frequent digital screen use.
+Intervention category: Behavioral. No study-assigned drug, device or surgery.
+The research assigns a break routine after consent and eligibility confirmation;
+it does not merely observe a routine chosen before enrollment.
+Group 1: Scheduled screen breaks, target 36 participants.
+Group 2: Usual screen-break habits, target 36 participants.
+Total enrollment: 72 unique people, target 36 per site and 36 per group overall.
+People, not eyes or diary entries, are the enrollment and primary analysis unit.
+
+BACKGROUND AND OBJECTIVES
+The study asks whether a scheduled break routine changes eye discomfort during
+frequent screen use compared with usual break habits. A benefit is uncertain.
+No prior treatment-effect estimate or bibliography is supplied.
+Primary objective: Estimate the between-group difference in change in average
+eye-discomfort rating from Day 0 to Day 56 after randomization.
+Secondary objectives: Describe near-task satisfaction at Day 56, distance
+visual acuity at Day 56, and adherence to the assigned break routine during
+the eight-week follow-up. Adherence is assessed only in the scheduled-break group.
+Hypothesis: The scheduled-break group will have a greater reduction in eye
+discomfort than the usual-habits group. This is an exploratory feasibility
+study, not a confirmatory efficacy study. Do not present benefit as established.
+
+POPULATION AND ELIGIBILITY
+Adults aged 21 through 65 years inclusive at consent; all sexes eligible.
+Healthy volunteers: No. Participants must have the specified eye discomfort.
+Inclusion criteria:
+- Use a digital screen for at least four hours on at least five days per week,
+  based on self-report covering the preceding four weeks.
+- Average eye discomfort during screen use of at least 4 on the 0-to-10 study
+  rating over the preceding seven days at Day 0.
+- Able to provide personal written consent, answer English-language questions
+  without a proxy, and complete a paper diary.
+- Able and willing to attend three clinic visits and one telephone contact.
+Exclusion criteria:
+- Eye surgery within 90 days before Day 0, or planned during follow-up.
+- An active ocular infection or an ocular condition that the investigator
+  determines makes the specified assessments unsuitable.
+- A planned major change in screen-use work pattern during follow-up.
+- Participation in another interventional study within 30 days before Day 0,
+  or planned participation in one during the eight-week follow-up.
+Screening and enrollment occur together on Day 0. The minimum nonparticipation
+period for another interventional study before screening is 30 days.
+Pregnancy is not excluded. No pregnancy tests, contraception requirements,
+radiation, specimen collection or study drugs are involved.
+No children, adults unable to consent, proxy respondents, legally authorized
+representatives or witness signatures are included under this study plan.
+Recruitment is through consecutive eligible clinic patients who express
+interest after routine clinic notices; participation does not affect care.
+
+RANDOMIZATION, ASSIGNMENT AND MASKING
+After written consent, eligibility confirmation and baseline measurements,
+randomize participants 1:1 using an independent statistician's computer-generated
+sequence, stratified by site with randomly varying blocks of four and six.
+A secure allocation service releases assignment to the training coordinator
+only after eligibility and baseline measurements have been recorded. Clinic
+assessors cannot access the allocation list. Do not assign before consent or
+alter group membership according to later adherence.
+The training coordinator gives scheduled-break participants a printed sheet
+and a ten-minute explanation at Day 0: take a two-minute break away from the
+screen after each 30 minutes of screen use during screen-use sessions lasting
+at least two hours. No app, timer or screen device is supplied or tested.
+Usual-habits participants continue their ordinary break habits; they are not
+instructed to avoid breaks. Both groups may continue ordinary eye care.
+The vision assessor performs the same measurements in both groups without
+access to training records or diaries. Participants are asked not to disclose
+assignment to that assessor. If assignment is inadvertently disclosed, record
+the masking breach; do not remove the participant automatically.
+There is no placebo, emergency unmasking procedure or concealed treatment needed
+for clinical safety. Clinical staff can access assignment when necessary.
+
+VISITS AND ACTIVITIES
+Follow-up lasts 56 days from Day 0/randomization, not from symptom onset.
+Four scheduled contacts: three in person and one by telephone.
+Visit 1: Day 0 / Enrollment and Randomization, in person, no window, about
+65 minutes total. Written consent before research; eligibility confirmation;
+demographics, current eye-care and screen-use history; seven-day eye-discomfort
+rating; near-task satisfaction rating; binocular best-corrected distance visual
+acuity at 4 meters using a logMAR chart and current correction; symptom enquiry;
+randomization after baseline assessments; allocation-specific instruction and
+paper-diary training. The ten-minute break explanation is included in the
+65-minute total, not an additional visit.
+Visit 2: Day 14 +/- 3 days, telephone, about 15 minutes. Seven-day eye-discomfort
+rating; interval eye-care update; assessment-related symptom enquiry; questions
+about diary completion. No visual acuity test, satisfaction rating, new training
+session or specimen collection occurs by telephone.
+Visit 3: Day 28 +/- 5 days, in person, about 30 minutes. Eye-discomfort rating;
+near-task satisfaction rating; binocular best-corrected distance acuity using
+the same chart conditions; interval eye-care and symptom updates; review of
+paper-diary completeness without changing assignment or the prescribed routine.
+Visit 4: Day 56 +/- 7 days / Final Visit, in person, about 35 minutes. Repeat
+the Day 28 assessments, collect the completed diary, and confirm completion.
+No extra exit form or separate closeout contact is required.
+A missed scheduled contact may prompt up to two scheduling attempts within
+that contact's existing window. There are no replacement home vision tests.
+
+HOME DIARY AND MEASUREMENTS
+Both groups complete one paper diary entry each evening from the day after
+randomization (Day 1) through Day 56 inclusive, about two minutes per day.
+Each entry records total screen-use hours and whether screen use occurred.
+Scheduled-break participants additionally record the number of eligible
+30-minute intervals and the number followed by a completed two-minute break.
+Usual-habits participants record the number of breaks they naturally took;
+they are not given adherence targets. An evening entry is not a clinic visit.
+Day 0 has no home-diary entry. Clinic visits are not multiplied by diary days.
+Do not invent daily symptom ratings: the diary does not collect symptom scores.
+At Day 0, Day 14, Day 28 and Day 56, ask: "Over the past seven days, how severe
+was your average eye discomfort while using a digital screen?" The answer is
+0 (no discomfort) through 10 (worst imaginable discomfort). Higher is worse.
+This is a study-specific single-item rating; no validation claim is supplied.
+Near-task satisfaction is 0 (not satisfied) to 10 (fully satisfied), asked
+only at Day 0, Day 28 and Day 56. Higher is better on this different scale.
+Distance visual acuity is binocular, with current correction, in logMAR;
+lower is better. No per-eye outcome or paired-eye model is specified.
+There are no research blood draws, saliva, genetic testing, banking, imaging,
+dilation, home devices, study medicines or surgical procedures.
+
+OUTCOMES AND STATISTICS
+Primary outcome: Change in seven-day average eye-discomfort rating from Day 0
+to Day 56 +/- 7 days, on the 0-to-10 scale. Calculate Day 56 minus Day 0;
+negative change means improvement, positive change means worsening.
+Secondary outcome 1: Near-task satisfaction rating at Day 56 +/- 7 days,
+0 to 10, higher indicating greater satisfaction.
+Secondary outcome 2: Binocular best-corrected distance visual acuity at Day 56
++/- 7 days, logMAR, lower indicating better acuity.
+Secondary outcome 3: Adherence to scheduled breaks during Days 1 through 56,
+only among participants assigned scheduled breaks. Calculate 100 times the
+number of completed prescribed breaks divided by the number of eligible
+intervals recorded across observed diary days. If no eligible intervals are
+recorded, adherence is not estimable; it is not zero. Report diary completeness
+and days with no screen use separately. Missing diary days do not count as
+zero adherence. Do not calculate control-group adherence to the intervention.
+No other or exploratory outcomes are authorized. Day 14/28 symptoms support
+descriptive trajectory summaries, without creating additional registry outcomes.
+Sample justification: 72 people is a feasible pilot sample, allowing about
+15% failure to complete follow-up. No formal power calculation, assumed effect
+size or confirmatory significance threshold is specified.
+Analysis population: all randomized participants with relevant observed data,
+analyzed in their assigned group regardless of adherence. Report disposition,
+withdrawal and missing data by group and site. No automatic exclusion for
+masking breaches or changes in ordinary care; describe those events.
+Primary analysis: linear model of Day 56 minus Day 0 symptom change including
+group, Day 0 symptom score and site. Report adjusted mean change by group and
+the scheduled-break minus usual-habits adjusted difference with 95% confidence
+interval. A negative between-group difference favors scheduled breaks.
+Summarize continuous observations with count, mean, standard deviation, median
+and range, categorical observations as counts and percentages with explicit
+denominators. Summarize secondary outcomes descriptively by assigned group,
+except intervention adherence which is intervention-group-only. Use available
+observations; do not impute missing symptoms or diaries. Report completeness
+and missing reasons. No multiplicity-adjusted confirmatory claims or causal
+certainty is justified by this feasibility study.
+
+RISKS, BENEFITS AND ALTERNATIVES
+Potential research risks are temporary eye fatigue or headache from vision
+testing, frustration or embarrassment with questions, inconvenience from
+interrupting screen work and diary completion, travel burden, and loss of
+privacy. Participants can pause or stop testing. The break routine may be
+inconvenient and may not reduce discomfort. It is not a replacement for ordinary
+eye care. Persistent or worsening symptoms should be discussed with the study
+doctor; clinical concerns are referred to ordinary care. No direct benefit
+is promised. Results may help design future studies of screen-break routines.
+The alternative is ordinary care without joining; usual breaks and clinical
+treatments remain available regardless of participation.
+
+PAYMENT, REIMBURSEMENT, COSTS AND INJURY
+Participant compensation: None. No attendance payments, bonus or gift cards.
+Travel reimbursement only: actual parking or public-transit expenses up to
+$25 for each of the three attended in-person visits, with receipts; maximum
+$75 across those visits. No telephone-visit reimbursement or mileage payment.
+Payment is by check within 30 days after receipt submission. Eligible expenses
+already incurred remain reimbursable after withdrawal. Reimbursement is not
+conditional on finishing the study and is not a guaranteed personal benefit.
+The sponsor pays for research assessments, printing and allocation services.
+No research costs are billed to participants or insurance. Ordinary care is
+paid by the participant or insurer under usual arrangements.
+For possible research injury or persistent discomfort, contact the enrolling
+site's coordinator to reach its study doctor. The clinic arranges evaluation.
+Use ordinary emergency services for emergencies. No sponsor fund for free
+injury treatment or additional injury compensation is established. Ordinary
+treatment may be billed to the participant or insurer; legal rights are not
+waived. Do not promise free care or automatic injury payments.
+
+PRIVACY, AUTHORIZATION AND SPONSOR ACCESS
+Collect name, contact information, signed consent, age, sex, eligibility,
+screen-use history, ordinary eye-care updates, assignment, visual acuity,
+ratings, diary records and reimbursement documentation. No date of birth,
+Social Security number, specimen or genetic information is collected.
+Each clinic keeps its identifying key separately on an access-controlled
+encrypted drive; signed consent and paper diaries are stored in locked research
+cabinets. Diary sheets carry study ID only and are returned at clinic visits.
+Participants are asked to keep diaries private while at home.
+Authorized clinic investigators/coordinators can access identifying records
+for study duties. The sponsor's reimbursement team receives participant name,
+mailing address, receipts and reimbursement amount solely to mail checks and
+reconcile expenses. Thus the sponsor DOES receive limited identifiable
+information; do not describe all sponsor access as coded-only. The sponsor's
+analysis team and statistician receive coded assessments, with no contact
+details or identity key. Authorized monitors, the IRB and legally authorized
+oversight bodies may inspect relevant original records for oversight.
+Sponsor reimbursement records are stored separately with restricted access.
+Study records, identity keys, diaries and reimbursement records are retained
+securely for seven years after administrative closeout on 31 December 2027,
+then destroyed unless a binding requirement requires longer retention.
+Authorization for new research health information ends at the final Day 56
+contact or earlier written withdrawal. Retention does not extend collection.
+Withdraw authorization by writing to the coordinator at the enrolling site's
+mailing address. New research collection then stops; already collected data
+may remain in analyses and required oversight records. Ordinary care continues.
+No public individual-data sharing, data sale, unrelated future research use,
+genetic research, commercial specimens or specimen banking is planned.
+
+WITHDRAWAL, RESULTS AND CALENDAR
+Participation is voluntary and may end without penalty or loss of usual
+benefits. Tell or write to the site coordinator to stop participation. A final
+discussion about symptoms and ordinary care is optional. No mandatory final
+research test, diary submission or extra data collection is required after
+withdrawal. The investigator may discontinue participation at the participant's
+request, if assessments cannot be completed, or if the study closes. Record
+the reason when available; do not demand diary completion to retain reimbursement.
+Offer individual vision results at each attended in-person visit. Explain
+clinical concerns and refer to ordinary care. An aggregate plain-language
+summary is available on request after analysis. There is no individual genetic
+result, clinical genetic report or treatment unmasking promised at completion.
+Recruitment: 1 February 2027 through 30 June 2027. Final participant assessments,
+primary completion and study completion anticipated by 1 September 2027,
+allowing the final Day 56 window. Administrative closeout: 31 December 2027.
+Closeout includes disposition and reimbursement reconciliation, diary/data
+queries, dataset lock, analysis, aggregate summary preparation and archiving.
+These staff activities do not extend individual follow-up.
+
+PARTIES, FACILITIES AND CONTACTS
+Sponsor: Meridian Visual Habits Research, 110 Research Way, Suite 200,
+Philadelphia, PA 19103, United States.
+Sponsor contact: Taylor Morgan, Research Director, +1 202-555-0180,
+taylor.morgan@example.org.
+Overall principal investigator: Dr. Rowan Blake, MD, Principal Investigator.
+Overall coordinator: Devon Reed, CCRC, Lead Study Coordinator.
+Business phone +1 202-555-0181; office phone +1 202-555-0182;
+devon.reed@example.org. Mailing address: Site 1 below.
+Site 1: Meridian Eye Research Clinic, 220 Clinic Avenue, Suite 110,
+Philadelphia, PA 19104, United States.
+Site 1 investigator: Dr. Rowan Blake, MD, Principal Investigator.
+Site 1 coordinator: Devon Reed, CCRC, Lead Study Coordinator, business
++1 202-555-0181, office +1 202-555-0182, devon.reed@example.org.
+Site 2: Brookside Vision Research Center, 330 Brookside Road, Suite 210,
+Wilmington, DE 19801, United States.
+Site 2 investigator: Dr. Emery Shaw, MD, Site Investigator.
+Site 2 coordinator: Reese Quinn, CCRC, Site Study Coordinator, business
++1 202-555-0183, office +1 202-555-0184, reese.quinn@example.org.
+Both coordinators handle scheduling, study questions and access to the study
+doctor Monday through Friday, 9 a.m. to 5 p.m. local time. These numbers are
+not 24-hour emergency services.
+Reviewing IRB: Meridian Independent Research Review Board.
+Affiliation: Independent IRB, unaffiliated with sponsor and clinics.
+Address: 440 Review Street, Suite 300, Philadelphia, PA 19106, United States.
+Telephone +1 202-555-0185; email participant.rights.meridian@example.org.
+The IRB contact is for participant-rights questions and research concerns.
+Sterling is the selected consent layout; retain its template-managed opening
+merge fields. Use these study-specific contacts in the body. Layout selection
+does not substitute another IRB, establish approval or populate an approval ID.
+
+REGISTRY AND CONDITIONAL FACTS
+Overall status: Not yet recruiting. Enrollment: 72, anticipated.
+Verification month: October 2026. No registry identifier has been assigned.
+Planned registry start: 2027-02-01, anticipated.
+Primary completion: 2027-09-01, anticipated.
+Study completion: 2027-09-01, anticipated.
+IRB review status: Not yet submitted. Approval not obtained; no number or date.
+FDA-regulated drug: No. FDA-regulated device: No. No investigational product,
+IND, IDE, radiation, genetics or future specimen use is involved.
+The sponsor requires public trial registration before enrollment and requests
+the standard ClinicalTrials.gov consent disclosure for this study. Include
+that disclosure without inventing an NCT identifier or claiming registration
+has already occurred. This is a supplied study-plan requirement, not a legal
+conclusion inferred merely from requesting XML.
+Sponsor receives identifiable information: Yes, limited reimbursement data as
+specified above. Genetic information collected: No. Future specimen use: No.
+LAR/witness signatures required: No. No optional genetic or banking choices.
