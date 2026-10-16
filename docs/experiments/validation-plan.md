@@ -2,7 +2,8 @@
 
 Agreed with the owner on 16 October 2026.
 Branch: `codex/generation-only-experiment`.
-Current candidate: retrospective coverage fixes (prompt v30), replacing `2017039`.
+Current candidate: registry disclosure mapping fix (contract v2.50, prompt v30),
+built on retrospective coverage commit `8d48c22`.
 Record the installed commit from the next Hermes run receipt.
 
 **Current step: Run 6 disclosure fix implemented and locally replayed; Hermes rerun pending.**
@@ -26,7 +27,7 @@ new input and a new template do not change at the same time.
 | 3 | Ambispective | COMFORT input with fresh Source of Truth | Sterling | Current-version run passes Codex review; owner acceptance pending |
 | 4 | Prospective | Same NEAR clinical facts as Run 2 | Sterling | Passes Codex review; owner acceptance pending |
 | 5 | Ambispective | Same COMFORT clinical facts as Run 3 | Advarra | Passes Codex review; owner acceptance pending |
-| 6 | Prospective | BREAK-27-05, approved revision r-3a7da16f6dea | Sterling | Needs disclosure mapping fix and rerun |
+| 6 | Prospective | BREAK-27-05, approved revision r-3a7da16f6dea | Sterling | Local disclosure fix passes; Hermes rerun pending |
 | 7 | Ambispective | New clinical input, to be prepared | Advarra | Pending |
 | 8 | Retrospective | New clinical input, to be prepared | Not applicable | Pending |
 
@@ -35,7 +36,7 @@ Runs 4–5 change only the selected consent family, preserving the studies'
 clinical facts. Record and approve that template-selection change through the
 usual Source of Truth process. Runs 6–8 test fresh clinical inputs after the
 template-switch results are accepted. Prepare and approve those inputs before
-starting their runs; they have not been created yet.
+starting their runs. Run 6 input is retained below; Runs 7–8 inputs remain pending.
 
 The current retrospective workflow produces **only protocol.docx**, with no ICF
 or XML. Prospective and ambispective produce protocol.docx, icf.docx and study.xml.
@@ -541,7 +542,9 @@ was removed from the inserted copy to prevent a stray visible number after
 native office refresh. The ICF remains eight pages: pages 1–6 and 8 are pixel
 identical to the supplied run’s render; page 7 was visually inspected and the
 disclosure and contacts fit. Original n8n prompts and production generation
-stages remain unchanged. Focused tests cover source preparation, positive,
+stages remain unchanged. Twenty focused tests passed across `test_registry_disclosure_mapping.py` and
+`test_generation_only.py`; Python compilation and `git diff --check` also passed.
+Tests cover source preparation, positive,
 negative, absent, ambiguous and conflicting decisions, exact wording, clean
 field formatting, and approved-source immutability.
 
