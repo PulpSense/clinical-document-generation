@@ -130,3 +130,30 @@ PDF-cache-refresh checks passed (40 tests). The full suite was not run.
 
 Prompt improvements still need a fresh Hermes run for evidence of actual model
 behavior. Current uploaded documents remain the baseline for that comparison.
+
+## Table-note follow-up — 16 October 2026
+
+The owner authorized a general assembly correction for the repeated table note.
+Supplemental notes now omit exact activity/visit statements when the same
+relationship is already marked in the assessment matrix. The comparison applies
+to any activity and to both typed schedules and source matrices; no study or
+product names are special-cased. Case, whitespace and sentence punctuation may
+differ. Paraphrases and uncertain relationships are retained rather than guessed.
+
+Different timing, unmarked visits, nonunique timing aliases, quantities, actors,
+conditions and ongoing monitoring instructions remain visible. An independent
+additional sentence is retained when its preceding duplicate is omitted;
+cross-sentence qualifications retain their original activity context. Approved
+source data and table marks are unchanged, and no new generation gate runs.
+
+The native-output regression also exposed a section-inspection ambiguity after
+the TOC fix: linked TOC entries could be mistaken for actual body headings.
+Section snapshots now select real heading paragraphs, preserving inspection of
+the document body rather than returning TOC entries.
+
+Focused table-note, assessment-matrix, existing note-preservation and native-TOC
+checks passed: 49 tests. One unrelated lexical-review-caution test fails unchanged
+in the original checkout and was excluded from that passing selection. The full
+suite was not run. The original TOC fix remains included: earlier downloaded
+files require regeneration to acquire the visible linked entries, with page
+numbers populated when Word updates its fields.

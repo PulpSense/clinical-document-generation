@@ -2130,6 +2130,41 @@ def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentati
     # Preserve unique qualifications as prose beside the matrix. They are not
     # visit/activity relationships and must not become merged table rows.
     detail_rows: list[list[str]] = []
+    if matrix:
+        # Remove only explicit repetitions of a marked activity/visit pair.
+        # Seeing the same words somewhere in the matrix is not proof of the
+        # same relationship; qualifiers and any unmatched prose stay visible.
+        def note_key(text: str) -> str:
+            return re.sub(r"\s+", " ", text).strip().casefold().rstrip(".!?")
+
+        aliases = [set(filter(None, (note_key(str(visit["visit"])),
+                                     note_key(str(visit["timing"]))))) for visit in visits]
+        represented_assignments: set[str] = set()
+        for column, visit_aliases in enumerate(aliases, start=1):
+            unique_aliases = {alias for alias in visit_aliases
+                              if sum(alias in other for other in aliases) == 1}
+            for row in assessment_rows[2:]:
+                if row[column] != "X":
+                    continue
+                activity = note_key(str(row[0]))
+                for alias in unique_aliases:
+                    represented_assignments.update((
+                        f"{activity} at {alias}", f"{alias}: {activity}",
+                        f"at {alias}, {activity}",
+                    ))
+        remaining_notes = []
+        for note in supplemental_notes:
+            sentences = re.split(r"(?<=[.!?])\s+", note)
+            retained = [sentence for sentence in sentences
+                        if note_key(sentence) not in represented_assignments]
+            dependent_qualification = any(re.match(
+                r"\s*(?:only|if|unless|except|when|while|this|these|that|those|it|they|such|repeat|continue)\b",
+                sentence, re.I) for sentence in retained)
+            if len(retained) == len(sentences) or dependent_qualification:
+                remaining_notes.append(note)
+            elif retained:
+                remaining_notes.append(" ".join(retained))
+        supplemental_notes = remaining_notes
     # Table label presentation is shared by renderer and deterministic audit.
     for row in assessment_rows[2 if matrix else 1:]:
         if row and row[0]:

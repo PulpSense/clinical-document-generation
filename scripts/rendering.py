@@ -246,7 +246,7 @@ def protocol_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
             paragraph = Paragraph(element, document)
             paragraph_level = _heading_level(paragraph)
             key = _protocol_heading_key(paragraph.text)
-            if key in headings:
+            if paragraph_level is not None and key in headings:
                 active = True
                 level = paragraph_level or 1
             elif active and paragraph_level is not None and paragraph_level <= level:
