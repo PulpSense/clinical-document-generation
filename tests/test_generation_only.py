@@ -100,7 +100,11 @@ def test_complete_native_set_without_post_generation_gates(tmp_path, monkeypatch
     workspace = Path(result["workspace"])
     assert not list(workspace.rglob("*.pdf"))
     assert not (workspace / "verification").exists()
-    assert not (tmp_path / "output").exists()
+    assert {path.name for path in (tmp_path / "output").iterdir()} == expected
+    assert not (tmp_path / "generation-only-output").exists()
+    assert Path(result["notice"]).parent == workspace
+    for name in expected:
+        assert list(tmp_path.rglob(name)) == [tmp_path / "output" / name]
     assert workflow.generate_only(tmp_path) == result
     assert office_refresh == [workspace / "candidate/protocol.docx"]
     file = Path(result["experimental_outputs"][0]["absolute_path"])
@@ -120,6 +124,19 @@ def test_office_failure_returns_construction_feedback_without_publishing(tmp_pat
     assert result["stage"] == "office_field_refresh"
     assert len(calls) == 1
     assert not list(tmp_path.glob("generation-only-output/**/*"))
+    assert not (tmp_path / "output").exists()
+
+
+def test_existing_output_is_preserved(tmp_path):
+    approved_run(tmp_path)
+    output = tmp_path / "output"
+    output.mkdir()
+    existing = output / "protocol.docx"
+    existing.write_bytes(b"existing document")
+    result = complete(tmp_path)
+    assert result["stage"] == "output_conflict"
+    assert existing.read_bytes() == b"existing document"
+    assert not (tmp_path / "generation-only-output").exists()
 
 
 def test_n8n_prompts_keep_original_messages_and_resolve_inputs(tmp_path):

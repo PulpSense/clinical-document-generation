@@ -438,15 +438,18 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
                 ElementTree.parse(path)
     except (OSError, ValueError, zipfile.BadZipFile, PackageNotFoundError, ElementTree.ParseError) as exc:
         return {**base, "status": "blocked", "stage": "file_integrity", "findings": [{"issue": str(exc)}]}
-    output = run_dir / "generation-only-output" / base["revision_id"] / identity[:16]
-    output.mkdir(parents=True, exist_ok=False)
+    output = run_dir / "output"
+    output.mkdir(parents=True, exist_ok=True)
+    if any(output.iterdir()):
+        return {**base, "status": "blocked", "stage": "output_conflict",
+                "findings": [{"issue": f"Output folder is not empty; use a new run folder: {output}"}]}
     entries = []
     for name in names:
         path = output / name
-        shutil.copy2(workspace / "candidate" / name, path)
+        shutil.move(str(workspace / "candidate" / name), str(path))
         entries.append({"absolute_path": str(path), "path": path.relative_to(run_dir).as_posix(),
                         "sha256": sha256_file(path), "link": f"[{name}](<{path.as_posix()}>)"})
-    notice = output / "README.txt"
+    notice = workspace / "README.txt"
     notice.write_text(
         "UNREVIEWED EXPERIMENT — not client-ready.\n"
         "Generated using n8n prompts with approved-source and Brad editorial corrections, "

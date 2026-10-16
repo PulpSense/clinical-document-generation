@@ -347,3 +347,19 @@ and whitespace checks passed. The full suite was not run; retired test modules
 importing the removed quality module remain outside this focused selection.
 The complete Hermes generation remains the final integration test. Linux
 dependencies and the six production scripts are unchanged.
+
+## Single final output folder — 16 October 2026
+
+Generation now moves completed native files from the assembly workspace into
+the run's `output/` folder instead of copying them to a separate
+`generation-only-output/<revision>/<attempt>/` tree. The notice stays with the
+internal run records. Delivery instructions use those final files directly;
+Hermes no longer needs to export another copy. Completed attempts retain their
+existing hash verification and delivery time. An occupied output folder is
+preserved and requires a new run folder. Existing saved runs are not migrated
+or deleted by this change.
+
+Focused workflow coverage checks the exact branch file set, one retained copy
+of each native file, internal notice placement, replay/integrity behavior,
+office failure and preservation of an occupied output folder. All 13 focused
+workflow tests and the skill validator passed. The full suite was not run.

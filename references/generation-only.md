@@ -63,7 +63,9 @@ are test fixtures and must never supply real study prose.
 The terminal result is `status: unreviewed`, with exact paths in
 `experimental_outputs`. Files are named `protocol.docx`,
 `icf.docx`, and `study.xml` as applicable. They live in
-`<run-dir>/generation-only-output/<revision>/<attempt>/`, with a separate notice.
+`<run-dir>/output/`. Completed native files are moved out of the assembly
+workspace, leaving one document set. The experiment notice stays in the internal
+workspace with the drafting and assembly records.
 `client_outputs` stays empty. Local host paths establish saved files only;
 use the channel's actual transfer mechanism when available.
 
@@ -90,7 +92,9 @@ in `office-field-refresh.json`. Completed results reuse their saved files.
 The current source-driven table and XML builders still preserve their structure;
 legacy workflow constants and external Google Docs/Gmail actions are excluded.
 Prompts, responses, merged drafts and assembly records remain in `workspace`.
-Changing the generation authority starts a separate attempt. Repeating a completed
+Changing the generation authority starts a separate attempt; use a new run folder
+for its document set. A nonempty output folder is preserved and returns
+`stage: output_conflict`. Repeating a completed
 command returns the saved result and verifies its file hashes.
 
 The owner generates the study files with Hermes, then the owner and Codex

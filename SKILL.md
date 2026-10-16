@@ -67,7 +67,7 @@ Apply these rules:
 5. Never reuse or overwrite a run folder. If the base name exists, append `__02`, `__03`, and so on, choosing the first unused suffix.
 6. Create the selected folder directly under `/opt/data/clinical-document-runs/` and pass its exact absolute path as every workflow command's `--run-dir`.
 7. Keep source inputs, the approved Source-of-Truth, revisions, drafts, logs and final documents inside that run folder.
-8. Generation writes the complete branch set beneath `generation-only-output/<revision>/<attempt>/`; use the exact paths returned in `experimental_outputs`.
+8. Generation moves the complete branch set into the run's `output/` folder; use the exact paths returned in `experimental_outputs`.
 9. Never generate files directly in `/opt/data`, inside this installed skill, or inside another study's run folder.
 10. Never delete or alter an earlier study-run folder.
 11. Deliver the document links and recorded generation time as described in [generation-only.md](references/generation-only.md).
@@ -104,7 +104,7 @@ that same generate command until native assembly is complete. Both plain
 
 - Present the documents as normal outputs, not as “generation-only” or experimental documents. Use the normal filenames `protocol.docx`, `icf.docx`, and, when applicable, `study.xml`.
 - The user-facing `output/` folder must contain only the branch-appropriate DOCX/XML documents. Keep README files, notices, commit identifiers, hashes, prompt provenance, and other technical metadata in internal run records, outside this folder.
-- If the workflow saves its immutable result elsewhere, export byte-identical copies into the run's `output/` folder and record their source/destination hashes internally. Do not rewrite the original result or misrepresent its actual assessment status.
+- Deliver the workflow's files directly from `output/`. Completed runs retain one document set, with hashes and actual assessment status in internal records.
 - At startup, simply say that document generation has started. Do not narrate internal prompt sources or mention Brad's corrections in progress or delivery messages; continue following them internally.
 - Finish with a short, neatly formatted message headed **Here are the documents**, one individually clickable link per document, and **Generation time: X minutes Y seconds**. Do not include commit IDs, revision IDs, experiment labels, audit details, or long technical explanations in that delivery message.
 - Use genuine accessible file links or actual channel uploads when supported. Never invent upload links or claim recipient transfer from a host-local path alone. If the channel cannot deliver accessible files, state that limitation plainly.
