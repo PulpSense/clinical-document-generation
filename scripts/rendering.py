@@ -2624,6 +2624,44 @@ def _repair_sterling_footer_page_fields(document: Document) -> None:
                         paragraph._p.insert(index + offset, replacement)
 
 
+def _normalize_icf_body_spacing(document: Document, *, sterling: bool) -> None:
+    """Use paragraph spacing for body prose, retaining native signing space."""
+    if not sterling:
+        # The Advarra shell reserves 1.77 inches above every page, including
+        # continuation pages. Its header fits inside a standard one-inch margin.
+        for section in document.sections:
+            section.top_margin = Inches(1)
+    paragraphs = list(document.paragraphs)
+    in_agreement = False
+    signature_start = len(paragraphs)
+    for index, paragraph in enumerate(paragraphs):
+        key = _icf_heading_key(paragraph.text)
+        if key in {
+            _icf_heading_key("AGREEMENT TO BE IN THE STUDY"),
+            _icf_heading_key("PARTICIPANT STATEMENT AUTHORIZATION"),
+        }:
+            in_agreement = True
+        # Preserve the signature block verbatim, including writing room and
+        # tab-based lines in Advarra and underscore-based lines in Sterling.
+        if in_agreement and (paragraph._p.xpath('.//w:tab') or "_____" in paragraph.text):
+            signature_start = index
+            while signature_start and _plain_blank(paragraphs[signature_start - 1]):
+                signature_start -= 1
+            break
+    for paragraph in paragraphs[:signature_start]:
+        if _plain_blank(paragraph) and not paragraph._p.xpath(
+            './/w:fldChar | .//w:fldSimple | .//w:instrText | .//w:drawing'
+            ' | .//w:pict | .//w:object | .//w:bookmarkStart | .//w:bookmarkEnd'
+            ' | .//w:r/w:rPr/w:u | .//w:pageBreakBefore'
+        ):
+            paragraph._p.getparent().remove(paragraph._p)
+        elif paragraph.text.strip():
+            paragraph.paragraph_format.space_after = Pt(6)
+            if _is_icf_heading(paragraph):
+                paragraph.paragraph_format.space_before = Pt(10)
+                paragraph.paragraph_format.space_after = Pt(4)
+
+
 def _compact_icf_signature_end(document: Document) -> None:
     """Avoid a client-template spacer forcing the final copy statement onto an otherwise blank page."""
     agreement = next((
@@ -3697,6 +3735,7 @@ def _template_document(
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
         if sterling:
             _preserve_sterling_registry_statement(document, authority, reference)
+        _normalize_icf_body_spacing(document, sterling=sterling)
 
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""

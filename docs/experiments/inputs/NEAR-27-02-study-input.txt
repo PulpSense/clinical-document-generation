@@ -1,0 +1,238 @@
+NEAR-27-02 STUDY SYNOPSIS AND OPERATIONAL SUPPLEMENT
+Version 1.0 | 16 October 2026
+
+DOCUMENT REQUEST
+Prepare a protocol, an informed consent form and study XML. Use the Advarra
+consent template. This input is for a new study; do not carry forward facts,
+contacts, approval decisions or procedures from PureSee/Odyssey or other studies.
+The Source of Truth must go through the usual owner approval process.
+
+IDENTIFICATION AND DESIGN
+Protocol number: NEAR-27-02.
+Full title: Near Vision and Spectacle Use After Routine Bilateral Monofocal
+Intraocular Lens Implantation: A Prospective Observational Cohort Study.
+Short title: Near Vision After Monofocal IOLs.
+Study type: Prospective. Registry study classification: Observational.
+Observational model: Cohort. Time perspective: Prospective.
+Condition: Pseudophakia following bilateral cataract surgery.
+Two exposure cohorts: enhanced monofocal IOLs in both eyes, or standard monofocal
+IOLs in both eyes. Lens selection and surgery occur as routine care before
+enrollment, independently of this research. The study assigns no treatment,
+implant, medication or surgery. There is no randomization, masking or placebo.
+Intervention/exposure name: Previously implanted bilateral monofocal IOL type.
+Intervention/exposure category: Device exposure observed during routine care;
+no study-assigned intervention. Research procedures are noninvasive vision
+assessments and questionnaires. Number of sites: 2, both in the United States.
+
+BACKGROUND, OBJECTIVES AND HYPOTHESIS
+The clinical question is whether people with these two routinely selected lens
+types differ in near vision and reported use of reading glasses. This study
+will collect the same assessments at consistent follow-up points in both
+cohorts. No prior comparative effect estimate or bibliography is supplied.
+Primary objective: Estimate the difference between cohorts in binocular
+uncorrected near visual acuity at Week 12 after enrollment.
+Secondary objectives: Describe reading-glasses use, near-task satisfaction,
+and binocular uncorrected distance visual acuity at Week 12.
+Hypothesis: The enhanced monofocal cohort will have better mean binocular
+uncorrected near visual acuity at Week 12 than the standard monofocal cohort.
+The study is exploratory and descriptive; it is not a confirmatory efficacy
+trial and cannot establish a causal effect of lens choice.
+
+POPULATION AND ELIGIBILITY
+Planned enrollment: 80 participants, targeting 40 per cohort and 40 per site.
+Age: 50 years or older; no upper age limit. All sexes are eligible. Healthy
+volunteers: No. Sampling: Non-probability, consecutive eligible patients at
+the two clinics until the enrollment target is reached.
+Inclusion criteria:
+- At least 50 years old at consent.
+- Bilateral routine cataract surgery completed before enrollment, with either
+  enhanced monofocal IOLs in both eyes or standard monofocal IOLs in both eyes.
+- Second-eye surgery occurred 28 to 42 days before Day 0.
+- Able to provide written informed consent and complete the questionnaires in
+  English without a proxy.
+- Able and willing to attend Day 0, Week 6 and Week 12 visits.
+Exclusion criteria:
+- A multifocal, trifocal or extended-depth-of-focus IOL in either eye.
+- A planned additional ocular surgery during the 12-week participation period.
+- An ocular condition that the site investigator determines prevents reliable
+  completion of the specified visual acuity assessments.
+- Participation in another interventional research study within the 30 days
+  before Day 0, or planned participation during follow-up.
+Minimum period without other interventional-study participation before
+screening: 30 days.
+Pregnancy is not an exclusion criterion. No pregnancy testing, contraception
+requirement or study-specific reproductive precautions are required because
+there is no research treatment, radiation or specimen collection.
+
+VISITS, ASSESSMENTS AND PARTICIPATION
+Participation lasts 12 weeks after Day 0, with three in-person research visits.
+Visit 1 — Day 0 / Enrollment, no visit window, approximately 60 minutes:
+written consent before any research assessment; eligibility and routine
+surgical-record review; demographic and lens-type collection; binocular
+uncorrected near visual acuity at 40 cm using the same clinic near chart and
+logMAR scoring; binocular uncorrected distance visual acuity at 4 m using a
+logMAR chart; reading-glasses use questionnaire; near-task satisfaction rating;
+and assessment-related symptom enquiry.
+Visit 2 — Week 6, Day 42 +/- 7 days, approximately 35 minutes:
+both visual acuity assessments, reading-glasses use questionnaire, near-task
+satisfaction rating, interval ocular-care update and symptom enquiry.
+Visit 3 — Week 12 / Final Visit, Day 84 +/- 7 days, approximately 35 minutes:
+the same assessments and updates as Week 6, followed by confirmation that
+research participation is complete. No separate exit form or extra closeout
+visit is required. Study staff may contact a participant once within 7 days
+after a missed visit solely to reschedule within its existing window.
+There are no blood draws, genetic tests, stored specimens, pupil dilation,
+research imaging, home monitoring, study medications or extra surgeries.
+Assessment-matrix note: Both cohorts follow exactly the same visit schedule.
+Only lens-type exposure differs.
+The reading-glasses questionnaire asks how often glasses were used for near
+tasks during the preceding 7 days: never, sometimes, often, or always.
+Near-task satisfaction is rated from 0 (not satisfied) to 10 (fully satisfied).
+The participant's study ends after the Week 12 assessments, or earlier upon
+withdrawal or investigator discontinuation. Routine clinical care continues.
+
+OUTCOMES AND ANALYSIS
+Primary outcome: Binocular uncorrected near visual acuity, in logMAR, at Week
+12 (Day 84 +/- 7 days). Lower values indicate better near visual acuity.
+Secondary outcome 1: Percentage reporting never using reading glasses for near
+tasks during the preceding 7 days, at Week 12, from the four-category question.
+Secondary outcome 2: Near-task satisfaction score, 0 to 10, at Week 12.
+Secondary outcome 3: Binocular uncorrected distance visual acuity, logMAR,
+at Week 12 (Day 84 +/- 7 days).
+Other/exploratory outcome: Change in binocular uncorrected near visual acuity
+from Day 0 to Week 6. No additional outcomes are authorized by this input.
+Sample justification: A feasible descriptive sample of 80 participants,
+targeting 40 per cohort, is planned. Approximately 10% may not complete Week
+12, leaving about 72 completers. No formal hypothesis-testing power calculation
+was performed; do not invent an assumed effect size or a power claim.
+Analysis plan: Summarize enrollment, disposition and baseline characteristics
+by cohort and site. Analyze the primary Week 12 outcome with a linear model
+including cohort, Day 0 near visual acuity and site; report the adjusted cohort
+mean difference and its 95% confidence interval. Report observed continuous
+outcomes using count, mean, standard deviation, median and range. Report
+categorical outcomes as counts and percentages with stated denominators.
+Present secondary outcomes descriptively by cohort, with 95% confidence
+intervals where applicable; no multiplicity-adjusted confirmatory claims.
+Use available observations for each analysis without imputing missing outcomes;
+report missing counts and reasons by cohort. Include all enrolled participants
+with relevant observed data. Exploratory analyses are labeled exploratory.
+
+RISKS, BENEFITS AND ALTERNATIVES
+Research-related risks: Temporary eye fatigue, dry-eye discomfort or headache
+during vision testing; mild embarrassment or frustration answering questions;
+time and travel burden; and a risk of loss of confidentiality. Staff can pause
+or stop testing at the participant's request. New or persistent symptoms are
+referred to the study doctor. Do not describe prior cataract surgery as a
+research procedure or present its surgical risks as new study risks.
+No direct benefit is promised. Information may help describe patients' visual
+experience after routine care. The alternative is not to participate and to
+continue the same ordinary clinical care. Declining does not affect care,
+insurance benefits or the relationship with the clinics.
+
+PAYMENTS, COSTS AND RESEARCH-RELATED INJURY
+Compensation: $30 for each attended research visit, up to $90 for all three.
+Payment is earned per attended visit and is not conditional on completing the
+study; withdrawal does not forfeit previously earned payments. Paid by mailed
+check within 30 days of the visit. No enrollment bonus or completion bonus.
+Travel reimbursement: Actual parking or public transit expenses up to $20 per
+attended visit with receipts, separate from compensation; no mileage payment.
+Research-only assessments and questionnaires are paid by the sponsor. Ordinary
+eye care, medications and treatment that would occur outside research remain
+the participant's or insurer's responsibility. No research costs are billed
+to insurance. No payment to participants is described as a guaranteed benefit.
+If research-related injury or persistent discomfort occurs, contact the site
+doctor through the site contact below; the site arranges evaluation. Emergency
+care is obtained through ordinary emergency services. This study has no
+sponsor fund for free injury treatment or additional injury compensation;
+ordinary treatment may be billed to the participant or insurer. Participants
+do not waive legal rights. Do not promise free treatment or automatic payment.
+
+PRIVACY, AUTHORIZATION AND DATA HANDLING
+Collect name and contact details for scheduling/payment; age, sex, lens type,
+surgery dates, relevant ocular history, acuity results and questionnaire data.
+Assign a study ID at enrollment. Identifying information and the ID key are
+kept separately from coded study assessments. Each site keeps its own key in
+an access-controlled encrypted clinic drive. Paper signed consent forms are
+kept in a locked research cabinet at the site. Authorized site investigators
+and coordinators may access identifying records for study duties.
+The sponsor and statistician receive coded assessments, with no names, contact
+details or ID key. Authorized sponsor monitors, the reviewing IRB and legally
+authorized oversight bodies may inspect relevant original records as required
+for study oversight. Reports and publications use aggregate results and do
+not identify participants. No sale of data, external future research use,
+specimen banking or genetic research is planned. Individual participant data
+will not be shared publicly.
+Study records and the separate ID keys are retained securely for 7 years after
+study closeout on 31 January 2028, then securely destroyed, unless a binding
+record-retention requirement requires longer storage. Authorization to collect
+new health information lasts through the participant's final research visit
+or earlier written withdrawal. This does not require deletion of records
+already collected and retained under the stated policy.
+Participants may withdraw authorization by writing to their site's study
+coordinator at the address below. No new research information is collected
+after withdrawal. Previously collected information may be retained and used
+for the study's integrity and required oversight. Withdrawal from research
+does not stop ordinary care. Do not substitute an unlimited authorization term.
+
+WITHDRAWAL, RESULTS AND CLOSEOUT
+Participants may stop at any time without penalty or loss of usual benefits.
+They can tell or write to the coordinator. Staff offer an optional discussion
+of symptoms and ordinary-care needs; no mandatory final research examination,
+extra testing or data collection is imposed after withdrawal. The investigator
+may stop participation if the person requests it, cannot complete assessments,
+undergoes additional ocular surgery or the study is stopped. Record the reason
+if available. Earned payments and eligible incurred travel expenses remain due.
+Individual visual acuity results are offered at each attended visit. Findings
+requiring clinical follow-up are explained and referred to ordinary eye care.
+An aggregate plain-language results summary will be available upon request
+from the coordinator after analysis is complete; no individual treatment
+assignment or unmasking is involved.
+Recruitment: 1 March 2027 through 31 August 2027. Final participant assessments
+expected by 30 November 2027. Primary completion and study completion date:
+30 November 2027, anticipated. Analysis and administrative closeout end
+31 January 2028; these activities do not extend individual participation.
+After follow-up, reconcile participant disposition, payments and coded data,
+resolve data queries, lock the dataset, analyze results, provide the requested
+summary and archive records under the retention policy above.
+
+PARTIES, FACILITIES AND CONTACTS
+Sponsor: Clearview Outcomes Research, 100 Research Avenue, Suite 200,
+Washington, DC 20001, United States. Sponsor contact: Morgan Ellis, Research
+Director, +1 202-555-0140, morgan.ellis@example.org.
+Overall principal investigator: Dr. Avery Chen, MD, Principal Investigator.
+Overall study coordinator: Jordan Lee, CCRC, Study Coordinator.
+Business phone: +1 202-555-0141. Office phone: +1 202-555-0142.
+Email: jordan.lee@example.org. Mailing address: Site 1 below.
+Site 1 facility: Clearview Eye Center, 120 Clinic Avenue, Suite 110,
+Washington, DC 20002, United States.
+Site 1 investigator: Dr. Avery Chen, MD, Principal Investigator.
+Site 1 contact: Jordan Lee, CCRC, Study Coordinator, business +1 202-555-0141,
+office +1 202-555-0142, jordan.lee@example.org.
+Site 2 facility: Riverside Vision Clinic, 240 Clinic Street, Suite 210,
+Baltimore, MD 21201, United States.
+Site 2 investigator: Dr. Riley Patel, MD, Site Investigator.
+Site 2 contact: Casey Brooks, CCRC, Site Study Coordinator, business
++1 202-555-0143, office +1 202-555-0144, casey.brooks@example.org.
+Site contacts handle scheduling, study questions and connection to the site
+doctor for possible research-related injury during business hours, Monday to
+Friday, 9:00 a.m. to 5:00 p.m. local time. These are not 24-hour emergency lines.
+Reviewing IRB: Clearview Independent Research Review Board.
+Affiliation: Independent IRB, unaffiliated with either study clinic.
+Address: 360 Review Street, Suite 300, Washington, DC 20003, United States.
+Phone: +1 202-555-0145. Email: participants.irb@example.org.
+The IRB contact is for participant-rights questions or concerns about research.
+The selected consent family is Advarra; the supplied study-specific IRB and
+site contacts must be used rather than contacts from a previous study.
+
+REGISTRY AND CONDITIONAL FACTS
+Recruitment status: Not yet recruiting. Enrollment: 80, anticipated.
+Verification month: October 2026. IRB review status: Not yet submitted.
+IRB approval has not been obtained. Do not invent an approval number or date.
+No public registry identifier has been assigned. Public trial registration
+and the consent's mandatory ClinicalTrials.gov disclosure are not required
+for this study according to this supplied study plan. Do not infer otherwise
+merely because an XML file is requested. No FDA-regulated investigational
+drug or device study, no investigational product, no genetic testing, no
+commercial specimens, no radiation, no randomization and no masking.
+The study does not recruit children or adults unable to consent. No legally
+authorized representative or witness signature is required under this plan.

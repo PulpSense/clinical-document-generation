@@ -286,3 +286,31 @@ Four regression cases reproduced the inherited-disabled setting and passed after
 the fix. The complete focused native-table, TOC, editorial and office-refresh
 selection passed (14 tests). No visual renderer was invoked for this correction.
 Clinical values, the dependency list and the six-script inventory are unchanged.
+
+## ICF whitespace and richer source follow-up — 16 October 2026
+
+The Advarra output inherited a 1.77-inch top margin on every page and empty
+body paragraphs from its authority shell. Assembly now sets Advarra's top
+margin to one inch. Both families use consistent paragraph spacing in body
+prose instead of cosmetic blank paragraphs, after authority layout is applied.
+Sterling's margins, IRB merge fields, native fields, drawings, explicit breaks
+and signing areas are preserved. Blank paragraphs carrying only inherited
+heading underline properties are cosmetic; actual underlined runs are retained.
+The signature block and its preceding writing space are left intact.
+
+The latest uploaded Advarra output was cleaned in a local preview, with the
+nonblank paragraph text unchanged, and rendered as five pages instead of six.
+Every preview page and every page of an assembled Sterling fixture was inspected
+for spacing, header/footer collisions and signature integrity. Development-only
+preview rendering adds no runtime content review, visual review or repair loop.
+The 18 focused ICF-spacing, front-matter, contact-pagination and office-refresh
+tests passed; the skill validator passed. The full suite was not run.
+
+`inputs/NEAR-27-02-study-input.txt` supplies a new two-site prospective
+observational study with explicit payment/reimbursement, research versus routine
+costs, injury handling, privacy/authorization, retention, withdrawal, individual
+and aggregate results, completion and administrative closeout facts. It selects
+Advarra, supplies all required operational contacts and analysis details, and
+states conditional clauses that do not apply. It is source input for a new
+normal approval/generation run, not an already approved Source of Truth or a
+claim that the study has IRB approval.
