@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "renderer": "/Users/juanpabloleoni/.cache/codex-runtimes/codex-primary-runtime/dependencies/bin/override/soffice",
+  "page_count": 12,
+  "source_sha256": "de18814aa545ffac716d4341a598a4276f4a041bda7a3a2c4a5fa5bb3bbc31ac",
+  "pagination_pdf_sha256": "5a5aa229150ea0f8e4ba55b1079f9bed6629f391e1b3272331ab1dadd876463f",
+  "output_sha256": "3d35180f4b52b0edf3f884da32a2d46a787596a9b4a77d7c773796933350ce8f",
+  "heading_count": 44,
+  "toc_entries": 44,
+  "section_18": [
+    "18. STUDY ENDPOINT CRITERIA",
+    "18.1. Patient Completion of Study",
+    "18.2. Patient Discontinuation",
+    "18.3. Study Completion"
+  ],
+  "source": "retained PureSee approved source",
+  "drafts": "retained actual Hermes merged-drafts; no fresh AI writing",
+  "documents_generated": [
+    "protocol.docx"
+  ]
+}

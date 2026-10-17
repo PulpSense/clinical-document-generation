@@ -242,7 +242,7 @@ def protocol_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
     document = Document(path)
     specs = [section for branch in ("Prospective", "Retrospective", "Ambispective")
              for section in protocol_contract(branch) if section.section_id == section_id]
-    headings = {_protocol_heading_key(f"{section.number} {section.title}") for section in specs}
+    headings = {(section.number.split(".")[0], _protocol_title_key(section.title)) for section in specs}
     active = section_id == "title-page"
     level = 1
     snapshot = []
@@ -250,7 +250,8 @@ def protocol_section_snapshot(path: Path, section_id: str) -> list[dict[str, Any
         if element.tag == qn("w:p"):
             paragraph = Paragraph(element, document)
             paragraph_level = _heading_level(paragraph)
-            key = _protocol_heading_key(paragraph.text)
+            major = re.match(r"\s*(\d+)\s*\.", paragraph.text)
+            key = (major.group(1) if major else "", _protocol_title_key(paragraph.text))
             if paragraph_level is not None and key in headings:
                 active = True
                 level = paragraph_level or 1
@@ -871,6 +872,81 @@ def _set_paragraph_text(paragraph: Paragraph, text: str) -> None:
             run.text = ""
     else:
         paragraph.add_run(text)
+
+
+def _renumber_protocol_subsections(document: Document) -> None:
+    """Resolve canonical template numbers once, after optional sections are removed.
+
+    Stable section IDs and template numbers remain the authoring identities.
+    Only included headings determine display numbers; ordinary clinical numbers
+    are untouched. Edit visible XML spans to retain runs, links and bookmarks.
+    """
+    heading_spans = []
+    numbers: dict[str, str] = {}
+    counts: dict[str, int] = {}
+    for paragraph in document.paragraphs:
+        if _heading_level(paragraph) is None:
+            continue
+        text = "".join(paragraph._p.xpath('.//w:t/text()'))
+        match = re.match(r"^(\d+(?:\.\d+)*)\.(?=\s)", text)
+        if not match:
+            continue
+        original = match.group(1)
+        if "." in original:
+            parent = original.rsplit(".", 1)[0]
+            counts[parent] = counts.get(parent, 0) + 1
+            display = f"{numbers.get(parent, parent)}.{counts[parent]}"
+        else:
+            display = original
+        numbers[original] = display
+        heading_spans.append((paragraph, match.start(1), match.end(1), display))
+
+    def replace_spans(paragraph: Paragraph, spans: list[tuple[int, int, str]]) -> None:
+        nodes = paragraph._p.xpath('.//w:t')
+        for start, stop, replacement in sorted(spans, reverse=True):
+            original = "".join(node.text or "" for node in nodes)[start:stop]
+            if original == replacement:
+                continue
+            # Preserve styling of unchanged components in split-run numbers.
+            prefix = 0
+            while prefix < min(len(original), len(replacement)) and original[prefix] == replacement[prefix]:
+                prefix += 1
+            suffix = 0
+            while (suffix < min(len(original), len(replacement)) - prefix
+                   and original[-1 - suffix] == replacement[-1 - suffix]):
+                suffix += 1
+            start += prefix
+            stop -= suffix
+            replacement = replacement[prefix:len(replacement) - suffix if suffix else None]
+            offset = 0
+            for node in nodes:
+                value = node.text or ""
+                end = offset + len(value)
+                if offset < stop and end > start:
+                    left, right = max(0, start - offset), min(len(value), stop - offset)
+                    node.text = value[:left] + (replacement if offset <= start < end else "") + value[right:]
+                offset = end
+
+    # Resolve all references against the original map simultaneously: 18.4 may
+    # become 18.3 while 18.5 becomes 18.4 in the same document.
+    references = re.compile(
+        r"\bSections?\s+\d+(?:\.\d+)*(?:\s*(?:,\s*(?:and\s+|or\s+)?|and\s+|or\s+|through\s+|to\s+|[–-]\s*)"
+        r"(?:Sections?\s+)?\d+(?:\.\d+)*)*", re.I)
+    seen = set()
+    for paragraph in _all_paragraphs(document):
+        if paragraph._p in seen:
+            continue
+        seen.add(paragraph._p)
+        text = "".join(paragraph._p.xpath('.//w:t/text()'))
+        spans = []
+        for reference in references.finditer(text):
+            for number in re.finditer(r"\d+(?:\.\d+)*", reference.group()):
+                original = number.group()
+                if original in numbers and numbers[original] != original:
+                    spans.append((reference.start() + number.start(), reference.start() + number.end(), numbers[original]))
+        replace_spans(paragraph, spans)
+    for paragraph, start, stop, display in heading_spans:
+        replace_spans(paragraph, [(start, stop, display)])
 
 
 def _normalize_protocol_container_introductions(
@@ -4044,6 +4120,9 @@ def _template_document(
                 value = edit['after']
         if construction_fields is not None:
             construction_fields.append({'path': identity, 'before': value, 'source_path': evidence})
+    if not icf:
+        _renumber_protocol_subsections(document)
+        _populate_protocol_toc_cache(document, {})
     _set_update_fields(document)
     return document
 

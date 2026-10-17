@@ -40,7 +40,7 @@ def test_editorial_ownership_reaches_each_active_drafting_batch(branch, family, 
         assert 'official form name' in constraints
         assert 'ambiguous trailing numeral' in constraints
         assert 'without renaming source-owned table labels' in constraints
-        assert request['prompt_version'] == TRIALS['prompt_version']
+        assert request['prompt_version'] == drafting.PROMPT_VERSION
         assert request['generation_only_prompts']['profile'] == 'n8n-with-brad-corrections/v1'
         assert drafting.request_hash_valid(request)
     assert source == original
