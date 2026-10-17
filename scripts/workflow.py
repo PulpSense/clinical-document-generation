@@ -403,6 +403,10 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
                 "requests": ["content-plan/request.json"], "handoffs": [{"request_path": "content-plan/request.json",
                     "response_path": planning_request["response_path"], "task": planning_request["task"], "batch_id": planning_request["batch_id"]}]}
     reference = content_plan.with_plan(reference, plan)
+    # Keep the pre-plan identity as the attempt locator. AI section choices can
+    # change evidence coverage, so every drafting consumer must use the same
+    # effective authority that scheduling derives from the accepted plan.
+    governing = governing_resources(SCRIPT_DIR.parent, reference, contracted_bundle=bundle)
     # Invalid response JSON can be corrected manually without invoking any
     # content reviewer or automatic drafting/repair loop.
     for rejected in (workspace / "hermes/rejected").glob("*.json"):
