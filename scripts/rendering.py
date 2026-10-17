@@ -737,9 +737,9 @@ def _visible_table_borders(table: Table) -> None:
 def _insert_retrospective_site_directory(document: Document, reference: Mapping[str, Any]) -> None:
     contract = protocol_table_contracts(reference)["study-sites"]
     rows = contract["rows"]
-    if len(rows) < 2:
+    if not rows and not contract.get("supplemental_notes"):
         return
-    sections = list(protocol_contract("Retrospective"))
+    sections = list(protocol_contract(str(get_path(reference, "meta.study_type")) if plan_for(reference) is not None else "Retrospective"))
     owner_index = next(i for i, section in enumerate(sections)
                        if section.section_id == contract.get("section_id", "study-design.design"))
     boundary = sections[owner_index + 1]
@@ -747,6 +747,13 @@ def _insert_retrospective_site_directory(document: Document, reference: Mapping[
     anchor = next((p for p in document.paragraphs
                    if _protocol_heading_key(p.text) == boundary_key), None)
     if anchor is None:
+        if plan_for(reference) is not None:
+            raise LayoutRepairTargetError("Planned site directory has no native insertion anchor.")
+        return
+    if not rows:
+        for text in contract.get("supplemental_notes", []):
+            note = document.add_paragraph(text)
+            anchor._p.addprevious(note._p)
         return
     caption = document.add_paragraph(contract["caption"])
     caption.paragraph_format.keep_with_next = True
@@ -1268,6 +1275,8 @@ def _replace_protocol_leaf_bodies(
             if _heading_level(paragraph) is not None and _protocol_heading_key(paragraph.text) == expected
         ), None)
         if heading is None:
+            if plan_for(reference) is not None:
+                raise LayoutRepairTargetError(f"Authored Protocol section has no native heading: {section.section_id}")
             continue
         if "\n" in heading.text:
             heading_text = next((line.strip() for line in heading.text.splitlines() if line.strip()), "")
@@ -2070,7 +2079,7 @@ def _icf_section_elements(document: Document, heading: Paragraph, heading_texts:
 
 
 def _populate_icf_sections(
-    document: Document, model: Mapping[str, Any], *, sterling: bool,
+    document: Document, model: Mapping[str, Any], *, sterling: bool, strict: bool = False,
 ) -> None:
     """Keep the client shell while ensuring every accepted ICF section is visible."""
     headings = _STERLING_ICF_HEADINGS if sterling else _ADVARRA_ICF_HEADINGS
@@ -2084,6 +2093,11 @@ def _populate_icf_sections(
 
     for section_id, heading in heading_by_id.items():
         if heading is None:
+            # Advarra's injury slot is restored from the layout authority after
+            # ordinary section placement, immediately before Legal Rights.
+            deferred_injury = not sterling and section_id == "icf.injury"
+            if strict and _icf_blocks(model, section_id) and not deferred_injury:
+                raise LayoutRepairTargetError(f"Authored ICF section has no native heading: {section_id}")
             continue
         elements, exemplar = _icf_section_elements(document, heading, heading_texts)
         for element in elements:
@@ -3565,6 +3579,9 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     """Populate Table 15.1 only from approved visit/procedure relationships."""
     placeholder = next((paragraph for paragraph in document.paragraphs if "{visitsTable}" in paragraph.text), None)
     if placeholder is None:
+        if plan_for(reference) is not None and (plan_for(reference)["tables"]["schedule-of-assessments"]["rows"]
+                or plan_for(reference)["tables"]["schedule-of-assessments"]["supplemental_notes"]):
+            raise LayoutRepairTargetError("Planned assessment table has no native insertion anchor.")
         return
     table_contract = protocol_table_contracts(reference, presentation)["schedule-of-assessments"]
     row_values = [list(row) for row in table_contract["rows"]]
@@ -3688,14 +3705,27 @@ def _sample_size_evidence_table(document: Document, reference: Mapping[str, Any]
     """Render every approved sample-size evidence row as an auditable Section 11 table."""
     table_contract = protocol_table_contracts(reference)["sample-size-evidence"]
     row_values = table_contract["rows"]
-    if not row_values:
+    if not row_values and not table_contract.get("supplemental_notes"):
         return
+    target_key = _protocol_heading_key("12. CONFIDENTIALITY/PUBLICATION OF THE STUDY")
+    if plan_for(reference) is not None:
+        sections = list(protocol_contract(str(get_path(reference, "meta.study_type"))))
+        index = next(i for i,s in enumerate(sections) if s.section_id == "sample-size")
+        boundary = sections[index + 1]
+        target_key = _protocol_heading_key(f"{boundary.number} {boundary.title}")
     target = next((
         paragraph for paragraph in document.paragraphs
         if _heading_level(paragraph) is not None
-        and _protocol_heading_key(paragraph.text) == _protocol_heading_key("12. CONFIDENTIALITY/PUBLICATION OF THE STUDY")
+        and _protocol_heading_key(paragraph.text) == target_key
     ), None)
     if target is None:
+        if plan_for(reference) is not None:
+            raise LayoutRepairTargetError("Planned sample-size table has no native insertion anchor.")
+        return
+    if not row_values:
+        for text in table_contract.get("supplemental_notes", []):
+            note = document.add_paragraph(text)
+            target._p.addprevious(note._p)
         return
     authority = Document(authority_path)
     design = authority.tables[-1]
@@ -3877,7 +3907,7 @@ def _template_document(
     if icf:
         if sterling:
             _repair_sterling_footer_page_fields(document)
-        _populate_icf_sections(document, model, sterling=sterling)
+        _populate_icf_sections(document, model, sterling=sterling, strict=planned is not None)
         if planned is not None:
             _insert_planned_icf_sections(document, planned["extra_icf_sections"], authority)
         elif sterling:
@@ -3934,7 +3964,7 @@ def _template_document(
             _insert_planned_container_introductions(document, reference, branch)
         _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
         _sample_size_evidence_table(document, reference, authority_path)
-        if branch == "Retrospective":
+        if branch == "Retrospective" or planned is not None:
             _insert_retrospective_site_directory(document, reference)
         _normalize_protocol_title_controls(document, reference)
         _normalize_protocol_summary_table(document, reference)

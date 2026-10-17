@@ -125,7 +125,8 @@ def _protocol_writing_plan(reference: Mapping[str, Any]) -> dict[str, Any]:
                           else "study-procedure.enrollment"),
         "completion_owner": ("endpoint-criteria.study-completion" if "endpoint-criteria.study-completion" in ids
                              else "study-procedure.enrollment"),
-        "assessment_table_owner": "evaluation-procedures" if "evaluation-procedures" in ids else None,
+        "assessment_table_owner": ("evaluation-procedures" if "evaluation-procedures" in ids
+            and (plan_for(reference) is None or plan_for(reference)["tables"]["schedule-of-assessments"]["rows"]) else None),
     }
 
 
@@ -467,7 +468,7 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
                              for item in original],
             }
         grouped[node]["targets"].append({"section_id": target, "legacy_fields": field})
-    return {
+    profile = {
         "profile": "n8n-with-brad-corrections/v1",
         "source": library["source"],
         "prompts": list(grouped.values()),
@@ -497,6 +498,22 @@ def generation_only_prompt_payload(repo_root: Path, reference: Mapping[str, Any]
             "The current source-derived tables, short-title/header formatting and PRS structural builder remain authoritative. This experiment stops at unreviewed native files; it requires no independent review or repair responses.",
         ],
     }
+
+
+    if plan_for(reference) is not None:
+        profile["adapter_instructions"] = [
+            instruction for instruction in profile["adapter_instructions"]
+            if "source-derived" not in instruction and "assessment_presentation" not in instruction
+        ] + [
+            "The shared content_plan owns every clinical display decision, table cell/note, optional section, conditional consent clause and XML value. Code renders that accepted plan literally; clinical interpretation or table edits in section responses are not applied. Follow the plan and full approved_source, preserving the original n8n writing style and current corrections.",
+            "Response checks cover identity, section inventory and text/list shape only. No semantic review or repair runs. Draft complete sections and retain evidence references when useful for manual inspection.",
+        ]
+        if "evaluation-procedures" in profile["editorial_corrections"]:
+            profile["editorial_corrections"]["evaluation-procedures"] = [
+                "The shared content_plan contains the complete table and adjacent notes. Draft a concise introduction without repeating their inventory. Clinical qualifications, table relationships and note omissions were decided in that plan; assembly does not interpret assessment_presentation or schedule_interpretation edits from section responses. Preserve unique safety facts in their owning prose sections.",
+            ]
+    return profile
+
 
 
 def _scoped_source(reference: Mapping[str, Any], families: Iterable[str]) -> dict[str, Any]:

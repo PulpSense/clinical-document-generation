@@ -31,7 +31,11 @@ The plan contains exactly these keys:
 - `tables`: exactly `study-sites`, `schedule-of-assessments`,
   `sample-size-evidence`. Each has `caption`, `header_rows` (1 or 2), `rows`
   (rectangular arrays of strings) and `supplemental_notes` (strings). An unused
-  table has empty rows and notes. For a schedule matrix, the first column holds
+  table has empty rows and notes. The retrospective template has no assessment
+  matrix anchor, so its schedule-of-assessments rows remain empty; describe
+  historical assessments in the active methods section. A site directory can
+  appear under Study Design in any branch; leave it empty when existing front
+  matter already carries the complete directory. For a schedule matrix, the first column holds
   activities and the remaining columns hold approved contacts; a two-row header
   has an empty first cell in its second row. AI places every activity, safety
   obligation and timing qualification in the right column or adjacent note.
@@ -55,6 +59,8 @@ The plan contains exactly these keys:
   when present), containing paragraph edits `{ "index": 123, "text": "..." }`.
   Indices identify the original template body paragraphs in the request. A null
   text removes that paragraph. Unlisted paragraphs retain their template text.
+  structural_paragraph_indices identifies immutable heading/table anchors; keep
+  those paragraphs unchanged and use source_sections for optional section choices.
   Read every template paragraph and choose the retained clinical/legal language
   deliberately. Replace study examples, template instructions, legacy trial
   claims and retained contact prose with correct complete text. Keep the client

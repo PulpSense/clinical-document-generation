@@ -48,14 +48,18 @@ def _xml_leaf_paths(node: ET.Element, prefix: str = "") -> list[str]:
 
 def request_payload(repo: Path, reference: Mapping[str, Any], bundle: Mapping[str, Any], governing: Mapping[str, Any]) -> dict[str, Any]:
     from contracts import protocol_contract, icf_retained_sections
-    from rendering import _all_paragraphs, TOKEN
+    from rendering import _all_paragraphs, TOKEN, _heading_level, _icf_heading_key, _STERLING_ICF_HEADING_KEYS, _ADVARRA_ICF_HEADING_KEYS
 
     branch = reference["meta"]["study_type"]
-    templates, tokens = {}, {}
+    templates, tokens, anchors = {}, {}, {}
     for artifact, record in bundle["contracted_templates"].items():
         document = Document(repo / record["path"])
         templates[artifact] = [{"index": index, "text": paragraph.text, "style": paragraph.style.name}
                                for index, paragraph in enumerate(document.paragraphs)]
+        anchors[artifact] = [index for index, paragraph in enumerate(document.paragraphs)
+                             if _heading_level(paragraph) is not None
+                             or artifact == "icf" and _icf_heading_key(paragraph.text) in (_STERLING_ICF_HEADING_KEYS | _ADVARRA_ICF_HEADING_KEYS)
+                             or "{visitsTable}" in paragraph.text]
         names = {token.strip("{}") for paragraph in _all_paragraphs(document) for token in TOKEN.findall(paragraph.text)}
         names.update(("date", "version", "investigatorName", "investigatorTitle", "facilityName", "facilityCity", "studySiteAddress") if artifact == "protocol" else ("studyCordinatorPhone", "studySiteAddress"))
         tokens[artifact] = sorted(names)
@@ -73,7 +77,7 @@ def request_payload(repo: Path, reference: Mapping[str, Any], bundle: Mapping[st
     payload = {
         "schema_version": SCHEMA, "task": "document_content_planning", "batch_id": "document-content-plan",
         "approved_source": source_only(reference), "governing_resources": dict(governing),
-        "templates": templates, "docx_field_names": tokens,
+        "templates": templates, "structural_paragraph_indices": anchors, "docx_field_names": tokens,
         "protocol_sections": [section.public() for section in protocol_contract(branch)],
         "consent_template_comments": json.loads((repo / "references/generation-only-n8n-prompts.json").read_text())["consent_template_comments"],
         "template_tables": {artifact: [[[cell.text for cell in row.cells] for row in table.rows] for table in Document(repo / record["path"]).tables] for artifact, record in bundle["contracted_templates"].items()},
@@ -135,6 +139,11 @@ def validate_plan(plan: Any, request: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError("The site-directory layout requires three columns.")
         if rows and table["header_rows"] == 2 and rows[1][0]:
             raise ValueError("The second header row starts with an empty merged-cell continuation.")
+    assessment = plan["tables"]["schedule-of-assessments"]
+    if (assessment["rows"] or assessment["supplemental_notes"]) and not any(
+        "{visitsTable}" in paragraph["text"] for paragraph in request["templates"]["protocol"]
+    ):
+        raise ValueError("This template has no assessment-table anchor; use its requested methods prose section.")
     expected = {s["section_id"] for s in request["protocol_sections"] if s["role"] == "source"}
     if not isinstance(plan["source_sections"], dict) or set(plan["source_sections"]) != expected:
         raise ValueError("source_sections needs an explicit include decision for every listed source-role section.")
@@ -161,15 +170,24 @@ def validate_plan(plan: Any, request: Mapping[str, Any]) -> dict[str, Any]:
                     or edit["index"] < 0 or edit["index"] >= len(request["templates"][artifact])
                     or edit["text"] is not None and not isinstance(edit["text"], str)):
                 raise ValueError("Shell edits require a valid original paragraph index and string text (null removes it).")
+            if edit["index"] in request["structural_paragraph_indices"][artifact] and edit["text"] != request["templates"][artifact][edit["index"]]["text"]:
+                raise ValueError("Shell edits must preserve structural headings and table anchors; use source_sections for optional headings.")
             indices.append(edit["index"])
         if len(indices) != len(set(indices)):
             raise ValueError("Duplicate shell edit index.")
     if not isinstance(plan["extra_icf_sections"], list):
         raise ValueError("extra_icf_sections must be an array.")
+    from rendering import _icf_heading_key
+    icf_anchors = {
+        _icf_heading_key(request["templates"]["icf"][index]["text"])
+        for index in request["structural_paragraph_indices"].get("icf", [])
+    }
     for section in plan["extra_icf_sections"]:
         if (not isinstance(section, dict) or set(section) != {"heading", "before", "blocks"}
                 or not isinstance(section["heading"], str) or not isinstance(section["before"], str)):
             raise ValueError("Extra consent sections need heading, before and blocks.")
+        if _icf_heading_key(section["before"]) not in icf_anchors:
+            raise ValueError("Extra consent sections must name an existing native ICF heading as their insertion anchor.")
         _blocks(section["blocks"], section["heading"])
     xml = plan["xml"]
     if request["xml_schema"] is None:
@@ -215,6 +233,8 @@ def handoff(repo: Path, workspace: Path, reference: Mapping[str, Any], bundle: M
     if not response_path.is_file():
         return request, None
     response = json.loads(response_path.read_text())
+    if not isinstance(response, dict):
+        raise ValueError("Content-plan response must be a JSON object.")
     if (response.get("schema_version") != SCHEMA or response.get("request_id") != request["request_id"]
             or response.get("request_sha256") != request["request_sha256"]
             or not isinstance(response.get("producer"), dict)

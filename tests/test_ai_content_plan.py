@@ -108,6 +108,7 @@ def test_xml_serializes_ai_values_without_cohort_or_eligibility_inference(tmp_pa
     plan = plan_response(req)["plan"]
     plan["xml"]["scalars"]["eligibility/criteria/textblock"] = "AI eligibility, exactly."
     plan["xml"]["scalars"]["brief_title"] = "AI title & literal <value>"
+    plan["xml"]["scalars"]["acronym"] = " [Keep label](https://example.test/x) "
     for tag in ("arm_group", "intervention", "location", "primary_outcome"):
         plan["xml"]["repeated"][tag] = [{p: "" for p in req["xml_schema"]["repeated"][tag]}]
     plan["xml"]["repeated"]["arm_group"][0]["arm_group_label"] = "Explicit cohort"
@@ -117,6 +118,7 @@ def test_xml_serializes_ai_values_without_cohort_or_eligibility_inference(tmp_pa
     root = ET.parse(output).getroot()
     assert root.find('.//criteria/textblock').text == "AI eligibility, exactly."
     assert root.find('.//brief_title').text == "AI title & literal <value>"
+    assert root.find('.//acronym').text == " [Keep label](https://example.test/x) "
     assert root.find('.//arm_group/arm_group_label').text == "Explicit cohort"
     assert len(root.findall('.//arm_group')) == 1
 
@@ -158,3 +160,85 @@ def test_native_documents_use_planned_consent_and_optional_sections(tmp_path, mo
         assert heading < paragraphs.index('QUESTIONS')
         for block in plan['extra_icf_sections'][0]['blocks']:
             assert paragraphs.count(block['text']) == 1
+
+
+@pytest.mark.parametrize('envelope', [None, [], 'text'])
+def test_non_object_planning_envelopes_return_format_feedback(tmp_path, envelope):
+    approved_run(tmp_path)
+    result = workflow.generate_only(tmp_path)
+    path = Path(result['workspace']) / 'content-plan/response.json'
+    path.write_text(json.dumps(envelope))
+    feedback = workflow.generate_only(tmp_path)
+    assert feedback['stage'] == 'content_plan_response'
+    assert 'JSON object' in feedback['findings'][0]['issue']
+
+
+def test_ai_shell_edits_cannot_remove_structural_anchors(tmp_path):
+    approved_run(tmp_path)
+    result = workflow.generate_only(tmp_path)
+    request, response = accept_plan(result)
+    index = next(i for i in request['structural_paragraph_indices']['protocol']
+                 if request['templates']['protocol'][i]['text'].strip().endswith('INTRODUCTION'))
+    response['plan']['shell_edits']['protocol'] = [{'index': index, 'text': None}]
+    (Path(result['workspace']) / request['response_path']).write_text(json.dumps(response))
+    feedback = workflow.generate_only(tmp_path)
+    assert feedback['stage'] == 'content_plan_response'
+    assert 'structural headings' in feedback['findings'][0]['issue']
+    assert not list(Path(result['workspace']).glob('hermes/requests/*.json'))
+
+
+def test_plan_fields_stay_separate_between_protocol_and_sterling_icf(tmp_path):
+    source = json.loads((ROOT / 'tests/fixtures/prospective-acceptance-source.json').read_text())
+    source['meta']['icf_template'] = 'Sterling'
+    bundle = contracts.contracted_template_bundle(ROOT, source)
+    request = content_plan.request_payload(ROOT, source, bundle, {})
+    plan = plan_response(request)['plan']
+    plan['docx_fields']['protocol']['protocolNumber'] = 'ACTUAL-PROTOCOL-42'
+    plan['docx_fields']['icf']['protocolNumber'] = '«Protocol_No»'
+    planned = content_plan.with_plan(source, plan)
+    assert rendering.render_fields(planned, {}, artifact='protocol')['protocolNumber'] == 'ACTUAL-PROTOCOL-42'
+    assert rendering.render_fields(planned, {}, artifact='icf')['protocolNumber'] == '«Protocol_No»'
+    rendering.render_documents(ROOT, tmp_path, planned, {'protocol': [], 'icf': {}, 'prs': {}}, audit_output=False)
+    protocol = '\n'.join(p.text for p in rendering._all_paragraphs(Document(tmp_path / 'candidate/protocol.docx')))
+    icf = '\n'.join(p.text for p in rendering._all_paragraphs(Document(tmp_path / 'candidate/icf.docx')))
+    assert 'ACTUAL-PROTOCOL-42' in protocol and '«Protocol_No»' not in protocol
+    assert '«Protocol_No»' in icf
+
+
+def test_planned_drafting_has_no_obsolete_table_edit_instructions(tmp_path):
+    approved_run(tmp_path)
+    result = workflow.generate_only(tmp_path)
+    accept_plan(result)
+    result = workflow.generate_only(tmp_path)
+    for path in result['requests']:
+        request = json.loads((Path(result['workspace']) / path).read_text())
+        profile = request['generation_only_prompts']
+        assert not any('built directly from approved source rows' in line for line in profile['adapter_instructions'])
+        assert not any('return assessment_presentation' in line.casefold() for lines in profile['editorial_corrections'].values() for line in lines)
+        assert any('shared content_plan' in line for line in profile['adapter_instructions'])
+
+
+def test_unsupported_retrospective_schedule_notes_return_format_feedback(tmp_path):
+    approved_run(tmp_path, 'Retrospective', None)
+    result = workflow.generate_only(tmp_path)
+    accept_plan(result, lambda plan: plan['tables']['schedule-of-assessments'].update(supplemental_notes=['A unique historical qualification.']))
+    feedback = workflow.generate_only(tmp_path)
+    assert feedback['stage'] == 'content_plan_response'
+    assert 'no assessment-table anchor' in feedback['findings'][0]['issue']
+
+
+@pytest.mark.parametrize('branch', ['Prospective', 'Retrospective'])
+def test_planned_evidence_and_site_tables_keep_every_value_and_note(tmp_path, branch):
+    source = json.loads((ROOT / f'tests/fixtures/{branch.lower()}-acceptance-source.json').read_text())
+    bundle = contracts.contracted_template_bundle(ROOT, source)
+    request = content_plan.request_payload(ROOT, source, bundle, {})
+    plan = plan_response(request)['plan']
+    plan['tables']['sample-size-evidence'].update(rows=[['Source', 'Estimate'], ['AI-selected evidence', '0.42']], supplemental_notes=['AI-selected evidence qualification.'])
+    plan['tables']['study-sites'].update(rows=[['Site', 'Investigator', 'Contact'], ['Explicit planned site', 'Explicit planned investigator', 'Explicit planned contact']], supplemental_notes=['Explicit planned site qualification.'])
+    content_plan.validate_plan(plan, request)
+    report = rendering.render_documents(ROOT, tmp_path, content_plan.with_plan(source, plan), {'protocol': [], 'icf': {}, 'prs': {}}, artifact_names={'protocol'}, audit_output=False)
+    assert report['status'] == 'passed'
+    document = Document(tmp_path / 'candidate/protocol.docx')
+    visible = '\n'.join(p.text for p in rendering._all_paragraphs(document))
+    for text in ('AI-selected evidence', '0.42', 'AI-selected evidence qualification.', 'Explicit planned site', 'Explicit planned investigator', 'Explicit planned contact', 'Explicit planned site qualification.'):
+        assert text in visible

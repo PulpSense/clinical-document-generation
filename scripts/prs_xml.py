@@ -878,6 +878,12 @@ def quality_report(path: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
 
 def _generate_planned(template_path: Path, output_path: Path, plan: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[str, Any]:
     """Serialize an AI-owned PRS record using the governed element order."""
+    def assign(node: ET.Element, path: str, text: str) -> None:
+        target = node.find(path)
+        if target is None:
+            raise ValueError(f"Planned XML field has no native element: {path}")
+        target.text = text
+
     tree = ET.parse(template_path)
     study = _study(tree.getroot())
     selected = plan["xml"]
@@ -898,15 +904,15 @@ def _generate_planned(template_path: Path, output_path: Path, plan: Mapping[str,
                         child.text = value
                         node.insert(position + index, child)
                 else:
-                    _set(node, path, text)
+                    assign(node, path, text)
     for path, text in selected["scalars"].items():
-        _set(study, path, text)
+        assign(study, path, text)
     # Narrative sections are authored after the shared plan; placement is fixed,
     # and empty narratives never cause a fallback to source-derived prose.
     for key, path in (("brief_summary", "brief_summary/textblock"), ("detailed_description", "detailed_description/textblock")):
         if key in narrative:
             value = narrative[key]
-            _set(study, path, value["text"] if isinstance(value, Mapping) else value)
+            assign(study, path, value["text"] if isinstance(value, Mapping) else value)
     # Remove template control markers in container text/tails, not AI leaf values.
     for node in study.iter():
         if len(node):
