@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from content_plan import plan_for
+
 import copy
 import hashlib
 import json
@@ -328,7 +330,9 @@ def study_design_display(reference: Mapping[str, Any]) -> str:
     return "; ".join(clauses)
 
 
-def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any]) -> dict[str, str]:
+def render_fields(reference: Mapping[str, Any], model: Mapping[str, Any], *, artifact: str = "protocol") -> dict[str, str]:
+    if (plan := plan_for(reference)) is not None:
+        return dict(plan["docx_fields"][artifact])
     site = _first_site(reference)
     facility_value = site.get("facility")
     facility: Mapping[str, Any] = facility_value if isinstance(facility_value, Mapping) else {}
@@ -438,11 +442,11 @@ def _all_paragraphs(document: Document):
                         yield from cell.paragraphs
 
 
-def _replace_paragraph(paragraph, fields: Mapping[str, str]) -> None:
+def _replace_paragraph(paragraph, fields: Mapping[str, str], *, literal: bool = False) -> None:
     original = paragraph.text
     if "{" not in original:
         return
-    if "{sponsortAdress}" in original and "{fundingSourceName}" in original:
+    if not literal and "{sponsortAdress}" in original and "{fundingSourceName}" in original:
         # The client shell concatenates these tokens without separators. Keep
         # funding elsewhere untouched; compose only this combined role block.
         fields = dict(fields)
@@ -516,7 +520,8 @@ def _insert_source_bound_sections(document: Document, reference: Mapping[str, An
         if section.role != "source":
             continue
         applies = section_applies(reference, section)
-        value = next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), None)
+        planned = plan_for(reference)
+        value = None if planned is not None else next((get_path(reference, path) for path in section.evidence if meaningful(get_path(reference, path))), None)
         heading_key = _protocol_heading_key(f"{section.number} {section.title}")
         heading = next((
             paragraph for paragraph in document.paragraphs
@@ -553,8 +558,14 @@ def _insert_source_bound_sections(document: Document, reference: Mapping[str, An
         if not applies:
             heading._p.getparent().remove(heading._p)
             continue
-        body = document.add_paragraph(_text(value), style="Normal")
-        heading._p.addnext(body._p)
+        blocks = planned["source_sections"][section.section_id]["blocks"] if planned is not None else [{"text": _text(value), "bullet": False}]
+        anchor = heading._p
+        for block in blocks:
+            body = document.add_paragraph(block["text"], style="Normal")
+            if block["bullet"]:
+                _apply_bullet_numbering(document, body)
+            anchor.addnext(body._p)
+            anchor = body._p
         heading.paragraph_format.keep_with_next = True
 
 
@@ -627,18 +638,21 @@ def _normalize_protocol_summary_table(document: Document, reference: Mapping[str
     table = _protocol_table_after_heading(document, "3. GENERAL INFORMATION")
     if table is None:
         return
-    sites_value = reference.get("sites")
-    sites = sites_value if isinstance(sites_value, list) else []
-    site_lines = []
-    for site in sites:
-        if not isinstance(site, Mapping):
-            continue
-        facility_value = site.get("facility")
-        if not isinstance(facility_value, Mapping):
-            continue
-        line = ", ".join(filter(None, (_text(facility_value.get("name")), _facility_address(facility_value))))
-        if line:
-            site_lines.append(line)
+    if (plan := plan_for(reference)) is not None:
+        site_lines = [plan["docx_fields"]["protocol"].get("studySiteAddress", "")] if plan["docx_fields"]["protocol"].get("studySiteAddress") else []
+    else:
+        sites_value = reference.get("sites")
+        sites = sites_value if isinstance(sites_value, list) else []
+        site_lines = []
+        for site in sites:
+            if not isinstance(site, Mapping):
+                continue
+            facility_value = site.get("facility")
+            if not isinstance(facility_value, Mapping):
+                continue
+            line = ", ".join(filter(None, (_text(facility_value.get("name")), _facility_address(facility_value))))
+            if line:
+                site_lines.append(line)
     site_row = next((row for row in table.rows if row.cells[0].text.strip().casefold() == "study sites"), None)
     if site_lines and site_row is None:
         number_row = next((row for row in table.rows if row.cells[0].text.strip().casefold() == "number of sites"), None)
@@ -727,7 +741,7 @@ def _insert_retrospective_site_directory(document: Document, reference: Mapping[
         return
     sections = list(protocol_contract("Retrospective"))
     owner_index = next(i for i, section in enumerate(sections)
-                       if section.section_id == contract["section_id"])
+                       if section.section_id == contract.get("section_id", "study-design.design"))
     boundary = sections[owner_index + 1]
     boundary_key = _protocol_heading_key(f"{boundary.number} {boundary.title}")
     anchor = next((p for p in document.paragraphs
@@ -758,12 +772,16 @@ def _insert_retrospective_site_directory(document: Document, reference: Mapping[
     _set_repeat_header(table.rows[0])
     _visible_table_borders(table)
     anchor._p.addprevious(table._tbl)
+    for text in contract.get("supplemental_notes", []):
+        note = document.add_paragraph(text)
+        anchor._p.addprevious(note._p)
 
 
 def _normalize_protocol_title_controls(document: Document, reference: Mapping[str, Any]) -> None:
     """Expose approved Protocol controls without conflating version and amendment."""
-    protocol_date = _document_control_date(reference)
-    protocol_version = _text(get_path(reference, "meta.version"))
+    planned_fields = plan_for(reference)["docx_fields"]["protocol"] if plan_for(reference) is not None else None
+    protocol_date = planned_fields.get("date", "") if planned_fields is not None else _document_control_date(reference)
+    protocol_version = planned_fields.get("version", "") if planned_fields is not None else _text(get_path(reference, "meta.version"))
     table = next((
         item for item in document.tables
         if item.rows and item.rows[0].cells[0].text.strip().casefold() == "protocol number"
@@ -1020,6 +1038,7 @@ def _replace_protocol_investigator_agreement(
     boilerplate: Mapping[str, str],
     branch: str,
     authority: Document,
+    planned_blocks: list[Mapping[str, Any]] | None = None,
 ) -> None:
     heading = next((
         paragraph for paragraph in document.paragraphs
@@ -1064,6 +1083,8 @@ def _replace_protocol_investigator_agreement(
         boilerplate["investigator-principle-law"],
         boilerplate["investigator-principle-protocol"],
     ]
+    if planned_blocks is not None:
+        statements = [block["text"] for block in planned_blocks]
     exemplars = _protocol_body_exemplars(authority, heading)
     anchor = heading._p
     for index, statement in enumerate(statements):
@@ -1072,7 +1093,7 @@ def _replace_protocol_investigator_agreement(
         _copy_paragraph_design(paragraph, exemplar)
         run = paragraph.add_run(statement)
         _copy_run_design(run, _first_visible_run(exemplar))
-        if index:
+        if planned_blocks[index]["bullet"] if planned_blocks is not None else bool(index):
             _apply_bullet_numbering(document, paragraph)
         if index == len(statements) - 1:
             paragraph.paragraph_format.space_after = Pt(12)
@@ -1221,11 +1242,13 @@ def _replace_protocol_leaf_bodies(
         "quality-safety.reporting": {_layout_target_key("Table 13.3.-1:")},
         "evaluation-procedures": {_layout_target_key("Table 15.1. Proposed Visits and Study Assessments")},
     }
+    if (plan := plan_for(reference)) is not None:
+        table_caption_keys["evaluation-procedures"] = {_layout_target_key(plan["tables"]["schedule-of-assessments"]["caption"])}
     for section in protocol_contract(branch):
         if section.role != "leaf":
             continue
         blocks = _draft_blocks(drafts.get(section.section_id, {}))
-        if section.section_id in table_sections:
+        if plan_for(reference) is None and section.section_id in table_sections:
             # The client template owns these captions. A model may echo one from
             # the source document, but retaining that echo would duplicate both
             # the caption and (when it shares a placeholder paragraph) the full
@@ -1780,19 +1803,26 @@ def _populate_protocol_signature_values(document: Document, reference: Mapping[s
     )
     if table is None:
         return
-    site = _first_site(reference)
-    investigator = get_path(reference, "parties.principal_investigator", {}) or {}
-    if not isinstance(investigator, Mapping) or not _text(investigator.get("name")):
-        site_investigators = site.get("investigators") if isinstance(site.get("investigators"), list) else []
-        investigator = site_investigators[0] if site_investigators and isinstance(site_investigators[0], Mapping) else {}
-    facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
-    city = facility_projection(facility)["city"]
-    values = {
-        "Investigator Name (print or type)": _text(investigator.get("name")),
-        "Investigator’s Title": _text(investigator.get("role") or investigator.get("title") or investigator.get("degrees") or investigator.get("degree")),
-        "Name of Facility": _text(facility.get("name")),
-        "Location of Facility (City)": city,
-    }
+    if (plan := plan_for(reference)) is not None:
+        fields = plan["docx_fields"]["protocol"]
+        values = {"Investigator Name (print or type)": fields.get("investigatorName", ""),
+                  "Investigator’s Title": fields.get("investigatorTitle", ""),
+                  "Name of Facility": fields.get("facilityName", ""),
+                  "Location of Facility (City)": fields.get("facilityCity", "")}
+    else:
+        site = _first_site(reference)
+        investigator = get_path(reference, "parties.principal_investigator", {}) or {}
+        if not isinstance(investigator, Mapping) or not _text(investigator.get("name")):
+            site_investigators = site.get("investigators") if isinstance(site.get("investigators"), list) else []
+            investigator = site_investigators[0] if site_investigators and isinstance(site_investigators[0], Mapping) else {}
+        facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
+        city = facility_projection(facility)["city"]
+        values = {
+            "Investigator Name (print or type)": _text(investigator.get("name")),
+            "Investigator’s Title": _text(investigator.get("role") or investigator.get("title") or investigator.get("degrees") or investigator.get("degree")),
+            "Name of Facility": _text(facility.get("name")),
+            "Location of Facility (City)": city,
+        }
     rows = list(table.rows)
     for row_index, row in enumerate(rows):
         for index, cell in enumerate(row.cells):
@@ -1824,6 +1854,8 @@ def _normalize_protocol_running_header(document: Document) -> None:
 
 def _supplied_protocol_references(reference: Mapping[str, Any]) -> str:
     """Render the shared approved bibliography projection."""
+    if (plan := plan_for(reference)) is not None:
+        return plan["bibliography"]
     return protocol_bibliography(reference)
 
 
@@ -2518,20 +2550,27 @@ def _normalize_icf_front_matter(document: Document, reference: Mapping[str, Any]
         labels = {row.cells[0].text.strip().casefold() for row in front.rows}
         if not labels.intersection({"sponsor / study title:", "protocol number:", "principal investigator:\n(study doctor)"}):
             return
-        site = _first_site(reference)
-        facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
-        coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
-        sites = [item for item in reference.get("sites", []) if isinstance(item, Mapping)]
-        site_address = _facility_address(facility)
-        if len(sites) > 1:
-            site_address = "\n".join(
-                f"{_text(item.get('facility', {}).get('name'))}: {_facility_address(item.get('facility', {}))}"
-                for item in sites
-            )
-        replacements = {
-            "Telephone:": ("Study Coordinator Telephone:", _text(coordinator.get("business_phone") or coordinator.get("phone"))),
-            "Address:": ("Study Site Addresses:" if len(sites) > 1 else "Study Site Address:", site_address),
-        }
+        if (plan := plan_for(reference)) is not None:
+            fields = plan["docx_fields"]["icf"]
+            replacements = {
+                "Telephone:": ("Study Coordinator Telephone:", fields.get("studyCordinatorPhone", "")),
+                "Address:": ("Study Site Address:", fields.get("studySiteAddress", "")),
+            }
+        else:
+            site = _first_site(reference)
+            facility = site.get("facility") if isinstance(site.get("facility"), Mapping) else {}
+            coordinator = get_path(reference, "parties.study_coordinator", {}) or {}
+            sites = [item for item in reference.get("sites", []) if isinstance(item, Mapping)]
+            site_address = _facility_address(facility)
+            if len(sites) > 1:
+                site_address = "\n".join(
+                    f"{_text(item.get('facility', {}).get('name'))}: {_facility_address(item.get('facility', {}))}"
+                    for item in sites
+                )
+            replacements = {
+                "Telephone:": ("Study Coordinator Telephone:", _text(coordinator.get("business_phone") or coordinator.get("phone"))),
+                "Address:": ("Study Site Addresses:" if len(sites) > 1 else "Study Site Address:", site_address),
+            }
         for row in front.rows:
             label = row.cells[0].text.strip()
             if label in replacements:
@@ -2879,7 +2918,7 @@ def _replace_static_toc(document: Document) -> None:
 
 def _visit_rows(document: Document, reference: Mapping[str, Any]) -> None:
     rows = normalized_visit_records(reference)
-    if not rows:
+    if not rows and plan_for(reference) is None:
         # Narrative contacts are labels only, never synthetic numbered visits.
         rows = [{"visitName": label} for label in
                 _assessment_visit_labels(get_path(reference, "procedures.assessments", []))]
@@ -3530,6 +3569,10 @@ def _assessment_matrix(document: Document, reference: Mapping[str, Any], authori
     table_contract = protocol_table_contracts(reference, presentation)["schedule-of-assessments"]
     row_values = [list(row) for row in table_contract["rows"]]
     header_rows = int(table_contract["header_rows"])
+    if plan_for(reference) is not None:
+        previous = placeholder._p.getprevious()
+        if previous is not None and previous.tag == qn("w:p") and Paragraph(previous, document).text.strip().startswith("Table 15.1"):
+            _set_paragraph_text(Paragraph(previous, document), table_contract["caption"])
     notes = table_contract.get("supplemental_notes", [])
     def insert_notes() -> None:
         for text in notes:
@@ -3694,7 +3737,60 @@ def _sample_size_evidence_table(document: Document, reference: Mapping[str, Any]
     caption.paragraph_format.keep_with_next = True
     target._p.addprevious(caption._p)
     target._p.addprevious(table._tbl)
+    for text in table_contract.get("supplemental_notes", []):
+        note = document.add_paragraph(text)
+        target._p.addprevious(note._p)
 
+
+
+def _apply_planned_shell(document: Document, edits: list[Mapping[str, Any]]) -> None:
+    paragraphs = list(document.paragraphs)
+    for edit in edits:
+        paragraph = paragraphs[edit["index"]]
+        if edit["text"] is None:
+            paragraph._p.getparent().remove(paragraph._p)
+        else:
+            _set_paragraph_text(paragraph, edit["text"])
+
+
+def _insert_planned_icf_sections(document: Document, sections: list[Mapping[str, Any]], authority: Document) -> None:
+    for section in sections:
+        anchor = next((p for p in document.paragraphs if _icf_heading_key(p.text) == _icf_heading_key(section["before"])), None)
+        if anchor is None:
+            raise LayoutRepairTargetError(f"Planned consent insertion anchor is missing: {section['before']}")
+        heading = document.add_paragraph()
+        _copy_paragraph_design(heading, anchor)
+        _set_paragraph_text(heading, section["heading"])
+        for run in heading.runs:
+            _copy_run_design(run, _first_visible_run(anchor))
+        heading.paragraph_format.keep_with_next = True
+        anchor._p.addprevious(heading._p)
+        source_heading = next((p for p in authority.paragraphs if _icf_heading_key(p.text) == _icf_heading_key(section["before"])), None)
+        exemplar = None
+        if source_heading is not None:
+            source_paragraphs = list(authority.paragraphs)
+            index = next(i for i,p in enumerate(source_paragraphs) if p._p is source_heading._p)
+            exemplar = next((p for p in source_paragraphs[index + 1:] if p.text.strip()), None)
+        _insert_icf_blocks(document, heading._p, [(block["text"], block["bullet"]) for block in section["blocks"]], exemplar)
+        if not section["heading"]:
+            heading._p.getparent().remove(heading._p)
+
+
+def _insert_planned_container_introductions(document: Document, reference: Mapping[str, Any], branch: str) -> None:
+    for section in protocol_contract(branch):
+        blocks = plan_for(reference)["container_introductions"].get(section.section_id, [])
+        if not blocks:
+            continue
+        heading = next((p for p in document.paragraphs if _protocol_heading_key(p.text) == _protocol_heading_key(f"{section.number} {section.title}")), None)
+        if heading is None:
+            raise LayoutRepairTargetError(f"Planned introduction heading is missing: {section.section_id}")
+        anchor = heading._p
+        for block in blocks:
+            paragraph = document.add_paragraph(block["text"], style="Normal")
+            if block["bullet"]:
+                _apply_bullet_numbering(document, paragraph)
+            anchor.addnext(paragraph._p)
+            anchor = paragraph._p
 
 def _template_document(
     reference: Mapping[str, Any],
@@ -3715,11 +3811,15 @@ def _template_document(
     _apply_authority_styles(document, authority)
     _apply_authority_bullet_numbering(document, authority)
     # Clean only the retained shell, before any authored section is inserted.
-    _normalize_source_bound_shell(document, reference, icf=icf)
-    if icf and not sterling:
-        _remove_advarra_example_study_prose(document)
-    fields = render_fields(reference, model)
-    if sterling:
+    planned = plan_for(reference)
+    if planned is not None:
+        _apply_planned_shell(document, planned["shell_edits"]["icf" if icf else "protocol"])
+    else:
+        _normalize_source_bound_shell(document, reference, icf=icf)
+        if icf and not sterling:
+            _remove_advarra_example_study_prose(document)
+    fields = render_fields(reference, model, artifact="icf" if icf else "protocol")
+    if sterling and planned is None:
         # Sterling IRB's open template comment reserves these merge fields for
         # its final document. Keep the reviewed field labels in the output.
         fields.update({
@@ -3772,13 +3872,15 @@ def _template_document(
         _assessment_matrix(document, table_reference, authority_path, presentation)
     _visit_rows(document, table_reference)
     for paragraph in list(_all_paragraphs(document)):
-        _replace_paragraph(paragraph, fields)
+        _replace_paragraph(paragraph, fields, literal=planned is not None)
     _normalize_typed_bullet_paragraphs(document)
     if icf:
         if sterling:
             _repair_sterling_footer_page_fields(document)
         _populate_icf_sections(document, model, sterling=sterling)
-        if sterling:
+        if planned is not None:
+            _insert_planned_icf_sections(document, planned["extra_icf_sections"], authority)
+        elif sterling:
             _normalize_sterling_retained_sections(document, reference)
             _insert_sterling_conditional_clauses(document, reference)
             repair_sterling_clause_placement(document, reference)
@@ -3799,7 +3901,8 @@ def _template_document(
         _normalize_known_icf_plain_paragraphs(document, generated_plain_paragraphs)
         if sterling:
             _normalize_sterling_generated_typography(document, model)
-            _preserve_sterling_registry_statement(document, authority, reference)
+            if planned is None:
+                _preserve_sterling_registry_statement(document, authority, reference)
         _normalize_icf_body_spacing(document, sterling=sterling)
         # Apply group cohesion after the authority layout has copied its
         # paragraph properties, so a visit label stays with its first activity.
@@ -3816,7 +3919,8 @@ def _template_document(
 
     else:
         branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
-        _replace_protocol_investigator_agreement(document, boilerplate, branch, authority)
+        _replace_protocol_investigator_agreement(document, boilerplate, branch, authority,
+                                                  planned["investigator_agreement"] if planned is not None else None)
         _replace_protocol_signature_table(document, authority)
         _populate_protocol_signature_values(document, reference)
         _normalize_protocol_running_header(document)
@@ -3824,7 +3928,10 @@ def _template_document(
         _omit_empty_visit_window(document)
         _ensure_contract_headings(document, branch)
         _insert_source_bound_sections(document, reference, branch)
-        _normalize_protocol_container_introductions(document, branch, boilerplate)
+        if planned is None:
+            _normalize_protocol_container_introductions(document, branch, boilerplate)
+        else:
+            _insert_planned_container_introductions(document, reference, branch)
         _replace_protocol_leaf_bodies(document, model, reference, branch, authority)
         _sample_size_evidence_table(document, reference, authority_path)
         if branch == "Retrospective":
@@ -3955,8 +4062,8 @@ def _boilerplate(repo_root: Path, bundle: Mapping[str, Any], reference: Mapping[
     payload = json.loads((repo_root / relative).read_text(encoding="utf-8"))
     if payload.get("version") != BOILERPLATE_VERSION or not isinstance(payload.get("sections"), dict):
         raise ValueError("Fixed Clinical Boilerplate does not match the rendering contract.")
-    return contextual_clinical_boilerplate(
-        {str(key): str(value) for key, value in payload["sections"].items()}, reference)
+    sections = {str(key): str(value) for key, value in payload["sections"].items()}
+    return sections if plan_for(reference) is not None else contextual_clinical_boilerplate(sections, reference)
 
 
 def _populate_protocol_toc_cache(document: Document, page_map: Mapping[str, int]) -> bool:
@@ -4225,7 +4332,8 @@ def render_documents(
     layout_repairs: Mapping[str, Iterable[Mapping[str, str]]] | None = None,
     audit_output: bool = True,
 ) -> dict[str, Any]:
-    participant_registry_disclosure(reference)  # Reject conflicting declarations before writing files.
+    if plan_for(reference) is None:
+        participant_registry_disclosure(reference)  # Legacy reviewed-path mapping.
     output = revision_dir / "candidate"; output.mkdir(parents=True, exist_ok=True)
     fields = render_fields(reference, model)
     bundle = dict(contracted_bundle or contracted_template_bundle(repo_root, reference))

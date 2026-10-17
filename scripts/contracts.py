@@ -7,6 +7,8 @@ not a workflow entrypoint.
 
 from __future__ import annotations
 
+from content_plan import plan_for
+
 import copy
 import hashlib
 import json
@@ -19,7 +21,7 @@ from typing import Any, Iterable, Mapping
 from xml.etree import ElementTree as ET
 
 
-CONTRACT_VERSION = "clinical-documents-v2.55-clinical-prose-focus"
+CONTRACT_VERSION = "clinical-documents-v2.56-ai-content-plan"
 BOILERPLATE_VERSION = "clinical-boilerplate-v14"
 STERLING_CLAUSE_CONTRACT_VERSION = "sterling-clause-contract/v1"
 STERLING_CLAUSE_CONTRACT_RESOURCE = "references/sterling-clause-contract.json"
@@ -1566,6 +1568,8 @@ def normalized_visit_records(reference: Mapping[str, Any]) -> list[dict[str, Any
     visit; the narrative then supplies clinical order and precise timing. Never
     turn narrative assessments into numbered visits or merge ambiguous contacts.
     """
+    if (plan := plan_for(reference)) is not None:
+        return copy.deepcopy(plan["visits"])
     visits: list[dict[str, Any]] = []
     table_count = 0
     matrix_table = False
@@ -1979,6 +1983,8 @@ def interpreted_schedule_reference(reference: Mapping[str, Any], interpretation:
 
 def document_table_reference(reference: Mapping[str, Any], model: Mapping[str, Any]) -> Mapping[str, Any]:
     """Select the authenticated draft's display mapping; approval stays immutable."""
+    if plan_for(reference) is not None:
+        return reference
     for section in model.get("protocol", []):
         if section.get("section_id") == "evaluation-procedures" and section.get("schedule_interpretation") is not None:
             return interpreted_schedule_reference(reference, section["schedule_interpretation"])
@@ -2029,6 +2035,8 @@ def protocol_site_directory(reference: Mapping[str, Any]) -> list[list[str]]:
 
 def protocol_table_contracts(reference: Mapping[str, Any], assessment_presentation: Any = None) -> dict[str, dict[str, Any]]:
     """Return typed, source-derived Protocol table matrices for rendering and QA."""
+    if (plan := plan_for(reference)) is not None:
+        return copy.deepcopy(plan["tables"])
     visits = normalized_visit_records(reference)
     assessment_rows: list[list[str]] = []
     if visits:
@@ -2863,6 +2871,8 @@ def source_evidence_coverage_map(reference: Mapping[str, Any]) -> dict[str, Any]
 
 def section_applies(reference: Mapping[str, Any], section: SectionSpec) -> bool:
     """Return the single contract decision used to scope a document section."""
+    if (plan := plan_for(reference)) is not None and section.role == "source":
+        return plan["source_sections"][section.section_id]["include"]
     return section.required or bool(evidence_available(reference, section.evidence))
 
 

@@ -75,8 +75,8 @@ this file.
   `provider_study_id` (or `meta.protocol_number`), `study_type`
   (`Observational` or `Interventional`), and the stable study UID used for
   repeated PRS records. This registry classification is distinct from
-  `meta.study_type`; during preparation, an unambiguous classification stated
-  in `design.study_design` populates the PRS field before review.
+  `meta.study_type`. AI records the classification from explicit design evidence
+  before source review; preparation does not infer it from narrative wording.
 
 When both `provider_study_id` and `meta.protocol_number` are absent for a
 Prospective or Ambispective study, preparation assigns one stable `ADM-...`

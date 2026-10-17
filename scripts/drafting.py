@@ -8,6 +8,8 @@ acceptance-test adapter, not a production drafting path.
 
 from __future__ import annotations
 
+from content_plan import plan_for, read_plan, source_only, with_plan
+
 import copy
 import hashlib
 import json
@@ -62,9 +64,9 @@ from contracts import (
 REQUEST_SCHEMA = "hermes-request/v2"
 RESPONSE_SCHEMA = "hermes-response/v2"
 TOPOLOGY_VERSION = "clinical-drafting-v1"
-PROMPT_VERSION = "section-drafting-v36-clinical-prose-focus"
+PROMPT_VERSION = "section-drafting-v37-ai-content-plan"
 PLACEHOLDER = re.compile(r"\{[#/^]?[A-Za-z_][A-Za-z0-9_.\-\[\]()&]*\}")
-IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py")
+IMPLEMENTATION_FILES = ("contracts.py", "drafting.py", "prs_xml.py", "rendering.py", "workflow.py", "output_recovery.py", "content_plan.py")
 
 
 def _canonical(value: Any) -> bytes:
@@ -134,11 +136,11 @@ def _request_constraints() -> list[str]:
         "Listed Fixed Clinical Boilerplate is authorized only where applicable and consistent with the approved source. The approved source supersedes boilerplate; boilerplate must not expand decision-making authority, termination grounds, completion criteria, procedures, or safety obligations.",
         "When a section lists both Fixed Clinical Boilerplate and minimum evidence, include all material source facts and only applicable, nonconflicting boilerplate; omit boilerplate clauses that would alter a source rule.",
         "Do not invent study-specific facts, procedures, risks, benefits, safety obligations, legal promises, or regulatory claims. Routine-use and record-review studies acquire no additional visits, monitoring or follow-up commitments from boilerplate.",
-        "The assembler owns the single final Protocol REFERENCES section and populates it from the approved bibliography. Draft Protocol sections as clinical prose with supplied citation numbers beside the claims they support, linked to those same bibliography entries. Format citation numbers in square brackets before sentence punctuation, for example 'prior evidence [1,2].' Omit reference headings and full bibliographic entries from section responses. Do not invent citations; ICF explanations use plain language.",
+        "The AI content plan owns the final Protocol REFERENCES content; assembly places that planned bibliography once. Draft Protocol sections as clinical prose with supplied citation numbers beside the claims they support, linked to those same bibliography entries. Format citation numbers in square brackets before sentence punctuation, for example 'prior evidence [1,2].' Omit reference headings and full bibliographic entries from section responses. Do not invent citations; ICF explanations use plain language.",
         "Return exactly one result for every requested section ID.",
         "Use only the drafted or fixed_boilerplate outcome. Sparse sections may use only applicable, source-consistent listed Fixed Clinical Boilerplate.",
         "Return structured section content, not a whole document or document markup.",
-        "You own the complete prose and lists for every requested section. Include all material approved evidence and applicable supplied fixed clinical boilerplate in that response, once. Assembly inserts accepted text as authored; it does not complete, rewrite or deduplicate your prose. Draft the full duration/enrollment and withdrawal sections, the brief assessment-table introduction and the full retrospective eligibility/enrollment rules where requested. Template-owned headings, fixed retained clauses, contact-field mappings, source-derived tables/notes and the final bibliography are assembled separately; do not repeat them in section prose.",
+        "You own the complete prose and lists for every requested section. Include all material approved evidence and applicable supplied fixed clinical boilerplate in that response, once. Assembly inserts accepted text as authored; it does not complete, rewrite or deduplicate your prose. Draft the full duration/enrollment and withdrawal sections, the brief assessment-table introduction and the full retrospective eligibility/enrollment rules where requested. The shared AI content plan owns retained clauses, contact wording, display fields, tables/notes, optional sections and the final bibliography; code places those planned values separately. Follow the plan without duplicating its content in section prose.",
         "Write to each section's purpose and ownership. Explain each operational rule fully in its owning section; elsewhere give only the fact needed for that section and a brief reference to the owning heading. Preserve necessary identifiers, endpoint definitions, quantities, timing anchors/windows, conditions, exceptions, safety information and client consent language. Compress repeated explanations, not clinical meaning.",
         "Use participant-facing language for ICF sections.",
         "writing_examples illustrate prose and organization using synthetic inputs. Draft from this request's approved_source and section_contracts; example facts are never study evidence or boilerplate. Return the requested response format.",
@@ -227,6 +229,8 @@ def _request_matches_approved_reference(
     try:
         repo_root = Path(__file__).resolve().parents[1]
         reference = _read_json(snapshot_path)
+        if (content := read_plan(revision_dir)) is not None:
+            reference = with_plan(reference, content)
         if request.get('construction_repair'):
             governing = expected_governing or governing_resources(repo_root, reference)
             spec = request['construction_repair']
@@ -281,6 +285,7 @@ def _request_matches_approved_reference(
             request.get("prompt_version") == PROMPT_VERSION,
             request.get("governing_resources") == expected_governing,
             request.get("approved_source") == scoped,
+            request.get("content_plan") == plan_for(reference),
             request.get("approved_input") == _draft_source_items(scoped, expected_contracts),
             contracts == expected_contracts,
             request.get("constraints") == _request_constraints(),
@@ -330,7 +335,7 @@ def load_boilerplate(
     sections = payload.get("sections")
     if not isinstance(sections, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in sections.items()):
         raise ValueError("Fixed Clinical Boilerplate must contain a string map named sections.")
-    return contextual_clinical_boilerplate(sections, reference)
+    return sections if plan_for(reference) is not None else contextual_clinical_boilerplate(sections, reference)
 
 
 def governing_resources(
@@ -349,6 +354,7 @@ def governing_resources(
         "topology_version": TOPOLOGY_VERSION,
         "prompt_version": PROMPT_VERSION,
         "producer_policy": "nonempty-model-id",
+        "content_plan_guidance_sha256": sha256_file(repo_root / "references/ai-content-plan.md"),
         "generation_only_prompts_sha256": (
             sha256_file(repo_root / "references/generation-only-n8n-prompts.json")
             if (repo_root / "references/generation-only-n8n-prompts.json").is_file() else None
@@ -512,6 +518,8 @@ def _source_items(value: Any, prefix: str = "") -> list[dict[str, Any]]:
 
 def _draft_scoped_source(reference: Mapping[str, Any], families: Iterable[str],
                          sections: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    if plan_for(reference) is not None:
+        return source_only(reference)
     roots = set(families)
     roots.update(str(path).split(".")[0] for section in sections
                  for path in [*section.get("minimum_evidence", []), *section.get("optional_evidence", [])])
@@ -596,6 +604,17 @@ def _section_payload(
     boilerplate: Mapping[str, str],
     reference: Mapping[str, Any],
 ) -> dict[str, Any]:
+    if plan_for(reference) is not None:
+        keys = tuple(dict.fromkeys(([section.boilerplate_key] if section.boilerplate_key else []) + list(section.boilerplate_keys)))
+        return {
+            **json.loads(json.dumps(section.public())), "allowed_modes": ["agent_draft", "fixed_boilerplate"],
+            "minimum_evidence": list(section.evidence),
+            "fixed_boilerplate": [{"boilerplate_id": key, "text": boilerplate[key], "sha256": sha256_value(boilerplate[key])} for key in keys],
+            "content_expectations": [*section.content_expectations,
+                *(["Write five concise key-information blocks covering study purpose, participation/duration, principal risks, possible benefit, and alternatives/voluntariness. Include the applicable supplied voluntary-participation wording once in its summary block."] if section.section_id == "icf.key-information-summary" else []),
+                "Use the complete approved_source and shared content_plan. Evidence paths are navigation hints, not an exclusive content filter. AI determines applicability and source relationships. Preserve every applicable material fact, conditional consent safeguard and qualification. Planned tables, retained shell edits, optional sections and extra consent clauses are rendered separately; avoid repeating them in prose."],
+            "concept_ownership": {"owns": list(section.owned_concepts), "brief_reference_only": list(section.brief_reference_concepts), "do_not_restate": list(section.do_not_restate_concepts)},
+        }
     allowed = ["agent_draft"]
     boilerplate_items: list[dict[str, str]] = []
     boilerplate_keys = tuple(dict.fromkeys(
@@ -1021,8 +1040,8 @@ def create_drafting_request(
 ) -> Path:
     snapshot_path = revision_dir / "approved-reference.json"
     if not snapshot_path.is_file():
-        _write_json(snapshot_path, reference)
-    elif _read_json(snapshot_path) != dict(reference):
+        _write_json(snapshot_path, source_only(reference))
+    elif _read_json(snapshot_path) != source_only(reference):
         raise ValueError("Drafting reference does not match the immutable approved-reference snapshot.")
     branch = canonical_study_type(get_path(reference, "meta.study_type")) or ""
     targets = tuple(target_ids or batch.section_ids)
@@ -1054,6 +1073,7 @@ def create_drafting_request(
         "attempts": {target: int(attempts[target]) for target in targets},
         "approved_input": _draft_source_items(scoped, sections),
         "approved_source": scoped,
+        "content_plan": copy.deepcopy(plan_for(reference)),
         "source_evidence_coverage_map": source_evidence_coverage_map(reference),
         "evidence_checklist": [
             {

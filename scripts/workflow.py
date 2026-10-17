@@ -20,6 +20,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
+import content_plan
+
 from contracts import contracted_template_bundle, document_set, get_path, parse_source_truth, repair_report, set_path, source_contract, source_truth_markdown
 from drafting import governing_resources, ingest_responses, merged_drafts, missing_drafts, pending_requests, schedule_requests, sha256_file, sha256_value
 from prs_xml import generate as generate_xml
@@ -234,7 +236,7 @@ def prepare(run_dir: Path, *, today: date | None = None, **_: Any) -> dict[str, 
     """Validate mandatory inputs and create the reviewer-editable source file."""
     run_dir = run_dir.resolve(); reference_path, reference = _reference(run_dir)
     intake_review = _intake_review_guidance(reference)
-    contract = source_contract(reference, derive_prs_study_type=True)
+    contract = source_contract(reference, derive_prs_study_type=False)
     if contract["status"] != "passed":
         reference_dir = run_dir / "reference"
         reference_dir.mkdir(parents=True, exist_ok=True)
@@ -392,6 +394,15 @@ def generate_only(run_dir: Path) -> dict[str, Any]:
                 return {**base, "status": "blocked", "stage": "file_integrity",
                         "findings": [{"issue": f"Saved experimental output changed or is missing: {path}"}]}
         return saved
+    try:
+        planning_request, plan = content_plan.handoff(SCRIPT_DIR.parent, workspace, reference, bundle, governing)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        return {**base, "status": "blocked", "stage": "content_plan_response", "findings": [{"issue": str(exc)}]}
+    if plan is None:
+        return {**base, "status": "awaiting_hermes", "stage": "content_planning",
+                "requests": ["content-plan/request.json"], "handoffs": [{"request_path": "content-plan/request.json",
+                    "response_path": planning_request["response_path"], "task": planning_request["task"], "batch_id": planning_request["batch_id"]}]}
+    reference = content_plan.with_plan(reference, plan)
     # Invalid response JSON can be corrected manually without invoking any
     # content reviewer or automatic drafting/repair loop.
     for rejected in (workspace / "hermes/rejected").glob("*.json"):

@@ -19,7 +19,17 @@ From this skill's folder, after approval:
 ```
 
 When the result is `awaiting_hermes`, `workspace` is the absolute base directory
-for every returned `requests` and `handoffs` path. For each request:
+for every returned `requests` and `handoffs` path.
+
+The first handoff has `task: document_content_planning`. Read its complete JSON
+and follow [ai-content-plan.md](ai-content-plan.md). Return the exact source-bound
+planning response to its response_path, then rerun generation. Planning receives
+the full approved source, selected template text/tables, consent comments,
+authorized clauses and explicit output shapes. AI decides every content surface;
+code checks shape and identity only. An accepted plan is immutable within an
+attempt. Later section requests share that exact plan and the full source.
+
+For each subsequent section-drafting request:
 
 1. Read the complete JSON. In `generation_only_prompts`, follow
    `adapter_instructions`, ICF `consent_template_comments`, and target-specific `editorial_corrections`, then the
@@ -43,17 +53,10 @@ for every returned `requests` and `handoffs` path. For each request:
    when useful for manual inspection. Interpretation bookkeeping is optional.
    A list group may include `label`, rendered as an unbulleted paragraph before
    its items. Use separate labeled groups for secondary and exploratory endpoints.
-   In `evaluation-procedures`, compare each supplied assessment note with the
-   structured table. Move non-activity qualifications into nonempty adjacent
-   notes using `assessment_presentation.qualifiers` (exact `source_text`,
-   participant-readable `display_text`, and factual `rationale`). Retain the
-   assessment name, conditions and timing. Keep actual assessments and staff
-   tasks in their assigned columns. Use `assessment_presentation.notes` edits to omit a wholly
-   redundant note (`display_text: ""`) or shorten it to its unique instructions.
-   Each edit cites exact `source_text` and explains its `rationale`. Preserve
-   every additional condition, measurement, timing rule and safety fact.
-   Compare safety notes with the supplied `related_source` context too: general
-   risks belong in the safety/risks sections; retain unique assessment instructions.
+   Follow `content_plan` for tables, notes, conditional clauses, optional
+   sections and shared bibliography; those complete planned values are rendered
+   separately. Put clinical interpretation and repetition decisions in the plan,
+   rather than asking the assembler to infer relationships or edit table notes.
    Draft each complete section; assembly preserves accepted prose without
    adding, rewriting or deduplicating sentences. For `icf.withdrawal`, include
    the applicable fixed voluntary-participation paragraph once plus all supplied
@@ -101,7 +104,8 @@ An office failure returns `stage: office_field_refresh` with construction feedba
 without starting a retry loop or publishing files with invented page numbers.
 The recorded renderer, before/after hashes and pagination-PDF hash stay internal
 in `office-field-refresh.json`. Completed results reuse their saved files.
-The current source-driven table and XML builders still preserve their structure;
+Native table and XML builders preserve structure and render the explicit AI plan;
+legacy source-interpreting builders are outside the active generation path;
 legacy workflow constants and external Google Docs/Gmail actions are excluded.
 Prompts, responses, merged drafts and assembly records remain in `workspace`.
 Changing the generation authority starts a separate attempt; use a new run folder

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from content_plan import plan_for, REPEATED as PLANNED_REPEATED
+
 import copy
 import hashlib
 import json
@@ -873,6 +875,49 @@ def quality_report(path: Path, reference: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+
+def _generate_planned(template_path: Path, output_path: Path, plan: Mapping[str, Any], narrative: Mapping[str, Any]) -> dict[str, Any]:
+    """Serialize an AI-owned PRS record using the governed element order."""
+    tree = ET.parse(template_path)
+    study = _study(tree.getroot())
+    selected = plan["xml"]
+    design = study.find("study_design")
+    for child in list(design):
+        if child.tag in {"observational_design", "interventional_design"} and child.tag != selected["design_branch"]:
+            design.remove(child)
+    for tag in PLANNED_REPEATED:
+        records = selected["repeated"][tag]
+        for node, record in zip(_resize(study, tag, len(records)), records):
+            for path, text in record.items():
+                if isinstance(text, list):
+                    prototype = node.find(path)
+                    position = list(node).index(prototype)
+                    node.remove(prototype)
+                    for index, value in enumerate(text):
+                        child = copy.deepcopy(prototype)
+                        child.text = value
+                        node.insert(position + index, child)
+                else:
+                    _set(node, path, text)
+    for path, text in selected["scalars"].items():
+        _set(study, path, text)
+    # Narrative sections are authored after the shared plan; placement is fixed,
+    # and empty narratives never cause a fallback to source-derived prose.
+    for key, path in (("brief_summary", "brief_summary/textblock"), ("detailed_description", "detailed_description/textblock")):
+        if key in narrative:
+            value = narrative[key]
+            _set(study, path, value["text"] if isinstance(value, Mapping) else value)
+    # Remove template control markers in container text/tails, not AI leaf values.
+    for node in study.iter():
+        if len(node):
+            node.text = None
+        node.tail = None
+    # Only XML whitespace, namespace, escaping and child order belong to code.
+    ET.indent(tree, space="  ")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    tree.write(output_path, encoding="utf-8", xml_declaration=True)
+    return {"artifact": "xml", "path": output_path.name, "status": "unreviewed", "findings": []}
+
 def generate(
     template_path: Path,
     output_path: Path,
@@ -882,6 +927,8 @@ def generate(
     structural_template: Path | None = None,
     check_output: bool = True,
 ) -> dict[str, Any]:
+    if (plan := plan_for(reference)) is not None:
+        return _generate_planned(template_path, output_path, plan, narrative)
     tree = ET.parse(template_path); root = tree.getroot(); study = _study(root)
     study_type = _text(get_path(reference, "regulatory.prs.study_type")).casefold()
     design = study.find("study_design")

@@ -45,10 +45,13 @@ Prospective/Ambispective use the approved Advarra or Sterling selection and
 Retrospective uses [retrospective-required-inputs.md](references/retrospective-required-inputs.md).
 Keep source facts distinct from template examples. Use retained n8n prompts plus
 Brad's corrections for matching sections; draft additional sections from supplied
-study facts. AI owns each complete requested section, including applicable supplied
-boilerplate; assembly preserves accepted prose and lists without completing or
-rewriting them. Current templates own retained fixed clauses, source-field
-mappings, headings and formatting.
+study facts. AI first produces the shared [content plan](references/ai-content-plan.md) from
+the entire approved source and selected templates. AI owns clinical applicability,
+retained/conditional clauses, optional sections, display fields, tables/notes,
+bibliography and XML values as well as every complete drafted section. Code
+renders the explicit plan and accepted prose; it owns native structure, styles,
+numbering, cross-references, TOC and file integrity. It supplies no clinical
+fallbacks, inferred activities, deduplication or prose completion.
 
 ## Run directory policy
 

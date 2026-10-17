@@ -38,7 +38,7 @@ def test_public_generate_command_uses_experimental_drafting(tmp_path, extra_args
     assert result["mode"] == "generation_only"
     assert result["status"] == "awaiting_hermes"
     assert result["handoffs"]
-    assert all(item["task"] in {"section_drafting", "prs_narrative_drafting"}
+    assert all(item["task"] in {"section_drafting", "prs_narrative_drafting", "document_content_planning"}
                for item in result["handoffs"])
 
 
@@ -60,8 +60,12 @@ def complete(path):
         workspace = Path(result["workspace"])
         for relative in result["requests"]:
             request = json.loads((workspace / relative).read_text())
-            assert request["task"] in {"section_drafting", "prs_narrative_drafting"}
-            response = drafting.recorded_acceptance_response(request)
+            assert request["task"] in {"section_drafting", "prs_narrative_drafting", "document_content_planning"}
+            if request["task"] == "document_content_planning":
+                from test_ai_content_plan import plan_response
+                response = plan_response(request)
+            else:
+                response = drafting.recorded_acceptance_response(request)
             (workspace / request["response_path"]).write_text(json.dumps(response))
         result = workflow.generate_only(path)
     pytest.fail(f"Experiment did not finish: {result}")
@@ -142,6 +146,9 @@ def test_existing_output_is_preserved(tmp_path):
 def test_n8n_prompts_keep_original_messages_and_resolve_inputs(tmp_path):
     approved_run(tmp_path)
     result = workflow.generate_only(tmp_path)
+    from test_ai_content_plan import accept_plan
+    accept_plan(result)
+    result = workflow.generate_only(tmp_path)
     workspace = Path(result["workspace"])
     library = json.loads((ROOT / "references/generation-only-n8n-prompts.json").read_text())
     mapped, fallback = set(), set()
@@ -187,6 +194,9 @@ def test_prompt_inputs_preserve_approved_articles_and_regulatory_aliases():
 
 def test_response_shape_can_be_fixed_without_a_review_or_repair_loop(tmp_path):
     approved_run(tmp_path)
+    result = workflow.generate_only(tmp_path)
+    from test_ai_content_plan import accept_plan
+    accept_plan(result)
     result = workflow.generate_only(tmp_path)
     workspace = Path(result["workspace"])
     request = json.loads((workspace / result["requests"][0]).read_text())
