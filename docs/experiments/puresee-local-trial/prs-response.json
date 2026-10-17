@@ -1,0 +1,37 @@
+{
+  "schema_version": "hermes-response/v2",
+  "request_id": "r-e5510f960b89.draft.prs-narrative.generation-only.a1.d64a6241",
+  "request_sha256": "c85c4566f91df298dca908a7fa3f732dc96d4431ab04d1dd00cec067463dd515",
+  "revision_id": "r-e5510f960b89",
+  "task": "prs_narrative_drafting",
+  "batch_id": "prs-narrative",
+  "producer": {
+    "model_id": "Codex-current-conversation-local-drafting-trial"
+  },
+  "narrative": {
+    "brief_summary": {
+      "text": "This prospective observational study will describe vision, satisfaction and visual disturbances after cataract surgery with a PureSee intraocular lens in the dominant eye and an Odyssey lens in the non-dominant eye. Forty adult participants will be followed through a 3-month postoperative assessment. The main measurement is binocular distance-corrected intermediate visual acuity at 66 cm. The study has one cohort, no control group and no randomized treatment assignment.",
+      "evidence_refs": [
+        "study.title",
+        "design.study_design",
+        "population.sample_size",
+        "endpoints.primary"
+      ]
+    },
+    "detailed_description": {
+      "text": "PureSee is a non-diffractive extended depth of focus intraocular lens, and Odyssey is a trifocal/full-range-of-vision intraocular lens. The study will evaluate the hypothesis that their mix-and-match use provides good vision across distances, high satisfaction and few visual disturbances. These expected outcomes are not established benefits of the combination.\n\nOne site will include 40 adults undergoing age-related cataract surgery. Preoperative screening includes informed consent, demographics and medical history. The operative phase consists of one visit per eye for the clinical cataract surgery and lens implantation being observed.\n\nAt 3 months postoperative, binocular photopic visual acuity is measured without correction and with distance correction at distance, 66 cm intermediate and 40 cm near. Binocular distance-corrected intermediate acuity at 66 cm is the primary outcome. Secondary outcomes are mean binocular CDVA, UIVA at 66 cm, UDVA, DCNVA at 40 cm and UNVA at 40 cm; the binocular distance-corrected defocus curve from +1.0 D through -2.50 D; and percentages of responses to each AIOLIS questionnaire question. Adverse events and device deficiencies are monitored, and an exit form is completed at that assessment.\n\nThe descriptive analysis reports available observations and does not impute missing values. The enrollment target allows for dropout from the estimated 35 participants needed to characterize performance. There is no control cohort, and observed outcomes cannot establish comparative superiority.",
+      "evidence_refs": [
+        "study.hypothesis",
+        "design.study_design",
+        "design.number_of_sites",
+        "population.sample_size",
+        "population.sample_justification",
+        "procedures.assessments",
+        "procedures.visit_schedule",
+        "endpoints.primary",
+        "endpoints.secondary",
+        "statistics.analysis_plan"
+      ]
+    }
+  }
+}

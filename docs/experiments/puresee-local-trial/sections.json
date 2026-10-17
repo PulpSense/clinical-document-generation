@@ -1,0 +1,794 @@
+{
+  "provenance": "Actual Codex-authored drafts in the current conversation, using public current requests and owner-authorized reused test operations. No separate Hermes inference or client approval.",
+  "sections": [
+    {
+      "section_id": "introduction",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Presbyopia-correcting intraocular lenses offer approaches to vision at different distances after cataract surgery. Reports on the TECNIS Odyssey full-range-of-vision IOL describe visual acuity and spectacle independence at distance, intermediate and near.[1,2] TECNIS PureSee is a non-diffractive extended depth of focus (EDOF) IOL. Its design may reduce dysphotopsias and improve contrast sensitivity compared with diffractive designs. A randomized trial reported better intermediate and near vision than a monofocal control, with similar contrast sensitivity, distance vision and dysphotopsia profiles.[3]",
+          "evidence_refs": [
+            "study.background",
+            "study.references"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "Using an EDOF lens in the dominant eye and a trifocal lens in the non-dominant eye may offer a wider range of vision with fewer visual disturbances. Data on the PureSee/Odyssey combination remain limited. Evidence on the individual lenses does not establish the outcomes of their combined use, supporting prospective assessment of binocular vision and patient experience.",
+          "evidence_refs": [
+            "study.background",
+            "study.references"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "objectives",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Evaluate distance, intermediate and near visual outcomes, patient satisfaction and patient-reported visual disturbances after mix-and-match implantation of PureSee and Odyssey intraocular lenses.",
+          "evidence_refs": [
+            "objectives.primary"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "subjects.population",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The study will include 40 adult participants undergoing age-related cataract surgery, with bilateral participation. Participants must meet the inclusion and exclusion criteria; the cohort count refers to people, not eyes.",
+          "evidence_refs": [
+            "population.study_population",
+            "population.sample_size"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "subjects.inclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Adult patients undergoing age-related cataract surgery."
+          ],
+          "evidence_refs": [
+            "population.inclusion_criteria"
+          ],
+          "boilerplate_refs": []
+        }
+      ]
+    },
+    {
+      "section_id": "subjects.exclusion",
+      "outcome": "drafted",
+      "paragraphs": [],
+      "lists": [
+        {
+          "items": [
+            "Any moderate-to-severe disease state that the surgeon deems could increase the risk of complicated cataract surgery, including pseudoexfoliation syndrome, zonular dehiscence, history of eye trauma and prior refractive surgery.",
+            "Participation in another interventional clinical study during the 30 days before screening."
+          ],
+          "evidence_refs": [
+            "population.exclusion_criteria"
+          ],
+          "boilerplate_refs": []
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.design",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This investigator-initiated, single-site prospective observational study follows one cohort of 40 participants undergoing bilateral mix-and-match implantation: TECNIS PureSee, a non-diffractive EDOF IOL, in the dominant eye and TECNIS Odyssey, a trifocal/full-range-of-vision IOL, in the non-dominant eye. There is no control arm or randomized treatment assignment. Clinical lens implantation is observed rather than assigned by the research.",
+          "evidence_refs": [
+            "design.study_design",
+            "design.intervention_description",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "The hypothesis is that the combination will provide excellent distance, intermediate and near vision, high patient satisfaction and few visual disturbances. These are expected outcomes to be evaluated, not established benefits. All endpoints below are assessed at 3 months postoperative. The primary endpoint is binocular distance-corrected intermediate visual acuity (DCIVA) at 66 cm.",
+          "evidence_refs": [
+            "design.study_design",
+            "design.intervention_description",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": [
+        {
+          "label": "Secondary endpoints",
+          "items": [
+            "Mean binocular corrected distance visual acuity (CDVA).",
+            "Mean binocular uncorrected intermediate visual acuity (UIVA) at 66 cm.",
+            "Mean binocular uncorrected distance visual acuity (UDVA).",
+            "Mean binocular distance-corrected near visual acuity (DCNVA) at 40 cm.",
+            "Mean binocular uncorrected near visual acuity (UNVA) at 40 cm.",
+            "Binocular distance-corrected defocus curve from +1.0 D through -2.50 D.",
+            "Percentages of participant responses to each AIOLIS questionnaire question."
+          ],
+          "evidence_refs": [
+            "design.study_design",
+            "design.intervention_description",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        }
+      ]
+    },
+    {
+      "section_id": "study-design.bias",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Apply consistent eligibility criteria, predefined assessments and the descriptive analysis plan. Study Methods and Measurements specifies the common binocular photopic assessments. Without a control arm, these observations cannot establish superiority over bilateral implantation of either lens alone.",
+          "evidence_refs": [
+            "design.study_design"
+          ],
+          "boilerplate_refs": [
+            "bias"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.consent",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Written informed consent will be obtained before any study-specific prospective procedure. The consent discussion and signed form will be documented in the study records.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "consent"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.visits",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The schedule has three phases and four encounters: preoperative screening, an operative visit for each eye, and the Month 3 postoperative assessment.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "At preoperative screening, obtain informed consent before study-specific activities and collect demographics and medical history.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "At the operative phase, cataract surgery and lens implantation occur at one visit per eye, with PureSee in the dominant eye and Odyssey in the non-dominant eye. These are the clinical procedures observed by the study.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "At Month 3 postoperative, complete the binocular vision assessments and AIOLIS questionnaire described in Study Methods and Measurements, monitor adverse events and device deficiencies, and complete the exit form.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.measurements",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "At 3 months postoperative, measure binocular photopic visual acuity without correction and with distance correction at distance, intermediate (66 cm) and near (40 cm). These measurements provide UDVA, CDVA, UIVA, DCIVA, UNVA and DCNVA; distance-corrected intermediate acuity at 66 cm provides the primary measurement.",
+          "evidence_refs": [
+            "procedures.methods",
+            "procedures.assessment_details",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "Obtain the binocular distance-corrected defocus curve from +1.0 D through -2.50 D. Administer the Assessment of IntraOcular Lens Implant Symptoms (AIOLIS) questionnaire to collect participant-reported lens symptoms and experience; summarize responses separately for each question.",
+          "evidence_refs": [
+            "procedures.methods",
+            "procedures.assessment_details",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.unscheduled",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Any unscheduled study contact is limited to the activities permitted by this protocol. Its reason and any activities performed are documented in the study records.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "unscheduled"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "study-procedure.discontinued",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "A participant may stop taking part at any time. Information collected before withdrawal may remain in the study records and may be included in the analysis as permitted by the consent and applicable requirements.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "discontinued-subjects"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "evaluation-procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The scheduled phases and study assessments are shown in Table 15.1.",
+          "evidence_refs": [
+            "procedures.visit_schedule"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": [],
+      "assessment_presentation": {
+        "notes": [
+          {
+            "source_text": "Screening: informed consent, demographics and medical history. One operative visit per eye. At 3 months postoperative, binocular uncorrected and distance-corrected photopic visual acuity at distance, 66 cm intermediate and 40 cm near, binocular distance-corrected defocus curve (+1.0 D through -2.50 D), AIOLIS questionnaire, monitoring of adverse events and device deficiencies, and exit form completion.",
+            "display_text": "The binocular distance-corrected defocus curve spans +1.0 D through -2.50 D.",
+            "rationale": "All activity and phase assignments are in the matrix; retain the unique defocus bounds as a brief note."
+          },
+          {
+            "source_text": "Monitor adverse events and device deficiencies at the 3-month postoperative assessment.",
+            "display_text": "",
+            "rationale": "The adverse-event/device-deficiency row already explicitly assigns this activity to Month 3 postoperative."
+          }
+        ]
+      }
+    },
+    {
+      "section_id": "endpoint-criteria.completion",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Planned participant follow-up extends through the Month 3 postoperative assessment; early discontinuation is a separate disposition.",
+          "evidence_refs": [
+            "study.timeline"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "endpoint-criteria.discontinuation",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "A participant may discontinue participation at any time without penalty or loss of benefits to which the participant is otherwise entitled. The study team may document the reason when the participant chooses to provide one, and information collected before withdrawal may continue to be used as permitted by the consent and applicable requirements.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "discontinuation"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "endpoint-criteria.study-completion",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The planned study phases allow 6 months for enrollment, 3 months for follow-up and 1 month for data analysis.",
+          "evidence_refs": [
+            "study.timeline"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "analysis-plan.datasets",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Use available observations for each measurement at its specified time point, reporting the contributing number of participants for every summary. Missing values will not be imputed. Safety summaries use the safety information collected through the planned assessments.",
+          "evidence_refs": [
+            "statistics.analysis_plan"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "analysis-plan.methodology",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "At 3 months postoperative, summarize the primary binocular DCIVA at 66 cm and each secondary visual-acuity measurement using the number of observations, mean, standard deviation, median, minimum and maximum. Summarize the binocular distance-corrected defocus curve across its +1.0 D to -2.50 D range using the same descriptive statistics.",
+          "evidence_refs": [
+            "statistics.analysis_plan",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "Report counts and percentages for each AIOLIS question, with the available-response denominator for that question. Where baseline and follow-up measurements exist, summarize observed changes descriptively; this analysis provision does not add baseline assessments to the visit schedule.",
+          "evidence_refs": [
+            "statistics.analysis_plan",
+            "endpoints.primary",
+            "endpoints.secondary"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "analysis-plan.considerations",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Interpret results descriptively. No inferential hypothesis tests, formal power claims or multiplicity adjustments are planned.",
+          "evidence_refs": [
+            "statistics.analysis_plan"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "sample-size",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "An estimated 35 participants will characterize performance of the PureSee/Odyssey mix-and-match approach; planned enrollment is increased to 40 to account for dropout. The supporting sample-size reference is Hacopian et al.[1] This is a descriptive sample justification, not a formal power calculation.",
+          "evidence_refs": [
+            "population.sample_size",
+            "population.sample_justification"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "confidentiality-publication",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Study results may be presented or published only in a form that protects participant confidentiality and follows the approved publication and data-governance requirements.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "publication"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "quality-safety.general",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "An adverse event is an unfavorable medical occurrence reported during study participation, whether or not it is considered related to a study activity. A serious adverse event is an event that results in death, is life-threatening, requires or prolongs inpatient hospitalization, causes persistent or significant disability, or is an important medical event. A device quality complaint is a reported concern about the identity, quality, durability, reliability, safety, effectiveness, or performance of the study device.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "safety-general"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "quality-safety.monitoring",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Monitor adverse events and device deficiencies at the Month 3 postoperative assessment.",
+          "evidence_refs": [
+            "safety.monitoring"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "quality-safety.reporting",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "The investigator will review reported events for seriousness and possible relationship to study activities or the study device. Serious events and device quality complaints will be communicated to the sponsor and reviewing ethics committee within the timelines required by the applicable approved procedures and governing requirements.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "safety-reporting"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "quality-safety.follow-up",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Any planned follow-up of safety events or quality complaints follows the study procedures and collection period described in this protocol.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "safety-followup"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "quality-safety.analysis",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Safety information available in the study data is summarized descriptively.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "safety-analysis"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "ethics",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Example Independent Review Board, an independent ethics review organization, is the designated review body. The study has not been submitted for IRB review; no approval is represented. Written informed consent will be obtained at preoperative screening before study-specific activities.",
+          "evidence_refs": [
+            "parties.irb",
+            "ethics"
+          ],
+          "boilerplate_refs": [
+            "ethics"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "ethics.confidentiality",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Confidentiality protections for study records and participant information are described in Section 16.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "confidentiality-cross-reference"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "confidentiality",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Study records will be kept confidential.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "confidentiality"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "financial-injury",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "No participant compensation, travel reimbursement or other payment is planned.",
+          "evidence_refs": [
+            "risks_benefits.compensation_or_reimbursement"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "risks-benefits.risks",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Participation may involve inconvenience or discomfort associated with the study procedures described in this protocol, as well as a risk of loss of confidentiality.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "protocol-sparse-risks"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "risks-benefits.benefits",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The hoped-for visual performance, satisfaction and low frequency of visual disturbances remain hypotheses. Participants may receive no direct benefit; the study may improve understanding of outcomes after this lens combination.",
+          "evidence_refs": [
+            "risks_benefits.benefits"
+          ],
+          "boilerplate_refs": [
+            "protocol-sparse-benefits"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.study-purpose",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Different artificial lenses can help vision at different distances after cataract surgery. Little is known about using PureSee in the dominant eye and Odyssey in the other eye. This study will examine your vision, satisfaction and visual disturbances after that combination. Researchers expect good vision and satisfaction with few disturbances, but these results are uncertain. There is no control group or random assignment. The main measurement is how clearly you see with both eyes together at an intermediate distance of 66 centimeters, with correction for distance vision, 3 months after surgery.",
+          "evidence_refs": [
+            "study.background",
+            "objectives.primary",
+            "study.hypothesis",
+            "endpoints.primary"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.procedures",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "This study is for adults having surgery for age-related cataracts. You cannot take part if your surgeon considers that a moderate or severe condition could increase the risk of complicated cataract surgery. Examples include deposits in the eye called pseudoexfoliation, weakness or separation of the fibers supporting the lens, a history of eye injury, and previous surgery to correct vision. You must not have taken part in another interventional clinical study during the 30 days before screening.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details",
+            "design.intervention_description",
+            "population.inclusion_criteria",
+            "population.exclusion_criteria",
+            "procedures.minimum_days_before_screening_without_participation"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "If you meet the inclusion and exclusion criteria and are enrolled in the study, there are four encounters across the screening, operative and postoperative phases. Cataract surgery and lens implantation are the clinical care being observed; the vision measurements and questionnaire study your outcomes. Details are indicated below:",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details",
+            "design.intervention_description",
+            "population.inclusion_criteria",
+            "population.exclusion_criteria",
+            "procedures.minimum_days_before_screening_without_participation"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "Preoperative screening, before surgery: You will review and sign the consent form before study-specific activities. Staff will collect general information about you and your medical history.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details",
+            "design.intervention_description",
+            "population.inclusion_criteria",
+            "population.exclusion_criteria",
+            "procedures.minimum_days_before_screening_without_participation"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "Operative (one visit per eye): At two separate operative visits, you will have cataract surgery with PureSee implanted in your dominant eye and Odyssey in your non-dominant eye. PureSee is an extended depth of focus artificial lens, and Odyssey is a trifocal artificial lens. The study observes this lens combination without randomly assigning treatment.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details",
+            "design.intervention_description",
+            "population.inclusion_criteria",
+            "population.exclusion_criteria",
+            "procedures.minimum_days_before_screening_without_participation"
+          ],
+          "boilerplate_refs": []
+        },
+        {
+          "text": "Month 3 postoperative, 3 months after surgery: Staff will test vision with both eyes together under bright lighting, at distance, at an intermediate distance of 66 centimeters and at a near distance of 40 centimeters. Testing at each distance is performed without correction and with correction for distance vision. A distance-corrected defocus curve tests how clearly you see through a series of lenses representing different focusing distances. You will answer the AIOLIS questionnaire about your experience with the lenses. Staff will also check for health problems and problems with the lenses and complete the exit form.",
+          "evidence_refs": [
+            "procedures.assessments",
+            "procedures.visit_schedule",
+            "procedures.assessment_details",
+            "design.intervention_description",
+            "population.inclusion_criteria",
+            "population.exclusion_criteria",
+            "procedures.minimum_days_before_screening_without_participation"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.duration",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "The study expects to include 40 participants. Your participation starts with preoperative screening and continues through the final assessment 3 months after surgery.",
+          "evidence_refs": [
+            "population.sample_size",
+            "study.participation_duration"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.risks",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Taking part may involve inconvenience or discomfort from the study procedures described in this consent form. There is also a risk that private information could be disclosed, although safeguards will be used to protect it.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "icf-sparse-risks"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.benefits",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "Researchers hope this lens combination will provide good vision at different distances, high satisfaction and few visual disturbances. These benefits are uncertain, and taking part may not help you. What is learned may help researchers understand outcomes after this combination.",
+          "evidence_refs": [
+            "risks_benefits.benefits"
+          ],
+          "boilerplate_refs": [
+            "icf-sparse-benefits"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.payment",
+      "outcome": "drafted",
+      "paragraphs": [
+        {
+          "text": "No payment, travel reimbursement or other compensation is planned for taking part in this study.",
+          "evidence_refs": [
+            "risks_benefits.compensation_or_reimbursement"
+          ],
+          "boilerplate_refs": []
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.costs",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Before you sign this form, the study team will explain whether any costs are associated with the research activities and which costs, if any, are your responsibility.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "costs"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.alternatives",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Participation is voluntary. You may choose not to participate and may discuss available care options with your treating clinician.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "alternatives"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.privacy",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "By signing this form, you authorize the study team to collect, use, and disclose the medical and study information described in this form for this research. Authorized representatives of the sponsor, reviewing ethics committee, and regulatory authorities may review this information as permitted by applicable requirements. Reports and publications will not identify you.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "icf-privacy-authorization"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.injury",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "If you believe that a study activity caused an injury or medical problem, contact the study doctor promptly using the contact information in this form. Seek emergency care when needed. The study team will explain available care and any responsibility for related costs. Signing this form does not waive your legal rights.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "injury"
+          ]
+        }
+      ],
+      "lists": []
+    },
+    {
+      "section_id": "icf.withdrawal",
+      "outcome": "fixed_boilerplate",
+      "paragraphs": [
+        {
+          "text": "Taking part is voluntary. You may refuse to participate or leave the study at any time without penalty or loss of benefits to which you are otherwise entitled. Tell the study doctor or study staff if you decide to leave. Discuss with the study doctor whether any follow-up care or testing would help evaluate side effects or other medical problems. Information collected before withdrawal may continue to be used as permitted by this consent and applicable requirements.",
+          "evidence_refs": [],
+          "boilerplate_refs": [
+            "icf-withdrawal"
+          ]
+        }
+      ],
+      "lists": []
+    }
+  ]
+}

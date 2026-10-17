@@ -863,3 +863,28 @@ were added. These are controlled local regression results, not fresh Hermes
 inference or new approval of old incomplete runs. Final Hermes confirmation
 and review of its entire-run ZIP remain pending. GLIDE exercises a full
 DOCX/ICF/XML package; CAPS specifically confirms retrospective method ownership.
+
+### CAPS Hermes confirmation and Brad synopsis local trial — 17 October 2026
+
+CAPS archive `Recorded-Vision-After-Routine-Laser-Capsulotomy__Retrospective__2026-10-17.zip`
+(SHA-256 `f61ae37130031214968d9d15de07604017a698d20dbf799684ff353dff1ff672`)
+records f6d38e5, current v2.52/v32 request hashes and a matching protocol receipt.
+All nine pages were inspected; all 21 TOC references match. Full retrospective
+selection/measurement, denominator, completion and access-restoration rules are
+present in section 8.1. Minor repetition, a duplicate MD and awkward shorthand
+for absent pressure data are not material blockers at the owner's threshold.
+The archive records fresh intake and subsequent client approval rather than
+reuse of an older source. This confirms the retrospective method fix in actual
+Hermes output; it does not exercise XML.
+
+The owner then supplied Brad's PureSee/Odyssey synopsis for a local full-package
+trial and explicitly authorized reuse of the earlier test operations supplement.
+See `puresee-local-trial/README.md` and its retained source/draft/results records.
+Final Protocol 12 pages, Advarra ICF four pages, 44/44 TOC matches, XML structural
+check passes with one primary and seven secondary outcomes. Content and all pages
+were reviewed. Local source/draft cleanup uses current supported instructions.
+Issue #118 fixes an actual trailing ICF spacer that produced a header-only page;
+20 focused tests pass, both code-review axes have no findings. No production
+prompts or Linux runtime were changed. This is a controlled Codex local run,
+not new Hermes inference. The next confirmation is Hermes on Brad's input plus
+the authorized operational supplement, retaining its entire run ZIP.
